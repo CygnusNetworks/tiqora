@@ -228,7 +228,8 @@ def extract_forwarded_sender(
     plain reply chain is not a forward, and guessing there would rewrite the
     customer of ordinary correspondence. ``exclude`` holds addresses that
     can never be the answer (the forwarder's own address, system/queue
-    addresses); comparison is case-insensitive.
+    addresses). Raw ``From:`` headers are parseaddr-normalized; comparison
+    is case-insensitive.
     """
     if not body:
         return None
@@ -238,7 +239,12 @@ def extract_forwarded_sender(
     if not positions:
         return None
 
-    blocked = {a.strip().lower() for a in exclude if a and a.strip()}
+    blocked: set[str] = set()
+    for raw in exclude:
+        if not raw or not str(raw).strip():
+            continue
+        parsed = _address_from_line(str(raw).strip())
+        blocked.add(parsed or str(raw).strip().lower())
     found: list[str] = []
     for pos in positions:
         block = normalised[pos:].splitlines()[1 : _HEADER_BLOCK_LINES + 1]
@@ -428,14 +434,14 @@ def build_route_tool(candidates: Sequence[QueueCandidate]) -> dict[str, Any]:
 def build_user_message(
     *,
     ticket: TicketSnapshot,
-    article: ArticleSnapshot,
     candidates: Sequence[QueueCandidate],
     subject: str,
     body: str,
+    from_address: str,
 ) -> str:
     lines = [
         f"Betreff: {subject}",
-        f"Von: {article.from_address or '(unbekannt)'}",
+        f"Von: {from_address}",
         f"Aktuelle Queue: {ticket.queue_name or ticket.queue_id}",
         "",
         "--- Nachricht ---",
@@ -499,8 +505,8 @@ async def decide(
     """Run the triage model ``samples`` times and fold the votes together.
 
     ``mask`` (the run's :class:`~tiqora.ai.pii.PiiMapper` ``mask``) is
-    applied to the subject and body only — never to the queue descriptions,
-    which are admin-authored config, not customer data.
+    applied to the subject, From header and body — never to the queue
+    descriptions, which are admin-authored config, not customer data.
     """
     run_id = run_id or uuid.uuid4().hex
     k = max(1, int(samples if samples is not None else policy.triage_samples))
@@ -532,6 +538,7 @@ async def decide(
     apply_mask = mask or (lambda value: value or "")
     subject = apply_mask(article.subject or ticket.title)
     body = apply_mask(_truncate_body(article.body))
+    from_address = apply_mask(article.from_address) if article.from_address else "(unbekannt)"
 
     messages = [
         LlmMessage(role="system", content=_SYSTEM_PROMPT),
@@ -539,10 +546,10 @@ async def decide(
             role="user",
             content=build_user_message(
                 ticket=ticket,
-                article=article,
                 candidates=candidates,
                 subject=subject,
                 body=body,
+                from_address=from_address,
             ),
         ),
     ]
@@ -680,6 +687,18 @@ async def _ticket_customer(session: AsyncSession, ticket_id: int) -> tuple[str |
     return row[0], row[1]
 
 
+async def _ticket_queue_id(session: AsyncSession, ticket_id: int) -> int | None:
+    row = (
+        await session.execute(
+            text("SELECT queue_id FROM ticket WHERE id = :tid LIMIT 1"),
+            {"tid": ticket_id},
+        )
+    ).first()
+    if row is None or row[0] is None:
+        return None
+    return int(row[0])
+
+
 MoveFn = Callable[[int], Awaitable[None]]
 SetCustomerFn = Callable[[str | None, str | None], Awaitable[None]]
 
@@ -714,6 +733,10 @@ async def apply_decision(
     Order matters: customer first, queue second. The other way round files
     the customer-change history against the new queue, and a failing
     ``set_customer`` would leave a ticket already moved.
+
+    The queue half re-reads ``ticket.queue_id`` at apply time: a proposal
+    can sit OPEN for hours, and a later human / GenericAgent / process
+    move must not be undone by accepting a stale row.
     """
     applied: list[str] = []
     old_customer_id, old_customer_user_id = await _ticket_customer(session, row.ticket_id)
@@ -758,8 +781,17 @@ async def apply_decision(
     old_queue_name = ""
     new_queue_name = ""
     if apply_queue and row.suggested_queue_id is not None:
-        if row.suggested_queue_id == row.source_queue_id:
+        current_queue_id = await _ticket_queue_id(session, row.ticket_id)
+        if current_queue_id == row.suggested_queue_id:
             logger.info("ai_triage_queue_noop", ticket_id=row.ticket_id)
+        elif current_queue_id != row.source_queue_id:
+            logger.info(
+                "ai_triage_queue_stale",
+                ticket_id=row.ticket_id,
+                current_queue_id=current_queue_id,
+                source_queue_id=row.source_queue_id,
+                suggested_queue_id=row.suggested_queue_id,
+            )
         else:
             old_queue_name = await _queue_name(session, row.source_queue_id)
             new_queue_name = await _queue_name(session, row.suggested_queue_id)

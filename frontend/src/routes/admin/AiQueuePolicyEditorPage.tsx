@@ -1753,13 +1753,22 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
 
         {tab === "triage" && (
           <div className="space-y-4">
+            {!gateOpen && (
+              <p
+                className="rounded-md border border-escalation/40 bg-escalation/10 p-2 text-xs text-escalation"
+                data-testid="admin-ai-queue-triage-gate-warning"
+              >
+                {t("admin.ai.queues.triageGateWarning")}
+              </p>
+            )}
             <label className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="checkbox"
                 data-testid="admin-ai-queue-form-enabled_triage"
                 checked={form.enabled_triage}
+                disabled={!gateOpen && !form.enabled_triage}
                 onChange={(e) => setField("enabled_triage", e.target.checked)}
-                className="rounded border-hairline"
+                className="rounded border-hairline disabled:cursor-not-allowed disabled:opacity-50"
               />
               {t("admin.ai.feature.triage")}
               <HelpPopover

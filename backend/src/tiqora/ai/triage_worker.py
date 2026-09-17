@@ -7,10 +7,10 @@ agent looks up ``get_queue_policy_by_queue(ticket.queue_id)`` for the same
 ``ArticleCreate`` event, so the answer is written under the *destination*
 queue's policy.
 
-Own watermark, own kill switch, deliberately separate from the auto-reply
-consumer. Like that one, the batch is drained and the watermark advanced
-even while triage is switched off or gated — otherwise turning it on would
-suddenly triage a backlog of tickets humans dealt with weeks ago.
+Own watermark, deliberately separate from the auto-reply consumer. Like
+that one, the batch is drained and the watermark advanced even while
+``operation_mode`` is not ``tiqora_primary`` — otherwise cutting over
+would suddenly triage a backlog of tickets humans dealt with weeks ago.
 
 **The watermark is never seeded to 0.** ``get_setting_int(..., 0)`` cannot
 tell a missing row from a stored zero, and that fallback would replay the
@@ -70,10 +70,8 @@ from tiqora.ai.senders import matches_ignored
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import (
-    KEY_AI_TRIAGE_ENABLED,
     KEY_AI_TRIAGE_WATERMARK,
     get_setting,
-    get_setting_bool,
     set_setting,
 )
 from tiqora.znuny.sysconfig import SysConfig
@@ -451,7 +449,6 @@ async def run_triage_tick(
             logger.info("ai_triage_watermark_seeded", watermark=start)
             return {"triage_seeded": start, "triage_events": 0, "triage_applied": 0}
         watermark = int(raw.strip())
-        enabled = await get_setting_bool(session, KEY_AI_TRIAGE_ENABLED, False)
         primary = await is_tiqora_primary(session)
         batch = await next_outbox_batch(session, watermark, OUTBOX_BATCH_SIZE)
 
@@ -460,7 +457,7 @@ async def run_triage_tick(
         "triage_applied": 0,
         "triage_suggested": 0,
         "triage_errors": 0,
-        "triage_enabled": int(enabled and primary),
+        "triage_enabled": int(primary),
     }
     last_id = watermark
 
@@ -469,9 +466,9 @@ async def run_triage_tick(
         totals["triage_events"] += 1
         if event.event_type != "ArticleCreate":
             continue
-        # Gated or switched off: the batch is still drained (watermark below)
-        # so re-enabling never triages a backlog.
-        if not enabled or not primary:
+        # Gated: the batch is still drained (watermark below) so cutting
+        # over to tiqora_primary never triages a backlog.
+        if not primary:
             continue
         try:
             async with factory() as session:

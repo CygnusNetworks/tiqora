@@ -716,7 +716,7 @@ const aiMcpToolPolicies: Record<number, unknown[]> = {
 // One policy per AI-enabled queue; the list page joins queue_id → queue name.
 function queuePolicy(over: Record<string, unknown>) {
   return {
-    id: 1, queue_id: 2, enabled_auto_reply: false, enabled_summary: true, enabled_manual_assist: true, enabled_refine: true,
+    id: 1, queue_id: 2, enabled_auto_reply: false, enabled_summary: true, enabled_manual_assist: true, enabled_refine: true, enabled_triage: false,
     system_prompt: "You are a support assistant for an IT service desk. Answer factually, in the customer's language, and never invent account details.",
     autonomy: "off", service_user_id: 1, llm_provider_id: 1, model_override: null,
     llm_fallback_json: JSON.stringify([{ provider_id: 2, model: null }]),
@@ -732,6 +732,10 @@ function queuePolicy(over: Record<string, unknown>) {
     ignored_senders: "noreply@,mailer-daemon@", ignore_senders_manual: false,
     reply_language_mode: "auto", reply_language_fixed: null, reply_language_default: "en",
     allowed_state_types: null, capabilities_json: null, summary_detail: "standard",
+    routing_description: null, triage_target_queue_ids: null,
+    triage_auto_threshold: 100, triage_suggest_threshold: 50, triage_samples: 3,
+    triage_customer_fix_enabled: false, triage_customer_fix_auto_threshold: 100,
+    triage_delay_reply: false, triage_llm_provider_id: null, triage_model_override: null,
     valid_id: 1, create_time: t0, change_time: t0,
     ...over,
   };

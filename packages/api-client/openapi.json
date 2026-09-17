@@ -3716,7 +3716,9 @@
               "summary",
               "auto_reply",
               "manual_assist",
-              "mcp"
+              "mcp",
+              "refine",
+              "triage"
             ],
             "title": "Feature",
             "type": "string"

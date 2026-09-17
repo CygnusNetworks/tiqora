@@ -37,7 +37,6 @@ from tiqora.ai.triage_worker import run_triage_tick
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.settings_store import (
-    KEY_AI_TRIAGE_ENABLED,
     KEY_AI_TRIAGE_WATERMARK,
     KEY_OPERATION_MODE,
     get_setting,
@@ -66,11 +65,10 @@ def _cleanup_triage_settings() -> Any:
         engine = create_engine(url)
         with engine.begin() as conn:
             conn.execute(
-                text("DELETE FROM tiqora_settings WHERE `key` IN (:k1, :k2, :k3)"),
+                text("DELETE FROM tiqora_settings WHERE `key` IN (:k1, :k2)"),
                 {
-                    "k1": KEY_AI_TRIAGE_ENABLED,
-                    "k2": KEY_AI_TRIAGE_WATERMARK,
-                    "k3": KEY_OPERATION_MODE,
+                    "k1": KEY_AI_TRIAGE_WATERMARK,
+                    "k2": KEY_OPERATION_MODE,
                 },
             )
         engine.dispose()
@@ -372,7 +370,6 @@ async def _setup_policies(
     target_description: str | None = NETADMIN_DESC,
 ) -> None:
     await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
-    await set_setting(session, KEY_AI_TRIAGE_ENABLED, "1")
     provider = await ai_providers.create_provider(
         session,
         settings=get_settings(),
@@ -502,10 +499,10 @@ async def test_first_tick_seeds_watermark_and_processes_nothing(
         _cleanup(mariadb_znuny_url, 1)
 
 
-async def test_disabled_still_drains_and_advances_watermark(
+async def test_parallel_still_drains_and_advances_watermark(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Switching triage back on must not triage a backlog."""
+    """Cutting over to tiqora_primary must not triage a backlog."""
     ids = _seed(mariadb_znuny_url, ns=2, created=datetime.now())
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -514,7 +511,7 @@ async def test_disabled_still_drains_and_advances_watermark(
     try:
         async with factory() as session:
             await _setup_policies(session, ids=ids)
-            await set_setting(session, KEY_AI_TRIAGE_ENABLED, "0")
+            await set_operation_mode(session, OPERATION_MODE_PARALLEL)
         await _reset_watermark(factory, mariadb_znuny_url)
 
         article_id = _add_article(
@@ -533,6 +530,8 @@ async def test_disabled_still_drains_and_advances_watermark(
             stored = await get_setting(session, KEY_AI_TRIAGE_WATERMARK)
         assert int(stored or 0) >= event_id
     finally:
+        async with factory() as session:
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
         await engine.dispose()
         _cleanup(mariadb_znuny_url, 2)
 

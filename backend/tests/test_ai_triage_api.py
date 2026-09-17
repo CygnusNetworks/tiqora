@@ -3,7 +3,7 @@
 ``triage`` field on ``GET /tickets/{id}/ai``.
 
 Reuses the seed/client helpers from ``test_ai_manual_draft_async.py`` (see its
-docstring for the ``ns`` registry); ns=75/76/77 — 74 is taken by
+docstring for the ``ns`` registry); ns=75–83 — 74 is taken by
 ``test_ai_resume.py``.
 """
 
@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tests.test_ai_manual_draft_async import (
@@ -114,6 +114,93 @@ async def _cleanup_triage(sync_url: str, ticket_id: int) -> None:
         )
         await conn.commit()
     await async_engine.dispose()
+
+
+def _ticket_queue(sync_url: str, ticket_id: int) -> int:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        value = conn.execute(
+            text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+        ).scalar()
+    engine.dispose()
+    return int(value or 0)
+
+
+def _add_group(sync_url: str, *, group_id: int, name: str) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM permission_groups WHERE id = :id"), {"id": group_id})
+        conn.execute(
+            text(
+                "INSERT INTO permission_groups (id, name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :name, 1, current_timestamp, 1, current_timestamp, 1)"
+            ),
+            {"id": group_id, "name": name},
+        )
+    engine.dispose()
+
+
+def _add_queue(sync_url: str, *, queue_id: int, group_id: int, name: str) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": queue_id})
+        conn.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :name, :gid, 1, 1, 1, 1, 0, 1,"
+                " current_timestamp, 1, current_timestamp, 1)"
+            ),
+            {"id": queue_id, "name": name, "gid": group_id},
+        )
+    engine.dispose()
+
+
+def _delete_queue(sync_url: str, queue_id: int) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM ticket_history WHERE queue_id = :qid"), {"qid": queue_id})
+        conn.execute(
+            text("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :qid"),
+            {"qid": queue_id},
+        )
+        conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": queue_id})
+    engine.dispose()
+
+
+def _delete_group(sync_url: str, group_id: int) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM group_user WHERE group_id = :gid"), {"gid": group_id})
+        conn.execute(text("DELETE FROM permission_groups WHERE id = :id"), {"id": group_id})
+    engine.dispose()
+
+
+def _grant_move_into(sync_url: str, *, agent_id: int, group_id: int) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO group_user (user_id, group_id, permission_key,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:uid, :gid, 'move_into', current_timestamp, 1,"
+                " current_timestamp, 1)"
+            ),
+            {"uid": agent_id, "gid": group_id},
+        )
+    engine.dispose()
+
+
+def _set_ticket_queue(sync_url: str, ticket_id: int, queue_id: int) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE ticket SET queue_id = :qid WHERE id = :tid"),
+            {"qid": queue_id, "tid": ticket_id},
+        )
+    engine.dispose()
 
 
 async def test_open_triage_is_exposed_on_the_state_route(
@@ -308,6 +395,146 @@ async def test_unknown_triage_id_is_404(
     finally:
         await client.aclose()
         await client_engine.dispose()
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
+
+
+async def test_accept_moves_into_a_queue_the_agent_can_enter(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed, client, client_engine = await _seed(mariadb_znuny_url, ns=81, monkeypatch=monkeypatch)
+    target_queue_id = seed["queue_id"] + 500
+    try:
+        _add_queue(
+            mariadb_znuny_url,
+            queue_id=target_queue_id,
+            group_id=_group_id(seed),
+            name=f"AiTriageTarget96{81}",
+        )
+        _grant_move_into(mariadb_znuny_url, agent_id=seed["agent_id"], group_id=_group_id(seed))
+        triage_id = await _insert_triage(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            source_queue_id=seed["queue_id"],
+            suggested_queue_id=target_queue_id,
+        )
+
+        resp = await client.post(
+            f"/api/v1/tickets/{seed['ticket_id']}/ai/triage/{triage_id}/accept",
+            json={"queue": True, "customer": False},
+        )
+        assert resp.status_code == 204
+        assert await _triage_status(mariadb_znuny_url, triage_id) == TRIAGE_STATUS_ACCEPTED
+        assert _ticket_queue(mariadb_znuny_url, seed["ticket_id"]) == target_queue_id
+    finally:
+        await _cleanup_triage(mariadb_znuny_url, seed["ticket_id"])
+        await client.aclose()
+        await client_engine.dispose()
+        _set_ticket_queue(mariadb_znuny_url, seed["ticket_id"], seed["queue_id"])
+        _delete_queue(mariadb_znuny_url, target_queue_id)
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
+
+
+async def test_accept_is_403_without_move_into_on_the_target(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``rw`` on the source group implies move_into there; the target must
+    live in a group the agent is not in."""
+    seed, client, client_engine = await _seed(mariadb_znuny_url, ns=82, monkeypatch=monkeypatch)
+    target_queue_id = seed["queue_id"] + 500
+    other_group_id = _group_id(seed) + 50
+    try:
+        _add_group(mariadb_znuny_url, group_id=other_group_id, name=f"AiTriageOtherGrp96{82}")
+        _add_queue(
+            mariadb_znuny_url,
+            queue_id=target_queue_id,
+            group_id=other_group_id,
+            name=f"AiTriageTarget96{82}",
+        )
+        _grant_move_into(mariadb_znuny_url, agent_id=seed["agent_id"], group_id=_group_id(seed))
+        triage_id = await _insert_triage(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            source_queue_id=seed["queue_id"],
+            suggested_queue_id=target_queue_id,
+        )
+
+        resp = await client.post(
+            f"/api/v1/tickets/{seed['ticket_id']}/ai/triage/{triage_id}/accept",
+            json={"queue": True, "customer": False},
+        )
+        assert resp.status_code == 403
+        assert await _triage_status(mariadb_znuny_url, triage_id) == TRIAGE_STATUS_OPEN
+        assert _ticket_queue(mariadb_znuny_url, seed["ticket_id"]) == seed["queue_id"]
+    finally:
+        await _cleanup_triage(mariadb_znuny_url, seed["ticket_id"])
+        await client.aclose()
+        await client_engine.dispose()
+        _delete_queue(mariadb_znuny_url, target_queue_id)
+        _delete_group(mariadb_znuny_url, other_group_id)
+        _cleanup_ticket(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            queue_id=seed["queue_id"],
+            agent_id=seed["agent_id"],
+            group_id=_group_id(seed),
+        )
+
+
+async def test_accept_does_not_undo_a_later_human_move(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An OPEN row can sit for hours; a later move must win."""
+    seed, client, client_engine = await _seed(mariadb_znuny_url, ns=83, monkeypatch=monkeypatch)
+    suggested_queue_id = seed["queue_id"] + 500
+    later_queue_id = seed["queue_id"] + 501
+    try:
+        _add_queue(
+            mariadb_znuny_url,
+            queue_id=suggested_queue_id,
+            group_id=_group_id(seed),
+            name=f"AiTriageSuggested96{83}",
+        )
+        _add_queue(
+            mariadb_znuny_url,
+            queue_id=later_queue_id,
+            group_id=_group_id(seed),
+            name=f"AiTriageLater96{83}",
+        )
+        _grant_move_into(mariadb_znuny_url, agent_id=seed["agent_id"], group_id=_group_id(seed))
+        triage_id = await _insert_triage(
+            mariadb_znuny_url,
+            ticket_id=seed["ticket_id"],
+            source_queue_id=seed["queue_id"],
+            suggested_queue_id=suggested_queue_id,
+        )
+        _set_ticket_queue(mariadb_znuny_url, seed["ticket_id"], later_queue_id)
+
+        resp = await client.post(
+            f"/api/v1/tickets/{seed['ticket_id']}/ai/triage/{triage_id}/accept",
+            json={"queue": True, "customer": False},
+        )
+        assert resp.status_code == 204
+        assert await _triage_status(mariadb_znuny_url, triage_id) == TRIAGE_STATUS_ACCEPTED
+        assert _ticket_queue(mariadb_znuny_url, seed["ticket_id"]) == later_queue_id
+    finally:
+        await _cleanup_triage(mariadb_znuny_url, seed["ticket_id"])
+        await client.aclose()
+        await client_engine.dispose()
+        _set_ticket_queue(mariadb_znuny_url, seed["ticket_id"], seed["queue_id"])
+        _delete_queue(mariadb_znuny_url, suggested_queue_id)
+        _delete_queue(mariadb_znuny_url, later_queue_id)
         _cleanup_ticket(
             mariadb_znuny_url,
             ticket_id=seed["ticket_id"],

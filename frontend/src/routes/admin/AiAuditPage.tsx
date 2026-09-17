@@ -923,6 +923,8 @@ export function AiAuditPage() {
     { value: "auto_reply", label: t("admin.ai.audit.feature.auto_reply") },
     { value: "vision", label: t("admin.ai.audit.feature.vision") },
     { value: "test", label: t("admin.ai.audit.feature.test") },
+    { value: "refine", label: t("admin.ai.audit.feature.refine") },
+    { value: "triage", label: t("admin.ai.audit.feature.triage") },
   ];
   const statusItems: SelectMenuItem<AuditRequestStatus | "">[] = [
     { value: "", label: t("admin.ai.audit.allStatuses") },

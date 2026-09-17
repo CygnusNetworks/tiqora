@@ -8,9 +8,10 @@ Routing of a newly created ticket into the correct queue, decided once on
 the ticket's first article before the reply agent runs, plus the customer
 correction for forwarded mails. See ``tiqora.ai.triage``.
 
-Both thresholds default to 100, i.e. "propose, never act": on a fresh
-install nothing has calibrated them yet, so autonomy has to be turned on
-per queue deliberately.
+``triage_auto_threshold`` defaults to 100 (propose, never act) and
+``triage_suggest_threshold`` to 50 (show a proposal the agent can accept).
+On a fresh install nothing has calibrated auto-apply yet, so autonomy has
+to be turned on per queue deliberately.
 
 The watermark for the triage outbox consumer is **not** seeded here — that
 would be non-idempotent and wrong on a fresh install. The worker seeds it

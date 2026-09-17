@@ -82,12 +82,16 @@ async def _ai_tick(factory: async_sessionmaker[Any]) -> dict[str, Any]:
     auto-summary regardless of the gate, and only skips the auto-reply send
     while it is closed (see :mod:`tiqora.ai.auto_worker`).
 
-    **Triage must run first.** It commits a queue move before
+    **Triage must run first.** An auto-applied move commits before
     ``run_auto_tick`` resolves the policy for the same ``ArticleCreate``
     event, so a re-routed ticket is answered under its *destination*
-    queue's policy in the very same tick. Swapping these two lines silently
-    reverts that. The result dicts are merged flat (triage's keys are
-    prefixed ``triage_``) because ``record_tick_status`` serialises them.
+    queue's policy in the very same tick. An OPEN proposal (below the auto
+    threshold) instead makes auto-reply skip that article until the row is
+    accepted or rejected, so the source-queue agent does not answer while
+    the UI still shows "Move to …". Swapping these two lines silently
+    reverts the auto-apply path. The result dicts are merged flat (triage's
+    keys are prefixed ``triage_``) because ``record_tick_status`` serialises
+    them.
     """
     async with factory() as session:
         enabled = await get_setting_bool(session, KEY_AI_WORKER_ENABLED, False)
