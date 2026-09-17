@@ -39,7 +39,12 @@ dependencies = [
     "defusedxml>=0.7.1",
     "webauthn>=2",
     # Sync drivers used by tiqora bootstrap (base-schema load) and tests.
-    "pymysql>=1.2.0",
+    # Upper bound is load-bearing: PyMySQL 1.2.1 dropped
+    # pymysql.converters.escape_dict, which aiomysql 0.3.2 imports at module
+    # level, so ANY container built against it dies on `import aiomysql`
+    # before a single line of Tiqora runs. Lift it only once aiomysql ships
+    # a release that no longer imports that name.
+    "pymysql>=1.2.0,<1.2.1",
     "psycopg2-binary>=2.9.12",
     # GDPR anonymize engine (ValueMapper) draws replacement values via faker
     # at runtime — must ship in the prod image, not just the dev group.
@@ -80,7 +85,7 @@ dev = [
     "types-passlib>=1.7.7",
     "types-pyyaml>=6.0.12.20260518",
     "types-defusedxml>=0.7.0.20260504",
-    "pymysql>=1.2.0",
+    "pymysql>=1.2.0,<1.2.1",
     "psycopg2-binary>=2.9.12",
 ]
 
@@ -172,5 +177,5 @@ markers = [
 [dependency-groups]
 dev = [
     "psycopg2-binary>=2.9.12",
-    "pymysql>=1.2.0",
+    "pymysql>=1.2.0,<1.2.1",
 ]
