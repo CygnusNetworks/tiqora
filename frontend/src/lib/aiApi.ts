@@ -182,9 +182,9 @@ export type AiQueuePolicyOut = {
   capabilities_json: string | null;
   summary_detail: "standard" | "detailed";
   /**
-   * AI triage. `routing_description` describes THIS queue and is offered to
-   * OTHER queues as a routing target -- it is never read for this queue's own
-   * triage run.
+   * AI triage. `routing_description` describes THIS queue. It is offered to
+   * OTHER queues as a routing target, and shown as the "stay" option in this
+   * queue's own triage run.
    */
   enabled_triage: boolean;
   routing_description: string | null;
