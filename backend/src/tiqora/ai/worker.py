@@ -30,6 +30,7 @@ import structlog
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from tiqora.ai.auto_worker import run_auto_tick
+from tiqora.ai.triage_worker import run_triage_tick
 from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import (
@@ -75,17 +76,30 @@ async def _heartbeat_loop(stop: asyncio.Event) -> None:
 
 
 async def _ai_tick(factory: async_sessionmaker[Any]) -> dict[str, Any]:
-    """One tick: honour ``daemon.ai_worker.enabled`` and run the
-    auto-reply/auto-summary tick. The Readiness-Gate is no longer checked
-    here — ``run_auto_tick`` drains the outbox and runs auto-summary
-    regardless of the gate, and only skips the auto-reply send while it is
-    closed (see :mod:`tiqora.ai.auto_worker`)."""
+    """One tick: honour ``daemon.ai_worker.enabled``, then run triage and the
+    auto-reply/auto-summary tick, in that order. The Readiness-Gate is no
+    longer checked here — ``run_auto_tick`` drains the outbox and runs
+    auto-summary regardless of the gate, and only skips the auto-reply send
+    while it is closed (see :mod:`tiqora.ai.auto_worker`).
+
+    **Triage must run first.** An auto-applied move commits before
+    ``run_auto_tick`` resolves the policy for the same ``ArticleCreate``
+    event, so a re-routed ticket is answered under its *destination*
+    queue's policy in the very same tick. An OPEN proposal (below the auto
+    threshold) instead makes auto-reply skip that article until the row is
+    accepted or rejected, so the source-queue agent does not answer while
+    the UI still shows "Move to …". Swapping these two lines silently
+    reverts the auto-apply path. The result dicts are merged flat (triage's
+    keys are prefixed ``triage_``) because ``record_tick_status`` serialises
+    them.
+    """
     async with factory() as session:
         enabled = await get_setting_bool(session, KEY_AI_WORKER_ENABLED, False)
         if not enabled:
             return {"enabled": False}
+    triage = await run_triage_tick(session_factory=factory)
     result = await run_auto_tick(session_factory=factory)
-    return {"enabled": True, **result}
+    return {"enabled": True, **triage, **result}
 
 
 async def _run_loop(stop: asyncio.Event) -> None:

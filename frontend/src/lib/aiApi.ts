@@ -22,6 +22,7 @@ export type ReplyLanguageMode = "off" | "fixed" | "auto";
 export type AclSubjectType = "group" | "role" | "user";
 export type AclFeature =
   "summary" | "auto_reply" | "manual_assist" | "mcp" | "refine";
+export type UsageFeature = AclFeature | "triage";
 
 export type AiSettingsOut = {
   operation_mode: OperationMode;
@@ -180,6 +181,24 @@ export type AiQueuePolicyOut = {
   /** Optional JSON capability overrides (bool map) on top of autonomy defaults. */
   capabilities_json: string | null;
   summary_detail: "standard" | "detailed";
+  /**
+   * AI triage. `routing_description` describes THIS queue and is offered to
+   * OTHER queues as a routing target -- it is never read for this queue's own
+   * triage run.
+   */
+  enabled_triage: boolean;
+  routing_description: string | null;
+  /** JSON array of queue ids this queue may route into. */
+  triage_target_queue_ids: string | null;
+  triage_auto_threshold: number;
+  triage_suggest_threshold: number;
+  triage_samples: number;
+  triage_customer_fix_enabled: boolean;
+  triage_customer_fix_auto_threshold: number;
+  /** Set on the DESTINATION queue: park the reply agent after a triage move. */
+  triage_delay_reply: boolean;
+  triage_llm_provider_id: number | null;
+  triage_model_override: string | null;
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -225,6 +244,17 @@ export type AiQueuePolicyCreate = {
   reply_language_default?: string | null;
   allowed_state_types?: string | null;
   capabilities_json?: string | null;
+  enabled_triage?: boolean;
+  routing_description?: string | null;
+  triage_target_queue_ids?: string | null;
+  triage_auto_threshold?: number;
+  triage_suggest_threshold?: number;
+  triage_samples?: number;
+  triage_customer_fix_enabled?: boolean;
+  triage_customer_fix_auto_threshold?: number;
+  triage_delay_reply?: boolean;
+  triage_llm_provider_id?: number | null;
+  triage_model_override?: string | null;
 };
 
 export type AiQueuePolicyUpdate = Partial<AiQueuePolicyCreate> & {
@@ -237,7 +267,7 @@ export type AiUsageOut = {
   user_id: number | null;
   queue_id: number | null;
   ticket_id: number | null;
-  feature: AclFeature;
+  feature: UsageFeature;
   provider_id: number | null;
   model: string | null;
   prompt_tokens: number;
@@ -258,7 +288,7 @@ export type AiUsagePageOut = {
 
 export type AiUsageListParams = {
   queue_id?: number;
-  feature?: AclFeature;
+  feature?: UsageFeature;
   from?: string;
   to?: string;
   page?: number;
@@ -291,7 +321,7 @@ export type AiAclUpdate = Partial<AiAclCreate>;
 // ── LLM-Request-Audit ──────────────────────────────────────────────────
 
 export type AuditFeature =
-  "draft" | "summary" | "auto_reply" | "vision" | "test";
+  "draft" | "summary" | "auto_reply" | "vision" | "test" | "refine" | "triage";
 export type AuditRequestStatus = "ok" | "error";
 
 export type AiAuditLogListItemOut = {

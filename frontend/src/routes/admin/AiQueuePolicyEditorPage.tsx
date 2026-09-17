@@ -53,7 +53,13 @@ const REPLY_LANGUAGE_MODES: ReplyLanguageMode[] = ["off", "fixed", "auto"];
 /** Znuny-compatible language codes for fixed/auto reply language. */
 const REPLY_LANGUAGES = [...LOCALE_CODES];
 
-type TabId = "basics" | "drafts" | "summaries" | "auto" | "safety";
+type TabId =
+  | "basics"
+  | "drafts"
+  | "summaries"
+  | "auto"
+  | "triage"
+  | "safety";
 
 /** One fallback-provider entry in the priority list (below the primary
  * `llm_provider_id`/`model_override`). `model` empty string means "use the
@@ -66,6 +72,17 @@ type FormState = {
   enabled_summary: boolean;
   enabled_manual_assist: boolean;
   enabled_refine: boolean;
+  enabled_triage: boolean;
+  routing_description: string;
+  triage_target_queue_ids: Set<number>;
+  triage_auto_threshold: string;
+  triage_suggest_threshold: string;
+  triage_samples: string;
+  triage_customer_fix_enabled: boolean;
+  triage_customer_fix_auto_threshold: string;
+  triage_delay_reply: boolean;
+  triage_llm_provider_id: number;
+  triage_model_override: string;
   autonomy: Autonomy;
   system_prompt: string;
   llm_provider_id: number;
@@ -112,6 +129,19 @@ function emptyForm(queueId: number): FormState {
     enabled_summary: false,
     enabled_manual_assist: false,
     enabled_refine: false,
+    enabled_triage: false,
+    routing_description: "",
+    triage_target_queue_ids: new Set(),
+    // 100 = "propose only". The thresholds are unmeasured on a fresh
+    // install, so autonomy has to be a deliberate per-queue decision.
+    triage_auto_threshold: "100",
+    triage_suggest_threshold: "50",
+    triage_samples: "3",
+    triage_customer_fix_enabled: false,
+    triage_customer_fix_auto_threshold: "100",
+    triage_delay_reply: false,
+    triage_llm_provider_id: NONE,
+    triage_model_override: "",
     autonomy: "off",
     system_prompt: "",
     llm_provider_id: NONE,
@@ -213,6 +243,28 @@ function fallbackToJson(entries: FallbackEntry[]): string | null {
   );
 }
 
+/**
+ * Tolerant id-list parse for the Text columns that hold a JSON array but,
+ * historically, sometimes a CSV instead (mirrors the backend's
+ * `tiqora.ai.listfields.parse_int_list`).
+ */
+function parseIdList(raw: string | null): number[] {
+  if (!raw || raw.trim() === "") return [];
+  const text = raw.trim();
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    }
+  } catch {
+    // Fall through to the CSV shape.
+  }
+  return text
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
+}
+
 function toForm(row: AiQueuePolicyOut): FormState {
   return {
     queue_id: row.queue_id,
@@ -220,6 +272,21 @@ function toForm(row: AiQueuePolicyOut): FormState {
     enabled_summary: row.enabled_summary,
     enabled_manual_assist: row.enabled_manual_assist,
     enabled_refine: row.enabled_refine,
+    enabled_triage: row.enabled_triage,
+    routing_description: row.routing_description ?? "",
+    triage_target_queue_ids: new Set(
+      parseIdList(row.triage_target_queue_ids),
+    ),
+    triage_auto_threshold: String(row.triage_auto_threshold),
+    triage_suggest_threshold: String(row.triage_suggest_threshold),
+    triage_samples: String(row.triage_samples),
+    triage_customer_fix_enabled: row.triage_customer_fix_enabled,
+    triage_customer_fix_auto_threshold: String(
+      row.triage_customer_fix_auto_threshold,
+    ),
+    triage_delay_reply: row.triage_delay_reply,
+    triage_llm_provider_id: row.triage_llm_provider_id ?? NONE,
+    triage_model_override: row.triage_model_override ?? "",
     autonomy: row.autonomy,
     system_prompt: row.system_prompt,
     llm_provider_id: row.llm_provider_id ?? NONE,
@@ -430,6 +497,27 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     return (queuesQ.data ?? []).filter((q) => !used.has(q.id));
   }, [queuesQ.data, policiesQ.data]);
 
+  /**
+   * Selected target queues that have no routing_description of their own.
+   *
+   * This is the single likeliest misconfiguration: without a description the
+   * model is offered nothing but the queue's name, which silently degrades
+   * routing instead of failing. Worth a visible warning rather than a doc note.
+   */
+  const undescribedTargets = useMemo(() => {
+    if (!form) return [];
+    const described = new Set(
+      (policiesQ.data?.items ?? [])
+        .filter((row) => (row.routing_description ?? "").trim() !== "")
+        .map((row) => row.queue_id),
+    );
+    return (queuesQ.data ?? [])
+      .filter(
+        (q) => form.triage_target_queue_ids.has(q.id) && !described.has(q.id),
+      )
+      .map((q) => q.name);
+  }, [form, policiesQ.data, queuesQ.data]);
+
   // Create: seed the form once queues are known (first available queue).
   useEffect(() => {
     if (isEdit || form) return;
@@ -588,6 +676,22 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     enabled_summary: f.enabled_summary,
     enabled_manual_assist: f.enabled_manual_assist,
     enabled_refine: f.enabled_refine,
+    enabled_triage: f.enabled_triage,
+    routing_description: f.routing_description.trim() || null,
+    triage_target_queue_ids:
+      f.triage_target_queue_ids.size > 0
+        ? JSON.stringify(Array.from(f.triage_target_queue_ids))
+        : null,
+    triage_auto_threshold: numOrNull(f.triage_auto_threshold) ?? 100,
+    triage_suggest_threshold: numOrNull(f.triage_suggest_threshold) ?? 50,
+    triage_samples: numOrNull(f.triage_samples) ?? 3,
+    triage_customer_fix_enabled: f.triage_customer_fix_enabled,
+    triage_customer_fix_auto_threshold:
+      numOrNull(f.triage_customer_fix_auto_threshold) ?? 100,
+    triage_delay_reply: f.triage_delay_reply,
+    triage_llm_provider_id:
+      f.triage_llm_provider_id !== NONE ? f.triage_llm_provider_id : null,
+    triage_model_override: f.triage_model_override.trim() || null,
     autonomy: f.autonomy,
     system_prompt: f.system_prompt,
     llm_provider_id: f.llm_provider_id !== NONE ? f.llm_provider_id : null,
@@ -729,6 +833,16 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
           label={t("admin.ai.queues.tab.auto")}
           active={form.enabled_auto_reply}
           testId="admin-ai-queue-tab-dot-auto"
+        />
+      ),
+    },
+    {
+      id: "triage",
+      label: (
+        <TabLabel
+          label={t("admin.ai.queues.tab.triage")}
+          active={form.enabled_triage}
+          testId="admin-ai-queue-tab-dot-triage"
         />
       ),
     },
@@ -1632,6 +1746,289 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   </p>
                 )}
                 <EscalationRuleTester rulesJson={form.escalation_rules} />
+              </div>
+            </fieldset>
+          </div>
+        )}
+
+        {tab === "triage" && (
+          <div className="space-y-4">
+            {!gateOpen && (
+              <p
+                className="rounded-md border border-escalation/40 bg-escalation/10 p-2 text-xs text-escalation"
+                data-testid="admin-ai-queue-triage-gate-warning"
+              >
+                {t("admin.ai.queues.triageGateWarning")}
+              </p>
+            )}
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                data-testid="admin-ai-queue-form-enabled_triage"
+                checked={form.enabled_triage}
+                disabled={!gateOpen && !form.enabled_triage}
+                onChange={(e) => setField("enabled_triage", e.target.checked)}
+                className="rounded border-hairline disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              {t("admin.ai.feature.triage")}
+              <HelpPopover
+                title={t("admin.ai.feature.triage")}
+                testId="admin-ai-queue-help-enabled_triage"
+              >
+                {t("admin.help.aiQueue.enabledTriage")}
+              </HelpPopover>
+            </label>
+
+            {/* Deliberately OUTSIDE the enabled_triage fieldset: this text
+                describes THIS queue for OTHER queues' triage runs, so it is
+                worth filling in even for a queue that never triages itself. */}
+            <label className="block text-sm">
+              <FieldLabel
+                text={t("admin.ai.queues.routingDescription")}
+                help={t("admin.help.aiQueue.routingDescription")}
+                testId="admin-ai-queue-help-routing_description"
+              />
+              <textarea
+                data-testid="admin-ai-queue-form-routing_description"
+                value={form.routing_description}
+                onChange={(e) =>
+                  setField("routing_description", e.target.value)
+                }
+                rows={4}
+                placeholder={t("admin.ai.queues.routingDescriptionPlaceholder")}
+                className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
+              />
+              <p className="mt-1 text-xs text-muted">
+                {t("admin.ai.queues.routingDescriptionHint")}
+              </p>
+            </label>
+
+            <fieldset
+              disabled={!form.enabled_triage}
+              className={cn(
+                "space-y-4",
+                !form.enabled_triage && "opacity-50",
+              )}
+            >
+              <div className="block text-sm">
+                <FieldLabel
+                  text={t("admin.ai.queues.triageTargets")}
+                  help={t("admin.help.aiQueue.triageTargets")}
+                  testId="admin-ai-queue-help-triage_target_queue_ids"
+                />
+                <div
+                  className="flex flex-wrap gap-2"
+                  data-testid="admin-ai-queue-form-triage_target_queue_ids"
+                >
+                  {(queuesQ.data ?? [])
+                    .filter((q) => q.id !== form.queue_id)
+                    .map((q) => (
+                      <label
+                        key={q.id}
+                        className="flex items-center gap-1.5 rounded-md border border-hairline bg-surface-subtle px-2 py-1.5 text-xs text-ink"
+                      >
+                        <input
+                          type="checkbox"
+                          data-testid={`admin-ai-queue-form-triage-target-${q.id}`}
+                          checked={form.triage_target_queue_ids.has(q.id)}
+                          onChange={(e) =>
+                            setForm((f) => {
+                              if (!f) return f;
+                              const next = new Set(f.triage_target_queue_ids);
+                              if (e.target.checked) next.add(q.id);
+                              else next.delete(q.id);
+                              return { ...f, triage_target_queue_ids: next };
+                            })
+                          }
+                          className="rounded border-hairline"
+                        />
+                        {q.name}
+                      </label>
+                    ))}
+                </div>
+                {undescribedTargets.length > 0 && (
+                  <p
+                    className="mt-2 rounded-md border border-amber/30 bg-amber/15 p-2 text-xs text-ink"
+                    data-testid="admin-ai-queue-triage-missing-description"
+                  >
+                    {t("admin.ai.queues.triageTargetsNoDescription", {
+                      queues: undescribedTargets.join(", "),
+                    })}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.triageAutoThreshold")}
+                    help={t("admin.help.aiQueue.triageAutoThreshold")}
+                    testId="admin-ai-queue-help-triage_auto_threshold"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    data-testid="admin-ai-queue-form-triage_auto_threshold"
+                    value={form.triage_auto_threshold}
+                    onChange={(e) =>
+                      setField("triage_auto_threshold", e.target.value)
+                    }
+                    className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.triageSuggestThreshold")}
+                    help={t("admin.help.aiQueue.triageSuggestThreshold")}
+                    testId="admin-ai-queue-help-triage_suggest_threshold"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    data-testid="admin-ai-queue-form-triage_suggest_threshold"
+                    value={form.triage_suggest_threshold}
+                    onChange={(e) =>
+                      setField("triage_suggest_threshold", e.target.value)
+                    }
+                    className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.triageSamples")}
+                    help={t("admin.help.aiQueue.triageSamples")}
+                    testId="admin-ai-queue-help-triage_samples"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={5}
+                    data-testid="admin-ai-queue-form-triage_samples"
+                    value={form.triage_samples}
+                    onChange={(e) =>
+                      setField("triage_samples", e.target.value)
+                    }
+                    className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
+              </div>
+
+              <p
+                className="rounded-md border border-hairline bg-surface-subtle p-2 text-xs text-muted"
+                data-testid="admin-ai-queue-triage-threshold-explainer"
+              >
+                {t("admin.ai.queues.triageThresholdExplainer", {
+                  auto: form.triage_auto_threshold || "100",
+                  suggestLow: form.triage_suggest_threshold || "0",
+                  suggestHigh: Math.max(
+                    0,
+                    (Number(form.triage_auto_threshold) || 100) - 1,
+                  ),
+                })}
+              </p>
+
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  data-testid="admin-ai-queue-form-triage_delay_reply"
+                  checked={form.triage_delay_reply}
+                  onChange={(e) =>
+                    setField("triage_delay_reply", e.target.checked)
+                  }
+                  className="rounded border-hairline"
+                />
+                {t("admin.ai.queues.triageDelayReply")}
+                <HelpPopover
+                  title={t("admin.ai.queues.triageDelayReply")}
+                  testId="admin-ai-queue-help-triage_delay_reply"
+                >
+                  {t("admin.help.aiQueue.triageDelayReply")}
+                </HelpPopover>
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  data-testid="admin-ai-queue-form-triage_customer_fix_enabled"
+                  checked={form.triage_customer_fix_enabled}
+                  onChange={(e) =>
+                    setField("triage_customer_fix_enabled", e.target.checked)
+                  }
+                  className="rounded border-hairline"
+                />
+                {t("admin.ai.queues.triageCustomerFix")}
+                <HelpPopover
+                  title={t("admin.ai.queues.triageCustomerFix")}
+                  testId="admin-ai-queue-help-triage_customer_fix_enabled"
+                >
+                  {t("admin.help.aiQueue.triageCustomerFix")}
+                </HelpPopover>
+              </label>
+
+              <div className="grid gap-4 sm:grid-cols-3">
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.triageCustomerFixThreshold")}
+                    help={t("admin.help.aiQueue.triageCustomerFixThreshold")}
+                    testId="admin-ai-queue-help-triage_customer_fix_auto_threshold"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    data-testid="admin-ai-queue-form-triage_customer_fix_auto_threshold"
+                    value={form.triage_customer_fix_auto_threshold}
+                    onChange={(e) =>
+                      setField(
+                        "triage_customer_fix_auto_threshold",
+                        e.target.value,
+                      )
+                    }
+                    className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.triageProvider")}
+                    help={t("admin.help.aiQueue.triageProvider")}
+                    testId="admin-ai-queue-help-triage_llm_provider_id"
+                  />
+                  <PickerField
+                    testId="admin-ai-queue-form-triage_llm_provider_id"
+                    value={form.triage_llm_provider_id}
+                    items={[
+                      {
+                        value: NONE,
+                        label: t("admin.ai.queues.triageProviderInherit"),
+                      },
+                      ...(providersQ.data?.items ?? []).map((p) => ({
+                        value: p.id,
+                        label: p.name,
+                      })),
+                    ]}
+                    placeholder={t("admin.form.selectPlaceholder")}
+                    loading={providersQ.isLoading}
+                    onSelect={(v) => setField("triage_llm_provider_id", v)}
+                  />
+                </label>
+                <label className="block text-sm">
+                  <FieldLabel
+                    text={t("admin.ai.queues.triageModelOverride")}
+                    help={t("admin.help.aiQueue.triageModelOverride")}
+                    testId="admin-ai-queue-help-triage_model_override"
+                  />
+                  <input
+                    type="text"
+                    data-testid="admin-ai-queue-form-triage_model_override"
+                    value={form.triage_model_override}
+                    onChange={(e) =>
+                      setField("triage_model_override", e.target.value)
+                    }
+                    className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
+                  />
+                </label>
               </div>
             </fieldset>
           </div>

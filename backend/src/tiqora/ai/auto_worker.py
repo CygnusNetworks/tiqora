@@ -36,14 +36,12 @@ uses, so the two paths never cross-charge each other).
 
 from __future__ import annotations
 
-import json
 import uuid
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai import summary as summary_service
@@ -57,7 +55,20 @@ from tiqora.ai.context import (
 from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
 from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
-from tiqora.ai.models import FEATURE_AUTO_REPLY, TiqoraAiQueuePolicy, TiqoraAiUsage
+from tiqora.ai.models import (
+    FEATURE_AUTO_REPLY,
+    FEATURE_TRIAGE,
+    TRIAGE_STATUS_OPEN,
+    TiqoraAiQueuePolicy,
+    TiqoraAiTriage,
+    TiqoraAiUsage,
+)
+from tiqora.ai.outbox import (
+    OUTBOX_BATCH_SIZE,
+    OutboxEvent,
+    article_sender_type,
+    next_outbox_batch,
+)
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.ai.runtime import (
     STATUS_NO_REPLY,
@@ -79,57 +90,13 @@ from tiqora.domain.settings_store import (
 
 logger = structlog.get_logger(__name__)
 
-_BATCH_SIZE = 200
-
-
-@dataclass(frozen=True, slots=True)
-class _OutboxEvent:
-    id: int
-    event_type: str
-    ticket_id: int
-    payload: dict[str, Any]
-
-
-async def _next_outbox_batch(
-    session: AsyncSession, after_id: int, batch_size: int
-) -> list[_OutboxEvent]:
-    rows = (
-        await session.execute(
-            text(
-                "SELECT id, event_type, ticket_id, payload FROM tiqora_event_outbox"
-                " WHERE id > :after ORDER BY id ASC LIMIT :n"
-            ),
-            {"after": after_id, "n": batch_size},
-        )
-    ).fetchall()
-    out: list[_OutboxEvent] = []
-    for row in rows:
-        payload: dict[str, Any] = {}
-        if row[3]:
-            try:
-                payload = json.loads(row[3])
-            except (TypeError, ValueError):
-                payload = {}
-        out.append(
-            _OutboxEvent(
-                id=int(row[0]), event_type=str(row[1]), ticket_id=int(row[2]), payload=payload
-            )
-        )
-    return out
-
-
-async def _article_sender_type(session: AsyncSession, article_id: int) -> str | None:
-    row = (
-        await session.execute(
-            text(
-                "SELECT st.name FROM article a"
-                " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
-                " WHERE a.id = :aid LIMIT 1"
-            ),
-            {"aid": article_id},
-        )
-    ).first()
-    return str(row[0]) if row else None
+# Re-exported under their historical private names so this module's existing
+# call sites (and tests that monkeypatch them) keep working after the helpers
+# moved to tiqora.ai.outbox for the triage worker to share.
+_BATCH_SIZE = OUTBOX_BATCH_SIZE
+_OutboxEvent = OutboxEvent
+_next_outbox_batch = next_outbox_batch
+_article_sender_type = article_sender_type
 
 
 async def _global_replies_per_hour_cap(session: AsyncSession) -> int | None:
@@ -160,6 +127,16 @@ async def _auto_replies_last_hour(session: AsyncSession, *, queue_id: int | None
 
 
 async def _tokens_used_today(session: AsyncSession, queue_id: int) -> int:
+    """Tokens this queue has spent today, across every feature that
+    ``budget_tokens_day`` is meant to cap.
+
+    Triage is counted here even though it is not an auto-reply: it runs from
+    the same worker, on the same queue's policy and provider, and costs
+    ``triage_samples`` calls per new ticket. Filtering on auto-reply alone
+    would let a queue quietly spend several times its daily budget.
+    ``_auto_replies_last_hour`` deliberately stays auto-reply-only — that one
+    rate-limits *messages to customers*, which triage never sends.
+    """
     now = datetime.now(UTC).replace(tzinfo=None)
     day_start = datetime(now.year, now.month, now.day)
     total = (
@@ -169,7 +146,7 @@ async def _tokens_used_today(session: AsyncSession, queue_id: int) -> int:
                     func.sum(TiqoraAiUsage.prompt_tokens + TiqoraAiUsage.completion_tokens), 0
                 )
             ).where(
-                TiqoraAiUsage.feature == FEATURE_AUTO_REPLY,
+                TiqoraAiUsage.feature.in_((FEATURE_AUTO_REPLY, FEATURE_TRIAGE)),
                 TiqoraAiUsage.queue_id == queue_id,
                 TiqoraAiUsage.ts >= day_start,
             )
@@ -217,6 +194,27 @@ async def _cap_reason(
     return None
 
 
+async def _has_open_triage(session: AsyncSession, ticket_id: int) -> bool:
+    """True while a triage proposal is waiting for an agent decision.
+
+    Auto-reply must not answer under the source-queue policy in that
+    window: the ticket may still move, and the agent UI is showing the
+    proposal. Skipping without touching ``last_customer_article_id`` lets
+    the same article be answered after accept/reject.
+    """
+    row = (
+        await session.execute(
+            select(TiqoraAiTriage.id)
+            .where(
+                TiqoraAiTriage.ticket_id == ticket_id,
+                TiqoraAiTriage.status == TRIAGE_STATUS_OPEN,
+            )
+            .limit(1)
+        )
+    ).first()
+    return row is not None
+
+
 async def _process_customer_article_event(
     session: AsyncSession,
     settings: Settings,
@@ -258,6 +256,14 @@ async def _process_customer_article_event(
 
     policy = await get_queue_policy_by_queue(session, ticket.queue_id)
     if policy is None or not policy.enabled_auto_reply or policy.service_user_id is None:
+        return None
+
+    if await _has_open_triage(session, ticket_id):
+        logger.info(
+            "ai_auto_worker_triage_open_skip",
+            ticket_id=ticket_id,
+            queue_id=ticket.queue_id,
+        )
         return None
 
     ignored_senders = parse_str_list(policy.ignored_senders)

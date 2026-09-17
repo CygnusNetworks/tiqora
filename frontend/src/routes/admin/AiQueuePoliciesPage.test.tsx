@@ -66,6 +66,8 @@ const samplePolicy = {
   pii_masking: true,
   identity_mode: "ticket_customer_id",
   clarify_schema_json: null,
+  enabled_refine: false,
+  enabled_triage: false,
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
@@ -132,6 +134,27 @@ describe("AiQueuePoliciesPage", () => {
       to: "/admin/ai/queues/$policyId",
       params: { policyId: "1" },
     });
+  });
+
+  it("shows a triage chip for a triage-only policy", async () => {
+    listQueuePolicies.mockResolvedValue({
+      items: [
+        {
+          ...samplePolicy,
+          enabled_summary: false,
+          enabled_manual_assist: false,
+          enabled_triage: true,
+        },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-ai-queue-row-1")).toHaveTextContent("Triage");
+    });
+    expect(screen.queryByText("none")).not.toBeInTheDocument();
   });
 
   it("navigates to the new-policy route from the + button", async () => {

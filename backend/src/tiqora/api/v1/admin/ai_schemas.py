@@ -18,6 +18,8 @@ ReplyLanguageMode = Literal["off", "fixed", "auto"]
 SummaryDetail = Literal["standard", "detailed"]
 AclSubjectType = Literal["group", "role", "user"]
 AclFeature = Literal["summary", "auto_reply", "manual_assist", "mcp"]
+# tiqora_ai_usage.feature — includes triage (not an ACL feature) and refine.
+UsageFeature = Literal["summary", "auto_reply", "manual_assist", "mcp", "refine", "triage"]
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +238,21 @@ class AiQueuePolicyOut(BaseModel):
     allowed_state_types: str | None
     capabilities_json: str | None = None
     summary_detail: SummaryDetail
+    # --- AI triage ---
+    # No defaults here on purpose: AiQueuePolicyOut is only ever built via
+    # from_attributes, and a Pydantic default turns the property *required*
+    # in the generated TypeScript type (see the openapi-regen skill).
+    enabled_triage: bool
+    routing_description: str | None
+    triage_target_queue_ids: str | None
+    triage_auto_threshold: int
+    triage_suggest_threshold: int
+    triage_samples: int
+    triage_customer_fix_enabled: bool
+    triage_customer_fix_auto_threshold: int
+    triage_delay_reply: bool
+    triage_llm_provider_id: int | None
+    triage_model_override: str | None
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -281,6 +298,17 @@ class AiQueuePolicyCreate(BaseModel):
     allowed_state_types: str | None = None
     capabilities_json: str | None = None
     summary_detail: SummaryDetail = "standard"
+    enabled_triage: bool = False
+    routing_description: str | None = None
+    triage_target_queue_ids: str | None = None
+    triage_auto_threshold: int = 100
+    triage_suggest_threshold: int = 50
+    triage_samples: int = 3
+    triage_customer_fix_enabled: bool = False
+    triage_customer_fix_auto_threshold: int = 100
+    triage_delay_reply: bool = False
+    triage_llm_provider_id: int | None = None
+    triage_model_override: str | None = None
 
 
 class AiQueuePolicyUpdate(BaseModel):
@@ -322,6 +350,17 @@ class AiQueuePolicyUpdate(BaseModel):
     allowed_state_types: str | None = None
     capabilities_json: str | None = None
     summary_detail: SummaryDetail | None = None
+    enabled_triage: bool | None = None
+    routing_description: str | None = None
+    triage_target_queue_ids: str | None = None
+    triage_auto_threshold: int | None = None
+    triage_suggest_threshold: int | None = None
+    triage_samples: int | None = None
+    triage_customer_fix_enabled: bool | None = None
+    triage_customer_fix_auto_threshold: int | None = None
+    triage_delay_reply: bool | None = None
+    triage_llm_provider_id: int | None = None
+    triage_model_override: str | None = None
     valid_id: int | None = None
 
 
@@ -404,7 +443,7 @@ class AiUsageOut(BaseModel):
     user_id: int | None
     queue_id: int | None
     ticket_id: int | None
-    feature: AclFeature
+    feature: UsageFeature
     provider_id: int | None
     model: str | None
     prompt_tokens: int
@@ -459,3 +498,56 @@ class AiAclUpdate(BaseModel):
     limit_requests_day: int | None = None
     limit_tokens_day: int | None = None
     limit_requests_month: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Triage
+# ---------------------------------------------------------------------------
+
+
+class AiTriageRowOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ticket_id: int
+    article_id: int
+    source_queue_id: int
+    status: str
+    suggested_queue_id: int | None
+    queue_confidence: int | None
+    queue_reason: str | None
+    candidates_json: str | None
+    extracted_email: str | None
+    suggested_customer_user_id: str | None
+    customer_confidence: int | None
+    queue_applied: bool
+    customer_applied: bool
+    run_id: str | None
+    error: str | None
+    decided_by_user_id: int | None
+    decided_note: str | None
+    decided_at: datetime | None
+    create_time: datetime
+
+
+class AiTriageBucketOut(BaseModel):
+    """Accept rate for one 10-point confidence band of one source queue.
+
+    This is the calibration view: ``triage_auto_threshold`` should be set to
+    the lowest bucket whose accept rate the operator is willing to live with,
+    rather than to the shipped default.
+    """
+
+    source_queue_id: int
+    bucket_low: int
+    bucket_high: int
+    total: int
+    accepted: int
+    rejected: int
+    applied: int
+    open: int
+    accept_rate: float | None
+
+
+class AiTriageStatsOut(BaseModel):
+    buckets: list[AiTriageBucketOut]
