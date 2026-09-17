@@ -1102,7 +1102,7 @@
         "kbCategoriesEmpty": "Keine Kategorien vorhanden.",
         "routingDescription": "Was gehört in diese Queue",
         "routingDescriptionPlaceholder": "z. B. Technischer Support: Anschluss, Router, Sperren, Account, WLAN-Technik, IPTV, Diagnose, Freischaltung.",
-        "routingDescriptionHint": "Dieser Text beschreibt DIESE Queue und wird ANDEREN Queues gezeigt, die sie als Ziel eingetragen haben. Für die Triage-Entscheidung dieser Queue selbst wird er nicht verwendet.",
+        "routingDescriptionHint": "Dieser Text beschreibt DIESE Queue. Er wird ANDEREN Queues gezeigt, die sie als Ziel eingetragen haben, und bei der Triage dieser Queue selbst als Grund, ein Ticket hier zu belassen.",
         "triageTargets": "Queues, in die verschoben werden darf",
         "triageTargetsNoDescription": "Keine Queue-Beschreibung hinterlegt für: {{queues}}. Das Modell sieht dann nur den Queue-Namen, was das Routing deutlich unzuverlässiger macht.",
         "triageAutoThreshold": "Automatisch verschieben ab",
