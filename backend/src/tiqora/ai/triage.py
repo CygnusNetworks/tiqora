@@ -12,6 +12,8 @@ Two independent proposals come out of one run:
 **Queue.** The model is offered the allowlisted target queues
 (``policy.triage_target_queue_ids``) with each queue's own
 ``routing_description``, and picks one opaque ``q_<id>`` key or ``none``.
+The source queue's own description is shown under ``none``, so staying
+put is argued for as concretely as moving.
 Opaque keys, not bare integers: an id that comes back stringified is a
 known LLM failure mode, and any key outside the offered set is then
 trivially detectable as invention rather than silently mis-parsed.
@@ -438,7 +440,17 @@ def build_user_message(
     subject: str,
     body: str,
     from_address: str,
+    current_description: str | None = None,
 ) -> str:
+    """Render the triage user message.
+
+    ``current_description`` is the SOURCE queue's own ``routing_description``
+    and is shown under the ``none`` option. Without it the model has nothing
+    arguing for staying: a mail that legitimately belongs where it is, but
+    shares vocabulary with a target's description, gets moved anyway (e.g. an
+    institutional note about unblocking a tenant vs. a support queue whose
+    description mentions blocks and unblocking).
+    """
     lines = [
         f"Betreff: {subject}",
         f"Von: {from_address}",
@@ -453,7 +465,11 @@ def build_user_message(
         lines.append(f"[{candidate.key}] {candidate.name}")
         lines.append(f"  {candidate.description}")
     lines.append("")
-    lines.append(f"[{NO_QUEUE_KEY}] Ticket bleibt, wo es ist.")
+    current_name = ticket.queue_name or str(ticket.queue_id)
+    lines.append(f"[{NO_QUEUE_KEY}] Ticket bleibt in der aktuellen Queue {current_name}.")
+    described = (current_description or "").strip()
+    if described:
+        lines.append(f"  {described}")
     return "\n".join(lines)
 
 
@@ -550,6 +566,7 @@ async def decide(
                 subject=subject,
                 body=body,
                 from_address=from_address,
+                current_description=policy.routing_description,
             ),
         ),
     ]
