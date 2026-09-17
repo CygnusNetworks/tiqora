@@ -15,7 +15,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import bindparam, func, select
+from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.escalation import EscalationRuleError, validate_escalation_rules
@@ -23,8 +24,10 @@ from tiqora.ai.gate import (
     queue_serves_tiqora_only_channel,
     require_auto_reply_not_paused,
     require_feature_allowed,
+    require_tiqora_primary,
 )
 from tiqora.ai.identity import get_customer_user_columns, valid_column_name
+from tiqora.ai.listfields import parse_int_list
 from tiqora.ai.models import (
     AUTONOMY_MODES,
     FEATURE_AUTO_REPLY,
@@ -262,6 +265,87 @@ def _validate_fields(
         )
 
 
+def _validate_triage_fields(
+    *,
+    enabled_triage: bool | None,
+    service_user_id: int | None,
+    llm_provider_id: int | None,
+    triage_llm_provider_id: int | None,
+    triage_target_queue_ids: str | None,
+    triage_auto_threshold: int | None,
+    triage_suggest_threshold: int | None,
+    triage_samples: int | None,
+    triage_customer_fix_auto_threshold: int | None,
+) -> None:
+    for name, value in (
+        ("triage_auto_threshold", triage_auto_threshold),
+        ("triage_suggest_threshold", triage_suggest_threshold),
+        ("triage_customer_fix_auto_threshold", triage_customer_fix_auto_threshold),
+    ):
+        if value is not None and not (0 <= value <= 100):
+            raise QueuePolicyValidationError(f"{name} must be between 0 and 100, got {value}")
+    if (
+        triage_auto_threshold is not None
+        and triage_suggest_threshold is not None
+        and triage_suggest_threshold > triage_auto_threshold
+    ):
+        raise QueuePolicyValidationError(
+            "triage_suggest_threshold must not exceed triage_auto_threshold "
+            f"({triage_suggest_threshold} > {triage_auto_threshold})"
+        )
+    # Upper bound is a cost guard, not a modelling one: every extra sample is
+    # another LLM call on every new ticket in this queue.
+    if triage_samples is not None and not (1 <= triage_samples <= 5):
+        raise QueuePolicyValidationError(
+            f"triage_samples must be between 1 and 5, got {triage_samples}"
+        )
+    if enabled_triage:
+        if service_user_id is None:
+            raise QueuePolicyValidationError(
+                "enabled_triage=true requires service_user_id to be set"
+            )
+        if triage_llm_provider_id is None and llm_provider_id is None:
+            raise QueuePolicyValidationError(
+                "enabled_triage=true requires triage_llm_provider_id or llm_provider_id to be set"
+            )
+        if not parse_int_list(triage_target_queue_ids):
+            raise QueuePolicyValidationError(
+                "enabled_triage=true requires at least one triage_target_queue_ids entry"
+            )
+
+
+async def _validate_triage_targets(
+    session: AsyncSession, raw: str | None, *, queue_id: int
+) -> None:
+    """Every allowlisted target must be a real, valid queue and must not be
+    the source queue itself.
+
+    This list is the authorization boundary for the automatic move (the
+    worker uses the permission-free mutator — see
+    :func:`tiqora.ai.triage.apply_decision`), so a typo'd id must fail loudly
+    at save time rather than silently never matching.
+    """
+    target_ids = parse_int_list(raw)
+    if not target_ids:
+        return
+    if queue_id in target_ids:
+        raise QueuePolicyValidationError(
+            "triage_target_queue_ids must not contain the queue's own id"
+        )
+    rows = (
+        await session.execute(
+            sa_text("SELECT id FROM queue WHERE id IN :ids AND valid_id = 1").bindparams(
+                bindparam("ids", expanding=True)
+            ),
+            {"ids": target_ids},
+        )
+    ).fetchall()
+    found = {int(r[0]) for r in rows}
+    missing = sorted(set(target_ids) - found)
+    if missing:
+        raise QueuePolicyValidationError(f"Unknown or invalid target queue ids: {missing}")
+
+
 async def _validate_clarify_schema_json(session: AsyncSession, raw: str | None) -> None:
     """``clarify_schema_json``, when set, must be ``{"fields": [{"column":
     str, "label": str}, ...]}`` with at least one field; each ``column`` must
@@ -363,8 +447,15 @@ async def _enforce_gate_on_enable(
     enabled_summary: bool | None,
     enabled_manual_assist: bool | None,
     queue_id: int,
+    enabled_triage: bool | None = None,
 ) -> None:
-    """Only re-check the gate when ``enabled_auto_reply`` is *becoming* true.
+    """Re-check the gate when ``enabled_auto_reply`` or ``enabled_triage`` is
+    *becoming* true.
+
+    Triage is gated for the same reason auto-reply is: a Tiqora-side queue
+    move is invisible to Znuny's queue-driven automation (escalation times,
+    autoresponders, GenericAgent jobs), so during ``parallel`` operation the
+    two systems would diverge on where a ticket lives.
 
     ``enabled_summary``/``enabled_manual_assist`` are accepted unconditionally
     (plan §3.0 v1.1 relaxation) — the parameters are still passed in so the
@@ -387,6 +478,9 @@ async def _enforce_gate_on_enable(
             await require_auto_reply_not_paused(session)
         else:
             await require_feature_allowed(session, FEATURE_AUTO_REPLY)
+    prev_triage = bool(previous.enabled_triage) if previous else False
+    if enabled_triage is True and not prev_triage:
+        await require_tiqora_primary(session)
 
 
 async def create_queue_policy(
@@ -432,6 +526,17 @@ async def create_queue_policy(
     allowed_state_types: str | None = None,
     capabilities_json: str | None = None,
     summary_detail: str = "standard",
+    enabled_triage: bool = False,
+    routing_description: str | None = None,
+    triage_target_queue_ids: str | None = None,
+    triage_auto_threshold: int = 100,
+    triage_suggest_threshold: int = 50,
+    triage_samples: int = 3,
+    triage_customer_fix_enabled: bool = False,
+    triage_customer_fix_auto_threshold: int = 100,
+    triage_delay_reply: bool = False,
+    triage_llm_provider_id: int | None = None,
+    triage_model_override: str | None = None,
 ) -> TiqoraAiQueuePolicy:
     _validate_fields(
         autonomy=autonomy,
@@ -444,16 +549,29 @@ async def create_queue_policy(
         reply_language_default=reply_language_default,
         summary_detail=summary_detail,
     )
+    _validate_triage_fields(
+        enabled_triage=enabled_triage,
+        service_user_id=service_user_id,
+        llm_provider_id=llm_provider_id,
+        triage_llm_provider_id=triage_llm_provider_id,
+        triage_target_queue_ids=triage_target_queue_ids,
+        triage_auto_threshold=triage_auto_threshold,
+        triage_suggest_threshold=triage_suggest_threshold,
+        triage_samples=triage_samples,
+        triage_customer_fix_auto_threshold=triage_customer_fix_auto_threshold,
+    )
     _validate_escalation_rules_json(escalation_rules)
     await _validate_clarify_schema_json(session, clarify_schema_json)
     await _validate_llm_fallback_json(session, llm_fallback_json)
     await _validate_vision_provider(session, vision_provider_id)
+    await _validate_triage_targets(session, triage_target_queue_ids, queue_id=queue_id)
     await _enforce_gate_on_enable(
         session,
         previous=None,
         enabled_auto_reply=enabled_auto_reply,
         enabled_summary=enabled_summary,
         enabled_manual_assist=enabled_manual_assist,
+        enabled_triage=enabled_triage,
         queue_id=queue_id,
     )
 
@@ -497,6 +615,17 @@ async def create_queue_policy(
         allowed_state_types=allowed_state_types,
         capabilities_json=capabilities_json,
         summary_detail=summary_detail,
+        enabled_triage=enabled_triage,
+        routing_description=routing_description,
+        triage_target_queue_ids=triage_target_queue_ids,
+        triage_auto_threshold=triage_auto_threshold,
+        triage_suggest_threshold=triage_suggest_threshold,
+        triage_samples=triage_samples,
+        triage_customer_fix_enabled=triage_customer_fix_enabled,
+        triage_customer_fix_auto_threshold=triage_customer_fix_auto_threshold,
+        triage_delay_reply=triage_delay_reply,
+        triage_llm_provider_id=triage_llm_provider_id,
+        triage_model_override=triage_model_override,
         create_by=change_by,
         change_by=change_by,
     )
@@ -526,6 +655,22 @@ async def update_queue_policy(
         "reply_language_default", row.reply_language_default
     )
     effective_summary_detail = fields.get("summary_detail", row.summary_detail)
+    # Triage validation has to see the *merged* row, not just the patch: a
+    # PATCH that only flips enabled_triage still needs the stored targets and
+    # provider checked, and one that only lowers triage_auto_threshold must
+    # be compared against the stored suggest threshold.
+    effective_triage = {
+        name: fields.get(name, getattr(row, name))
+        for name in (
+            "enabled_triage",
+            "triage_llm_provider_id",
+            "triage_target_queue_ids",
+            "triage_auto_threshold",
+            "triage_suggest_threshold",
+            "triage_samples",
+            "triage_customer_fix_auto_threshold",
+        )
+    }
 
     _validate_fields(
         autonomy=effective_autonomy,
@@ -538,6 +683,15 @@ async def update_queue_policy(
         reply_language_default=effective_reply_language_default,
         summary_detail=effective_summary_detail,
     )
+    _validate_triage_fields(
+        service_user_id=effective_service_user_id,
+        llm_provider_id=effective_llm_provider_id,
+        **effective_triage,
+    )
+    if "triage_target_queue_ids" in fields:
+        await _validate_triage_targets(
+            session, fields.get("triage_target_queue_ids"), queue_id=row.queue_id
+        )
     if "escalation_rules" in fields:
         _validate_escalation_rules_json(fields.get("escalation_rules"))
     if "clarify_schema_json" in fields:
@@ -552,6 +706,7 @@ async def update_queue_policy(
         enabled_auto_reply=fields.get("enabled_auto_reply"),
         enabled_summary=fields.get("enabled_summary"),
         enabled_manual_assist=fields.get("enabled_manual_assist"),
+        enabled_triage=fields.get("enabled_triage"),
         queue_id=row.queue_id,
     )
 
