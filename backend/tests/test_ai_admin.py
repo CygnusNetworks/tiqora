@@ -674,6 +674,49 @@ async def test_queue_policy_gate_enforcement_409_then_ok_then_regression(
         get_settings.cache_clear()
 
 
+async def test_queue_policy_triage_enable_requires_tiqora_primary(
+    mariadb_znuny_url: str,
+) -> None:
+    """``enabled_triage`` is gated the same way as ``enabled_auto_reply``."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    settings = get_settings()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name="p-triage-gate",
+                kind="openai_compat",
+                base_url="https://example.com/v1",
+                default_model="m",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=True,
+                eu_hosted=False,
+            )
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.create_queue_policy_route(
+                    AiQueuePolicyCreate(
+                        queue_id=1,
+                        enabled_triage=True,
+                        service_user_id=42,
+                        llm_provider_id=provider.id,
+                        triage_target_queue_ids="[2]",
+                    ),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 409
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
 async def test_queue_policy_manual_assist_and_summary_enable_in_parallel_operation(
     mariadb_znuny_url: str,
 ) -> None:
@@ -747,6 +790,110 @@ async def test_queue_policy_auto_reply_requires_service_user_and_provider(
                     session,
                 )
             assert exc_info.value.status_code == 422
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Triage validation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("payload", "why"),
+    [
+        (
+            {"enabled_triage": True},
+            "no service user, no provider, no targets",
+        ),
+        (
+            {"triage_auto_threshold": 101},
+            "threshold above 100",
+        ),
+        (
+            {"triage_suggest_threshold": -1},
+            "threshold below 0",
+        ),
+        (
+            {"triage_auto_threshold": 50, "triage_suggest_threshold": 80},
+            "suggest threshold above the auto threshold",
+        ),
+        (
+            {"triage_samples": 0},
+            "fewer than one sample",
+        ),
+        (
+            {"triage_samples": 9},
+            "more samples than the cost guard allows",
+        ),
+        (
+            {"triage_target_queue_ids": "[987654]"},
+            "target queue that does not exist",
+        ),
+    ],
+)
+async def test_queue_policy_triage_validation_rejects(
+    mariadb_znuny_url: str, payload: dict[str, object], why: str
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.create_queue_policy_route(
+                    AiQueuePolicyCreate(queue_id=2, **payload),  # type: ignore[arg-type]
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422, why
+    finally:
+        await engine.dispose()
+
+
+async def test_queue_policy_triage_targets_must_not_contain_own_queue(
+    mariadb_znuny_url: str,
+) -> None:
+    """Routing a queue into itself is always a no-op and usually a typo."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.create_queue_policy_route(
+                    AiQueuePolicyCreate(queue_id=2, triage_target_queue_ids="[2]"),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422
+    finally:
+        await engine.dispose()
+
+
+async def test_queue_policy_triage_defaults_are_propose_only(
+    mariadb_znuny_url: str,
+) -> None:
+    """A fresh policy must never move a ticket on its own: the thresholds
+    have not been calibrated on a new install."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
+            created = await admin_ai.create_queue_policy_route(
+                AiQueuePolicyCreate(queue_id=2), _root_user(), session
+            )
+            assert created.enabled_triage is False
+            assert created.triage_auto_threshold == 100
+            assert created.triage_customer_fix_auto_threshold == 100
+            assert created.triage_delay_reply is False
+            row = await ai_policies.get_queue_policy(session, created.id)
+            assert row is not None
+            await ai_policies.delete_queue_policy(session, row)
     finally:
         await engine.dispose()
 
