@@ -1074,6 +1074,7 @@
           "queueLocked": "Die Queue kann nach dem Anlegen nicht mehr geändert werden."
         },
         "autoGateWarning": "Auto-Antworten erfordern den Betriebsmodus „Nur Tiqora“ (tiqora_primary). Aktuell: Parallelbetrieb — der Schalter bleibt gesperrt.",
+        "triageGateWarning": "Triage erfordert den Betriebsmodus „Nur Tiqora“ (tiqora_primary). Aktuell: Parallelbetrieb — der Schalter bleibt gesperrt.",
         "ignoredSenders": "Ignorierte Absender",
         "ignoredSendersPlaceholder": "eine Adresse pro Zeile, z. B. noreply@example.com oder *@internal.example",
         "ignoreSendersManual": "Auch bei manuellen Entwürfen blocken",
@@ -1153,7 +1154,9 @@
           "summary": "Zusammenfassung",
           "auto_reply": "Auto-Antwort",
           "vision": "Bildanalyse",
-          "test": "Verbindungstest"
+          "test": "Verbindungstest",
+          "refine": "Text verfeinern",
+          "triage": "Triage"
         },
         "allFeatures": "Alle Funktionen",
         "status": "Status",
@@ -1291,7 +1294,7 @@
         "enabledTriage": "Läuft einmal beim ersten Kundenartikel, vor dem Antwort-Agenten, und schlägt eine passendere Queue vor. Braucht Service-User, Provider und mindestens eine Ziel-Queue. Nur im Betriebsmodus tiqora_primary verfügbar.",
         "routingDescription": "Die wichtigste Stellschraube für die Routing-Qualität. Ohne sie sieht das Modell von einer Ziel-Queue nur den Namen.",
         "triageTargets": "Diese Liste ist zugleich die Berechtigung: der Worker verschiebt ohne move_into-Prüfung. Trage also nur Queues ein, die er wirklich erreichen soll.",
-        "triageAutoThreshold": "Konfidenz, ab der ohne Rückfrage verschoben wird. 100 heißt: nie selbst verschieben, nur vorschlagen. Erst senken, wenn die Annahmequote unter Triage-Statistik das trägt.",
+        "triageAutoThreshold": "Konfidenz, ab der ohne Rückfrage verschoben wird. 100 heißt: nie selbst verschieben, nur vorschlagen. Erst senken, wenn Agenten Vorschläge in diesem Konfidenzbereich oft genug annehmen.",
         "triageSuggestThreshold": "Konfidenz, ab der ein Vorschlag angezeigt wird, den ein Agent annehmen kann. Darunter passiert gar nichts.",
         "triageSamples": "Wie oft das Modell pro Ticket gefragt wird. Die Übereinstimmung der Stichproben ist das wichtigste Konfidenzsignal, 1 schaltet es also ab. Jede Stichprobe ist ein eigener LLM-Aufruf pro neuem Ticket.",
         "triageDelayReply": "Wird auf der ZIEL-Queue gesetzt. Verhindert, dass ein Routing-Fehler zu einer falschen Antwort wird — dafür bekommt der Kunde auf seine erste Mail keine KI-Antwort.",
