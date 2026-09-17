@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
+import { currencySymbol, parseMoney } from "@/lib/money";
 import {
   aiApi,
   type LlmProviderCreate,
@@ -162,15 +163,32 @@ export function AiProvidersPage() {
     setDrawerOpen(true);
   };
 
-  const priceOrNull = (v: unknown): number | null => {
-    const s = String(v ?? "").trim();
-    if (!s) return null;
-    const n = Number(s.replace(",", "."));
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
+  /** Symbol for the currency currently picked in the form, so every money
+   * field follows the selector without its own state. */
+  const currencyOf = (values: FieldValues) =>
+    currencySymbol(String(values.price_currency ?? ""));
 
   const handleSubmit = async (values: FieldValues) => {
     setFormError(null);
+    // Unparseable input is refused rather than quietly dropped: the previous
+    // helper turned a typo into `null`, which now *clears* the stored value —
+    // silently wiping a configured budget because someone fat-fingered it.
+    const money: Record<string, number | null> = {};
+    for (const field of [
+      "price_input_per_1m",
+      "price_output_per_1m",
+      "budget_cost_day",
+      "budget_cost_week",
+      "budget_cost_month",
+      "max_tool_rounds",
+    ]) {
+      const parsed = parseMoney(String(values[field] ?? ""));
+      if (parsed === "invalid") {
+        setFormError(t("admin.ai.providers.invalidAmount"));
+        throw new Error("invalid amount");
+      }
+      money[field] = parsed;
+    }
     const base: LlmProviderCreate = {
       name: String(values.name ?? ""),
       kind: values.kind as ProviderKind,
@@ -180,18 +198,16 @@ export function AiProvidersPage() {
       supports_streaming: Boolean(values.supports_streaming),
       eu_hosted: Boolean(values.eu_hosted),
       supports_vision: Boolean(values.supports_vision),
-      price_input_per_1m: priceOrNull(values.price_input_per_1m),
-      price_output_per_1m: priceOrNull(values.price_output_per_1m),
+      price_input_per_1m: money.price_input_per_1m,
+      price_output_per_1m: money.price_output_per_1m,
       price_currency:
         String(values.price_currency ?? "")
           .trim()
           .toUpperCase() || null,
-      budget_cost_day: priceOrNull(values.budget_cost_day),
-      budget_cost_week: priceOrNull(values.budget_cost_week),
-      budget_cost_month: priceOrNull(values.budget_cost_month),
-      // 0 rather than null on an empty field: the backend reads null as "field
-      // not supplied" and would keep the old override instead of clearing it.
-      max_tool_rounds: priceOrNull(values.max_tool_rounds) ?? 0,
+      budget_cost_day: money.budget_cost_day,
+      budget_cost_week: money.budget_cost_week,
+      budget_cost_month: money.budget_cost_month,
+      max_tool_rounds: money.max_tool_rounds,
     };
     const apiKey =
       typeof values.api_key === "string" ? values.api_key.trim() : "";
@@ -404,13 +420,17 @@ export function AiProvidersPage() {
     {
       name: "price_input_per_1m",
       label: t("admin.ai.providers.priceInput"),
-      type: "number",
+      type: "money",
+      moneyPrecision: "price",
+      currency: currencyOf,
       helpText: t("admin.ai.providers.priceHelp"),
     },
     {
       name: "price_output_per_1m",
       label: t("admin.ai.providers.priceOutput"),
-      type: "number",
+      type: "money",
+      moneyPrecision: "price",
+      currency: currencyOf,
     },
     {
       name: "price_currency",
@@ -418,25 +438,28 @@ export function AiProvidersPage() {
       type: "select",
       options: [
         { value: "", label: t("admin.ai.providers.priceCurrencyNone") },
-        { value: "EUR", label: "EUR" },
-        { value: "USD", label: "USD" },
+        { value: "EUR", label: `EUR (${currencySymbol("EUR")})` },
+        { value: "USD", label: `USD (${currencySymbol("USD")})` },
       ],
     },
     {
       name: "budget_cost_day",
       label: t("admin.ai.providers.budgetCostDay"),
-      type: "number",
+      type: "money",
+      currency: currencyOf,
       helpText: t("admin.ai.providers.budgetCostHelp"),
     },
     {
       name: "budget_cost_week",
       label: t("admin.ai.providers.budgetCostWeek"),
-      type: "number",
+      type: "money",
+      currency: currencyOf,
     },
     {
       name: "budget_cost_month",
       label: t("admin.ai.providers.budgetCostMonth"),
-      type: "number",
+      type: "money",
+      currency: currencyOf,
     },
     {
       name: "max_tool_rounds",

@@ -6,6 +6,12 @@ import { HelpPopover } from "@/components/ui/HelpPopover";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { toBcp47 } from "@/i18n";
+import {
+  formatMoney,
+  toEditableMoney,
+  type MoneyPrecision,
+} from "@/lib/money";
 
 export type FieldOption = { value: string | number; label: string };
 
@@ -13,6 +19,7 @@ export type FieldType =
   | "text"
   | "textarea"
   | "number"
+  | "money"
   | "checkbox"
   | "select"
   | "password"
@@ -40,6 +47,11 @@ export type FieldDef = {
   mono?: boolean;
   /** Textarea row count (default 4). */
   rows?: number;
+  /** "money" fields: the symbol shown after the value, and how many decimals
+   * it is written with. Computed from the form's values so it follows the
+   * currency picker without a re-render dance. */
+  currency?: string | ((values: FieldValues) => string);
+  moneyPrecision?: MoneyPrecision;
   /** Hard cap for "text"/"password" inputs, where the backend enforces one
    * too (e.g. the password length policy). */
   maxLength?: number;
@@ -96,6 +108,64 @@ export type CrudDrawerProps = {
   testIdPrefix?: string;
   size?: "sm" | "md" | "lg" | "xl";
 };
+
+/** Text input that shows a formatted amount while idle and the bare value
+ * while being edited, with the currency symbol pinned to its right.
+ *
+ * Not `<input type="number">`: that renders whatever number it is given, so
+ * "1" can never display as "1.00", and it has nowhere to put a symbol. The
+ * value handed upward stays the raw string — the page parses it on submit,
+ * where an empty field has to become `null` rather than 0. */
+function MoneyInput({
+  id,
+  value,
+  placeholder,
+  invalid,
+  precision,
+  symbol,
+  className,
+  onChange,
+}: {
+  id: string;
+  value: unknown;
+  placeholder?: string;
+  invalid: boolean;
+  precision: MoneyPrecision;
+  symbol: string;
+  className: string;
+  onChange: (value: string) => void;
+}) {
+  const { i18n } = useTranslation();
+  const locale = toBcp47(i18n.language);
+  const [editing, setEditing] = useState(false);
+  const raw = value == null ? "" : String(value);
+  return (
+    <div className="relative">
+      <input
+        id={id}
+        data-testid={id}
+        type="text"
+        inputMode="decimal"
+        value={editing ? toEditableMoney(raw) : formatMoney(raw, locale, precision)}
+        placeholder={placeholder}
+        aria-invalid={invalid || undefined}
+        onFocus={() => setEditing(true)}
+        onBlur={() => setEditing(false)}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(className, symbol && "pr-8")}
+      />
+      {symbol && (
+        <span
+          aria-hidden
+          data-testid={`${id}-currency`}
+          className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted"
+        >
+          {symbol}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function isEmpty(v: unknown): boolean {
   return v === undefined || v === null || v === "";
@@ -303,6 +373,17 @@ export function CrudDrawer({
             aria-invalid={invalid || undefined}
             onChange={(e) => setField(f.name, e.target.value === "" ? "" : Number(e.target.value))}
             className={`${baseInputClass} ${borderClass} ${fontClass}`}
+          />
+        ) : f.type === "money" ? (
+          <MoneyInput
+            id={id}
+            value={value}
+            placeholder={f.placeholder}
+            invalid={invalid}
+            precision={f.moneyPrecision ?? "budget"}
+            symbol={typeof f.currency === "function" ? f.currency(values) : (f.currency ?? "")}
+            className={`${baseInputClass} ${borderClass} ${fontClass}`}
+            onChange={(v) => setField(f.name, v)}
           />
         ) : f.type === "textarea" ? (
           <textarea
