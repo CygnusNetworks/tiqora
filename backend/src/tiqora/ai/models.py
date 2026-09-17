@@ -427,11 +427,12 @@ class TiqoraAiQueuePolicy(TiqoraBase):
         Boolean, nullable=False, default=False, server_default=false()
     )
 
-    # Free text describing what belongs in **this** queue. It is never read
-    # for this queue's own triage run — it is offered to *other* queues that
-    # list this one in their triage_target_queue_ids. Empty means a target
-    # queue is presented to the model by name only, which degrades routing
-    # badly; the admin UI warns about it.
+    # Free text describing what belongs in **this** queue. Used twice: shown
+    # to *other* queues that list this one in their triage_target_queue_ids,
+    # and shown under the "stay" option of this queue's own triage run, so
+    # the model has a concrete reason to leave a ticket where it is. Empty
+    # means a target is offered by name only, which degrades routing badly;
+    # the admin UI warns about it.
     routing_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # JSON array of queue ids this queue may route *into* (parsed with

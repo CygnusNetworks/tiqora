@@ -991,6 +991,9 @@ async def test_real_world_tickets_route_to_netadmin_queue(
         prompt = llm.last_user_message
         assert subject in prompt
         assert NETADMIN_DESC in prompt, "target routing_description missing from the prompt"
+        # The source queue's own description sits under the "stay" option,
+        # so staying is argued for as concretely as moving.
+        assert NETZKOORDINATOR_DESC in prompt, "source routing_description missing"
         assert queue_key(ids["target_queue_id"]) in prompt
         assert body.splitlines()[2] in prompt
     finally:

@@ -317,3 +317,54 @@ def test_queue_id_from_key_rejects_foreign_shapes() -> None:
     assert queue_id_from_key("stw-bn") is None
     assert queue_id_from_key("q_abc") is None
     assert queue_id_from_key(NO_QUEUE_KEY) is None
+
+
+# --------------------------------------------------------------------------
+# build_user_message: the "stay" option
+# --------------------------------------------------------------------------
+
+
+def _ticket() -> TicketSnapshot:
+    return TicketSnapshot(
+        ticket_id=1,
+        queue_id=10,
+        customer_id=None,
+        title="Entsperrung",
+        queue_name="studentenwerk-bonn",
+    )
+
+
+_TARGET = QueueCandidate(
+    queue_id=5,
+    key=queue_key(5),
+    name="stw-bn",
+    description="Technischer Support: Sperren und deren Entsperrung.",
+)
+
+
+def test_stay_option_carries_the_source_queue_description() -> None:
+    """Without it the model has nothing arguing for staying, and a mail that
+    shares vocabulary with a target ("Entsperrung") is moved anyway."""
+    rendered = build_user_message(
+        ticket=_ticket(),
+        candidates=[_TARGET],
+        subject="Mieter entsperren?",
+        body="Kann der Mieter nach der Urheberrechtsverletzung entsperrt werden?",
+        from_address="wohnen@example.org",
+        current_description="Institutionelle Kommunikation mit der Abteilung Wohnen.",
+    )
+    stay = rendered[rendered.index(f"[{NO_QUEUE_KEY}]") :]
+    assert "studentenwerk-bonn" in stay
+    assert "Institutionelle Kommunikation mit der Abteilung Wohnen." in stay
+
+
+def test_stay_option_without_description_has_no_empty_line() -> None:
+    rendered = build_user_message(
+        ticket=_ticket(),
+        candidates=[_TARGET],
+        subject="x",
+        body="y",
+        from_address="z@example.org",
+        current_description="   ",
+    )
+    assert rendered.rstrip().endswith("Ticket bleibt in der aktuellen Queue studentenwerk-bonn.")
