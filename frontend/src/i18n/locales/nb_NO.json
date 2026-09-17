@@ -1102,7 +1102,7 @@
         "kbCategoriesEmpty": "Ingen kategorier tilgjengelig.",
         "routingDescription": "What belongs in this queue",
         "routingDescriptionPlaceholder": "e.g. Technical support: connection, router, blocks, account, Wi-Fi, IPTV, diagnosis, activation.",
-        "routingDescriptionHint": "This text describes THIS queue and is shown to OTHER queues that list it as a routing target. It is not used for this queue's own triage decision.",
+        "routingDescriptionHint": "This text describes THIS queue. It is shown to OTHER queues that list it as a routing target, and in this queue's own triage run as the reason to leave a ticket where it is.",
         "triageTargets": "Queues this queue may route into",
         "triageTargetsNoDescription": "No routing description set for: {{queues}}. The model only sees the queue name, which makes routing much less reliable.",
         "triageAutoThreshold": "Move automatically from",
