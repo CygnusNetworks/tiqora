@@ -107,6 +107,16 @@ KEY_AI_WORKER_INTERVAL_SECONDS = "daemon.ai_worker.interval_seconds"
 # key so the settings_store surface is stable.
 KEY_AI_OUTBOX_WATERMARK = "daemon.ai_worker.outbox_watermark"
 
+# AI triage (tiqora.ai.triage_worker) — its own outbox cursor, independent
+# of the auto-reply one above. Enablement is per-queue ``enabled_triage``
+# plus ``operation_mode=tiqora_primary`` (same gate as auto-reply); there is
+# no extra global flag. The cursor is NOT seeded by the migration: the
+# worker sets it to the current MAX(tiqora_event_outbox.id) on its first
+# tick, so the first primary tick never replays the backlog. A missing row
+# and a stored "0" therefore mean different things — read it with
+# get_setting (str | None), never get_setting_int with a 0 default.
+KEY_AI_TRIAGE_WATERMARK = "daemon.ai_worker.triage_watermark"
+
 # LLM-Request-Audit (tiqora.ai.audit) — how many days a tiqora_ai_audit_log
 # row is kept before the daily cleanup daemon deletes it. Default 30,
 # admin-editable within [1, 365] (tiqora.ai.audit.MIN/MAX_RETENTION_DAYS).

@@ -264,10 +264,42 @@ export function AiPanel({
     },
   });
 
+  const acceptTriageMutation = useMutation({
+    mutationFn: ({
+      triageId,
+      parts,
+    }: {
+      triageId: number;
+      parts: { queue: boolean; customer: boolean };
+    }) => ticketAiApi.acceptTriage(ticketId, triageId, parts),
+    onSuccess: () => {
+      // Accepting a queue half changes the ticket header, not just the AI
+      // panel, so invalidate the whole ticket rather than only its ai key.
+      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
+    },
+  });
+
+  const rejectTriageMutation = useMutation({
+    mutationFn: (triageId: number) =>
+      ticketAiApi.rejectTriage(ticketId, triageId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["tickets", ticketId, "ai"],
+      });
+    },
+  });
+
   if (stateQ.isLoading || stateQ.isError || !stateQ.data) return null;
 
   const state = stateQ.data;
-  if (!state.manual_assist_available && !state.summary_available) return null;
+  if (
+    !state.manual_assist_available &&
+    !state.summary_available &&
+    !state.triage
+  )
+    // A triage-only queue enables neither of the two, but still has a
+    // proposal worth showing.
+    return null;
 
   // Only this panel instance's OWN triggered run ever renders a
   // running/skipped/error result — see the `myRunStartedAt` doc comment
@@ -374,6 +406,94 @@ export function AiPanel({
               )}
             </Button>
           </span>
+        </div>
+      )}
+
+      {state.triage && (
+        <div
+          className="space-y-2 rounded-md border border-accent/40 bg-accent/10 p-2.5 text-xs text-ink"
+          data-testid="ai-panel-triage"
+        >
+          <div className="font-semibold">{t("ticket.ai.triage.title")}</div>
+
+          {state.triage.suggested_queue_id != null && (
+            <div data-testid="ai-panel-triage-queue">
+              {t("ticket.ai.triage.queueLine", {
+                queue:
+                  state.triage.suggested_queue_name ??
+                  String(state.triage.suggested_queue_id),
+                confidence: state.triage.queue_confidence ?? 0,
+              })}
+              {state.triage.queue_reason && (
+                <div className="mt-0.5 text-muted">
+                  {state.triage.queue_reason}
+                </div>
+              )}
+            </div>
+          )}
+
+          {state.triage.extracted_email && (
+            <div data-testid="ai-panel-triage-customer">
+              {state.triage.suggested_customer_user_id
+                ? t("ticket.ai.triage.customerLine", {
+                    email: state.triage.extracted_email,
+                    name:
+                      state.triage.suggested_customer_name ??
+                      state.triage.suggested_customer_user_id,
+                  })
+                : t("ticket.ai.triage.customerUnknownLine", {
+                    email: state.triage.extracted_email,
+                  })}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              title={!canNote ? t("ticket.toolbar.noPermission") : undefined}
+            >
+              <Button
+                size="sm"
+                variant="secondary"
+                data-testid="ai-panel-triage-accept"
+                disabled={!canNote || acceptTriageMutation.isPending}
+                onClick={() =>
+                  acceptTriageMutation.mutate({
+                    triageId: state.triage!.id,
+                    parts: {
+                      queue: state.triage!.suggested_queue_id != null,
+                      customer:
+                        state.triage!.suggested_customer_user_id != null,
+                    },
+                  })
+                }
+              >
+                {acceptTriageMutation.isPending ? (
+                  <Spinner className="h-3.5 w-3.5" />
+                ) : (
+                  t("ticket.ai.triage.accept")
+                )}
+              </Button>
+            </span>
+            <span
+              title={!canNote ? t("ticket.toolbar.noPermission") : undefined}
+            >
+              <Button
+                size="sm"
+                variant="ghost"
+                data-testid="ai-panel-triage-reject"
+                disabled={!canNote || rejectTriageMutation.isPending}
+                onClick={() => rejectTriageMutation.mutate(state.triage!.id)}
+              >
+                {t("ticket.ai.triage.reject")}
+              </Button>
+            </span>
+          </div>
+
+          {acceptTriageMutation.isError && (
+            <div className="text-danger" data-testid="ai-panel-triage-error">
+              {t("ticket.ai.triage.acceptFailed")}
+            </div>
+          )}
         </div>
       )}
 

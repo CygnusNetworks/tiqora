@@ -88,6 +88,36 @@ DRAFT_STATUSES = frozenset(
     {DRAFT_STATUS_OPEN, DRAFT_STATUS_ACCEPTED, DRAFT_STATUS_DISCARDED, DRAFT_STATUS_SUPERSEDED}
 )
 
+# tiqora_ai_triage.status
+#   open      — a proposal is waiting for an agent to accept/reject it
+#   applied   — the worker itself applied it (confidence >= auto threshold)
+#   accepted  — a human accepted the proposal from the ticket UI
+#   rejected  — a human rejected it
+#   no_action — the run finished but nothing reached the suggest threshold
+#   error     — the run failed; the row exists only as the "already triaged" guard
+TRIAGE_STATUS_OPEN = "open"
+TRIAGE_STATUS_APPLIED = "applied"
+TRIAGE_STATUS_ACCEPTED = "accepted"
+TRIAGE_STATUS_REJECTED = "rejected"
+TRIAGE_STATUS_NO_ACTION = "no_action"
+TRIAGE_STATUS_ERROR = "error"
+TRIAGE_STATUSES = frozenset(
+    {
+        TRIAGE_STATUS_OPEN,
+        TRIAGE_STATUS_APPLIED,
+        TRIAGE_STATUS_ACCEPTED,
+        TRIAGE_STATUS_REJECTED,
+        TRIAGE_STATUS_NO_ACTION,
+        TRIAGE_STATUS_ERROR,
+    }
+)
+
+# tiqora_ai_triage.customer_source — how the forwarded-sender address was
+# obtained. "header_parse" is the only one that can auto-apply; "llm" exists
+# for the (currently disabled) tie-breaker path, see tiqora.ai.triage.
+TRIAGE_CUSTOMER_SOURCE_HEADER = "header_parse"
+TRIAGE_CUSTOMER_SOURCE_LLM = "llm"
+
 # tiqora_ai_draft.source / tiqora_ai_article_origin.source
 SOURCE_AUTO = "auto"
 SOURCE_MANUAL = "manual"
@@ -122,6 +152,13 @@ AI_FEATURES = frozenset(
     {FEATURE_SUMMARY, FEATURE_AUTO_REPLY, FEATURE_MANUAL_ASSIST, FEATURE_MCP, FEATURE_REFINE}
 )
 
+# tiqora_ai_usage.feature for triage runs. Deliberately **not** in
+# AI_FEATURES: that set is what tiqora.ai.acl validates against, and triage
+# has no interactive user to grant or deny it to — listing it there would
+# surface a meaningless per-user ACL row in the admin UI. The usage column is
+# free-form String(30), so the literal is all that is needed.
+FEATURE_TRIAGE = "triage"
+
 # tiqora_ai_audit_log.feature — distinct from AI_FEATURES above: this is the
 # LLM *call site*, not the ACL/usage feature name (manual assist calls are
 # logged as "draft" — every Manual Assist run is always the draft path, see
@@ -132,6 +169,7 @@ AUDIT_FEATURE_AUTO_REPLY = "auto_reply"
 AUDIT_FEATURE_VISION = "vision"
 AUDIT_FEATURE_TEST = "test"
 AUDIT_FEATURE_REFINE = "refine"
+AUDIT_FEATURE_TRIAGE = "triage"
 AUDIT_FEATURES = frozenset(
     {
         AUDIT_FEATURE_DRAFT,
@@ -140,6 +178,7 @@ AUDIT_FEATURES = frozenset(
         AUDIT_FEATURE_VISION,
         AUDIT_FEATURE_TEST,
         AUDIT_FEATURE_REFINE,
+        AUDIT_FEATURE_TRIAGE,
     }
 )
 
@@ -381,6 +420,68 @@ class TiqoraAiQueuePolicy(TiqoraBase):
         String(12), nullable=False, default=DETAIL_STANDARD, server_default=DETAIL_STANDARD
     )
 
+    # --- AI triage (tiqora.ai.triage / tiqora.ai.triage_worker) ------------
+    # Routing of a newly created ticket into the correct queue, decided once
+    # on the ticket's first article, before the reply agent runs.
+    enabled_triage: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+
+    # Free text describing what belongs in **this** queue. It is never read
+    # for this queue's own triage run — it is offered to *other* queues that
+    # list this one in their triage_target_queue_ids. Empty means a target
+    # queue is presented to the model by name only, which degrades routing
+    # badly; the admin UI warns about it.
+    routing_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # JSON array of queue ids this queue may route *into* (parsed with
+    # tiqora.ai.listfields.parse_int_list, same shape as kb_category_ids).
+    # This list is also the authorization boundary for the automatic move:
+    # the worker uses the module-level move_queue mutator, which does not
+    # check move_into for the service user — an admin putting a queue here
+    # *is* the grant. See tiqora.ai.triage.apply_decision.
+    triage_target_queue_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Confidence is an int 0..100 (never a float — every other threshold in
+    # this table is Integer, and it avoids MariaDB/Postgres rounding drift).
+    # Default 100 means "suggest only, never move on its own": the thresholds
+    # are unmeasured on a fresh install, so autonomy has to be switched on
+    # deliberately per queue once /admin/ai/triage/stats supports it.
+    triage_auto_threshold: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+    triage_suggest_threshold: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=50, server_default="50"
+    )
+    # Self-consistency votes per triage run (see tiqora.ai.triage.decide).
+    # 1 disables voting and falls back to the model's self-report alone.
+    triage_samples: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=3, server_default="3"
+    )
+
+    triage_customer_fix_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    triage_customer_fix_auto_threshold: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+
+    # Set on the *destination* queue: after a triage move into this queue,
+    # park the reply agent until the customer writes again (implemented by
+    # setting tiqora_ai_ticket_state.last_customer_article_id). Off by
+    # default — with it on, the customer gets no AI answer to their first
+    # mail at all.
+    triage_delay_reply: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+
+    # Triage may use a cheaper model than the reply agent. NULL falls back to
+    # llm_provider_id / model_override.
+    triage_llm_provider_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
+    )
+    triage_model_override: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"
     )
@@ -389,6 +490,77 @@ class TiqoraAiQueuePolicy(TiqoraBase):
         DateTime, nullable=False, server_default=func.now()
     )
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+
+class TiqoraAiTriage(TiqoraBase):
+    """One triage decision per ticket (tiqora.ai.triage_worker).
+
+    A row is written for **every** run, including ``no_action`` and
+    ``error`` — it doubles as the permanent "this ticket was already
+    triaged" guard (hence ``UNIQUE(ticket_id)``) and as the labelled
+    dataset that turns ``triage_auto_threshold`` from a guess into a
+    measured number: accepted-vs-rejected per confidence bucket is exactly
+    what ``GET /admin/ai/triage/stats`` reports.
+
+    Deliberately its own table rather than columns on
+    ``tiqora_ai_ticket_state``: that row is read on the hot path of every
+    auto-reply tick, and the two independent proposals here (queue and
+    customer), each with its own confidence and applied flag, would add
+    ~15 columns to it. Shape mirrors ``tiqora_ai_draft``.
+    """
+
+    __tablename__ = "tiqora_ai_triage"
+    __table_args__ = (
+        UniqueConstraint("ticket_id", name="uq_tiqora_ai_triage_ticket"),
+        Index("ix_tiqora_ai_triage_status_created", "status", "create_time"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # The article that triggered the run — always the ticket's first.
+    article_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_queue_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    # --- queue proposal ---
+    suggested_queue_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    queue_confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    queue_applied: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    # Model rationale. Internal only — never shown to a customer.
+    queue_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON array of [{"key": "q_42", "votes": 3, "self": 95}, ...] — the raw
+    # vote distribution, kept because the run is not deterministic on replay.
+    candidates_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- customer proposal (forwarded mail) ---
+    extracted_email: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # customer_user.LOGIN, not the numeric PK — that is what ticket.
+    # customer_user_id stores (see tiqora.ai.context.customer_user_name).
+    suggested_customer_user_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    suggested_customer_id: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    customer_confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_applied: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    customer_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    # --- bookkeeping ---
+    # Joins tiqora_ai_audit_log and tiqora_ai_usage; one run_id covers all
+    # `triage_samples` LLM calls.
+    run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    decided_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
     change_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

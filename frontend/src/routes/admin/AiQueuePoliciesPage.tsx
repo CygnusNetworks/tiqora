@@ -9,6 +9,7 @@ import {
   type AclFeature,
   type AiQueuePolicyOut,
   type AiUsageOut,
+  type UsageFeature,
 } from "@/lib/aiApi";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { PickerField } from "@/components/admin/PickerField";
@@ -46,7 +47,7 @@ export function AiQueuePoliciesPage() {
 
   const [listTab, setListTab] = useState<ListTab>("policies");
   const [usageQueueFilter, setUsageQueueFilter] = useState<number>(NONE);
-  const [usageFeatureFilter, setUsageFeatureFilter] = useState<AclFeature | "">(
+  const [usageFeatureFilter, setUsageFeatureFilter] = useState<UsageFeature | "">(
     "",
   );
   const [usagePage, setUsagePage] = useState(1);
@@ -122,7 +123,8 @@ export function AiQueuePoliciesPage() {
       r.enabled_manual_assist ||
       r.enabled_summary ||
       r.enabled_auto_reply ||
-      r.enabled_refine;
+      r.enabled_refine ||
+      r.enabled_triage;
     return (
       <div key={r.id} className="border-t border-hairline first:border-t-0">
         <div
@@ -175,6 +177,9 @@ export function AiQueuePoliciesPage() {
             )}
             {r.enabled_auto_reply && (
               <Badge tone="warn">{t("admin.ai.feature.auto_reply")}</Badge>
+            )}
+            {r.enabled_triage && (
+              <Badge tone="accent">{t("admin.ai.queues.tab.triage")}</Badge>
             )}
             {!hasFeature && (
               <Badge tone="muted">{t("admin.ai.queues.noFeatures")}</Badge>
@@ -231,9 +236,12 @@ export function AiQueuePoliciesPage() {
   const usageFeatureItems = useMemo(
     () => [
       { value: "" as const, label: t("admin.ai.usage.allFeatures") },
-      ...[...FEATURES, "mcp" as AclFeature].map((f) => ({
+      ...[...FEATURES, "mcp" as AclFeature, "triage" as UsageFeature].map((f) => ({
         value: f,
-        label: t(`admin.ai.feature.${f}`),
+        label:
+          f === "triage"
+            ? t("admin.ai.queues.tab.triage")
+            : t(`admin.ai.feature.${f}`),
       })),
     ],
     [t],
