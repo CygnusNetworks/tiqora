@@ -529,6 +529,15 @@
         "accepted": "Accepted",
         "discarded": "Discarded",
         "superseded": "Superseded"
+      },
+      "triage": {
+        "title": "AI triage suggestion",
+        "queueLine": "Move to {{queue}} (confidence {{confidence}}%)",
+        "customerLine": "Sender of the forwarded mail: {{email}} ({{name}})",
+        "customerUnknownLine": "Sender of the forwarded mail: {{email}} — no matching customer record",
+        "accept": "Apply",
+        "reject": "Dismiss",
+        "acceptFailed": "Could not apply — you may not have permission to move into that queue."
       }
     },
     "toolbar": {
@@ -907,7 +916,8 @@
         "auto_reply": "Auto reply",
         "manual_assist": "Manual assist",
         "mcp": "MCP",
-        "refine": "Refine text"
+        "refine": "Refine text",
+        "triage": "Route new tickets into the right queue"
       },
       "providers": {
         "title": "LLM providers",
@@ -1055,7 +1065,8 @@
           "drafts": "Drafts",
           "summaries": "Summaries",
           "auto": "Auto replies",
-          "safety": "Safety"
+          "safety": "Safety",
+          "triage": "Triage"
         },
         "editor": {
           "newTitle": "New queue policy",
@@ -1063,6 +1074,7 @@
           "queueLocked": "The queue can no longer be changed after creation."
         },
         "autoGateWarning": "Auto replies require \"Tiqora only\" (tiqora_primary) mode. Currently: parallel operation — the switch stays locked.",
+        "triageGateWarning": "Triage requires \"Tiqora only\" (tiqora_primary) mode. Currently: parallel operation — the switch stays locked.",
         "ignoredSenders": "Ignored senders",
         "ignoredSendersPlaceholder": "one address per line, e.g. noreply@example.com or *@internal.example",
         "ignoreSendersManual": "Also block manual drafts",
@@ -1087,7 +1099,22 @@
           "detailed": "Detailed"
         },
         "kbCategories": "KB categories",
-        "kbCategoriesEmpty": "No categories available."
+        "kbCategoriesEmpty": "No categories available.",
+        "routingDescription": "What belongs in this queue",
+        "routingDescriptionPlaceholder": "e.g. Technical support: connection, router, blocks, account, Wi-Fi, IPTV, diagnosis, activation.",
+        "routingDescriptionHint": "This text describes THIS queue and is shown to OTHER queues that list it as a routing target. It is not used for this queue's own triage decision.",
+        "triageTargets": "Queues this queue may route into",
+        "triageTargetsNoDescription": "No routing description set for: {{queues}}. The model only sees the queue name, which makes routing much less reliable.",
+        "triageAutoThreshold": "Move automatically from",
+        "triageSuggestThreshold": "Propose from",
+        "triageSamples": "Samples",
+        "triageThresholdExplainer": "{{auto}} and above → move automatically · {{suggestLow}}–{{suggestHigh}} → propose · below {{suggestLow}} → do nothing",
+        "triageDelayReply": "After a move into this queue, wait for the customer's next message before replying",
+        "triageCustomerFix": "Correct the customer on forwarded mail",
+        "triageCustomerFixThreshold": "Correct customer from",
+        "triageProvider": "Triage provider",
+        "triageProviderInherit": "Inherit from the queue's provider",
+        "triageModelOverride": "Triage model"
       },
       "usage": {
         "title": "Usage",
@@ -1127,7 +1154,9 @@
           "summary": "Summary",
           "auto_reply": "Auto-reply",
           "vision": "Vision",
-          "test": "Connection test"
+          "test": "Connection test",
+          "refine": "Refine text",
+          "triage": "Triage"
         },
         "allFeatures": "All features",
         "status": "Status",
@@ -1261,7 +1290,18 @@
         "allowedStateTypes": "Comma-separated list of allowed Znuny state types (e.g. \"open\" or \"open,closed\"). It governs both what the AI may set via update_ticket_fields — enforced for the state name and the numeric state id alike — and the state Tiqora parks a ticket in after it sent an auto-reply itself: a factual reply closes the ticket when \"closed\" is allowed (falling back to \"open\"), a clarifying question only opens it. Empty = default \"open\" only (reopening allowed, never closing); an explicit empty list \"[]\" disables state changes entirely, so an auto-replied ticket keeps whatever state it had.",
         "piiNer": "Detects person names in text via spaCy NER (German + English) and masks them as [NAME_n] before content reaches the LLM provider — in addition to customer name and senders. Only active when PII masking is on. False positives are harmless (just more masking).",
         "summaryDetail": "Standard: compact paragraphs, 1–2 sentences per attached document. Detailed: more thorough paragraphs and 3–5 sentences per document — useful for queues with many PDF attachments.",
-        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate."
+        "enabledRefine": "Shows the “Refine text” button in the reply and New-ticket composers. The model rewrites only what the agent typed; quoted passages are left untouched. Nothing is stored and nothing is sent — the agent sees the result in the editor and can undo it. Not affected by the operation-mode gate.",
+        "enabledTriage": "Runs once on a ticket's first message, before the reply agent, and proposes a better queue. Requires a service user, a provider and at least one target queue. Only available in tiqora_primary operation mode.",
+        "routingDescription": "The single most important setting for routing quality. Without it a target queue is offered to the model by name alone.",
+        "triageTargets": "The allowlist is also the authorization: the worker moves tickets without a move_into permission check, so only list queues you want it to reach.",
+        "triageAutoThreshold": "Confidence needed to move the ticket without asking. 100 means never move on its own, only propose. Lower it once agents accept enough proposals at that confidence.",
+        "triageSuggestThreshold": "Confidence needed to show a proposal an agent can accept. Below this nothing is shown at all.",
+        "triageSamples": "How often the model is asked per ticket. Agreement between samples is the main confidence signal, so 1 disables it. Each sample is a separate LLM call on every new ticket.",
+        "triageDelayReply": "Set on the DESTINATION queue. Protects against a routing mistake turning into a wrong answer, at the cost of the customer getting no AI reply to their first mail.",
+        "triageCustomerFix": "When a mail was forwarded, use the original sender as the ticket customer. Only applied when the address appears verbatim in the message and matches exactly one customer record.",
+        "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain.",
+        "triageProvider": "Triage is a classification task and runs several times per ticket, so a smaller, cheaper model is usually the right choice here.",
+        "triageModelOverride": "Leave empty to use the provider's default model."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."
@@ -1820,7 +1860,15 @@
       "every": "every",
       "olderThan": "older than {{duration}}",
       "newerThan": "newer than {{duration}}",
-      "weekdaysShort": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      "weekdaysShort": [
+        "Sun",
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat"
+      ],
       "keyLabel": {
         "StateIDs": "State",
         "QueueIDs": "Queue",

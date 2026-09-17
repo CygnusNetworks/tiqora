@@ -99,7 +99,11 @@ export function AiSettingsPage() {
 
   const mode = settingsQ.data.operation_mode;
   const activePolicyCount = (policiesQ.data?.items ?? []).filter(
-    (p) => p.enabled_auto_reply || p.enabled_summary || p.enabled_manual_assist,
+    (p) =>
+      p.enabled_auto_reply ||
+      p.enabled_summary ||
+      p.enabled_manual_assist ||
+      p.enabled_triage,
   ).length;
 
   return (
