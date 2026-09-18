@@ -24,13 +24,13 @@ export function SignaturesPage() {
 
   const fields: FieldDef[] = [
     { name: "name", label: t("admin.signatures.name"), type: "text", required: true },
-    // Prose body — proportional UI font (not monospace).
+    // Monospace to match how the signature is rendered in the reply composer.
     {
       name: "text",
       label: t("admin.signatures.text"),
       type: "textarea",
       required: true,
-      mono: false,
+      mono: true,
       rows: 10,
       afterControl: ({ value, onChange, controlId }) => (
         <VariableReference
