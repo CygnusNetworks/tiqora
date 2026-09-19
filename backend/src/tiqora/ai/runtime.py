@@ -19,6 +19,7 @@ from email.utils import parseaddr
 from typing import Any
 
 import structlog
+from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,7 +55,7 @@ from tiqora.ai.identity import (
     record_identity_attempt,
     verify_identity_claim,
 )
-from tiqora.ai.kb_wiring import build_vision_llm_factory
+from tiqora.ai.kb_wiring import build_llm_client, build_vision_llm_factory
 from tiqora.ai.listfields import parse_int_list
 from tiqora.ai.llm import (
     LlmClient,
@@ -1051,6 +1052,49 @@ async def _run_identity_exchange(
     return result
 
 
+async def _resolve_final_answer_llm(
+    session: AsyncSession,
+    settings: Settings,
+    policy: TiqoraAiQueuePolicy,
+    injected: LlmClient | None,
+    *,
+    audit_context: AuditContext,
+    pii: PiiMapper,
+) -> LlmClient | None:
+    """The audited final-answer client for this run, or ``None`` when the
+    queue has none configured or it is unusable right now (provider gone,
+    budget exceeded) — the primary model then answers, as before."""
+    if injected is None:
+        if policy.final_answer_llm_provider_id is None:
+            return None
+        try:
+            injected = await build_llm_client(
+                session,
+                settings,
+                policy.final_answer_llm_provider_id,
+                policy.final_answer_model_override,
+            )
+        except HTTPException as exc:
+            logger.warning(
+                "ai_final_answer_model_unavailable",
+                queue_id=policy.queue_id,
+                provider_id=policy.final_answer_llm_provider_id,
+                reason=exc.detail,
+            )
+            return None
+    return AuditingLlmClient(
+        injected,
+        settings=settings,
+        context=replace(
+            audit_context,
+            provider_id=policy.final_answer_llm_provider_id,
+            model=policy.final_answer_model_override,
+        ),
+        session=session,
+        pii_mapper=pii,
+    )
+
+
 async def run_ticket_agent(
     session: AsyncSession,
     *,
@@ -1070,6 +1114,7 @@ async def run_ticket_agent(
     vision_llm_factory: Any = None,
     source_channel: str | None = None,
     telegram_gateway: Any = None,
+    final_llm: LlmClient | None = None,
 ) -> AgentRunResult:
     """Run the agent once for one ticket (plan §3.4 steps 1-12).
 
@@ -1086,6 +1131,9 @@ async def run_ticket_agent(
     ``tiqora.ai.gate``). ``telegram_gateway`` is an injectable seam for the
     typing-indicator task (tests); production omits it and a gateway is
     built lazily from the channel config only when actually needed.
+    ``final_llm`` is an injectable seam for the final-answer model (tests);
+    production omits it and the policy's ``final_answer_llm_provider_id`` is
+    resolved instead.
     """
     # 1. Readiness gate — auto-reply only (plan §3.0 v1.1 relaxation, Phase
     # E). Manual Assist always runs regardless of operation_mode: it only
@@ -1244,6 +1292,9 @@ async def run_ticket_agent(
         llm = AuditingLlmClient(
             llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
         )
+        final_llm = await _resolve_final_answer_llm(
+            session, settings, policy, final_llm, audit_context=audit_context, pii=pii
+        )
         reply_language_line = _resolve_reply_language_line(policy, ticket, customer_articles)
         # trigger=manual (AI draft in the agent UI) never sets source_channel,
         # so a Telegram ticket is instead recognized off the based-on/latest
@@ -1336,13 +1387,32 @@ async def run_ticket_agent(
             )
         )
         nudges_left = _MAX_PLAIN_TEXT_NUDGES
+        # Final-answer handover: the primary model does the research; the
+        # moment it tries to write the customer message, that call is
+        # discarded unexecuted and the same conversation goes to the
+        # final-answer model, which carries on (it may still look things up)
+        # until it reaches a terminal tool. Everything before the handover is
+        # already in `messages`, so nothing the primary found is lost.
+        active_llm: LlmClient = llm
+        handed_over = False
+        # Tokens the final-answer model spent, booked on its own provider so
+        # its prices and budget apply (``prompt_tokens``/``completion_tokens``
+        # stay the run totals).
+        final_prompt_tokens = 0
+        final_completion_tokens = 0
+        final_served_model: str | None = None
         for _round in range(rounds):
             response: LlmResponse = await _chat_with_budget_retry(
-                llm, messages=messages, tools=schemas, max_tokens=completion_budget
+                active_llm, messages=messages, tools=schemas, max_tokens=completion_budget
             )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
-            served_model = response.model or served_model
+            if handed_over:
+                final_prompt_tokens += response.usage.prompt_tokens
+                final_completion_tokens += response.usage.completion_tokens
+                final_served_model = response.model or final_served_model
+            else:
+                served_model = response.model or served_model
 
             if not response.tool_calls:
                 # Plain text never reaches anyone (no send-tool exists) — but
@@ -1357,6 +1427,16 @@ async def run_ticket_agent(
                     messages.append(LlmMessage(role="user", content=_PLAIN_TEXT_NUDGE))
                     continue
                 break
+
+            if (
+                final_llm is not None
+                and not handed_over
+                and any(tc.name == TOOL_PROPOSE_CUSTOMER_MESSAGE for tc in response.tool_calls)
+            ):
+                handed_over = True
+                active_llm = final_llm
+                logger.info("ai_final_answer_handover", ticket_id=ticket_id, round=_round)
+                continue
 
             messages.append(
                 LlmMessage(
@@ -1413,12 +1493,22 @@ async def run_ticket_agent(
             # makes "how often is the budget too small?" answerable from the
             # logs instead of by guesswork the next time someone asks.
             logger.info("ai_terminal_force", ticket_id=ticket_id, trigger=trigger, rounds=rounds)
+            # The forced call writes the answer, so it is the final-answer
+            # model's job whenever one is configured.
+            if final_llm is not None:
+                handed_over = True
+                active_llm = final_llm
             response = await _chat_with_budget_retry(
-                llm, messages=messages, tools=terminal_schemas, max_tokens=completion_budget
+                active_llm, messages=messages, tools=terminal_schemas, max_tokens=completion_budget
             )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
-            served_model = response.model or served_model
+            if handed_over:
+                final_prompt_tokens += response.usage.prompt_tokens
+                final_completion_tokens += response.usage.completion_tokens
+                final_served_model = response.model or final_served_model
+            else:
+                served_model = response.model or served_model
             if response.tool_calls:
                 messages.append(
                     LlmMessage(
@@ -1462,6 +1552,20 @@ async def run_ticket_agent(
                 trigger=trigger,
             )
 
+        if handed_over:
+            await usage_service.record_usage(
+                session,
+                user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
+                queue_id=ticket.queue_id,
+                ticket_id=ticket_id,
+                feature=feature,
+                provider_id=policy.final_answer_llm_provider_id,
+                model=final_served_model or policy.final_answer_model_override,
+                prompt_tokens=final_prompt_tokens,
+                completion_tokens=final_completion_tokens,
+                success=True,
+                extra_json=json.dumps({"final_answer": True}),
+            )
         await usage_service.record_usage(
             session,
             user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
@@ -1470,13 +1574,14 @@ async def run_ticket_agent(
             feature=feature,
             provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
             model=served_model or getattr(raw_llm, "active_model", None) or policy.model_override,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
+            prompt_tokens=prompt_tokens - final_prompt_tokens,
+            completion_tokens=completion_tokens - final_completion_tokens,
             success=True,
             extra_json=json.dumps(
                 {
                     "tool_trace": "masked_in_messages",
                     "tools_executed": executed_tool_names,
+                    "final_answer_handover": handed_over,
                     "tool_chain_alerts": [
                         {"code": a.code, "message": a.message} for a in chain_alerts
                     ],
