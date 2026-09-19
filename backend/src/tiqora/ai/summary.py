@@ -47,6 +47,7 @@ from tiqora.ai.context import (
     get_or_create_state,
     load_articles,
     ner_source_texts,
+    pii_never_mask,
     render_ticket_header,
     ticket_snapshot,
 )
@@ -431,7 +432,7 @@ async def summarize_ticket(
     )
     attachment_blocks = attachment_context.blocks
 
-    never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+    never_mask = pii_never_mask(ticket)
     ner_texts = (
         ner_source_texts(articles, attachment_blocks)
         if policy.pii_masking and policy.pii_ner_enabled
