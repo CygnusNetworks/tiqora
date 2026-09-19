@@ -483,6 +483,15 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     )
     triage_model_override: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
+    # Final-answer model for the reply agent: the (cheaper) primary model runs
+    # the research/tool loop; once it wants to write the customer message, the
+    # run is handed over to this model, which writes the answer from the same
+    # conversation (see tiqora.ai.runtime). NULL = the primary model answers.
+    final_answer_llm_provider_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
+    )
+    final_answer_model_override: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"
     )

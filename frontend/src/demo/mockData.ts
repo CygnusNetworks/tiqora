@@ -736,6 +736,7 @@ function queuePolicy(over: Record<string, unknown>) {
     triage_auto_threshold: 100, triage_suggest_threshold: 50, triage_samples: 3,
     triage_customer_fix_enabled: false, triage_customer_fix_auto_threshold: 100,
     triage_delay_reply: false, triage_llm_provider_id: null, triage_model_override: null,
+    final_answer_llm_provider_id: null, final_answer_model_override: null,
     valid_id: 1, create_time: t0, change_time: t0,
     ...over,
   };

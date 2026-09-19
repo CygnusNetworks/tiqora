@@ -1114,7 +1114,10 @@
         "triageCustomerFixThreshold": "Correct customer from",
         "triageProvider": "Triage provider",
         "triageProviderInherit": "Inherit from the queue's provider",
-        "triageModelOverride": "Triage model"
+        "triageModelOverride": "Triage model",
+        "finalAnswerProvider": "Final-answer provider",
+        "finalAnswerProviderNone": "None (the queue's model answers)",
+        "finalAnswerModelOverride": "Final-answer model"
       },
       "usage": {
         "title": "उपयोग",
@@ -1301,7 +1304,9 @@
         "triageCustomerFix": "When a mail was forwarded, use the original sender as the ticket customer. Only applied when the address appears verbatim in the message and matches exactly one customer record.",
         "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain.",
         "triageProvider": "Triage is a classification task and runs several times per ticket, so a smaller, cheaper model is usually the right choice here.",
-        "triageModelOverride": "Leave empty to use the provider's default model."
+        "triageModelOverride": "Leave empty to use the provider's default model.",
+        "finalAnswerProvider": "Optional stronger model that writes the customer message. The queue's model does the research (diagnosis, knowledge base); as soon as it wants to answer, the conversation is handed over to this model, which writes the reply. Costs one or two extra calls per answered ticket.",
+        "finalAnswerModelOverride": "Leave empty to use the provider's default model."
       },
       "common": {
         "validId": "वैध/अमान्य एक सॉफ्ट-डिलीट फ़्लैग है: किसी प्रविष्टि को अमान्य चिह्नित करना मौजूदा संदर्भों (जैसे टिकट, असाइनमेंट) को हटाए बिना नए रिकॉर्ड के लिए इसे चुनने वालों से छुपाता है। कोई हार्ड डिलीट नहीं है."
