@@ -206,7 +206,7 @@ def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
             },
         )
     engine.dispose()
-    return {"agent_id": agent_id, "queue_id": queue_id, "ticket_id": ticket_id}
+    return {"agent_id": agent_id, "queue_id": queue_id, "ticket_id": ticket_id, "tn": tn}
 
 
 def _add_article(
@@ -218,6 +218,7 @@ def _add_article(
     subject: str = "Re: Help",
     ai_origin: bool = False,
     queue_id: int | None = None,
+    a_from: str | None = None,
 ) -> int:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -242,11 +243,11 @@ def _add_article(
         ).scalar()
         conn.execute(
             text(
-                "INSERT INTO article_data_mime (article_id, a_subject, a_body, incoming_time,"
-                " create_time, create_by, change_time, change_by)"
-                " VALUES (:aid, :subj, :body, 0, :t, 1, :t, 1)"
+                "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                " incoming_time, create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :afrom, :subj, :body, 0, :t, 1, :t, 1)"
             ),
-            {"aid": article_id, "subj": subject, "body": body, "t": NOW},
+            {"aid": article_id, "afrom": a_from, "subj": subject, "body": body, "t": NOW},
         )
         if ai_origin:
             conn.execute(
@@ -946,6 +947,90 @@ async def test_pii_ner_enabled_masks_third_party_name_mentioned_in_body(
         assert "[NAME_" in llm.last_user_message
     finally:
         await engine.dispose()
+
+
+async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
+    mariadb_znuny_url: str,
+) -> None:
+    """Ticket 43087: an invalidated placeholder customer_user ("Invalid User")
+    and the queue's own sender display name ("Netadmin StudNet Bonn") became
+    name-masking candidates, so every "user" (including the ``"user": {`` key
+    of a diagnose_connection result and the KB text about it), "StudNet" and
+    "Bonn" reached the model as [NAME_n] — and the ticket number as [PHONE_n].
+    A real person's From-header name must still be masked."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=17)
+    sys_addr_id = 9717
+    sys_addr = "netadmin-9717@example.org"
+    customer_user_id = 9717
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM system_address WHERE id = :id"), {"id": sys_addr_id})
+        conn.execute(text("DELETE FROM customer_user WHERE id = :id"), {"id": customer_user_id})
+        conn.execute(
+            text(
+                "INSERT INTO system_address (id, value0, value1, queue_id, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :addr, 'Netadmin StudNet Bonn', :qid, 1, :t, 1, :t, 1)"
+            ),
+            {"id": sys_addr_id, "addr": sys_addr, "qid": seed["queue_id"], "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO customer_user (id, login, email, customer_id, first_name,"
+                " last_name, valid_id, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :login, 'x@invalid.local', 'CUST9717', 'Invalid', 'User',"
+                " 2, :t, 1, :t, 1)"
+            ),
+            {"id": customer_user_id, "login": "customer9717@example.com", "t": NOW},
+        )
+    engine.dispose()
+    _add_article(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        sender_type="customer",
+        a_from="Yifei Yang <yifei@example.net>",
+        body="Hi, my landlord activated my internet but it does not work. Yifei Yang",
+    )
+    _add_article(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        sender_type="agent",
+        a_from=f"Netadmin StudNet Bonn <{sys_addr}>",
+        subject=f"[Cygnus#{seed['tn']}] Re: network",
+        body=(
+            f"Ref [Cygnus#{seed['tn']}]. StudNet Bonn: diagnose shows"
+            ' "user": {"active": 0, "free_traffic": 6597069766656}'
+        ),
+    )
+    async_engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(async_engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, pii_masking=True, pii_ner_enabled=False)
+
+        llm = ScriptedLlm(["ok"])
+        async with factory() as session:
+            await summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+        sent = llm.last_user_message
+        assert sent is not None
+        assert "Yifei Yang" not in sent
+        assert '"user": {"active": 0' in sent
+        assert "StudNet Bonn" in sent
+        assert f"[Cygnus#{seed['tn']}]" in sent
+        assert "6597069766656" in sent
+    finally:
+        await async_engine.dispose()
+        engine = create_engine(mariadb_znuny_url)
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM system_address WHERE id = :id"), {"id": sys_addr_id})
+            conn.execute(text("DELETE FROM customer_user WHERE id = :id"), {"id": customer_user_id})
+        engine.dispose()
 
 
 def test_length_guidance_scales_mail_and_documents() -> None:

@@ -77,6 +77,9 @@ def test_plausible_person_name_filters() -> None:
     assert _plausible_person_name("Knoblich", "Frau Knoblich hat angerufen.")
     assert _plausible_person_name("Meyer", "Sehr geehrter Herr Meyer,")
     assert _plausible_person_name("Weber", "Herrn Dr. Weber wurde mitgeteilt")
+    # Organisational units are not people (ticket 43087).
+    assert not _plausible_person_name("Abteilung Wohnen", "an die Abteilung Wohnen")
+    assert not _plausible_person_name("Team Netadmin", "Dein Team Netadmin")
 
 
 def test_extract_person_names_skips_capitalized_common_nouns() -> None:

@@ -79,6 +79,12 @@ _PHONE_LABEL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# A candidate right behind a JSON key ('"free_traffic": 6597069766656') is a
+# JSON *number*, and JSON carries phone numbers as strings — so a bare digit
+# run in that position is a counter/ID from a tool result, not a phone number.
+# Masking it hid traffic counters from the model in ticket 43087.
+_JSON_NUMBER_VALUE_RE = re.compile(r'"\s*:\s*\Z')
+
 
 # Clock times ("07:53:55" inside "2026-07-24T07:53:55+00:00") satisfy the
 # loose IPv6 group shape — an IPV6 candidate that looks like a time of day
@@ -129,6 +135,8 @@ def _validate_phone(match: re.Match[str]) -> bool:
         return False
     stripped = value.strip()
     if _DATE_LIKE_RE.match(stripped):
+        return False
+    if stripped.isdigit() and _JSON_NUMBER_VALUE_RE.search(match.string[: match.start()]):
         return False
     # "+"/parens are phone syntax no identifier uses; an explicit label in
     # front ("Tel: 544010110") likewise settles it — mask in both cases.

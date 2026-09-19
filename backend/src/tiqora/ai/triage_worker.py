@@ -43,6 +43,7 @@ from tiqora.ai.context import (
     collect_known_names,
     get_or_create_state,
     load_articles,
+    pii_never_mask,
     ticket_snapshot,
 )
 from tiqora.ai.gate import is_tiqora_primary
@@ -214,7 +215,7 @@ async def _build_pii_mapper(
         return None
     articles = await load_articles(session, ticket.ticket_id)
     known_names = await collect_known_names(session, ticket, articles)
-    never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+    never_mask = pii_never_mask(ticket)
     return PiiMapper(never_mask=never_mask, known_names=known_names)
 
 

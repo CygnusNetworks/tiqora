@@ -53,9 +53,19 @@ _HAS_DIGIT_RE = re.compile(r"\d")
 _HONORIFIC = r"(?:Herrn?|Frau|Hr\.|Fr\.|Dr\.|Prof\.)"
 
 
+# Organisational units the small models tag as PER ("Abteilung Wohnen",
+# ticket 43087). A candidate containing one of these words is an office, not
+# a person, and masking it hides who the customer should contact.
+_ORG_WORDS = frozenset(
+    {"abteilung", "amt", "büro", "hotline", "referat", "service", "support", "team"}
+)
+
+
 def _plausible_person_name(name: str, snippet: str) -> bool:
     tokens = name.split()
     if not tokens:
+        return False
+    if any(t.lower() in _ORG_WORDS for t in tokens):
         return False
     # First and last token must be capitalized; middle tokens may be
     # lowercase nobiliary particles ("von", "zu", "de").
