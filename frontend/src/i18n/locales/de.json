@@ -1305,7 +1305,7 @@
         "triageCustomerFixThreshold": "100 heißt: nur vorschlagen. Eine mehrfach weitergeleitete Mail bekommt 70, weil der ursprüngliche Absender dort unsicherer ist.",
         "triageProvider": "Triage ist eine Klassifikationsaufgabe und läuft mehrfach pro Ticket — ein kleineres, günstigeres Modell ist hier meist die richtige Wahl.",
         "triageModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden.",
-        "finalAnswerProvider": "Optionales stärkeres Modell, das die Kundennachricht schreibt. Das Modell der Queue recherchiert (Diagnose, Wissensdatenbank); sobald es antworten will, übernimmt dieses Modell den Verlauf und schreibt die Antwort. Kostet ein bis zwei zusätzliche Aufrufe pro beantwortetem Ticket.",
+        "finalAnswerProvider": "Optionales stärkeres Modell, das die Kundennachricht schreibt. Das Modell der Queue recherchiert (Diagnose, Wissensdatenbank); sobald es antworten will, übernimmt dieses Modell den Verlauf und schreibt die Antwort. Kostet ein bis zwei zusätzliche Aufrufe pro beantwortetem Ticket. Seine Tokens werden über den hier gewählten Provider abgerechnet und auf dessen Budget angerechnet — Preise gelten pro Provider, für ein Modell mit anderen Preisen also einen eigenen Provider-Eintrag anlegen.",
         "finalAnswerModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden."
       },
       "common": {
