@@ -1114,7 +1114,10 @@
         "triageCustomerFixThreshold": "Kunden korrigieren ab",
         "triageProvider": "Triage-Provider",
         "triageProviderInherit": "Provider der Queue übernehmen",
-        "triageModelOverride": "Triage-Modell"
+        "triageModelOverride": "Triage-Modell",
+        "finalAnswerProvider": "Provider für die finale Antwort",
+        "finalAnswerProviderNone": "Keiner (Modell der Queue antwortet)",
+        "finalAnswerModelOverride": "Modell für die finale Antwort"
       },
       "usage": {
         "title": "Nutzung",
@@ -1301,7 +1304,9 @@
         "triageCustomerFix": "Bei einer weitergeleiteten Mail den ursprünglichen Absender als Ticket-Kunden setzen. Wird nur angewendet, wenn die Adresse wörtlich im Text steht und genau einen Kundendatensatz trifft.",
         "triageCustomerFixThreshold": "100 heißt: nur vorschlagen. Eine mehrfach weitergeleitete Mail bekommt 70, weil der ursprüngliche Absender dort unsicherer ist.",
         "triageProvider": "Triage ist eine Klassifikationsaufgabe und läuft mehrfach pro Ticket — ein kleineres, günstigeres Modell ist hier meist die richtige Wahl.",
-        "triageModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden."
+        "triageModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden.",
+        "finalAnswerProvider": "Optionales stärkeres Modell, das die Kundennachricht schreibt. Das Modell der Queue recherchiert (Diagnose, Wissensdatenbank); sobald es antworten will, übernimmt dieses Modell den Verlauf und schreibt die Antwort. Kostet ein bis zwei zusätzliche Aufrufe pro beantwortetem Ticket.",
+        "finalAnswerModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden."
       },
       "common": {
         "validId": "Gültig/Ungültig ist ein weicher Löschstatus: „Ungültig“ blendet den Eintrag aus Auswahllisten für neue Datensätze aus, ohne bestehende Verknüpfungen (z. B. Tickets, Zuordnungen) zu löschen. Ein echtes Löschen ist nicht vorgesehen."

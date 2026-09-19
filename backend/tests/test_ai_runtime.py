@@ -3413,3 +3413,146 @@ async def test_usage_records_the_model_the_provider_actually_served(
         assert row[0] == "served/model-v9"
     finally:
         await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Final-answer model: research with the primary, answer with the final model
+# ---------------------------------------------------------------------------
+
+
+async def _draft_body(factory: Any, draft_id: int) -> str:
+    async with factory() as session:
+        return str(
+            (
+                await session.execute(
+                    text("SELECT body FROM tiqora_ai_draft WHERE id = :id"), {"id": draft_id}
+                )
+            ).scalar_one()
+        )
+
+
+async def test_final_answer_model_writes_the_customer_message(
+    mariadb_znuny_url: str,
+) -> None:
+    """Ticket 43087: the primary model's proposal is discarded unexecuted and
+    the final-answer model answers from the same conversation, including
+    everything the primary researched."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=73)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        primary = ScriptedLlm(
+            [
+                _note_tool_response("diagnose: user.active = 0"),
+                _propose_response("reply", "Your account is active."),
+            ]
+        )
+        final = ScriptedLlm([_propose_response("reply", "Please register on startup.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=primary,
+                final_llm=final,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-final-1",
+            )
+        assert result.status == "drafted"
+        assert result.draft_id is not None
+        assert await _draft_body(factory, result.draft_id) == "Please register on startup."
+        assert primary.calls == 2
+        assert final.calls == 1
+        # The final model saw the primary's research, not its discarded proposal.
+        assert any(
+            tc.name == "add_internal_note"
+            and tc.arguments.get("body") == "diagnose: user.active = 0"
+            for m in final.last_messages
+            for tc in (m.tool_calls or [])
+        )
+        # `messages` is shared and keeps growing after the call: the only
+        # proposal in it must be the final model's own, the primary's was dropped.
+        proposals = [
+            tc.arguments.get("body")
+            for m in final.last_messages
+            for tc in (m.tool_calls or [])
+            if tc.name == "propose_customer_message"
+        ]
+        assert proposals == ["Please register on startup."]
+    finally:
+        await engine.dispose()
+
+
+async def test_final_answer_model_may_research_before_answering(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=74)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        primary = ScriptedLlm([_propose_response("reply", "cheap answer")])
+        final = ScriptedLlm(
+            [
+                _note_tool_response("checked the KB first"),
+                _propose_response("reply", "strong answer"),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=primary,
+                final_llm=final,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-final-2",
+            )
+        assert result.status == "drafted"
+        assert result.draft_id is not None
+        assert await _draft_body(factory, result.draft_id) == "strong answer"
+        assert (primary.calls, final.calls) == (1, 2)
+    finally:
+        await engine.dispose()
+
+
+async def test_terminal_force_uses_the_final_answer_model(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=75)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        primary = ScriptedLlm([_note_tool_response("recherche")])
+        final = ScriptedLlm([_propose_response("reply", "forced strong answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=primary,
+                final_llm=final,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-final-3",
+                max_tool_rounds=1,
+            )
+        assert result.status == "drafted"
+        assert result.draft_id is not None
+        assert await _draft_body(factory, result.draft_id) == "forced strong answer"
+        assert (primary.calls, final.calls) == (1, 1)
+    finally:
+        await engine.dispose()
