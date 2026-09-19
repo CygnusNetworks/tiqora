@@ -83,6 +83,8 @@ type FormState = {
   triage_delay_reply: boolean;
   triage_llm_provider_id: number;
   triage_model_override: string;
+  final_answer_llm_provider_id: number;
+  final_answer_model_override: string;
   autonomy: Autonomy;
   system_prompt: string;
   llm_provider_id: number;
@@ -142,6 +144,8 @@ function emptyForm(queueId: number): FormState {
     triage_delay_reply: false,
     triage_llm_provider_id: NONE,
     triage_model_override: "",
+    final_answer_llm_provider_id: NONE,
+    final_answer_model_override: "",
     autonomy: "off",
     system_prompt: "",
     llm_provider_id: NONE,
@@ -287,6 +291,8 @@ function toForm(row: AiQueuePolicyOut): FormState {
     triage_delay_reply: row.triage_delay_reply,
     triage_llm_provider_id: row.triage_llm_provider_id ?? NONE,
     triage_model_override: row.triage_model_override ?? "",
+    final_answer_llm_provider_id: row.final_answer_llm_provider_id ?? NONE,
+    final_answer_model_override: row.final_answer_model_override ?? "",
     autonomy: row.autonomy,
     system_prompt: row.system_prompt,
     llm_provider_id: row.llm_provider_id ?? NONE,
@@ -692,6 +698,11 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     triage_llm_provider_id:
       f.triage_llm_provider_id !== NONE ? f.triage_llm_provider_id : null,
     triage_model_override: f.triage_model_override.trim() || null,
+    final_answer_llm_provider_id:
+      f.final_answer_llm_provider_id !== NONE
+        ? f.final_answer_llm_provider_id
+        : null,
+    final_answer_model_override: f.final_answer_model_override.trim() || null,
     autonomy: f.autonomy,
     system_prompt: f.system_prompt,
     llm_provider_id: f.llm_provider_id !== NONE ? f.llm_provider_id : null,
@@ -1115,6 +1126,45 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                 data-testid="admin-ai-queue-form-model_override"
                 value={form.model_override}
                 onChange={(e) => setField("model_override", e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className="block text-sm">
+              <FieldLabel
+                text={t("admin.ai.queues.finalAnswerProvider")}
+                help={t("admin.help.aiQueue.finalAnswerProvider")}
+                testId="admin-ai-queue-help-final_answer_llm_provider_id"
+              />
+              <PickerField
+                testId="admin-ai-queue-form-final_answer_llm_provider_id"
+                value={form.final_answer_llm_provider_id}
+                items={[
+                  {
+                    value: NONE,
+                    label: t("admin.ai.queues.finalAnswerProviderNone"),
+                  },
+                  ...(providersQ.data?.items ?? []).map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                  })),
+                ]}
+                placeholder={t("admin.form.selectPlaceholder")}
+                loading={providersQ.isLoading}
+                onSelect={(v) => setField("final_answer_llm_provider_id", v)}
+              />
+            </label>
+            <label className="block text-sm">
+              <FieldLabel
+                text={t("admin.ai.queues.finalAnswerModelOverride")}
+                help={t("admin.help.aiQueue.finalAnswerModelOverride")}
+                testId="admin-ai-queue-help-final_answer_model_override"
+              />
+              <input
+                data-testid="admin-ai-queue-form-final_answer_model_override"
+                value={form.final_answer_model_override}
+                onChange={(e) =>
+                  setField("final_answer_model_override", e.target.value)
+                }
                 className={inputClass}
               />
             </label>
