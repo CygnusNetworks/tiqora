@@ -1395,13 +1395,24 @@ async def run_ticket_agent(
         # already in `messages`, so nothing the primary found is lost.
         active_llm: LlmClient = llm
         handed_over = False
+        # Tokens the final-answer model spent, booked on its own provider so
+        # its prices and budget apply (``prompt_tokens``/``completion_tokens``
+        # stay the run totals).
+        final_prompt_tokens = 0
+        final_completion_tokens = 0
+        final_served_model: str | None = None
         for _round in range(rounds):
             response: LlmResponse = await _chat_with_budget_retry(
                 active_llm, messages=messages, tools=schemas, max_tokens=completion_budget
             )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
-            served_model = response.model or served_model
+            if handed_over:
+                final_prompt_tokens += response.usage.prompt_tokens
+                final_completion_tokens += response.usage.completion_tokens
+                final_served_model = response.model or final_served_model
+            else:
+                served_model = response.model or served_model
 
             if not response.tool_calls:
                 # Plain text never reaches anyone (no send-tool exists) — but
@@ -1492,7 +1503,12 @@ async def run_ticket_agent(
             )
             prompt_tokens += response.usage.prompt_tokens
             completion_tokens += response.usage.completion_tokens
-            served_model = response.model or served_model
+            if handed_over:
+                final_prompt_tokens += response.usage.prompt_tokens
+                final_completion_tokens += response.usage.completion_tokens
+                final_served_model = response.model or final_served_model
+            else:
+                served_model = response.model or served_model
             if response.tool_calls:
                 messages.append(
                     LlmMessage(
@@ -1536,6 +1552,20 @@ async def run_ticket_agent(
                 trigger=trigger,
             )
 
+        if handed_over:
+            await usage_service.record_usage(
+                session,
+                user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
+                queue_id=ticket.queue_id,
+                ticket_id=ticket_id,
+                feature=feature,
+                provider_id=policy.final_answer_llm_provider_id,
+                model=final_served_model or policy.final_answer_model_override,
+                prompt_tokens=final_prompt_tokens,
+                completion_tokens=final_completion_tokens,
+                success=True,
+                extra_json=json.dumps({"final_answer": True}),
+            )
         await usage_service.record_usage(
             session,
             user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
@@ -1544,8 +1574,8 @@ async def run_ticket_agent(
             feature=feature,
             provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
             model=served_model or getattr(raw_llm, "active_model", None) or policy.model_override,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
+            prompt_tokens=prompt_tokens - final_prompt_tokens,
+            completion_tokens=completion_tokens - final_completion_tokens,
             success=True,
             extra_json=json.dumps(
                 {
