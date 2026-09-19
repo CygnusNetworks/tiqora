@@ -6854,6 +6854,10 @@ export interface components {
             enabled_triage: boolean;
             /** Escalation Rules */
             escalation_rules?: string | null;
+            /** Final Answer Llm Provider Id */
+            final_answer_llm_provider_id?: number | null;
+            /** Final Answer Model Override */
+            final_answer_model_override?: string | null;
             /**
              * Identity Mode
              * @default ticket_customer_id
@@ -7018,6 +7022,10 @@ export interface components {
             enabled_triage: boolean;
             /** Escalation Rules */
             escalation_rules: string | null;
+            /** Final Answer Llm Provider Id */
+            final_answer_llm_provider_id: number | null;
+            /** Final Answer Model Override */
+            final_answer_model_override: string | null;
             /** Id */
             id: number;
             /**
@@ -7134,6 +7142,10 @@ export interface components {
             enabled_triage?: boolean | null;
             /** Escalation Rules */
             escalation_rules?: string | null;
+            /** Final Answer Llm Provider Id */
+            final_answer_llm_provider_id?: number | null;
+            /** Final Answer Model Override */
+            final_answer_model_override?: string | null;
             /** Identity Mode */
             identity_mode?: ("ticket_customer_id" | "clarify_schema" | "off") | null;
             /** Ignore Senders Manual */
