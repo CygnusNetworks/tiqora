@@ -40,6 +40,7 @@ from tiqora.ai.context import (
     latest_customer_article_id,
     load_articles,
     ner_source_texts,
+    pii_never_mask,
     render_ticket_header,
     ticket_snapshot,
 )
@@ -1227,7 +1228,7 @@ async def run_ticket_agent(
             vision_llm_factory=effective_vision_factory,
         )
 
-        never_mask = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+        never_mask = pii_never_mask(ticket)
         ner_texts = (
             ner_source_texts(articles, attachment_context.blocks)
             if policy.pii_masking and policy.pii_ner_enabled

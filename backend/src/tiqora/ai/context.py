@@ -295,6 +295,63 @@ async def customer_user_name(
 
 _NAME_SPLIT_RE = re.compile(r"[\s,]+")
 
+# Words that turn up as name candidates but are never a person: placeholder
+# customer_user records (an invalidated one is "Invalid User"), role and
+# mailbox labels. PiiMapper masks a candidate as a whole word, case-
+# insensitively, *everywhere* — "User" masked the ``"user": {`` key of every
+# diagnose_connection result and the KB text about it (ticket 43087), so the
+# model could no longer tie ``user.active = 0`` to the account.
+_GENERIC_NAME_WORDS = frozenset(
+    {
+        "admin",
+        "administrator",
+        "contact",
+        "helpdesk",
+        "hotline",
+        "info",
+        "invalid",
+        "kontakt",
+        "mailer-daemon",
+        "netadmin",
+        "no-reply",
+        "noreply",
+        "office",
+        "postmaster",
+        "root",
+        "service",
+        "support",
+        "system",
+        "team",
+        "user",
+        "webmaster",
+    }
+)
+
+
+def _is_generic_name(candidate: str) -> bool:
+    """True when every word of ``candidate`` is a :data:`_GENERIC_NAME_WORDS`
+    entry ("User", "Invalid User"); a real name that merely carries a role
+    ("Torge Valerius - NetAdmin") is kept."""
+    words = [w.strip(".-_'\"()").lower() for w in candidate.split()]
+    words = [w for w in words if w]
+    return bool(words) and all(w in _GENERIC_NAME_WORDS for w in words)
+
+
+async def _system_addresses(session: AsyncSession) -> frozenset[str]:
+    """Lower-cased addresses of every configured ``system_address`` — our own
+    queue senders, whose display names ("Netadmin StudNet Bonn") name the
+    organisation, not a person."""
+    rows = await session.execute(text("SELECT value0 FROM system_address"))
+    return frozenset(str(r[0]).strip().lower() for r in rows if r[0])
+
+
+def pii_never_mask(ticket: TicketSnapshot) -> set[str]:
+    """Values a :class:`tiqora.ai.pii.PiiMapper` must leave readable for this
+    ticket: the customer ids the MCP tools need verbatim, and the ticket
+    number, which the loose PHONE pattern would otherwise swallow wherever it
+    is quoted ("[Cygnus#2026090710000011]")."""
+    return {v for v in (ticket.customer_id, ticket.customer_user_id, ticket.ticket_number) if v}
+
 
 def display_name_tokens(from_header: str | None) -> list[str]:
     """Name candidates parsed out of a raw ``From:`` header's display-name
@@ -345,19 +402,29 @@ async def collect_known_names(
     names mentioned in the body (not just From-headers) are also masked. NER
     must see unmasked text, so this always runs before
     :class:`tiqora.ai.pii.PiiMapper` construction.
+
+    Two sources are excluded because the mapper masks every candidate as a
+    whole word across the entire prompt: From-headers of our own
+    ``system_address`` senders (organisation names like "StudNet", "Bonn"),
+    and candidates made only of generic words (placeholder customer_user
+    "Invalid User", role labels) — see :func:`_is_generic_name`.
     """
     first, last = await customer_user_name(session, ticket.customer_user_id)
     names = [n for n in (first, last) if n]
     if first and last:
         names.append(f"{first} {last}")
+    own_addresses = await _system_addresses(session)
     for article in articles:
+        address = parseaddr(article.from_address or "")[1].strip().lower()
+        if address and address in own_addresses:
+            continue
         names.extend(display_name_tokens(article.from_address))
     if extra_texts:
         from tiqora.ai.ner import extract_person_names
 
         for text_block in extra_texts:
             names.extend(extract_person_names(text_block))
-    return names
+    return [n for n in names if not _is_generic_name(n)]
 
 
 def ner_source_texts(
@@ -389,6 +456,7 @@ __all__ = [
     "load_articles",
     "load_attachment_content",
     "ner_source_texts",
+    "pii_never_mask",
     "render_ticket_header",
     "ticket_snapshot",
 ]
