@@ -179,6 +179,36 @@ async def _default_mcp_call(
         return await client.call_tool(tool_name, arguments)
 
 
+# Result fields whose values are credentials, never content for a customer
+# message: the PKZ is, together with the Wohnplatznummer, the key that
+# registers an account. Replays of ticket 43087 showed models copying
+# ``user.pkz`` from diagnose_connection into the reply despite a prompt rule.
+_CREDENTIAL_RESULT_KEYS = frozenset({"pkz", "password", "passwort", "pin"})
+# Shorter values are too likely to occur in ordinary text by coincidence.
+_CREDENTIAL_MIN_LEN = 4
+
+
+def _collect_credential_values(obj: Any) -> set[str]:
+    """String values of :data:`_CREDENTIAL_RESULT_KEYS` anywhere in ``obj``."""
+    found: set[str] = set()
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if (
+                isinstance(key, str)
+                and key.lower() in _CREDENTIAL_RESULT_KEYS
+                and isinstance(value, (str, int))
+                and not isinstance(value, bool)
+                and len(str(value).strip()) >= _CREDENTIAL_MIN_LEN
+            ):
+                found.add(str(value).strip())
+            else:
+                found |= _collect_credential_values(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            found |= _collect_credential_values(item)
+    return found
+
+
 def _mcp_result_payload(raw: Any) -> Any:
     """Normalize a fastmcp ``CallToolResult`` into plain data before it is
     JSON-serialized for the model/trace — ``json.dumps(raw, default=str)``
@@ -506,6 +536,9 @@ class ToolExecutor:
         self._mask_results = mask_results
         self._ticket_customer_id = ticket_customer_id
         self._ticket_customer_user_id = ticket_customer_user_id
+        # Credential values seen in this run's MCP results; a customer message
+        # containing one is rejected (see _CREDENTIAL_RESULT_KEYS).
+        self._credential_values: set[str] = set()
         # True once the model has set the ticket state itself in this run. The
         # runtime reads it to decide whether to apply its own closing state
         # after an auto-send — the model's explicit choice always wins.
@@ -560,6 +593,13 @@ class ToolExecutor:
             "subject": self._pii.unmask(subject_str) if subject_str else "",
             "body": self._pii.unmask(body),
         }
+        text_out = f"{proposal['subject']}\n{proposal['body']}"
+        if any(value in text_out for value in self._credential_values):
+            raise ToolArgumentError(
+                "The message contains a credential value from a tool result (e.g. the "
+                "customer's PKZ). Never write it into a customer message — refer to the "
+                "tenancy agreement instead. Propose the message again without it."
+            )
         return ToolOutcome(
             name=TOOL_PROPOSE_CUSTOMER_MESSAGE,
             content_for_model="Message proposal recorded.",
@@ -860,6 +900,7 @@ class ToolExecutor:
                 error=str(exc)[:500],
             )
             raise ToolArgumentError(f"MCP tool rejected the call: {exc}") from exc
+        self._credential_values |= _collect_credential_values(raw_result)
         hit = check_escalation(
             self._escalation_rules, tool_full_name=spec.full_name, raw_result=raw_result
         )

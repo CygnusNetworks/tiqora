@@ -101,3 +101,13 @@ def test_extract_person_names_skips_capitalized_common_nouns() -> None:
     )
     for word in noise:
         assert word not in names
+
+
+def test_clean_candidate_keeps_only_the_name() -> None:
+    from tiqora.ai.ner import _clean_candidate
+
+    assert _clean_candidate("Yifei Yang\r\n\r\n-----原始邮件-----") == "Yifei Yang"
+    assert _clean_candidate("Hi Yifei") == "Yifei"
+    assert _clean_candidate("Sehr geehrter Herr Meyer,") == "Herr Meyer"
+    assert _clean_candidate("Anna Meyer") == "Anna Meyer"
+    assert _clean_candidate("\n\n") == ""

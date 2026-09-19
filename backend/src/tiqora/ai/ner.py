@@ -61,6 +61,24 @@ _ORG_WORDS = frozenset(
 )
 
 
+# Salutations the models fold into a PER span ("Hi Yifei", "Liebe Anna").
+_GREETING_RE = re.compile(
+    r"\A(?:(?:hi|hey|hello|dear|hallo|liebe|lieber|sehr geehrte|sehr geehrter|guten tag)"
+    r"\b[\s,]*)+",
+    re.IGNORECASE,
+)
+
+
+def _clean_candidate(raw: str) -> str:
+    """The name part of an entity span. Spans cross line breaks — a signature
+    followed by a quoted-reply header came back as
+    "Yifei Yang\r\n\r\n-----原始邮件-----" (ticket 43087) — and such a string
+    never occurs verbatim, so it masked nothing. Keep the first line, drop a
+    leading salutation and trailing punctuation."""
+    first_line = next((ln.strip() for ln in raw.splitlines() if ln.strip()), "")
+    return _GREETING_RE.sub("", first_line).strip(" ,.;:!")
+
+
 def _plausible_person_name(name: str, snippet: str) -> bool:
     tokens = name.split()
     if not tokens:
@@ -133,7 +151,7 @@ def extract_person_names(text: str, *, max_chars: int = 100_000) -> list[str]:
         for ent in doc.ents:
             if ent.label_ not in _PERSON_LABELS:
                 continue
-            name = ent.text.strip()
+            name = _clean_candidate(ent.text)
             if len(name) < 3 or _HAS_DIGIT_RE.search(name):
                 continue
             if not _plausible_person_name(name, snippet):
