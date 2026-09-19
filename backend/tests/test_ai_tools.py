@@ -336,3 +336,37 @@ def test_mcp_result_payload_passes_plain_data_through() -> None:
     assert _mcp_result_payload([1, 2]) == [1, 2]
     assert _mcp_result_payload("text") == "text"
     assert _mcp_result_payload(None) is None
+
+
+@pytest.mark.asyncio
+async def test_credential_values_from_tool_results_are_blocked_in_customer_messages() -> None:
+    """Replays of ticket 43087: models copied ``user.pkz`` from
+    diagnose_connection into the customer mail — together with the
+    Wohnplatznummer that is the registration key. A proposal carrying such a
+    value is rejected so the model rewrites it."""
+
+    async def _caller(url, token, tool, args):  # noqa: ANN001
+        return {"user": {"id": "z50352", "pkz": 242765, "wpnum": "545-03-03-52-0"}}
+
+    spec = _mcp_spec(mutating=False)
+    executor = _executor_with_spy(spec, _caller)
+    await executor.execute(spec.full_name, {})
+
+    with pytest.raises(ToolArgumentError, match="PKZ"):
+        await executor.execute(
+            TOOL_PROPOSE_CUSTOMER_MESSAGE,
+            {"kind": "reply", "subject": "Re", "body": "Register with PKZ 242765 please."},
+        )
+    outcome = await executor.execute(
+        TOOL_PROPOSE_CUSTOMER_MESSAGE,
+        {"kind": "reply", "subject": "Re", "body": "Use the PKZ from your tenancy agreement."},
+    )
+    assert outcome.proposal is not None
+
+
+def test_collect_credential_values_walks_nested_results() -> None:
+    from tiqora.ai.tools import _collect_credential_values
+
+    assert _collect_credential_values(
+        {"a": [{"PKZ": "132665"}, {"password": "hunter22"}], "pin": 12, "pkz": None}
+    ) == {"132665", "hunter22"}

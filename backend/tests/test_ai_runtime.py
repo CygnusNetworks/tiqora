@@ -3413,3 +3413,235 @@ async def test_usage_records_the_model_the_provider_actually_served(
         assert row[0] == "served/model-v9"
     finally:
         await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Final-answer model: research with the primary, answer with the final model
+# ---------------------------------------------------------------------------
+
+
+async def _draft_body(factory: Any, draft_id: int) -> str:
+    async with factory() as session:
+        return str(
+            (
+                await session.execute(
+                    text("SELECT body FROM tiqora_ai_draft WHERE id = :id"), {"id": draft_id}
+                )
+            ).scalar_one()
+        )
+
+
+async def test_final_answer_model_writes_the_customer_message(
+    mariadb_znuny_url: str,
+) -> None:
+    """Ticket 43087: the primary model's proposal is discarded unexecuted and
+    the final-answer model answers from the same conversation, including
+    everything the primary researched."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=73)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        primary = ScriptedLlm(
+            [
+                _note_tool_response("diagnose: user.active = 0"),
+                _propose_response("reply", "Your account is active."),
+            ]
+        )
+        final = ScriptedLlm([_propose_response("reply", "Please register on startup.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=primary,
+                final_llm=final,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-final-1",
+            )
+        assert result.status == "drafted"
+        assert result.draft_id is not None
+        assert await _draft_body(factory, result.draft_id) == "Please register on startup."
+        assert primary.calls == 2
+        assert final.calls == 1
+        # The final model saw the primary's research, not its discarded proposal.
+        assert any(
+            tc.name == "add_internal_note"
+            and tc.arguments.get("body") == "diagnose: user.active = 0"
+            for m in final.last_messages
+            for tc in (m.tool_calls or [])
+        )
+        # `messages` is shared and keeps growing after the call: the only
+        # proposal in it must be the final model's own, the primary's was dropped.
+        proposals = [
+            tc.arguments.get("body")
+            for m in final.last_messages
+            for tc in (m.tool_calls or [])
+            if tc.name == "propose_customer_message"
+        ]
+        assert proposals == ["Please register on startup."]
+    finally:
+        await engine.dispose()
+
+
+async def test_final_answer_model_may_research_before_answering(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=74)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        primary = ScriptedLlm([_propose_response("reply", "cheap answer")])
+        final = ScriptedLlm(
+            [
+                _note_tool_response("checked the KB first"),
+                _propose_response("reply", "strong answer"),
+            ]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=primary,
+                final_llm=final,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-final-2",
+            )
+        assert result.status == "drafted"
+        assert result.draft_id is not None
+        assert await _draft_body(factory, result.draft_id) == "strong answer"
+        assert (primary.calls, final.calls) == (1, 2)
+    finally:
+        await engine.dispose()
+
+
+async def test_terminal_force_uses_the_final_answer_model(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=75)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+
+        primary = ScriptedLlm([_note_tool_response("recherche")])
+        final = ScriptedLlm([_propose_response("reply", "forced strong answer")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=primary,
+                final_llm=final,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-final-3",
+                max_tool_rounds=1,
+            )
+        assert result.status == "drafted"
+        assert result.draft_id is not None
+        assert await _draft_body(factory, result.draft_id) == "forced strong answer"
+        assert (primary.calls, final.calls) == (1, 1)
+    finally:
+        await engine.dispose()
+
+
+async def test_final_answer_tokens_are_booked_on_the_final_provider(
+    mariadb_znuny_url: str,
+) -> None:
+    """Prices and budgets are per provider: the final model's tokens get their
+    own usage row priced by its provider, the primary keeps the rest."""
+    from tiqora.ai import providers as ai_providers
+
+    seed = _seed_ticket(mariadb_znuny_url, ns=76)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    final_name = f"fake-final-provider-{seed['queue_id']}"
+    try:
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM tiqora_llm_provider WHERE name = :n"), {"n": final_name}
+            )
+            await session.commit()
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            final_provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=final_name,
+                kind="openai_compat",
+                base_url="https://llm.example/v1",
+                default_model="strong-model",
+                api_key=None,
+                extra_json=None,
+                supports_tools=True,
+                supports_streaming=False,
+                eu_hosted=True,
+                price_input_per_1m=1_000_000.0,
+                price_output_per_1m=2_000_000.0,
+            )
+            policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
+            assert policy is not None
+            await ai_policies.update_queue_policy(
+                session, policy, change_by=1, final_answer_llm_provider_id=final_provider.id
+            )
+
+        primary = ScriptedLlm([_propose_response("reply", "cheap answer")])
+        final = ScriptedLlm([_propose_response("reply", "strong answer", model="strong-model")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=primary,
+                final_llm=final,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+                run_id="run-final-4",
+            )
+        assert result.status == "drafted"
+        assert (result.prompt_tokens, result.completion_tokens) == (20, 10)
+
+        async with factory() as session:
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT provider_id, model, prompt_tokens, completion_tokens, cost_hint"
+                        " FROM tiqora_ai_usage WHERE ticket_id = :tid ORDER BY id"
+                    ),
+                    {"tid": seed["ticket_id"]},
+                )
+            ).all()
+        final_row = next(r for r in rows if r[0] == final_provider.id)
+        assert (final_row[1], final_row[2], final_row[3]) == ("strong-model", 10, 5)
+        assert final_row[4] == pytest.approx(10 * 1.0 + 5 * 2.0)
+        primary_rows = [r for r in rows if r[0] != final_provider.id]
+        assert [(r[2], r[3]) for r in primary_rows] == [(10, 5)]
+    finally:
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM tiqora_ai_usage WHERE ticket_id = :tid"),
+                {"tid": seed["ticket_id"]},
+            )
+            await session.execute(
+                text("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :q"),
+                {"q": seed["queue_id"]},
+            )
+            await session.execute(
+                text("DELETE FROM tiqora_llm_provider WHERE name = :n"), {"n": final_name}
+            )
+            await session.commit()
+        await engine.dispose()

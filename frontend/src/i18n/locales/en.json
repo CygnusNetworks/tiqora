@@ -1114,7 +1114,10 @@
         "triageCustomerFixThreshold": "Correct customer from",
         "triageProvider": "Triage provider",
         "triageProviderInherit": "Inherit from the queue's provider",
-        "triageModelOverride": "Triage model"
+        "triageModelOverride": "Triage model",
+        "finalAnswerProvider": "Final-answer provider",
+        "finalAnswerProviderNone": "None (the queue's model answers)",
+        "finalAnswerModelOverride": "Final-answer model"
       },
       "usage": {
         "title": "Usage",
@@ -1301,7 +1304,9 @@
         "triageCustomerFix": "When a mail was forwarded, use the original sender as the ticket customer. Only applied when the address appears verbatim in the message and matches exactly one customer record.",
         "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain.",
         "triageProvider": "Triage is a classification task and runs several times per ticket, so a smaller, cheaper model is usually the right choice here.",
-        "triageModelOverride": "Leave empty to use the provider's default model."
+        "triageModelOverride": "Leave empty to use the provider's default model.",
+        "finalAnswerProvider": "Optional stronger model that writes the customer message. The queue's model does the research (diagnosis, knowledge base); as soon as it wants to answer, the conversation is handed over to this model, which writes the reply. Costs one or two extra calls per answered ticket. Its tokens are billed and budgeted on the provider selected here — prices are per provider, so use a separate provider entry for a model with different prices.",
+        "finalAnswerModelOverride": "Leave empty to use the provider's default model."
       },
       "common": {
         "validId": "Valid/invalid is a soft-delete flag: marking an entry invalid hides it from pickers for new records without deleting existing references (e.g. tickets, assignments). There is no hard delete."
