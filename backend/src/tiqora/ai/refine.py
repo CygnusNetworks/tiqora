@@ -47,6 +47,7 @@ from tiqora.ai.context import (
     collect_known_names,
     customer_user_name,
     load_articles,
+    pii_never_mask,
     ticket_snapshot,
 )
 from tiqora.ai.llm import LlmClient, LlmMessage
@@ -353,7 +354,7 @@ async def _name_masking_inputs(
             return [], set()
         articles = await load_articles(session, ticket_id)
         ticket_names = await collect_known_names(session, ticket, articles, extra_texts=ner_texts)
-        ticket_never = {v for v in (ticket.customer_id, ticket.customer_user_id) if v}
+        ticket_never = pii_never_mask(ticket)
         return ticket_names, ticket_never
 
     names: list[str] = []
