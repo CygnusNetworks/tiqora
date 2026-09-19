@@ -253,6 +253,8 @@ class AiQueuePolicyOut(BaseModel):
     triage_delay_reply: bool
     triage_llm_provider_id: int | None
     triage_model_override: str | None
+    final_answer_llm_provider_id: int | None
+    final_answer_model_override: str | None
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -309,6 +311,8 @@ class AiQueuePolicyCreate(BaseModel):
     triage_delay_reply: bool = False
     triage_llm_provider_id: int | None = None
     triage_model_override: str | None = None
+    final_answer_llm_provider_id: int | None = None
+    final_answer_model_override: str | None = None
 
 
 class AiQueuePolicyUpdate(BaseModel):
@@ -361,6 +365,8 @@ class AiQueuePolicyUpdate(BaseModel):
     triage_delay_reply: bool | None = None
     triage_llm_provider_id: int | None = None
     triage_model_override: str | None = None
+    final_answer_llm_provider_id: int | None = None
+    final_answer_model_override: str | None = None
     valid_id: int | None = None
 
 

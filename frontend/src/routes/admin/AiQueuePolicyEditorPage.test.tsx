@@ -108,6 +108,8 @@ const samplePolicy = {
   triage_delay_reply: false,
   triage_llm_provider_id: null,
   triage_model_override: null,
+  final_answer_llm_provider_id: null,
+  final_answer_model_override: null,
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",

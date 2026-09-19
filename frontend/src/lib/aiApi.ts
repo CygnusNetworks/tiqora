@@ -199,6 +199,8 @@ export type AiQueuePolicyOut = {
   triage_delay_reply: boolean;
   triage_llm_provider_id: number | null;
   triage_model_override: string | null;
+  final_answer_llm_provider_id: number | null;
+  final_answer_model_override: string | null;
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -255,6 +257,8 @@ export type AiQueuePolicyCreate = {
   triage_delay_reply?: boolean;
   triage_llm_provider_id?: number | null;
   triage_model_override?: string | null;
+  final_answer_llm_provider_id?: number | null;
+  final_answer_model_override?: string | null;
 };
 
 export type AiQueuePolicyUpdate = Partial<AiQueuePolicyCreate> & {

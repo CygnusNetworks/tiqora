@@ -1382,6 +1382,28 @@
             ],
             "title": "Escalation Rules"
           },
+          "final_answer_llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer Llm Provider Id"
+          },
+          "final_answer_model_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer Model Override"
+          },
           "identity_mode": {
             "default": "ticket_customer_id",
             "enum": [
@@ -1824,6 +1846,28 @@
             ],
             "title": "Escalation Rules"
           },
+          "final_answer_llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer Llm Provider Id"
+          },
+          "final_answer_model_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer Model Override"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -2192,6 +2236,8 @@
           "triage_delay_reply",
           "triage_llm_provider_id",
           "triage_model_override",
+          "final_answer_llm_provider_id",
+          "final_answer_model_override",
           "valid_id",
           "create_time",
           "change_time"
@@ -2348,6 +2394,28 @@
               }
             ],
             "title": "Escalation Rules"
+          },
+          "final_answer_llm_provider_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer Llm Provider Id"
+          },
+          "final_answer_model_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Answer Model Override"
           },
           "identity_mode": {
             "anyOf": [

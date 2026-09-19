@@ -537,6 +537,8 @@ async def create_queue_policy(
     triage_delay_reply: bool = False,
     triage_llm_provider_id: int | None = None,
     triage_model_override: str | None = None,
+    final_answer_llm_provider_id: int | None = None,
+    final_answer_model_override: str | None = None,
 ) -> TiqoraAiQueuePolicy:
     _validate_fields(
         autonomy=autonomy,
@@ -626,6 +628,8 @@ async def create_queue_policy(
         triage_delay_reply=triage_delay_reply,
         triage_llm_provider_id=triage_llm_provider_id,
         triage_model_override=triage_model_override,
+        final_answer_llm_provider_id=final_answer_llm_provider_id,
+        final_answer_model_override=final_answer_model_override,
         create_by=change_by,
         change_by=change_by,
     )
