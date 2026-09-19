@@ -196,3 +196,45 @@ def test_zulu_timestamps_in_tool_results_are_not_masked_as_ipv6() -> None:
     masked = mapper.mask('{"at": "2026-09-10T14:36:36Z", "ip": "2a01:238:4d5c::1"}')
     assert "2026-09-10T14:36:36Z" in masked
     assert "2a01:238:4d5c::1" not in masked
+
+
+def test_json_number_values_are_not_masked_as_phone() -> None:
+    """Traffic counters in a diagnose_connection result are JSON numbers;
+    JSON carries phone numbers as strings (a production ticket)."""
+    pii = PiiMapper()
+    raw = '{"free_traffic": 6597069766656, "current_traffic": 70793010637}'
+    assert pii.mask(raw) == raw
+    masked = pii.mask('{"phone": "0228 7654321", "fax": "+49 228 1234567"}')
+    assert "0228 7654321" not in masked
+    assert "+49 228 1234567" not in masked
+    assert "Tel: 70793010637" not in pii.mask("Tel: 70793010637")
+
+
+def test_generic_name_candidates_are_dropped() -> None:
+    from tiqora.ai.context import _is_generic_name
+
+    assert _is_generic_name("User")
+    assert _is_generic_name("Invalid User")
+    assert _is_generic_name("NetAdmin")
+    assert not _is_generic_name("Tobias Beispiel - NetAdmin")
+    assert not _is_generic_name("Anna Meyer")
+    assert not _is_generic_name("")
+
+
+def test_pii_never_mask_keeps_ticket_number_readable() -> None:
+    from tiqora.ai.context import TicketSnapshot, pii_never_mask
+
+    ticket = TicketSnapshot(
+        ticket_id=1,
+        queue_id=1,
+        customer_id="z90003",
+        customer_user_id="z90003#11-invalid",
+        title="network",
+        ticket_number="2026010510000011",
+    )
+    never = pii_never_mask(ticket)
+    assert never == {"z90003", "z90003#11-invalid", "2026010510000011"}
+    pii = PiiMapper(never_mask=never)
+    assert pii.mask("[Cygnus#2026010510000011] Re: network") == (
+        "[Cygnus#2026010510000011] Re: network"
+    )
