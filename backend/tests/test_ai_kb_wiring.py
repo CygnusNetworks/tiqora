@@ -71,6 +71,32 @@ async def test_kb_bundle_builds_markdown_from_tagged_articles(
     assert "Step 1. Step 2." in bundle
 
 
+async def test_kb_bundle_headers_carry_article_id_and_mark_truncation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without ids in the headers the model guessed kb_get_article ids (old
+    drafts) in 6/6 replays of ticket 43087; with them it fetched the right
+    article. A cut body says so and names the id to fetch."""
+
+    class _LongKb(_FakeKbService):
+        async def get_knowledge(
+            self, user_id: int, *, tags: list[str] | None = None, category_id: int | None = None
+        ) -> list[tuple[_FakeArticle, list[str]]]:
+            return [
+                (_FakeArticle(18, "Account", "x" * 2500), ["netadmin"]),
+                (_FakeArticle(7, "Short", "short body"), []),
+            ]
+
+    monkeypatch.setattr("tiqora.kb.service.KbService", _LongKb)
+    policy = SimpleNamespace(kb_tags=json.dumps(["netadmin"]), kb_category_ids=None)
+    bundle = await kb_wiring.kb_bundle(None, None, 1, policy)  # type: ignore[arg-type]
+    assert bundle is not None
+    assert "### Account (article_id: 18; tags: netadmin)" in bundle
+    assert "[… truncated — full text: kb_get_article(18)]" in bundle
+    assert "### Short (article_id: 7)\nshort body" in bundle
+    assert "kb_get_article(7)" not in bundle
+
+
 async def test_kb_bundle_none_when_queue_has_no_tags_or_category() -> None:
     policy = SimpleNamespace(kb_tags=None, kb_category_ids=None)
     bundle = await kb_wiring.kb_bundle(None, None, 1, policy)  # type: ignore[arg-type]

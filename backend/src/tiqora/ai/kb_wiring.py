@@ -227,8 +227,15 @@ async def kb_bundle(
         return None
     parts = []
     for article, tag_names in pairs[:_KB_ARTICLE_BUNDLE_LIMIT]:
-        header = f"### {article.title}" + (f" (tags: {', '.join(tag_names)})" if tag_names else "")
-        parts.append(f"{header}\n{article.content_md[:_KB_ARTICLE_BODY_CHARS]}")
+        # The id is what kb_get_article takes: without it the model guessed
+        # ids and fetched unrelated draft articles (ticket 43087 replays).
+        meta = f"article_id: {article.id}" + (
+            f"; tags: {', '.join(tag_names)}" if tag_names else ""
+        )
+        body = article.content_md[:_KB_ARTICLE_BODY_CHARS]
+        if len(article.content_md) > _KB_ARTICLE_BODY_CHARS:
+            body += f"\n[… truncated — full text: kb_get_article({article.id})]"
+        parts.append(f"### {article.title} ({meta})\n{body}")
     return "\n\n".join(parts)
 
 
