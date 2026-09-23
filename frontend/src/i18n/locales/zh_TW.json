@@ -690,6 +690,26 @@
       "customerHint": "輸入客戶編號或姓名（至少 2 個字元）",
       "loading": "正在尋找..."
     },
+    "detect": {
+      "kind": {
+        "ticket": "Ticket number",
+        "email": "E-mail",
+        "date": "Date"
+      },
+      "hint": {
+        "ticket": "Exact ticket number – the direct hit is listed first.",
+        "email": "Searches the ticket's contact address.",
+        "date": "Searched as text."
+      },
+      "offersLabel": "Also possible",
+      "offerDate": "Filter by creation date",
+      "offerCustomer": "Filter by customer: {{label}}",
+      "openHint": "↵ open"
+    },
+    "groups": {
+      "direct": "Direct hit",
+      "mentions": "Mentions this number"
+    },
     "presets": {
       "label": "時間範圍",
       "all": "全部",
