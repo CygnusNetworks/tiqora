@@ -39,11 +39,13 @@ dependencies = [
     "defusedxml>=0.7.1",
     "webauthn>=2",
     # Sync drivers used by tiqora bootstrap (base-schema load) and tests.
-    # Upper bound is load-bearing: PyMySQL 1.2.1 dropped
-    # pymysql.converters.escape_dict, which aiomysql 0.3.2 imports at module
-    # level, so ANY container built against it dies on `import aiomysql`
-    # before a single line of Tiqora runs. Lift it only once aiomysql ships
-    # a release that no longer imports that name.
+    # Upper bound is load-bearing: PyMySQL >=1.2.1 turned
+    # pymysql.converters.escape_dict/escape_bytes_prefixed into a "DO NOT
+    # IMPORT THIS!!!" string sentinel (the fix for the bytes-escaping SQL
+    # injection, GHSA-x4f8-9hx9-hpp9). aiomysql 0.3.2 still imports and calls
+    # escape_bytes_prefixed at module level, so every query with bytes
+    # parameters raises `TypeError: 'str' object is not callable`. Lift it
+    # only once aiomysql ships a release that no longer relies on that name.
     "pymysql>=1.2.0,<1.2.1",
     "psycopg2-binary>=2.9.12",
     # GDPR anonymize engine (ValueMapper) draws replacement values via faker
