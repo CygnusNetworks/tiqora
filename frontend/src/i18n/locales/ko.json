@@ -520,7 +520,8 @@
       "moreActions": "추가 작업",
       "detail": {
         "standard": "표준",
-        "detailed": "상세한"
+        "detailed": "상세한",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "요약 삭제",
       "adminDeleteSummaryHint": "관리자: 저장된 AI 요약 삭제 — 다음 실행은 처음부터 시작됩니다.",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "비슷한 티켓",
       "empty": "유사한 마감 티켓을 찾을 수 없습니다.",
-      "loadError": "유사한 티켓을 로드할 수 없습니다."
+      "loadError": "유사한 티켓을 로드할 수 없습니다.",
+      "short": "Similar"
     },
     "type": "유형",
     "service": "서비스",

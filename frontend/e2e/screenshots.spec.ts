@@ -69,16 +69,16 @@ test("agent screenshots", async ({ page }) => {
   ] as const) {
     await shot(page, route, name);
   }
-  // AI assist panel (summary + drafts) — a focused element shot of the panel
-  // on the ticket zoom (best-effort).
+  // AI summary card — the header chip opened by click, so the card stays up
+  // for the shot (best-effort).
   try {
     await page.goto("/agent/tickets/100", { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => undefined);
-    const ai = page.getByTestId("ai-panel");
-    await ai.waitFor({ state: "visible", timeout: 5000 });
-    await ai.scrollIntoViewIfNeeded();
+    await page.getByTestId("ai-chip-summary").click({ timeout: 5000 });
+    const card = page.getByTestId("ai-card-summary");
+    await card.waitFor({ state: "visible", timeout: 5000 });
     await page.waitForTimeout(400);
-    await ai.screenshot({ path: `${OUT}/agent-ai-assist${SUFFIX}.png` });
+    await card.screenshot({ path: `${OUT}/agent-ai-assist${SUFFIX}.png` });
   } catch (err) {
     console.warn("screenshot 'agent-ai-assist' failed:", err);
   }
@@ -88,7 +88,8 @@ test("agent screenshots", async ({ page }) => {
   try {
     await page.goto("/agent/tickets/108", { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => undefined);
-    const ai = page.getByTestId("ai-panel");
+    await page.getByTestId("ai-chip-drafts").click({ timeout: 5000 });
+    const ai = page.getByTestId("ai-card-drafts");
     await ai.waitFor({ state: "visible", timeout: 5000 });
     await page.getByTestId("ai-panel-draft-toggle-9101").click().catch(() => undefined);
     await page.getByTestId("ai-panel-draft-trace-toggle-9101").click().catch(() => undefined);
@@ -98,7 +99,6 @@ test("agent screenshots", async ({ page }) => {
         .click()
         .catch(() => undefined);
     }
-    await ai.scrollIntoViewIfNeeded();
     await page.waitForTimeout(400);
     await ai.screenshot({ path: `${OUT}/agent-ai-mcp${SUFFIX}.png` });
   } catch (err) {

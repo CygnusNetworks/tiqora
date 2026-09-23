@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
-import { SimilarTicketsPanel } from "./SimilarTicketsPanel";
+import { SimilarTicketsChip } from "./SimilarTicketsChip";
 
 const getSimilarTickets = vi.fn();
 
@@ -44,20 +44,19 @@ function renderPanel(ticketId = 42) {
   return render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <SimilarTicketsPanel ticketId={ticketId} />
+        <SimilarTicketsChip ticketId={ticketId} />
       </I18nextProvider>
     </QueryClientProvider>,
   );
 }
 
-describe("SimilarTicketsPanel", () => {
+describe("SimilarTicketsChip", () => {
   beforeEach(() => {
     getSimilarTickets.mockReset();
   });
 
-  it("does not fetch while collapsed", () => {
+  it("does not fetch while the card is closed", () => {
     renderPanel();
-    expect(screen.getByTestId("similar-tickets-panel")).toBeInTheDocument();
     expect(screen.getByTestId("similar-tickets-toggle")).toBeInTheDocument();
     expect(getSimilarTickets).not.toHaveBeenCalled();
     expect(screen.queryByTestId("similar-tickets-body")).toBeNull();
@@ -89,6 +88,32 @@ describe("SimilarTicketsPanel", () => {
     expect(screen.getByText("Related closed issue")).toBeInTheDocument();
     expect(screen.getByText("20240721000007")).toBeInTheDocument();
     expect(screen.getByTestId("similar-tickets-score-7")).toHaveTextContent("90%");
+    // The chip picks the hit count up from the shared cache.
+    expect(screen.getByTestId("similar-tickets-toggle")).toHaveTextContent("1");
+  });
+
+  it("opens on hover after the delay and closes again when the pointer leaves", async () => {
+    getSimilarTickets.mockResolvedValue({ items: [] });
+    renderPanel();
+    const chip = screen.getByTestId("similar-tickets-toggle");
+    fireEvent.mouseEnter(chip);
+    expect(screen.queryByTestId("similar-tickets-body")).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("similar-tickets-body")).toBeInTheDocument());
+    fireEvent.mouseLeave(chip);
+    await waitFor(() => expect(screen.queryByTestId("similar-tickets-body")).toBeNull());
+  });
+
+  it("stays open after a click even when the pointer leaves", async () => {
+    getSimilarTickets.mockResolvedValue({ items: [] });
+    renderPanel();
+    const chip = screen.getByTestId("similar-tickets-toggle");
+    fireEvent.click(chip);
+    await waitFor(() => expect(screen.getByTestId("similar-tickets-empty")).toBeInTheDocument());
+    fireEvent.mouseLeave(chip);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(screen.getByTestId("similar-tickets-body")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByTestId("similar-tickets-body")).toBeNull();
   });
 
   it("hides the score badge when score is missing or zero", async () => {

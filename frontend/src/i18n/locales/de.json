@@ -520,7 +520,8 @@
       "moreActions": "Weitere Aktionen",
       "detail": {
         "standard": "Standard",
-        "detailed": "Ausführlich"
+        "detailed": "Ausführlich",
+        "custom": "Eigene"
       },
       "adminDeleteSummary": "Zusammenfassung löschen",
       "adminDeleteSummaryHint": "Admin: gespeicherte KI-Zusammenfassung löschen — der nächste Lauf beginnt von vorn",
@@ -538,6 +539,23 @@
         "accept": "Übernehmen",
         "reject": "Verwerfen",
         "acceptFailed": "Konnte nicht übernommen werden — evtl. fehlt dir das Recht, in diese Queue zu verschieben."
+      },
+      "pin": "Anheften",
+      "unpin": "Lösen",
+      "summaryStaleShort": "Neue Artikel seit der Zusammenfassung",
+      "custom": {
+        "savedLabel": "Gespeicherte Anweisungen",
+        "removeSaved": "Gespeicherte Anweisung entfernen",
+        "instructionLabel": "Eigene Anweisung für die Zusammenfassung",
+        "placeholder": "z. B. Fasse das Ticket für einen Mitarbeiter der Verwaltung zusammen, erkläre die Sperre ohne Fachbegriffe und gib eine Timeline an.",
+        "run": "Zusammenfassen",
+        "save": "Als Vorlage speichern",
+        "saved": "Gespeichert",
+        "hint": "Wird nicht gespeichert · ⌘/Strg+Enter",
+        "running": "Zusammenfassung wird erstellt – das kann bei langen Tickets eine Minute dauern.",
+        "resultLabel": "Eigene Zusammenfassung",
+        "copy": "Kopieren",
+        "copied": "Kopiert"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "Ähnliche Tickets",
       "empty": "Keine ähnlichen geschlossenen Tickets gefunden.",
-      "loadError": "Ähnliche Tickets konnten nicht geladen werden."
+      "loadError": "Ähnliche Tickets konnten nicht geladen werden.",
+      "short": "Ähnliche"
     },
     "type": "Typ",
     "service": "Service",

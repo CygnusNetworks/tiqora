@@ -249,3 +249,30 @@ export function ExternalLinkIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 20h4L19 9l-4-4L4 16v4Z" />
+      <path d="m13.5 6.5 4 4" />
+    </Icon>
+  );
+}
+
+export function StackIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="13" height="10" rx="2" />
+      <path d="M8 18h11a2 2 0 0 0 2-2V8" />
+    </Icon>
+  );
+}
+
+export function PinIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 4h6l-1 6 3 3H7l3-3-1-6Z" />
+      <path d="M12 13v7" />
+    </Icon>
+  );
+}
