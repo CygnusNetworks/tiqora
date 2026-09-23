@@ -28,9 +28,11 @@ from tiqora.ai.summary import (
     TRIGGER_AUTO,
     TRIGGER_MANUAL,
     SummaryAclDeniedError,
+    SummaryEmptyOutputError,
     SummaryPolicyDisabledError,
     _system_prompt_for_detail,
     auto_summary_due,
+    custom_summarize_ticket,
     summarize_ticket,
 )
 from tiqora.config import get_settings
@@ -1136,5 +1138,162 @@ async def test_usage_records_the_model_the_provider_actually_served(
             ).first()
         assert row is not None
         assert row[0] == "served/model-v9"
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Custom summary: the agent's own instruction, ephemeral result
+# ---------------------------------------------------------------------------
+
+
+async def test_custom_summary_follows_instruction_and_never_touches_state(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=40)
+    _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="First msg"
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+
+        # A stored, up-to-date standard summary must neither short-circuit the
+        # custom run nor be overwritten by it.
+        async with factory() as session:
+            await summarize_ticket(
+                session,
+                llm=ScriptedLlm(["Standard summary."]),
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_MANUAL,
+                acting_user_id=seed["agent_id"],
+            )
+
+        llm = ScriptedLlm(["Custom result with timeline."])
+        async with factory() as session:
+            result = await custom_summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                acting_user_id=seed["agent_id"],
+                instruction="Fasse für die Hausverwaltung zusammen, inkl. Timeline.",
+            )
+        assert result.summary_body == "Custom result with timeline."
+        assert llm.last_system_message is not None
+        assert "Fasse für die Hausverwaltung zusammen, inkl. Timeline." in (
+            llm.last_system_message
+        )
+        assert llm.last_user_message is not None
+        # Always the full conversation (no incremental previous-summary path),
+        # with article dates so a requested timeline has something to go on.
+        assert "full conversation" in llm.last_user_message
+        assert "First msg" in llm.last_user_message
+        assert "previous summary" not in llm.last_user_message
+        assert "2024-06-01 12:00" in llm.last_user_message
+
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.summary_body == "Standard summary."
+    finally:
+        await engine.dispose()
+
+
+async def test_custom_summary_respects_acl(mariadb_znuny_url: str) -> None:
+    from tiqora.ai.acl import create_acl
+
+    seed = _seed_ticket(mariadb_znuny_url, ns=41)
+    _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+            await create_acl(
+                session,
+                subject_type="user",
+                subject_id=seed["agent_id"],
+                feature="summary",
+                allowed=False,
+            )
+
+        llm = ScriptedLlm(["Should not run."])
+        async with factory() as session:
+            with pytest.raises(SummaryAclDeniedError):
+                await custom_summarize_ticket(
+                    session,
+                    llm=llm,
+                    ticket_id=seed["ticket_id"],
+                    acting_user_id=seed["agent_id"],
+                    instruction="Kurz zusammenfassen",
+                )
+        assert llm.calls == 0
+    finally:
+        await engine.dispose()
+
+
+async def test_custom_summary_masks_the_instruction_like_the_conversation(
+    mariadb_znuny_url: str,
+) -> None:
+    """A name the agent types into the instruction must map to the same
+    placeholder the conversation got — otherwise the model could not relate
+    the two, and the clear name would leak to the provider."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=42)
+    _add_article(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        sender_type="customer",
+        body="Bitte sprechen Sie mit Rasmus Rübenthal in unserer Buchhaltung dazu.",
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, pii_masking=True, pii_ner_enabled=True)
+
+        llm = ScriptedLlm(["[NAME_1] ist zuständig."])
+        async with factory() as session:
+            result = await custom_summarize_ticket(
+                session,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                acting_user_id=seed["agent_id"],
+                instruction="Was soll Rasmus Rübenthal tun?",
+            )
+        assert llm.last_system_message is not None
+        assert llm.last_user_message is not None
+        assert "Rasmus Rübenthal" not in llm.last_system_message
+        assert "Rasmus Rübenthal" not in llm.last_user_message
+        assert "[NAME_1]" in llm.last_system_message
+        assert "[NAME_1]" in llm.last_user_message
+        assert result.summary_body == "Rasmus Rübenthal ist zuständig."
+    finally:
+        await engine.dispose()
+
+
+async def test_custom_summary_empty_output_raises(mariadb_znuny_url: str) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=43)
+    _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+
+        async with factory() as session:
+            with pytest.raises(SummaryEmptyOutputError):
+                await custom_summarize_ticket(
+                    session,
+                    llm=ScriptedLlm(["   "]),
+                    ticket_id=seed["ticket_id"],
+                    acting_user_id=seed["agent_id"],
+                    instruction="Kurz zusammenfassen",
+                )
     finally:
         await engine.dispose()
