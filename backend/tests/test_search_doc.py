@@ -5,10 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from tiqora.db.legacy.ticket import Ticket
-from tiqora.domain.schemas import SimilarTicketItem
+from tiqora.domain.schemas import SearchHit, SimilarTicketItem
 from tiqora.domain.search import (
     build_similar_query,
     build_ticket_document,
+    hoist_exact_tn,
+    index_settings,
+    parse_ticket_number,
     rank_similar_keyword,
 )
 
@@ -112,3 +115,48 @@ def test_rank_similar_keyword_stable_for_equal_scores() -> None:
     ranked = rank_similar_keyword(cands, exclude_id=99, limit=5)
     # Equal scores keep their original (Meilisearch relevance) order.
     assert [r.id for r in ranked] == [1, 2, 3]
+
+
+def test_parse_ticket_number_accepts_bare_and_hashed_numbers() -> None:
+    assert parse_ticket_number("2026010110000042") == "2026010110000042"
+    assert parse_ticket_number("  #2026010110000042 ") == "2026010110000042"
+
+
+def test_parse_ticket_number_rejects_non_numbers() -> None:
+    # Too short to be a Znuny ticket number …
+    assert parse_ticket_number("123456") is None
+    # … and reference numbers that merely contain digits stay free text, so a
+    # subject like "DFN-CERT 2601-000-0001" is never mistaken for a TN.
+    assert parse_ticket_number("2601-000-0001") is None
+    assert parse_ticket_number("Router gesperrt") is None
+    assert parse_ticket_number("") is None
+
+
+def test_index_settings_disable_typos_on_identifier_attributes() -> None:
+    typo = index_settings().typo_tolerance
+    assert typo is not None
+    # A 16-digit ticket number is one long word to Meilisearch, which tolerates
+    # two typos above eight characters — that is what made an exact TN search
+    # return every ticket within two digits of it.
+    assert typo.disable_on_attributes is not None
+    assert set(typo.disable_on_attributes) == {"tn", "customer_id", "customer_user_id"}
+
+
+def test_hoist_exact_tn_moves_the_exact_match_first() -> None:
+    hits = [
+        SearchHit(id=1, tn="2026010210000042", title="mentions 2026010110000042"),
+        SearchHit(id=2, tn="2026010110000042", title="the ticket itself"),
+        SearchHit(id=3, tn="2026010810000076", title="unrelated"),
+    ]
+    hoisted = hoist_exact_tn(hits, "2026010110000042")
+    assert [h.id for h in hoisted] == [2, 1, 3]
+
+
+def test_hoist_exact_tn_keeps_order_without_an_exact_match() -> None:
+    hits = [
+        SearchHit(id=1, tn="2026010210000042", title="a"),
+        SearchHit(id=2, tn="2026010810000076", title="b"),
+    ]
+    assert [h.id for h in hoist_exact_tn(hits, "2026010110000042")] == [1, 2]
+    # A free-text query never reorders anything.
+    assert [h.id for h in hoist_exact_tn(hits, "Router")] == [1, 2]

@@ -690,6 +690,26 @@
       "customerHint": "고객 번호 또는 이름을 입력하세요(최소 2자).",
       "loading": "검색 중…"
     },
+    "detect": {
+      "kind": {
+        "ticket": "Ticket number",
+        "email": "E-mail",
+        "date": "Date"
+      },
+      "hint": {
+        "ticket": "Exact ticket number – the direct hit is listed first.",
+        "email": "Searches the ticket's contact address.",
+        "date": "Searched as text."
+      },
+      "offersLabel": "Also possible",
+      "offerDate": "Filter by creation date",
+      "offerCustomer": "Filter by customer: {{label}}",
+      "openHint": "↵ open"
+    },
+    "groups": {
+      "direct": "Direct hit",
+      "mentions": "Mentions this number"
+    },
     "presets": {
       "label": "시간 범위",
       "all": "모두",

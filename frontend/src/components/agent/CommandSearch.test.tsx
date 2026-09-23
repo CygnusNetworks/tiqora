@@ -127,4 +127,58 @@ describe("CommandSearch", () => {
     fireEvent.click(screen.getByTestId("command-search-trigger"));
     expect(screen.getByTestId("command-search-input")).toHaveValue("");
   });
+  it("marks the exact ticket number as the direct hit and groups the rest", async () => {
+    const exact = { ...HIT, id: 200, tn: "2026010110000042", title: "Router does not connect" };
+    const mention = {
+      ...HIT,
+      id: 201,
+      tn: "2026010210000042",
+      title: "Softwareupdate [Partner#2026010110000042]",
+    };
+    search.mockResolvedValue({ query: "", hits: [exact, mention], estimated_total: 2, facets: {} });
+    renderSearch();
+    fireEvent.click(screen.getByTestId("command-search-trigger"));
+    fireEvent.change(screen.getByTestId("command-search-input"), {
+      target: { value: "2026010110000042" },
+    });
+    // The typed number is recognised while typing, before any result arrives.
+    expect(screen.getByTestId("search-kind-ticket")).toBeInTheDocument();
+    await screen.findByTestId("command-search-hit-200");
+    expect(screen.getByTestId("command-search-group-direct")).toBeInTheDocument();
+    expect(screen.getByTestId("command-search-group-mentions")).toBeInTheDocument();
+  });
+
+  it("opens the ticket directly on Enter when the query is its exact number", async () => {
+    const exact = { ...HIT, id: 200, tn: "2026010110000042" };
+    search.mockResolvedValue({ query: "", hits: [exact], estimated_total: 1, facets: {} });
+    renderSearch();
+    fireEvent.click(screen.getByTestId("command-search-trigger"));
+    const input = screen.getByTestId("command-search-input");
+    fireEvent.change(input, { target: { value: "2026010110000042" } });
+    await screen.findByTestId("command-search-hit-200");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/agent/tickets/$ticketId",
+      params: { ticketId: "200" },
+    });
+  });
+
+  it("offers a customer filter when the typed text is a customer id on the hits", async () => {
+    search.mockResolvedValue({
+      query: "",
+      hits: [{ ...HIT, customer_id: "campus-nord" }],
+      estimated_total: 1,
+      facets: {},
+    });
+    renderSearch();
+    fireEvent.click(screen.getByTestId("command-search-trigger"));
+    fireEvent.change(screen.getByTestId("command-search-input"), {
+      target: { value: "campus-nord" },
+    });
+    const offer = await screen.findByTestId("search-offer-customer");
+    fireEvent.mouseDown(offer);
+    // The text becomes a chip, so it must not stay in the free-text query too.
+    await waitFor(() => expect(screen.getByTestId("command-search-input")).toHaveValue(""));
+    expect(screen.getByTestId("smart-chip-customer")).toHaveTextContent("campus-nord");
+  });
 });
