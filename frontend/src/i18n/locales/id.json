@@ -520,7 +520,8 @@
       "moreActions": "Lebih banyak tindakan",
       "detail": {
         "standard": "Standar",
-        "detailed": "Terperinci"
+        "detailed": "Terperinci",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "Hapus ringkasan",
       "adminDeleteSummaryHint": "Admin: hapus ringkasan AI yang disimpan — proses berikutnya dimulai dari awal",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "Tiket serupa",
       "empty": "Tidak ditemukan tiket tertutup serupa.",
-      "loadError": "Tidak dapat memuat tiket serupa."
+      "loadError": "Tidak dapat memuat tiket serupa.",
+      "short": "Similar"
     },
     "type": "Jenis",
     "service": "Layanan",
