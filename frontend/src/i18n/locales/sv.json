@@ -520,7 +520,8 @@
       "moreActions": "Fler åtgärder",
       "detail": {
         "standard": "Standard",
-        "detailed": "Detaljerad"
+        "detailed": "Detaljerad",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "Ta bort sammanfattning",
       "adminDeleteSummaryHint": "Admin: radera den lagrade AI-sammanfattningen - nästa körning börjar från början",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "Liknande ärenden",
       "empty": "Inga liknande stängda ärenden hittades.",
-      "loadError": "Det gick inte att ladda liknande ärenden."
+      "loadError": "Det gick inte att ladda liknande ärenden.",
+      "short": "Similar"
     },
     "type": "Typ",
     "service": "Tjänst",
