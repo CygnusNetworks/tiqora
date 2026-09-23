@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
@@ -6,9 +6,17 @@ import { aiApi } from "@/lib/aiApi";
 import { useAuth } from "@/auth/AuthContext";
 import {
   ticketAiApi,
+  type AiCustomSummaryOut,
   type AiDraftOut,
   type SummaryDetail,
 } from "@/lib/ticketAiApi";
+import {
+  addSavedPrompt,
+  loadSavedPrompts,
+  loadSummaryPinned,
+  saveSavedPrompts,
+  saveSummaryPinned,
+} from "@/lib/customSummaryPrompts";
 import { articleSortKey } from "@/lib/article";
 import { channelNameOf } from "@/lib/articleChannel";
 import { formatDateTime } from "@/lib/format";
@@ -19,25 +27,31 @@ import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import { HelpPopover } from "@/components/ui/HelpPopover";
+import { HoverCard } from "@/components/ui/HoverCard";
+import { PencilIcon, PinIcon, SparkIcon } from "@/components/ui/icons";
 import { ToolTraceCard } from "@/components/ai/ToolResultView";
 import { ReplyDialog } from "./ReplyDialog";
 import { SummaryText } from "./SummaryText";
+import { AssistChip, ChipCount } from "./AssistChip";
+import { CustomSummaryPanel } from "./CustomSummaryPanel";
 
 /**
- * AI panel for the ticket zoom page (plan §3.4 Drafts, §3.5 Summary,
- * Phase B/C). Fetches `GET /tickets/{id}/ai` and renders nothing when
- * neither summary nor manual-assist is available for this agent/queue —
- * agents without ACL access see no trace of the feature.
- *
- * Sibling to `ProcessWidget` in `TicketZoomPage`; matches its panel chrome
- * (`rounded-lg border border-hairline bg-surface p-4`).
+ * AI assist row in the ticket header (plan §3.4 Drafts, §3.5 Summary,
+ * Phase B/C). Fetches `GET /tickets/{id}/ai` and shows compact chips —
+ * summary and drafts — whose content opens as a hover card, so the ticket
+ * history starts right below the header. The summary can be pinned open
+ * below the chips; triage proposals and the escalation banner need action
+ * and stay visible. Agents without ACL access see no AI chips at all, only
+ * the `trailing` chips (similar tickets).
  */
 
 /** Max articles rendered as individual coverage dots; beyond that the
  * indicator degrades to a plain "n/m" fraction to avoid a dot wall. */
 const MAX_COVERAGE_DOTS = 12;
 
-const SUMMARY_DETAILS: SummaryDetail[] = ["standard", "detailed"];
+/** Stored-summary scopes plus the agent's own one-off instruction. */
+type SummaryView = SummaryDetail | "custom";
+const SUMMARY_VIEWS: SummaryView[] = ["standard", "detailed", "custom"];
 
 /** Manual Assist draft POST returns immediately (nginx-90s-timeout fix) and
  * this panel polls `GET /tickets/{id}/ai` for the background run's outcome
@@ -126,6 +140,22 @@ function CoverageDots({ covered, total }: { covered: number; total: number }) {
   );
 }
 
+/** Freshness of the stored summary, shown on the chip without opening it. */
+function SummaryStatusDot({ status }: { status: "current" | "stale" | null }) {
+  const { t } = useTranslation();
+  if (status === null) return null;
+  return (
+    <span
+      className={cn(
+        "h-1.5 w-1.5 rounded-full",
+        status === "current" ? "bg-green" : "bg-escalation",
+      )}
+      title={status === "current" ? t("ticket.ai.summaryCurrent") : t("ticket.ai.summaryStaleShort")}
+      data-testid={`ai-chip-summary-${status}`}
+    />
+  );
+}
+
 function DraftKindIcon({ kind }: { kind: string }) {
   const clarify = kind === "clarify";
   return (
@@ -146,9 +176,12 @@ function DraftKindIcon({ kind }: { kind: string }) {
 export function AiPanel({
   ticketId,
   canNote,
+  trailing,
 }: {
   ticketId: number;
   canNote: boolean;
+  /** Non-AI chips appended to the row (similar tickets). */
+  trailing?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -158,7 +191,22 @@ export function AiPanel({
   const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
   const [openTraceId, setOpenTraceId] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState<AiDraftOut | null>(null);
-  const [summaryDetail, setSummaryDetail] = useState<SummaryDetail>("standard");
+  const [summaryView, setSummaryView] = useState<SummaryView>("standard");
+  const [pinned, setPinnedState] = useState(loadSummaryPinned);
+  const [savedPrompts, setSavedPrompts] = useState(loadSavedPrompts);
+  const [customInstruction, setCustomInstruction] = useState("");
+  const [customResult, setCustomResult] = useState<
+    (AiCustomSummaryOut & { instruction: string }) | null
+  >(null);
+
+  const setPinned = (next: boolean) => {
+    setPinnedState(next);
+    saveSummaryPinned(next);
+  };
+  const updateSavedPrompts = (next: string[]) => {
+    setSavedPrompts(next);
+    saveSavedPrompts(next);
+  };
   // Manual Assist background-run tracking (nginx-90s-timeout fix): the
   // draft POST returns "started" immediately, so the actual outcome is
   // polled via GET below. `myRunStartedAt` remembers the `manual_run_started_at`
@@ -227,6 +275,12 @@ export function AiPanel({
     },
   });
 
+  const customSummaryMutation = useMutation({
+    mutationFn: (instruction: string) =>
+      ticketAiApi.customSummary(ticketId, instruction),
+    onSuccess: (data, instruction) => setCustomResult({ ...data, instruction }),
+  });
+
   const discardMutation = useMutation({
     mutationFn: (draftId: number) =>
       ticketAiApi.discardDraft(ticketId, draftId),
@@ -289,7 +343,11 @@ export function AiPanel({
     },
   });
 
-  if (stateQ.isLoading || stateQ.isError || !stateQ.data) return null;
+  const trailingOnly = trailing ? (
+    <div className="flex flex-wrap items-center gap-1.5">{trailing}</div>
+  ) : null;
+
+  if (stateQ.isLoading || stateQ.isError || !stateQ.data) return trailingOnly;
 
   const state = stateQ.data;
   if (
@@ -299,7 +357,7 @@ export function AiPanel({
   )
     // A triage-only queue enables neither of the two, but still has a
     // proposal worth showing.
-    return null;
+    return trailingOnly;
 
   // Only this panel instance's OWN triggered run ever renders a
   // running/skipped/error result — see the `myRunStartedAt` doc comment
@@ -372,15 +430,557 @@ export function AiPanel({
       ? articles.find((a) => a.id === replyArticleId)
       : undefined;
 
-  return (
-    <div
-      className="space-y-3 rounded-lg border border-hairline bg-surface p-4"
-      data-testid="ai-panel"
-    >
-      <h2 className="font-display text-sm font-semibold text-ink">
-        {t("ticket.ai.title")}
-      </h2>
+  const openDraftCount = openDrafts.length;
+  const summaryStatus = !hasSummary
+    ? null
+    : staleCount > 0
+      ? "stale"
+      : "current";
 
+  const summaryContent = (
+    <div className="space-y-2" data-testid="ai-panel-summary">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
+          {t("ticket.ai.summaryLabel")}
+          <HelpPopover
+            title={t("ticket.ai.summaryLabel")}
+            testId="ai-panel-help-summary"
+          >
+            {t("ticket.ai.help.summary")}
+          </HelpPopover>
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div
+            role="group"
+            aria-label={t("ticket.ai.detailLabel")}
+            className="inline-flex rounded-lg border border-hairline bg-surface p-0.5"
+          >
+            {SUMMARY_VIEWS.map((d) => (
+              <button
+                key={d}
+                type="button"
+                aria-pressed={summaryView === d}
+                data-testid={`ai-panel-summary-detail-${d}`}
+                disabled={summarizeMutation.isPending}
+                onClick={() => setSummaryView(d)}
+                className={cn(
+                  "rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  summaryView === d
+                    ? d === "custom"
+                      ? "bg-purple text-white"
+                      : "bg-accent text-accent-ink"
+                    : "text-muted hover:bg-surface-subtle hover:text-ink",
+                )}
+              >
+                {d === "custom" && <span aria-hidden>✦ </span>}
+                {t(`ticket.ai.detail.${d}`)}
+              </button>
+            ))}
+          </div>
+          {summaryView !== "custom" && (
+            <Button
+              size="sm"
+              variant="primary"
+              data-testid="ai-panel-summarize-button"
+              disabled={!state.can_summarize || summarizeMutation.isPending}
+              onClick={() => summarizeMutation.mutate(summaryView)}
+            >
+              {summarizeMutation.isPending ? (
+                <Spinner className="h-3.5 w-3.5" />
+              ) : hasSummary ? (
+                t("ticket.ai.refreshButton")
+              ) : (
+                t("ticket.ai.summarizeButton")
+              )}
+            </Button>
+          )}
+          {isAdmin && hasSummary && (
+            <Menu
+              panelTestId="ai-panel-summary-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  type="button"
+                  ref={ref}
+                  {...toggleProps}
+                  data-testid="ai-panel-summary-menu-trigger"
+                  title={t("ticket.ai.moreActions")}
+                  className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
+                >
+                  ⋯
+                </button>
+              )}
+            >
+              <MenuItem
+                danger
+                testId="ai-panel-summary-admin-delete"
+                onSelect={() => {
+                  void (async () => {
+                    const ok = await confirm({
+                      title: t("ticket.ai.adminDeleteSummary"),
+                      message: t("ticket.ai.adminDeleteSummaryConfirm"),
+                      variant: "danger",
+                    });
+                    if (ok) adminDeleteSummaryMutation.mutate();
+                  })();
+                }}
+              >
+                {t("ticket.ai.adminDeleteSummary")}
+              </MenuItem>
+            </Menu>
+          )}
+          <button
+            type="button"
+            aria-pressed={pinned}
+            data-testid="ai-panel-summary-pin"
+            title={pinned ? t("ticket.ai.unpin") : t("ticket.ai.pin")}
+            onClick={() => setPinned(!pinned)}
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted transition-colors hover:bg-surface-subtle hover:text-ink aria-pressed:text-purple"
+          >
+            <PinIcon className="h-3.5 w-3.5" />
+            <span className="sr-only sm:not-sr-only">
+              {pinned ? t("ticket.ai.unpin") : t("ticket.ai.pin")}
+            </span>
+          </button>
+        </div>
+      </div>
+      {summaryView === "custom" ? (
+        <CustomSummaryPanel
+          instruction={customInstruction}
+          onInstructionChange={setCustomInstruction}
+          onRun={() => customSummaryMutation.mutate(customInstruction.trim())}
+          pending={customSummaryMutation.isPending}
+          result={customResult}
+          errorText={
+            customSummaryMutation.isError
+              ? mapRunError(customSummaryMutation.error)
+              : null
+          }
+          savedPrompts={savedPrompts}
+          onSavePrompt={(prompt) => updateSavedPrompts(addSavedPrompt(savedPrompts, prompt))}
+          onRemovePrompt={(prompt) =>
+            updateSavedPrompts(savedPrompts.filter((p) => p !== prompt))
+          }
+        />
+      ) : (
+        <>
+          {adminDeleteSummaryMutation.isError && (
+            <p
+              className="text-xs text-danger"
+              data-testid="ai-panel-summary-admin-delete-error"
+            >
+              {mapRunError(adminDeleteSummaryMutation.error)}
+            </p>
+          )}
+
+          {hasSummary ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                {staleCount > 0 ? (
+                  <Badge tone="warn" data-testid="ai-summary-stale">
+                    {t("ticket.ai.summaryStale", { count: staleCount })}
+                  </Badge>
+                ) : (
+                  <Badge tone="success" data-testid="ai-summary-current">
+                    {t("ticket.ai.summaryCurrent")}
+                  </Badge>
+                )}
+                {articles.length > 0 && (
+                  <CoverageDots
+                    covered={coveredCount}
+                    total={articles.length}
+                  />
+                )}
+                {state.summary_created_at && (
+                  <span
+                    className="text-[11px] text-muted"
+                    data-testid="ai-summary-created-at"
+                  >
+                    {t("ticket.ai.summaryCreatedAt", {
+                      dateTime: formatDateTime(
+                        state.summary_created_at,
+                        locale,
+                      ),
+                    })}
+                  </span>
+                )}
+              </div>
+              <SummaryText
+                body={state.summary_body ?? ""}
+                testId="ai-panel-summary-body"
+              />
+            </div>
+          ) : (
+            <p
+              className="text-sm text-muted"
+              data-testid="ai-panel-summary-empty"
+            >
+              {t("ticket.ai.summaryEmpty")}
+            </p>
+          )}
+          {summarizeMutation.isSuccess &&
+            summarizeMutation.data.status === "up_to_date" && (
+              <p
+                className="text-xs text-muted"
+                data-testid="ai-panel-summary-uptodate"
+              >
+                {t("ticket.ai.summaryUpToDate")}
+              </p>
+            )}
+          {summarizeMutation.isError && (
+            <p
+              className="text-xs text-danger"
+              data-testid="ai-panel-summary-error"
+            >
+              {mapRunError(summarizeMutation.error)}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+
+  const draftsContent = (
+    <div className="space-y-2" data-testid="ai-panel-drafts">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
+          {t("ticket.ai.draftsLabel")}
+          <HelpPopover
+            title={t("ticket.ai.draftsLabel")}
+            testId="ai-panel-help-drafts"
+          >
+            {t("ticket.ai.help.drafts")}
+          </HelpPopover>
+        </span>
+        <span
+          title={!canNote ? t("ticket.toolbar.noPermission") : undefined}
+        >
+          <Button
+            size="sm"
+            variant="primary"
+            data-testid="ai-panel-create-draft-button"
+            disabled={!canNote || manualRunBusy}
+            onClick={() => {
+              setMyRunStartedAt(null);
+              setAwaitingRunMarker(true);
+              draftMutation.mutate();
+            }}
+          >
+            {manualRunBusy ? (
+              <Spinner className="h-3.5 w-3.5" />
+            ) : (
+              t("ticket.ai.createDraftButton")
+            )}
+          </Button>
+        </span>
+      </div>
+      {manualRunBusy && (
+        <p
+          className="text-xs text-muted"
+          data-testid="ai-panel-draft-running"
+        >
+          {manualRunActive
+            ? t("ticket.ai.draftRunning")
+            : t("ticket.ai.createDraftHint")}
+        </p>
+      )}
+      {draftMutation.isError && (
+        <p
+          className="text-xs text-danger"
+          data-testid="ai-panel-draft-error"
+        >
+          {mapRunError(draftMutation.error)}
+        </p>
+      )}
+      {manualRunSkipped && (
+        <div
+          className="rounded-md border border-hairline bg-surface-subtle p-2 text-xs text-muted"
+          data-testid="ai-panel-draft-skipped"
+        >
+          <p>{t("ticket.ai.draftSkipped")}</p>
+          {state.manual_run_notes && (
+            <p
+              className="mt-1 text-[11px] text-muted/80"
+              data-testid="ai-panel-draft-skipped-notes"
+            >
+              {state.manual_run_notes}
+            </p>
+          )}
+        </div>
+      )}
+      {manualRunErrored && (
+        <p
+          className="text-xs text-danger"
+          data-testid="ai-panel-draft-run-error"
+        >
+          {runErrorCodeText(t, state.manual_run_error_code ?? undefined)}
+        </p>
+      )}
+
+      {visibleDrafts.length === 0 ? (
+        <p
+          className="text-sm text-muted"
+          data-testid="ai-panel-drafts-empty"
+        >
+          {t("ticket.ai.draftsEmpty")}
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {visibleDrafts.map((draft) => {
+            const expanded = expandedDraftId === draft.id;
+            const isOpen = draft.status === "open";
+            return (
+              <li
+                key={draft.id}
+                className="space-y-2 rounded-md border border-hairline bg-surface-subtle p-3"
+                data-testid={`ai-panel-draft-${draft.id}`}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <DraftKindIcon kind={draft.kind} />
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-semibold text-ink">
+                        {t(`ticket.ai.draftTitle.${draft.kind}`, {
+                          defaultValue: t(
+                            `ticket.ai.draftKind.${draft.kind}`,
+                            {
+                              defaultValue: draft.kind,
+                            },
+                          ),
+                        })}
+                      </div>
+                      <div
+                        className="truncate text-[11px] text-muted"
+                        data-testid={`ai-panel-draft-meta-${draft.id}`}
+                      >
+                        {formatDateTime(draft.create_time, locale)}
+                        {" · "}
+                        {t(`ticket.ai.draftSource.${draft.source}`, {
+                          defaultValue: draft.source,
+                        })}
+                        {draft.based_on_article_id != null && (
+                          <>
+                            {" · "}
+                            {t("ticket.ai.basedOnArticle", {
+                              articleId: draft.based_on_article_id,
+                            })}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {!isOpen && (
+                      <Badge
+                        tone="muted"
+                        data-testid={`ai-panel-draft-status-${draft.id}`}
+                      >
+                        {t(`ticket.ai.draftStatus.${draft.status}`, {
+                          defaultValue: draft.status,
+                        })}
+                      </Badge>
+                    )}
+                    {isOpen && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          data-testid={`ai-panel-draft-discard-${draft.id}`}
+                          disabled={discardMutation.isPending}
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: t("ticket.ai.discardDraft"),
+                              message: t("ticket.ai.discardConfirm"),
+                              variant: "danger",
+                            });
+                            if (ok) discardMutation.mutate(draft.id);
+                          }}
+                        >
+                          {discardMutation.isPending &&
+                          discardMutation.variables === draft.id ? (
+                            <Spinner className="h-3.5 w-3.5" />
+                          ) : (
+                            t("ticket.ai.discardDraft")
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          data-testid={`ai-panel-draft-use-${draft.id}`}
+                          disabled={!canNote}
+                          onClick={() => setReplyDraft(draft)}
+                        >
+                          {t("ticket.ai.useDraft")}
+                        </Button>
+                      </>
+                    )}
+                    {isAdmin && (
+                      <Menu
+                        panelTestId={`ai-panel-draft-menu-${draft.id}`}
+                        trigger={({ ref, toggleProps }) => (
+                          <button
+                            type="button"
+                            ref={ref}
+                            {...toggleProps}
+                            data-testid={`ai-panel-draft-menu-trigger-${draft.id}`}
+                            title={t("ticket.ai.moreActions")}
+                            className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface hover:text-ink"
+                          >
+                            ⋯
+                          </button>
+                        )}
+                      >
+                        <MenuItem
+                          danger
+                          testId={`ai-panel-draft-admin-delete-${draft.id}`}
+                          onSelect={() => {
+                            void (async () => {
+                              const ok = await confirm({
+                                title: t("ticket.ai.adminDeleteDraft"),
+                                message: t("ticket.ai.adminDeleteConfirm"),
+                                variant: "danger",
+                              });
+                              if (ok) adminDeleteMutation.mutate(draft.id);
+                            })();
+                          }}
+                        >
+                          {t("ticket.ai.adminDeleteDraft")}
+                        </MenuItem>
+                      </Menu>
+                    )}
+                  </div>
+                </div>
+                <p
+                  className={cn(
+                    "whitespace-pre-wrap text-[13px] text-ink",
+                    !expanded && "line-clamp-2",
+                  )}
+                  data-testid={`ai-panel-draft-body-${draft.id}`}
+                >
+                  {draft.body}
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    className="text-[11px] font-medium text-accent hover:underline"
+                    data-testid={`ai-panel-draft-toggle-${draft.id}`}
+                    onClick={() =>
+                      setExpandedDraftId(expanded ? null : draft.id)
+                    }
+                  >
+                    {expanded
+                      ? t("ticket.ai.collapse")
+                      : t("ticket.ai.expand")}
+                  </button>
+                  {isAdmin && draft.tool_trace?.length > 0 && (
+                    <button
+                      type="button"
+                      className="text-[11px] font-medium text-muted hover:text-ink hover:underline"
+                      data-testid={`ai-panel-draft-trace-toggle-${draft.id}`}
+                      aria-expanded={openTraceId === draft.id}
+                      onClick={() =>
+                        setOpenTraceId(
+                          openTraceId === draft.id ? null : draft.id,
+                        )
+                      }
+                    >
+                      {t("ticket.ai.toolTrace", {
+                        count: draft.tool_trace.length,
+                      })}
+                      <span aria-hidden>
+                        {" "}
+                        {openTraceId === draft.id ? "▾" : "▸"}
+                      </span>
+                    </button>
+                  )}
+                </div>
+                {isAdmin && openTraceId === draft.id && (
+                  <ul
+                    className="space-y-1.5"
+                    data-testid={`ai-panel-draft-trace-${draft.id}`}
+                  >
+                    {draft.tool_trace.map((step, i) => (
+                      <li key={i}>
+                        <ToolTraceCard
+                          name={step.name}
+                          content={step.content}
+                          arguments={step.arguments}
+                          testId={`ai-panel-draft-trace-step-${draft.id}-${i}`}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {discardMutation.isError && (
+        <p
+          className="text-xs text-danger"
+          data-testid="ai-panel-discard-error"
+        >
+          {mapRunError(discardMutation.error)}
+        </p>
+      )}
+    </div>
+  );
+
+  const chipRow = (
+    <div className="flex flex-wrap items-center gap-1.5" data-testid="ai-chips">
+      {state.summary_available &&
+        (pinned ? (
+          <AssistChip
+            aria-pressed
+            title={t("ticket.ai.unpin")}
+            data-testid="ai-chip-summary"
+            onClick={() => setPinned(false)}
+          >
+            <SparkIcon className="h-3.5 w-3.5 text-purple" />
+            {t("ticket.ai.summaryLabel")}
+            <SummaryStatusDot status={summaryStatus} />
+          </AssistChip>
+        ) : (
+          <HoverCard
+            label={t("ticket.ai.summaryLabel")}
+            panelTestId="ai-card-summary"
+            trigger={({ ref, triggerProps }) => (
+              <AssistChip ref={ref} {...triggerProps} data-testid="ai-chip-summary">
+                <SparkIcon className="h-3.5 w-3.5 text-purple" />
+                {t("ticket.ai.summaryLabel")}
+                <SummaryStatusDot status={summaryStatus} />
+              </AssistChip>
+            )}
+          >
+            {summaryContent}
+          </HoverCard>
+        ))}
+      {state.manual_assist_available && (
+        <HoverCard
+          label={t("ticket.ai.draftsLabel")}
+          panelTestId="ai-card-drafts"
+          trigger={({ ref, triggerProps }) => (
+            <AssistChip ref={ref} {...triggerProps} data-testid="ai-chip-drafts">
+              <PencilIcon className="h-3.5 w-3.5 text-purple" />
+              {t("ticket.ai.draftsLabel")}
+              {manualRunBusy ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                <ChipCount value={openDraftCount} highlight={openDraftCount > 0} />
+              )}
+            </AssistChip>
+          )}
+        >
+          {draftsContent}
+        </HoverCard>
+      )}
+      {trailing}
+    </div>
+  );
+
+  return (
+    <div className="space-y-2.5" data-testid="ai-panel">
+      {chipRow}
       {state.ai_escalated_at && (
         <div
           className="flex items-center justify-between gap-2 rounded-md border border-amber/30 bg-amber/15 p-2.5 text-xs text-ink"
@@ -408,7 +1008,6 @@ export function AiPanel({
           </span>
         </div>
       )}
-
       {state.triage && (
         <div
           className="space-y-2 rounded-md border border-accent/40 bg-accent/10 p-2.5 text-xs text-ink"
@@ -496,455 +1095,12 @@ export function AiPanel({
           )}
         </div>
       )}
-
-      {state.summary_available && (
-        <div className="space-y-2" data-testid="ai-panel-summary">
-          <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
-              {t("ticket.ai.summaryLabel")}
-              <HelpPopover
-                title={t("ticket.ai.summaryLabel")}
-                testId="ai-panel-help-summary"
-              >
-                {t("ticket.ai.help.summary")}
-              </HelpPopover>
-            </span>
-            <div className="flex items-center gap-1.5">
-              <div
-                role="group"
-                aria-label={t("ticket.ai.detailLabel")}
-                className="inline-flex rounded-lg border border-hairline bg-surface p-0.5"
-              >
-                {SUMMARY_DETAILS.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    aria-pressed={summaryDetail === d}
-                    data-testid={`ai-panel-summary-detail-${d}`}
-                    disabled={
-                      !state.can_summarize || summarizeMutation.isPending
-                    }
-                    onClick={() => setSummaryDetail(d)}
-                    className={cn(
-                      "rounded-md px-2.5 py-0.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                      summaryDetail === d
-                        ? "bg-accent text-accent-ink"
-                        : "text-muted hover:bg-surface-subtle hover:text-ink",
-                    )}
-                  >
-                    {t(`ticket.ai.detail.${d}`)}
-                  </button>
-                ))}
-              </div>
-              <Button
-                size="sm"
-                variant="primary"
-                data-testid="ai-panel-summarize-button"
-                disabled={!state.can_summarize || summarizeMutation.isPending}
-                onClick={() => summarizeMutation.mutate(summaryDetail)}
-              >
-                {summarizeMutation.isPending ? (
-                  <Spinner className="h-3.5 w-3.5" />
-                ) : hasSummary ? (
-                  t("ticket.ai.refreshButton")
-                ) : (
-                  t("ticket.ai.summarizeButton")
-                )}
-              </Button>
-              {isAdmin && hasSummary && (
-                <Menu
-                  panelTestId="ai-panel-summary-menu"
-                  trigger={({ ref, toggleProps }) => (
-                    <button
-                      type="button"
-                      ref={ref}
-                      {...toggleProps}
-                      data-testid="ai-panel-summary-menu-trigger"
-                      title={t("ticket.ai.moreActions")}
-                      className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
-                    >
-                      ⋯
-                    </button>
-                  )}
-                >
-                  <MenuItem
-                    danger
-                    testId="ai-panel-summary-admin-delete"
-                    onSelect={() => {
-                      void (async () => {
-                        const ok = await confirm({
-                          title: t("ticket.ai.adminDeleteSummary"),
-                          message: t("ticket.ai.adminDeleteSummaryConfirm"),
-                          variant: "danger",
-                        });
-                        if (ok) adminDeleteSummaryMutation.mutate();
-                      })();
-                    }}
-                  >
-                    {t("ticket.ai.adminDeleteSummary")}
-                  </MenuItem>
-                </Menu>
-              )}
-            </div>
-          </div>
-          {adminDeleteSummaryMutation.isError && (
-            <p
-              className="text-xs text-danger"
-              data-testid="ai-panel-summary-admin-delete-error"
-            >
-              {mapRunError(adminDeleteSummaryMutation.error)}
-            </p>
-          )}
-
-          {hasSummary ? (
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                {staleCount > 0 ? (
-                  <Badge tone="warn" data-testid="ai-summary-stale">
-                    {t("ticket.ai.summaryStale", { count: staleCount })}
-                  </Badge>
-                ) : (
-                  <Badge tone="success" data-testid="ai-summary-current">
-                    {t("ticket.ai.summaryCurrent")}
-                  </Badge>
-                )}
-                {articles.length > 0 && (
-                  <CoverageDots
-                    covered={coveredCount}
-                    total={articles.length}
-                  />
-                )}
-                {state.summary_created_at && (
-                  <span
-                    className="text-[11px] text-muted"
-                    data-testid="ai-summary-created-at"
-                  >
-                    {t("ticket.ai.summaryCreatedAt", {
-                      dateTime: formatDateTime(
-                        state.summary_created_at,
-                        locale,
-                      ),
-                    })}
-                  </span>
-                )}
-              </div>
-              <SummaryText
-                body={state.summary_body ?? ""}
-                testId="ai-panel-summary-body"
-              />
-            </div>
-          ) : (
-            <p
-              className="text-sm text-muted"
-              data-testid="ai-panel-summary-empty"
-            >
-              {t("ticket.ai.summaryEmpty")}
-            </p>
-          )}
-          {summarizeMutation.isSuccess &&
-            summarizeMutation.data.status === "up_to_date" && (
-              <p
-                className="text-xs text-muted"
-                data-testid="ai-panel-summary-uptodate"
-              >
-                {t("ticket.ai.summaryUpToDate")}
-              </p>
-            )}
-          {summarizeMutation.isError && (
-            <p
-              className="text-xs text-danger"
-              data-testid="ai-panel-summary-error"
-            >
-              {mapRunError(summarizeMutation.error)}
-            </p>
-          )}
-        </div>
-      )}
-
-      {state.manual_assist_available && (
-        <div className="space-y-2" data-testid="ai-panel-drafts">
-          <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted">
-              {t("ticket.ai.draftsLabel")}
-              <HelpPopover
-                title={t("ticket.ai.draftsLabel")}
-                testId="ai-panel-help-drafts"
-              >
-                {t("ticket.ai.help.drafts")}
-              </HelpPopover>
-            </span>
-            <span
-              title={!canNote ? t("ticket.toolbar.noPermission") : undefined}
-            >
-              <Button
-                size="sm"
-                variant="primary"
-                data-testid="ai-panel-create-draft-button"
-                disabled={!canNote || manualRunBusy}
-                onClick={() => {
-                  setMyRunStartedAt(null);
-                  setAwaitingRunMarker(true);
-                  draftMutation.mutate();
-                }}
-              >
-                {manualRunBusy ? (
-                  <Spinner className="h-3.5 w-3.5" />
-                ) : (
-                  t("ticket.ai.createDraftButton")
-                )}
-              </Button>
-            </span>
-          </div>
-          {manualRunBusy && (
-            <p
-              className="text-xs text-muted"
-              data-testid="ai-panel-draft-running"
-            >
-              {manualRunActive
-                ? t("ticket.ai.draftRunning")
-                : t("ticket.ai.createDraftHint")}
-            </p>
-          )}
-          {draftMutation.isError && (
-            <p
-              className="text-xs text-danger"
-              data-testid="ai-panel-draft-error"
-            >
-              {mapRunError(draftMutation.error)}
-            </p>
-          )}
-          {manualRunSkipped && (
-            <div
-              className="rounded-md border border-hairline bg-surface-subtle p-2 text-xs text-muted"
-              data-testid="ai-panel-draft-skipped"
-            >
-              <p>{t("ticket.ai.draftSkipped")}</p>
-              {state.manual_run_notes && (
-                <p
-                  className="mt-1 text-[11px] text-muted/80"
-                  data-testid="ai-panel-draft-skipped-notes"
-                >
-                  {state.manual_run_notes}
-                </p>
-              )}
-            </div>
-          )}
-          {manualRunErrored && (
-            <p
-              className="text-xs text-danger"
-              data-testid="ai-panel-draft-run-error"
-            >
-              {runErrorCodeText(t, state.manual_run_error_code ?? undefined)}
-            </p>
-          )}
-
-          {visibleDrafts.length === 0 ? (
-            <p
-              className="text-sm text-muted"
-              data-testid="ai-panel-drafts-empty"
-            >
-              {t("ticket.ai.draftsEmpty")}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {visibleDrafts.map((draft) => {
-                const expanded = expandedDraftId === draft.id;
-                const isOpen = draft.status === "open";
-                return (
-                  <li
-                    key={draft.id}
-                    className="space-y-2 rounded-md border border-hairline bg-surface-subtle p-3"
-                    data-testid={`ai-panel-draft-${draft.id}`}
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <DraftKindIcon kind={draft.kind} />
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-ink">
-                            {t(`ticket.ai.draftTitle.${draft.kind}`, {
-                              defaultValue: t(
-                                `ticket.ai.draftKind.${draft.kind}`,
-                                {
-                                  defaultValue: draft.kind,
-                                },
-                              ),
-                            })}
-                          </div>
-                          <div
-                            className="truncate text-[11px] text-muted"
-                            data-testid={`ai-panel-draft-meta-${draft.id}`}
-                          >
-                            {formatDateTime(draft.create_time, locale)}
-                            {" · "}
-                            {t(`ticket.ai.draftSource.${draft.source}`, {
-                              defaultValue: draft.source,
-                            })}
-                            {draft.based_on_article_id != null && (
-                              <>
-                                {" · "}
-                                {t("ticket.ai.basedOnArticle", {
-                                  articleId: draft.based_on_article_id,
-                                })}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {!isOpen && (
-                          <Badge
-                            tone="muted"
-                            data-testid={`ai-panel-draft-status-${draft.id}`}
-                          >
-                            {t(`ticket.ai.draftStatus.${draft.status}`, {
-                              defaultValue: draft.status,
-                            })}
-                          </Badge>
-                        )}
-                        {isOpen && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              data-testid={`ai-panel-draft-discard-${draft.id}`}
-                              disabled={discardMutation.isPending}
-                              onClick={async () => {
-                                const ok = await confirm({
-                                  title: t("ticket.ai.discardDraft"),
-                                  message: t("ticket.ai.discardConfirm"),
-                                  variant: "danger",
-                                });
-                                if (ok) discardMutation.mutate(draft.id);
-                              }}
-                            >
-                              {discardMutation.isPending &&
-                              discardMutation.variables === draft.id ? (
-                                <Spinner className="h-3.5 w-3.5" />
-                              ) : (
-                                t("ticket.ai.discardDraft")
-                              )}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              data-testid={`ai-panel-draft-use-${draft.id}`}
-                              disabled={!canNote}
-                              onClick={() => setReplyDraft(draft)}
-                            >
-                              {t("ticket.ai.useDraft")}
-                            </Button>
-                          </>
-                        )}
-                        {isAdmin && (
-                          <Menu
-                            panelTestId={`ai-panel-draft-menu-${draft.id}`}
-                            trigger={({ ref, toggleProps }) => (
-                              <button
-                                type="button"
-                                ref={ref}
-                                {...toggleProps}
-                                data-testid={`ai-panel-draft-menu-trigger-${draft.id}`}
-                                title={t("ticket.ai.moreActions")}
-                                className="rounded-md px-1.5 py-1 text-sm leading-none text-muted transition-colors hover:bg-surface hover:text-ink"
-                              >
-                                ⋯
-                              </button>
-                            )}
-                          >
-                            <MenuItem
-                              danger
-                              testId={`ai-panel-draft-admin-delete-${draft.id}`}
-                              onSelect={() => {
-                                void (async () => {
-                                  const ok = await confirm({
-                                    title: t("ticket.ai.adminDeleteDraft"),
-                                    message: t("ticket.ai.adminDeleteConfirm"),
-                                    variant: "danger",
-                                  });
-                                  if (ok) adminDeleteMutation.mutate(draft.id);
-                                })();
-                              }}
-                            >
-                              {t("ticket.ai.adminDeleteDraft")}
-                            </MenuItem>
-                          </Menu>
-                        )}
-                      </div>
-                    </div>
-                    <p
-                      className={cn(
-                        "whitespace-pre-wrap text-[13px] text-ink",
-                        !expanded && "line-clamp-2",
-                      )}
-                      data-testid={`ai-panel-draft-body-${draft.id}`}
-                    >
-                      {draft.body}
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        className="text-[11px] font-medium text-accent hover:underline"
-                        data-testid={`ai-panel-draft-toggle-${draft.id}`}
-                        onClick={() =>
-                          setExpandedDraftId(expanded ? null : draft.id)
-                        }
-                      >
-                        {expanded
-                          ? t("ticket.ai.collapse")
-                          : t("ticket.ai.expand")}
-                      </button>
-                      {isAdmin && draft.tool_trace?.length > 0 && (
-                        <button
-                          type="button"
-                          className="text-[11px] font-medium text-muted hover:text-ink hover:underline"
-                          data-testid={`ai-panel-draft-trace-toggle-${draft.id}`}
-                          aria-expanded={openTraceId === draft.id}
-                          onClick={() =>
-                            setOpenTraceId(
-                              openTraceId === draft.id ? null : draft.id,
-                            )
-                          }
-                        >
-                          {t("ticket.ai.toolTrace", {
-                            count: draft.tool_trace.length,
-                          })}
-                          <span aria-hidden>
-                            {" "}
-                            {openTraceId === draft.id ? "▾" : "▸"}
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                    {isAdmin && openTraceId === draft.id && (
-                      <ul
-                        className="space-y-1.5"
-                        data-testid={`ai-panel-draft-trace-${draft.id}`}
-                      >
-                        {draft.tool_trace.map((step, i) => (
-                          <li key={i}>
-                            <ToolTraceCard
-                              name={step.name}
-                              content={step.content}
-                              arguments={step.arguments}
-                              testId={`ai-panel-draft-trace-step-${draft.id}-${i}`}
-                            />
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-          {discardMutation.isError && (
-            <p
-              className="text-xs text-danger"
-              data-testid="ai-panel-discard-error"
-            >
-              {mapRunError(discardMutation.error)}
-            </p>
-          )}
+      {pinned && state.summary_available && (
+        <div
+          className="rounded-lg border border-purple/30 bg-surface-subtle/60 p-3"
+          data-testid="ai-panel-summary-pinned"
+        >
+          {summaryContent}
         </div>
       )}
 

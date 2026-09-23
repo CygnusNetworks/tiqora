@@ -10,6 +10,7 @@ const {
   getState,
   requestDraft,
   summarize,
+  customSummary,
   discardDraft,
   resume,
   acceptTriage,
@@ -24,6 +25,7 @@ const {
   getState: vi.fn(),
   requestDraft: vi.fn(),
   summarize: vi.fn(),
+  customSummary: vi.fn(),
   discardDraft: vi.fn(),
   resume: vi.fn(),
   acceptTriage: vi.fn(),
@@ -47,6 +49,7 @@ vi.mock("@/lib/ticketAiApi", async () => {
       getState,
       requestDraft,
       summarize,
+      customSummary,
       discardDraft,
       resume,
       acceptTriage,
@@ -101,6 +104,16 @@ function wrap(ui: React.ReactElement) {
   );
 }
 
+/** The panel's content lives in hover cards behind the header chips —
+ * click every chip so the card stays open for the rest of the test. */
+async function openCards() {
+  await waitFor(() => expect(screen.getByTestId("ai-chips")).toBeTruthy());
+  for (const id of ["ai-chip-summary", "ai-chip-drafts"]) {
+    const chip = screen.queryByTestId(id);
+    if (chip && chip.getAttribute("aria-expanded") !== "true") fireEvent.click(chip);
+  }
+}
+
 const baseState = {
   manual_assist_available: false,
   summary_available: false,
@@ -130,6 +143,8 @@ describe("AiPanel", () => {
     getState.mockReset();
     requestDraft.mockReset();
     summarize.mockReset();
+    customSummary.mockReset();
+    window.localStorage.clear();
     discardDraft.mockReset();
     resume.mockReset();
     listArticles.mockReset().mockResolvedValue([]);
@@ -213,6 +228,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-summary-body")).toBeTruthy(),
@@ -251,6 +267,7 @@ describe("AiPanel", () => {
     listArticles.mockResolvedValue([40, 41, 42].map(fakeArticle));
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-summary-current")).toBeTruthy(),
@@ -269,6 +286,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-summary-empty")).toBeTruthy(),
@@ -296,6 +314,7 @@ describe("AiPanel", () => {
     );
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-7")).toBeTruthy(),
@@ -326,6 +345,7 @@ describe("AiPanel", () => {
     );
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
@@ -343,6 +363,7 @@ describe("AiPanel", () => {
     );
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
@@ -364,6 +385,7 @@ describe("AiPanel", () => {
     );
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
@@ -385,6 +407,7 @@ describe("AiPanel", () => {
     );
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() =>
@@ -428,6 +451,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
     await waitFor(() => expect(requestDraft).toHaveBeenCalledWith(1));
@@ -478,6 +502,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
 
@@ -521,6 +546,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
 
@@ -558,6 +584,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     fireEvent.click(await screen.findByTestId("ai-panel-create-draft-button"));
 
@@ -580,6 +607,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await screen.findByTestId("ai-panel-create-draft-button");
     expect(screen.queryByTestId("ai-panel-draft-run-error")).toBeNull();
@@ -606,6 +634,7 @@ describe("AiPanel", () => {
     discardDraft.mockResolvedValue(undefined);
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-discard-7")).toBeTruthy(),
@@ -634,6 +663,7 @@ describe("AiPanel", () => {
       ],
     });
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-discard-8")).toBeTruthy(),
@@ -665,6 +695,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 42, login: "agent", is_admin: false };
     const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-21")).toBeTruthy(),
     );
@@ -673,6 +704,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-menu-trigger-21")).toBeTruthy(),
     );
@@ -706,6 +738,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 42, login: "agent", is_admin: false };
     const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-drafts-empty")).toBeTruthy(),
     );
@@ -714,6 +747,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-30")).toBeTruthy(),
     );
@@ -738,6 +772,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 42, login: "agent", is_admin: false };
     const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-summary-body")).toBeTruthy(),
     );
@@ -746,6 +781,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-summary-menu-trigger")).toBeTruthy(),
     );
@@ -774,6 +810,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(
@@ -815,6 +852,7 @@ describe("AiPanel", () => {
     // Non-admins never see the trace toggle.
     mockUser.current = { id: 42, login: "agent", is_admin: false };
     const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-11")).toBeTruthy(),
     );
@@ -823,6 +861,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-11")).toBeTruthy(),
     );
@@ -872,6 +911,7 @@ describe("AiPanel", () => {
 
     mockUser.current = { id: 1, login: "root@localhost", is_admin: true };
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-trace-toggle-13")).toBeTruthy(),
     );
@@ -905,6 +945,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-use-9")).toBeTruthy(),
@@ -960,6 +1001,7 @@ describe("AiPanel", () => {
     });
 
     wrap(<AiPanel ticketId={1} canNote />);
+    await openCards();
 
     await waitFor(() =>
       expect(screen.getByTestId("ai-panel-draft-use-9")).toBeTruthy(),
@@ -981,6 +1023,139 @@ describe("AiPanel", () => {
     };
     expect(payload.channel).toBe("telegram");
     expect(payload.to_address).toBeNull();
+  });
+
+  describe("header chips", () => {
+    const summaryState = {
+      ...baseState,
+      summary_available: true,
+      can_summarize: true,
+      summary_body: "Stored summary",
+      last_summary_upto_article_id: 42,
+      summary_created_at: "2026-07-23T09:21:00",
+    };
+
+    it("keeps the content out of the page until a chip is hovered or clicked", async () => {
+      getState.mockResolvedValue({ ...summaryState, manual_assist_available: true });
+      listArticles.mockResolvedValue([40, 41, 42].map(fakeArticle));
+
+      wrap(<AiPanel ticketId={1} canNote />);
+
+      await waitFor(() => expect(screen.getByTestId("ai-chip-summary")).toBeTruthy());
+      expect(screen.queryByTestId("ai-panel-summary-body")).toBeNull();
+      expect(screen.getByTestId("ai-chip-drafts").textContent).toContain("0");
+      await waitFor(() => expect(screen.getByTestId("ai-chip-summary-current")).toBeTruthy());
+
+      fireEvent.mouseEnter(screen.getByTestId("ai-chip-summary"));
+      await waitFor(() =>
+        expect(screen.getByTestId("ai-panel-summary-body").textContent).toBe("Stored summary"),
+      );
+    });
+
+    it("renders the trailing chip even when no AI feature is available", async () => {
+      getState.mockResolvedValue(baseState);
+      wrap(<AiPanel ticketId={1} canNote trailing={<span data-testid="trailing-chip" />} />);
+      await waitFor(() => expect(screen.getByTestId("trailing-chip")).toBeTruthy());
+      expect(screen.queryByTestId("ai-panel")).toBeNull();
+    });
+
+    it("pins the summary below the chips and remembers it", async () => {
+      getState.mockResolvedValue(summaryState);
+
+      const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+      await openCards();
+      fireEvent.click(await screen.findByTestId("ai-panel-summary-pin"));
+
+      const pinnedCard = await screen.findByTestId("ai-panel-summary-pinned");
+      expect(pinnedCard.textContent).toContain("Stored summary");
+      expect(screen.getByTestId("ai-chip-summary").getAttribute("aria-pressed")).toBe("true");
+      unmount();
+
+      wrap(<AiPanel ticketId={1} canNote />);
+      await waitFor(() => expect(screen.getByTestId("ai-panel-summary-pinned")).toBeTruthy());
+      // The pressed chip unpins again.
+      fireEvent.click(screen.getByTestId("ai-chip-summary"));
+      expect(screen.queryByTestId("ai-panel-summary-pinned")).toBeNull();
+    });
+
+    it("runs a custom summary with the agent's own instruction", async () => {
+      getState.mockResolvedValue({ ...summaryState, can_summarize: false });
+      customSummary.mockResolvedValue({
+        summary_body: "Für die Hausverwaltung: gesperrt wegen Malware.",
+        created_at: "2026-09-23T08:00:00Z",
+      });
+
+      wrap(<AiPanel ticketId={1} canNote />);
+      await openCards();
+      fireEvent.click(await screen.findByTestId("ai-panel-summary-detail-custom"));
+      // The stored-summary refresh button belongs to the other two views.
+      expect(screen.queryByTestId("ai-panel-summarize-button")).toBeNull();
+
+      const run = screen.getByTestId("ai-custom-summary-run");
+      expect(run).toBeDisabled();
+      fireEvent.change(screen.getByTestId("ai-custom-summary-input"), {
+        target: { value: "  Für die Hausverwaltung, inkl. Timeline  " },
+      });
+      fireEvent.click(run);
+
+      await waitFor(() =>
+        expect(customSummary).toHaveBeenCalledWith(1, "Für die Hausverwaltung, inkl. Timeline"),
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("ai-custom-summary-body").textContent).toContain(
+          "gesperrt wegen Malware",
+        ),
+      );
+      expect(summarize).not.toHaveBeenCalled();
+
+      // Back to the stored summary is always possible, even with nothing to refresh.
+      fireEvent.click(screen.getByTestId("ai-panel-summary-detail-standard"));
+      expect(screen.getByTestId("ai-panel-summary-body").textContent).toBe("Stored summary");
+    });
+
+    it("saves instructions as templates and reuses them", async () => {
+      getState.mockResolvedValue(summaryState);
+
+      const { unmount } = wrap(<AiPanel ticketId={1} canNote />);
+      await openCards();
+      fireEvent.click(await screen.findByTestId("ai-panel-summary-detail-custom"));
+      fireEvent.change(screen.getByTestId("ai-custom-summary-input"), {
+        target: { value: "Nur offene Punkte" },
+      });
+      fireEvent.click(screen.getByTestId("ai-custom-summary-save"));
+      expect(screen.getByTestId("ai-custom-summary-save")).toBeDisabled();
+      unmount();
+
+      wrap(<AiPanel ticketId={1} canNote />);
+      await openCards();
+      fireEvent.click(await screen.findByTestId("ai-panel-summary-detail-custom"));
+      fireEvent.click(screen.getByTestId("ai-custom-summary-saved-0"));
+      expect(
+        (screen.getByTestId("ai-custom-summary-input") as HTMLTextAreaElement).value,
+      ).toBe("Nur offene Punkte");
+
+      fireEvent.click(screen.getByTestId("ai-custom-summary-remove-0"));
+      expect(screen.queryByTestId("ai-custom-summary-saved-0")).toBeNull();
+    });
+
+    it("maps a failed custom summary to the shared LLM error text", async () => {
+      getState.mockResolvedValue(summaryState);
+      customSummary.mockRejectedValue(
+        new ApiError(504, "llm_timeout: slow", "/api/v1/tickets/1/ai/summarize/custom"),
+      );
+
+      wrap(<AiPanel ticketId={1} canNote />);
+      await openCards();
+      fireEvent.click(await screen.findByTestId("ai-panel-summary-detail-custom"));
+      fireEvent.change(screen.getByTestId("ai-custom-summary-input"), {
+        target: { value: "Kurz" },
+      });
+      fireEvent.click(screen.getByTestId("ai-custom-summary-run"));
+      await waitFor(() => expect(screen.getByTestId("ai-custom-summary-error")).toBeTruthy());
+      expect(screen.getByTestId("ai-custom-summary-error").textContent).toBe(
+        i18n.t("ticket.ai.errorLlmTimeout"),
+      );
+    });
   });
 
   describe("triage proposal", () => {
