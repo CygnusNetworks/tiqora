@@ -10,9 +10,11 @@ import { SearchIcon } from "@/components/ui/icons";
 import { SmartSearchBar } from "@/components/agent/SmartSearchBar";
 import {
   applySmartPatch,
+  detectQueryType,
   smartValuesToSearchParams,
   type SmartSearchValues,
 } from "@/components/agent/smartSearch";
+import type { ReadoutOffer } from "@/components/agent/SmartSearchBar";
 import { cn } from "@/lib/cn";
 
 /**
@@ -130,19 +132,89 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
     Boolean(values.createdFrom) ||
     Boolean(values.createdTo);
 
-  const openFull = (term: string) => {
-    const search = smartValuesToSearchParams({ ...values, q: term });
-    if (!search.q && !hasFilters) return;
-    setOpen(false);
-    void navigate({ to: "/agent/search", search });
-  };
-
   const openTicket = (id: number) => {
     setOpen(false);
     void navigate({ to: "/agent/tickets/$ticketId", params: { ticketId: String(id) } });
   };
 
   const hits = resultsQ.data?.hits ?? [];
+
+  // Typing a ticket number means one ticket, not "everything that looks like
+  // it": the exact match gets its own group (the backend hoists it to the
+  // front), and whatever merely quotes the number follows below.
+  const detected = detectQueryType(values.q);
+  const ticketNumber = detected?.kind === "ticket" ? detected.value : null;
+  const directHits = ticketNumber ? hits.filter((h) => h.tn === ticketNumber) : [];
+  const otherHits = ticketNumber ? hits.filter((h) => h.tn !== ticketNumber) : hits;
+
+  const openFull = (term: string) => {
+    // Enter on an exact ticket number opens that ticket instead of a result
+    // page that would hold exactly this one row.
+    const direct = directHits[0];
+    if (direct && term.trim() === detected?.raw) {
+      openTicket(direct.id);
+      return;
+    }
+    const search = smartValuesToSearchParams({ ...values, q: term });
+    if (!search.q && !hasFilters) return;
+    setOpen(false);
+    void navigate({ to: "/agent/search", search });
+  };
+
+  // A customer id is only recognisable against real data, so the offer comes
+  // from the hits already on screen rather than from an extra lookup.
+  const typed = values.q.trim().toLowerCase();
+  const customerMatch =
+    typed.length >= 3 && detected?.kind === "text"
+      ? (hits.find((h) => h.customer_id?.toLowerCase() === typed)?.customer_id ?? null)
+      : null;
+  const offers: ReadoutOffer[] =
+    customerMatch && values.customerId !== customerMatch
+      ? [
+          {
+            id: "customer",
+            label: t("search.detect.offerCustomer", { label: customerMatch }),
+            onApply: () =>
+              setValues((v) => ({
+                ...v,
+                q: "",
+                customerId: customerMatch,
+                customerLabel: customerMatch,
+              })),
+          },
+        ]
+      : [];
+
+  /** One dropdown row. The direct hit carries an accent spine and the Enter
+   * hint, so "the ticket you asked for" reads differently at a glance from
+   * "tickets that mention it". */
+  const renderHit = (hit: (typeof hits)[number], direct: boolean) => (
+    <button
+      type="button"
+      onClick={() => openTicket(hit.id)}
+      data-testid={`command-search-hit-${hit.id}`}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+        direct
+          ? "border-accent/30 bg-accent/10 shadow-[inset_3px_0_0_0_var(--color-accent)] hover:bg-accent/15"
+          : "border-transparent hover:border-hairline hover:bg-surface-subtle",
+      )}
+    >
+      <span className="shrink-0 font-mono text-[11px] text-accent">{hit.tn}</span>
+      <span className={cn("min-w-0 flex-1 truncate text-sm text-ink", direct && "font-medium")}>
+        {hit.title}
+      </span>
+      {direct && (
+        <span className="shrink-0 rounded border border-accent/40 px-1 font-mono text-[10px] text-accent">
+          {t("search.detect.openHint")}
+        </span>
+      )}
+      {hit.state && <StateChip state={hit.state} />}
+      {hit.queue_name && (
+        <span className="hidden shrink-0 text-xs text-muted sm:inline">{hit.queue_name}</span>
+      )}
+    </button>
+  );
   // Ticket hits only for free-text (not while composing queue:/kunde:/…).
   const showResultsPanel =
     open && !composingFilter && (hasQuery || Boolean(values.q.trim()));
@@ -194,6 +266,7 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
         onQueryChange={(text) => setValues((v) => ({ ...v, q: text }))}
         onEscape={() => setOpen(false)}
         onComposingFilterChange={setComposingFilter}
+        offers={offers}
         inputTestId="command-search-input"
         submitLabel={null}
         autoFocus
@@ -218,25 +291,30 @@ export function CommandSearch({ fill = false }: { fill?: boolean }) {
             {hasQuery && !resultsQ.isLoading && hits.length === 0 && (
               <p className="px-2 py-3 text-xs text-muted">{t("search.noResults")}</p>
             )}
+            {directHits.length > 0 && (
+              <p
+                className="px-2 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted"
+                data-testid="command-search-group-direct"
+              >
+                {t("search.groups.direct")}
+              </p>
+            )}
             <ul className="space-y-0.5">
-              {hits.map((hit) => (
-                <li key={hit.id}>
-                  <button
-                    type="button"
-                    onClick={() => openTicket(hit.id)}
-                    data-testid={`command-search-hit-${hit.id}`}
-                    className="flex w-full items-center gap-2 rounded-md border border-transparent px-2 py-1.5 text-left hover:border-hairline hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-                  >
-                    <span className="shrink-0 font-mono text-[11px] text-accent">{hit.tn}</span>
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{hit.title}</span>
-                    {hit.state && <StateChip state={hit.state} />}
-                    {hit.queue_name && (
-                      <span className="hidden shrink-0 text-xs text-muted sm:inline">
-                        {hit.queue_name}
-                      </span>
-                    )}
-                  </button>
-                </li>
+              {directHits.map((hit) => (
+                <li key={hit.id}>{renderHit(hit, true)}</li>
+              ))}
+            </ul>
+            {directHits.length > 0 && otherHits.length > 0 && (
+              <p
+                className="px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted"
+                data-testid="command-search-group-mentions"
+              >
+                {t("search.groups.mentions")}
+              </p>
+            )}
+            <ul className="space-y-0.5">
+              {otherHits.map((hit) => (
+                <li key={hit.id}>{renderHit(hit, false)}</li>
               ))}
             </ul>
           </div>
