@@ -520,7 +520,8 @@
       "moreActions": "اقدامات بیشتر",
       "detail": {
         "standard": "استاندارد",
-        "detailed": "به تفصیل"
+        "detailed": "به تفصیل",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "حذف خلاصه",
       "adminDeleteSummaryHint": "مدیر: خلاصه AI ذخیره شده را حذف کنید - اجرای بعدی از ابتدا شروع می شود",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "بلیط های مشابه",
       "empty": "هیچ بلیط بسته مشابهی پیدا نشد.",
-      "loadError": "بلیت‌های مشابه بارگیری نشد."
+      "loadError": "بلیت‌های مشابه بارگیری نشد.",
+      "short": "Similar"
     },
     "type": "نوع",
     "service": "خدمت",

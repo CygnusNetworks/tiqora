@@ -520,7 +520,8 @@
       "moreActions": "अधिक क्रियाएं",
       "detail": {
         "standard": "मानक",
-        "detailed": "विस्तृत"
+        "detailed": "विस्तृत",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "सारांश हटाएँ",
       "adminDeleteSummaryHint": "व्यवस्थापक: संग्रहीत AI सारांश हटाएं - अगला रन स्क्रैच से शुरू होता है",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "समान टिकट",
       "empty": "कोई समान बंद टिकट नहीं मिला.",
-      "loadError": "समान टिकटें लोड नहीं की जा सकीं."
+      "loadError": "समान टिकटें लोड नहीं की जा सकीं.",
+      "short": "Similar"
     },
     "type": "प्रकार",
     "service": "सेवा",

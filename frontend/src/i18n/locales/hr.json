@@ -520,7 +520,8 @@
       "moreActions": "Više akcija",
       "detail": {
         "standard": "Standardno",
-        "detailed": "Detaljno"
+        "detailed": "Detaljno",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "Izbriši sažetak",
       "adminDeleteSummaryHint": "Administrator: izbrišite pohranjeni AI sažetak — sljedeće pokretanje počinje ispočetka",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "Slične karte",
       "empty": "Nisu pronađene slične zatvorene karte.",
-      "loadError": "Nije moguće učitati slične karte."
+      "loadError": "Nije moguće učitati slične karte.",
+      "short": "Similar"
     },
     "type": "Vrsta",
     "service": "Usluga",

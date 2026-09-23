@@ -928,6 +928,41 @@
         "title": "AiAclUpdate",
         "type": "object"
       },
+      "AiCustomSummaryIn": {
+        "description": "The agent's own summary instruction (\"f\u00fcr eine Mitarbeiterin des\nHausverwaltung, inkl. Timeline\").",
+        "properties": {
+          "instruction": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Instruction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instruction"
+        ],
+        "title": "AiCustomSummaryIn",
+        "type": "object"
+      },
+      "AiCustomSummaryOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "summary_body": {
+            "title": "Summary Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary_body",
+          "created_at"
+        ],
+        "title": "AiCustomSummaryOut",
+        "type": "object"
+      },
       "AiDraftOut": {
         "properties": {
           "accepted_article_id": {
@@ -55714,6 +55749,91 @@
           }
         },
         "summary": "Request Summarize",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/ai/summarize/custom": {
+      "post": {
+        "description": "Summary along the agent's own instruction. Returned only, never\nstored \u2014 the ticket's regular summary stays as it is. Same ``note``\npermission and queue/ACL gates as ``/summarize``.",
+        "operationId": "request_custom_summary_api_v1_tickets__ticket_id__ai_summarize_custom_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiCustomSummaryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiCustomSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Custom Summary",
         "tags": [
           "ai"
         ]
