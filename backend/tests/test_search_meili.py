@@ -256,6 +256,46 @@ async def test_backfill_search_and_permission_filter(
 
 
 @pytest.mark.asyncio
+async def test_exact_ticket_number_does_not_match_near_numbers(
+    postgres_znuny_url: str,
+    meili_url: str,
+) -> None:
+    """An exact ticket number returns that ticket and nothing near it.
+
+    The seeded pair differs in a single digit ('…999999' vs '…999998').
+    Meilisearch tolerates two typos in words longer than eight characters, so
+    without ``typo_tolerance.disable_on_attributes`` on ``tn`` both tickets
+    came back — that is what made searching one number return a page of them.
+    """
+    ids = _seed_search(postgres_znuny_url)
+    async_url = _to_async_url(postgres_znuny_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    settings = Settings(
+        meili_url=meili_url,
+        meili_master_key="test-master-key",
+        meili_tickets_index="tickets_test",
+        database_url=async_url,
+    )
+    await rebuild_index(settings=settings, session_factory=factory, batch_size=100, resume=False)
+
+    async with factory() as session:
+        svc = SearchIndexService(session, settings)
+        try:
+            # include_archived so the near-miss ticket is eligible at all —
+            # otherwise the archive filter would hide it for the wrong reason.
+            found = await svc.search(
+                ids["agent"], "20240601999999", limit=10, include_archived=True
+            )
+            assert [h.id for h in found.hits] == [ids["ticket"]]
+        finally:
+            await svc.close()
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_search_facets_and_filters(
     postgres_znuny_url: str,
     meili_url: str,
