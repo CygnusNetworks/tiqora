@@ -520,7 +520,8 @@
       "moreActions": "更多行動",
       "detail": {
         "standard": "標準型",
-        "detailed": "詳細"
+        "detailed": "詳細",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "刪除摘要",
       "adminDeleteSummaryHint": "管理員：刪除儲存的 AI 摘要 - 下一次運行從頭開始",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "類似門票",
       "empty": "未找到類似的封閉門票。",
-      "loadError": "無法載入類似的票證。"
+      "loadError": "無法載入類似的票證。",
+      "short": "Similar"
     },
     "type": "類型",
     "service": "服務",

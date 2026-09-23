@@ -72,15 +72,18 @@ from tiqora.ai.runtime import (
     run_ticket_agent,
 )
 from tiqora.ai.senders import matches_ignored
-from tiqora.ai.summary import TRIGGER_MANUAL as SUMMARY_TRIGGER_MANUAL
 from tiqora.ai.summary import (
+    CUSTOM_INSTRUCTION_MAX_CHARS,
     SummaryAclDeniedError,
     SummaryAclLimitExceededError,
+    SummaryEmptyOutputError,
     SummaryError,
     SummaryPolicyDisabledError,
     SummaryResult,
+    custom_summarize_ticket,
     summarize_ticket,
 )
+from tiqora.ai.summary import TRIGGER_MANUAL as SUMMARY_TRIGGER_MANUAL
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
@@ -265,6 +268,23 @@ class AiSummarizeOut(BaseModel):
     upto_article_id: int | None = None
 
 
+class AiCustomSummaryIn(BaseModel):
+    """The agent's own summary instruction ("für eine Mitarbeiterin des
+    Hausverwaltung, inkl. Timeline")."""
+
+    instruction: str = Field(min_length=1, max_length=CUSTOM_INSTRUCTION_MAX_CHARS)
+
+    @field_validator("instruction", mode="before")
+    @classmethod
+    def _strip(cls, value: object) -> object:
+        return value.strip() if isinstance(value, str) else value
+
+
+class AiCustomSummaryOut(BaseModel):
+    summary_body: str
+    created_at: datetime
+
+
 class AiDraftRequestOut(BaseModel):
     status: str
     draft_id: int | None = None
@@ -378,6 +398,25 @@ def _map_summary_error(exc: SummaryError) -> HTTPException:
     if isinstance(exc, SummaryPolicyDisabledError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+
+def _map_custom_summary_error(exc: SummaryError | LlmError) -> HTTPException:
+    """Stored-summary mapping plus the ``"<code>: <message>"`` LLM codes the
+    AI panel already translates (see ``_map_run_error``) — a custom summary
+    has no stored text to fall back on, so provider failures surface."""
+    if isinstance(exc, SummaryEmptyOutputError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"llm_empty_output: {exc}"
+        )
+    if isinstance(exc, LlmTimeoutError):
+        return HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=f"llm_timeout: {exc}"
+        )
+    if isinstance(exc, LlmError):
+        return HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"llm_provider_error: {exc}"
+        )
+    return _map_summary_error(exc)
 
 
 def _map_refine_error(exc: RefineError) -> HTTPException:
@@ -786,6 +825,54 @@ async def request_summarize(
         status=result.status,
         summary_body=result.summary_body,
         upto_article_id=result.upto_article_id,
+    )
+
+
+@router.post("/summarize/custom", response_model=AiCustomSummaryOut, status_code=status.HTTP_200_OK)
+async def request_custom_summary(
+    ticket_id: int,
+    body: AiCustomSummaryIn,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> AiCustomSummaryOut:
+    """Summary along the agent's own instruction. Returned only, never
+    stored — the ticket's regular summary stays as it is. Same ``note``
+    permission and queue/ACL gates as ``/summarize``."""
+    try:
+        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        if isinstance(exc, TicketNotFound):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+    await _assert_note_permission(session, user.id, ticket.queue_id)
+
+    policy = await get_queue_policy_by_queue(session, ticket.queue_id)
+    if policy is None or not policy.enabled_summary:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Summary is disabled for this queue"
+        )
+
+    llm = await build_llm_client(
+        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
+    )
+    try:
+        result = await custom_summarize_ticket(
+            session,
+            llm=llm,
+            ticket_id=ticket_id,
+            acting_user_id=user.id,
+            instruction=body.instruction,
+        )
+    except (SummaryError, LlmError) as exc:
+        raise _map_custom_summary_error(exc) from exc
+
+    return AiCustomSummaryOut(
+        summary_body=result.summary_body or "",
+        # Aware on purpose: nothing stores it, and a naive value would be
+        # read as local time in the browser.
+        created_at=datetime.now(UTC),
     )
 
 

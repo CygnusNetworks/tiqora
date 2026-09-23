@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from email.utils import parseaddr
 
 from sqlalchemy import bindparam, text
@@ -57,6 +58,9 @@ class ArticleSnapshot:
     is_ai_origin: bool
     attachments: tuple[AttachmentSnapshot, ...] = ()
     channel: str = "Internal"
+    # Znuny server-local time, as stored. Only the custom summary renders it
+    # (a requested timeline needs dates); the other prompts omit it.
+    create_time: datetime | None = None
 
 
 class TicketNotFoundError(Exception):
@@ -124,7 +128,7 @@ async def load_articles(session: AsyncSession, ticket_id: int) -> list[ArticleSn
                     "SELECT a.id, st.name AS sender_type, a.is_visible_for_customer,"
                     " m.a_subject, m.a_body, m.a_from,"
                     " (o.article_id IS NOT NULL) AS is_ai_origin,"
-                    " cc.name AS channel"
+                    " cc.name AS channel, a.create_time"
                     " FROM article a"
                     " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
                     " LEFT JOIN article_data_mime m ON m.article_id = a.id"
@@ -152,6 +156,7 @@ async def load_articles(session: AsyncSession, ticket_id: int) -> list[ArticleSn
             is_ai_origin=bool(r["is_ai_origin"]),
             attachments=tuple(attachments_by_article.get(int(r["id"]), [])),
             channel=r["channel"] or "Internal",
+            create_time=r["create_time"],
         )
         for r in rows
     ]

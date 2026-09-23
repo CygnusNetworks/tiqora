@@ -7,7 +7,7 @@ import type { CSSProperties, ReactNode } from "react";
 /**
  * Ticket-zoom header shell: escalation/state spine + the "Variante 2 — Zwei
  * Ebenen" content rows (see `TicketHeaderActions`) + collapsible dynamic
- * fields. Number/queue/title/SLA/people all live in the actions component,
+ * fields + the optional assist row (AI chips, similar tickets). Number/queue/title/SLA/people all live in the actions component,
  * which owns the reference-data queries and dialog wiring.
  */
 export function TicketHeader({
@@ -15,6 +15,7 @@ export function TicketHeader({
   overflowMenu,
   canNote,
   onOpenNote,
+  assist,
 }: {
   ticket: TicketDetail;
   /** Optional ⋮ overflow menu rendered at the end of the actions row. */
@@ -23,6 +24,8 @@ export function TicketHeader({
   canNote: boolean;
   /** Opens the internal-note composer at the bottom of the article list. */
   onOpenNote: () => void;
+  /** Assist row below the header rows (AI chips, similar tickets). */
+  assist?: ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -62,6 +65,11 @@ export function TicketHeader({
             ))}
           </dl>
         </details>
+      )}
+      {assist && (
+        <div className="border-t border-hairline pt-2.5" data-testid="ticket-header-assist">
+          {assist}
+        </div>
       )}
     </header>
   );

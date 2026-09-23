@@ -5479,6 +5479,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/summarize/custom": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Custom Summary
+         * @description Summary along the agent's own instruction. Returned only, never
+         *     stored — the ticket's regular summary stays as it is. Same ``note``
+         *     permission and queue/ACL gates as ``/summarize``.
+         */
+        post: operations["request_custom_summary_api_v1_tickets__ticket_id__ai_summarize_custom_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/triage/{triage_id}/accept": {
         parameters: {
             query?: never;
@@ -6688,6 +6710,25 @@ export interface components {
             subject_id?: number | null;
             /** Subject Type */
             subject_type?: ("group" | "role" | "user") | null;
+        };
+        /**
+         * AiCustomSummaryIn
+         * @description The agent's own summary instruction ("für eine Mitarbeiterin des
+         *     Hausverwaltung, inkl. Timeline").
+         */
+        AiCustomSummaryIn: {
+            /** Instruction */
+            instruction: string;
+        };
+        /** AiCustomSummaryOut */
+        AiCustomSummaryOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Summary Body */
+            summary_body: string;
         };
         /** AiDraftOut */
         AiDraftOut: {
@@ -28179,6 +28220,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiSummarizeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_custom_summary_api_v1_tickets__ticket_id__ai_summarize_custom_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCustomSummaryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCustomSummaryOut"];
                 };
             };
             /** @description Validation Error */

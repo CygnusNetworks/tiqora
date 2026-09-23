@@ -520,7 +520,8 @@
       "moreActions": "更多操作",
       "detail": {
         "standard": "标准",
-        "detailed": "详细"
+        "detailed": "详细",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "删除摘要",
       "adminDeleteSummaryHint": "管理员：删除已存储的 AI 摘要 — 下次运行将从头开始",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "类似工单",
       "empty": "未找到类似的封闭工单。",
-      "loadError": "无法加载类似的工单。"
+      "loadError": "无法加载类似的工单。",
+      "short": "Similar"
     },
     "type": "类型",
     "service": "服务",

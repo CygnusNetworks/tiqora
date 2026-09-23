@@ -520,7 +520,8 @@
       "moreActions": "Más acciones",
       "detail": {
         "standard": "Estándar",
-        "detailed": "Detallado"
+        "detailed": "Detallado",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "Eliminar resumen",
       "adminDeleteSummaryHint": "Administrador: elimine el resumen de IA almacenado; la siguiente ejecución comienza desde cero",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "Entradas similares",
       "empty": "No se encontraron tickets cerrados similares.",
-      "loadError": "No se pudieron cargar entradas similares."
+      "loadError": "No se pudieron cargar entradas similares.",
+      "short": "Similar"
     },
     "type": "Tipo",
     "service": "Servicio",

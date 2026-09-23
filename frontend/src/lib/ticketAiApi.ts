@@ -102,6 +102,12 @@ export type AiSummarizeOut = {
   upto_article_id?: number | null;
 };
 
+/** Summary along the agent's own instruction — returned once, never stored. */
+export type AiCustomSummaryOut = {
+  summary_body: string;
+  created_at: string;
+};
+
 export type AiDraftRequestOut = {
   status: string;
   draft_id?: number | null;
@@ -132,6 +138,13 @@ export const ticketAiApi = {
         body: detail ? { detail } : undefined,
         signal,
       },
+    );
+  },
+  customSummary(ticketId: number, instruction: string, signal?: AbortSignal) {
+    return api.request<AiCustomSummaryOut>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/summarize/custom`,
+      { body: { instruction }, signal },
     );
   },
   discardDraft(ticketId: number, draftId: number, signal?: AbortSignal) {
