@@ -690,6 +690,26 @@
       "customerHint": "顧客番号または名前を入力します (2文字以上)",
       "loading": "検索中…"
     },
+    "detect": {
+      "kind": {
+        "ticket": "Ticket number",
+        "email": "E-mail",
+        "date": "Date"
+      },
+      "hint": {
+        "ticket": "Exact ticket number – the direct hit is listed first.",
+        "email": "Searches the ticket's contact address.",
+        "date": "Searched as text."
+      },
+      "offersLabel": "Also possible",
+      "offerDate": "Filter by creation date",
+      "offerCustomer": "Filter by customer: {{label}}",
+      "openHint": "↵ open"
+    },
+    "groups": {
+      "direct": "Direct hit",
+      "mentions": "Mentions this number"
+    },
     "presets": {
       "label": "時間範囲",
       "all": "すべて",

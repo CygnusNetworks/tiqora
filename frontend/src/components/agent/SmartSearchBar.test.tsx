@@ -179,4 +179,38 @@ describe("SmartSearchBar", () => {
     expect(screen.getByTestId("smart-search-suggest")).toBeInTheDocument();
     expect(screen.getByTestId("smart-suggest-queue-7")).toHaveTextContent("stoerungen");
   });
+
+  it("badges a typed ticket number and explains it below the field", () => {
+    renderBar(EMPTY);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "2026010110000042" } });
+    expect(screen.getByTestId("search-kind-ticket")).toHaveTextContent("Ticketnummer");
+    expect(screen.getByTestId("search-readout")).toBeInTheDocument();
+  });
+
+  it("badges an e-mail address but leaves plain text unbadged", () => {
+    renderBar(EMPTY);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "m.muster@uni.example.org" } });
+    expect(screen.getByTestId("search-kind-email")).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: "Router gesperrt" } });
+    expect(screen.queryByTestId("search-kind-email")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("search-readout")).not.toBeInTheDocument();
+  });
+
+  it("offers a typed date as a created-on filter without also searching for it", () => {
+    const onPatch = vi.fn();
+    const { onSubmit } = renderBar(EMPTY, onPatch);
+    const input = screen.getByTestId("search-input");
+    fireEvent.change(input, { target: { value: "22.09.2026" } });
+    expect(screen.getByTestId("search-kind-date")).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByTestId("search-offer-date"));
+    expect(onPatch).toHaveBeenCalledWith({
+      created_from: "2026-09-22",
+      created_to: "2026-09-22",
+    });
+    // The date turned into chips, so the field must not keep searching for it.
+    expect(input).toHaveValue("");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
 });

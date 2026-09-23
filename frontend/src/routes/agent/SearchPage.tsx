@@ -13,6 +13,7 @@ import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { SmartSearchBar } from "@/components/agent/SmartSearchBar";
+import { detectQueryType } from "@/components/agent/smartSearch";
 
 export type SearchSearch = {
   q?: string;
@@ -101,6 +102,10 @@ export function SearchPage() {
   const navigate = useNavigate({ from: "/agent/search" });
   const search = useSearch({ from: "/agent/search" }) as SearchSearch;
   const q = search.q ?? "";
+  // Searched-for ticket number: its row is marked as the direct hit, the same
+  // way the header dropdown groups it. The backend already sorts it first.
+  const detected = detectQueryType(q);
+  const directTn = detected?.kind === "ticket" ? detected.value : null;
   const offset = search.offset ?? 0;
   const queueIds = search.queue_id ?? [];
   const stateTypes = search.state_type ?? [];
@@ -461,11 +466,21 @@ export function SearchPage() {
                   <Link
                     to="/agent/tickets/$ticketId"
                     params={{ ticketId: String(hit.id) }}
-                    className="block rounded-lg border border-hairline bg-surface p-3 transition-colors duration-100 hover:border-accent/60 hover:bg-surface-subtle"
+                    className={cn(
+                      "block rounded-lg border bg-surface p-3 transition-colors duration-100 hover:border-accent/60 hover:bg-surface-subtle",
+                      directTn && hit.tn === directTn
+                        ? "border-accent/40 bg-accent/5 shadow-[inset_3px_0_0_0_var(--color-accent)]"
+                        : "border-hairline",
+                    )}
                     data-testid={`search-hit-${hit.id}`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-accent">{hit.tn}</span>
+                      {directTn && hit.tn === directTn && (
+                        <Badge tone="accent" data-testid={`search-hit-direct-${hit.id}`}>
+                          {t("search.groups.direct")}
+                        </Badge>
+                      )}
                       <StateChip state={hit.state} />
                       <PriorityChip priority={hit.priority} />
                       {hit.archive_flag === 1 && (

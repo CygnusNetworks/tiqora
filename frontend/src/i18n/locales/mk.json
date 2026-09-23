@@ -690,6 +690,26 @@
       "customerHint": "Внесете број или име на клиент (мин. 2 знаци)",
       "loading": "Се бара…"
     },
+    "detect": {
+      "kind": {
+        "ticket": "Ticket number",
+        "email": "E-mail",
+        "date": "Date"
+      },
+      "hint": {
+        "ticket": "Exact ticket number – the direct hit is listed first.",
+        "email": "Searches the ticket's contact address.",
+        "date": "Searched as text."
+      },
+      "offersLabel": "Also possible",
+      "offerDate": "Filter by creation date",
+      "offerCustomer": "Filter by customer: {{label}}",
+      "openHint": "↵ open"
+    },
+    "groups": {
+      "direct": "Direct hit",
+      "mentions": "Mentions this number"
+    },
     "presets": {
       "label": "Временски опсег",
       "all": "Сите",
