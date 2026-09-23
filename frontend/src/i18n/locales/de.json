@@ -690,6 +690,26 @@
       "customerHint": "Kundennummer oder Name eingeben (mind. 2 Zeichen)",
       "loading": "Suche…"
     },
+    "detect": {
+      "kind": {
+        "ticket": "Ticketnummer",
+        "email": "E-Mail",
+        "date": "Datum"
+      },
+      "hint": {
+        "ticket": "Exakte Ticketnummer – der Direkttreffer steht oben.",
+        "email": "Sucht in der Kontaktadresse des Tickets.",
+        "date": "Wird als Text gesucht."
+      },
+      "offersLabel": "Auch möglich",
+      "offerDate": "Als Erstelldatum filtern",
+      "offerCustomer": "Als Kundenfilter: {{label}}",
+      "openHint": "↵ öffnen"
+    },
+    "groups": {
+      "direct": "Direkttreffer",
+      "mentions": "Erwähnt diese Nummer"
+    },
     "presets": {
       "label": "Zeitraum",
       "all": "Alle",

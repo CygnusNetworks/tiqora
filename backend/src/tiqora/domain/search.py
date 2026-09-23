@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 
 from meilisearch_python_sdk import AsyncClient
 from meilisearch_python_sdk.errors import MeilisearchApiError
-from meilisearch_python_sdk.models.settings import MeilisearchSettings
+from meilisearch_python_sdk.models.settings import MeilisearchSettings, TypoTolerance
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +42,19 @@ SORT_OPTIONS: dict[str, list[str]] = {
 }
 _DEFAULT_SORT = "changed_desc"
 
+# Attributes holding identifiers rather than prose. Meilisearch tolerates two
+# typos in any word longer than eight characters, so a 16-digit ticket number —
+# one long "word" to the engine — matched every ticket within two digits of it,
+# and an exact TN search returned a whole page of near misses. Identifiers have
+# no near misses: you either have the number, the customer id or the contact, or
+# you do not. Prefix matching on the final query word is unaffected.
+EXACT_MATCH_ATTRIBUTES = ["tn", "customer_id", "customer_user_id"]
+
+# A bare ticket number, optionally "#"-prefixed. The lower bound keeps reference
+# numbers out (a Znuny TN carries date + system id + counter, so it is long);
+# inner separators are never stripped, so "2601-000-0001" stays free text.
+_TICKET_NUMBER_RE = re.compile(r"^#?(\d{10,20})$")
+
 # Similar-tickets v1: pull a wider Meili window then rank down to the public top-N.
 _SIMILAR_CANDIDATE_LIMIT = 20
 _SIMILAR_RESULT_LIMIT = 5
@@ -72,6 +86,63 @@ def _meili_escape_string(value: str) -> str:
     ``queue_id IN [...]`` permission clause (Meili binds AND tighter than OR).
     """
     return value.replace("\\", "\\\\").replace("'", "\\'")
+
+
+def parse_ticket_number(query: str) -> str | None:
+    """Return the bare ticket number when *query* is one, else ``None``."""
+    match = _TICKET_NUMBER_RE.match(query.strip())
+    return match.group(1) if match else None
+
+
+def index_settings() -> MeilisearchSettings:
+    """Settings pushed to the ticket index on every ``ensure_index``.
+
+    Pure so the exact-match guarantees above are unit-testable without a
+    Meilisearch container. Typo tolerance is a query-time setting, so changing
+    it takes effect on the next search — no reindex needed.
+    """
+    return MeilisearchSettings(
+        filterable_attributes=[
+            "queue_id",
+            "state_type",
+            "owner_id",
+            "customer_id",
+            "has_escalation",
+            "created_ts",
+            "changed_ts",
+            "archive_flag",
+        ],
+        sortable_attributes=["changed", "created", "id"],
+        searchable_attributes=[
+            "tn",
+            "title",
+            "latest_article_excerpt",
+            "customer_id",
+            "customer_user_id",
+            "owner_login",
+            "owner_name",
+            "queue_name",
+            "dynamic_fields",
+        ],
+        typo_tolerance=TypoTolerance(disable_on_attributes=EXACT_MATCH_ATTRIBUTES),
+    )
+
+
+def hoist_exact_tn(hits: list[SearchHit], query: str) -> list[SearchHit]:
+    """Move the ticket whose ``tn`` *is* the query to the front of *hits*.
+
+    ``sort`` (``changed:desc`` by default) replaces Meilisearch's relevance
+    ranking entirely, so the searched-for ticket otherwise sits wherever its
+    change date puts it — below older tickets that merely quote the number in
+    their subject, and potentially off the first page.
+    """
+    tn = parse_ticket_number(query)
+    if tn is None:
+        return hits
+    exact = [h for h in hits if h.tn == tn]
+    if not exact:
+        return hits
+    return exact + [h for h in hits if h.tn != tn]
 
 
 def build_similar_query(title: str | None, excerpt: str | None) -> str:
@@ -180,31 +251,7 @@ class SearchIndexService:
         if index_name not in names:
             await client.create_index(index_name, primary_key="id")
         index = client.index(index_name)
-        settings = MeilisearchSettings(
-            filterable_attributes=[
-                "queue_id",
-                "state_type",
-                "owner_id",
-                "customer_id",
-                "has_escalation",
-                "created_ts",
-                "changed_ts",
-                "archive_flag",
-            ],
-            sortable_attributes=["changed", "created", "id"],
-            searchable_attributes=[
-                "tn",
-                "title",
-                "latest_article_excerpt",
-                "customer_id",
-                "customer_user_id",
-                "owner_login",
-                "owner_name",
-                "queue_name",
-                "dynamic_fields",
-            ],
-        )
-        task = await index.update_settings(settings)
+        task = await index.update_settings(index_settings())
         await client.wait_for_task(task.task_uid, timeout_in_ms=60_000)
 
     async def build_document(self, ticket_id: int) -> dict[str, Any] | None:
@@ -414,7 +461,9 @@ class SearchIndexService:
             )
         return SearchResponse(
             query=query,
-            hits=hits,
+            # Only meaningful on the first page — later pages hold no exact match
+            # the agent could be waiting for.
+            hits=hoist_exact_tn(hits, query) if offset == 0 else hits,
             estimated_total=int(result.estimated_total_hits or len(hits)),
             facets=facets,
         )

@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  detectQueryType,
   formatCustomerLabel,
   isFilterComposition,
   matchQueues,
+  parseDate,
   parseKeyed,
   uniqueQueueMatch,
 } from "./smartSearch";
@@ -56,5 +58,64 @@ describe("matchQueues / uniqueQueueMatch", () => {
 describe("formatCustomerLabel", () => {
   it("appends customer id when missing from name", () => {
     expect(formatCustomerLabel("Marcus", "z90001")).toBe("Marcus · z90001");
+  });
+});
+
+describe("detectQueryType", () => {
+  it("recognises a ticket number, with or without a leading #", () => {
+    expect(detectQueryType("2026010110000042")).toEqual({
+      kind: "ticket",
+      value: "2026010110000042",
+      raw: "2026010110000042",
+    });
+    expect(detectQueryType(" #2026010110000042 ")?.value).toBe("2026010110000042");
+  });
+
+  it("keeps reference numbers and short digit runs as free text", () => {
+    // A DFN-CERT reference out of a real subject line — inner separators are
+    // never stripped, so this never masquerades as a ticket number.
+    expect(detectQueryType("2601-000-0001")?.kind).toBe("text");
+    expect(detectQueryType("123456")?.kind).toBe("text");
+  });
+
+  it("recognises an e-mail address", () => {
+    expect(detectQueryType("m.muster@uni.example.org")).toEqual({
+      kind: "email",
+      value: "m.muster@uni.example.org",
+      raw: "m.muster@uni.example.org",
+    });
+    expect(detectQueryType("m.muster@uni-example")?.kind).toBe("text");
+  });
+
+  it("recognises a date and normalises it to ISO", () => {
+    expect(detectQueryType("22.09.2026")).toEqual({
+      kind: "date",
+      value: "2026-09-22",
+      raw: "22.09.2026",
+    });
+    expect(detectQueryType("2026-09-22")?.value).toBe("2026-09-22");
+  });
+
+  it("returns null for empty input and while a filter token is composed", () => {
+    expect(detectQueryType("")).toBeNull();
+    expect(detectQueryType("   ")).toBeNull();
+    // "queue:stw" belongs to the chip typeahead, not to type detection.
+    expect(detectQueryType("queue:stw")).toBeNull();
+  });
+
+  it("falls back to free text", () => {
+    expect(detectQueryType("Router gesperrt")).toEqual({
+      kind: "text",
+      value: "Router gesperrt",
+      raw: "Router gesperrt",
+    });
+  });
+});
+
+describe("parseDate", () => {
+  it("accepts both ISO and German notation", () => {
+    expect(parseDate("2026-09-22")).toBe("2026-09-22");
+    expect(parseDate("1.2.2026")).toBe("2026-02-01");
+    expect(parseDate("nope")).toBeNull();
   });
 });

@@ -690,6 +690,26 @@
       "customerHint": "Escriba un número ou nome de cliente (mínimo 2 caracteres)",
       "loading": "Buscando…"
     },
+    "detect": {
+      "kind": {
+        "ticket": "Ticket number",
+        "email": "E-mail",
+        "date": "Date"
+      },
+      "hint": {
+        "ticket": "Exact ticket number – the direct hit is listed first.",
+        "email": "Searches the ticket's contact address.",
+        "date": "Searched as text."
+      },
+      "offersLabel": "Also possible",
+      "offerDate": "Filter by creation date",
+      "offerCustomer": "Filter by customer: {{label}}",
+      "openHint": "↵ open"
+    },
+    "groups": {
+      "direct": "Direct hit",
+      "mentions": "Mentions this number"
+    },
     "presets": {
       "label": "Intervalo de tempo",
       "all": "Todos",

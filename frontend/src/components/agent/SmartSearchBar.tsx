@@ -5,12 +5,15 @@ import { api } from "@/lib/api";
 import { SearchIcon } from "@/components/ui/icons";
 import {
   FILTER_KEY_HINTS,
+  detectQueryType,
   formatCustomerLabel,
   isFilterComposition,
   matchQueues,
+  parseDate,
   parseKeyed,
   uniqueQueueMatch,
   type AgentOption,
+  type QueryKind,
   type QueueOption,
   type SmartPatch,
   type SmartSearchValues,
@@ -38,17 +41,17 @@ const CHIP_CLASS: Record<ChipKind, string> = {
 
 const STATE_TYPES = ["new", "open", "pending", "closed"] as const;
 
-/** Accept ``YYYY-MM-DD`` or ``DD.MM.YYYY``; return ISO ``YYYY-MM-DD`` or null. */
-function parseDate(frag: string): string | null {
-  const s = frag.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-  if (m) {
-    const [, d, mo, y] = m;
-    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
-  }
-  return null;
-}
+/** Badge colours per recognised query kind. "text" carries no badge — a
+ * "full text" label on every keystroke would be noise, not information. */
+const KIND_CLASS: Record<Exclude<QueryKind, "text">, string> = {
+  ticket: "text-accent bg-accent/10 border-accent/30",
+  email: "text-violet-500 bg-violet-500/10 border-violet-500/30",
+  date: "text-emerald-500 bg-emerald-500/10 border-emerald-500/30",
+};
+
+/** One clickable alternative in the readout line, supplied by the consumer
+ * that knows the current hits (e.g. "search as customer filter"). */
+export type ReadoutOffer = { id: string; label: string; onApply: () => void };
 
 type Suggestion = {
   id: string;
@@ -74,6 +77,7 @@ export function SmartSearchBar({
   onEscape,
   freeTextSuggest = true,
   onComposingFilterChange,
+  offers,
 }: {
   values: SmartSearchValues;
   queues: QueueOption[];
@@ -98,6 +102,8 @@ export function SmartSearchBar({
   freeTextSuggest?: boolean;
   /** Notifies parent when the user is composing a filter token (hide ticket hits). */
   onComposingFilterChange?: (composing: boolean) => void;
+  /** Extra alternatives for the readout line — only the consumer knows the hits. */
+  offers?: ReadoutOffer[];
 }) {
   const { t } = useTranslation();
   // The input mirrors the active free-text query; while composing a key:token it
@@ -197,6 +203,16 @@ export function SmartSearchBar({
     // Drop any partial-key that leaked into free-text before the colon.
     const q = valuesRef.current.q;
     if (q && isFilterComposition(q)) onQueryChangeRef.current?.("");
+    inputRef.current?.focus();
+  };
+
+  /** Apply a filter derived from the free text itself: the text turns into a
+   * chip, so the query has to go too — otherwise it filters *and* searches. */
+  const applyOffer = (offer: ReadoutOffer) => {
+    setText("");
+    setActive(0);
+    onQueryChangeRef.current?.("");
+    offer.onApply();
     inputRef.current?.focus();
   };
 
@@ -518,11 +534,28 @@ export function SmartSearchBar({
 
   const showSuggest = focused && text.trim().length > 0 && suggestions.length > 0;
 
+  // --- Live type detection: badge inside the field, readout line below ----
+  const detected = detectQueryType(text);
+  const kind = detected && detected.kind !== "text" ? detected.kind : null;
+  const dateValue = detected?.kind === "date" ? detected.value : null;
+  const readoutOffers: ReadoutOffer[] = [
+    ...(dateValue
+      ? [
+          {
+            id: "date",
+            label: t("search.detect.offerDate"),
+            onApply: () => onPatch({ created_from: dateValue, created_to: dateValue }),
+          },
+        ]
+      : []),
+    ...(offers ?? []),
+  ];
+
   // Keep active index in range when list shrinks.
   const safeActive = Math.min(active, Math.max(0, suggestions.length - 1));
 
   return (
-    <div className="flex gap-2">
+    <div className="flex flex-wrap gap-2">
       <div className="relative flex-1">
         <div
           className={
@@ -572,6 +605,14 @@ export function SmartSearchBar({
               compact ? "py-0.5 text-[13px]" : "py-0.5 text-sm"
             }`}
           />
+          {kind && (
+            <span
+              className={`ml-auto shrink-0 rounded border px-1.5 py-0.5 text-[10.5px] font-medium ${KIND_CLASS[kind]}`}
+              data-testid={`search-kind-${kind}`}
+            >
+              {t(`search.detect.kind.${kind}`)}
+            </span>
+          )}
         </div>
 
         {showSuggest && (
@@ -626,6 +667,30 @@ export function SmartSearchBar({
         >
           {submitLabel ?? t("search.submit")}
         </button>
+      )}
+
+      {(kind || readoutOffers.length > 0) && (
+        <div
+          className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-0.5 text-xs text-muted"
+          data-testid="search-readout"
+        >
+          {kind && <span>{t(`search.detect.hint.${kind}`)}</span>}
+          {!kind && readoutOffers.length > 0 && <span>{t("search.detect.offersLabel")}</span>}
+          {readoutOffers.map((offer) => (
+            <button
+              key={offer.id}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyOffer(offer);
+              }}
+              className="rounded-full border border-hairline px-2 py-0.5 text-[11px] transition-colors duration-100 hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              data-testid={`search-offer-${offer.id}`}
+            >
+              {offer.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

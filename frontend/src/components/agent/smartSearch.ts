@@ -68,6 +68,53 @@ export function isFilterComposition(text: string): boolean {
   return false;
 }
 
+/** Accept ``YYYY-MM-DD`` or ``DD.MM.YYYY``; return ISO ``YYYY-MM-DD`` or null. */
+export function parseDate(frag: string): string | null {
+  const s = frag.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (m) {
+    const [, d, mo, y] = m;
+    return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/** What the free text looks like — drives the badge, the readout and grouping. */
+export type QueryKind = "ticket" | "email" | "date" | "text";
+
+export type DetectedQuery = {
+  kind: QueryKind;
+  /** Normalised for the kind: bare digits, lower-cased address, ISO date. */
+  value: string;
+  /** The trimmed input the user actually typed. */
+  raw: string;
+};
+
+/** A bare ticket number, optionally ``#``-prefixed. Mirrors
+ * ``tiqora.domain.search._TICKET_NUMBER_RE`` — inner separators are never
+ * stripped, so a reference like "2601-000-0001" stays free text. */
+const TICKET_NUMBER_RE = /^#?(\d{10,20})$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+
+/**
+ * Classify the free-text part of the query. Returns null for empty input and
+ * while a ``key:value`` filter token is being composed — those belong to the
+ * chip typeahead, not to type detection.
+ */
+export function detectQueryType(raw: string): DetectedQuery | null {
+  const s = raw.trim();
+  if (!s) return null;
+  if (isFilterComposition(s)) return null;
+
+  const tn = s.match(TICKET_NUMBER_RE);
+  if (tn) return { kind: "ticket", value: tn[1]!, raw: s };
+  if (EMAIL_RE.test(s)) return { kind: "email", value: s.toLowerCase(), raw: s };
+  const iso = parseDate(s);
+  if (iso) return { kind: "date", value: iso, raw: s };
+  return { kind: "text", value: s, raw: s };
+}
+
 /** Last path segment for Znuny-style ``Parent::Child`` queue names. */
 export function queueLeafName(name: string): string {
   const parts = name.split("::");
