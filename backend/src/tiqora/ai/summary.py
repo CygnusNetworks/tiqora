@@ -37,12 +37,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.ai import usage as usage_service
 from tiqora.ai.acl import AclLimitExceededError as AiAclLimitExceededError
 from tiqora.ai.acl import check_feature_access, check_feature_limits
-from tiqora.ai.attachment_context import build_attachment_context, mask_attachment_block
+from tiqora.ai.attachment_context import (
+    AttachmentContextResult,
+    build_attachment_context,
+    mask_attachment_block,
+)
 from tiqora.ai.audit import FEATURE_SUMMARY as AUDIT_FEATURE_SUMMARY
 from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.context import (
     ArticleSnapshot,
     TicketNotFoundError,
+    TicketSnapshot,
     collect_known_names,
     get_or_create_state,
     load_articles,
@@ -68,6 +73,12 @@ logger = structlog.get_logger(__name__)
 
 TRIGGER_MANUAL = "manual"
 TRIGGER_AUTO = "auto"
+# Audit/usage label for an agent's own-instruction summary (ephemeral result).
+TRIGGER_CUSTOM = "custom"
+
+# Upper bound for the agent's own instruction — long enough for a detailed
+# brief, short enough that it cannot crowd out the conversation.
+CUSTOM_INSTRUCTION_MAX_CHARS = 2000
 
 STATUS_UPDATED = "updated"
 STATUS_UP_TO_DATE = "up_to_date"
@@ -148,6 +159,26 @@ _SYSTEM_PROMPT_DETAILED = (
     "about.\n\n"
     "Output ONLY the updated summary text - no preamble, no meta-commentary "
     "about what you changed."
+)
+
+
+# Custom summary — the agent phrases the task ("für eine Mitarbeiterin des
+# Hausverwaltung, inkl. Timeline"). The result is shown once and never
+# stored, so there is no previous summary to carry forward.
+_CUSTOM_SYSTEM_PROMPT = (
+    "You write an internal summary of a support ticket for a support agent, "
+    "following the agent's own instruction below. Base every statement "
+    "strictly on the ticket content; never invent facts, dates, names or "
+    "figures. If the instruction asks for something the ticket does not "
+    "contain, say so in one short sentence instead of guessing.\n\n"
+    "Write plain text in the language of the agent's instruction. Separate "
+    "paragraphs with a blank line. Do not use markdown headings, bold or "
+    "tables; a simple list with one item per line starting with '- ' is "
+    "fine. When a timeline is requested, write one entry per line in the "
+    "form 'DD.MM.YYYY HH:MM - event', oldest first, taking the dates from the "
+    "article headers.\n\n"
+    "Output ONLY the summary text - no preamble, no meta-commentary.\n\n"
+    "--- agent instruction ---\n"
 )
 
 
@@ -261,6 +292,11 @@ class SummaryAclLimitExceededError(SummaryError):
     """An ACL request/token limit (plan §3.6) is already reached."""
 
 
+class SummaryEmptyOutputError(SummaryError):
+    """The model returned no text (custom summary — there is no stored
+    summary to fall back on)."""
+
+
 @dataclass(frozen=True, slots=True)
 class SummaryResult:
     status: str
@@ -283,6 +319,7 @@ def _render_articles(
     pii: PiiMapper,
     mask: bool,
     attachment_blocks: dict[int, str] | None = None,
+    with_time: bool = False,
 ) -> str:
     lines: list[str] = []
     for a in articles:
@@ -299,7 +336,8 @@ def _render_articles(
             if mask:
                 attach_text = mask_attachment_block(pii, attach_text)
             body = f"{body}\n\n{attach_text}" if body else attach_text
-        lines.append(f"--- article {a.id} [{_label(a)}] ---")
+        when = f" {a.create_time:%Y-%m-%d %H:%M}" if with_time and a.create_time else ""
+        lines.append(f"--- article {a.id} [{_label(a)}]{when} ---")
         if subject_line:
             lines.append(subject_line)
         lines.append(body)
@@ -336,81 +374,47 @@ def _is_incremental_no_op(
     return len(countable) < min_articles and total_chars < min_chars
 
 
-async def summarize_ticket(
+async def _check_agent_access(session: AsyncSession, acting_user_id: int | None) -> None:
+    """ACL gate for an agent-triggered summary (plan §3.6)."""
+    if acting_user_id is None:
+        raise SummaryError("Manual summarize requires an acting user")
+    if not await check_feature_access(session, acting_user_id, FEATURE_SUMMARY):
+        raise SummaryAclDeniedError(
+            f"User {acting_user_id} is not allowed to use {FEATURE_SUMMARY}"
+        )
+    try:
+        await check_feature_limits(session, acting_user_id, FEATURE_SUMMARY)
+    except AiAclLimitExceededError as exc:
+        raise SummaryAclLimitExceededError(str(exc)) from exc
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedRun:
+    llm: LlmClient
+    raw_llm: LlmClient
+    pii: PiiMapper
+    attachment_context: AttachmentContextResult
+
+
+async def _prepare_run(
     session: AsyncSession,
     *,
     llm: LlmClient,
-    ticket_id: int,
-    trigger: str,
+    ticket: TicketSnapshot,
+    policy: TiqoraAiQueuePolicy,
+    articles: list[ArticleSnapshot],
     acting_user_id: int | None,
-    settings: Settings | None = None,
-    vision_llm_factory: Any = None,
-    run_id: str | None = None,
-    detail: str | None = None,
-) -> SummaryResult:
-    """Run the summary service once for one ticket (plan §3.5).
-
-    ``detail`` (``"standard"``/``"detailed"``) overrides the queue policy's
-    ``summary_detail`` for this run — the agent picks the scope per ticket.
-
-    ``acting_user_id`` is required for ``trigger="manual"`` (ACL check);
-    ``None`` for ``trigger="auto"`` (queue-driven, no per-user ACL — mirrors
-    the auto-reply path's "keine Kreuz-Anrechnung" rule, plan §3.6).
-
-    ``settings``/``vision_llm_factory`` support the same attachment vision
-    pre-pass as :func:`tiqora.ai.runtime.run_ticket_agent` (see
-    :mod:`tiqora.ai.attachment_context`); ``settings`` defaults to
-    :func:`tiqora.config.get_settings` when a ``vision_provider_id`` is
-    configured and no factory was injected.
-
-    Not gated by the Readiness-Gate (plan §3.0 v1.1 / Phase E) — see the
-    module docstring.
-    """
-    try:
-        ticket = await ticket_snapshot(session, ticket_id)
-    except TicketNotFoundError as exc:
-        raise SummaryError(str(exc)) from exc
-
-    policy = await get_queue_policy_by_queue(session, ticket.queue_id)
-    if policy is None or not policy.enabled_summary:
-        raise SummaryPolicyDisabledError(f"Summary is disabled for queue {ticket.queue_id}")
-
-    if trigger == TRIGGER_MANUAL:
-        if acting_user_id is None:
-            raise SummaryError("Manual summarize requires an acting user")
-        if not await check_feature_access(session, acting_user_id, FEATURE_SUMMARY):
-            raise SummaryAclDeniedError(
-                f"User {acting_user_id} is not allowed to use {FEATURE_SUMMARY}"
-            )
-        try:
-            await check_feature_limits(session, acting_user_id, FEATURE_SUMMARY)
-        except AiAclLimitExceededError as exc:
-            raise SummaryAclLimitExceededError(str(exc)) from exc
-
-    state = await get_or_create_state(session, ticket_id)
-    articles = await load_articles(session, ticket_id)
-
-    new_articles = _new_articles(articles, since_article_id=state.last_summary_upto_article_id)
-    if not new_articles:
-        return SummaryResult(
-            status=STATUS_UP_TO_DATE,
-            summary_body=state.summary_body,
-            upto_article_id=state.last_summary_upto_article_id,
-        )
-
-    if _is_incremental_no_op(new_articles, policy, trigger=trigger):
-        return SummaryResult(
-            status=STATUS_UP_TO_DATE,
-            summary_body=state.summary_body,
-            upto_article_id=state.last_summary_upto_article_id,
-        )
-
-    mask = bool(policy.pii_masking)
-
+    trigger: str,
+    run_id: str | None,
+    settings: Settings | None,
+    vision_llm_factory: Any,
+) -> _PreparedRun:
+    """Attachment extraction, PII mapper and audit wrapping shared by the
+    stored and the custom summary."""
     audit_context = AuditContext(
         feature=AUDIT_FEATURE_SUMMARY,
         run_id=run_id or uuid.uuid4().hex,
-        ticket_id=ticket_id,
+        ticket_id=ticket.ticket_id,
         queue_id=ticket.queue_id,
         acting_user_id=acting_user_id,
         trigger=trigger,
@@ -453,6 +457,86 @@ async def summarize_ticket(
         session=session,
         pii_mapper=pii,
     )
+
+    return _PreparedRun(llm=llm, raw_llm=raw_llm, pii=pii, attachment_context=attachment_context)
+
+
+async def summarize_ticket(
+    session: AsyncSession,
+    *,
+    llm: LlmClient,
+    ticket_id: int,
+    trigger: str,
+    acting_user_id: int | None,
+    settings: Settings | None = None,
+    vision_llm_factory: Any = None,
+    run_id: str | None = None,
+    detail: str | None = None,
+) -> SummaryResult:
+    """Run the summary service once for one ticket (plan §3.5).
+
+    ``detail`` (``"standard"``/``"detailed"``) overrides the queue policy's
+    ``summary_detail`` for this run — the agent picks the scope per ticket.
+
+    ``acting_user_id`` is required for ``trigger="manual"`` (ACL check);
+    ``None`` for ``trigger="auto"`` (queue-driven, no per-user ACL — mirrors
+    the auto-reply path's "keine Kreuz-Anrechnung" rule, plan §3.6).
+
+    ``settings``/``vision_llm_factory`` support the same attachment vision
+    pre-pass as :func:`tiqora.ai.runtime.run_ticket_agent` (see
+    :mod:`tiqora.ai.attachment_context`); ``settings`` defaults to
+    :func:`tiqora.config.get_settings` when a ``vision_provider_id`` is
+    configured and no factory was injected.
+
+    Not gated by the Readiness-Gate (plan §3.0 v1.1 / Phase E) — see the
+    module docstring.
+    """
+    try:
+        ticket = await ticket_snapshot(session, ticket_id)
+    except TicketNotFoundError as exc:
+        raise SummaryError(str(exc)) from exc
+
+    policy = await get_queue_policy_by_queue(session, ticket.queue_id)
+    if policy is None or not policy.enabled_summary:
+        raise SummaryPolicyDisabledError(f"Summary is disabled for queue {ticket.queue_id}")
+
+    if trigger == TRIGGER_MANUAL:
+        await _check_agent_access(session, acting_user_id)
+
+    state = await get_or_create_state(session, ticket_id)
+    articles = await load_articles(session, ticket_id)
+
+    new_articles = _new_articles(articles, since_article_id=state.last_summary_upto_article_id)
+    if not new_articles:
+        return SummaryResult(
+            status=STATUS_UP_TO_DATE,
+            summary_body=state.summary_body,
+            upto_article_id=state.last_summary_upto_article_id,
+        )
+
+    if _is_incremental_no_op(new_articles, policy, trigger=trigger):
+        return SummaryResult(
+            status=STATUS_UP_TO_DATE,
+            summary_body=state.summary_body,
+            upto_article_id=state.last_summary_upto_article_id,
+        )
+
+    mask = bool(policy.pii_masking)
+    run = await _prepare_run(
+        session,
+        llm=llm,
+        ticket=ticket,
+        policy=policy,
+        articles=articles,
+        acting_user_id=acting_user_id,
+        trigger=trigger,
+        run_id=run_id,
+        settings=settings,
+        vision_llm_factory=vision_llm_factory,
+    )
+    llm, raw_llm, pii = run.llm, run.raw_llm, run.pii
+    attachment_context = run.attachment_context
+    attachment_blocks = attachment_context.blocks
 
     header = render_ticket_header(ticket)
     effective_detail = detail or policy.summary_detail
@@ -545,6 +629,107 @@ async def summarize_ticket(
     )
 
 
+async def custom_summarize_ticket(
+    session: AsyncSession,
+    *,
+    llm: LlmClient,
+    ticket_id: int,
+    acting_user_id: int,
+    instruction: str,
+    settings: Settings | None = None,
+    vision_llm_factory: Any = None,
+    run_id: str | None = None,
+) -> SummaryResult:
+    """Summarize the whole ticket along the agent's own ``instruction``.
+
+    Same policy/ACL gates, attachment context and PII masking as
+    :func:`summarize_ticket`, but the result is returned only — the stored
+    summary in ``tiqora_ai_ticket_state`` stays untouched. The instruction
+    goes through the same :class:`PiiMapper` as the conversation, so a name
+    the agent types maps to the placeholder the model sees in the articles.
+    """
+    try:
+        ticket = await ticket_snapshot(session, ticket_id)
+    except TicketNotFoundError as exc:
+        raise SummaryError(str(exc)) from exc
+
+    policy = await get_queue_policy_by_queue(session, ticket.queue_id)
+    if policy is None or not policy.enabled_summary:
+        raise SummaryPolicyDisabledError(f"Summary is disabled for queue {ticket.queue_id}")
+    await _check_agent_access(session, acting_user_id)
+
+    articles = await load_articles(session, ticket_id)
+    if not articles:
+        raise SummaryError("Ticket has no articles to summarize")
+
+    mask = bool(policy.pii_masking)
+    run = await _prepare_run(
+        session,
+        llm=llm,
+        ticket=ticket,
+        policy=policy,
+        articles=articles,
+        acting_user_id=acting_user_id,
+        trigger=TRIGGER_CUSTOM,
+        run_id=run_id,
+        settings=settings,
+        vision_llm_factory=vision_llm_factory,
+    )
+    attachment_blocks = run.attachment_context.blocks
+
+    rendered = _render_articles(
+        articles, pii=run.pii, mask=mask, attachment_blocks=attachment_blocks, with_time=True
+    )
+    user_message = f"{render_ticket_header(ticket)}\n\n--- full conversation ---\n{rendered}"
+    agent_instruction = instruction.strip()[:CUSTOM_INSTRUCTION_MAX_CHARS]
+    if mask:
+        agent_instruction = run.pii.mask(agent_instruction)
+    system_prompt = (
+        f"{UNTRUSTED_CONTENT_SUMMARY_BLOCK}\n\n{_CUSTOM_SYSTEM_PROMPT}{agent_instruction}"
+    )
+
+    docs = _collect_docs(articles, attachment_blocks)
+    response = await run.llm.chat(
+        messages=[
+            LlmMessage(role="system", content=system_prompt),
+            LlmMessage(role="user", content=user_message),
+        ],
+        tools=None,
+        max_tokens=_completion_budget(docs, detail=DETAIL_DETAILED),
+    )
+
+    prompt_tokens = run.attachment_context.vision_usage.prompt_tokens + response.usage.prompt_tokens
+    completion_tokens = (
+        run.attachment_context.vision_usage.completion_tokens + response.usage.completion_tokens
+    )
+    await usage_service.record_usage(
+        session,
+        user_id=acting_user_id,
+        queue_id=ticket.queue_id,
+        ticket_id=ticket_id,
+        feature=FEATURE_SUMMARY,
+        provider_id=getattr(run.raw_llm, "active_provider_id", None) or policy.llm_provider_id,
+        model=response.model or getattr(run.raw_llm, "active_model", None) or policy.model_override,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        success=bool((response.content or "").strip()),
+    )
+    await session.commit()
+
+    summary_text = (response.content or "").strip()
+    if not summary_text:
+        raise SummaryEmptyOutputError("The model returned an empty summary")
+    if mask:
+        summary_text = run.pii.unmask(summary_text)
+    return SummaryResult(
+        status=STATUS_UPDATED,
+        summary_body=summary_text,
+        upto_article_id=articles[-1].id,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+
+
 async def auto_summary_due(session: AsyncSession, ticket_id: int) -> bool:
     """Plan §3.5 auto-trigger condition (worker-side, Phase D): article count
     or total content chars since the last summary exceed the queue's
@@ -597,13 +782,16 @@ __all__ = [
     "STATUS_UP_TO_DATE",
     "STATUS_UPDATED",
     "TRIGGER_AUTO",
+    "TRIGGER_CUSTOM",
     "TRIGGER_MANUAL",
     "SummaryAclDeniedError",
     "SummaryAclLimitExceededError",
+    "SummaryEmptyOutputError",
     "SummaryError",
     "SummaryPolicyDisabledError",
     "SummaryResult",
     "auto_summary_due",
+    "custom_summarize_ticket",
     "delete_summary",
     "summarize_ticket",
 ]
