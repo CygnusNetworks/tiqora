@@ -520,7 +520,8 @@
       "moreActions": "Més accions",
       "detail": {
         "standard": "Estàndard",
-        "detailed": "Detallat"
+        "detailed": "Detallat",
+        "custom": "Custom"
       },
       "adminDeleteSummary": "Suprimeix el resum",
       "adminDeleteSummaryHint": "Administrador: suprimiu el resum de l'IA emmagatzemat; la següent execució comença des de zero",
@@ -538,6 +539,23 @@
         "accept": "Apply",
         "reject": "Dismiss",
         "acceptFailed": "Could not apply — you may not have permission to move into that queue."
+      },
+      "pin": "Pin",
+      "unpin": "Unpin",
+      "summaryStaleShort": "New articles since the summary",
+      "custom": {
+        "savedLabel": "Saved instructions",
+        "removeSaved": "Remove saved instruction",
+        "instructionLabel": "Your own instruction for the summary",
+        "placeholder": "e.g. Summarize this ticket for a housing office employee, explain the block without jargon and include a timeline.",
+        "run": "Summarize",
+        "save": "Save as template",
+        "saved": "Saved",
+        "hint": "Not stored · ⌘/Ctrl+Enter",
+        "running": "Creating the summary – this can take a minute for long tickets.",
+        "resultLabel": "Custom summary",
+        "copy": "Copy",
+        "copied": "Copied"
       }
     },
     "toolbar": {
@@ -602,7 +620,8 @@
     "similar": {
       "title": "Entrades similars",
       "empty": "No s'han trobat entrades tancades semblants.",
-      "loadError": "No s'han pogut carregar bitllets semblants."
+      "loadError": "No s'han pogut carregar bitllets semblants.",
+      "short": "Similar"
     },
     "type": "Tipus",
     "service": "Servei",
