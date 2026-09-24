@@ -42,9 +42,7 @@
     "inbox": "Saapuneet",
     "myTickets": "Minun lippuni",
     "watched": "Katsottu",
-    "locked": "Lukittu",
     "responsible": "Vastuuhenkilö",
-    "escalated": "Eskaloitu",
     "services": "Palvelut",
     "timeAccounting": "Ajan kirjaus",
     "queues": "Jonot",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Näytä aktiivinen",
     "queueSearch": "Suodata jonoja…",
     "noQueueMatch": "Ei vastaavia jonoja.",
-    "templates": "Mallit"
+    "templates": "Mallit",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Omat tiketit",
@@ -255,8 +254,6 @@
     "sidebar": "Jonot",
     "allQueues": "Kaikki jonot",
     "empty": "Ei jonoja käytettävissä.",
-    "openBadge": "{{count}} auki",
-    "metaLine": "Kaikki jonot · lajiteltu kiireellisyyden mukaan",
     "exportCsv": "Vie CSV",
     "newCount": "{{count}} uutta",
     "customerFilter": "Asiakas: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Avaa",
       "pending": "Odottaa",
       "closed": "Suljettu",
-      "all": "Kaikki"
+      "all": "Kaikki",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Valitse",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} muutettu…",
       "updated": "{{count}} päivitetty",
       "partialFail": "{{done}} päivitetty, {{failed}} epäonnistui: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} liitteitä",
       "hasSummary": "AI yhteenveto saatavilla",
       "aiRepliedAuto": "Tekoäly vastasi automaattisesti",
-      "aiRepliedAccepted": "Tekoälyluonnos, agentin hyväksymä"
+      "aiRepliedAccepted": "Tekoälyluonnos, agentin hyväksymä",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Samanlaiset liput",

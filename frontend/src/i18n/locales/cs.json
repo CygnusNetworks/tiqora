@@ -42,9 +42,7 @@
     "inbox": "Doručená pošta",
     "myTickets": "Moje tikety",
     "watched": "Sledované",
-    "locked": "Uzamčeno",
     "responsible": "Odpovědný",
-    "escalated": "Eskalováno",
     "services": "Služby",
     "timeAccounting": "Evidence času",
     "queues": "Fronty",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Zobrazit aktivní",
     "queueSearch": "Filtrovat fronty…",
     "noQueueMatch": "Žádná fronta neodpovídá.",
-    "templates": "Šablony"
+    "templates": "Šablony",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Moje tickety",
@@ -255,8 +254,6 @@
     "sidebar": "Fronty",
     "allQueues": "Všechny fronty",
     "empty": "Žádné fronty nejsou k dispozici.",
-    "openBadge": "{{count}} otevřených",
-    "metaLine": "Všechny fronty · seřazeno podle naléhavosti",
     "exportCsv": "Exportovat CSV",
     "newCount": "{{count}} nových",
     "customerFilter": "Zákazník: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Otevřené",
       "pending": "Čekající",
       "closed": "Uzavřené",
-      "all": "Vše"
+      "all": "Vše",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Vybrat",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} změněno…",
       "updated": "{{count}} aktualizováno",
       "partialFail": "{{done}} aktualizováno, {{failed}} selhalo: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} příloh",
       "hasSummary": "AI shrnutí k dispozici",
       "aiRepliedAuto": "Zodpovězeno automaticky AI",
-      "aiRepliedAccepted": "Návrh AI, přijatý agentem"
+      "aiRepliedAccepted": "Návrh AI, přijatý agentem",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Podobné tikety",

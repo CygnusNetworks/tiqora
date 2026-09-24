@@ -276,3 +276,99 @@ export function PinIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Inbox tray — the agent sidebar's "Eingang" entry. */
+export function InboxIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 13.5 6.5 5.5h11l2.5 8V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4.5Z" />
+      <path d="M4 13.5h4.5l1 2h5l1-2H20" />
+    </Icon>
+  );
+}
+
+/** Open eye — watched tickets. */
+export function EyeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </Icon>
+  );
+}
+
+/** Padlock — locked tickets. */
+export function LockIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5.5" y="10.5" width="13" height="9.5" rx="2" />
+      <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+    </Icon>
+  );
+}
+
+/** Pennant flag — SLA-escalated tickets. */
+export function FlagIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5.5 21V4" />
+      <path d="M5.5 4.5h12l-2.5 4 2.5 4h-12" />
+    </Icon>
+  );
+}
+
+/** Dashed person outline — tickets nobody owns yet. */
+export function UserDashedIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="8" r="3.5" strokeDasharray="2 2.2" />
+      <path d="M5.5 19a6.5 6.5 0 0 1 13 0" strokeDasharray="2 2.2" />
+    </Icon>
+  );
+}
+
+/** Book — knowledge base. */
+export function BookIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4.5 5.5a2 2 0 0 1 2-2h13v14h-13a2 2 0 0 0-2 2v-14Z" />
+      <path d="M4.5 19.5a2 2 0 0 0 2 2h13" />
+    </Icon>
+  );
+}
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="5.5" width="16" height="14.5" rx="2" />
+      <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
+    </Icon>
+  );
+}
+
+/** Three bars — statistics. */
+export function ChartIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 20v-9M12 20V4M19 20v-7" />
+    </Icon>
+  );
+}
+
+export function ClockIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </Icon>
+  );
+}
+
+/** Horizontal ellipsis — "more actions" menu trigger. */
+export function MoreIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 12h.01M12 12h.01M18 12h.01" strokeWidth={2.5} />
+    </Icon>
+  );
+}

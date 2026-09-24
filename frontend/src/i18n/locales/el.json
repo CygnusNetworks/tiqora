@@ -42,9 +42,7 @@
     "inbox": "Εισερχόμενα",
     "myTickets": "Τα εισιτήριά μου",
     "watched": "Παρακολούθησαν",
-    "locked": "Κλειδωμένα",
     "responsible": "Υπεύθυνος",
-    "escalated": "Κλιμακωμένα",
     "services": "Υπηρεσίες",
     "timeAccounting": "Καταγραφή χρόνου",
     "queues": "Ουρές",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Εμφάνιση ενεργού",
     "queueSearch": "Φιλτράρισμα ουρών…",
     "noQueueMatch": "Δεν ταιριάζουν οι ουρές.",
-    "templates": "Πρότυπα"
+    "templates": "Πρότυπα",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Τα αιτήματά μου",
@@ -255,8 +254,6 @@
     "sidebar": "Ουρές",
     "allQueues": "Όλες οι ουρές",
     "empty": "Δεν υπάρχουν διαθέσιμες ουρές.",
-    "openBadge": "{{count}} ανοιχτό",
-    "metaLine": "Όλες οι ουρές · ταξινομημένες κατά επείγοντα",
     "exportCsv": "Εξαγωγή CSV",
     "newCount": "{{count}} νέο",
     "customerFilter": "Πελάτης: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Ανοίξτε",
       "pending": "Σε εκκρεμότητα",
       "closed": "Κλειστό",
-      "all": "Όλα"
+      "all": "Όλα",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Επιλέξτε",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} άλλαξε…",
       "updated": "{{count}} ενημερώθηκε",
       "partialFail": "{{done}} ενημερώθηκε, {{failed}} απέτυχε: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} συνημμένα",
       "hasSummary": "Σύνοψη AI διαθέσιμη",
       "aiRepliedAuto": "Απαντήθηκε αυτόματα από την AI",
-      "aiRepliedAccepted": "Πρόχειρο AI, εγκρίθηκε από πράκτορα"
+      "aiRepliedAccepted": "Πρόχειρο AI, εγκρίθηκε από πράκτορα",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Παρόμοια εισιτήρια",

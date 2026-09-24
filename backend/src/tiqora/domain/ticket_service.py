@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
+from datetime import datetime
 from typing import Any
 
 import yaml
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, case, func, or_, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -78,14 +79,57 @@ logger = logging.getLogger(__name__)
 #: pending auto) so the default queue "Offen" view — previously a literal
 #: equality match against the single state type named ``open`` — no longer
 #: hides freshly-arrived ``new`` tickets. ``"new"`` is also exposed as its
-#: own view for the dedicated "Neu" tab. Any ``state_type`` value not in this
-#: map (e.g. ``"closed"``, or a raw ``ticket_state_type.name``) still falls
-#: back to a literal single-name match.
+#: own view for the dedicated "Neu" tab. The inbox segments add ``"todo"``
+#: (new + open: everything that still needs an agent's action, i.e. the
+#: viewable set minus pending) and ``"open_only"`` (literally the ``open``
+#: state type, without ``new``). ``"open"`` keeps its viewable-state meaning
+#: for backwards compatibility. Any ``state_type`` value not in this map
+#: (e.g. ``"closed"``, or a raw ``ticket_state_type.name``) still falls back
+#: to a literal single-name match.
 VIEW_STATE_TYPES: dict[str, frozenset[str]] = {
     "open": OPEN_STATE_TYPES,
     "new": frozenset({"new"}),
     "pending": frozenset({"pending reminder", "pending auto"}),
+    "todo": frozenset({"new", "open"}),
+    "open_only": frozenset({"open"}),
 }
+
+#: ``ticket.user_id`` of Znuny's root/admin account. Znuny leaves freshly
+#: arrived tickets owned by it until an agent takes ownership, so "owned by
+#: root" is how "unassigned" is expressed.
+UNASSIGNED_OWNER_ID = 1
+
+
+def _escalation_due_before(deadline: int, cols: Sequence[Any] | None = None) -> ColumnElement[bool]:
+    """Any ``escalation_*`` epoch set (``> 0``) and earlier than ``deadline``.
+
+    With ``deadline=now`` this is "already escalated"; a later deadline also
+    matches tickets that escalate within the window (overdue ones included).
+    ``cols`` swaps in the four columns of a subquery over ``ticket``.
+    """
+    if cols is None:
+        cols = (
+            Ticket.escalation_time,
+            Ticket.escalation_response_time,
+            Ticket.escalation_update_time,
+            Ticket.escalation_solution_time,
+        )
+    return or_(*(and_(col > 0, col < deadline) for col in cols))
+
+
+#: Last activity of a ticket: its newest article's ``create_time``, or the
+#: ticket's own ``create_time`` when it has no article yet. A correlated
+#: scalar subquery (served by the ``article.ticket_id`` index) rather than a
+#: join, so the permission-filtered ``Ticket`` select stays one row per
+#: ticket. ``ticket.change_time`` is no substitute: adding an article does
+#: not bump it.
+_LAST_ACTIVITY = func.coalesce(
+    select(func.max(Article.create_time))
+    .where(Article.ticket_id == Ticket.id)
+    .correlate(Ticket)
+    .scalar_subquery(),
+    Ticket.create_time,
+)
 
 
 def _addresses_of(value: str | None) -> set[str]:
@@ -192,8 +236,10 @@ class TicketService:
         customer_email_by_login: dict[str, str] | None = None,
         ai_escalated_ticket_ids: set[int] | None = None,
         ai_reply_source_by_ticket: dict[int, str] | None = None,
+        last_article_by_ticket: dict[int, tuple[datetime, str | None]] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
+        last_article = (last_article_by_ticket or {}).get(t.id)
         return TicketListItem(
             id=t.id,
             tn=t.tn,
@@ -223,6 +269,8 @@ class TicketService:
             has_ai_summary=t.id in (ai_summary_ticket_ids or set()),
             ai_escalated=t.id in (ai_escalated_ticket_ids or set()),
             ai_reply_source=(ai_reply_source_by_ticket or {}).get(t.id),
+            last_article_time=last_article[0] if last_article else None,
+            last_sender_type=last_article[1] if last_article else None,
             create_time=t.create_time,
             change_time=t.change_time,
             age_seconds=age_seconds(t.create_time),
@@ -233,13 +281,14 @@ class TicketService:
             until_time=t.until_time,
         )
 
-    _SORT_COLUMNS = {
+    _SORT_COLUMNS: dict[str, Any] = {
         "age": Ticket.create_time,
         "created": Ticket.create_time,
         "changed": Ticket.change_time,
         "tn": Ticket.tn,
         "title": Ticket.title,
         "priority": Ticket.ticket_priority_id,
+        "activity": _LAST_ACTIVITY,
     }
 
     async def _filtered_ticket_stmt(
@@ -257,6 +306,8 @@ class TicketService:
         watcher_user_id: int | None = None,
         escalated: bool | None = None,
         ai_escalated: bool | None = None,
+        unassigned: bool | None = None,
+        escalating_within: int | None = None,
         include_archived: bool = False,
     ) -> Select[tuple[Ticket]] | None:
         """Build the permission-filtered, unordered ``Ticket`` select.
@@ -328,22 +379,16 @@ class TicketService:
             if not watched_ids:
                 return None
             stmt = stmt.where(Ticket.id.in_(set(watched_ids)))
-        if escalated:
-            now = int(time.time())
+        if unassigned is not None:
             stmt = stmt.where(
-                or_(
-                    and_(Ticket.escalation_time > 0, Ticket.escalation_time < now),
-                    and_(
-                        Ticket.escalation_response_time > 0,
-                        Ticket.escalation_response_time < now,
-                    ),
-                    and_(Ticket.escalation_update_time > 0, Ticket.escalation_update_time < now),
-                    and_(
-                        Ticket.escalation_solution_time > 0,
-                        Ticket.escalation_solution_time < now,
-                    ),
-                )
+                Ticket.user_id == UNASSIGNED_OWNER_ID
+                if unassigned
+                else Ticket.user_id != UNASSIGNED_OWNER_ID
             )
+        if escalated:
+            stmt = stmt.where(_escalation_due_before(int(time.time())))
+        if escalating_within is not None:
+            stmt = stmt.where(_escalation_due_before(int(time.time()) + escalating_within))
         if ai_escalated:
             try:
                 ai_ticket_ids = (
@@ -414,6 +459,8 @@ class TicketService:
         watcher_user_id: int | None = None,
         escalated: bool | None = None,
         ai_escalated: bool | None = None,
+        unassigned: bool | None = None,
+        escalating_within: int | None = None,
         offset: int = 0,
         limit: int = 50,
         sort: str = "age",
@@ -433,6 +480,8 @@ class TicketService:
             watcher_user_id=watcher_user_id,
             escalated=escalated,
             ai_escalated=ai_escalated,
+            unassigned=unassigned,
+            escalating_within=escalating_within,
             include_archived=include_archived,
         )
         if stmt is None:
@@ -451,6 +500,7 @@ class TicketService:
         ai_summary_ticket_ids = await self._ai_summary_ticket_ids(ticket_ids)
         ai_escalated_ids = await _ai_escalated_ticket_ids(self._session, ticket_ids)
         ai_reply_source_by_ticket = await self._ai_reply_source_by_ticket(ticket_ids)
+        last_article_by_ticket = await self._last_article_by_ticket(ticket_ids)
         customer_email_by_login = await self._customer_emails_by_login(
             [t.customer_user_id for t in tickets if t.customer_user_id]
         )
@@ -464,6 +514,7 @@ class TicketService:
                 customer_email_by_login,
                 ai_escalated_ids,
                 ai_reply_source_by_ticket,
+                last_article_by_ticket,
             )
             for t in tickets
         ]
@@ -493,6 +544,47 @@ class TicketService:
             .join(ArticleDataMime, ArticleDataMime.article_id == Article.id)
         )
         return {ticket_id: a_from for ticket_id, a_from in rows.all() if a_from}
+
+    async def _last_article_by_ticket(
+        self, ticket_ids: list[int]
+    ) -> dict[int, tuple[datetime, str | None]]:
+        """``(create_time, sender type name)`` of each ticket's newest article.
+
+        One query for the page's ticket ids (mirrors
+        :meth:`_first_article_from_by_ticket`): the articles carrying their
+        ticket's ``max(create_time)``, joined to ``article_sender_type``.
+        Several articles can share that second — the highest ``article.id``
+        among them wins, so "newest" is ``max(create_time, id)``. Internal
+        notes count as activity too. Tickets without an article are absent.
+        """
+        if not ticket_ids:
+            return {}
+        newest = (
+            select(
+                Article.ticket_id.label("ticket_id"),
+                func.max(Article.create_time).label("max_time"),
+            )
+            .where(Article.ticket_id.in_(ticket_ids))
+            .group_by(Article.ticket_id)
+            .subquery()
+        )
+        rows = await self._session.execute(
+            select(Article.ticket_id, Article.id, Article.create_time, ArticleSenderType.name)
+            .join(
+                newest,
+                and_(
+                    Article.ticket_id == newest.c.ticket_id,
+                    Article.create_time == newest.c.max_time,
+                ),
+            )
+            .outerjoin(ArticleSenderType, ArticleSenderType.id == Article.article_sender_type_id)
+            .order_by(Article.ticket_id, Article.id)
+        )
+        # Ordered by article id, so the last row per ticket wins the tie.
+        return {
+            int(ticket_id): (create_time, sender)
+            for ticket_id, _, create_time, sender in rows.all()
+        }
 
     async def _customer_emails_by_login(self, logins: list[str]) -> dict[str, str]:
         """``customer_user.email`` for a set of ``customer_user.login`` values.
@@ -621,6 +713,8 @@ class TicketService:
         watcher_user_id: int | None = None,
         escalated: bool | None = None,
         ai_escalated: bool | None = None,
+        unassigned: bool | None = None,
+        escalating_within: int | None = None,
         sort: str = "age",
         order: str = "desc",
         batch_size: int = 500,
@@ -644,6 +738,8 @@ class TicketService:
             watcher_user_id=watcher_user_id,
             escalated=escalated,
             ai_escalated=ai_escalated,
+            unassigned=unassigned,
+            escalating_within=escalating_within,
             include_archived=include_archived,
         )
         if stmt is None:
@@ -746,6 +842,136 @@ class TicketService:
             count_stmt = select(func.count()).select_from(stmt.subquery())
             counts[view] = int((await self._session.execute(count_stmt)).scalar_one())
         return counts
+
+    #: ``states`` keys of :meth:`facet_counts`, each a ``state_type`` view.
+    _FACET_STATE_VIEWS: tuple[str, ...] = ("todo", "new", "open_only", "pending", "closed")
+
+    async def facet_counts(
+        self,
+        user_id: int,
+        *,
+        queue_id: int | None = None,
+        state_id: int | None = None,
+        state_type: str | None = None,
+        owner_id: int | None = None,
+        customer_id: str | None = None,
+        responsible_id: int | None = None,
+        service_id: int | None = None,
+        locked: bool | None = None,
+        watcher_user_id: int | None = None,
+        escalated: bool | None = None,
+        ai_escalated: bool | None = None,
+        unassigned: bool | None = None,
+        escalating_within: int | None = None,
+        include_archived: bool = False,
+    ) -> dict[str, dict[str, int]]:
+        """Segment and chip counts for the inbox, in two ``COUNT`` queries.
+
+        - ``states``: every filter applied *except* ``state_type``/``state_id``,
+          counted per view (``todo``/``new``/``open_only``/``pending`` from
+          :data:`VIEW_STATE_TYPES`, ``closed`` as the literal state type, as
+          the list's fallback matches it) plus ``all`` (no state filter).
+          Grouped by ``ticket_state_id`` and folded onto the views in Python.
+        - ``flags``: scope filters *and* the state filter applied, but the
+          three flag filters (``escalated``/``locked``/``unassigned``)
+          ignored — each count is that base plus only its own flag, so a
+          chip shows what clicking it would yield. One conditional-sum query.
+
+        Both go through :meth:`_filtered_ticket_stmt`, so the numbers agree
+        with the list the segments and chips link to.
+        """
+        scope: dict[str, Any] = {
+            "queue_id": queue_id,
+            "owner_id": owner_id,
+            "customer_id": customer_id,
+            "responsible_id": responsible_id,
+            "service_id": service_id,
+            "watcher_user_id": watcher_user_id,
+            "ai_escalated": ai_escalated,
+            "escalating_within": escalating_within,
+            "include_archived": include_archived,
+        }
+        states = dict.fromkeys((*self._FACET_STATE_VIEWS, "all"), 0)
+        flags = {"escalated": 0, "locked": 0, "unassigned": 0}
+
+        state_base = await self._filtered_ticket_stmt(
+            user_id,
+            state_id=None,
+            state_type=None,
+            escalated=escalated,
+            locked=locked,
+            unassigned=unassigned,
+            **scope,
+        )
+        if state_base is not None:
+            sub = state_base.subquery()
+            per_state = {
+                int(sid): int(n)
+                for sid, n in (
+                    await self._session.execute(
+                        select(sub.c.ticket_state_id, func.count()).group_by(sub.c.ticket_state_id)
+                    )
+                ).all()
+            }
+            type_by_state = {
+                int(sid): str(name)
+                for sid, name in (
+                    await self._session.execute(
+                        select(TicketState.id, TicketStateType.name).join(
+                            TicketStateType, TicketStateType.id == TicketState.type_id
+                        )
+                    )
+                ).all()
+            }
+            for sid, n in per_state.items():
+                states["all"] += n
+                type_name = type_by_state.get(sid)
+                for view in self._FACET_STATE_VIEWS:
+                    if type_name in VIEW_STATE_TYPES.get(view, {view}):
+                        states[view] += n
+
+        flag_base = await self._filtered_ticket_stmt(
+            user_id, state_id=state_id, state_type=state_type, **scope
+        )
+        if flag_base is not None:
+            lock_ids = (
+                (
+                    await self._session.execute(
+                        select(TicketLockType.id).where(
+                            TicketLockType.name.in_({"lock", "tmp_lock"})
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            sub = flag_base.subquery()
+            esc = _escalation_due_before(
+                int(time.time()),
+                (
+                    sub.c.escalation_time,
+                    sub.c.escalation_response_time,
+                    sub.c.escalation_update_time,
+                    sub.c.escalation_solution_time,
+                ),
+            )
+            row = (
+                await self._session.execute(
+                    select(
+                        func.coalesce(func.sum(case((esc, 1), else_=0)), 0),
+                        func.coalesce(
+                            func.sum(case((sub.c.ticket_lock_id.in_(lock_ids), 1), else_=0)), 0
+                        ),
+                        func.coalesce(
+                            func.sum(case((sub.c.user_id == UNASSIGNED_OWNER_ID, 1), else_=0)),
+                            0,
+                        ),
+                    )
+                )
+            ).one()
+            flags = {"escalated": int(row[0]), "locked": int(row[1]), "unassigned": int(row[2])}
+
+        return {"states": states, "flags": flags}
 
     async def count_dashboard_summary(self, user_id: int) -> dict[str, int]:
         """KPI-tile counts for the agent dashboard.

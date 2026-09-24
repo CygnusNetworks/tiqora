@@ -42,9 +42,7 @@
     "inbox": "Innboks",
     "myTickets": "Billettene mine",
     "watched": "Så på",
-    "locked": "Låst",
     "responsible": "Ansvarlig",
-    "escalated": "Eskalert",
     "services": "Tjenester",
     "timeAccounting": "Tidsregistrering",
     "queues": "Køer",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Vis aktive",
     "queueSearch": "Filtrer køer...",
     "noQueueMatch": "Ingen køer samsvarer.",
-    "templates": "Maler"
+    "templates": "Maler",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mine saker",
@@ -255,8 +254,6 @@
     "sidebar": "Køer",
     "allQueues": "Alle køer",
     "empty": "Ingen køer tilgjengelig.",
-    "openBadge": "{{count}} åpen",
-    "metaLine": "Alle køer · sortert etter haster",
     "exportCsv": "Eksporter CSV",
     "newCount": "{{count}} ny",
     "customerFilter": "Kunde: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Åpne",
       "pending": "Venter",
       "closed": "Stengt",
-      "all": "Alle"
+      "all": "Alle",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Velg",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} endret...",
       "updated": "{{count}} oppdatert",
       "partialFail": "{{done}} oppdatert, {{failed}} mislyktes: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} vedlegg",
       "hasSummary": "AI-sammendrag tilgjengelig",
       "aiRepliedAuto": "Besvart automatisk av KI-en",
-      "aiRepliedAccepted": "KI-utkast, godtatt av en agent"
+      "aiRepliedAccepted": "KI-utkast, godtatt av en agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Lignende billetter",
