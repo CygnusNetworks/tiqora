@@ -17,7 +17,7 @@ IdentityMode = Literal["ticket_customer_id", "clarify_schema", "off"]
 ReplyLanguageMode = Literal["off", "fixed", "auto"]
 SummaryDetail = Literal["standard", "detailed"]
 AclSubjectType = Literal["group", "role", "user"]
-AclFeature = Literal["summary", "auto_reply", "manual_assist", "mcp"]
+AclFeature = Literal["summary", "auto_reply", "manual_assist", "mcp", "refine"]
 # tiqora_ai_usage.feature — includes triage (not an ACL feature) and refine.
 UsageFeature = Literal["summary", "auto_reply", "manual_assist", "mcp", "refine", "triage"]
 
