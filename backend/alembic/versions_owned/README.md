@@ -30,3 +30,12 @@ on-demand against the ~15 most important Znuny relations. No destructive
 cleanup is implemented in v1.
 
 All changes must remain reverse-friendly for the documented rollback probe.
+
+## Branching
+
+The owned chain is a separate Alembic branch (`branch_labels=("owned",)`)
+forking off `20260720_0007`. Do **not** rebase it onto the newest tiqora
+revision when adding tiqora migrations: that turns every newer tiqora revision
+into an ancestor of the owned head, and a database already stamped at the owned
+head then skips them. With ownership active there are two heads, so upgrade to
+`heads` (which `tiqora migrate upgrade` does by default).
