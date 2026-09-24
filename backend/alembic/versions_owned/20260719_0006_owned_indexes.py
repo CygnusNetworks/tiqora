@@ -4,8 +4,12 @@ Revision ID: 20260719_0006
 Revises: 20260720_0007
 Create Date: 2026-07-19
 
-Rebased onto ``20260919_0047`` (AI final-answer model) so the combined chain
-(tiqora + owned) keeps a single head — see ``tests/test_migration_gate.py``.
+Branches off ``20260720_0007`` as its own ``owned`` branch — deliberately NOT
+rebased onto the latest tiqora revision. Rebasing made every later tiqora
+revision an *ancestor* of this one, so a database already stamped at
+``20260719_0006`` looked "at head" and silently skipped them. With a fixed
+branch point the two chains advance independently; ``tiqora migrate upgrade``
+targets ``heads`` — see ``tests/test_migration_gate.py``.
 
 **Gated**: only reachable once schema ownership is active (see
 ``tiqora.domain.ownership`` and ``alembic/env.py``'s dynamic
@@ -33,8 +37,8 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "20260719_0006"
-down_revision: str | None = "20260919_0047"
-branch_labels: str | Sequence[str] | None = None
+down_revision: str | None = "20260720_0007"
+branch_labels: str | Sequence[str] | None = ("owned",)
 depends_on: str | Sequence[str] | None = None
 
 _INDEXES = [
