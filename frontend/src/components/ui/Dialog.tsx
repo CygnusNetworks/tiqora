@@ -29,6 +29,7 @@ export function Dialog({
   description,
   children,
   footer,
+  footerClassName,
   size = "md",
   className,
 }: {
@@ -40,6 +41,9 @@ export function Dialog({
   children: ReactNode;
   /** Optional fixed action bar; content scrolls independently above it. */
   footer?: ReactNode;
+  /** Replaces the footer bar's alignment/background (default: right-aligned
+   * on the surface colour) — e.g. a tinted bar with content on both sides. */
+  footerClassName?: string;
   size?: keyof typeof SIZE_CLASS;
   className?: string;
 }) {
@@ -154,7 +158,12 @@ export function Dialog({
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 text-sm text-ink">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-hairline bg-surface px-4 py-3">
+          <div
+            className={cn(
+              "flex items-center gap-2 border-t border-hairline px-4 py-3",
+              footerClassName ?? "justify-end bg-surface",
+            )}
+          >
             {footer}
           </div>
         )}
