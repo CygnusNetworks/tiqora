@@ -19,7 +19,8 @@ Multiple own sections are refined in ONE call: each is labelled ``[SECTION
 <index>]`` and the model answers with a JSON object keyed by those same
 indices. If the response does not cover exactly the requested ids, the batch
 is discarded and each section is retried on its own — a small, bounded
-fallback rather than a half-applied rewrite.
+fallback (:data:`FALLBACK_BUDGET_SECONDS`) that returns every section or none,
+never a half-applied rewrite.
 
 Gating mirrors :mod:`tiqora.ai.summary`: per-queue ``enabled_refine`` plus the
 per-agent ACL/limits for ``FEATURE_REFINE``. Not Readiness-Gate gated — this
@@ -30,6 +31,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -70,6 +72,12 @@ KIND_OWN = "own"
 #: Guard against a runaway composer body; the composer is a reply box, not a
 #: document editor. Enforced by the API layer, repeated here as a hard stop.
 MAX_TOTAL_CHARS = 60_000
+
+#: Wall-clock budget, measured from the batch call, after which no further
+#: per-section retry is started. Refine answers a synchronous request and
+#: nginx cuts /api/ at 90 s; one retry already in flight may still run past
+#: this, so it stays well below the proxy limit.
+FALLBACK_BUDGET_SECONDS = 45.0
 
 #: Role and the non-negotiable rules. Kept separate from the tone block and
 #: the output contract so the tone can sit BETWEEN them — a tone sentence
@@ -467,17 +475,27 @@ async def refine_text(
         model_served = response.model or model_served
         return _parse_sections(response.content, ids)
 
+    started = time.monotonic()
     sections = await _ask(section_ids)
     if sections is None:
         # The batch answer was unusable. Retry each section on its own — a
         # single-section request is the shape models get right most reliably.
+        # All or nothing: one section that cannot be recovered discards the
+        # rest, since the composer would otherwise rewrite some paragraphs and
+        # silently keep others. The retries run inside a synchronous request
+        # behind nginx's 90 s /api/ timeout, so they stop once the budget is
+        # spent instead of running into a 504.
         logger.info("ai.refine.batch_unusable", queue_id=queue_id, sections=len(section_ids))
         recovered: dict[int, str] = {}
         for section_id in section_ids:
+            if time.monotonic() - started > FALLBACK_BUDGET_SECONDS:
+                logger.info("ai.refine.fallback_budget_spent", queue_id=queue_id)
+                break
             single = await _ask([section_id])
-            if single is not None:
-                recovered.update(single)
-        sections = recovered or None
+            if single is None:
+                break
+            recovered.update(single)
+        sections = recovered if len(recovered) == len(section_ids) else None
 
     await usage_service.record_usage(
         session,
@@ -506,6 +524,7 @@ async def refine_text(
 
 
 __all__ = [
+    "FALLBACK_BUDGET_SECONDS",
     "MAX_TOTAL_CHARS",
     "REFINE_TONES",
     "TONE_CONCISE",
