@@ -20,6 +20,7 @@ export {
   type TicketListItem,
   type PaginatedTickets,
   type MyTicketCounts,
+  type TicketFacets,
   type DashboardSummary,
   type TicketDetail,
   type TicketPermissions,

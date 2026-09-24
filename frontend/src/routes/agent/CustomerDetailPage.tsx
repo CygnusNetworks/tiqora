@@ -134,7 +134,7 @@ export function CustomerDetailPage() {
           {customerId && (
             <Link
               to="/agent/queues"
-              search={{ customer_id: customerId, state_type: "open" }}
+              search={{ customer_id: customerId, state_type: "all" }}
               className="text-sm font-medium text-accent hover:underline"
               data-testid="customer-all-tickets-link"
             >

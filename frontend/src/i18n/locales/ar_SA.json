@@ -42,9 +42,7 @@
     "inbox": "البريد الوارد",
     "myTickets": "التذاكر الخاصة بي",
     "watched": "شاهد",
-    "locked": "مقفل",
     "responsible": "المسؤول",
-    "escalated": "مُصعَّد",
     "services": "الخدمات",
     "timeAccounting": "تسجيل الوقت",
     "queues": "قوائم الانتظار",
@@ -60,7 +58,8 @@
     "showActiveQueues": "إظهار نشط",
     "queueSearch": "طوابير التصفية...",
     "noQueueMatch": "لا توجد قوائم انتظار متطابقة.",
-    "templates": "قوالب"
+    "templates": "قوالب",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "تذاكري",
@@ -255,8 +254,6 @@
     "sidebar": "قوائم الانتظار",
     "allQueues": "جميع قوائم الانتظار",
     "empty": "لا توجد طوابير متاحة.",
-    "openBadge": "{{count}} مفتوح",
-    "metaLine": "جميع قوائم الانتظار · مرتبة حسب الإلحاح",
     "exportCsv": "تصدير CSV",
     "newCount": "{{count}} جديد",
     "customerFilter": "العميل: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "مفتوح",
       "pending": "في انتظار",
       "closed": "مغلق",
-      "all": "الكل"
+      "all": "الكل",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ اختر",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} تم التغيير…",
       "updated": "{{count}} محدث",
       "partialFail": "{{done}} تم التحديث، {{failed}} فشل: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} المرفقات",
       "hasSummary": "ملخص الذكاء الاصطناعي متاح",
       "aiRepliedAuto": "تمت الإجابة تلقائيًا بواسطة الذكاء الاصطناعي",
-      "aiRepliedAccepted": "مسودة ذكاء اصطناعي، اعتمدها موظف"
+      "aiRepliedAccepted": "مسودة ذكاء اصطناعي، اعتمدها موظف",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "تذاكر مماثلة",

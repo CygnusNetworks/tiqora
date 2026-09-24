@@ -42,9 +42,7 @@
     "inbox": "Hộp thư đến",
     "myTickets": "Vé của tôi",
     "watched": "Đã xem",
-    "locked": "Đã khóa",
     "responsible": "Phụ trách",
-    "escalated": "Đã leo thang",
     "services": "Dịch vụ",
     "timeAccounting": "Ghi nhận thời gian",
     "queues": "Hàng đợi",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Hiển thị hoạt động",
     "queueSearch": "Lọc hàng đợi…",
     "noQueueMatch": "Không có hàng đợi nào phù hợp.",
-    "templates": "Mẫu"
+    "templates": "Mẫu",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Ticket của tôi",
@@ -255,8 +254,6 @@
     "sidebar": "Hàng đợi",
     "allQueues": "Tất cả hàng đợi",
     "empty": "Không có hàng đợi có sẵn.",
-    "openBadge": "{{count}} mở",
-    "metaLine": "Tất cả hàng đợi · sắp xếp theo mức độ khẩn cấp",
     "exportCsv": "Xuất CSV",
     "newCount": "{{count}} mới",
     "customerFilter": "Khách hàng: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Mở",
       "pending": "Đang chờ xử lý",
       "closed": "Đã đóng",
-      "all": "Tất cả"
+      "all": "Tất cả",
+      "todo": "To do"
     },
     "bulk": {
       "select": "Ø Chọn",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} đã thay đổi…",
       "updated": "{{count}} đã cập nhật",
       "partialFail": "{{done}} đã cập nhật, {{failed}} không thành công: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} tệp đính kèm",
       "hasSummary": "Bản tóm tắt AI có sẵn",
       "aiRepliedAuto": "Được AI trả lời tự động",
-      "aiRepliedAccepted": "Bản nháp AI, đã được nhân viên chấp nhận"
+      "aiRepliedAccepted": "Bản nháp AI, đã được nhân viên chấp nhận",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Vé tương tự",

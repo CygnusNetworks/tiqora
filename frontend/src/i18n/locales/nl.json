@@ -42,9 +42,7 @@
     "inbox": "Postvak IN",
     "myTickets": "Mijn tickets",
     "watched": "Gevolgd",
-    "locked": "Vergrendeld",
     "responsible": "Verantwoordelijke",
-    "escalated": "Geëscaleerd",
     "services": "Services",
     "timeAccounting": "Tijdregistratie",
     "queues": "Wachtrijen",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Actieve tonen",
     "queueSearch": "Wachtrijen filteren…",
     "noQueueMatch": "Geen wachtrijen gevonden.",
-    "templates": "Sjablonen"
+    "templates": "Sjablonen",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mijn tickets",
@@ -255,8 +254,6 @@
     "sidebar": "Wachtrijen",
     "allQueues": "Alle wachtrijen",
     "empty": "Geen wachtrijen beschikbaar.",
-    "openBadge": "{{count}} geopend",
-    "metaLine": "Alle wachtrijen · gesorteerd op urgentie",
     "exportCsv": "CSV exporteren",
     "newCount": "{{count}} nieuw",
     "customerFilter": "Klant: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Open",
       "pending": "In behandeling",
       "closed": "Gesloten",
-      "all": "Alles"
+      "all": "Alles",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Selecteren",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} gewijzigd…",
       "updated": "{{count}} bijgewerkt",
       "partialFail": "{{done}} bijgewerkt, {{failed}} mislukt: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} bijlagen",
       "hasSummary": "AI-samenvatting beschikbaar",
       "aiRepliedAuto": "Automatisch beantwoord door de AI",
-      "aiRepliedAccepted": "AI-concept, geaccepteerd door een agent"
+      "aiRepliedAccepted": "AI-concept, geaccepteerd door een agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Soortgelijke tickets",
