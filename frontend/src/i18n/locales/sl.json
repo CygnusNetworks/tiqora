@@ -42,9 +42,7 @@
     "inbox": "Prejeto",
     "myTickets": "Moje vstopnice",
     "watched": "Gledal",
-    "locked": "Zaklenjeno",
     "responsible": "Odgovoren",
-    "escalated": "Eskalirano",
     "services": "Storitve",
     "timeAccounting": "Evidenca časa",
     "queues": "Čakalne vrste",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Pokaži aktivno",
     "queueSearch": "Filtriraj čakalne vrste ...",
     "noQueueMatch": "Nobena čakalna vrsta se ne ujema.",
-    "templates": "Predloge"
+    "templates": "Predloge",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Moji zahtevki",
@@ -255,8 +254,6 @@
     "sidebar": "Čakalne vrste",
     "allQueues": "Vse čakalne vrste",
     "empty": "Čakalne vrste niso na voljo.",
-    "openBadge": "{{count}} odprto",
-    "metaLine": "Vse čakalne vrste · razvrščene po nujnosti",
     "exportCsv": "Izvoz CSV",
     "newCount": "{{count}} novo",
     "customerFilter": "Stranka: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Odpri",
       "pending": "V teku",
       "closed": "Zaprto",
-      "all": "Vse"
+      "all": "Vse",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Izberite",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} spremenjeno …",
       "updated": "{{count}} posodobljeno",
       "partialFail": "{{done}} posodobljeno, {{failed}} neuspešno: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} priloge",
       "hasSummary": "Na voljo je povzetek AI",
       "aiRepliedAuto": "Samodejno odgovorila UI",
-      "aiRepliedAccepted": "Osnutek UI, sprejel agent"
+      "aiRepliedAccepted": "Osnutek UI, sprejel agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Podobne vstopnice",

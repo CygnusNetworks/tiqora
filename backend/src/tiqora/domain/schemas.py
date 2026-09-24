@@ -208,6 +208,15 @@ class TicketListItem(BaseModel):
     archive_flag: int = 0
     """1 when the ticket is archived — only ever non-zero in admin listings
     with ``include_archived`` (used to show an "Archiviert" badge)."""
+    last_article_time: UtcDateTime | None = None
+    """``create_time`` of the ticket's newest article (internal notes
+    included) — the ticket's real last activity, which ``change_time`` is
+    not: adding an article does not bump it. ``None`` if the ticket has no
+    articles; the CSV export leaves it unset."""
+    last_sender_type: str | None = None
+    """``article_sender_type.name`` of that newest article (``"customer"``,
+    ``"agent"`` or ``"system"``; ties on ``create_time`` go to the higher
+    article id) — shows who wrote last. ``None`` like ``last_article_time``."""
     create_time: UtcDateTime
     change_time: UtcDateTime
     age_seconds: int | None = None

@@ -14,7 +14,8 @@ export function QueueShortcutCard({ queue }: { queue: QueueNode }) {
   const open = queue.counts?.open ?? 0;
   const newCount = queue.counts?.new ?? 0;
   const shortName = queue.name.includes("::") ? queue.name.split("::").pop()! : queue.name;
-  const openSearch = { queue_id: queue.id, state_type: "open" as const };
+  // No status: the queue opens on its default "Zu tun" segment.
+  const openSearch = { queue_id: queue.id };
 
   return (
     <div
