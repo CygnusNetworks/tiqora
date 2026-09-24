@@ -132,7 +132,6 @@
     "prev": "Anterior",
     "next": "Siguiente",
     "back": "Atrás",
-    "backToQueues": "Volver a colas",
     "loading": "Cargando…",
     "close": "Cerrar",
     "confirm": "Confirmar",
@@ -579,7 +578,13 @@
         "resultLabel": "Custom summary",
         "copy": "Copy",
         "copied": "Copied"
-      }
+      },
+      "summaryStaleRefresh_one": "1 new article",
+      "summaryStaleRefresh_other": "{{count}} new articles",
+      "more": "more",
+      "less": "less",
+      "scopeAndInstruction": "Scope & own instruction …",
+      "pinOpen": "Pin (stays expanded)"
     },
     "toolbar": {
       "print": "Imprimir",
@@ -711,7 +716,31 @@
       "errorDisabled": "AI rewriting is not enabled for this queue.",
       "error": "Refining failed. Your text is unchanged.",
       "nothingToRefineShort": "nothing of your own",
-      "toneMenuLabel": "Choose tone"
+      "toneMenuLabel": "Choose tone",
+      "buttonShort": "Refine"
+    },
+    "nav": {
+      "label": "Origin",
+      "search": "Search “{{query}}”",
+      "position": "{{index}} / {{total}}",
+      "prev": "Previous ticket in the list",
+      "next": "Next ticket in the list"
+    },
+    "stateGroup": {
+      "pending": "Pending",
+      "closed": "Closed"
+    },
+    "signatureAppended": "Signature · appended on send",
+    "replyNext": {
+      "label": "Then",
+      "keep": "Keep state",
+      "pending": "Pending",
+      "closed": "Close successfully",
+      "until": "until",
+      "send": {
+        "pending": "Send · pending",
+        "closed": "Send & close"
+      }
     }
   },
   "search": {

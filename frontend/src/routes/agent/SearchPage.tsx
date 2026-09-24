@@ -12,6 +12,7 @@ import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { setTicketNavContext } from "@/lib/ticketNavContext";
 import { SmartSearchBar } from "@/components/agent/SmartSearchBar";
 import { detectQueryType } from "@/components/agent/smartSearch";
 
@@ -466,6 +467,14 @@ export function SearchPage() {
                   <Link
                     to="/agent/tickets/$ticketId"
                     params={{ ticketId: String(hit.id) }}
+                    onClick={() =>
+                      setTicketNavContext({
+                        label: t("ticket.nav.search", { query: resultsQ.data?.query ?? "" }),
+                        to: "/agent/search",
+                        search,
+                        ids: (resultsQ.data?.hits ?? []).map((h) => h.id),
+                      })
+                    }
                     className={cn(
                       "block rounded-lg border bg-surface p-3 transition-colors duration-100 hover:border-accent/60 hover:bg-surface-subtle",
                       directTn && hit.tn === directTn

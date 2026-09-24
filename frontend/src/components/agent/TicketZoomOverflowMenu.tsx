@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
+import { Menu, MenuItem, MenuLabel } from "@/components/ui/Menu";
 
 export type TicketZoomOverflowMenuProps = {
   tab: "articles" | "history";
@@ -16,10 +16,11 @@ export type TicketZoomOverflowMenuProps = {
 };
 
 /**
- * Compact ⋮ overflow for ticket-zoom secondary actions: Artikel/Historie,
- * Prozess starten, Interne Notiz, and article/history sort order.
+ * The ticket-zoom secondary actions as bare menu items (Artikel/Historie,
+ * sort order, internal note, start process), so the ticket header can list
+ * them inside its single ⋯ menu.
  */
-export function TicketZoomOverflowMenu({
+export function TicketZoomOverflowItems({
   tab,
   onTabChange,
   sortLabel,
@@ -29,6 +30,53 @@ export function TicketZoomOverflowMenu({
   canStartProcess,
   onStartProcess,
 }: TicketZoomOverflowMenuProps) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <MenuLabel>{t("ticket.overflow.menu")}</MenuLabel>
+      <MenuItem
+        testId="overflow-tab-articles"
+        selected={tab === "articles"}
+        onSelect={() => onTabChange("articles")}
+      >
+        {t("ticket.overflow.articles")}
+      </MenuItem>
+      <MenuItem
+        testId="overflow-tab-history"
+        selected={tab === "history"}
+        onSelect={() => onTabChange("history")}
+      >
+        {t("ticket.overflow.history")}
+      </MenuItem>
+      <MenuItem testId="overflow-sort" onSelect={onToggleSort}>
+        {t("ticket.overflow.sort")}: {sortLabel}
+      </MenuItem>
+      {canNote ? (
+        <MenuItem testId="overflow-internal-note" onSelect={onInternalNote}>
+          {t("ticket.overflow.internalNote")}
+        </MenuItem>
+      ) : (
+        <div
+          role="menuitem"
+          aria-disabled="true"
+          data-testid="overflow-internal-note"
+          title={t("ticket.toolbar.noPermission")}
+          className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-muted opacity-40"
+        >
+          {t("ticket.overflow.internalNote")}
+        </div>
+      )}
+      {canStartProcess && (
+        <MenuItem testId="overflow-start-process" onSelect={onStartProcess}>
+          {t("ticket.overflow.startProcess")}
+        </MenuItem>
+      )}
+    </>
+  );
+}
+
+/** Stand-alone ⋮ menu around `TicketZoomOverflowItems`. */
+export function TicketZoomOverflowMenu(props: TicketZoomOverflowMenuProps) {
   const { t } = useTranslation();
 
   return (
@@ -51,46 +99,7 @@ export function TicketZoomOverflowMenu({
         </button>
       )}
     >
-      <MenuLabel>{t("ticket.overflow.menu")}</MenuLabel>
-      <MenuItem
-        testId="overflow-tab-articles"
-        selected={tab === "articles"}
-        onSelect={() => onTabChange("articles")}
-      >
-        {t("ticket.overflow.articles")}
-      </MenuItem>
-      <MenuItem
-        testId="overflow-tab-history"
-        selected={tab === "history"}
-        onSelect={() => onTabChange("history")}
-      >
-        {t("ticket.overflow.history")}
-      </MenuItem>
-      <MenuSeparator />
-      <MenuItem testId="overflow-sort" onSelect={onToggleSort}>
-        {t("ticket.overflow.sort")}: {sortLabel}
-      </MenuItem>
-      <MenuSeparator />
-      {canNote ? (
-        <MenuItem testId="overflow-internal-note" onSelect={onInternalNote}>
-          {t("ticket.overflow.internalNote")}
-        </MenuItem>
-      ) : (
-        <div
-          role="menuitem"
-          aria-disabled="true"
-          data-testid="overflow-internal-note"
-          title={t("ticket.toolbar.noPermission")}
-          className="flex w-full cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-muted opacity-40"
-        >
-          {t("ticket.overflow.internalNote")}
-        </div>
-      )}
-      {canStartProcess && (
-        <MenuItem testId="overflow-start-process" onSelect={onStartProcess}>
-          {t("ticket.overflow.startProcess")}
-        </MenuItem>
-      )}
+      <TicketZoomOverflowItems {...props} />
     </Menu>
   );
 }

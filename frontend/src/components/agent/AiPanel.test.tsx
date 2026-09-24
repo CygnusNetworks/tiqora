@@ -1035,21 +1035,55 @@ describe("AiPanel", () => {
       summary_created_at: "2026-07-23T09:21:00",
     };
 
-    it("keeps the content out of the page until a chip is hovered or clicked", async () => {
+    it("shows the summary as one line and keeps the full controls closed until expanded", async () => {
       getState.mockResolvedValue({ ...summaryState, manual_assist_available: true });
       listArticles.mockResolvedValue([40, 41, 42].map(fakeArticle));
 
       wrap(<AiPanel ticketId={1} canNote />);
 
-      await waitFor(() => expect(screen.getByTestId("ai-chip-summary")).toBeTruthy());
+      expect(await screen.findByTestId("ai-summary-line-text")).toHaveTextContent("Stored summary");
       expect(screen.queryByTestId("ai-panel-summary-body")).toBeNull();
       expect(screen.getByTestId("ai-chip-drafts").textContent).toContain("0");
-      await waitFor(() => expect(screen.getByTestId("ai-chip-summary-current")).toBeTruthy());
+      // All three articles are covered: nothing stale to refresh.
+      expect(screen.queryByTestId("ai-summary-stale-refresh")).toBeNull();
 
-      fireEvent.mouseEnter(screen.getByTestId("ai-chip-summary"));
-      await waitFor(() =>
-        expect(screen.getByTestId("ai-panel-summary-body").textContent).toBe("Stored summary"),
+      fireEvent.click(screen.getByTestId("ai-chip-summary"));
+      expect(await screen.findByTestId("ai-panel-summary-body")).toHaveTextContent("Stored summary");
+      expect(screen.getByTestId("ai-chip-summary")).toHaveAttribute("aria-expanded", "true");
+    });
+
+    it("offers a one-click refresh when new articles arrived after the summary", async () => {
+      getState.mockResolvedValue(summaryState);
+      listArticles.mockResolvedValue([41, 42, 43, 44].map(fakeArticle));
+      summarize.mockResolvedValue({ status: "started" });
+
+      wrap(<AiPanel ticketId={1} canNote />);
+
+      const stale = await screen.findByTestId("ai-summary-stale-refresh");
+      expect(stale).toHaveTextContent("2");
+      fireEvent.click(stale);
+      await waitFor(() => expect(summarize).toHaveBeenCalledWith(1, "standard"));
+    });
+
+    it("hands its pieces to a render function instead of the default layout", async () => {
+      getState.mockResolvedValue({ ...summaryState, manual_assist_available: true });
+      wrap(
+        <AiPanel ticketId={1} canNote>
+          {(ai) => (
+            <div>
+              <div data-testid="slot-title">{ai.summaryLine}</div>
+              <div data-testid="slot-reply">{ai.draftsButton}</div>
+            </div>
+          )}
+        </AiPanel>,
       );
+      await waitFor(() =>
+        expect(screen.getByTestId("slot-title")).toContainElement(
+          screen.getByTestId("ai-summary-line"),
+        ),
+      );
+      expect(screen.getByTestId("slot-reply")).toContainElement(screen.getByTestId("ai-chip-drafts"));
+      expect(screen.queryByTestId("ai-chips")).toBeNull();
     });
 
     it("renders the trailing chip even when no AI feature is available", async () => {

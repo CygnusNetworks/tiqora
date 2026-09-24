@@ -5596,6 +5596,11 @@ export interface paths {
          *     Agent email replies (``channel=email``, ``sender_type=agent``) are SMTP-
          *     delivered then stored (send-then-store). Delivery failure returns HTTP 502
          *     and does not leave a silent no-op 201.
+         *
+         *     With ``state_id`` the ticket's state is changed after the article, in the
+         *     same transaction (PATCH semantics). The state change is validated before
+         *     the article is created, so an invalid one returns 403/404/422 without
+         *     sending or storing anything.
          */
         post: operations["create_article_api_v1_tickets__ticket_id__articles_post"];
         delete?: never;
@@ -7883,6 +7888,8 @@ export interface components {
             is_visible_for_customer: boolean;
             /** Message Id */
             message_id?: string | null;
+            /** Pending Time */
+            pending_time?: string | null;
             /** References */
             references?: string | null;
             /** Reply To */
@@ -7892,6 +7899,8 @@ export interface components {
              * @default agent
              */
             sender_type: string;
+            /** State Id */
+            state_id?: number | null;
             /** Subject */
             subject: string;
             /** To Address */

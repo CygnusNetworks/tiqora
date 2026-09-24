@@ -207,6 +207,18 @@ describe("QueuesPage selection", () => {
     expect(screen.queryByTestId("queue-select-banner")).toBeNull();
   });
 
+  it("remembers the list when a ticket is opened, for the ticket's back link and ‹ ›", async () => {
+    window.sessionStorage.clear();
+    await renderQueuesPage({ state_type: "pending" });
+    await screen.findByTestId("ticket-row-102");
+    fireEvent.click(screen.getByTestId("ticket-row-102"));
+    const ctx = JSON.parse(window.sessionStorage.getItem("tiqora.ticketNavContext") ?? "null");
+    expect(ctx.label).toBe("Eingang");
+    expect(ctx.to).toBe("/agent/queues");
+    expect(ctx.search).toMatchObject({ state_type: "pending" });
+    expect(ctx.ids).toEqual([101, 102, 103]);
+  });
+
   it("a row click still opens the ticket while something is selected", async () => {
     const router = await renderQueuesPage();
     await screen.findByTestId("ticket-row-101");

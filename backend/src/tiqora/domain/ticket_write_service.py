@@ -2139,6 +2139,29 @@ class TicketWriteService:
             sysconfig=self._sysconfig,
         )
 
+    async def validate_state_change(
+        self,
+        user_id: int,
+        ticket_id: int,
+        new_state_id: int,
+        pending_time: datetime | None = None,
+    ) -> None:
+        """Pre-flight :meth:`change_state` without writing anything.
+
+        Used by "reply + next state" (``POST /tickets/{id}/articles`` with
+        ``state_id``) so a bad state is rejected BEFORE the article is sent —
+        email/Telegram delivery is send-then-store and cannot be rolled back.
+        Checks the same things :meth:`change_state` would fail on (ticket
+        exists, ``rw`` on its queue, state exists) plus that a pending-type
+        state comes with a ``pending_time`` (``InvalidInput`` otherwise).
+        """
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        await _state_name(self._session, new_state_id)  # InvalidInput if unknown
+        new_state_type = await _state_type_name(self._session, new_state_id)
+        if new_state_type.lower().startswith("pending") and pending_time is None:
+            raise InvalidInput(f"pending_time is required for pending state {new_state_id}")
+
     async def change_state(
         self,
         user_id: int,
