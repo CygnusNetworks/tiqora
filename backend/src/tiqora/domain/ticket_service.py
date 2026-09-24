@@ -131,6 +131,23 @@ _LAST_ACTIVITY = func.coalesce(
     Ticket.create_time,
 )
 
+#: Nearest SLA deadline that is set (any ``escalation_*`` epoch ``> 0``);
+#: tickets without one sort last in ascending order. ``LEAST`` over CASEs
+#: rather than over NULLs because MariaDB's LEAST returns NULL as soon as one
+#: argument is NULL, while PostgreSQL skips them.
+_NO_DEADLINE = 2**31 - 1
+_NEAREST_DEADLINE = func.least(
+    *(
+        case((col > 0, col), else_=_NO_DEADLINE)
+        for col in (
+            Ticket.escalation_time,
+            Ticket.escalation_response_time,
+            Ticket.escalation_update_time,
+            Ticket.escalation_solution_time,
+        )
+    )
+)
+
 
 def _addresses_of(value: str | None) -> set[str]:
     """Lowercased bare email addresses in an address header field."""
@@ -289,6 +306,7 @@ class TicketService:
         "title": Ticket.title,
         "priority": Ticket.ticket_priority_id,
         "activity": _LAST_ACTIVITY,
+        "deadline": _NEAREST_DEADLINE,
     }
 
     async def _filtered_ticket_stmt(

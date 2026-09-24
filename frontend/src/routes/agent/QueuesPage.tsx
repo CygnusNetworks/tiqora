@@ -286,6 +286,9 @@ export function QueuesPage() {
   // on top of the activity-sorted list, whatever their last activity was.
   // Only on the first page of the activity view — with the "Eskaliert" chip
   // on, or another sort, the list itself already answers that question.
+  // Fetched with sort=deadline so the backend picks the N most urgent: with
+  // sort=activity the most overdue tickets (usually the least active ones)
+  // fell outside the page before the client ever re-sorted it.
   const showPinned =
     sort === "activity" && offset === 0 && !escalated && stateType !== "closed";
   const pinnedQ = useQuery({
@@ -295,9 +298,9 @@ export function QueuesPage() {
         ...filterParams,
         escalating_within: ESCALATION_SOON_SECONDS,
         offset: 0,
-        limit: 20,
-        sort: "activity",
-        order: "desc",
+        limit: PINNED_MAX,
+        sort: "deadline",
+        order: "asc",
       }),
     enabled: showPinned,
   });
@@ -306,11 +309,10 @@ export function QueuesPage() {
     () =>
       showPinned
         ? (pinnedData ?? [])
-            // The backend already filters by `escalating_within`; re-check so
-            // the block can never fill up with tickets that aren't due soon.
+            // The backend already filters by `escalating_within` and sorts by
+            // deadline; re-check so the block can never fill up with tickets
+            // that aren't due soon.
             .filter((t) => nearestDeadline(t) <= Date.now() / 1000 + ESCALATION_SOON_SECONDS)
-            .sort((a, b) => nearestDeadline(a) - nearestDeadline(b))
-            .slice(0, PINNED_MAX)
         : [],
     [showPinned, pinnedData],
   );
@@ -852,7 +854,10 @@ export function QueuesPage() {
               ? {
                   items: pinnedItems,
                   total: pinnedQ.data?.total ?? pinnedItems.length,
-                  onShowAll: () => setSearch({ escalated: true, offset: 0 }),
+                  // Same set as the block, in the same order: the whole list
+                  // by nearest deadline. The "Eskaliert" chip would drop the
+                  // due-soon tickets the block's count includes.
+                  onShowAll: () => setSearch({ sort: "deadline", order: "asc", offset: 0 }),
                 }
               : undefined
           }
