@@ -25,7 +25,18 @@ from collections.abc import Callable, Sequence
 # valid IPv6 group prefix); IPv6 before IPv4-looking substrings is irrelevant
 # since the shapes don't overlap; phone runs last because its char class is
 # the loosest.
-_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+# RFC 5321 bounds (local part 64, domain 255) cap the work per start position;
+# the lookbehind only lets a match start at the beginning of a run, so a long
+# word run without "@" is scanned once instead of once per character (the old
+# unanchored "+" was O(n²): 64 kB took 2.4 s). The lookbehind also keeps the
+# match all-or-nothing — bounds alone would mask only the last 64 characters of
+# an overlong local part and leave the rest in clear. The lookahead rejects a
+# match that runs on into a longer domain but allows a sentence-final dot and
+# a hyphen suffix ("a@b.de-intern").
+_EMAIL_RE = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,}"
+    r"(?![A-Za-z0-9]|\.[A-Za-z0-9])"
+)
 _MAC_RE = re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b")
 # {0,4} (not {1,4}) per group so "::" (zero-compression) still matches.
 _IPV6_RE = re.compile(r"\b(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}\b")
@@ -85,6 +96,19 @@ _PHONE_LABEL_RE = re.compile(
 # Masking it hid traffic counters from the model in a production ticket.
 _JSON_NUMBER_VALUE_RE = re.compile(r'"\s*:\s*\Z')
 
+# How far in front of a PHONE candidate the label / JSON-key checks look. Both
+# patterns are anchored at the candidate (``\Z`` at ``endpos``), so only the
+# text directly in front matters; 32 characters cover the longest label
+# ("Durchwahl:") plus generous whitespace. Do NOT widen this back to the whole
+# prefix: slicing and scanning ``text[:start]`` per candidate was O(n²) —
+# 255 kB of labelled numbers took 54 s, a 255 kB JSON tool result 1.2 s.
+_LOOKBEHIND_WINDOW = 32
+
+
+def _in_front_of(pattern: re.Pattern[str], match: re.Match[str]) -> bool:
+    start = match.start()
+    return pattern.search(match.string, max(0, start - _LOOKBEHIND_WINDOW), start) is not None
+
 
 # Clock times ("07:53:55" inside "2026-07-24T07:53:55+00:00") satisfy the
 # loose IPv6 group shape — an IPV6 candidate that looks like a time of day
@@ -136,13 +160,13 @@ def _validate_phone(match: re.Match[str]) -> bool:
     stripped = value.strip()
     if _DATE_LIKE_RE.match(stripped):
         return False
-    if stripped.isdigit() and _JSON_NUMBER_VALUE_RE.search(match.string[: match.start()]):
+    if stripped.isdigit() and _in_front_of(_JSON_NUMBER_VALUE_RE, match):
         return False
     # "+"/parens are phone syntax no identifier uses; an explicit label in
     # front ("Tel: 990123456") likewise settles it — mask in both cases.
     if "+" in stripped or "(" in stripped:
         return True
-    if _PHONE_LABEL_RE.search(match.string[: match.start()]):
+    if _in_front_of(_PHONE_LABEL_RE, match):
         return True
     # Either the whole span is one identifier ("544-010-110"), or it is
     # several identifiers the loose char class glued together
