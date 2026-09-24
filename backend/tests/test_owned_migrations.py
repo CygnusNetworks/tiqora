@@ -47,7 +47,7 @@ def _run_alembic_upgrade_head(database_url: str) -> None:
         # with the owned locations included — exactly what `tiqora migrate`
         # does once the ownership gate is active.
         cfg = build_alembic_config(include_owned=True)
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, "heads")
     finally:
         if old_url is None:
             os.environ.pop("DATABASE_URL", None)
