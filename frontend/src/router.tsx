@@ -180,6 +180,7 @@ const agentQueuesRoute = createRoute({
     const sort = s.sort as QueuesSearch["sort"];
     const order = s.order === "asc" || s.order === "desc" ? s.order : undefined;
     const state =
+      s.state_type === "todo" ||
       s.state_type === "new" ||
       s.state_type === "open" ||
       s.state_type === "pending" ||
@@ -218,6 +219,7 @@ const agentQueuesRoute = createRoute({
       locked: bool(s.locked),
       watcher_user_id: num(s.watcher_user_id),
       escalated: bool(s.escalated),
+      unassigned: bool(s.unassigned),
       view,
       offset: num(s.offset),
       limit: num(s.limit),

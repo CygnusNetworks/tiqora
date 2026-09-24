@@ -42,9 +42,7 @@
     "inbox": "صندوق ورودی",
     "myTickets": "بلیط های من",
     "watched": "تماشا کرد",
-    "locked": "قفل‌شده",
     "responsible": "مسئول",
-    "escalated": "ارتقا یافته",
     "services": "خدمات",
     "timeAccounting": "ثبت زمان",
     "queues": "صف ها",
@@ -60,7 +58,8 @@
     "showActiveQueues": "نمایش فعال",
     "queueSearch": "صف های فیلتر…",
     "noQueueMatch": "هیچ صفی مطابقت ندارد.",
-    "templates": "قالب ها"
+    "templates": "قالب ها",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "تیکت‌های من",
@@ -255,8 +254,6 @@
     "sidebar": "صف ها",
     "allQueues": "همه صف ها",
     "empty": "هیچ صفی در دسترس نیست",
-    "openBadge": "{{count}} باز",
-    "metaLine": "همه صف ها · مرتب شده بر اساس فوریت",
     "exportCsv": "صادرات CSV",
     "newCount": "{{count}} جدید",
     "customerFilter": "مشتری: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "باز کنید",
       "pending": "در انتظار",
       "closed": "بسته شد",
-      "all": "همه"
+      "all": "همه",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ انتخاب کنید",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} تغییر کرد…",
       "updated": "{{count}} به روز شد",
       "partialFail": "{{done}} به روز شد، {{failed}} ناموفق بود: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} پیوست",
       "hasSummary": "خلاصه هوش مصنوعی در دسترس است",
       "aiRepliedAuto": "به‌طور خودکار توسط هوش مصنوعی پاسخ داده شد",
-      "aiRepliedAccepted": "پیش‌نویس هوش مصنوعی، تأییدشده توسط کارشناس"
+      "aiRepliedAccepted": "پیش‌نویس هوش مصنوعی، تأییدشده توسط کارشناس",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "بلیط های مشابه",

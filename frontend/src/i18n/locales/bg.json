@@ -42,9 +42,7 @@
     "inbox": "Входяща кутия",
     "myTickets": "Моите билети",
     "watched": "Гледах",
-    "locked": "Заключени",
     "responsible": "Отговорен",
-    "escalated": "Ескалирани",
     "services": "Услуги",
     "timeAccounting": "Отчитане на време",
     "queues": "Опашки",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Покажи активно",
     "queueSearch": "Филтриране на опашки...",
     "noQueueMatch": "Няма съвпадение на опашки.",
-    "templates": "Шаблони"
+    "templates": "Шаблони",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Моите тикети",
@@ -255,8 +254,6 @@
     "sidebar": "Опашки",
     "allQueues": "Всички опашки",
     "empty": "Няма налични опашки.",
-    "openBadge": "{{count}} отворено",
-    "metaLine": "Всички опашки · сортирани по спешност",
     "exportCsv": "Експортиране на CSV",
     "newCount": "{{count}} ново",
     "customerFilter": "Клиент: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Отворете",
       "pending": "В очакване",
       "closed": "Затворено",
-      "all": "Всички"
+      "all": "Всички",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Изберете",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} променен...",
       "updated": "{{count}} актуализиран",
       "partialFail": "{{done}} актуализиран, {{failed}} неуспешен: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} прикачени файлове",
       "hasSummary": "Налично е резюме на AI",
       "aiRepliedAuto": "Отговорено автоматично от ИИ",
-      "aiRepliedAccepted": "Чернова от ИИ, приета от агент"
+      "aiRepliedAccepted": "Чернова от ИИ, приета от агент",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Подобни билети",

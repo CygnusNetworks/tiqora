@@ -42,9 +42,7 @@
     "inbox": "Postkast",
     "myTickets": "Minu piletid",
     "watched": "Vaadati",
-    "locked": "Lukustatud",
     "responsible": "Vastutaja",
-    "escalated": "Eskaleeritud",
     "services": "Teenused",
     "timeAccounting": "Ajaarvestus",
     "queues": "Järjekorrad",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Näita aktiivset",
     "queueSearch": "Filtreeri järjekorrad…",
     "noQueueMatch": "Ükski järjekord ei vasta.",
-    "templates": "Mallid"
+    "templates": "Mallid",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Minu piletid",
@@ -255,8 +254,6 @@
     "sidebar": "Järjekorrad",
     "allQueues": "Kõik järjekorrad",
     "empty": "Järjekorrad pole saadaval.",
-    "openBadge": "{{count}} avatud",
-    "metaLine": "Kõik järjekorrad · sorteeritud kiireloomulisuse järgi",
     "exportCsv": "Ekspordi CSV",
     "newCount": "{{count}} uus",
     "customerFilter": "Klient: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Avatud",
       "pending": "Ootel",
       "closed": "Suletud",
-      "all": "Kõik"
+      "all": "Kõik",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Valige",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} muudetud…",
       "updated": "{{count}} värskendatud",
       "partialFail": "{{done}} värskendati, {{failed}} ebaõnnestus: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} manuseid",
       "hasSummary": "AI kokkuvõte on saadaval",
       "aiRepliedAuto": "Vastatud automaatselt AI poolt",
-      "aiRepliedAccepted": "AI mustand, agendi poolt kinnitatud"
+      "aiRepliedAccepted": "AI mustand, agendi poolt kinnitatud",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Sarnased piletid",

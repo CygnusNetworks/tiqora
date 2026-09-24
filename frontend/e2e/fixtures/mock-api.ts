@@ -605,6 +605,13 @@ export async function mockApi(page: Page) {
       await json(route, 200, tickets);
       return;
     }
+    if (path.endsWith("/api/v1/tickets/facets") && method === "GET") {
+      await json(route, 200, {
+        states: { todo: 2, new: 1, open_only: 1, pending: 0, closed: 0, all: 2 },
+        flags: { escalated: 0, locked: 0, unassigned: 1 },
+      });
+      return;
+    }
 
     if (path.endsWith("/api/v1/search") && method === "GET") {
       const q = url.searchParams.get("q") || "";

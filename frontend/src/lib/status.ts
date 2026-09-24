@@ -171,6 +171,8 @@ export function formatCountdown(epochSeconds: number | null | undefined): string
   const sign = diffMs < 0 ? "-" : "";
   const h = Math.floor(abs / 60);
   const m = abs % 60;
+  // Beyond two days, minutes (and hours) are noise: "-3d", not "-72h14m".
+  if (h >= 48) return `${sign}${Math.floor(h / 24)}d`;
   const body = h > 0 ? `${h}h${String(m).padStart(2, "0")}m` : `${m}m`;
   return `${sign}${body}`;
 }

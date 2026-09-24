@@ -42,9 +42,7 @@
     "inbox": "इनबॉक्स",
     "myTickets": "मेरे टिकट",
     "watched": "देखा",
-    "locked": "लॉक",
     "responsible": "उत्तरदायी",
-    "escalated": "एस्केलेटेड",
     "services": "सेवाएँ",
     "timeAccounting": "समय लेखांकन",
     "queues": "कतारें",
@@ -60,7 +58,8 @@
     "showActiveQueues": "सक्रिय दिखाएँ",
     "queueSearch": "कतारें फ़िल्टर करें...",
     "noQueueMatch": "कोई कतार मेल नहीं खाती.",
-    "templates": "टेम्पलेट्स"
+    "templates": "टेम्पलेट्स",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "मेरे टिकट",
@@ -255,8 +254,6 @@
     "sidebar": "कतारें",
     "allQueues": "सभी कतारें",
     "empty": "कोई कतार उपलब्ध नहीं.",
-    "openBadge": "{{count}} खुला",
-    "metaLine": "सभी कतारें · तात्कालिकता के अनुसार क्रमबद्ध",
     "exportCsv": "सीएसवी निर्यात करें",
     "newCount": "{{count}} नया",
     "customerFilter": "ग्राहक: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "खुला",
       "pending": "लंबित",
       "closed": "बंद",
-      "all": "सब"
+      "all": "सब",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ चयन करें",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} बदल गया…",
       "updated": "{{count}} अपडेट किया गया",
       "partialFail": "{{done}} अद्यतन, {{failed}} विफल: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} संलग्नक",
       "hasSummary": "एआई सारांश उपलब्ध है",
       "aiRepliedAuto": "AI द्वारा स्वतः उत्तर दिया गया",
-      "aiRepliedAccepted": "AI ड्राफ़्ट, एजेंट द्वारा स्वीकृत"
+      "aiRepliedAccepted": "AI ड्राफ़्ट, एजेंट द्वारा स्वीकृत",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "समान टिकट",

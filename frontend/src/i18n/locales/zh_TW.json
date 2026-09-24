@@ -42,9 +42,7 @@
     "inbox": "收件匣",
     "myTickets": "我的門票",
     "watched": "看過",
-    "locked": "已鎖定",
     "responsible": "負責人",
-    "escalated": "已升級",
     "services": "服務",
     "timeAccounting": "工時統計",
     "queues": "佇列",
@@ -60,7 +58,8 @@
     "showActiveQueues": "顯示活躍",
     "queueSearch": "過濾隊列...",
     "noQueueMatch": "沒有隊列匹配。",
-    "templates": "範本"
+    "templates": "範本",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "我的工單",
@@ -255,8 +254,6 @@
     "sidebar": "佇列",
     "allQueues": "所有隊列",
     "empty": "沒有可用的隊列。",
-    "openBadge": "{{count}} 打開",
-    "metaLine": "所有隊列·按緊急程度排序",
     "exportCsv": "匯出 CSV",
     "newCount": "{{count}}新",
     "customerFilter": "顧客：{{customerId}}",
@@ -268,7 +265,8 @@
       "open": "打開",
       "pending": "待定",
       "closed": "關閉",
-      "all": "全部"
+      "all": "全部",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ 選擇",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}}改變了…",
       "updated": "{{count}} 已更新",
       "partialFail": "{{done}}已更新，{{failed}}失敗：{{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} 附件",
       "hasSummary": "AI摘要可用",
       "aiRepliedAuto": "由 AI 自動回覆",
-      "aiRepliedAccepted": "AI 草稿，由客服採納"
+      "aiRepliedAccepted": "AI 草稿，由客服採納",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "類似門票",

@@ -42,9 +42,7 @@
     "inbox": "Iesūtne",
     "myTickets": "Manas biļetes",
     "watched": "Noskatījos",
-    "locked": "Bloķēti",
     "responsible": "Atbildīgais",
-    "escalated": "Eskalēti",
     "services": "Pakalpojumi",
     "timeAccounting": "Laika uzskaite",
     "queues": "Rindas",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Rādīt aktīvo",
     "queueSearch": "Filtrēt rindas…",
     "noQueueMatch": "Neviena rinda neatbilst.",
-    "templates": "Veidnes"
+    "templates": "Veidnes",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mani pieteikumi",
@@ -255,8 +254,6 @@
     "sidebar": "Rindas",
     "allQueues": "Visas rindas",
     "empty": "Rindas nav pieejamas.",
-    "openBadge": "{{count}} atvērts",
-    "metaLine": "Visas rindas · sakārtotas pēc steidzamības",
     "exportCsv": "Eksportēt CSV",
     "newCount": "{{count}} jauns",
     "customerFilter": "Klients: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Atvērt",
       "pending": "Gaida",
       "closed": "Slēgts",
-      "all": "Visi"
+      "all": "Visi",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Izvēlieties",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} mainīts…",
       "updated": "{{count}} atjaunināts",
       "partialFail": "{{done}} atjaunināts, {{failed}} neizdevās: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} pielikumi",
       "hasSummary": "Ir pieejams AI kopsavilkums",
       "aiRepliedAuto": "Atbildējis MI automātiski",
-      "aiRepliedAccepted": "MI melnraksts, ko apstiprināja aģents"
+      "aiRepliedAccepted": "MI melnraksts, ko apstiprināja aģents",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Līdzīgas biļetes",

@@ -56,13 +56,13 @@ async function renderInRouter(ui: React.ReactElement) {
 }
 
 describe("QueueShortcutCard", () => {
-  it("renders the open count linking to the open view", async () => {
+  it("renders the open count linking to the queue's default view", async () => {
     await renderInRouter(<QueueShortcutCard queue={queueWithNew} />);
     const openLink = await screen.findByTestId("queue-shortcut-7-open");
     expect(openLink).toHaveTextContent("12");
     const href = openLink.getAttribute("href") ?? "";
     expect(href).toContain("queue_id=7");
-    expect(href).toContain("state_type=open");
+    expect(href).not.toContain("state_type");
   });
 
   it("renders an accent new badge linking to the new view when new > 0", async () => {

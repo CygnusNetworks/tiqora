@@ -14,7 +14,21 @@ import { NewTicketButton } from "@/components/agent/NewTicketButton";
 import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
 import { AccountMenu } from "@/components/agent/AccountMenu";
 import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
-import { ChevronDownIcon, HelpIcon } from "@/components/ui/icons";
+import {
+  BookIcon,
+  CalendarIcon,
+  ChartIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  EyeIcon,
+  HelpIcon,
+  InboxIcon,
+  MailIcon,
+  SearchIcon,
+  ServerIcon,
+  ShieldIcon,
+  UserIcon,
+} from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { appVersion } from "@/lib/appVersion";
 import { SSEProvider } from "@/lib/useSSE";
@@ -36,10 +50,19 @@ function BetaPill() {
 /** Count badge shared by the nav items and, in spirit, the queue rows: shows
  * a single number (the open count) and signals "has new items" by colour
  * alone — accent-tinted pill instead of plain muted text, no "neu" chip. */
-function NavCountBadge({ count, newCount }: { count: number; newCount?: number }) {
+function NavCountBadge({
+  count,
+  newCount,
+  alertCount,
+}: {
+  count: number;
+  newCount?: number;
+  /** SLA-escalated tickets within this entry — shown as a separate red pill. */
+  alertCount?: number;
+}) {
   const { t } = useTranslation();
   const hasNew = (newCount ?? 0) > 0;
-  return (
+  const badge = (
     <span
       className={cn(
         "shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
@@ -50,39 +73,98 @@ function NavCountBadge({ count, newCount }: { count: number; newCount?: number }
       {count}
     </span>
   );
+  if (!alertCount) return badge;
+  return (
+    <span className="flex shrink-0 items-center gap-1">
+      <span
+        className="rounded-full bg-danger/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-danger"
+        title={t("sidebar.escalatedCount", { count: alertCount })}
+        data-testid="nav-escalated-count"
+      >
+        {alertCount}
+      </span>
+      {badge}
+    </span>
+  );
 }
 
 function NavItem({
   to,
   search,
   label,
+  icon,
   count,
   newCount,
+  alertCount,
   testId,
   onNavigate,
   disabled,
   exact,
+  active,
 }: {
   to: string;
   search?: Record<string, unknown>;
   label: string;
+  icon?: ReactNode;
   count?: number;
   newCount?: number;
+  alertCount?: number;
   testId: string;
   onNavigate?: () => void;
   disabled?: boolean;
   exact?: boolean;
+  /** Overrides Link's own path/search matching. The ticket-list entries all
+   * share `/agent/queues` and differ only in search params, which Link
+   * matches as a subset — "Eingang" would light up on every one of them. */
+  active?: boolean;
 }) {
+  const iconNode = icon && (
+    <span className="flex h-4 w-4 shrink-0 items-center justify-center text-muted [&_svg]:h-4 [&_svg]:w-4 group-aria-[current=page]:text-accent">
+      {icon}
+    </span>
+  );
   if (disabled) {
     return (
       <span
-        className="flex cursor-not-allowed items-center justify-between rounded-lg px-2.5 py-[7px] text-[13.5px] text-muted/50"
+        className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13.5px] text-muted/50"
         data-testid={testId}
         aria-disabled="true"
       >
-        <span>{label}</span>
+        {iconNode}
+        <span className="flex-1">{label}</span>
         {count != null && <span className="font-mono text-[11px] tabular-nums">{count}</span>}
       </span>
+    );
+  }
+  const base =
+    "group flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13.5px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
+  const idle = "text-ink/80 hover:bg-surface-subtle";
+  const current = "font-medium text-ink bg-accent-dim shadow-[inset_2px_0_0_var(--color-accent)]";
+  const content = (
+    <>
+      {iconNode}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {count != null && (
+        <NavCountBadge count={count} newCount={newCount} alertCount={alertCount} />
+      )}
+    </>
+  );
+  if (active !== undefined) {
+    return (
+      <Link
+        to={to}
+        search={search}
+        onClick={onNavigate}
+        data-testid={testId}
+        className={cn(base, active ? current : idle)}
+        // Link's own matching would treat these search params as a subset
+        // ("Eingang" = any /agent/queues). Make it exact so its aria-current
+        // agrees with ours, and pin ours for the inactive case.
+        activeOptions={{ exact: true, includeSearch: true }}
+        inactiveProps={{ "aria-current": active ? "page" : undefined }}
+      >
+        {content}
+      </Link>
     );
   }
   return (
@@ -92,14 +174,11 @@ function NavItem({
       onClick={onNavigate}
       data-testid={testId}
       activeOptions={{ exact }}
-      className="flex items-center justify-between rounded-lg px-2.5 py-[7px] text-[13.5px] text-ink/80 transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-      activeProps={{
-        className:
-          "flex items-center justify-between rounded-lg px-2.5 py-[7px] text-[13.5px] font-medium text-ink bg-accent-dim shadow-[inset_2px_0_0_var(--color-accent)]",
-      }}
+      className={base}
+      activeProps={{ className: current, "aria-current": "page" }}
+      inactiveProps={{ className: idle }}
     >
-      <span className="truncate">{label}</span>
-      {count != null && <NavCountBadge count={count} newCount={newCount} />}
+      {content}
     </Link>
   );
 }
@@ -187,7 +266,7 @@ function QueueNavRow({
   return (
     <Link
       to="/agent/queues"
-      search={{ queue_id: node.id, state_type: "open" }}
+      search={{ queue_id: node.id }}
       onClick={onNavigate}
       data-testid={`sidebar-queue-${node.id}`}
       className={cn(
@@ -301,6 +380,18 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     queryKey: ["tickets", "my-counts"],
     queryFn: () => api.myTicketCounts(),
   });
+  // SLA-escalated count for the inbox's red pill — the dashboard's KPI
+  // endpoint, shared cache entry with the dashboard tile.
+  const summaryQ = useQuery({
+    queryKey: ["tickets", "dashboard-summary"],
+    queryFn: () => api.dashboardSummary(),
+  });
+
+  // The ticket-list entries share one route; which one is current is
+  // decided by the preset `view` / `queue_id` in the URL.
+  const location = useLocation();
+  const onQueues = location.pathname === "/agent/queues";
+  const listSearch = (location.search ?? {}) as { view?: string; queue_id?: number };
 
   const [collapsedGroups, setCollapsedGroups] =
     useState<Record<string, boolean>>(readCollapsedGroups);
@@ -339,71 +430,55 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           <NavItem
             to="/agent/search"
             label={t("search.title")}
+            icon={<SearchIcon />}
             testId="agent-nav-search"
             onNavigate={onNavigate}
           />
           <NavItem
             to="/agent/queues"
-            search={{ state_type: "open" }}
             label={t("sidebar.inbox")}
+            icon={<InboxIcon />}
             count={totalOpen}
+            alertCount={summaryQ.data?.escalated}
             testId="agent-nav-inbox"
             onNavigate={onNavigate}
+            active={onQueues && !listSearch.view && listSearch.queue_id == null}
           />
           <NavItem
             to="/agent/queues"
-            search={{
-              state_type: "open",
-              owner_id: user?.id,
-              view: "mine",
-            }}
+            search={{ owner_id: user?.id, view: "mine" }}
             label={t("sidebar.myTickets")}
+            icon={<UserIcon />}
             count={myCountsQ.data?.open}
             newCount={myCountsQ.data?.new}
             testId="agent-nav-my-tickets"
             onNavigate={onNavigate}
+            active={onQueues && listSearch.view === "mine"}
           />
           <NavItem
             to="/agent/queues"
-            search={{
-              state_type: "open",
-              responsible_id: user?.id,
-              view: "responsible",
-            }}
+            search={{ responsible_id: user?.id, view: "responsible" }}
             label={t("sidebar.responsible")}
+            icon={<ShieldIcon />}
             testId="agent-nav-responsible"
             onNavigate={onNavigate}
             disabled={!user?.id}
+            active={onQueues && listSearch.view === "responsible"}
           />
           <NavItem
             to="/agent/queues"
-            search={{ state_type: "open", locked: true, view: "locked" }}
-            label={t("sidebar.locked")}
-            testId="agent-nav-locked"
-            onNavigate={onNavigate}
-          />
-          <NavItem
-            to="/agent/queues"
-            search={{
-              state_type: "open",
-              watcher_user_id: user?.id,
-              view: "watched",
-            }}
+            search={{ watcher_user_id: user?.id, view: "watched" }}
             label={t("sidebar.watched")}
+            icon={<EyeIcon />}
             testId="agent-nav-watched"
             onNavigate={onNavigate}
             disabled={!user?.id}
-          />
-          <NavItem
-            to="/agent/queues"
-            search={{ state_type: "open", escalated: true, view: "escalated" }}
-            label={t("sidebar.escalated")}
-            testId="agent-nav-escalated"
-            onNavigate={onNavigate}
+            active={onQueues && listSearch.view === "watched"}
           />
           <NavItem
             to="/agent/services"
             label={t("sidebar.services")}
+            icon={<ServerIcon />}
             testId="agent-nav-services"
             onNavigate={onNavigate}
           />
@@ -428,6 +503,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           <NavItem
             to="/agent/kb"
             label={t("sidebar.knowledgeBase")}
+            icon={<BookIcon />}
             testId="agent-nav-kb"
             onNavigate={onNavigate}
           />
@@ -435,6 +511,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             <NavItem
               to="/agent/templates"
               label={t("sidebar.templates")}
+              icon={<MailIcon />}
               testId="agent-nav-templates"
               onNavigate={onNavigate}
             />
@@ -452,18 +529,21 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           <NavItem
             to="/agent/calendar"
             label={t("sidebar.calendar")}
+            icon={<CalendarIcon />}
             testId="agent-nav-calendar"
             onNavigate={onNavigate}
           />
           <NavItem
             to="/agent/stats"
             label={t("sidebar.stats")}
+            icon={<ChartIcon />}
             testId="agent-nav-stats"
             onNavigate={onNavigate}
           />
           <NavItem
             to="/agent/time-accounting"
             label={t("sidebar.timeAccounting")}
+            icon={<ClockIcon />}
             testId="agent-nav-time-accounting"
             onNavigate={onNavigate}
           />

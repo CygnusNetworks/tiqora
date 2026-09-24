@@ -42,9 +42,7 @@
     "inbox": "收件箱",
     "myTickets": "我的工单",
     "watched": "已关注",
-    "locked": "已锁定",
     "responsible": "负责人",
-    "escalated": "已升级",
     "services": "服务",
     "timeAccounting": "工时统计",
     "queues": "队列",
@@ -60,7 +58,8 @@
     "showActiveQueues": "显示活动",
     "queueSearch": "筛选队列…",
     "noQueueMatch": "没有匹配的队列。",
-    "templates": "模板"
+    "templates": "模板",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "我的工单",
@@ -255,8 +254,6 @@
     "sidebar": "队列",
     "allQueues": "全部队列",
     "empty": "暂无可用队列。",
-    "openBadge": "{{count}} 个处理中",
-    "metaLine": "全部队列 · 按紧急程度排序",
     "exportCsv": "导出 CSV",
     "newCount": "{{count}} 个新建",
     "customerFilter": "客户：{{customerId}}",
@@ -268,7 +265,8 @@
       "open": "处理中",
       "pending": "挂起",
       "closed": "已关闭",
-      "all": "全部"
+      "all": "全部",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ 选择",
@@ -291,6 +289,31 @@
       "progress": "已更改 {{done}}/{{total}}…",
       "updated": "已更新 {{count}} 项",
       "partialFail": "已更新 {{done}} 项，失败 {{failed}} 项：{{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} 附件",
       "hasSummary": "AI摘要可用",
       "aiRepliedAuto": "由 AI 自动回复",
-      "aiRepliedAccepted": "AI 草稿，由客服采纳"
+      "aiRepliedAccepted": "AI 草稿，由客服采纳",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "类似工单",

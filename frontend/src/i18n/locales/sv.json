@@ -42,9 +42,7 @@
     "inbox": "Inkorg",
     "myTickets": "Mina ärenden",
     "watched": "Bevakade",
-    "locked": "Låsta",
     "responsible": "Ansvarig",
-    "escalated": "Eskalerade",
     "services": "Tjänster",
     "timeAccounting": "Tidredovisning",
     "queues": "Köer",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Visa aktiva",
     "queueSearch": "Filtrera köer...",
     "noQueueMatch": "Inga köer matchar.",
-    "templates": "Mallar"
+    "templates": "Mallar",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mina ärenden",
@@ -255,8 +254,6 @@
     "sidebar": "Köer",
     "allQueues": "Alla köer",
     "empty": "Inga köer tillgängliga.",
-    "openBadge": "{{count}} öppen",
-    "metaLine": "Alla köer · sorterade efter brådska",
     "exportCsv": "Exportera CSV",
     "newCount": "{{count}} ny",
     "customerFilter": "Kund: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Öppna",
       "pending": "Väntar",
       "closed": "Stängt",
-      "all": "Alla"
+      "all": "Alla",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Välj",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} ändrade...",
       "updated": "{{count}} uppdaterad",
       "partialFail": "{{done}} uppdaterad, {{failed}} misslyckades: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} bilagor",
       "hasSummary": "AI sammanfattning tillgänglig",
       "aiRepliedAuto": "Besvarad automatiskt av AI:n",
-      "aiRepliedAccepted": "AI-utkast, godkänt av en agent"
+      "aiRepliedAccepted": "AI-utkast, godkänt av en agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Liknande ärenden",

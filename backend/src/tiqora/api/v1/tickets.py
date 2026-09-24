@@ -212,6 +212,20 @@ def _write_service(session: Any, settings: Any) -> TicketWriteService:
     return TicketWriteService(session, factory, sysconfig, mail_sender=None)
 
 
+_UNASSIGNED_DESC = (
+    "True = still owned by the Znuny root account (user id 1, nobody took it);"
+    " False = owned by a real agent."
+)
+_ESCALATING_WITHIN_DESC = (
+    "Seconds: any escalation_* epoch set and due before now + this window"
+    " (already-overdue tickets included)."
+)
+_SORT_DESC = (
+    "age | created | changed | tn | title | priority | activity (newest article's"
+    " create_time, falling back to the ticket's create_time)."
+)
+
+
 @router.get("", response_model=PaginatedTickets)
 async def list_tickets(
     user: CurrentUser,
@@ -234,9 +248,11 @@ async def list_tickets(
         None,
         description="True = AI handed the ticket to a human and a human has not yet taken over.",
     ),
+    unassigned: bool | None = Query(None, description=_UNASSIGNED_DESC),
+    escalating_within: int | None = Query(None, ge=0, description=_ESCALATING_WITHIN_DESC),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
-    sort: str = Query("age"),
+    sort: str = Query("age", description=_SORT_DESC),
     order: str = Query("desc"),
     include_archived: bool = Query(
         False, description="Also list archived tickets (admins only; ignored otherwise)."
@@ -258,6 +274,8 @@ async def list_tickets(
         watcher_user_id=watcher_user_id,
         escalated=True if escalated else None,
         ai_escalated=True if ai_escalated else None,
+        unassigned=unassigned,
+        escalating_within=escalating_within,
         offset=offset,
         limit=limit,
         sort=sort,
@@ -303,6 +321,94 @@ async def dashboard_summary(user: CurrentUser, session: DbSession) -> DashboardS
     """
     counts = await TicketService(session).count_dashboard_summary(user.id)
     return DashboardSummary(**counts)
+
+
+class TicketFacetStates(BaseModel):
+    """Ticket counts per state segment (every filter except the state filter)."""
+
+    todo: int
+    new: int
+    open_only: int
+    pending: int
+    closed: int
+    all: int
+
+
+class TicketFacetFlags(BaseModel):
+    """Ticket counts per flag chip (state filter applied, other flags ignored)."""
+
+    escalated: int
+    locked: int
+    unassigned: int
+
+
+class TicketFacets(BaseModel):
+    """Inbox segment and chip counts for the current ticket-list filters."""
+
+    states: TicketFacetStates
+    flags: TicketFacetFlags
+
+
+@router.get("/facets", response_model=TicketFacets)
+async def ticket_facets(
+    user: CurrentUser,
+    session: DbSession,
+    queue_id: int | None = None,
+    state_id: int | None = None,
+    state_type: str | None = None,
+    owner_id: int | None = None,
+    customer_id: str | None = None,
+    responsible_id: int | None = None,
+    service_id: int | None = None,
+    locked: bool | None = Query(
+        None, description="True = lock/tmp_lock only; False = unlock only."
+    ),
+    watcher_user_id: int | None = Query(None, description="Tickets watched by this agent user id."),
+    escalated: bool | None = Query(
+        None, description="True = any escalation_* epoch already in the past."
+    ),
+    ai_escalated: bool | None = Query(
+        None,
+        description="True = AI handed the ticket to a human and a human has not yet taken over.",
+    ),
+    unassigned: bool | None = Query(None, description=_UNASSIGNED_DESC),
+    escalating_within: int | None = Query(None, ge=0, description=_ESCALATING_WITHIN_DESC),
+    include_archived: bool = Query(
+        False, description="Also count archived tickets (admins only; ignored otherwise)."
+    ),
+) -> TicketFacets:
+    """Segment (state) and chip (flag) counts for the inbox, in one request.
+
+    Takes the same filters as ``GET /tickets``. ``states`` ignores
+    ``state_type``/``state_id`` (one count per segment, ``all`` = no state
+    filter); ``flags`` applies the state filter but ignores
+    ``escalated``/``locked``/``unassigned`` (each count = the rest plus only
+    that flag). Registered before ``/{ticket_id}`` so "facets" is not parsed
+    as a ticket id.
+    """
+    if include_archived and not await PermissionEngine(session).is_admin(user.id):
+        include_archived = False
+    counts = await TicketService(session).facet_counts(
+        user.id,
+        queue_id=queue_id,
+        state_id=state_id,
+        state_type=state_type,
+        owner_id=owner_id,
+        customer_id=customer_id,
+        responsible_id=responsible_id,
+        service_id=service_id,
+        locked=locked,
+        watcher_user_id=watcher_user_id,
+        escalated=True if escalated else None,
+        ai_escalated=True if ai_escalated else None,
+        unassigned=unassigned,
+        escalating_within=escalating_within,
+        include_archived=include_archived,
+    )
+    return TicketFacets(
+        states=TicketFacetStates(**counts["states"]),
+        flags=TicketFacetFlags(**counts["flags"]),
+    )
 
 
 class TicketSearchHitOut(BaseModel):
@@ -390,6 +496,8 @@ async def _export_tickets_csv_stream(
     watcher_user_id: int | None = None,
     escalated: bool | None = None,
     ai_escalated: bool | None = None,
+    unassigned: bool | None = None,
+    escalating_within: int | None = None,
     sort: str,
     order: str,
     include_archived: bool = False,
@@ -412,6 +520,8 @@ async def _export_tickets_csv_stream(
         watcher_user_id=watcher_user_id,
         escalated=escalated,
         ai_escalated=ai_escalated,
+        unassigned=unassigned,
+        escalating_within=escalating_within,
         sort=sort,
         order=order,
         include_archived=include_archived,
@@ -434,7 +544,9 @@ async def export_tickets_csv(
     watcher_user_id: int | None = None,
     escalated: bool | None = None,
     ai_escalated: bool | None = None,
-    sort: str = Query("age"),
+    unassigned: bool | None = Query(None, description=_UNASSIGNED_DESC),
+    escalating_within: int | None = Query(None, ge=0, description=_ESCALATING_WITHIN_DESC),
+    sort: str = Query("age", description=_SORT_DESC),
     order: str = Query("desc"),
     include_archived: bool = Query(
         False, description="Also export archived tickets (admins only; ignored otherwise)."
@@ -466,6 +578,8 @@ async def export_tickets_csv(
             watcher_user_id=watcher_user_id,
             escalated=True if escalated else None,
             ai_escalated=True if ai_escalated else None,
+            unassigned=unassigned,
+            escalating_within=escalating_within,
             sort=sort,
             order=order,
             include_archived=include_archived,

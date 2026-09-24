@@ -42,9 +42,7 @@
     "inbox": "תיבת דואר נכנס",
     "myTickets": "הכרטיסים שלי",
     "watched": "צפו",
-    "locked": "נעול",
     "responsible": "אחראי",
-    "escalated": "הועלה",
     "services": "שירותים",
     "timeAccounting": "רישום זמן",
     "queues": "תורים",
@@ -60,7 +58,8 @@
     "showActiveQueues": "הצג פעיל",
     "queueSearch": "סינון תורים...",
     "noQueueMatch": "אין תורים תואמים.",
-    "templates": "תבניות"
+    "templates": "תבניות",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "הפניות שלי",
@@ -255,8 +254,6 @@
     "sidebar": "תורים",
     "allQueues": "כל התורים",
     "empty": "אין תורים זמינים.",
-    "openBadge": "{{count}} פתוח",
-    "metaLine": "כל התורים · ממוינים לפי דחיפות",
     "exportCsv": "ייצא CSV",
     "newCount": "{{count}} חדש",
     "customerFilter": "לקוח: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "פתוח",
       "pending": "בהמתנה",
       "closed": "סגור",
-      "all": "הכל"
+      "all": "הכל",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ בחר",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} השתנו...",
       "updated": "{{count}} עודכן",
       "partialFail": "{{done}} עודכן, {{failed}} נכשל: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} קבצים מצורפים",
       "hasSummary": "תקציר AI זמין",
       "aiRepliedAuto": "נענה אוטומטית על ידי ה-AI",
-      "aiRepliedAccepted": "טיוטת AI, אושרה על ידי נציג"
+      "aiRepliedAccepted": "טיוטת AI, אושרה על ידי נציג",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "כרטיסים דומים",
