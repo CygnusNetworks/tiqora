@@ -154,6 +154,11 @@ export function CustomerDetailPage() {
             total={recentQ.data?.total ?? 0}
             offset={0}
             limit={25}
+            navContext={{
+              label: c ? `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || login : login,
+              to: "/agent/customers/$login",
+              params: { login: loginParam },
+            }}
             sort={sort}
             order="desc"
             onPageChange={() => {}}

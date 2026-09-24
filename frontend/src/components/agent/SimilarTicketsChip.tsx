@@ -15,7 +15,14 @@ const similarKey = (ticketId: number) => ["tickets", ticketId, "similar"] as con
  * Meili query runs only once the card first opens (hover or click); the
  * chip shows the hit count from then on.
  */
-export function SimilarTicketsChip({ ticketId }: { ticketId: number }) {
+export function SimilarTicketsChip({
+  ticketId,
+  variant = "chip",
+}: {
+  ticketId: number;
+  /** "link": plain text trigger for the ticket header's people row. */
+  variant?: "chip" | "link";
+}) {
   const { t } = useTranslation();
   // Reads the cache the card's list fills — never fetches by itself.
   const cached = useQuery({
@@ -29,13 +36,27 @@ export function SimilarTicketsChip({ ticketId }: { ticketId: number }) {
     <HoverCard
       label={t("ticket.similar.title")}
       panelTestId="similar-tickets-body"
-      trigger={({ ref, triggerProps }) => (
-        <AssistChip ref={ref} {...triggerProps} data-testid="similar-tickets-toggle">
-          <StackIcon className="h-3.5 w-3.5 text-muted" />
-          {t("ticket.similar.short")}
-          {count !== undefined && <ChipCount value={count} />}
-        </AssistChip>
-      )}
+      trigger={({ ref, triggerProps }) =>
+        variant === "link" ? (
+          <button
+            ref={ref}
+            type="button"
+            {...triggerProps}
+            data-testid="similar-tickets-toggle"
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-accent transition-colors hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          >
+            <StackIcon className="h-3.5 w-3.5" />
+            {t("ticket.similar.title")}
+            {count !== undefined && <span className="font-mono tabular-nums">({count})</span>}
+          </button>
+        ) : (
+          <AssistChip ref={ref} {...triggerProps} data-testid="similar-tickets-toggle">
+            <StackIcon className="h-3.5 w-3.5 text-muted" />
+            {t("ticket.similar.short")}
+            {count !== undefined && <ChipCount value={count} />}
+          </AssistChip>
+        )
+      }
     >
       <div className="space-y-2">
         <div className="text-xs uppercase tracking-wide text-muted">
