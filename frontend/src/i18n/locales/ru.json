@@ -42,9 +42,7 @@
     "inbox": "Входящие",
     "myTickets": "Мои тикеты",
     "watched": "Отслеживаемые",
-    "locked": "Заблокированные",
     "responsible": "Ответственный",
-    "escalated": "Эскалированные",
     "services": "Сервисы",
     "timeAccounting": "Учёт времени",
     "queues": "Очереди",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Показать активные",
     "queueSearch": "Фильтр очередей…",
     "noQueueMatch": "Нет подходящих очередей.",
-    "templates": "Шаблоны"
+    "templates": "Шаблоны",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Мои заявки",
@@ -255,8 +254,6 @@
     "sidebar": "Очереди",
     "allQueues": "Все очереди",
     "empty": "Нет доступных очередей.",
-    "openBadge": "{{count}} открытых",
-    "metaLine": "Все очереди · по срочности",
     "exportCsv": "Экспорт CSV",
     "newCount": "{{count}} новых",
     "customerFilter": "Клиент: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Открытые",
       "pending": "В ожидании",
       "closed": "Закрытые",
-      "all": "Все"
+      "all": "Все",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Выбрать",
@@ -291,6 +289,31 @@
       "progress": "Изменено {{done}}/{{total}}…",
       "updated": "Обновлено: {{count}}",
       "partialFail": "Обновлено {{done}}, ошибок {{failed}}: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "Вложения {{count}}",
       "hasSummary": "Доступна сводка AI",
       "aiRepliedAuto": "Отвечено автоматически ИИ",
-      "aiRepliedAccepted": "Черновик ИИ, принят агентом"
+      "aiRepliedAccepted": "Черновик ИИ, принят агентом",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Похожие тикеты",

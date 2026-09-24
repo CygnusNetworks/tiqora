@@ -5246,6 +5246,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ticket Facets
+         * @description Segment (state) and chip (flag) counts for the inbox, in one request.
+         *
+         *     Takes the same filters as ``GET /tickets``. ``states`` ignores
+         *     ``state_type``/``state_id`` (one count per segment, ``all`` = no state
+         *     filter); ``flags`` applies the state filter but ignores
+         *     ``escalated``/``locked``/``unassigned`` (each count = the rest plus only
+         *     that flag). Registered before ``/{ticket_id}`` so "facets" is not parsed
+         *     as a ticket id.
+         */
+        get: operations["ticket_facets_api_v1_tickets_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/my-counts": {
         parameters: {
             query?: never;
@@ -12806,6 +12833,10 @@ export interface components {
              * @default false
              */
             is_watched: boolean;
+            /** Last Article Time */
+            last_article_time?: string | null;
+            /** Last Sender Type */
+            last_sender_type?: string | null;
             /** Lock */
             lock?: string | null;
             /** Lock Id */
@@ -12854,6 +12885,44 @@ export interface components {
              * @default 0
              */
             until_time: number;
+        };
+        /**
+         * TicketFacetFlags
+         * @description Ticket counts per flag chip (state filter applied, other flags ignored).
+         */
+        TicketFacetFlags: {
+            /** Escalated */
+            escalated: number;
+            /** Locked */
+            locked: number;
+            /** Unassigned */
+            unassigned: number;
+        };
+        /**
+         * TicketFacetStates
+         * @description Ticket counts per state segment (every filter except the state filter).
+         */
+        TicketFacetStates: {
+            /** All */
+            all: number;
+            /** Closed */
+            closed: number;
+            /** New */
+            new: number;
+            /** Open Only */
+            open_only: number;
+            /** Pending */
+            pending: number;
+            /** Todo */
+            todo: number;
+        };
+        /**
+         * TicketFacets
+         * @description Inbox segment and chip counts for the current ticket-list filters.
+         */
+        TicketFacets: {
+            flags: components["schemas"]["TicketFacetFlags"];
+            states: components["schemas"]["TicketFacetStates"];
         };
         /**
          * TicketFieldOptionsOut
@@ -13009,6 +13078,10 @@ export interface components {
             has_ai_summary: boolean;
             /** Id */
             id: number;
+            /** Last Article Time */
+            last_article_time?: string | null;
+            /** Last Sender Type */
+            last_sender_type?: string | null;
             /** Lock */
             lock?: string | null;
             /** Lock Id */
@@ -27680,8 +27753,13 @@ export interface operations {
                 escalated?: boolean | null;
                 /** @description True = AI handed the ticket to a human and a human has not yet taken over. */
                 ai_escalated?: boolean | null;
+                /** @description True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent. */
+                unassigned?: boolean | null;
+                /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
+                escalating_within?: number | null;
                 offset?: number;
                 limit?: number;
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time). */
                 sort?: string;
                 order?: string;
                 /** @description Also list archived tickets (admins only; ignored otherwise). */
@@ -27801,6 +27879,11 @@ export interface operations {
                 watcher_user_id?: number | null;
                 escalated?: boolean | null;
                 ai_escalated?: boolean | null;
+                /** @description True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent. */
+                unassigned?: boolean | null;
+                /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
+                escalating_within?: number | null;
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time). */
                 sort?: string;
                 order?: string;
                 /** @description Also export archived tickets (admins only; ignored otherwise). */
@@ -27823,6 +27906,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_facets_api_v1_tickets_facets_get: {
+        parameters: {
+            query?: {
+                queue_id?: number | null;
+                state_id?: number | null;
+                state_type?: string | null;
+                owner_id?: number | null;
+                customer_id?: string | null;
+                responsible_id?: number | null;
+                service_id?: number | null;
+                /** @description True = lock/tmp_lock only; False = unlock only. */
+                locked?: boolean | null;
+                /** @description Tickets watched by this agent user id. */
+                watcher_user_id?: number | null;
+                /** @description True = any escalation_* epoch already in the past. */
+                escalated?: boolean | null;
+                /** @description True = AI handed the ticket to a human and a human has not yet taken over. */
+                ai_escalated?: boolean | null;
+                /** @description True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent. */
+                unassigned?: boolean | null;
+                /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
+                escalating_within?: number | null;
+                /** @description Also count archived tickets (admins only; ignored otherwise). */
+                include_archived?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketFacets"];
                 };
             };
             /** @description Validation Error */

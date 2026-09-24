@@ -42,9 +42,7 @@
     "inbox": "Eingang",
     "myTickets": "Meine Tickets",
     "watched": "Beobachtet",
-    "locked": "Gesperrt",
     "responsible": "Verantwortlich",
-    "escalated": "Eskaliert",
     "services": "Services",
     "timeAccounting": "Zeitabrechnung",
     "queues": "Queues",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Aktive anzeigen",
     "queueSearch": "Queues filtern…",
     "noQueueMatch": "Keine passenden Queues.",
-    "templates": "Templates"
+    "templates": "Templates",
+    "escalatedCount": "{{count}} eskaliert"
   },
   "views": {
     "mine": "Meine Tickets",
@@ -255,8 +254,6 @@
     "sidebar": "Queues",
     "allQueues": "Alle Queues",
     "empty": "Keine Queues verfügbar.",
-    "openBadge": "{{count}} offen",
-    "metaLine": "Alle Queues · sortiert nach Dringlichkeit",
     "exportCsv": "CSV exportieren",
     "newCount": "{{count}} neu",
     "customerFilter": "Kunde: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Offen",
       "pending": "Wartend",
       "closed": "Geschlossen",
-      "all": "Alle"
+      "all": "Alle",
+      "todo": "Zu tun"
     },
     "bulk": {
       "select": "☑ Auswählen",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} geändert…",
       "updated": "{{count}} aktualisiert",
       "partialFail": "{{done}} aktualisiert, {{failed}} fehlgeschlagen: {{ids}}"
+    },
+    "countBadge_one": "1 Ticket",
+    "countBadge_other": "{{count}} Tickets",
+    "byActivity": "nach letzter Aktivität",
+    "stateFilter": "Status",
+    "moreActions": "Weitere Aktionen",
+    "flags": {
+      "label": "Nach Merkmal filtern",
+      "only": "Nur",
+      "escalated": "Eskaliert",
+      "locked": "Gesperrt",
+      "unassigned": "Nicht zugewiesen",
+      "reset": "zurücksetzen"
+    },
+    "pinned": {
+      "title": "Braucht Aufmerksamkeit · {{count}}",
+      "hint": "überfällig zuerst, dann bald fällig",
+      "showAll": "Alle eskalierten anzeigen",
+      "rest": "Nach letzter Aktivität"
+    },
+    "day": {
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "week": "Diese Woche",
+      "older": "Älter"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} Anhänge",
       "hasSummary": "KI-Zusammenfassung vorhanden",
       "aiRepliedAuto": "Automatisch von der KI beantwortet",
-      "aiRepliedAccepted": "KI-Entwurf, von einem Agenten übernommen"
+      "aiRepliedAccepted": "KI-Entwurf, von einem Agenten übernommen",
+      "lastActivity": "Zuletzt",
+      "ticket": "Ticket",
+      "locked": "Gesperrt",
+      "lastBy": {
+        "customer": "← Kunde",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Ähnliche Tickets",

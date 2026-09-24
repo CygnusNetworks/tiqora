@@ -42,9 +42,7 @@
     "inbox": "Kikasha",
     "myTickets": "Tikiti zangu",
     "watched": "Imetazamwa",
-    "locked": "Imefungwa",
     "responsible": "Anayehusika",
-    "escalated": "Imeongezwa kiwango",
     "services": "Huduma",
     "timeAccounting": "Uhasibu wa muda",
     "queues": "Foleni",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Onyesha hai",
     "queueSearch": "Chuja foleni...",
     "noQueueMatch": "Hakuna foleni zinazolingana.",
-    "templates": "Violezo"
+    "templates": "Violezo",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Tiketi zangu",
@@ -255,8 +254,6 @@
     "sidebar": "Foleni",
     "allQueues": "Foleni zote",
     "empty": "Hakuna foleni zinazopatikana.",
-    "openBadge": "{{count}} fungua",
-    "metaLine": "Foleni zote · zimepangwa kwa dharura",
     "exportCsv": "Hamisha CSV",
     "newCount": "{{count}} mpya",
     "customerFilter": "Mteja: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Fungua",
       "pending": "Inasubiri",
       "closed": "Imefungwa",
-      "all": "Wote"
+      "all": "Wote",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Chagua",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} imebadilishwa…",
       "updated": "{{count}} imesasishwa",
       "partialFail": "{{done}} imesasishwa, {{failed}} haikufaulu: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} viambatisho",
       "hasSummary": "Muhtasari wa AI unapatikana",
       "aiRepliedAuto": "Imejibiwa kiotomatiki na AI",
-      "aiRepliedAccepted": "Rasimu ya AI, imekubaliwa na wakala"
+      "aiRepliedAccepted": "Rasimu ya AI, imekubaliwa na wakala",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Tikiti zinazofanana",

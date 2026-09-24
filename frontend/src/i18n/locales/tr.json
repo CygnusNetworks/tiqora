@@ -42,9 +42,7 @@
     "inbox": "Gelen kutusu",
     "myTickets": "Biletlerim",
     "watched": "İzlenenler",
-    "locked": "Kilitli",
     "responsible": "Sorumlu",
-    "escalated": "Yükseltilmiş",
     "services": "Hizmetler",
     "timeAccounting": "Zaman kaydı",
     "queues": "Kuyruklar",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Aktif olanları göster",
     "queueSearch": "Kuyrukları filtrele…",
     "noQueueMatch": "Eşleşen kuyruk yok.",
-    "templates": "Şablonlar"
+    "templates": "Şablonlar",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Biletlerim",
@@ -255,8 +254,6 @@
     "sidebar": "Kuyruklar",
     "allQueues": "Tüm kuyruklar",
     "empty": "Kullanılabilir kuyruk yok.",
-    "openBadge": "{{count}} açık",
-    "metaLine": "Tüm kuyruklar · aciliyete göre sıralı",
     "exportCsv": "CSV dışa aktar",
     "newCount": "{{count}} yeni",
     "customerFilter": "Müşteri: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Açık",
       "pending": "Beklemede",
       "closed": "Kapalı",
-      "all": "Tümü"
+      "all": "Tümü",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Seç",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} değişti…",
       "updated": "{{count}} güncellendi",
       "partialFail": "{{done}} güncellendi, {{failed}} başarısız oldu: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} ekler",
       "hasSummary": "AI özeti mevcut",
       "aiRepliedAuto": "Yapay zekâ tarafından otomatik yanıtlandı",
-      "aiRepliedAccepted": "Yapay zekâ taslağı, bir temsilci onayladı"
+      "aiRepliedAccepted": "Yapay zekâ taslağı, bir temsilci onayladı",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Benzer biletler",

@@ -42,9 +42,7 @@
     "inbox": "Вхідні",
     "myTickets": "Мої квитки",
     "watched": "Дивився",
-    "locked": "Заблоковані",
     "responsible": "Відповідальний",
-    "escalated": "Ескальовані",
     "services": "Сервіси",
     "timeAccounting": "Облік часу",
     "queues": "Черги",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Показати активний",
     "queueSearch": "Фільтрувати черги…",
     "noQueueMatch": "Жодна черга не збігається.",
-    "templates": "Шаблони"
+    "templates": "Шаблони",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Мої заявки",
@@ -255,8 +254,6 @@
     "sidebar": "Черги",
     "allQueues": "Всі черги",
     "empty": "Немає доступних черг.",
-    "openBadge": "{{count}} відкрито",
-    "metaLine": "Усі черги · відсортовані за терміновістю",
     "exportCsv": "Експорт CSV",
     "newCount": "{{count}} новий",
     "customerFilter": "Клієнт: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "відкритий",
       "pending": "В очікуванні",
       "closed": "Закрито",
-      "all": "все"
+      "all": "все",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Виберіть",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} змінено…",
       "updated": "{{count}} оновлено",
       "partialFail": "{{done}} оновлено, {{failed}} не вдалося: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} вкладень",
       "hasSummary": "Доступне резюме AI",
       "aiRepliedAuto": "Відповіло автоматично ШІ",
-      "aiRepliedAccepted": "Чернетка ШІ, прийнята агентом"
+      "aiRepliedAccepted": "Чернетка ШІ, прийнята агентом",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Схожі квитки",

@@ -42,9 +42,7 @@
     "inbox": "Skrzynka",
     "myTickets": "Moje tickety",
     "watched": "Obserwowane",
-    "locked": "Zablokowane",
     "responsible": "Odpowiedzialny",
-    "escalated": "Eskalowane",
     "services": "Usługi",
     "timeAccounting": "Ewidencja czasu",
     "queues": "Kolejki",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Pokaż aktywne",
     "queueSearch": "Filtruj kolejki…",
     "noQueueMatch": "Żadna kolejka nie pasuje.",
-    "templates": "Szablony"
+    "templates": "Szablony",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Moje zgłoszenia",
@@ -255,8 +254,6 @@
     "sidebar": "Kolejki",
     "allQueues": "Wszystkie kolejki",
     "empty": "Brak dostępnych kolejek.",
-    "openBadge": "{{count}} otwarte",
-    "metaLine": "Wszystkie kolejki · posortowane według pilności",
     "exportCsv": "Eksportuj CSV",
     "newCount": "{{count}} nowość",
     "customerFilter": "Klient: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Otwórz",
       "pending": "Oczekujące",
       "closed": "Zamknięte",
-      "all": "Wszystko"
+      "all": "Wszystko",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Wybierz",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} zmienione…",
       "updated": "{{count}} zaktualizowano",
       "partialFail": "{{done}} zaktualizowano, {{failed}} nie powiodło się: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} załączników",
       "hasSummary": "Dostępne podsumowanie AI",
       "aiRepliedAuto": "Odpowiedziane automatycznie przez AI",
-      "aiRepliedAccepted": "Szkic AI, zaakceptowany przez agenta"
+      "aiRepliedAccepted": "Szkic AI, zaakceptowany przez agenta",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Podobne tickety",

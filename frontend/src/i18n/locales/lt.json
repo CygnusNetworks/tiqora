@@ -42,9 +42,7 @@
     "inbox": "Gautieji",
     "myTickets": "Mano bilietai",
     "watched": "Žiūrėjo",
-    "locked": "Užrakinta",
     "responsible": "Atsakingas",
-    "escalated": "Eskaluota",
     "services": "Paslaugos",
     "timeAccounting": "Laiko apskaita",
     "queues": "Eilės",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Rodyti aktyvų",
     "queueSearch": "Filtruoti eiles…",
     "noQueueMatch": "Neatitinka nė viena eilė.",
-    "templates": "Šablonai"
+    "templates": "Šablonai",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mano bilietai",
@@ -255,8 +254,6 @@
     "sidebar": "Eilės",
     "allQueues": "Visos eilės",
     "empty": "Eilių nėra.",
-    "openBadge": "{{count}} atidaryta",
-    "metaLine": "Visos eilės · surūšiuotos pagal skubumą",
     "exportCsv": "Eksportuoti CSV",
     "newCount": "{{count}} naujas",
     "customerFilter": "Klientas: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Atidaryti",
       "pending": "Laukiama",
       "closed": "Uždaryta",
-      "all": "Visi"
+      "all": "Visi",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Pasirinkite",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} pakeista…",
       "updated": "{{count}} atnaujinta",
       "partialFail": "{{done}} atnaujinta, {{failed}} nepavyko: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} priedai",
       "hasSummary": "Galima AI santrauka",
       "aiRepliedAuto": "Atsakė DI automatiškai",
-      "aiRepliedAccepted": "DI juodraštis, priimtas agento"
+      "aiRepliedAccepted": "DI juodraštis, priimtas agento",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Panašūs bilietai",

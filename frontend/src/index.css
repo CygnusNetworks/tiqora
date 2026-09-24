@@ -49,8 +49,9 @@ h3 {
 .status-spine--escalation-approaching {
   box-shadow: inset 3px 0 0 0 var(--color-escalation);
 }
+/* Overdue reads red, due-soon amber — the same split as the list's SLA badge. */
 .status-spine--escalation-breached {
-  box-shadow: inset 3px 0 0 0 var(--color-escalation);
+  box-shadow: inset 3px 0 0 0 var(--color-danger);
 }
 
 /* Calm markdown typography for the portal knowledge-base reader. */

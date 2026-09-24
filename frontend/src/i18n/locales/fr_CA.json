@@ -42,9 +42,7 @@
     "inbox": "Boîte de réception",
     "myTickets": "Mes billets",
     "watched": "Regardé",
-    "locked": "Verrouillé",
     "responsible": "Responsable",
-    "escalated": "Escaladé",
     "services": "Services",
     "timeAccounting": "Comptabilisation du temps",
     "queues": "Files d'attente",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Afficher actif",
     "queueSearch": "Filtrer les files d'attente…",
     "noQueueMatch": "Aucune file d'attente ne correspond.",
-    "templates": "Modèles"
+    "templates": "Modèles",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mes tickets",
@@ -255,8 +254,6 @@
     "sidebar": "Files d'attente",
     "allQueues": "Toutes les files d'attente",
     "empty": "Aucune file d'attente disponible.",
-    "openBadge": "{{count}} ouvert",
-    "metaLine": "Toutes les files d'attente · triées par urgence",
     "exportCsv": "Exporter au format CSV",
     "newCount": "{{count}} nouveau",
     "customerFilter": "Client : {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Ouvrir",
       "pending": "En attente",
       "closed": "Fermé",
-      "all": "Tous"
+      "all": "Tous",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Sélectionnez",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} modifié…",
       "updated": "{{count}} mis à jour",
       "partialFail": "{{done}} mis à jour, {{failed}} a échoué : {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} pièces jointes",
       "hasSummary": "Résumé de l'IA disponible",
       "aiRepliedAuto": "Répondu automatiquement par l'IA",
-      "aiRepliedAccepted": "Brouillon IA, accepté par un agent"
+      "aiRepliedAccepted": "Brouillon IA, accepté par un agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Billets similaires",

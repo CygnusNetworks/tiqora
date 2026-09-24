@@ -42,9 +42,7 @@
     "inbox": "Peti masuk",
     "myTickets": "tiket saya",
     "watched": "ditonton",
-    "locked": "Dikunci",
     "responsible": "Bertanggungjawab",
-    "escalated": "Dieskalasi",
     "services": "Perkhidmatan",
     "timeAccounting": "Perakaunan masa",
     "queues": "Beratur",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Tunjukkan aktif",
     "queueSearch": "Tapis baris gilir…",
     "noQueueMatch": "Tiada baris gilir sepadan.",
-    "templates": "templat"
+    "templates": "templat",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Tiket saya",
@@ -255,8 +254,6 @@
     "sidebar": "Beratur",
     "allQueues": "Semua beratur",
     "empty": "Tiada baris gilir tersedia.",
-    "openBadge": "{{count}} terbuka",
-    "metaLine": "Semua baris gilir · diisih mengikut segera",
     "exportCsv": "Eksport CSV",
     "newCount": "{{count}} baharu",
     "customerFilter": "Pelanggan: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Buka",
       "pending": "Belum selesai",
       "closed": "tertutup",
-      "all": "Semua"
+      "all": "Semua",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Pilih",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} berubah…",
       "updated": "{{count}} dikemas kini",
       "partialFail": "{{done}} dikemas kini, {{failed}} gagal: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} lampiran",
       "hasSummary": "Ringkasan AI tersedia",
       "aiRepliedAuto": "Dijawab automatik oleh AI",
-      "aiRepliedAccepted": "Draf AI, diterima oleh ejen"
+      "aiRepliedAccepted": "Draf AI, diterima oleh ejen",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Tiket yang serupa",

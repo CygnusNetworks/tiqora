@@ -42,9 +42,7 @@
     "inbox": "受信箱",
     "myTickets": "自分のチケット",
     "watched": "ウォッチ中",
-    "locked": "ロック中",
     "responsible": "担当",
-    "escalated": "エスカレーション",
     "services": "サービス",
     "timeAccounting": "工数管理",
     "queues": "キュー",
@@ -60,7 +58,8 @@
     "showActiveQueues": "有効のみ表示",
     "queueSearch": "キューを絞り込み…",
     "noQueueMatch": "一致するキューがありません。",
-    "templates": "テンプレート"
+    "templates": "テンプレート",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "自分のチケット",
@@ -255,8 +254,6 @@
     "sidebar": "キュー",
     "allQueues": "すべてのキュー",
     "empty": "利用可能なキューがありません。",
-    "openBadge": "未完了 {{count}}件",
-    "metaLine": "すべてのキュー · 緊急度順",
     "exportCsv": "CSVをエクスポート",
     "newCount": "新規 {{count}}件",
     "customerFilter": "顧客: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "未完了",
       "pending": "保留",
       "closed": "クローズ",
-      "all": "すべて"
+      "all": "すべて",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ 選択",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}}件を変更中…",
       "updated": "{{count}}件を更新しました",
       "partialFail": "{{done}}件更新、{{failed}}件失敗: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} 添付ファイル",
       "hasSummary": "AIサマリーが利用可能",
       "aiRepliedAuto": "AI が自動で回答",
-      "aiRepliedAccepted": "AI の下書きを担当者が承認"
+      "aiRepliedAccepted": "AI の下書きを担当者が承認",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "同様のチケット",

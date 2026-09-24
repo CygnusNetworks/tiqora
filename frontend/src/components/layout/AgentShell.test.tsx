@@ -41,16 +41,17 @@ vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({ user: { id: 1, login: "agent", can_edit_templates: false } }),
 }));
 
-const { listQueues, myTicketCounts } = vi.hoisted(() => ({
+const { listQueues, myTicketCounts, dashboardSummary } = vi.hoisted(() => ({
   listQueues: vi.fn(),
   myTicketCounts: vi.fn(),
+  dashboardSummary: vi.fn(),
 }));
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { listQueues, myTicketCounts } };
+  return { ...actual, api: { listQueues, myTicketCounts, dashboardSummary } };
 });
 
-async function renderShell() {
+async function renderShell(initialEntry = "/agent") {
   const rootRoute = createRootRoute({
     component: () => (
       <AgentShell>
@@ -69,7 +70,7 @@ async function renderShell() {
   );
   const router = createRouter({
     routeTree: rootRoute.addChildren(childRoutes),
-    history: createMemoryHistory({ initialEntries: ["/agent"] }),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
   });
   await router.load();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -87,6 +88,13 @@ describe("AgentShell sidebar", () => {
   beforeEach(() => {
     listQueues.mockReset().mockResolvedValue([]);
     myTicketCounts.mockReset().mockResolvedValue({ open: 0, new: 0 });
+    dashboardSummary.mockReset().mockResolvedValue({
+      my_open: 0,
+      my_new: 0,
+      unowned_new: 0,
+      escalated: 0,
+      ai_escalated: 0,
+    });
     window.localStorage.clear();
     void i18n.changeLanguage("de");
   });
@@ -141,5 +149,44 @@ describe("AgentShell sidebar", () => {
     await screen.findByTestId("agent-sidebar-nav");
     expect(screen.getByTestId("sidebar-queue-search")).toBeInTheDocument();
     expect(screen.getByTestId("sidebar-queues-toggle-all")).toBeInTheDocument();
+  });
+
+  it("lists who-owns-it views only — locked/escalated moved to the list's filter chips", async () => {
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    expect(screen.getByTestId("agent-nav-my-tickets")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-nav-watched")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-nav-locked")).toBeNull();
+    expect(screen.queryByTestId("agent-nav-escalated")).toBeNull();
+    // Every workspace entry carries an icon.
+    expect(screen.getByTestId("agent-nav-inbox").querySelector("svg")).not.toBeNull();
+  });
+
+  it("marks only the current ticket view as active, not the inbox as well", async () => {
+    await renderShell("/agent/queues?view=mine&owner_id=1");
+    await screen.findByTestId("agent-sidebar-nav");
+    expect(screen.getByTestId("agent-nav-my-tickets")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("agent-nav-inbox")).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks the inbox active on the plain ticket list", async () => {
+    await renderShell("/agent/queues");
+    await screen.findByTestId("agent-sidebar-nav");
+    expect(screen.getByTestId("agent-nav-inbox")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("agent-nav-my-tickets")).not.toHaveAttribute("aria-current");
+  });
+
+  it("shows the escalated count as a red pill on the inbox", async () => {
+    dashboardSummary.mockResolvedValue({
+      my_open: 0,
+      my_new: 0,
+      unowned_new: 0,
+      escalated: 3,
+      ai_escalated: 0,
+    });
+    await renderShell();
+    const pill = await screen.findByTestId("nav-escalated-count");
+    expect(pill).toHaveTextContent("3");
+    expect(screen.getByTestId("agent-nav-inbox")).toContainElement(pill);
   });
 });

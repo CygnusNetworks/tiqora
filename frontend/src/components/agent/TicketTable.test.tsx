@@ -129,14 +129,20 @@ describe("TicketTable queue name", () => {
     expect(screen.queryByTestId("ticket-queue-chip-11")).toBeNull();
   });
 
-  it("links the chip to that queue's open view rather than the ticket row", async () => {
+  it("links the queue name to that queue's default view rather than the ticket row", async () => {
     await renderTable([makeItem({ queue_id: 42, queue_name: "Support" })]);
     const chip = screen.getByTestId("ticket-queue-chip-11");
     expect(chip.tagName).toBe("A");
     const href = chip.getAttribute("href") ?? "";
     expect(href).toContain("/agent/queues");
     expect(href).toContain("queue_id=42");
-    expect(href).toContain("state_type=open");
+    // No forced status: the queue opens on its default "Zu tun" segment.
+    expect(href).not.toContain("state_type");
+  });
+
+  it("omits the queue name inside a single-queue view", async () => {
+    await renderTable([makeItem({ queue_name: "Support" })], { hideQueue: true });
+    expect(screen.queryByTestId("ticket-queue-chip-11")).toBeNull();
   });
 
   it("clicking the chip does not also navigate to the ticket detail route", async () => {
@@ -262,9 +268,9 @@ describe("TicketTable selection mode", () => {
     expect(screen.queryByTestId("queue-select-all-page")).toBeNull();
   });
 
-  it("with a selection prop, row click toggles the row instead of navigating", async () => {
+  it("with a selection prop, the checkbox toggles and the row itself still opens the ticket", async () => {
     const onToggleRow = vi.fn();
-    await renderTable([makeItem()], {
+    const { router } = await renderTable([makeItem()], {
       selection: {
         selected: new Set(),
         onToggleRow,
@@ -276,9 +282,16 @@ describe("TicketTable selection mode", () => {
 
     const checkbox = await screen.findByTestId("queue-row-check-11");
     expect(checkbox).not.toBeChecked();
+    fireEvent.click(checkbox);
+    expect(onToggleRow).toHaveBeenCalledWith(11, false);
+    expect(router.state.location.pathname).toBe("/");
+
+    fireEvent.click(checkbox, { shiftKey: true });
+    expect(onToggleRow).toHaveBeenLastCalledWith(11, true);
 
     fireEvent.click(screen.getByTestId("ticket-row-11"));
-    expect(onToggleRow).toHaveBeenCalledWith(11);
+    await router.load();
+    expect(router.state.location.pathname).toBe("/agent/tickets/11");
   });
 
   it("header checkbox reflects allPageSelected/somePageSelected and calls onToggleAllPage", async () => {
@@ -353,22 +366,89 @@ describe("TicketTable quick edit", () => {
     expect(onPatch).toHaveBeenCalledWith(11, { owner_id: 2 });
   });
 
-  it("is disabled while selection mode is active — cells render read-only", async () => {
+  it("stays available alongside row selection — the row click no longer toggles", async () => {
     await renderTable([makeItem()], {
       quickEdit: quickEditProps(),
       selection: {
-        selected: new Set(),
+        selected: new Set([11]),
         onToggleRow: vi.fn(),
         onToggleAllPage: vi.fn(),
-        allPageSelected: false,
+        allPageSelected: true,
         somePageSelected: false,
       },
     });
 
-    expect(screen.queryByTestId("ticket-row-state-11")).toBeNull();
-    expect(screen.queryByTestId("ticket-row-priority-11")).toBeNull();
-    expect(screen.queryByTestId("ticket-row-owner-11")).toBeNull();
-    // The chip/testids used elsewhere still render, just non-interactive.
-    expect(screen.getByTestId("ticket-state-chip-11")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-row-state-11")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-row-owner-11")).toBeInTheDocument();
+  });
+});
+
+describe("TicketTable inbox layout", () => {
+  it("only shows a priority chip when the priority is not normal", async () => {
+    await renderTable([
+      makeItem({ id: 11, priority_id: 3, priority: "3 normal" }),
+      makeItem({ id: 12, tn: "20240601000012", priority_id: 4, priority: "4 high" }),
+    ]);
+    expect(screen.queryByTestId("ticket-priority-chip-11")).toBeNull();
+    expect(screen.getByTestId("ticket-priority-chip-12")).toHaveTextContent("high");
+  });
+
+  it("shows who wrote last under the activity time", async () => {
+    await renderTable([
+      makeItem({ id: 11, last_sender_type: "customer", last_article_time: "2024-06-02T08:00:00Z" }),
+      makeItem({ id: 12, tn: "20240601000012", last_sender_type: "agent" }),
+      makeItem({ id: 13, tn: "20240601000013", last_sender_type: null }),
+    ]);
+    expect(screen.getByTestId("ticket-last-sender-11")).toHaveTextContent("Customer");
+    expect(screen.getByTestId("ticket-last-sender-11")).toHaveAttribute("data-sender", "customer");
+    expect(screen.getByTestId("ticket-last-sender-12")).toHaveTextContent("Agent");
+    expect(screen.queryByTestId("ticket-last-sender-13")).toBeNull();
+  });
+
+  it("groups rows under day headers when asked to", async () => {
+    const now = new Date();
+    const hoursAgo = (h: number) => new Date(now.getTime() - h * 3600_000).toISOString();
+    await renderTable(
+      [
+        makeItem({ id: 11, last_article_time: now.toISOString() }),
+        makeItem({ id: 12, tn: "20240601000012", last_article_time: hoursAgo(24 * 20) }),
+      ],
+      { groupByDay: true, sort: "activity" },
+    );
+    expect(screen.getByTestId("ticket-table-day-today")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-table-day-older")).toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-table-day-yesterday")).toBeNull();
+  });
+
+  it("renders the pinned block first and never repeats a pinned ticket below", async () => {
+    const onShowAll = vi.fn();
+    const pinnedItem = makeItem({ id: 12, tn: "20240601000012", title: "Burning" });
+    await renderTable([makeItem({ id: 11 }), pinnedItem], {
+      pinned: { items: [pinnedItem], total: 7, onShowAll },
+    });
+
+    expect(screen.getByTestId("ticket-table-pinned-head")).toHaveTextContent("7");
+    const rows = screen.getAllByTestId(/^ticket-row-\d+$/).map((r) => r.dataset.testid);
+    expect(rows).toEqual(["ticket-row-12", "ticket-row-11"]);
+
+    fireEvent.click(screen.getByTestId("ticket-table-pinned-show-all"));
+    expect(onShowAll).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks an overdue deadline as breached and a close one as approaching", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    await renderTable([
+      makeItem({ id: 11, escalation_response_time: now - 60 }),
+      makeItem({ id: 12, tn: "20240601000012", escalation_solution_time: now + 3600 }),
+      makeItem({ id: 13, tn: "20240601000013", escalation_solution_time: now + 86400 }),
+    ]);
+    expect(screen.getByTestId("ticket-escalation-badge-11")).toHaveAttribute("data-level", "breached");
+    expect(screen.getByTestId("ticket-escalation-badge-12")).toHaveAttribute("data-level", "approaching");
+    expect(screen.queryByTestId("ticket-escalation-badge-13")).toBeNull();
+  });
+
+  it("shows a lock icon for locked tickets", async () => {
+    await renderTable([makeItem({ lock: "lock" })]);
+    expect(screen.getByTestId("ticket-lock-indicator-11")).toBeInTheDocument();
   });
 });

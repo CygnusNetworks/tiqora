@@ -42,9 +42,7 @@
     "inbox": "Beérkezett üzenetek",
     "myTickets": "Saját jegyek",
     "watched": "Figyelt",
-    "locked": "Zárolt",
     "responsible": "Felelős",
-    "escalated": "Eszkalált",
     "services": "Szolgáltatások",
     "timeAccounting": "Időelszámolás",
     "queues": "Várólisták",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Aktív megjelenítése",
     "queueSearch": "Várólisták szűrése…",
     "noQueueMatch": "Egyetlen sor sem egyezik.",
-    "templates": "Sablonok"
+    "templates": "Sablonok",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Saját jegyek",
@@ -255,8 +254,6 @@
     "sidebar": "Várólisták",
     "allQueues": "Összes várólista",
     "empty": "Nincs jegy ebben a várólistában.",
-    "openBadge": "{{count}} nyitva",
-    "metaLine": "Minden várólista · sürgősség szerint rendezve",
     "exportCsv": "CSV exportálása",
     "newCount": "{{count}} új",
     "customerFilter": "Ügyfél: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Nyitott",
       "pending": "Függőben",
       "closed": "Lezárt",
-      "all": "Összes"
+      "all": "Összes",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Válassza ki",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} megváltozott…",
       "updated": "{{count}} frissítve",
       "partialFail": "{{done}} frissítve, {{failed}} sikertelen: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} mellékletek",
       "hasSummary": "Az AI összefoglaló elérhető",
       "aiRepliedAuto": "Az MI automatikusan válaszolt",
-      "aiRepliedAccepted": "MI-piszkozat, ügyintéző fogadta el"
+      "aiRepliedAccepted": "MI-piszkozat, ügyintéző fogadta el",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Hasonló jegyek",
