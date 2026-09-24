@@ -42,9 +42,7 @@
     "inbox": "Inbox",
     "myTickets": "Biletele mele",
     "watched": "Privit",
-    "locked": "Blocat",
     "responsible": "Responsabil",
-    "escalated": "Escalat",
     "services": "Servicii",
     "timeAccounting": "Pontaj",
     "queues": "Cozile",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Arată activ",
     "queueSearch": "Cozile de filtrare...",
     "noQueueMatch": "Nicio coadă nu se potrivește.",
-    "templates": "Șabloane"
+    "templates": "Șabloane",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Tichetele mele",
@@ -255,8 +254,6 @@
     "sidebar": "Cozile",
     "allQueues": "Toate cozile",
     "empty": "Nu există cozi disponibile.",
-    "openBadge": "{{count}} deschis",
-    "metaLine": "Toate cozile · sortate după urgență",
     "exportCsv": "Exportați CSV",
     "newCount": "{{count}} nou",
     "customerFilter": "Client: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Deschide",
       "pending": "În așteptare",
       "closed": "Închis",
-      "all": "Toate"
+      "all": "Toate",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Selectați",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} schimbat...",
       "updated": "{{count}} actualizat",
       "partialFail": "{{done}} actualizat, {{failed}} eșuat: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} atașamente",
       "hasSummary": "Rezumat AI disponibil",
       "aiRepliedAuto": "Răspuns automat de IA",
-      "aiRepliedAccepted": "Ciornă IA, acceptată de un agent"
+      "aiRepliedAccepted": "Ciornă IA, acceptată de un agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Bilete similare",

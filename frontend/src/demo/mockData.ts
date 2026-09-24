@@ -107,11 +107,39 @@ const ticketItems = SUBJECTS.map((title, i) => {
 /** Built on demand rather than eagerly: `ai_reply_source` is only known once
  * the article threads below have registered their AI-written articles. */
 function ticketListPage() {
-  const items = ticketItems.map((t) => ({
+  const senders = ["customer", "agent", "customer", "system"] as const;
+  const items = ticketItems.map((t, i) => ({
     ...t,
     ai_reply_source: aiReplySourceByTicket[t.id] ?? null,
+    last_article_time: t.change_time,
+    last_sender_type: senders[i % senders.length],
   }));
   return { items, total: items.length, offset: 0, limit: 50 };
+}
+/** Segment / chip counts for the inbox toolbar, derived from the demo tickets
+ * (unfiltered — the demo resolver sees only the path, not the query). */
+function ticketFacets() {
+  const byType = (types: string[]) => ticketItems.filter((t) => types.includes(t.state_type)).length;
+  const now = Math.floor(Date.now() / 1000);
+  const overdue = (t: (typeof ticketItems)[number]) =>
+    [t.escalation_time, t.escalation_response_time, t.escalation_update_time, t.escalation_solution_time].some(
+      (e) => e > 0 && e < now,
+    );
+  return {
+    states: {
+      todo: byType(["new", "open"]),
+      new: byType(["new"]),
+      open_only: byType(["open"]),
+      pending: byType(["pending reminder", "pending auto"]),
+      closed: byType(["closed"]),
+      all: ticketItems.length,
+    },
+    flags: {
+      escalated: ticketItems.filter(overdue).length,
+      locked: ticketItems.filter((t) => t.lock === "lock").length,
+      unassigned: ticketItems.filter((t) => t.owner_id === 1).length,
+    },
+  };
 }
 const ticketById = new Map(ticketItems.map((t) => [t.id, t]));
 
@@ -1022,6 +1050,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/reference/agents")) return OWNERS.map((o) => ({ id: o.owner_id, login: o.owner_login, name: o.owner_name }));
   if (p.endsWith("/api/v1/tickets/dashboard-summary")) return { my_open: 9, my_new: 3, unowned_new: 5, escalated: 6 };
   if (p.endsWith("/api/v1/tickets") && method === "GET") return ticketListPage();
+  if (p.endsWith("/api/v1/tickets/facets")) return ticketFacets();
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/ai-origin$/)) { const id = Number(p.split("/").slice(-2)[0]); return aiOriginByArticle[id] ?? null; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) { const id = Number(p.split("/").slice(-2)[0]); return bodiesById[id] ?? bodiesById[500]; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/attachments/)) { const aid = Number(p.split("/").slice(-2)[0]); return attachmentsByArticle[aid] ?? []; }

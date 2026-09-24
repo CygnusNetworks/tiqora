@@ -76,3 +76,55 @@ export function isEscalated(epoch: number | undefined | null): boolean {
   if (!epoch || epoch <= 0) return false;
   return epoch * 1000 < Date.now();
 }
+
+export type DayBucket = "today" | "yesterday" | "week" | "older";
+
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function calendarDaysAgo(d: Date, now: Date): number {
+  return Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000);
+}
+
+/** Which inbox day group a timestamp falls into, by local calendar day
+ * (not by 24h distance: 23:50 yesterday is "yesterday" at 00:10 today). */
+export function dayBucket(value: string | Date | null | undefined, now = new Date()): DayBucket {
+  if (!value) return "older";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "older";
+  const days = calendarDaysAgo(d, now);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 7) return "week";
+  return "older";
+}
+
+/** Compact mail-client style timestamp for the ticket list: the time of day
+ * for today, `yesterdayLabel` for yesterday, weekday + time within the week,
+ * otherwise the short date. */
+export function formatListTime(
+  value: string | Date | null | undefined,
+  locale: string,
+  yesterdayLabel: string,
+  now = new Date(),
+): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(d);
+  switch (dayBucket(d, now)) {
+    case "today":
+      return time;
+    case "yesterday":
+      return yesterdayLabel;
+    case "week":
+      return `${new Intl.DateTimeFormat(locale, { weekday: "short" }).format(d)} ${time}`;
+    default:
+      return new Intl.DateTimeFormat(locale, {
+        day: "2-digit",
+        month: "2-digit",
+        year: d.getFullYear() === now.getFullYear() ? undefined : "2-digit",
+      }).format(d);
+  }
+}

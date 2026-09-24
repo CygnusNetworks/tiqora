@@ -19801,6 +19801,29 @@
             "title": "Is Watched",
             "type": "boolean"
           },
+          "last_article_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Article Time"
+          },
+          "last_sender_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sender Type"
+          },
           "lock": {
             "anyOf": [
               {
@@ -20012,6 +20035,86 @@
           "change_time"
         ],
         "title": "TicketDetail",
+        "type": "object"
+      },
+      "TicketFacetFlags": {
+        "description": "Ticket counts per flag chip (state filter applied, other flags ignored).",
+        "properties": {
+          "escalated": {
+            "title": "Escalated",
+            "type": "integer"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "integer"
+          },
+          "unassigned": {
+            "title": "Unassigned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "escalated",
+          "locked",
+          "unassigned"
+        ],
+        "title": "TicketFacetFlags",
+        "type": "object"
+      },
+      "TicketFacetStates": {
+        "description": "Ticket counts per state segment (every filter except the state filter).",
+        "properties": {
+          "all": {
+            "title": "All",
+            "type": "integer"
+          },
+          "closed": {
+            "title": "Closed",
+            "type": "integer"
+          },
+          "new": {
+            "title": "New",
+            "type": "integer"
+          },
+          "open_only": {
+            "title": "Open Only",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "todo": {
+            "title": "Todo",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "todo",
+          "new",
+          "open_only",
+          "pending",
+          "closed",
+          "all"
+        ],
+        "title": "TicketFacetStates",
+        "type": "object"
+      },
+      "TicketFacets": {
+        "description": "Inbox segment and chip counts for the current ticket-list filters.",
+        "properties": {
+          "flags": {
+            "$ref": "#/components/schemas/TicketFacetFlags"
+          },
+          "states": {
+            "$ref": "#/components/schemas/TicketFacetStates"
+          }
+        },
+        "required": [
+          "states",
+          "flags"
+        ],
+        "title": "TicketFacets",
         "type": "object"
       },
       "TicketFieldOptionsOut": {
@@ -20291,6 +20394,29 @@
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "last_article_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Article Time"
+          },
+          "last_sender_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sender Type"
           },
           "lock": {
             "anyOf": [
@@ -54292,6 +54418,43 @@
             }
           },
           {
+            "description": "True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent.",
+            "in": "query",
+            "name": "unassigned",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent.",
+              "title": "Unassigned"
+            }
+          },
+          {
+            "description": "Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included).",
+            "in": "query",
+            "name": "escalating_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included).",
+              "title": "Escalating Within"
+            }
+          },
+          {
             "in": "query",
             "name": "offset",
             "required": false,
@@ -54315,11 +54478,13 @@
             }
           },
           {
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
             "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "default": "age",
+              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
               "title": "Sort",
               "type": "string"
             }
@@ -54729,11 +54894,50 @@
             }
           },
           {
+            "description": "True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent.",
+            "in": "query",
+            "name": "unassigned",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent.",
+              "title": "Unassigned"
+            }
+          },
+          {
+            "description": "Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included).",
+            "in": "query",
+            "name": "escalating_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included).",
+              "title": "Escalating Within"
+            }
+          },
+          {
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
             "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "default": "age",
+              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
               "title": "Sort",
               "type": "string"
             }
@@ -54814,6 +55018,305 @@
           }
         },
         "summary": "Export Tickets Csv",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/facets": {
+      "get": {
+        "description": "Segment (state) and chip (flag) counts for the inbox, in one request.\n\nTakes the same filters as ``GET /tickets``. ``states`` ignores\n``state_type``/``state_id`` (one count per segment, ``all`` = no state\nfilter); ``flags`` applies the state filter but ignores\n``escalated``/``locked``/``unassigned`` (each count = the rest plus only\nthat flag). Registered before ``/{ticket_id}`` so \"facets\" is not parsed\nas a ticket id.",
+        "operationId": "ticket_facets_api_v1_tickets_facets_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "queue_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Queue Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "owner_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Owner Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "responsible_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Responsible Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "service_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Service Id"
+            }
+          },
+          {
+            "description": "True = lock/tmp_lock only; False = unlock only.",
+            "in": "query",
+            "name": "locked",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True = lock/tmp_lock only; False = unlock only.",
+              "title": "Locked"
+            }
+          },
+          {
+            "description": "Tickets watched by this agent user id.",
+            "in": "query",
+            "name": "watcher_user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Tickets watched by this agent user id.",
+              "title": "Watcher User Id"
+            }
+          },
+          {
+            "description": "True = any escalation_* epoch already in the past.",
+            "in": "query",
+            "name": "escalated",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True = any escalation_* epoch already in the past.",
+              "title": "Escalated"
+            }
+          },
+          {
+            "description": "True = AI handed the ticket to a human and a human has not yet taken over.",
+            "in": "query",
+            "name": "ai_escalated",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True = AI handed the ticket to a human and a human has not yet taken over.",
+              "title": "Ai Escalated"
+            }
+          },
+          {
+            "description": "True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent.",
+            "in": "query",
+            "name": "unassigned",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "True = still owned by the Znuny root account (user id 1, nobody took it); False = owned by a real agent.",
+              "title": "Unassigned"
+            }
+          },
+          {
+            "description": "Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included).",
+            "in": "query",
+            "name": "escalating_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included).",
+              "title": "Escalating Within"
+            }
+          },
+          {
+            "description": "Also count archived tickets (admins only; ignored otherwise).",
+            "in": "query",
+            "name": "include_archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Also count archived tickets (admins only; ignored otherwise).",
+              "title": "Include Archived",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFacets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ticket Facets",
         "tags": [
           "tickets"
         ]
