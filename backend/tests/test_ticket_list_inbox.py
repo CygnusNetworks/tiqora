@@ -248,6 +248,45 @@ async def test_state_views_and_filters(url_fixture: str, request: pytest.Fixture
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_deadline_sort_puts_the_most_urgent_first(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """The pinned SLA block fetches its top N with sort=deadline. Sorting by
+    activity and re-sorting on the client dropped the most overdue tickets
+    whenever they were not also among the most recently active."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    _seed(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        ts = TicketService(session)
+        page = await ts.list_tickets(
+            AGENT_ID, queue_id=QUEUE_ID, sort="deadline", order="asc", limit=50
+        )
+        # Both overdue ones share the epoch (1000, once as escalation_time and
+        # once as escalation_update_time) and tie-break on id; the pending one
+        # is due in 10 min; tickets without any deadline come last.
+        assert [i.id for i in page.items] == [
+            T_CLOSED,
+            T_OPEN_OVERDUE,
+            T_PENDING_ROOT,
+            T_NEW_ROOT,
+            T_OPEN_LOCKED,
+        ]
+        top = await ts.list_tickets(
+            AGENT_ID,
+            queue_id=QUEUE_ID,
+            sort="deadline",
+            order="asc",
+            escalating_within=3600,
+            limit=1,
+        )
+        assert [i.id for i in top.items] == [T_CLOSED]
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
 async def test_activity_sort_and_last_article(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
