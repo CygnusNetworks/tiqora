@@ -98,6 +98,12 @@ export function ServiceViewPage() {
           sort={sort}
           order={order}
           isLoading={ticketsQ.isLoading}
+          navContext={{
+            label:
+              (servicesQ.data ?? []).find((s) => s.id === serviceId)?.name ?? t("views.service"),
+            to: "/agent/services",
+            search,
+          }}
           onPageChange={(nextOffset) => setSearch({ offset: nextOffset })}
           onSortChange={() => {
             /* fixed sort for this view */

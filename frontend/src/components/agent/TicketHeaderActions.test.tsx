@@ -71,17 +71,28 @@ vi.mock("@tanstack/react-router", () => ({
     children,
     to,
     params,
+    search,
     ...rest
   }: {
     children: React.ReactNode;
     to?: string;
     params?: Record<string, string>;
+    search?: Record<string, unknown>;
     [k: string]: unknown;
-  }) => (
-    <a href={typeof to === "string" ? to : "#"} data-params={JSON.stringify(params ?? {})} {...rest}>
-      {children}
-    </a>
-  ),
+  }) => {
+    // Resolve $params into the path and search into a query string, like
+    // the real Link does, so hrefs can be asserted.
+    let href = typeof to === "string" ? to : "#";
+    for (const [k, v] of Object.entries(params ?? {})) href = href.replace(`$${k}`, v);
+    const qs = new URLSearchParams(
+      Object.entries(search ?? {}).map(([k, v]) => [k, String(v)] as [string, string]),
+    ).toString();
+    return (
+      <a href={qs ? `${href}?${qs}` : href} data-params={JSON.stringify(params ?? {})} {...rest}>
+        {children}
+      </a>
+    );
+  },
 }));
 
 function wrap(ui: React.ReactElement) {
@@ -186,9 +197,11 @@ describe("TicketHeaderActions", () => {
     getTicketCustomerLink.mockReset().mockResolvedValue({ label: null, url: null });
   });
 
-  it("renders the state/priority/queue/owner/customer pills with their values", async () => {
+  it("renders the status bar and the priority/queue/owner/customer values", async () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
-    expect(screen.getByTestId("ticket-pill-state")).toHaveTextContent("Open");
+    const open = await screen.findByTestId("ticket-status-4");
+    expect(open).toHaveTextContent("Open");
+    expect(open).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("ticket-pill-priority")).toHaveTextContent("normal");
     expect(screen.getByTestId("ticket-pill-queue")).toHaveTextContent("Support");
     expect(screen.getByTestId("ticket-pill-owner")).toHaveTextContent("Ada");
@@ -198,7 +211,7 @@ describe("TicketHeaderActions", () => {
   it("hides the type/service/sla pills when the system defines ≤1 of each", async () => {
     // beforeEach already mocks 1 type, 0 services, 0 slas.
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
-    await screen.findByTestId("ticket-pill-state");
+    await screen.findByTestId("ticket-status-4");
     expect(screen.queryByTestId("ticket-pill-type")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ticket-pill-service")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ticket-pill-sla")).not.toBeInTheDocument();
@@ -223,19 +236,77 @@ describe("TicketHeaderActions", () => {
     expect(screen.getByTestId("ticket-pill-sla")).toHaveTextContent("SLA");
   });
 
-  it("patches state directly from the status pill's menu", async () => {
+  it("closes the ticket from the status bar's Closed menu", async () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
-    fireEvent.click(screen.getByTestId("ticket-pill-state"));
-    const item = await screen.findByText("Closed successful");
+    fireEvent.click(await screen.findByTestId("ticket-status-closed"));
+    const item = await screen.findByTestId("ticket-status-close-2");
+    expect(item).toHaveTextContent(/closed successful/i);
     fireEvent.click(item);
     await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { state_id: 2 }));
   });
 
-  it("opens the pending (Warten) dialog from the status pill's menu", async () => {
+  it("opens the pending (Warten) dialog from the status bar", async () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
-    fireEvent.click(screen.getByTestId("ticket-pill-state"));
-    fireEvent.click(await screen.findByText(/Pending/));
+    fireEvent.click(await screen.findByTestId("ticket-status-pending"));
     expect(await screen.findByTestId("pending-dialog")).toBeInTheDocument();
+  });
+
+  it("does not patch when the current state's segment is clicked again", async () => {
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    fireEvent.click(await screen.findByTestId("ticket-status-4"));
+    expect(patchTicket).not.toHaveBeenCalled();
+  });
+
+  it("links back to the ticket's queue when it was not opened from a list", async () => {
+    window.sessionStorage.clear();
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    const back = await screen.findByTestId("ticket-back-link");
+    expect(back).toHaveTextContent("Support");
+    expect(back.getAttribute("href")).toContain("queue_id=1");
+    expect(screen.queryByTestId("ticket-back-nav-pos")).toBeNull();
+  });
+
+  it("links back to the originating list with its position and neighbours", async () => {
+    window.sessionStorage.setItem(
+      "tiqora.ticketNavContext",
+      JSON.stringify({
+        label: "Meine Tickets",
+        to: "/agent/queues",
+        search: { view: "mine", owner_id: 2 },
+        ids: [5, 7, 9],
+      }),
+    );
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    const back = await screen.findByTestId("ticket-back-link");
+    expect(back).toHaveTextContent("Meine Tickets");
+    expect(back.getAttribute("href")).toContain("view=mine");
+    expect(screen.getByTestId("ticket-back-nav-pos")).toHaveTextContent("2 / 3");
+    expect(screen.getByTestId("ticket-nav-prev").getAttribute("href")).toContain("/agent/tickets/5");
+    expect(screen.getByTestId("ticket-nav-next").getAttribute("href")).toContain("/agent/tickets/9");
+    window.sessionStorage.clear();
+  });
+
+  it("places the AI pieces: summary under the title, drafts on the reply button, banners", async () => {
+    wrap(
+      <TicketHeaderActions
+        ticket={makeTicket()}
+        canNote
+        onOpenNote={vi.fn()}
+        ai={{
+          summaryLine: <p data-testid="ai-line">Summary</p>,
+          summaryPanel: null,
+          draftsButton: <button data-testid="ai-drafts">✎ 1</button>,
+          banners: <div data-testid="ai-banner">Triage</div>,
+          overlays: null,
+        }}
+      />,
+    );
+    const title = await screen.findByRole("heading", { level: 1 });
+    expect(title.parentElement).toContainElement(screen.getByTestId("ai-line"));
+    expect(screen.getByTestId("ticket-actions-reply").parentElement).toContainElement(
+      screen.getByTestId("ai-drafts"),
+    );
+    expect(screen.getByTestId("ai-banner")).toBeInTheDocument();
   });
 
   it("opens the queue pill's listbox and patches queue_id on selection", async () => {
@@ -332,13 +403,13 @@ describe("TicketHeaderActions", () => {
   it("lists the Mehr menu's grouped entries and triggers a dialog", async () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
     fireEvent.click(screen.getByTestId("ticket-actions-more"));
-    // Closed states load asynchronously — wait for the Close section.
-    expect(await screen.findByTestId("more-close-2")).toBeInTheDocument();
+    expect(await screen.findByTestId("more-link")).toBeInTheDocument();
     const menu = screen.getByTestId("ticket-actions-more-menu");
     expect(menu).toHaveTextContent("Assignment");
     expect(menu).toHaveTextContent("Organize");
     expect(menu).toHaveTextContent("Other");
-    expect(menu).toHaveTextContent("Close");
+    // Closing moved to the status bar's Closed segment.
+    expect(screen.queryByTestId("more-close-2")).toBeNull();
     expect(screen.getByTestId("more-link")).toBeInTheDocument();
     expect(screen.getByTestId("more-merge")).toBeInTheDocument();
     expect(screen.getByTestId("more-print")).toBeInTheDocument();
@@ -357,14 +428,6 @@ describe("TicketHeaderActions", () => {
     await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { watcher_user_id: 42 }));
   });
 
-  it("closes the ticket from the Mehr menu", async () => {
-    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
-    fireEvent.click(screen.getByTestId("ticket-actions-more"));
-    const closeItem = await screen.findByTestId("more-close-2");
-    expect(closeItem).toHaveTextContent(/closed successful|Erfolgreich geschlossen/i);
-    fireEvent.click(closeItem);
-    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { state_id: 2 }));
-  });
 
   it("disables Antworten/Notiz without the note permission", () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote={false} onOpenNote={vi.fn()} />);
@@ -381,7 +444,7 @@ describe("TicketHeaderActions", () => {
       />,
     );
     const link = await screen.findByTestId("ticket-customer-centre-link");
-    expect(link).toHaveAttribute("href", "/agent/customers/$login");
+    expect(link).toHaveAttribute("href", "/agent/customers/bob");
     expect(link).toHaveAttribute("data-params", JSON.stringify({ login: "bob" }));
   });
 
