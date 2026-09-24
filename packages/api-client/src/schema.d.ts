@@ -6686,7 +6686,7 @@ export interface components {
              * Feature
              * @enum {string}
              */
-            feature: "summary" | "auto_reply" | "manual_assist" | "mcp";
+            feature: "summary" | "auto_reply" | "manual_assist" | "mcp" | "refine";
             /** Limit Requests Day */
             limit_requests_day?: number | null;
             /** Limit Requests Month */
@@ -6709,7 +6709,7 @@ export interface components {
              * Feature
              * @enum {string}
              */
-            feature: "summary" | "auto_reply" | "manual_assist" | "mcp";
+            feature: "summary" | "auto_reply" | "manual_assist" | "mcp" | "refine";
             /** Id */
             id: number;
             /** Limit Requests Day */
@@ -6731,7 +6731,7 @@ export interface components {
             /** Allowed */
             allowed?: boolean | null;
             /** Feature */
-            feature?: ("summary" | "auto_reply" | "manual_assist" | "mcp") | null;
+            feature?: ("summary" | "auto_reply" | "manual_assist" | "mcp" | "refine") | null;
             /** Limit Requests Day */
             limit_requests_day?: number | null;
             /** Limit Requests Month */
@@ -27768,7 +27768,7 @@ export interface operations {
                 escalating_within?: number | null;
                 offset?: number;
                 limit?: number;
-                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time). */
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
                 /** @description Also list archived tickets (admins only; ignored otherwise). */
@@ -27892,7 +27892,7 @@ export interface operations {
                 unassigned?: boolean | null;
                 /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
                 escalating_within?: number | null;
-                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time). */
+                /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
                 /** @description Also export archived tickets (admins only; ignored otherwise). */
