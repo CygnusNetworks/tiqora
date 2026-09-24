@@ -11,7 +11,7 @@ import { PresenceBar } from "@/components/agent/PresenceBar";
 import { ProcessWidget } from "@/components/agent/process/ProcessWidget";
 import { AiPanel } from "@/components/agent/AiPanel";
 import { SimilarTicketsChip } from "@/components/agent/SimilarTicketsChip";
-import { TicketZoomOverflowMenu } from "@/components/agent/TicketZoomOverflowMenu";
+import { TicketZoomOverflowItems } from "@/components/agent/TicketZoomOverflowMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { recordTicketView } from "@/lib/lastViews";
 
@@ -128,8 +128,8 @@ export function TicketZoomPage() {
   // weaker ``note`` permission that's enough to create one.
   const canDeleteNote = Boolean(ticketQ.data?.permissions?.rw);
 
-  const overflowMenu = (
-    <TicketZoomOverflowMenu
+  const overflowItems = (
+    <TicketZoomOverflowItems
       tab={tab}
       onTabChange={(next) => {
         setTab(next);
@@ -149,26 +149,24 @@ export function TicketZoomPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 px-4 py-4" data-testid="ticket-zoom">
-      <Link to="/agent/queues" className="text-xs text-accent hover:underline">
-        ← {t("common.backToQueues")}
-      </Link>
-      {/* Ticket info + primary actions/pills, then content. */}
-      <TicketHeader
-        ticket={ticketQ.data}
-        overflowMenu={overflowMenu}
-        canNote={canNote}
-        onOpenNote={() => {
-          setTab("articles");
-          setNoteOpen(true);
-        }}
-        assist={
-          <AiPanel
-            ticketId={ticketId}
+      {/* Ticket info + primary actions; the AI panel hands its pieces to the
+          header, which places them (summary under the title, drafts next to
+          "Antworten", banners above the status bar). */}
+      <AiPanel ticketId={ticketId} canNote={canNote}>
+        {(ai) => (
+          <TicketHeader
+            ticket={ticketQ.data}
+            overflowItems={overflowItems}
             canNote={canNote}
-            trailing={<SimilarTicketsChip ticketId={ticketId} />}
+            onOpenNote={() => {
+              setTab("articles");
+              setNoteOpen(true);
+            }}
+            ai={ai}
+            similar={<SimilarTicketsChip ticketId={ticketId} variant="link" />}
           />
-        }
-      />
+        )}
+      </AiPanel>
       <ProcessWidget
         ticketId={ticketId}
         hideInactiveStart

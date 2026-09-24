@@ -36,14 +36,48 @@ import { AssistChip, ChipCount } from "./AssistChip";
 import { CustomSummaryPanel } from "./CustomSummaryPanel";
 
 /**
- * AI assist row in the ticket header (plan §3.4 Drafts, §3.5 Summary,
- * Phase B/C). Fetches `GET /tickets/{id}/ai` and shows compact chips —
- * summary and drafts — whose content opens as a hover card, so the ticket
- * history starts right below the header. The summary can be pinned open
- * below the chips; triage proposals and the escalation banner need action
- * and stay visible. Agents without ACL access see no AI chips at all, only
- * the `trailing` chips (similar tickets).
+ * AI assist for the ticket header (plan §3.4 Drafts, §3.5 Summary, Phase
+ * B/C). Fetches `GET /tickets/{id}/ai` and produces the pieces the header
+ * places where each belongs (see `TicketAiSlots`): the summary as a one-line
+ * subtitle under the title that expands into the full summary controls, the
+ * drafts trigger next to "Antworten", and the triage / hand-over banners
+ * that need a decision. Without a `children` render function the pieces are
+ * stacked in a compact default layout. Agents without ACL access get empty
+ * slots (only the `trailing` chips in the default layout).
  */
+
+/** The header-placed parts of the AI assist. `null` = nothing to show. */
+export type TicketAiSlots = {
+  /** One-line summary subtitle with expand / refresh / menu controls. */
+  summaryLine: ReactNode | null;
+  /** Full summary controls (scope, custom instruction, body) when expanded or pinned. */
+  summaryPanel: ReactNode | null;
+  /** Drafts trigger styled to attach to the right edge of the primary reply button. */
+  draftsButton: ReactNode | null;
+  /** Hand-over and triage banners — shown only when they apply. */
+  banners: ReactNode | null;
+  /** Dialogs opened from inside the slots (reply from draft, confirmations). */
+  overlays: ReactNode | null;
+};
+
+const EMPTY_SLOTS: TicketAiSlots = {
+  summaryLine: null,
+  summaryPanel: null,
+  draftsButton: null,
+  banners: null,
+  overlays: null,
+};
+
+/** The summary as one plain line: markdown markers and the trailing
+ * "Dokumente:" section dropped, whitespace collapsed. */
+function summaryOneLiner(body: string): string {
+  const main = body.split(/\n\s*\n(?=Dokumente:)/i)[0] ?? body;
+  return main
+    .replace(/^\s*(?:[-*•]|#+|\d+\.)\s+/gm, "")
+    .replace(/[*_`]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 /** Max articles rendered as individual coverage dots; beyond that the
  * indicator degrades to a plain "n/m" fraction to avoid a dot wall. */
@@ -140,22 +174,6 @@ function CoverageDots({ covered, total }: { covered: number; total: number }) {
   );
 }
 
-/** Freshness of the stored summary, shown on the chip without opening it. */
-function SummaryStatusDot({ status }: { status: "current" | "stale" | null }) {
-  const { t } = useTranslation();
-  if (status === null) return null;
-  return (
-    <span
-      className={cn(
-        "h-1.5 w-1.5 rounded-full",
-        status === "current" ? "bg-green" : "bg-escalation",
-      )}
-      title={status === "current" ? t("ticket.ai.summaryCurrent") : t("ticket.ai.summaryStaleShort")}
-      data-testid={`ai-chip-summary-${status}`}
-    />
-  );
-}
-
 function DraftKindIcon({ kind }: { kind: string }) {
   const clarify = kind === "clarify";
   return (
@@ -177,11 +195,14 @@ export function AiPanel({
   ticketId,
   canNote,
   trailing,
+  children,
 }: {
   ticketId: number;
   canNote: boolean;
-  /** Non-AI chips appended to the row (similar tickets). */
+  /** Non-AI chips appended to the default layout's row (similar tickets). */
   trailing?: ReactNode;
+  /** Places the pieces itself (the ticket header does); default: stacked. */
+  children?: (slots: TicketAiSlots) => ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -192,6 +213,7 @@ export function AiPanel({
   const [openTraceId, setOpenTraceId] = useState<number | null>(null);
   const [replyDraft, setReplyDraft] = useState<AiDraftOut | null>(null);
   const [summaryView, setSummaryView] = useState<SummaryView>("standard");
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [pinned, setPinnedState] = useState(loadSummaryPinned);
   const [savedPrompts, setSavedPrompts] = useState(loadSavedPrompts);
   const [customInstruction, setCustomInstruction] = useState("");
@@ -343,11 +365,27 @@ export function AiPanel({
     },
   });
 
-  const trailingOnly = trailing ? (
-    <div className="flex flex-wrap items-center gap-1.5">{trailing}</div>
-  ) : null;
+  const renderSlots = (slots: TicketAiSlots, draftsChip: ReactNode = null) => {
+    if (children) return <>{children(slots)}</>;
+    const anyAi = slots.summaryLine || draftsChip || slots.banners;
+    if (!anyAi) {
+      return trailing ? <div className="flex flex-wrap items-center gap-1.5">{trailing}</div> : null;
+    }
+    return (
+      <div className="space-y-2.5" data-testid="ai-panel">
+        <div className="flex flex-wrap items-center gap-1.5" data-testid="ai-chips">
+          {slots.summaryLine && <div className="min-w-0 flex-1">{slots.summaryLine}</div>}
+          {draftsChip}
+          {trailing}
+        </div>
+        {slots.banners}
+        {slots.summaryPanel}
+        {slots.overlays}
+      </div>
+    );
+  };
 
-  if (stateQ.isLoading || stateQ.isError || !stateQ.data) return trailingOnly;
+  if (stateQ.isLoading || stateQ.isError || !stateQ.data) return renderSlots(EMPTY_SLOTS);
 
   const state = stateQ.data;
   if (
@@ -357,7 +395,7 @@ export function AiPanel({
   )
     // A triage-only queue enables neither of the two, but still has a
     // proposal worth showing.
-    return trailingOnly;
+    return renderSlots(EMPTY_SLOTS);
 
   // Only this panel instance's OWN triggered run ever renders a
   // running/skipped/error result — see the `myRunStartedAt` doc comment
@@ -431,12 +469,6 @@ export function AiPanel({
       : undefined;
 
   const openDraftCount = openDrafts.length;
-  const summaryStatus = !hasSummary
-    ? null
-    : staleCount > 0
-      ? "stale"
-      : "current";
-
   const summaryContent = (
     <div className="space-y-2" data-testid="ai-panel-summary">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -926,40 +958,171 @@ export function AiPanel({
     </div>
   );
 
-  const chipRow = (
-    <div className="flex flex-wrap items-center gap-1.5" data-testid="ai-chips">
-      {state.summary_available &&
-        (pinned ? (
-          <AssistChip
-            aria-pressed
-            title={t("ticket.ai.unpin")}
-            data-testid="ai-chip-summary"
-            onClick={() => setPinned(false)}
+  const summaryOpen = summaryExpanded || pinned;
+  const summaryPlain = hasSummary ? summaryOneLiner(state.summary_body ?? "") : "";
+  const refreshSummary = () =>
+    summarizeMutation.mutate(summaryView === "custom" ? "standard" : summaryView);
+
+  const summaryLine = state.summary_available ? (
+    <div
+      className="flex min-w-0 items-center gap-2 text-[13px] leading-5"
+      data-testid="ai-summary-line"
+    >
+      <SparkIcon className="h-3.5 w-3.5 shrink-0 text-purple" aria-hidden />
+      {summaryOpen ? (
+        <span className="font-medium text-ink">{t("ticket.ai.summaryLabel")}</span>
+      ) : hasSummary ? (
+        <span
+          className="min-w-0 flex-1 truncate text-ink/85"
+          title={summaryPlain}
+          data-testid="ai-summary-line-text"
+        >
+          {summaryPlain}
+        </span>
+      ) : (
+        <span className="text-muted" data-testid="ai-summary-line-empty">
+          {t("ticket.ai.summaryEmpty")}
+        </span>
+      )}
+      {staleCount > 0 && (
+        <button
+          type="button"
+          data-testid="ai-summary-stale-refresh"
+          disabled={!state.can_summarize || summarizeMutation.isPending}
+          title={t("ticket.ai.refreshButton")}
+          onClick={refreshSummary}
+          className="shrink-0 whitespace-nowrap rounded bg-escalation/15 px-1.5 py-px text-[11px] font-semibold text-escalation transition-colors hover:bg-escalation/25 disabled:opacity-60"
+        >
+          {summarizeMutation.isPending ? (
+            <Spinner className="h-3 w-3" />
+          ) : (
+            <>{t("ticket.ai.summaryStaleRefresh", { count: staleCount })} ↻</>
+          )}
+        </button>
+      )}
+      <button
+        type="button"
+        data-testid="ai-chip-summary"
+        aria-expanded={summaryOpen}
+        aria-pressed={pinned || undefined}
+        onClick={() => {
+          if (summaryOpen) {
+            setSummaryExpanded(false);
+            if (pinned) setPinned(false);
+          } else {
+            setSummaryExpanded(true);
+          }
+        }}
+        className="shrink-0 text-[12.5px] font-medium text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+      >
+        {summaryOpen
+          ? t("ticket.ai.less")
+          : hasSummary
+            ? t("ticket.ai.more")
+            : t("ticket.ai.summarizeButton")}
+      </button>
+      <Menu
+        panelTestId="ai-summary-line-menu"
+        trigger={({ ref, toggleProps }) => (
+          <button
+            type="button"
+            ref={ref}
+            {...toggleProps}
+            data-testid="ai-summary-line-menu-trigger"
+            aria-label={t("ticket.ai.moreActions")}
+            title={t("ticket.ai.moreActions")}
+            className="shrink-0 rounded-md px-1.5 text-sm leading-5 text-muted transition-colors hover:bg-surface-subtle hover:text-ink"
           >
-            <SparkIcon className="h-3.5 w-3.5 text-purple" />
-            {t("ticket.ai.summaryLabel")}
-            <SummaryStatusDot status={summaryStatus} />
-          </AssistChip>
-        ) : (
-          <HoverCard
-            label={t("ticket.ai.summaryLabel")}
-            panelTestId="ai-card-summary"
-            trigger={({ ref, triggerProps }) => (
-              <AssistChip ref={ref} {...triggerProps} data-testid="ai-chip-summary">
-                <SparkIcon className="h-3.5 w-3.5 text-purple" />
-                {t("ticket.ai.summaryLabel")}
-                <SummaryStatusDot status={summaryStatus} />
-              </AssistChip>
-            )}
+            ⋯
+          </button>
+        )}
+      >
+        <MenuItem
+          testId="ai-summary-line-refresh"
+          onSelect={refreshSummary}
+        >
+          ↻ {hasSummary ? t("ticket.ai.refreshButton") : t("ticket.ai.summarizeButton")}
+        </MenuItem>
+        <MenuItem
+          testId="ai-summary-line-scope"
+          onSelect={() => {
+            setSummaryView("custom");
+            setSummaryExpanded(true);
+          }}
+        >
+          {t("ticket.ai.scopeAndInstruction")}
+        </MenuItem>
+        <MenuItem testId="ai-summary-line-pin" onSelect={() => setPinned(!pinned)}>
+          {pinned ? t("ticket.ai.unpin") : t("ticket.ai.pinOpen")}
+        </MenuItem>
+        {hasSummary && (
+          <MenuItem
+            testId="ai-summary-line-copy"
+            onSelect={() => {
+              void navigator.clipboard?.writeText(state.summary_body ?? "").catch(() => undefined);
+            }}
           >
-            {summaryContent}
-          </HoverCard>
-        ))}
-      {state.manual_assist_available && (
-        <HoverCard
-          label={t("ticket.ai.draftsLabel")}
-          panelTestId="ai-card-drafts"
-          trigger={({ ref, triggerProps }) => (
+            {t("ticket.ai.custom.copy")}
+          </MenuItem>
+        )}
+        {isAdmin && hasSummary && (
+          <MenuItem
+            danger
+            testId="ai-summary-line-admin-delete"
+            onSelect={() => {
+              void (async () => {
+                const ok = await confirm({
+                  title: t("ticket.ai.adminDeleteSummary"),
+                  message: t("ticket.ai.adminDeleteSummaryConfirm"),
+                  variant: "danger",
+                });
+                if (ok) adminDeleteSummaryMutation.mutate();
+              })();
+            }}
+          >
+            {t("ticket.ai.adminDeleteSummary")}
+          </MenuItem>
+        )}
+      </Menu>
+    </div>
+  ) : null;
+
+  const summaryPanel =
+    state.summary_available && summaryOpen ? (
+      <div
+        className="rounded-lg border border-purple/25 bg-purple/5 p-3"
+        data-testid={pinned ? "ai-panel-summary-pinned" : "ai-card-summary"}
+      >
+        {summaryContent}
+      </div>
+    ) : null;
+
+  const draftsTrigger = (attached: boolean) =>
+    state.manual_assist_available ? (
+      <HoverCard
+        label={t("ticket.ai.draftsLabel")}
+        panelTestId="ai-card-drafts"
+        trigger={({ ref, triggerProps }) =>
+          attached ? (
+            <button
+              ref={ref}
+              type="button"
+              {...triggerProps}
+              data-testid="ai-chip-drafts"
+              title={t("ticket.ai.draftsLabel")}
+              aria-label={t("ticket.ai.draftsLabel")}
+              className="inline-flex items-center gap-1 rounded-r-md border-l border-accent-ink/25 bg-accent px-2 text-xs font-medium text-accent-ink transition-colors hover:bg-accent/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            >
+              <PencilIcon className="h-3.5 w-3.5" />
+              {manualRunBusy ? (
+                <Spinner className="h-3 w-3" />
+              ) : (
+                <span className="rounded bg-accent-ink/20 px-1 font-mono text-[10px] tabular-nums">
+                  {openDraftCount}
+                </span>
+              )}
+            </button>
+          ) : (
             <AssistChip ref={ref} {...triggerProps} data-testid="ai-chip-drafts">
               <PencilIcon className="h-3.5 w-3.5 text-purple" />
               {t("ticket.ai.draftsLabel")}
@@ -969,141 +1132,130 @@ export function AiPanel({
                 <ChipCount value={openDraftCount} highlight={openDraftCount > 0} />
               )}
             </AssistChip>
-          )}
-        >
-          {draftsContent}
-        </HoverCard>
-      )}
-      {trailing}
-    </div>
-  );
+          )
+        }
+      >
+        {draftsContent}
+      </HoverCard>
+    ) : null;
 
-  return (
-    <div className="space-y-2.5" data-testid="ai-panel">
-      {chipRow}
-      {state.ai_escalated_at && (
-        <div
-          className="flex items-center justify-between gap-2 rounded-md border border-amber/30 bg-amber/15 p-2.5 text-xs text-ink"
-          data-testid="ai-panel-escalated-banner"
-        >
-          <span>
-            {t("ticket.ai.escalatedBanner", {
-              dateTime: formatDateTime(state.ai_escalated_at, locale),
-            })}
-          </span>
-          <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
-            <Button
-              size="sm"
-              variant="secondary"
-              data-testid="ai-panel-resume-button"
-              disabled={!canNote || resumeMutation.isPending}
-              onClick={() => resumeMutation.mutate()}
-            >
-              {resumeMutation.isPending ? (
-                <Spinner className="h-3.5 w-3.5" />
-              ) : (
-                t("ticket.ai.resumeButton")
-              )}
-            </Button>
-          </span>
-        </div>
-      )}
-      {state.triage && (
-        <div
-          className="space-y-2 rounded-md border border-accent/40 bg-accent/10 p-2.5 text-xs text-ink"
-          data-testid="ai-panel-triage"
-        >
-          <div className="font-semibold">{t("ticket.ai.triage.title")}</div>
-
-          {state.triage.suggested_queue_id != null && (
-            <div data-testid="ai-panel-triage-queue">
-              {t("ticket.ai.triage.queueLine", {
-                queue:
-                  state.triage.suggested_queue_name ??
-                  String(state.triage.suggested_queue_id),
-                confidence: state.triage.queue_confidence ?? 0,
+  const banners =
+    state.ai_escalated_at || state.triage ? (
+      <div className="space-y-2" data-testid="ai-banners">
+        {state.ai_escalated_at && (
+          <div
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-amber/35 bg-amber/10 px-2.5 py-1.5 text-xs text-ink"
+            data-testid="ai-panel-escalated-banner"
+          >
+            <span className="font-semibold text-amber">⚑</span>
+            <span className="min-w-0 flex-1">
+              {t("ticket.ai.escalatedBanner", {
+                dateTime: formatDateTime(state.ai_escalated_at, locale),
               })}
-              {state.triage.queue_reason && (
-                <div className="mt-0.5 text-muted">
-                  {state.triage.queue_reason}
-                </div>
-              )}
-            </div>
-          )}
-
-          {state.triage.extracted_email && (
-            <div data-testid="ai-panel-triage-customer">
-              {state.triage.suggested_customer_user_id
-                ? t("ticket.ai.triage.customerLine", {
-                    email: state.triage.extracted_email,
-                    name:
-                      state.triage.suggested_customer_name ??
-                      state.triage.suggested_customer_user_id,
-                  })
-                : t("ticket.ai.triage.customerUnknownLine", {
-                    email: state.triage.extracted_email,
-                  })}
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              title={!canNote ? t("ticket.toolbar.noPermission") : undefined}
-            >
+            </span>
+            <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
               <Button
                 size="sm"
                 variant="secondary"
-                data-testid="ai-panel-triage-accept"
-                disabled={!canNote || acceptTriageMutation.isPending}
-                onClick={() =>
-                  acceptTriageMutation.mutate({
-                    triageId: state.triage!.id,
-                    parts: {
-                      queue: state.triage!.suggested_queue_id != null,
-                      customer:
-                        state.triage!.suggested_customer_user_id != null,
-                    },
-                  })
-                }
+                data-testid="ai-panel-resume-button"
+                disabled={!canNote || resumeMutation.isPending}
+                onClick={() => resumeMutation.mutate()}
               >
-                {acceptTriageMutation.isPending ? (
+                {resumeMutation.isPending ? (
                   <Spinner className="h-3.5 w-3.5" />
                 ) : (
-                  t("ticket.ai.triage.accept")
+                  t("ticket.ai.resumeButton")
                 )}
               </Button>
             </span>
-            <span
-              title={!canNote ? t("ticket.toolbar.noPermission") : undefined}
-            >
-              <Button
-                size="sm"
-                variant="ghost"
-                data-testid="ai-panel-triage-reject"
-                disabled={!canNote || rejectTriageMutation.isPending}
-                onClick={() => rejectTriageMutation.mutate(state.triage!.id)}
-              >
-                {t("ticket.ai.triage.reject")}
-              </Button>
+          </div>
+        )}
+        {state.triage && (
+          <div
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-accent/35 bg-accent/5 px-2.5 py-1.5 text-xs text-ink"
+            data-testid="ai-panel-triage"
+          >
+            <span className="inline-flex items-center gap-1 font-semibold text-accent">
+              <SparkIcon className="h-3.5 w-3.5" aria-hidden />
+              {t("ticket.ai.triage.title")}
+            </span>
+            <span className="min-w-0 flex-1 space-y-0.5">
+              {state.triage.suggested_queue_id != null && (
+                <span className="block" data-testid="ai-panel-triage-queue">
+                  {t("ticket.ai.triage.queueLine", {
+                    queue:
+                      state.triage.suggested_queue_name ??
+                      String(state.triage.suggested_queue_id),
+                    confidence: state.triage.queue_confidence ?? 0,
+                  })}
+                  {state.triage.queue_reason && (
+                    <span className="block text-muted">{state.triage.queue_reason}</span>
+                  )}
+                </span>
+              )}
+              {state.triage.extracted_email && (
+                <span className="block" data-testid="ai-panel-triage-customer">
+                  {state.triage.suggested_customer_user_id
+                    ? t("ticket.ai.triage.customerLine", {
+                        email: state.triage.extracted_email,
+                        name:
+                          state.triage.suggested_customer_name ??
+                          state.triage.suggested_customer_user_id,
+                      })
+                    : t("ticket.ai.triage.customerUnknownLine", {
+                        email: state.triage.extracted_email,
+                      })}
+                </span>
+              )}
+              {acceptTriageMutation.isError && (
+                <span className="block text-danger" data-testid="ai-panel-triage-error">
+                  {t("ticket.ai.triage.acceptFailed")}
+                </span>
+              )}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-testid="ai-panel-triage-accept"
+                  disabled={!canNote || acceptTriageMutation.isPending}
+                  onClick={() =>
+                    acceptTriageMutation.mutate({
+                      triageId: state.triage!.id,
+                      parts: {
+                        queue: state.triage!.suggested_queue_id != null,
+                        customer: state.triage!.suggested_customer_user_id != null,
+                      },
+                    })
+                  }
+                >
+                  {acceptTriageMutation.isPending ? (
+                    <Spinner className="h-3.5 w-3.5" />
+                  ) : (
+                    t("ticket.ai.triage.accept")
+                  )}
+                </Button>
+              </span>
+              <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  data-testid="ai-panel-triage-reject"
+                  disabled={!canNote || rejectTriageMutation.isPending}
+                  onClick={() => rejectTriageMutation.mutate(state.triage!.id)}
+                >
+                  {t("ticket.ai.triage.reject")}
+                </Button>
+              </span>
             </span>
           </div>
+        )}
+      </div>
+    ) : null;
 
-          {acceptTriageMutation.isError && (
-            <div className="text-danger" data-testid="ai-panel-triage-error">
-              {t("ticket.ai.triage.acceptFailed")}
-            </div>
-          )}
-        </div>
-      )}
-      {pinned && state.summary_available && (
-        <div
-          className="rounded-lg border border-purple/30 bg-surface-subtle/60 p-3"
-          data-testid="ai-panel-summary-pinned"
-        >
-          {summaryContent}
-        </div>
-      )}
-
+  const overlays = (
+    <>
       {replyDraft && replyArticleId != null && (
         <ReplyDialog
           ticketId={ticketId}
@@ -1119,8 +1271,18 @@ export function AiPanel({
           channelName={replyArticle ? channelNameOf(replyArticle) : undefined}
         />
       )}
-
       {confirmDialog}
-    </div>
+    </>
+  );
+
+  return renderSlots(
+    {
+      summaryLine,
+      summaryPanel,
+      draftsButton: draftsTrigger(true),
+      banners,
+      overlays,
+    },
+    draftsTrigger(false),
   );
 }

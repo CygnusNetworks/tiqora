@@ -8,6 +8,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
+import { ticketPerms } from "@/lib/ticket";
 import {
   getDraft,
   useClearReplyDraft,
@@ -30,6 +31,30 @@ import {
   parseRecipientList,
   type Recipient,
 } from "./RecipientsField";
+
+type NextState = "keep" | "pending" | "closed";
+
+/** Choices for the ticket after the reply is sent. `color` is the state colour
+ * the segment takes when picked. */
+const NEXT_STATES: { key: NextState; color: string }[] = [
+  { key: "keep", color: "var(--color-state-open)" },
+  { key: "pending", color: "var(--color-state-pending)" },
+  { key: "closed", color: "var(--color-state-new)" },
+];
+
+function isoDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function todayIso(): string {
+  return isoDate(new Date());
+}
+/** Default reminder for "Wartend": three days from today. */
+function defaultPendingDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 3);
+  return isoDate(d);
+}
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -97,6 +122,10 @@ export function ReplyDialog({
   // Collected while writing, recorded after the article is created.
   const [mentions, setMentions] = useState<PickedMention[]>([]);
   const [timeUnits, setTimeUnits] = useState("");
+  /** What happens to the ticket once the reply is sent (see `NEXT_STATES`). */
+  const [nextState, setNextState] = useState<NextState>("keep");
+  /** Reminder date (local, `YYYY-MM-DD`) for "Wartend". */
+  const [pendingDate, setPendingDate] = useState(defaultPendingDate);
   /** Set when the article went out but a mention/time write did not — the
    * dialog then offers a retry for those alone, never a second send. */
   const [extrasFailed, setExtrasFailed] = useState<Array<"mentions" | "time">>(
@@ -312,10 +341,41 @@ export function ReplyDialog({
     setMentions([]);
     setTimeUnits("");
     setExtrasFailed([]);
+    setNextState("keep");
     onClose();
   };
 
   const templates = templatesQ.data ?? [];
+
+  // "Danach": the ticket and the state catalogue are cache hits on the
+  // ticket page. Only agents who may change the state get the control — the
+  // backend refuses `state_id` without `rw` (a note-only agent can still reply).
+  const ticketQ = useQuery({
+    queryKey: ["tickets", ticketId],
+    queryFn: () => api.getTicket(ticketId),
+    enabled: open,
+  });
+  const statesQ = useQuery({
+    queryKey: ["reference", "states"],
+    queryFn: () => api.listReferenceStates(),
+    enabled: open,
+  });
+  const states = statesQ.data ?? [];
+  const pendingState =
+    states.find((s) => s.name === "pending reminder") ??
+    states.find((s) => s.type_name === "pending reminder");
+  const closedState =
+    states.find((s) => s.name === "closed successful") ??
+    states.find((s) => s.type_name.startsWith("closed"));
+  const canSetState = Boolean(ticketQ.data && ticketPerms(ticketQ.data).rw);
+  const nextOptions = NEXT_STATES.filter(
+    (o) =>
+      o.key === "keep" ||
+      (o.key === "pending" && pendingState) ||
+      (o.key === "closed" && closedState),
+  );
+  const nextStateId =
+    nextState === "pending" ? pendingState?.id : nextState === "closed" ? closedState?.id : undefined;
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -337,6 +397,14 @@ export function ReplyDialog({
         in_reply_to: isTelegram ? null : (draftQ.data?.in_reply_to ?? null),
         references: isTelegram ? null : (draftQ.data?.references ?? null),
         ai_draft_id: aiDraftId,
+        ...(canSetState && nextStateId != null
+          ? {
+              state_id: nextStateId,
+              // 08:00 local on the chosen day — a reminder for the morning.
+              pending_time:
+                nextState === "pending" ? new Date(`${pendingDate}T08:00`).toISOString() : null,
+            }
+          : {}),
       });
       // The reply is out; mentions and the booking follow and may fail on
       // their own without costing the message.
@@ -356,6 +424,11 @@ export function ReplyDialog({
         queryKey: ["tickets", ticketId, "articles"],
       });
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
+      if (nextStateId != null) {
+        // A state change moves the ticket between list segments and counts.
+        void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+        void queryClient.invalidateQueries({ queryKey: ["queues"] });
+      }
       if (initialDraft) {
         // Sending with ai_draft_id accepts the draft server-side — it drops
         // out of the AI panel's open-drafts list.
@@ -443,7 +516,102 @@ export function ReplyDialog({
   const replyToOn = showReplyTo || replyToCount > 0;
 
   return (
-    <Dialog open={open} onClose={onClose} title={title} className={dialogWidth}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      className={dialogWidth}
+      footerClassName="flex-wrap bg-surface-subtle"
+      footer={
+        draftQ.isLoading || draftQ.isError ? undefined : (
+          <>
+            {canSetState && nextOptions.length > 1 && extrasFailed.length === 0 && (
+              <span className="inline-flex flex-wrap items-center gap-2" data-testid="reply-next-state">
+                <span className="text-xs text-muted">{t("ticket.replyNext.label")}</span>
+                <span
+                  role="group"
+                  aria-label={t("ticket.replyNext.label")}
+                  className="inline-flex gap-0.5 rounded-lg border border-hairline bg-surface p-0.5"
+                >
+                  {nextOptions.map((o) => (
+                    <button
+                      key={o.key}
+                      type="button"
+                      data-testid={`reply-next-${o.key}`}
+                      aria-pressed={nextState === o.key}
+                      onClick={() => setNextState(o.key)}
+                      style={{ "--seg": o.color } as React.CSSProperties}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                        nextState === o.key
+                          ? "bg-[color-mix(in_srgb,var(--seg)_14%,transparent)] font-semibold text-[var(--seg)]"
+                          : "text-muted hover:text-ink",
+                      )}
+                    >
+                      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--seg)]" />
+                      {t(`ticket.replyNext.${o.key}`)}
+                    </button>
+                  ))}
+                </span>
+                {nextState === "pending" && (
+                  <label className="inline-flex items-center gap-1.5 rounded-md bg-[color-mix(in_srgb,var(--color-state-pending)_12%,transparent)] px-2 py-1 text-xs text-[var(--color-state-pending)]">
+                    {t("ticket.replyNext.until")}
+                    <input
+                      type="date"
+                      value={pendingDate}
+                      min={todayIso()}
+                      onChange={(e) => setPendingDate(e.target.value)}
+                      data-testid="reply-next-pending-date"
+                      className="border-0 bg-transparent p-0 text-xs text-inherit focus:outline-none"
+                    />
+                  </label>
+                )}
+              </span>
+            )}
+            {storedDraft && (
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="reply-discard-draft"
+                className="hover:text-danger"
+                onClick={() => void onDiscardDraft()}
+              >
+                {t("ticket.draftDiscard")}
+              </Button>
+            )}
+            <span className="flex-1" />
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              {t("ticket.composerCancel")}
+            </Button>
+            {extrasFailed.length > 0 ? (
+              <Button
+                variant="primary"
+                size="sm"
+                data-testid="reply-extras-retry"
+                disabled={retryExtrasMutation.isPending}
+                onClick={() => retryExtrasMutation.mutate()}
+              >
+                {t("ticket.extrasRetry")}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                data-testid="reply-send"
+                disabled={!canSend || (nextState === "pending" && !pendingDate)}
+                onClick={() => sendMutation.mutate()}
+              >
+                {sendMutation.isPending
+                  ? t("ticket.replySending")
+                  : canSetState && nextState !== "keep"
+                    ? t(`ticket.replyNext.send.${nextState}`)
+                    : t("ticket.composerSend")}
+              </Button>
+            )}
+          </>
+        )
+      }
+    >
       {confirmDialog}
       {draftQ.isLoading ? (
         <div className="flex justify-center py-8">
@@ -595,57 +763,68 @@ export function ReplyDialog({
               />
             </label>
           )}
-          <div className="text-xs text-muted">
-            <span className="block">{t("ticket.replyAnswer")}</span>
+          {/* One framed editor: the text, the signature that will be appended,
+              and a toolbar (refine, time) along its bottom edge. */}
+          <div
+            className="overflow-hidden rounded-lg border border-hairline bg-surface-subtle/40 focus-within:border-accent/60"
+            data-testid="reply-editor"
+          >
             <MentionTextarea
               value={body}
               onChange={setBody}
               mentions={mentions}
               onMentionsChange={setMentions}
               rows={12}
-              className="font-mono text-xs"
+              bare
+              className="font-mono text-[12.5px] leading-relaxed"
               testId="reply-body"
               ariaLabel={t("ticket.replyAnswer")}
               // The article is already sent at this point; editing on would
               // only resurrect a draft for a reply that no longer exists.
               readOnly={extrasFailed.length > 0}
             />
-          </div>
-          {/* Rewrites only the agent's own text; the quoted original below it
-              is re-assembled from the untouched original (see replyQuote). */}
-          <RefineControls
-            target={{ ticket_id: ticketId }}
-            body={body}
-            onChange={setBody}
-            disabled={extrasFailed.length > 0}
-            testIdPrefix="reply-refine"
-          />
-          {/* Read-only signature preview — backend appends on send; do not
-              put this into the editable body (would double on send). */}
-          {Boolean(draftQ.data?.signature?.trim()) && (
-            <div
-              className="rounded border border-hairline bg-surface-subtle/60 p-2"
-              data-testid="reply-signature-preview"
-            >
-              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                {t("ticket.signaturePreview")}
-              </p>
-              {draftQ.data?.signature_is_html ? (
-                <ArticleBodyRenderer
-                  body={draftQ.data.signature}
-                  isHtml
-                  className="text-xs"
-                />
-              ) : (
-                <pre
-                  className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-ink"
-                  data-testid="reply-signature-plain"
-                >
-                  {draftQ.data?.signature}
-                </pre>
-              )}
+            {/* Read-only signature preview — backend appends on send; do not
+                put this into the editable body (would double on send). */}
+            {Boolean(draftQ.data?.signature?.trim()) && (
+              <div
+                className="mx-3 mb-2.5 border-t border-dashed border-hairline pt-2"
+                data-testid="reply-signature-preview"
+              >
+                <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-muted">
+                  {t("ticket.signatureAppended")}
+                </p>
+                {draftQ.data?.signature_is_html ? (
+                  <ArticleBodyRenderer
+                    body={draftQ.data.signature}
+                    isHtml
+                    className="text-xs text-muted"
+                  />
+                ) : (
+                  <pre
+                    className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-muted"
+                    data-testid="reply-signature-plain"
+                  >
+                    {draftQ.data?.signature}
+                  </pre>
+                )}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-2 border-t border-hairline bg-surface px-2 py-1.5">
+              {/* Rewrites only the agent's own text; the quoted original below
+                  it is re-assembled from the untouched original (see replyQuote). */}
+              <RefineControls
+                target={{ ticket_id: ticketId }}
+                body={body}
+                onChange={setBody}
+                disabled={extrasFailed.length > 0}
+                testIdPrefix="reply-refine"
+                variant="toolbar"
+              />
+              <span className="ml-auto">
+                <ComposerTimeChip value={timeUnits} onChange={setTimeUnits} testId="reply-time" />
+              </span>
             </div>
-          )}
+          </div>
           {sendMutation.isError && (
             <p className="text-xs text-danger" data-testid="reply-send-error">
               {sendMutation.error instanceof ApiError &&
@@ -669,51 +848,6 @@ export function ReplyDialog({
               )}
             </p>
           )}
-          <div className="flex items-center gap-1.5 pt-1">
-            <ComposerTimeChip
-              value={timeUnits}
-              onChange={setTimeUnits}
-              testId="reply-time"
-            />
-            {storedDraft && (
-              <Button
-                variant="ghost"
-                size="sm"
-                data-testid="reply-discard-draft"
-                className="hover:text-danger"
-                onClick={() => void onDiscardDraft()}
-              >
-                {t("ticket.draftDiscard")}
-              </Button>
-            )}
-            <span className="flex-1" />
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              {t("ticket.composerCancel")}
-            </Button>
-            {extrasFailed.length > 0 ? (
-              <Button
-                variant="primary"
-                size="sm"
-                data-testid="reply-extras-retry"
-                disabled={retryExtrasMutation.isPending}
-                onClick={() => retryExtrasMutation.mutate()}
-              >
-                {t("ticket.extrasRetry")}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                data-testid="reply-send"
-                disabled={!canSend}
-                onClick={() => sendMutation.mutate()}
-              >
-                {sendMutation.isPending
-                  ? t("ticket.replySending")
-                  : t("ticket.composerSend")}
-              </Button>
-            )}
-          </div>
         </div>
       )}
     </Dialog>
