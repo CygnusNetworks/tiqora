@@ -41,7 +41,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai import summary as summary_service
@@ -83,6 +83,7 @@ from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import (
     KEY_AI_GLOBAL_REPLIES_PER_HOUR,
     KEY_AI_OUTBOX_WATERMARK,
+    KEY_AI_TRIAGE_WATERMARK,
     get_setting,
     get_setting_int,
     set_setting,
@@ -194,22 +195,45 @@ async def _cap_reason(
     return None
 
 
-async def _has_open_triage(session: AsyncSession, ticket_id: int) -> bool:
+async def _defer_for_open_triage(session: AsyncSession, ticket_id: int, article_id: int) -> bool:
     """True while a triage proposal is waiting for an agent decision.
 
     Auto-reply must not answer under the source-queue policy in that
     window: the ticket may still move, and the agent UI is showing the
-    proposal. Skipping without touching ``last_customer_article_id`` lets
-    the same article be answered after accept/reject.
+    proposal. The outbox watermark moves past this event regardless, so the
+    article is remembered on the triage row (``reply_deferred_article_id``)
+    and :func:`_replay_deferred_replies` answers it once the row is decided.
     """
     row = (
         await session.execute(
-            select(TiqoraAiTriage.id)
+            select(TiqoraAiTriage)
             .where(
                 TiqoraAiTriage.ticket_id == ticket_id,
                 TiqoraAiTriage.status == TRIAGE_STATUS_OPEN,
             )
             .limit(1)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        return False
+    if row.reply_deferred_article_id is None or row.reply_deferred_article_id < article_id:
+        row.reply_deferred_article_id = article_id
+        await session.commit()
+    return True
+
+
+async def _agent_replied_since(session: AsyncSession, ticket_id: int, article_id: int) -> bool:
+    """True once an agent has written to the customer after *article_id* —
+    a deferred reply would then answer a message a human already answered."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT 1 FROM article a"
+                " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                " WHERE a.ticket_id = :tid AND a.id > :aid"
+                " AND st.name = 'agent' AND a.is_visible_for_customer = 1 LIMIT 1"
+            ),
+            {"tid": ticket_id, "aid": article_id},
         )
     ).first()
     return row is not None
@@ -258,7 +282,7 @@ async def _process_customer_article_event(
     if policy is None or not policy.enabled_auto_reply or policy.service_user_id is None:
         return None
 
-    if await _has_open_triage(session, ticket_id):
+    if await _defer_for_open_triage(session, ticket_id, int(article_id)):
         logger.info(
             "ai_auto_worker_triage_open_skip",
             ticket_id=ticket_id,
@@ -342,6 +366,59 @@ async def _maybe_auto_summarize(session: AsyncSession, settings: Settings, ticke
     return True
 
 
+async def _replay_deferred_replies(
+    factory: async_sessionmaker[AsyncSession], cfg: Settings, *, gate_open: bool
+) -> dict[str, int]:
+    """Answer customer articles held back while their triage row was OPEN.
+
+    Runs once the agent has accepted or rejected the proposal (any status
+    but OPEN). The column is cleared before the run, mirroring the outbox's
+    at-most-once semantics: a failing run is not retried forever. While the
+    gate is closed the deferral is dropped like any other gated event.
+    """
+    out = {"deferred_replies": 0, "errors": 0}
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(
+                    TiqoraAiTriage.id,
+                    TiqoraAiTriage.ticket_id,
+                    TiqoraAiTriage.reply_deferred_article_id,
+                )
+                .where(
+                    TiqoraAiTriage.reply_deferred_article_id.is_not(None),
+                    TiqoraAiTriage.status != TRIAGE_STATUS_OPEN,
+                )
+                .limit(OUTBOX_BATCH_SIZE)
+            )
+        ).all()
+    for triage_id, ticket_id, article_id in rows:
+        try:
+            async with factory() as session:
+                row = await session.get(TiqoraAiTriage, triage_id)
+                if row is None or row.reply_deferred_article_id is None:
+                    continue
+                row.reply_deferred_article_id = None
+                await session.commit()
+                if not gate_open or await _agent_replied_since(session, ticket_id, article_id):
+                    continue
+                event = _OutboxEvent(
+                    id=0,
+                    event_type="ArticleCreate",
+                    ticket_id=int(ticket_id),
+                    payload={"article_id": int(article_id)},
+                )
+                result = await _process_customer_article_event(session, cfg, event)
+            if result is not None and result.status == "sent":
+                out["deferred_replies"] += 1
+        except AgentRunError:
+            logger.info("ai_auto_worker_deferred_run_aborted", ticket_id=ticket_id)
+        except Exception:  # noqa: BLE001 — one broken ticket must not stop the tick
+            logger.exception("ai_auto_worker_deferred_failed", ticket_id=ticket_id)
+            out["errors"] += 1
+    return out
+
+
 async def run_auto_tick(
     *,
     settings: Settings | None = None,
@@ -361,6 +438,16 @@ async def run_auto_tick(
         gate_open = primary and not paused
         watermark = await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0)
         batch = await _next_outbox_batch(session, watermark, _BATCH_SIZE)
+        triage_raw = await get_setting(session, KEY_AI_TRIAGE_WATERMARK)
+
+    # Never overtake triage. Triage reads its batch first and then spends
+    # seconds on LLM calls; a mail arriving in that window would otherwise be
+    # answered here under the source queue's policy before triage has seen
+    # it, and triage would then skip the ticket as "ticket_continued". The
+    # events beyond the triage watermark are picked up next tick.
+    if triage_raw is not None and triage_raw.strip():
+        triage_watermark = int(triage_raw.strip())
+        batch = [event for event in batch if event.id <= triage_watermark]
 
     if not gate_open:
         logger.info("ai_auto_worker_auto_reply_gated_skipping")
@@ -432,6 +519,10 @@ async def run_auto_tick(
     if last_id != watermark:
         async with factory() as session:
             await set_setting(session, KEY_AI_OUTBOX_WATERMARK, str(last_id))
+
+    deferred = await _replay_deferred_replies(factory, cfg, gate_open=gate_open)
+    totals["deferred_replies"] = deferred["deferred_replies"]
+    totals["errors"] += deferred["errors"]
 
     logger.info("ai_auto_worker_tick", **totals)
     return totals

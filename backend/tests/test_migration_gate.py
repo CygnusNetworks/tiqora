@@ -17,7 +17,7 @@ from tiqora.cli.migrate import ALEMBIC_INI, build_alembic_config
 # The current head of the tiqora-only chain and of the owned chain. Update
 # these when adding migrations; the assertions below encode the invariant,
 # not the exact ids.
-TIQORA_HEAD = "20260919_0047"
+TIQORA_HEAD = "20260924_0048"
 OWNED_HEAD = "20260719_0006"
 
 
@@ -60,7 +60,5 @@ def test_owned_head_is_not_downstream_of_later_tiqora_revisions() -> None:
     revision then counted every later tiqora revision as applied and skipped
     it. The owned branch must stay on a fixed, old branch point."""
     script = ScriptDirectory.from_config(build_alembic_config(include_owned=True))
-    owned_ancestors = {
-        rev.revision for rev in script.iterate_revisions(OWNED_HEAD, "base")
-    }
+    owned_ancestors = {rev.revision for rev in script.iterate_revisions(OWNED_HEAD, "base")}
     assert TIQORA_HEAD not in owned_ancestors
