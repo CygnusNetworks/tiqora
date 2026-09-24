@@ -42,9 +42,7 @@
     "inbox": "Safata d'entrada",
     "myTickets": "Les meves entrades",
     "watched": "Mirat",
-    "locked": "Bloquejat",
     "responsible": "Responsable",
-    "escalated": "Escalat",
     "services": "Serveis",
     "timeAccounting": "Comptabilització de temps",
     "queues": "Cues",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Mostra actiu",
     "queueSearch": "Filtra les cues...",
     "noQueueMatch": "No coincideix cap cua.",
-    "templates": "Plantilles"
+    "templates": "Plantilles",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Els meus tiquets",
@@ -255,8 +254,6 @@
     "sidebar": "Cues",
     "allQueues": "Totes les cues",
     "empty": "No hi ha cues disponibles.",
-    "openBadge": "{{count}} obert",
-    "metaLine": "Totes les cues · ordenades per urgència",
     "exportCsv": "Exporta CSV",
     "newCount": "{{count}} nou",
     "customerFilter": "Client: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Obert",
       "pending": "Pendent",
       "closed": "Tancat",
-      "all": "Tots"
+      "all": "Tots",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Seleccioneu",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} ha canviat...",
       "updated": "{{count}} actualitzat",
       "partialFail": "{{done}} actualitzat, {{failed}} ha fallat: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} fitxers adjunts",
       "hasSummary": "Resum de l'IA disponible",
       "aiRepliedAuto": "Respost automàticament per la IA",
-      "aiRepliedAccepted": "Esborrany d'IA, acceptat per un agent"
+      "aiRepliedAccepted": "Esborrany d'IA, acceptat per un agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Entrades similars",

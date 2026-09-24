@@ -42,9 +42,7 @@
     "inbox": "Bandeja de entrada",
     "myTickets": "Mis entradas",
     "watched": "visto",
-    "locked": "Bloqueado",
     "responsible": "Responsable",
-    "escalated": "Escalado",
     "services": "Servicios",
     "timeAccounting": "Contabilización de tiempo",
     "queues": "Colas",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Mostrar activo",
     "queueSearch": "Filtrar colas…",
     "noQueueMatch": "Ninguna cola coincide.",
-    "templates": "Plantillas"
+    "templates": "Plantillas",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mis tickets",
@@ -255,8 +254,6 @@
     "sidebar": "Colas",
     "allQueues": "Todas las colas",
     "empty": "No hay colas disponibles.",
-    "openBadge": "{{count}} abierto",
-    "metaLine": "Todas las colas · ordenadas por urgencia",
     "exportCsv": "Exportar CSV",
     "newCount": "{{count}} nuevo",
     "customerFilter": "Cliente: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Abierto",
       "pending": "Pendiente",
       "closed": "Cerrado",
-      "all": "Todos"
+      "all": "Todos",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Seleccionar",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} cambió…",
       "updated": "{{count}} actualizado",
       "partialFail": "{{done}} actualizado, {{failed}} fallido: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} archivos adjuntos",
       "hasSummary": "Resumen de AI disponible",
       "aiRepliedAuto": "Respondido automáticamente por la IA",
-      "aiRepliedAccepted": "Borrador de IA, aceptado por un agente"
+      "aiRepliedAccepted": "Borrador de IA, aceptado por un agente",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Entradas similares",
