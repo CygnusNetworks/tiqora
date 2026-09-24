@@ -42,9 +42,7 @@
     "inbox": "กล่องจดหมาย",
     "myTickets": "ตั๋วของฉัน",
     "watched": "ดูแล้ว",
-    "locked": "ล็อกแล้ว",
     "responsible": "ผู้รับผิดชอบ",
-    "escalated": "เลื่อนระดับ",
     "services": "บริการ",
     "timeAccounting": "บันทึกเวลา",
     "queues": "คิว",
@@ -60,7 +58,8 @@
     "showActiveQueues": "แสดงการใช้งาน",
     "queueSearch": "กรองคิว...",
     "noQueueMatch": "ไม่มีคิวที่ตรงกัน",
-    "templates": "เทมเพลต"
+    "templates": "เทมเพลต",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "ตั๋วของฉัน",
@@ -255,8 +254,6 @@
     "sidebar": "คิว",
     "allQueues": "ทุกคิว",
     "empty": "ไม่มีคิวว่าง",
-    "openBadge": "{{count}} เปิด",
-    "metaLine": "คิวทั้งหมด · จัดเรียงตามความเร่งด่วน",
     "exportCsv": "ส่งออก CSV",
     "newCount": "{{count}} ใหม่",
     "customerFilter": "ลูกค้า: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "เปิด",
       "pending": "รอดำเนินการ",
       "closed": "ปิดแล้ว",
-      "all": "ทั้งหมด"
+      "all": "ทั้งหมด",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ เลือก",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} เปลี่ยนแล้ว...",
       "updated": "{{count}} อัปเดตแล้ว",
       "partialFail": "{{done}} อัปเดตแล้ว {{failed}} ล้มเหลว: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "ไฟล์แนบ {{count}}",
       "hasSummary": "มีข้อมูลสรุป AI",
       "aiRepliedAuto": "ตอบอัตโนมัติโดย AI",
-      "aiRepliedAccepted": "ร่างจาก AI ที่เจ้าหน้าที่ยอมรับ"
+      "aiRepliedAccepted": "ร่างจาก AI ที่เจ้าหน้าที่ยอมรับ",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "ตั๋วที่คล้ายกัน",

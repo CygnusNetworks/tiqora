@@ -42,9 +42,7 @@
     "inbox": "Indbakke",
     "myTickets": "Mine billetter",
     "watched": "Så",
-    "locked": "Låst",
     "responsible": "Ansvarlig",
-    "escalated": "Eskaleret",
     "services": "Services",
     "timeAccounting": "Tidsregistrering",
     "queues": "Køer",
@@ -60,7 +58,8 @@
     "showActiveQueues": "Vis aktiv",
     "queueSearch": "Filtrer køer...",
     "noQueueMatch": "Ingen køer matcher.",
-    "templates": "Skabeloner"
+    "templates": "Skabeloner",
+    "escalatedCount": "{{count}} escalated"
   },
   "views": {
     "mine": "Mine sager",
@@ -255,8 +254,6 @@
     "sidebar": "Køer",
     "allQueues": "Alle køer",
     "empty": "Ingen tilgængelige køer.",
-    "openBadge": "{{count}} åben",
-    "metaLine": "Alle køer · sorteret efter haster",
     "exportCsv": "Eksporter CSV",
     "newCount": "{{count}} ny",
     "customerFilter": "Kunde: {{customerId}}",
@@ -268,7 +265,8 @@
       "open": "Åbn",
       "pending": "Afventer",
       "closed": "Lukket",
-      "all": "Alle"
+      "all": "Alle",
+      "todo": "To do"
     },
     "bulk": {
       "select": "☑ Vælg",
@@ -291,6 +289,31 @@
       "progress": "{{done}}/{{total}} ændret...",
       "updated": "{{count}} opdateret",
       "partialFail": "{{done}} opdateret, {{failed}} mislykkedes: {{ids}}"
+    },
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
+    "byActivity": "by latest activity",
+    "stateFilter": "Status",
+    "moreActions": "More actions",
+    "flags": {
+      "label": "Filter by flag",
+      "only": "Only",
+      "escalated": "Escalated",
+      "locked": "Locked",
+      "unassigned": "Unassigned",
+      "reset": "reset"
+    },
+    "pinned": {
+      "title": "Needs attention · {{count}}",
+      "hint": "overdue first, then due soon",
+      "showAll": "Show all escalated",
+      "rest": "By latest activity"
+    },
+    "day": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "This week",
+      "older": "Older"
     }
   },
   "ticket": {
@@ -615,7 +638,15 @@
       "attachments_other": "{{count}} vedhæftede filer",
       "hasSummary": "AI resumé tilgængelig",
       "aiRepliedAuto": "Besvaret automatisk af AI'en",
-      "aiRepliedAccepted": "AI-udkast, accepteret af en agent"
+      "aiRepliedAccepted": "AI-udkast, accepteret af en agent",
+      "lastActivity": "Last activity",
+      "ticket": "Ticket",
+      "locked": "Locked",
+      "lastBy": {
+        "customer": "← Customer",
+        "agent": "→ Agent",
+        "system": "System"
+      }
     },
     "similar": {
       "title": "Lignende billetter",

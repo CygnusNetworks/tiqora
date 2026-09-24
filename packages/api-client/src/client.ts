@@ -27,6 +27,7 @@ export type QueueCounts = Schemas["QueueCounts"];
 export type TicketListItem = Schemas["TicketListItem"];
 export type PaginatedTickets = Schemas["PaginatedTickets"];
 export type MyTicketCounts = Schemas["MyTicketCounts"];
+export type TicketFacets = Schemas["TicketFacets"];
 // Hand-written (see the Stats block below for why we don't regenerate
 // schema.d.ts): mirrors the DashboardSummary model in tiqora/api/v1/tickets.py.
 export type DashboardSummary = {
@@ -1186,8 +1187,13 @@ export class ApiClient {
       escalated?: boolean;
       /** True = AI handed the ticket to a human and a human has not yet taken over. */
       ai_escalated?: boolean;
+      /** True = still owned by the Znuny root account (nobody took it); False = owned by an agent. */
+      unassigned?: boolean;
+      /** Seconds: any escalation_* epoch due before now + this window (overdue ones included). */
+      escalating_within?: number;
       offset?: number;
       limit?: number;
+      /** age | created | changed | tn | title | priority | activity (newest article, else creation). */
       sort?: string;
       order?: string;
       /** Admins only — also list archived tickets (ignored for non-admins). */
@@ -1196,6 +1202,46 @@ export class ApiClient {
     signal?: AbortSignal,
   ) {
     return this.request<PaginatedTickets>("GET", "/api/v1/tickets", {
+      query: params,
+      signal,
+    });
+  }
+
+  /**
+   * Inbox segment + chip counts for the given list filters, in one request.
+   * `states` ignores `state_type`/`state_id` (one count per segment, `all` =
+   * no state filter); `flags` applies the state filter but ignores
+   * `escalated`/`locked`/`unassigned` (each = the rest plus only that flag).
+   */
+  ticketFacets(
+    params: {
+      queue_id?: number;
+      state_id?: number;
+      state_type?: string;
+      owner_id?: number;
+      customer_id?: string;
+      /** Filter by responsible agent user id. */
+      responsible_id?: number;
+      /** Filter by service id. */
+      service_id?: number;
+      /** True = lock/tmp_lock only; False = unlock only. */
+      locked?: boolean;
+      /** Tickets watched by this agent user id. */
+      watcher_user_id?: number;
+      /** True = any escalation_* epoch already in the past. */
+      escalated?: boolean;
+      /** True = AI handed the ticket to a human and a human has not yet taken over. */
+      ai_escalated?: boolean;
+      /** True = still owned by the Znuny root account (nobody took it); False = owned by an agent. */
+      unassigned?: boolean;
+      /** Seconds: any escalation_* epoch due before now + this window (overdue ones included). */
+      escalating_within?: number;
+      /** Admins only — also count archived tickets (ignored for non-admins). */
+      include_archived?: boolean;
+    } = {},
+    signal?: AbortSignal,
+  ) {
+    return this.request<TicketFacets>("GET", "/api/v1/tickets/facets", {
       query: params,
       signal,
     });
@@ -1476,6 +1522,10 @@ export class ApiClient {
       watcher_user_id?: number;
       escalated?: boolean;
       ai_escalated?: boolean;
+      /** True = still owned by the Znuny root account (nobody took it); False = owned by an agent. */
+      unassigned?: boolean;
+      /** Seconds: any escalation_* epoch due before now + this window (overdue ones included). */
+      escalating_within?: number;
       sort?: string;
       order?: string;
       /** Admins only — also export archived tickets (ignored for non-admins). */
