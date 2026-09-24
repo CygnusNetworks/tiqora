@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from tiqora.ai.pii import PiiMapper
 
 
@@ -238,3 +240,63 @@ def test_pii_never_mask_keeps_ticket_number_readable() -> None:
     assert pii.mask("[Cygnus#2026010510000011] Re: network") == (
         "[Cygnus#2026010510000011] Re: network"
     )
+
+
+# ---------------------------------------------------------------------------
+# Linear time (docs/superpowers/specs/2026-09-19-pii-mask-linear-time-design.md)
+#
+# Budgets sit far above the fixed runtime and far below the old quadratic
+# one (~40 s for the email case, 54 s for the label case at 256 kB), so they
+# neither flake on a loaded runner nor pass on a regression.
+# ---------------------------------------------------------------------------
+
+_BIG = 256 * 1024
+
+
+def _timed_mask(text: str) -> tuple[str, float]:
+    started = time.perf_counter()
+    out = PiiMapper().mask(text)
+    return out, time.perf_counter() - started
+
+
+def test_a_long_word_run_does_not_backtrack_quadratically() -> None:
+    _out, elapsed = _timed_mask("a" * _BIG)
+    assert elapsed < 2.0
+
+
+def test_masking_a_big_text_with_many_candidates_stays_fast() -> None:
+    chunk = "Wohnplatz 990123456 ok. "
+    text = chunk * (_BIG // len(chunk))
+    out, elapsed = _timed_mask(text)
+    assert elapsed < 2.0
+    assert out == text
+
+
+def test_masking_a_big_json_result_stays_fast() -> None:
+    chunk = '{"free_traffic": 6597069766656}, '
+    text = chunk * (_BIG // len(chunk))
+    out, elapsed = _timed_mask(text)
+    assert elapsed < 2.0
+    assert out == text
+
+
+def test_an_overlong_address_is_never_half_masked() -> None:
+    text = "Kontakt " + "a" * 70 + "@example.org bitte"
+    out = PiiMapper().mask(text)
+    assert out in (text, "Kontakt [EMAIL_1] bitte")
+
+
+def test_an_address_followed_by_a_hyphen_is_still_masked() -> None:
+    assert PiiMapper().mask("Konto erika@example.org-intern") == "Konto [EMAIL_1]-intern"
+
+
+def test_a_sentence_final_dot_is_not_part_of_the_address() -> None:
+    assert PiiMapper().mask("Mail: erika@example.org.") == "Mail: [EMAIL_1]."
+
+
+def test_only_a_phone_label_close_to_the_number_counts() -> None:
+    assert PiiMapper().mask("Wohnplatz 990123456") == "Wohnplatz 990123456"
+    text = "Tel: 0228 1234567. " + "x" * 128 + " Wohnplatz 990123456"
+    out = PiiMapper().mask(text)
+    assert out.startswith("Tel: [PHONE_1]")
+    assert out.endswith("Wohnplatz 990123456")
