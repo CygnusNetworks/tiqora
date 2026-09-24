@@ -132,7 +132,6 @@
     "prev": "Zurück",
     "next": "Weiter",
     "back": "Zurück",
-    "backToQueues": "Zurück zu Queues",
     "loading": "Laden…",
     "close": "Schließen",
     "confirm": "Bestätigen",
@@ -579,7 +578,13 @@
         "resultLabel": "Eigene Zusammenfassung",
         "copy": "Kopieren",
         "copied": "Kopiert"
-      }
+      },
+      "summaryStaleRefresh_one": "1 neuer Artikel",
+      "summaryStaleRefresh_other": "{{count}} neue Artikel",
+      "more": "mehr",
+      "less": "weniger",
+      "scopeAndInstruction": "Umfang & eigene Anweisung …",
+      "pinOpen": "Anheften (bleibt aufgeklappt)"
     },
     "toolbar": {
       "print": "Drucken",
@@ -711,7 +716,31 @@
       "errorDisabled": "Die KI-Überarbeitung ist für diese Queue nicht aktiviert.",
       "error": "Die Überarbeitung ist fehlgeschlagen. Dein Text ist unverändert.",
       "nothingToRefineShort": "kein eigener Text",
-      "toneMenuLabel": "Tonfall wählen"
+      "toneMenuLabel": "Tonfall wählen",
+      "buttonShort": "Verfeinern"
+    },
+    "nav": {
+      "label": "Herkunft",
+      "search": "Suche „{{query}}“",
+      "position": "{{index}} / {{total}}",
+      "prev": "Vorheriges Ticket der Liste",
+      "next": "Nächstes Ticket der Liste"
+    },
+    "stateGroup": {
+      "pending": "Wartend",
+      "closed": "Geschlossen"
+    },
+    "signatureAppended": "Signatur · wird beim Senden angehängt",
+    "replyNext": {
+      "label": "Danach",
+      "keep": "Status lassen",
+      "pending": "Wartend",
+      "closed": "Erfolgreich schließen",
+      "until": "bis",
+      "send": {
+        "pending": "Senden · wartend",
+        "closed": "Senden & schließen"
+      }
     }
   },
   "search": {

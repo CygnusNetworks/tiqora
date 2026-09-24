@@ -30,6 +30,7 @@ export function MentionTextarea({
   textareaRef,
   ariaLabel,
   readOnly = false,
+  bare = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -43,6 +44,9 @@ export function MentionTextarea({
   ariaLabel?: string;
   /** Locks the text once it has been sent (see the composers' retry state). */
   readOnly?: boolean;
+  /** No own border/background/focus ring — for a textarea that sits inside
+   * a framed editor which draws those itself. */
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const localRef = useRef<HTMLTextAreaElement | null>(null);
@@ -136,7 +140,9 @@ export function MentionTextarea({
         aria-controls={open ? "mention-typeahead" : undefined}
         aria-autocomplete="list"
         className={cn(
-          "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent",
+          bare
+            ? "block w-full resize-y border-0 bg-transparent px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none"
+            : "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent",
           className,
         )}
         onChange={(e) => {

@@ -19,6 +19,8 @@ const {
   formDrafts,
   refine,
   refineAvailability,
+  getTicket,
+  listReferenceStates,
 } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
   listTemplates: vi.fn(),
@@ -30,6 +32,8 @@ const {
   formDrafts: { list: vi.fn(), upsert: vi.fn(), remove: vi.fn() },
   refine: vi.fn(),
   refineAvailability: vi.fn(),
+  getTicket: vi.fn(),
+  listReferenceStates: vi.fn(),
 }));
 
 vi.mock("@/lib/refineApi", async () => {
@@ -50,6 +54,8 @@ vi.mock("@/lib/api", async () => {
       createTicketTimeAccounting,
       listReferenceAgents,
       acquireTicketLock,
+      getTicket,
+      listReferenceStates,
     },
   };
 });
@@ -886,5 +892,76 @@ describe("ReplyDialog refine", () => {
     );
     // Addressed by ticket — the server derives the queue from it.
     expect(refine.mock.calls[0][0].ticket_id).toBe(1);
+  });
+});
+
+describe("ReplyDialog: state after sending (Danach)", () => {
+  const STATES = [
+    { id: 1, name: "new", type_name: "new" },
+    { id: 4, name: "open", type_name: "open" },
+    { id: 2, name: "closed successful", type_name: "closed" },
+    { id: 3, name: "closed unsuccessful", type_name: "closed" },
+    { id: 6, name: "pending reminder", type_name: "pending reminder" },
+  ];
+  const perms = (rw: boolean) => ({
+    ro: true,
+    move_into: rw,
+    create: rw,
+    note: true,
+    owner: rw,
+    priority: rw,
+    rw,
+  });
+
+  beforeEach(() => {
+    getReplyDraft.mockReset().mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
+    listTemplates.mockReset().mockResolvedValue([]);
+    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    listReferenceStates.mockReset().mockResolvedValue(STATES);
+    getTicket.mockReset().mockResolvedValue({ id: 1, permissions: perms(true) });
+  });
+
+  function open() {
+    return wrap(<ReplyDialog ticketId={1} articleId={2} replyAll={false} open onClose={vi.fn()} />);
+  }
+
+  it("keeps the state by default and sends no state_id", async () => {
+    open();
+    expect(await screen.findByTestId("reply-next-keep")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("reply-send")).toHaveTextContent("Send");
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(createArticle.mock.calls[0][1]).not.toHaveProperty("state_id");
+  });
+
+  it("closes successfully in the same request and says so on the button", async () => {
+    open();
+    fireEvent.click(await screen.findByTestId("reply-next-closed"));
+    expect(screen.getByTestId("reply-send")).toHaveTextContent("Send & close");
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(createArticle.mock.calls[0][1]).toMatchObject({ state_id: 2, pending_time: null });
+  });
+
+  it("sets pending with a reminder at 08:00 on the chosen day", async () => {
+    open();
+    fireEvent.click(await screen.findByTestId("reply-next-pending"));
+    fireEvent.change(screen.getByTestId("reply-next-pending-date"), {
+      target: { value: "2030-01-02" },
+    });
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(createArticle.mock.calls[0][1]).toMatchObject({
+      state_id: 6,
+      pending_time: new Date("2030-01-02T08:00").toISOString(),
+    });
+  });
+
+  it("offers no state choice to an agent who may only add notes", async () => {
+    getTicket.mockResolvedValue({ id: 1, permissions: perms(false) });
+    open();
+    await screen.findByTestId("reply-dialog");
+    await waitFor(() => expect(getTicket).toHaveBeenCalled());
+    expect(screen.queryByTestId("reply-next-state")).toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
 import { Menu, MenuItem, MenuLabel } from "@/components/ui/Menu";
 import { Spinner } from "@/components/ui/Spinner";
+import { HelpPopover } from "@/components/ui/HelpPopover";
 import { cn } from "@/lib/cn";
 import { applyRefined, ownSections, segmentBody } from "@/lib/replyQuote";
 import {
@@ -30,6 +31,10 @@ import { loadRefineTone, saveRefineTone } from "@/lib/refineTone";
  * the new body is re-assembled from the ORIGINAL quote bytes — quoted text
  * cannot change, whatever the model returns.
  *
+ * The `toolbar` variant is for an editor's bottom bar (reply dialog): a
+ * "Verfeinern" button, the tones as an always-visible segmented switch and
+ * the explanation behind an ⓘ instead of a line of text.
+ *
  * Renders nothing unless the queue has `enabled_refine` and the agent's ACL
  * allows the feature, so a composer in a non-AI queue looks exactly as before.
  */
@@ -39,6 +44,7 @@ export function RefineControls({
   onChange,
   disabled,
   testIdPrefix = "refine",
+  variant = "split",
 }: {
   /** `{ticket_id}` when replying inside a ticket (the server reads its queue),
    * `{queue_id}` for the New-ticket form, `null` while no queue is picked
@@ -48,6 +54,7 @@ export function RefineControls({
   onChange: (body: string) => void;
   disabled?: boolean;
   testIdPrefix?: string;
+  variant?: "split" | "toolbar";
 }) {
   const { t } = useTranslation();
   const [tone, setTone] = useState<RefineTone>(loadRefineTone);
@@ -91,6 +98,70 @@ export function RefineControls({
     setBeforeRefine(null);
     refineMutation.reset();
   };
+
+  const undoButton = beforeRefine !== null && (
+    <button
+      type="button"
+      data-testid={`${testIdPrefix}-undo`}
+      disabled={busy}
+      onClick={undo}
+      className="rounded px-1.5 py-1 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+    >
+      ↩ {t("ticket.refine.undo")}
+    </button>
+  );
+  const errorText = refineMutation.isError && (
+    <span className="text-danger" data-testid={`${testIdPrefix}-error`}>
+      {refineErrorMessage(refineMutation.error, t)}
+    </span>
+  );
+
+  if (variant === "toolbar") {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-xs" data-testid={`${testIdPrefix}-toolbar`}>
+        <button
+          type="button"
+          data-testid={`${testIdPrefix}-button`}
+          disabled={!canRefine}
+          title={nothingToRefine ? t("ticket.refine.nothingToRefine") : undefined}
+          onClick={() => refineMutation.mutate()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-accent/35 bg-accent/10 px-2.5 py-1 font-semibold text-accent transition-colors duration-100 enabled:hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        >
+          {busy ? <Spinner className="h-3 w-3" /> : <span aria-hidden>✦</span>}
+          {busy ? t("ticket.refine.running") : t("ticket.refine.buttonShort")}
+        </button>
+        <span
+          role="group"
+          aria-label={t("ticket.refine.toneLabel")}
+          className="inline-flex gap-0.5 rounded-md border border-hairline bg-surface-subtle p-0.5"
+        >
+          {REFINE_TONES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              data-testid={`${testIdPrefix}-tone-${value}`}
+              aria-pressed={value === tone}
+              disabled={busy}
+              onClick={() => pickTone(value)}
+              className={cn(
+                "rounded px-2 py-0.5 text-[11.5px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                value === tone
+                  ? "bg-surface font-semibold text-ink shadow-[0_0_0_1px_var(--color-hairline)]"
+                  : "text-muted hover:text-ink",
+              )}
+            >
+              {t(toneLabelKey(value))}
+            </button>
+          ))}
+        </span>
+        <HelpPopover title={t("ticket.refine.button")} testId={`${testIdPrefix}-help`}>
+          {t("ticket.refine.hint")}
+        </HelpPopover>
+        {undoButton}
+        {errorText}
+      </div>
+    );
+  }
 
   const half =
     "px-2 py-1 text-xs text-ink transition-colors duration-100 disabled:cursor-not-allowed disabled:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -159,23 +230,8 @@ export function RefineControls({
           : t(toneLabelKey(tone))}
       </span>
 
-      {beforeRefine !== null && (
-        <button
-          type="button"
-          data-testid={`${testIdPrefix}-undo`}
-          disabled={busy}
-          onClick={undo}
-          className="rounded px-1.5 py-1 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-        >
-          ↩ {t("ticket.refine.undo")}
-        </button>
-      )}
-
-      {refineMutation.isError && (
-        <span className="text-danger" data-testid={`${testIdPrefix}-error`}>
-          {refineErrorMessage(refineMutation.error, t)}
-        </span>
-      )}
+      {undoButton}
+      {errorText}
     </div>
   );
 }

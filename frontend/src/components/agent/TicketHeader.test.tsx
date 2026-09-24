@@ -84,7 +84,7 @@ function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
   } as TicketDetail;
 }
 
-function wrap(ticket: TicketDetail, overflowMenu?: React.ReactNode) {
+function wrap(ticket: TicketDetail, overflowItems?: React.ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -93,7 +93,7 @@ function wrap(ticket: TicketDetail, overflowMenu?: React.ReactNode) {
       <I18nextProvider i18n={i18n}>
         <TicketHeader
           ticket={ticket}
-          overflowMenu={overflowMenu}
+          overflowItems={overflowItems}
           canNote
           onOpenNote={vi.fn()}
         />
@@ -109,6 +109,7 @@ describe("TicketHeader", () => {
       { id: 5, name: "5 very high" },
     ]);
     listReferenceStates.mockReset().mockResolvedValue([
+      { id: 1, name: "new", type_name: "new" },
       { id: 4, name: "open", type_name: "open" },
       { id: 2, name: "closed successful", type_name: "closed" },
       { id: 8, name: "pending reminder", type_name: "pending reminder" },
@@ -117,23 +118,25 @@ describe("TicketHeader", () => {
     patchTicket.mockReset().mockResolvedValue(undefined);
   });
 
-  it("shows status and priority as soft-chips inside the interactive pills", async () => {
-    wrap(makeTicket({ state: "pending reminder", state_type: "pending reminder" }));
-    const statePill = screen.getByTestId("ticket-pill-state");
-    expect(statePill).toHaveTextContent("Pending reminder");
-    const prioPill = screen.getByTestId("ticket-pill-priority");
-    expect(prioPill).toHaveTextContent("normal");
+  it("marks the pending segment of the status bar with the exact pending state", async () => {
+    wrap(makeTicket({ state: "pending reminder", state_type: "pending reminder", state_id: 8 }));
+    const pending = await screen.findByTestId("ticket-status-pending");
+    expect(pending).toHaveTextContent("Pending reminder");
+    expect(pending).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("ticket-pill-priority")).toHaveTextContent("normal");
   });
 
-  it("shows the same soft-chip for new tickets (no separate Neu badge)", () => {
-    wrap(makeTicket({ state: "new", state_type: "new" }));
-    expect(screen.getByTestId("ticket-pill-state")).toHaveTextContent("New");
+  it("marks a new ticket's own segment in the status bar", async () => {
+    wrap(makeTicket({ state: "new", state_type: "new", state_id: 1 }));
+    expect(await screen.findByTestId("ticket-status-1")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("ticket-status-4")).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByTestId("ticket-header-new-badge")).toBeNull();
   });
 
-  it("anchors the overflow menu top-right", () => {
-    wrap(makeTicket(), <button data-testid="overflow-stub">⋮</button>);
-    expect(screen.getByTestId("ticket-header-overflow")).toContainElement(
+  it("lists the page's own items at the end of the single ⋯ menu", async () => {
+    wrap(makeTicket(), <button data-testid="overflow-stub">History</button>);
+    fireEvent.click(screen.getByTestId("ticket-actions-more"));
+    expect(await screen.findByTestId("ticket-actions-more-menu")).toContainElement(
       screen.getByTestId("overflow-stub"),
     );
   });
