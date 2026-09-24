@@ -36,6 +36,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.settings_store import (
     KEY_AI_GLOBAL_REPLIES_PER_HOUR,
     KEY_AI_OUTBOX_WATERMARK,
+    KEY_AI_TRIAGE_WATERMARK,
     get_setting_int,
     set_setting,
 )
@@ -1004,4 +1005,201 @@ async def test_ticket_without_handoff_flag_still_answered(
         totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
         assert totals["auto_replies"] == 1
     finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Open triage proposals: deferred replies and the triage watermark
+# ---------------------------------------------------------------------------
+
+
+def _insert_open_triage(sync_url: str, *, ticket_id: int, queue_id: int, article_id: int) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM tiqora_ai_triage WHERE ticket_id = :tid"), {"tid": ticket_id}
+        )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_ai_triage (ticket_id, article_id, source_queue_id, status,"
+                " suggested_queue_id, queue_confidence, queue_applied, customer_applied,"
+                " create_time, change_time)"
+                " VALUES (:tid, :aid, :qid, 'open', :qid, 67, 0, 0,"
+                " current_timestamp, current_timestamp)"
+            ),
+            {"tid": ticket_id, "aid": article_id, "qid": queue_id},
+        )
+    engine.dispose()
+
+
+def _triage_row(sync_url: str, ticket_id: int) -> dict[str, Any]:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        row = (
+            conn.execute(
+                text("SELECT * FROM tiqora_ai_triage WHERE ticket_id = :tid"), {"tid": ticket_id}
+            )
+            .mappings()
+            .one()
+        )
+    engine.dispose()
+    return dict(row)
+
+
+def _decide_triage(sync_url: str, ticket_id: int, status: str) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE tiqora_ai_triage SET status = :st WHERE ticket_id = :tid"),
+            {"st": status, "tid": ticket_id},
+        )
+    engine.dispose()
+
+
+def _delete_triage(sync_url: str, ticket_id: int) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM tiqora_ai_triage WHERE ticket_id = :tid"), {"tid": ticket_id}
+        )
+        conn.execute(
+            text("DELETE FROM tiqora_settings WHERE `key` = :k"), {"k": KEY_AI_TRIAGE_WATERMARK}
+        )
+    engine.dispose()
+
+
+async def test_article_held_back_by_open_triage_is_answered_after_the_decision(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the tick skipped the article while triage was OPEN but
+    moved its watermark past it, and accept/reject never came back to it —
+    the customer's opening mail was never answered."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=44)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Router?"
+    )
+    _insert_open_triage(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        queue_id=seed["queue_id"],
+        article_id=article_id,
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Gerne!")]))
+
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 0
+        assert _triage_row(mariadb_znuny_url, seed["ticket_id"])["reply_deferred_article_id"] == (
+            article_id
+        )
+
+        # Still open: nothing happens on the next tick either.
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["deferred_replies"] == 0
+
+        _decide_triage(mariadb_znuny_url, seed["ticket_id"], "rejected")
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["deferred_replies"] == 1
+        assert (
+            _triage_row(mariadb_znuny_url, seed["ticket_id"])["reply_deferred_article_id"] is None
+        )
+
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.last_customer_article_id == article_id
+    finally:
+        _delete_triage(mariadb_znuny_url, seed["ticket_id"])
+        await engine.dispose()
+
+
+async def test_deferred_reply_is_dropped_when_an_agent_answered_meanwhile(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed = _seed_ticket(mariadb_znuny_url, ns=45)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Router?"
+    )
+    _insert_open_triage(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        queue_id=seed["queue_id"],
+        article_id=article_id,
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+        llm = ScriptedLlm([_propose_response("reply", "Gerne!")])
+        _patch_llm(monkeypatch, llm)
+
+        await run_auto_tick(settings=get_settings(), session_factory=factory)
+        _add_article(
+            mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="agent", body="Erledigt."
+        )
+        _decide_triage(mariadb_znuny_url, seed["ticket_id"], "accepted")
+
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["deferred_replies"] == 0
+        assert (
+            _triage_row(mariadb_znuny_url, seed["ticket_id"])["reply_deferred_article_id"] is None
+        )
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is None or state.auto_reply_count == 0
+    finally:
+        _delete_triage(mariadb_znuny_url, seed["ticket_id"])
+        await engine.dispose()
+
+
+async def test_auto_tick_never_overtakes_the_triage_watermark(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A mail that arrives while triage is busy with LLM calls must wait for
+    triage to see it, not be answered under the source queue's policy."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=46)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Hallo?"
+    )
+    event_id = _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await set_setting(session, KEY_AI_TRIAGE_WATERMARK, str(event_id - 1))
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Gerne!")]))
+
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 0
+        async with factory() as session:
+            assert await get_setting_int(session, KEY_AI_OUTBOX_WATERMARK, 0) < event_id
+            await set_setting(session, KEY_AI_TRIAGE_WATERMARK, str(event_id))
+
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 1
+    finally:
+        _delete_triage(mariadb_znuny_url, seed["ticket_id"])
         await engine.dispose()
