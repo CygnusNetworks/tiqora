@@ -567,6 +567,10 @@ class TiqoraAiTriage(TiqoraBase):
     decided_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     decided_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Newest customer article auto-reply skipped because this row was OPEN.
+    # The worker answers it once the row is decided and clears the column —
+    # without it the outbox watermark has already moved past that article.
+    reply_deferred_article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
     create_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()

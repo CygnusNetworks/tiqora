@@ -4,6 +4,7 @@ extraction and self-consistency confidence. No DB, no LLM."""
 from __future__ import annotations
 
 from tiqora.ai.context import TicketSnapshot
+from tiqora.ai.models import TiqoraAiQueuePolicy, TiqoraAiTriage
 from tiqora.ai.triage import (
     NO_QUEUE_KEY,
     QueueCandidate,
@@ -11,6 +12,7 @@ from tiqora.ai.triage import (
     aggregate_votes,
     build_user_message,
     extract_forwarded_sender,
+    open_halves,
     queue_id_from_key,
     queue_key,
 )
@@ -368,3 +370,45 @@ def test_stay_option_without_description_has_no_empty_line() -> None:
         current_description="   ",
     )
     assert rendered.rstrip().endswith("Ticket bleibt in der aktuellen Queue campus-verwaltung.")
+
+
+# ---------------------------------------------------------------------------
+# open_halves — shared by worker status, ticket UI and the accept route
+# ---------------------------------------------------------------------------
+
+
+def _row(**kw: object) -> TiqoraAiTriage:
+    base: dict[str, object] = {
+        "ticket_id": 1,
+        "article_id": 1,
+        "source_queue_id": 1,
+        "status": "open",
+        "suggested_queue_id": 7,
+        "queue_confidence": 60,
+        "queue_applied": False,
+        "suggested_customer_user_id": "student@uni.example.org",
+        "customer_applied": False,
+        "error": None,
+    }
+    base.update(kw)
+    return TiqoraAiTriage(**base)
+
+
+def _policy(*, customer_fix: bool, suggest: int = 50) -> TiqoraAiQueuePolicy:
+    return TiqoraAiQueuePolicy(
+        triage_suggest_threshold=suggest, triage_customer_fix_enabled=customer_fix
+    )
+
+
+def test_open_halves_hides_customer_when_the_fix_is_disabled() -> None:
+    assert open_halves(_row(), _policy(customer_fix=False)) == (True, False)
+    assert open_halves(_row(), _policy(customer_fix=True)) == (True, True)
+
+
+def test_open_halves_drops_applied_and_below_threshold_halves() -> None:
+    policy = _policy(customer_fix=True)
+    assert open_halves(_row(customer_applied=True), policy) == (True, False)
+    assert open_halves(_row(queue_applied=True), policy) == (False, True)
+    assert open_halves(_row(queue_confidence=40), policy) == (False, True)
+    assert open_halves(_row(error="boom"), policy) == (False, True)
+    assert open_halves(_row(), None) == (False, False)

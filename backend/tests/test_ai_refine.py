@@ -489,6 +489,81 @@ async def test_refine_falls_back_to_one_call_per_section_when_the_model_drops_on
         await engine.dispose()
 
 
+async def test_refine_fallback_is_all_or_nothing(
+    mariadb_znuny_url: str,
+) -> None:
+    """One section the retry cannot recover discards the others too — the
+    composer must never rewrite some paragraphs and silently keep the rest."""
+    seed = _seed(mariadb_znuny_url, ns=20)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+
+        segments = [
+            Segment(kind="own", text="erstens\n"),
+            Segment(kind="quote", text="> frage\n"),
+            Segment(kind="own", text="zweitens\n"),
+        ]
+        llm = ScriptedLlm(
+            [
+                "not json at all",
+                "still not json",
+                json.dumps({"sections": [{"id": 2, "text": "Zweitens."}]}),
+            ]
+        )
+        async with factory() as session:
+            with pytest.raises(RefineEmptyOutputError):
+                await refine_text(
+                    session,
+                    llm=llm,
+                    queue_id=seed["queue_id"],
+                    segments=segments,
+                    tone=TONE_STANDARD,
+                    acting_user_id=seed["agent_id"],
+                )
+        # Stops at the first unrecoverable section instead of spending a
+        # call on a result that would be thrown away.
+        assert llm.calls == 2
+    finally:
+        await engine.dispose()
+
+
+async def test_refine_fallback_stops_once_its_time_budget_is_spent(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed = _seed(mariadb_znuny_url, ns=21)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    monkeypatch.setattr("tiqora.ai.refine.FALLBACK_BUDGET_SECONDS", -1.0)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+
+        segments = [Segment(kind="own", text="erstens\n"), Segment(kind="own", text="zwei\n")]
+        llm = ScriptedLlm(
+            [
+                "not json at all",
+                json.dumps({"sections": [{"id": 0, "text": "Erstens."}]}),
+                json.dumps({"sections": [{"id": 1, "text": "Zwei."}]}),
+            ]
+        )
+        async with factory() as session:
+            with pytest.raises(RefineEmptyOutputError):
+                await refine_text(
+                    session,
+                    llm=llm,
+                    queue_id=seed["queue_id"],
+                    segments=segments,
+                    tone=TONE_STANDARD,
+                    acting_user_id=seed["agent_id"],
+                )
+        assert llm.calls == 1
+    finally:
+        await engine.dispose()
+
+
 async def test_refine_raises_when_the_model_returns_nothing_usable(
     mariadb_znuny_url: str,
 ) -> None:

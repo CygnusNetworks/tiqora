@@ -694,7 +694,8 @@
               "summary",
               "auto_reply",
               "manual_assist",
-              "mcp"
+              "mcp",
+              "refine"
             ],
             "title": "Feature",
             "type": "string"
@@ -765,7 +766,8 @@
               "summary",
               "auto_reply",
               "manual_assist",
-              "mcp"
+              "mcp",
+              "refine"
             ],
             "title": "Feature",
             "type": "string"
@@ -854,7 +856,8 @@
                   "summary",
                   "auto_reply",
                   "manual_assist",
-                  "mcp"
+                  "mcp",
+                  "refine"
                 ],
                 "type": "string"
               },
@@ -54501,13 +54504,13 @@
             }
           },
           {
-            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
             "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "default": "age",
-              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
+              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
               "title": "Sort",
               "type": "string"
             }
@@ -54954,13 +54957,13 @@
             }
           },
           {
-            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
             "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "default": "age",
-              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time).",
+              "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
               "title": "Sort",
               "type": "string"
             }
