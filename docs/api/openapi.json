@@ -4796,6 +4796,18 @@
             ],
             "title": "Message Id"
           },
+          "pending_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Time"
+          },
           "references": {
             "anyOf": [
               {
@@ -4822,6 +4834,17 @@
             "default": "agent",
             "title": "Sender Type",
             "type": "string"
+          },
+          "state_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Id"
           },
           "subject": {
             "title": "Subject",
@@ -56608,7 +56631,7 @@
         ]
       },
       "post": {
-        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.",
+        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.",
         "operationId": "create_article_api_v1_tickets__ticket_id__articles_post",
         "parameters": [
           {

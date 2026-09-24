@@ -846,6 +846,7 @@ export function QueuesPage() {
           isLoading={ticketsQ.isLoading}
           groupByDay={sort === "activity" && order === "desc"}
           hideQueue={queueId != null}
+          navContext={{ label: selectedQueueName, to: "/agent/queues", search }}
           pinned={
             pinnedItems.length
               ? {

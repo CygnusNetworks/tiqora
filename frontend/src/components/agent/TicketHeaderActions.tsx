@@ -9,10 +9,10 @@ import { useAuth } from "@/auth/AuthContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ExternalLinkIcon, UserIcon } from "@/components/ui/icons";
+import { ExternalLinkIcon, MoreIcon, UserIcon } from "@/components/ui/icons";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
-import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
+import { PriorityChip } from "@/components/ui/StatusChip";
 import { formatDateTime } from "@/lib/format";
 import { escalationLevel, stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
@@ -24,15 +24,20 @@ import { articleSortKey } from "@/lib/article";
 import { flattenQueues } from "./QueueTree";
 import { CustomerPickerDialog, LinkDialog, MergeDialog, PendingDialog } from "./ActionToolbar";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
+import { stateColorVar } from "@/lib/status";
+import type { TicketAiSlots } from "./AiPanel";
+import { TicketBackNav } from "./TicketBackNav";
 
 /**
- * Ticket-zoom header, "Variante 2 — Zwei Ebenen": state next to the title,
- * people below. Three rows:
+ * Ticket-zoom header ("3b"). Rows:
  *
- *   1. identity — ticket number, queue breadcrumb, lock badge
- *   2. title + state/priority chips + humanized SLA chip, actions right
- *   3. people — owner/responsible/customer as avatar pills, relative
- *      changed-timestamp right (absolute created/changed in the tooltip)
+ *   1. back breadcrumb to the list the ticket was opened from, ‹ › within it
+ *   2. title with the AI summary as subtitle; Antworten (+ AI drafts),
+ *      Notiz and one ⋯ menu on the right
+ *   3. AI banners that need a decision (hand-over, triage) — only if present
+ *   4. status bar (Neu · Offen · Wartend ⌄ · Geschlossen ⌄); priority,
+ *      type/service/SLA pickers and the SLA chip on the right
+ *   5. queue, people, customer and similar tickets; counters + timestamp right
  *
  * All values stay clickable dropdowns/dialogs; ActionToolbar keeps owning
  * the dialog implementations — this component only re-wires their triggers.
@@ -44,15 +49,21 @@ export function TicketHeaderActions({
   ticket,
   canNote,
   onOpenNote,
-  overflowMenu,
+  overflowItems,
+  ai,
+  similar,
 }: {
   ticket: TicketDetail;
   /** Whether the agent may reply / add notes (``note`` permission). */
   canNote: boolean;
   /** Opens the internal-note composer at the bottom of the article list. */
   onOpenNote: () => void;
-  /** Optional ⋮ overflow menu rendered at the end of the actions row. */
-  overflowMenu?: ReactNode;
+  /** Page-level items (history tab, sort, process …) appended to the ⋯ menu. */
+  overflowItems?: ReactNode;
+  /** AI pieces placed into the header (summary subtitle, drafts, banners). */
+  ai?: TicketAiSlots;
+  /** "Similar tickets" trigger for the people row. */
+  similar?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
@@ -181,228 +192,37 @@ export function TicketHeaderActions({
     );
   };
 
+  const stateType = (ticket.state_type ?? "").toLowerCase();
+  const inPending = stateType.startsWith("pending");
+  const inClosed = stateType.startsWith("closed");
+
   return (
-    <div className="space-y-2 print:hidden" data-testid="ticket-header-actions">
-      {/* ── Row 1: identity ─────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-        <span className="rounded bg-accent-dim px-1.5 py-0.5 font-mono text-[12px] text-accent">
-          {ticket.tn}
-        </span>
-        <QueueBreadcrumb
-          items={queueItems}
-          value={ticket.queue_id}
-          valueLabel={ticket.queue_name}
-          disabledTitle={!perms.move_into ? noPerm : undefined}
-          rootLabel={t("ticket.queuesRoot")}
-          placeholder={t("ticket.dialog.selectPlaceholder")}
-          onSelect={(id) => patch.mutate({ queue_id: id })}
-        />
+    <div className="space-y-3 print:hidden" data-testid="ticket-header-actions">
+      {/* ── Row 1: back to the originating list, ‹ › within it ─────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <TicketBackNav ticket={ticket} />
+        </div>
         {isLocked && <Badge tone="warn">{ticket.lock}</Badge>}
       </div>
 
-      {/* ── Row 2: title + state + actions ──────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="min-w-0 max-w-full font-display text-xl font-semibold leading-tight text-ink">
-          {ticket.title || t("ticket.noTitle")}
-        </h1>
-        <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
-          <Menu
-            align="left"
-            panelTestId="ticket-pill-state-menu"
-            trigger={({ ref, toggleProps }) => (
-              <button
-                ref={ref}
-                type="button"
-                data-testid="ticket-pill-state"
-                disabled={!perms.rw}
-                {...toggleProps}
-                className="block"
-              >
-                <StateChip state={ticket.state} />
-              </button>
-            )}
-          >
-            <MenuLabel>{t("ticket.state")}</MenuLabel>
-            {primaryStates.map((s) => (
-              <MenuItem
-                key={s.id}
-                selected={s.id === ticket.state_id}
-                onSelect={() => patch.mutate({ state_id: s.id })}
-              >
-                {stateLabel(t, s.name)}
-              </MenuItem>
-            ))}
-            <MenuSeparator />
-            <MenuItem testId="pill-state-pending" onSelect={() => setDialog("pending")}>
-              {t("ticket.toolbar.pending")}…
-            </MenuItem>
-            {closedStates.length > 0 && (
-              <>
-                <MenuSeparator />
-                <MenuLabel>{t("ticket.toolbar.close")}</MenuLabel>
-                {closedStates.map((s) => (
-                  <MenuItem
-                    key={s.id}
-                    selected={s.id === ticket.state_id}
-                    onSelect={() => patch.mutate({ state_id: s.id })}
-                  >
-                    {stateLabel(t, s.name)}
-                  </MenuItem>
-                ))}
-              </>
-            )}
-          </Menu>
-        </span>
-        <span
-          title={!perms.priority ? noPerm : undefined}
-          className={cn(!perms.priority && "opacity-60")}
-        >
-          <Menu
-            align="left"
-            panelTestId="ticket-pill-priority-menu"
-            trigger={({ ref, toggleProps }) => (
-              <button
-                ref={ref}
-                type="button"
-                data-testid="ticket-pill-priority"
-                disabled={!perms.priority}
-                {...toggleProps}
-                className="block"
-              >
-                <PriorityChip priority={ticket.priority} priorityId={ticket.priority_id} />
-              </button>
-            )}
-          >
-            <MenuLabel>{t("ticket.priority")}</MenuLabel>
-            {priorities.map((p) => (
-              <MenuItem
-                key={p.id}
-                selected={p.id === ticket.priority_id}
-                onSelect={() => patch.mutate({ priority_id: p.id })}
-              >
-                {p.name}
-              </MenuItem>
-            ))}
-          </Menu>
-        </span>
-        {/* Type/Service/SLA pickers are only worth a header slot once the
-            system actually offers a choice — with ≤1 defined system-wide
-            there's nothing to pick, so each hides independently. */}
-        {(typesQ.data?.length ?? 0) > 1 && (
-          <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
-            <Menu
-              align="left"
-              panelTestId="ticket-pill-type-menu"
-              trigger={({ ref, toggleProps }) => (
-                <button
-                  ref={ref}
-                  type="button"
-                  data-testid="ticket-pill-type"
-                  disabled={!perms.rw}
-                  {...toggleProps}
-                  className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
-                >
-                  {ticket.type_name || t("ticket.type")}
-                </button>
-              )}
-            >
-              <MenuLabel>{t("ticket.type")}</MenuLabel>
-              {types.map((ty) => (
-                <MenuItem
-                  key={ty.id}
-                  selected={ty.id === ticket.type_id}
-                  onSelect={() => patch.mutate({ type_id: ty.id })}
-                >
-                  {ty.name}
-                </MenuItem>
-              ))}
-            </Menu>
-          </span>
-        )}
-        {(servicesQ.data?.length ?? 0) > 1 && (
-          <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
-            <Menu
-              align="left"
-              panelTestId="ticket-pill-service-menu"
-              trigger={({ ref, toggleProps }) => (
-                <button
-                  ref={ref}
-                  type="button"
-                  data-testid="ticket-pill-service"
-                  disabled={!perms.rw}
-                  {...toggleProps}
-                  className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
-                >
-                  {ticket.service_name || t("ticket.service")}
-                </button>
-              )}
-            >
-              <MenuLabel>{t("ticket.service")}</MenuLabel>
-              <MenuItem
-                selected={ticket.service_id == null}
-                onSelect={() => patch.mutate({ clear_service: true })}
-              >
-                —
-              </MenuItem>
-              {services.map((s) => (
-                <MenuItem
-                  key={s.id}
-                  selected={s.id === ticket.service_id}
-                  onSelect={() => patch.mutate({ service_id: s.id })}
-                >
-                  {s.name}
-                </MenuItem>
-              ))}
-            </Menu>
-          </span>
-        )}
-        {(slasQ.data?.length ?? 0) > 1 && (
-          <span title={!perms.rw ? noPerm : undefined} className={cn(!perms.rw && "opacity-60")}>
-            <Menu
-              align="left"
-              panelTestId="ticket-pill-sla-menu"
-              trigger={({ ref, toggleProps }) => (
-                <button
-                  ref={ref}
-                  type="button"
-                  data-testid="ticket-pill-sla"
-                  disabled={!perms.rw}
-                  {...toggleProps}
-                  className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink"
-                >
-                  {ticket.sla_name || t("ticket.sla")}
-                </button>
-              )}
-            >
-              <MenuLabel>{t("ticket.sla")}</MenuLabel>
-              <MenuItem
-                selected={ticket.sla_id == null}
-                onSelect={() => patch.mutate({ clear_sla: true })}
-              >
-                —
-              </MenuItem>
-              {slas.map((s) => (
-                <MenuItem
-                  key={s.id}
-                  selected={s.id === ticket.sla_id}
-                  onSelect={() => patch.mutate({ sla_id: s.id })}
-                >
-                  {s.name}
-                </MenuItem>
-              ))}
-            </Menu>
-          </span>
-        )}
-        <SlaChip ticket={ticket} />
-
-        <span className="ml-auto flex items-center gap-2">
-          <span title={!canNote ? noPerm : undefined} className="inline-flex">
+      {/* ── Row 2: title + AI summary subtitle, actions right ──────────── */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 md:flex-nowrap">
+        <div className="min-w-0 flex-1 space-y-1">
+          <h1 className="font-display text-xl font-semibold leading-tight text-ink">
+            {ticket.title || t("ticket.noTitle")}
+          </h1>
+          {ai?.summaryLine}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <span title={!canNote ? noPerm : undefined} className="inline-flex items-stretch">
             <Button
               variant="primary"
               size="sm"
               disabled={!canNote || !replyTarget}
               data-testid="ticket-actions-reply"
               data-has-draft={headerHasDraft ? "true" : undefined}
+              className={cn(ai?.draftsButton && "rounded-r-none")}
               onClick={() => setReplyOpen(true)}
             >
               ↩ {headerHasDraft ? t("ticket.draftResume") : t("ticket.reply")}
@@ -414,6 +234,7 @@ export function TicketHeaderActions({
                 />
               )}
             </Button>
+            {ai?.draftsButton}
           </span>
           <span title={!canNote ? noPerm : undefined} className="inline-flex">
             <Button
@@ -434,10 +255,12 @@ export function TicketHeaderActions({
                 ref={ref}
                 type="button"
                 data-testid="ticket-actions-more"
-                className="inline-flex items-center gap-1.5 rounded-md border border-hairline bg-surface px-2 py-1 text-xs font-medium text-ink transition-colors duration-100 hover:bg-surface-subtle"
+                aria-label={t("ticket.moreActions")}
+                title={t("ticket.moreActions")}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-hairline bg-surface text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                 {...toggleProps}
               >
-                {t("ticket.moreActions")} ⌄
+                <MoreIcon className="h-4 w-4" />
               </button>
             )}
           >
@@ -469,23 +292,6 @@ export function TicketHeaderActions({
               </MenuItem>
             )}
 
-            {perms.rw && closedStates.length > 0 && (
-              <>
-                <MenuSeparator />
-                <MenuLabel>{t("ticket.toolbar.close")}</MenuLabel>
-                {closedStates.map((s) => (
-                  <MenuItem
-                    key={s.id}
-                    testId={`more-close-${s.id}`}
-                    selected={s.id === ticket.state_id}
-                    onSelect={() => patch.mutate({ state_id: s.id })}
-                  >
-                    {stateLabel(t, s.name)}
-                  </MenuItem>
-                ))}
-              </>
-            )}
-
             <MenuSeparator />
             <MenuLabel>{t("ticket.actionsGroupMisc")}</MenuLabel>
             <MenuItem
@@ -502,13 +308,176 @@ export function TicketHeaderActions({
             >
               {t("ticket.toolbar.appointment")}
             </MenuItem>
+            {overflowItems && (
+              <>
+                <MenuSeparator />
+                {overflowItems}
+              </>
+            )}
           </Menu>
-          {overflowMenu && <span data-testid="ticket-header-overflow">{overflowMenu}</span>}
-        </span>
+        </div>
+      </div>
+      {ai?.summaryPanel}
+
+      {/* ── Row 3: AI decisions (hand-over, triage) ────────────────────── */}
+      {ai?.banners}
+
+      {/* ── Row 4: status bar; priority / type / service / SLA right ───── */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div
+          role="group"
+          aria-label={t("ticket.state")}
+          title={!perms.rw ? noPerm : undefined}
+          className={cn(
+            "inline-flex flex-wrap overflow-hidden rounded-lg border border-hairline bg-surface-subtle",
+            !perms.rw && "opacity-60",
+          )}
+          data-testid="ticket-status-bar"
+        >
+          {primaryStates.map((s) => (
+            <StatusSegment
+              key={s.id}
+              testId={`ticket-status-${s.id}`}
+              color={stateColorVar(s.name)}
+              pressed={s.id === ticket.state_id}
+              disabled={!perms.rw}
+              onClick={() => s.id !== ticket.state_id && patch.mutate({ state_id: s.id })}
+            >
+              {stateLabel(t, s.name)}
+            </StatusSegment>
+          ))}
+          {pendingStates.length > 0 && (
+            <StatusSegment
+              testId="ticket-status-pending"
+              color="var(--color-state-pending)"
+              pressed={inPending}
+              disabled={!perms.rw}
+              onClick={() => setDialog("pending")}
+            >
+              {inPending ? stateLabel(t, ticket.state) : t("ticket.stateGroup.pending")} ⌄
+            </StatusSegment>
+          )}
+          {closedStates.length > 0 && (
+            <Menu
+              align="left"
+              panelTestId="ticket-status-closed-menu"
+              trigger={({ ref, toggleProps }) => (
+                <StatusSegment
+                  testId="ticket-status-closed"
+                  color="var(--color-state-closed)"
+                  pressed={inClosed}
+                  disabled={!perms.rw}
+                  buttonRef={ref}
+                  toggleProps={toggleProps}
+                >
+                  {inClosed ? stateLabel(t, ticket.state) : t("ticket.stateGroup.closed")} ⌄
+                </StatusSegment>
+              )}
+            >
+              <MenuLabel>{t("ticket.toolbar.close")}</MenuLabel>
+              {closedStates.map((s) => (
+                <MenuItem
+                  key={s.id}
+                  testId={`ticket-status-close-${s.id}`}
+                  selected={s.id === ticket.state_id}
+                  onSelect={() => patch.mutate({ state_id: s.id })}
+                >
+                  {stateLabel(t, s.name)}
+                </MenuItem>
+              ))}
+            </Menu>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Type/Service/SLA pickers are only worth a slot once the system
+              actually offers a choice — with ≤1 defined system-wide there's
+              nothing to pick, so each hides independently. */}
+          {(typesQ.data?.length ?? 0) > 1 && (
+            <HeaderPickMenu
+              testId="ticket-pill-type"
+              panelTestId="ticket-pill-type-menu"
+              label={ticket.type_name || t("ticket.type")}
+              heading={t("ticket.type")}
+              disabledTitle={!perms.rw ? noPerm : undefined}
+              items={types.map((ty) => ({ id: ty.id, name: ty.name }))}
+              selectedId={ticket.type_id}
+              onSelect={(id) => patch.mutate({ type_id: id })}
+            />
+          )}
+          {(servicesQ.data?.length ?? 0) > 1 && (
+            <HeaderPickMenu
+              testId="ticket-pill-service"
+              panelTestId="ticket-pill-service-menu"
+              label={ticket.service_name || t("ticket.service")}
+              heading={t("ticket.service")}
+              disabledTitle={!perms.rw ? noPerm : undefined}
+              items={services.map((sv) => ({ id: sv.id, name: sv.name }))}
+              selectedId={ticket.service_id}
+              onClear={() => patch.mutate({ clear_service: true })}
+              onSelect={(id) => patch.mutate({ service_id: id })}
+            />
+          )}
+          {(slasQ.data?.length ?? 0) > 1 && (
+            <HeaderPickMenu
+              testId="ticket-pill-sla"
+              panelTestId="ticket-pill-sla-menu"
+              label={ticket.sla_name || t("ticket.sla")}
+              heading={t("ticket.sla")}
+              disabledTitle={!perms.rw ? noPerm : undefined}
+              items={slas.map((sl) => ({ id: sl.id, name: sl.name }))}
+              selectedId={ticket.sla_id}
+              onClear={() => patch.mutate({ clear_sla: true })}
+              onSelect={(id) => patch.mutate({ sla_id: id })}
+            />
+          )}
+          <span
+            title={!perms.priority ? noPerm : undefined}
+            className={cn(!perms.priority && "opacity-60")}
+          >
+            <Menu
+              align="right"
+              panelTestId="ticket-pill-priority-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="ticket-pill-priority"
+                  disabled={!perms.priority}
+                  {...toggleProps}
+                  className="block"
+                >
+                  <PriorityChip priority={ticket.priority} priorityId={ticket.priority_id} />
+                </button>
+              )}
+            >
+              <MenuLabel>{t("ticket.priority")}</MenuLabel>
+              {priorities.map((p) => (
+                <MenuItem
+                  key={p.id}
+                  selected={p.id === ticket.priority_id}
+                  onSelect={() => patch.mutate({ priority_id: p.id })}
+                >
+                  {p.name}
+                </MenuItem>
+              ))}
+            </Menu>
+          </span>
+          <SlaChip ticket={ticket} />
+        </div>
       </div>
 
-      {/* ── Row 3: people + timestamps ──────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-hairline pt-2">
+      {/* ── Row 5: queue, people, customer; counters + timestamp right ─── */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-hairline pt-2.5">
+        <QueueBreadcrumb
+          items={queueItems}
+          value={ticket.queue_id}
+          valueLabel={ticket.queue_name}
+          disabledTitle={!perms.move_into ? noPerm : undefined}
+          rootLabel={t("ticket.queue")}
+          placeholder={t("ticket.dialog.selectPlaceholder")}
+          onSelect={(id) => patch.mutate({ queue_id: id })}
+        />
         <PersonSelect
           label={t("ticket.owner")}
           name={ownerName}
@@ -576,6 +545,7 @@ export function TicketHeaderActions({
             {customerLinkQ.data.label || t("customerCentre.externalDefault")}
           </a>
         )}
+        {similar}
         {/* Counters and timestamp share the right edge: state first, then when. */}
         <span className="ml-auto inline-flex items-center gap-2">
           <TicketMetaCounters ticketId={ticketId} />
@@ -599,6 +569,7 @@ export function TicketHeaderActions({
           channelName={channelNameOf(replyTarget)}
         />
       )}
+      {ai?.overlays}
       {dialog === "customer" && (
         <CustomerPickerDialog
           ticketId={ticketId}
@@ -617,6 +588,110 @@ export function TicketHeaderActions({
       {dialog === "link" && <LinkDialog ticketId={ticketId} onClose={() => setDialog(null)} />}
       {dialog === "merge" && <MergeDialog ticketId={ticketId} onClose={() => setDialog(null)} />}
     </div>
+  );
+}
+
+/* ── Status bar segment ───────────────────────────────────────────────── */
+
+/** One segment of the header's status bar. Also serves as a `Menu` trigger
+ * (closed states), hence the optional ref / toggle props. */
+function StatusSegment({
+  children,
+  color,
+  pressed,
+  disabled,
+  testId,
+  onClick,
+  buttonRef,
+  toggleProps,
+}: {
+  children: ReactNode;
+  color: string;
+  pressed: boolean;
+  disabled?: boolean;
+  testId: string;
+  onClick?: () => void;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
+  toggleProps?: object;
+}) {
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      data-testid={testId}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={onClick}
+      {...toggleProps}
+      style={{ "--seg": color } as React.CSSProperties}
+      className={cn(
+        "inline-flex items-center gap-1.5 border-r border-hairline px-3 py-1.5 text-[12.5px] transition-colors duration-100 last:border-r-0 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed",
+        pressed
+          ? "bg-[color-mix(in_srgb,var(--seg)_14%,transparent)] font-semibold text-[var(--seg)]"
+          : "text-muted enabled:hover:bg-surface enabled:hover:text-ink",
+      )}
+    >
+      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--seg)]" />
+      {children}
+    </button>
+  );
+}
+
+/* ── Type / service / SLA picker ──────────────────────────────────────── */
+
+function HeaderPickMenu({
+  testId,
+  panelTestId,
+  label,
+  heading,
+  disabledTitle,
+  items,
+  selectedId,
+  onSelect,
+  onClear,
+}: {
+  testId: string;
+  panelTestId: string;
+  label: string;
+  heading: string;
+  disabledTitle?: string;
+  items: { id: number; name: string }[];
+  selectedId: number | null | undefined;
+  onSelect: (id: number) => void;
+  /** Offers a "—" entry that clears the value. */
+  onClear?: () => void;
+}) {
+  return (
+    <span title={disabledTitle} className={cn(disabledTitle && "opacity-60")}>
+      <Menu
+        align="right"
+        panelTestId={panelTestId}
+        trigger={({ ref, toggleProps }) => (
+          <button
+            ref={ref}
+            type="button"
+            data-testid={testId}
+            disabled={Boolean(disabledTitle)}
+            {...toggleProps}
+            className="rounded-md border border-hairline bg-surface px-2 py-0.5 text-xs text-ink transition-colors hover:bg-surface-subtle"
+          >
+            {label} <span aria-hidden className="text-muted">⌄</span>
+          </button>
+        )}
+      >
+        <MenuLabel>{heading}</MenuLabel>
+        {onClear && (
+          <MenuItem selected={selectedId == null} onSelect={onClear}>
+            —
+          </MenuItem>
+        )}
+        {items.map((it) => (
+          <MenuItem key={it.id} selected={it.id === selectedId} onSelect={() => onSelect(it.id)}>
+            {it.name}
+          </MenuItem>
+        ))}
+      </Menu>
+    </span>
   );
 }
 
@@ -668,7 +743,7 @@ function SlaChip({ ticket }: { ticket: TicketDetail }) {
   );
 }
 
-/* ── Row-1 queue breadcrumb ───────────────────────────────────────────── */
+/* ── Queue picker (people row) ────────────────────────────────────────── */
 
 function QueueBreadcrumb({
   items,
@@ -689,12 +764,13 @@ function QueueBreadcrumb({
 }) {
   const crumb = (
     <>
-      {rootLabel} / <span className="font-medium text-ink">{valueLabel || "—"}</span>
+      <span className="text-muted">{rootLabel}</span>{" "}
+      <span className="font-medium text-ink">{valueLabel || "—"}</span>
     </>
   );
   if (disabledTitle) {
     return (
-      <span data-testid="ticket-pill-queue" title={disabledTitle} className="opacity-60">
+      <span data-testid="ticket-pill-queue" title={disabledTitle} className="text-xs opacity-60">
         {crumb}
       </span>
     );
@@ -712,9 +788,9 @@ function QueueBreadcrumb({
           type="button"
           data-testid="ticket-pill-queue"
           {...toggleProps}
-          className="rounded px-1 py-0.5 transition-colors duration-100 hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="rounded-md px-1.5 py-0.5 text-xs transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
         >
-          {crumb} <span aria-hidden>⌄</span>
+          {crumb} <span aria-hidden className="text-muted">⌄</span>
         </button>
       )}
     />
@@ -764,8 +840,8 @@ function PersonShell({
   const interactive = Boolean(onClick || toggleProps);
   const inner = (
     <>
-      <Avatar initials={initialsOf(name)} email={email} size={20} tone={avatarTone} />
       <span className="text-muted">{label}</span>
+      <Avatar initials={initialsOf(name)} email={email} size={18} tone={avatarTone} />
       <span className={cn("font-medium", muted || unresolvedTitle ? "text-muted" : "text-ink")}>
         {name}
       </span>
@@ -797,7 +873,7 @@ function PersonShell({
       <span
         data-testid={testId}
         title={disabledTitle}
-        className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface-subtle/60 py-0.5 pl-0.5 pr-2.5 text-xs opacity-70"
+        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs opacity-70"
       >
         {inner}
       </span>
@@ -810,7 +886,7 @@ function PersonShell({
       data-testid={testId}
       onClick={onClick}
       {...toggleProps}
-      className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface py-0.5 pl-0.5 pr-2.5 text-xs transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+      className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
     >
       {inner}
     </button>

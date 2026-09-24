@@ -6,6 +6,7 @@ import type { MutationRequest, TicketListItem } from "@/lib/api";
 import { dayBucket, formatDateTime, formatListTime, type DayBucket } from "@/lib/format";
 import { senderDisplayName } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
+import { setTicketNavContext, type TicketNavContext } from "@/lib/ticketNavContext";
 import { Button } from "@/components/ui/Button";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
@@ -98,6 +99,9 @@ export type TicketTableProps = {
   pinned?: TicketTablePinned;
   /** Omit the per-row queue name (e.g. inside a single-queue view). */
   hideQueue?: boolean;
+  /** Where this list lives, so the opened ticket can link back to it and
+   * step through the same rows with ‹ › (see `ticketNavContext`). */
+  navContext?: Omit<TicketNavContext, "ids">;
 };
 
 const SORT_COLUMNS: { key: SortKey; labelKey: string }[] = [
@@ -150,6 +154,7 @@ export function TicketTable({
   groupByDay,
   pinned,
   hideQueue,
+  navContext,
 }: TicketTableProps) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -173,6 +178,15 @@ export function TicketTable({
     setFocusIdx(0);
   }, [items]);
 
+  const openTicket = (id: number) => {
+    if (navContext) setTicketNavContext({ ...navContext, ids: ordered.map((it) => it.id) });
+    void navigate({ to: "/agent/tickets/$ticketId", params: { ticketId: String(id) } });
+  };
+  // The keyboard handler is subscribed once per list change; read the latest
+  // opener through a ref instead of re-subscribing on every render.
+  const openTicketRef = useRef(openTicket);
+  openTicketRef.current = openTicket;
+
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
@@ -191,15 +205,12 @@ export function TicketTable({
         selection.onToggleRow(ordered[focusIdx].id);
       } else if (e.key === "Enter" && ordered[focusIdx]) {
         e.preventDefault();
-        void navigate({
-          to: "/agent/tickets/$ticketId",
-          params: { ticketId: String(ordered[focusIdx].id) },
-        });
+        openTicketRef.current(ordered[focusIdx].id);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [ordered, focusIdx, navigate, selection]);
+  }, [ordered, focusIdx, selection]);
 
   const toggleSort = (key: SortKey) => {
     if (sort === key) {
@@ -348,12 +359,7 @@ export function TicketTable({
               onCustomerClick={onCustomerClick}
               hideQueue={hideQueue}
               onHover={() => setFocusIdx(idx)}
-              onOpen={() =>
-                void navigate({
-                  to: "/agent/tickets/$ticketId",
-                  params: { ticketId: String(ticket.id) },
-                })
-              }
+              onOpen={() => openTicket(ticket.id)}
             />
           );
         })}

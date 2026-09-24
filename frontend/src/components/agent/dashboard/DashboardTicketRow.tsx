@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import type { TicketListItem } from "@/lib/api";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { cn } from "@/lib/cn";
+import { setTicketNavContext } from "@/lib/ticketNavContext";
 
 /**
  * A single ticket row for the dashboard work lists: number + title, then a
@@ -20,11 +22,15 @@ export function DashboardTicketRow({
   trailing?: ReactNode;
   escalated?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <li className={cn(escalated && "border-l-2 border-danger")}>
       <Link
         to="/agent/tickets/$ticketId"
         params={{ ticketId: String(ticket.id) }}
+        onClick={() =>
+          setTicketNavContext({ label: t("nav.dashboard"), to: "/agent", ids: [ticket.id] })
+        }
         data-testid={`dashboard-ticket-${ticket.id}`}
         className="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >

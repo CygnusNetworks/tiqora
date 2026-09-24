@@ -106,6 +106,16 @@ class ArticleCreateRequest(BaseModel):
     # time — only once the article actually exists. Absent/unknown values are
     # a no-op so this stays fully backward compatible.
     ai_draft_id: int | None = None
+    # Optional "send & set next state" (e.g. close successful, pending until
+    # a date): after the article is stored, the ticket moves to this state with
+    # the same semantics, permission check (``rw``) and history as the
+    # ``state_id`` field of PATCH /tickets/{id}. Validated up-front, so an
+    # unknown state / missing rights / missing pending_time fails the whole
+    # request before anything is sent or stored.
+    state_id: int | None = None
+    # Required when ``state_id`` is a pending-type state (422 otherwise);
+    # ignored for non-pending states. Same type/format as PATCH ``pending_time``.
+    pending_time: datetime | None = None
 
 
 class ArticleCreateResponse(BaseModel):
@@ -1213,10 +1223,19 @@ async def create_article(
     Agent email replies (``channel=email``, ``sender_type=agent``) are SMTP-
     delivered then stored (send-then-store). Delivery failure returns HTTP 502
     and does not leave a silent no-op 201.
+
+    With ``state_id`` the ticket's state is changed after the article, in the
+    same transaction (PATCH semantics). The state change is validated before
+    the article is created, so an invalid one returns 403/404/422 without
+    sending or storing anything.
     """
     svc = _write_service(session, settings)
     try:
         async with session.begin():
+            if body.state_id is not None:
+                await svc.validate_state_change(
+                    user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                )
             aid = await svc.add_article(
                 user.id,
                 ticket_id,
@@ -1237,6 +1256,10 @@ async def create_article(
                     channel=body.channel,
                 ),
             )
+            if body.state_id is not None:
+                await svc.change_state(
+                    user.id, ticket_id, body.state_id, pending_time=body.pending_time
+                )
     except (
         WriteAccessDenied,
         WriteNotFound,

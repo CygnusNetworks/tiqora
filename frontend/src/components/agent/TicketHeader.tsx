@@ -1,31 +1,34 @@
 import { useTranslation } from "react-i18next";
 import type { TicketDetail } from "@/lib/api";
 import { TicketHeaderActions } from "./TicketHeaderActions";
+import type { TicketAiSlots } from "./AiPanel";
 import { combinedEscalationLevel, spineClassName, stateColorVar } from "@/lib/status";
 import type { CSSProperties, ReactNode } from "react";
 
 /**
- * Ticket-zoom header shell: escalation/state spine + the "Variante 2 — Zwei
- * Ebenen" content rows (see `TicketHeaderActions`) + collapsible dynamic
- * fields + the optional assist row (AI chips, similar tickets). Number/queue/title/SLA/people all live in the actions component,
- * which owns the reference-data queries and dialog wiring.
+ * Ticket-zoom header shell: escalation/state spine + the content rows (see
+ * `TicketHeaderActions`, which owns the reference-data queries and dialog
+ * wiring and places the AI pieces) + collapsible dynamic fields.
  */
 export function TicketHeader({
   ticket,
-  overflowMenu,
+  overflowItems,
   canNote,
   onOpenNote,
-  assist,
+  ai,
+  similar,
 }: {
   ticket: TicketDetail;
-  /** Optional ⋮ overflow menu rendered at the end of the actions row. */
-  overflowMenu?: ReactNode;
+  /** Page-level items appended to the header's ⋯ menu. */
+  overflowItems?: ReactNode;
   /** Whether the agent may reply / add notes (``note`` permission). */
   canNote: boolean;
   /** Opens the internal-note composer at the bottom of the article list. */
   onOpenNote: () => void;
-  /** Assist row below the header rows (AI chips, similar tickets). */
-  assist?: ReactNode;
+  /** AI pieces the header places (summary subtitle, drafts, banners). */
+  ai?: TicketAiSlots;
+  /** "Similar tickets" trigger for the people row. */
+  similar?: ReactNode;
 }) {
   const { t } = useTranslation();
 
@@ -39,7 +42,7 @@ export function TicketHeader({
 
   return (
     <header
-      className={`space-y-2 rounded-lg border border-hairline bg-surface p-3.5 pl-5 ${spineClassName(
+      className={`space-y-3 rounded-lg border border-hairline bg-surface p-4 pl-5 ${spineClassName(
         escLevel,
       )}`}
       style={{ "--spine-color": spineColor } as CSSProperties}
@@ -49,7 +52,9 @@ export function TicketHeader({
         ticket={ticket}
         canNote={canNote}
         onOpenNote={onOpenNote}
-        overflowMenu={overflowMenu}
+        overflowItems={overflowItems}
+        ai={ai}
+        similar={similar}
       />
       {ticket.dynamic_fields && ticket.dynamic_fields.length > 0 && (
         <details className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm">
@@ -65,11 +70,6 @@ export function TicketHeader({
             ))}
           </dl>
         </details>
-      )}
-      {assist && (
-        <div className="border-t border-hairline pt-2.5" data-testid="ticket-header-assist">
-          {assist}
-        </div>
       )}
     </header>
   );

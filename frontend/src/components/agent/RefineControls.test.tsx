@@ -37,7 +37,13 @@ beforeEach(() => {
 
 /** Renders the controls over a body the test can read back, exactly as the
  * composers wire them up. */
-function Harness({ initial }: { initial: string }) {
+function Harness({
+  initial,
+  variant,
+}: {
+  initial: string;
+  variant?: "split" | "toolbar";
+}) {
   const [body, setBody] = useState(initial);
   return (
     <>
@@ -50,16 +56,17 @@ function Harness({ initial }: { initial: string }) {
         target={{ ticket_id: 42 }}
         body={body}
         onChange={setBody}
+        variant={variant}
       />
     </>
   );
 }
 
-function renderHarness(initial: string) {
+function renderHarness(initial: string, variant?: "split" | "toolbar") {
   return render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <Harness initial={initial} />
+        <Harness initial={initial} variant={variant} />
       </I18nextProvider>
     </QueryClientProvider>,
   );
@@ -253,5 +260,33 @@ describe("RefineControls", () => {
         i18n.t("ticket.refine.errorLimit"),
       ),
     );
+  });
+});
+
+describe("RefineControls toolbar variant", () => {
+  it("shows the tones as a visible switch and refines with the picked one", async () => {
+    refine.mockResolvedValue({ sections: [{ id: 0, text: "Sehr geehrte Frau Muster, erledigt." }] });
+    renderHarness("erledigt", "toolbar");
+
+    await waitFor(() => expect(screen.getByTestId("refine-button")).toBeEnabled());
+    expect(screen.getByTestId("refine-toolbar")).toBeInTheDocument();
+    // No dropdown in this variant — every tone is one click away.
+    expect(screen.queryByTestId("refine-tone-trigger")).toBeNull();
+    expect(screen.getByTestId("refine-tone-standard")).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(screen.getByTestId("refine-tone-formal"));
+    expect(screen.getByTestId("refine-tone-formal")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("refine-button"));
+
+    await waitFor(() => expect(body()).toBe("Sehr geehrte Frau Muster, erledigt."));
+    expect(refine.mock.calls[0][0].tone).toBe("formal");
+    expect(screen.getByTestId("refine-undo")).toBeInTheDocument();
+  });
+
+  it("keeps the explanation behind a help button instead of a line of text", async () => {
+    renderHarness("erledigt", "toolbar");
+    await waitFor(() => expect(screen.getByTestId("refine-button")).toBeEnabled());
+    expect(screen.getByTestId("refine-help")).toBeInTheDocument();
+    expect(screen.queryByText(/Quotes stay unchanged|Zitate bleiben unverändert/)).toBeNull();
   });
 });

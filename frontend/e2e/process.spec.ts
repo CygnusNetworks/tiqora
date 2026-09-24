@@ -15,7 +15,7 @@ test.describe("ticket process widget", () => {
     await expect(page.getByTestId("ticket-zoom")).toBeVisible();
     // Ticket 100 starts outside any process; the start trigger lives in the
     // ticket-zoom ⋯ overflow menu (the inline affordance was removed).
-    await page.getByTestId("ticket-zoom-overflow-trigger").click();
+    await page.getByTestId("ticket-actions-more").click();
     await page.getByTestId("overflow-start-process").click();
     // `process-start-select` is a custom SelectField, not a native <select>;
     // force the option click past the portal's entrance animation.
