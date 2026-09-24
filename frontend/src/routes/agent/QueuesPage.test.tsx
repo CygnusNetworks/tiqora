@@ -594,17 +594,44 @@ describe("QueuesPage status segments and flag chips", () => {
     const soon = makeTicket({ id: 201, title: "Soon", escalation_solution_time: now + 600 });
     const overdue = makeTicket({ id: 202, title: "Overdue", escalation_response_time: now - 600 });
     // The overdue ticket is also on the regular page — it must only render once.
-    serveTickets([...tickets, overdue], [soon, overdue]);
+    serveTickets([...tickets, overdue], [overdue, soon]);
 
     await renderQueuesPage();
     await screen.findByTestId("ticket-table-pinned-head");
 
+    // The backend picks the most urgent ones: sorting by activity first let
+    // the most overdue (least active) tickets fall outside the fetched page.
     expect(listTickets).toHaveBeenCalledWith(
-      expect.objectContaining({ escalating_within: 7200, state_type: "todo" }),
+      expect.objectContaining({
+        escalating_within: 7200,
+        state_type: "todo",
+        sort: "deadline",
+        order: "asc",
+      }),
     );
     const rows = screen.getAllByTestId(/^ticket-row-\d+$/).map((r) => r.dataset.testid);
     expect(rows.slice(0, 2)).toEqual(["ticket-row-202", "ticket-row-201"]);
     expect(rows.filter((r) => r === "ticket-row-202")).toHaveLength(1);
+  });
+
+  it("“show all” lists every pinned ticket, not only the overdue ones", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const pinned = Array.from({ length: 5 }, (_, i) =>
+      makeTicket({ id: 300 + i, title: `Due ${i}`, escalation_solution_time: now + 60 * (i + 1) }),
+    );
+    listTickets.mockImplementation(async (params: ListParams = {}) =>
+      params.escalating_within != null ? page(pinned, 12) : page(tickets),
+    );
+
+    const router = await renderQueuesPage();
+    fireEvent.click(await screen.findByTestId("ticket-table-pinned-show-all"));
+
+    await waitFor(() => {
+      const search = router.state.location.search as Record<string, unknown>;
+      expect(search.sort).toBe("deadline");
+      expect(search.order).toBe("asc");
+      expect(search.escalated).toBeUndefined();
+    });
   });
 
   it("does not pin anything while the “Eskaliert” chip is on", async () => {
