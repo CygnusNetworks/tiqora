@@ -143,7 +143,7 @@ async def _ticket_guard_row(session: AsyncSession, ticket_id: int) -> Any:
         (
             await session.execute(
                 text(
-                    "SELECT t.ticket_lock_id, t.create_time,"
+                    "SELECT t.ticket_lock_id, t.create_time, t.create_by,"
                     " (SELECT s.ai_escalated_at FROM tiqora_ai_ticket_state s"
                     "    WHERE s.ticket_id = t.id) AS ai_escalated_at"
                     " FROM ticket t WHERE t.id = :tid LIMIT 1"
@@ -156,7 +156,13 @@ async def _ticket_guard_row(session: AsyncSession, ticket_id: int) -> Any:
     )
 
 
-async def _skip_reason(session: AsyncSession, *, ticket_id: int, article_id: int) -> str | None:
+async def _skip_reason(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    article_id: int,
+    system_user_ids: frozenset[int] = frozenset({1}),
+) -> str | None:
     """Everything that disqualifies this ticket, cheapest check first.
 
     Four of these (first article, no earlier triage row, no Move history,
@@ -177,6 +183,12 @@ async def _skip_reason(session: AsyncSession, *, ticket_id: int, article_id: int
         return "ticket_gone"
     if int(row["ticket_lock_id"]) != _UNLOCKED_LOCK_ID:
         return "ticket_locked"
+    # Every inbound channel (postmaster, portal, SMS, Telegram, WhatsApp)
+    # creates tickets as the system/postmaster user. Any other creator is an
+    # agent who filed e.g. a phone ticket into this queue on purpose — a
+    # human routing decision, which outranks ours like a Move does.
+    if row["create_by"] is not None and int(row["create_by"]) not in system_user_ids:
+        return "agent_created"
     if row["ai_escalated_at"] is not None:
         return "escalated_to_human"
     created = row["create_time"]
@@ -241,7 +253,13 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
         return policy_reason
     assert policy is not None  # narrowed by _policy_skip_reason
 
-    reason = await _skip_reason(session, ticket_id=ticket_id, article_id=int(article_id))
+    postmaster_user_id = await SysConfig(session).postmaster_user_id()
+    reason = await _skip_reason(
+        session,
+        ticket_id=ticket_id,
+        article_id=int(article_id),
+        system_user_ids=frozenset({1, postmaster_user_id}),
+    )
     if reason is not None:
         logger.info("ai_triage_skip", ticket_id=ticket_id, reason=reason)
         return reason
@@ -343,22 +361,11 @@ async def _persist_and_apply(
     queue = decision.queue
     customer = decision.customer
 
-    if decision.error is not None:
-        status = TRIAGE_STATUS_ERROR
-    elif queue.queue_id is not None and queue.confidence >= policy.triage_suggest_threshold:
-        status = TRIAGE_STATUS_OPEN
-    elif customer.login is not None:
-        # No queue proposal worth showing, but a real forwarded-sender fix is
-        # still actionable on its own.
-        status = TRIAGE_STATUS_OPEN
-    else:
-        status = TRIAGE_STATUS_NO_ACTION
-
     row = TiqoraAiTriage(
         ticket_id=ticket.ticket_id,
         article_id=article_id,
         source_queue_id=ticket.queue_id,
-        status=status,
+        status=TRIAGE_STATUS_NO_ACTION,
         suggested_queue_id=queue.queue_id,
         queue_confidence=queue.confidence,
         queue_reason=queue.reason or None,
@@ -371,6 +378,11 @@ async def _persist_and_apply(
         run_id=decision.run_id,
         error=decision.error,
     )
+    queue_open, customer_open = triage_service.open_halves(row, policy)
+    if decision.error is not None:
+        row.status = TRIAGE_STATUS_ERROR
+    elif queue_open or customer_open:
+        row.status = TRIAGE_STATUS_OPEN
     session.add(row)
     try:
         await session.flush()
@@ -401,9 +413,13 @@ async def _persist_and_apply(
             apply_customer=apply_customer,
         )
         if applied:
-            row.status = TRIAGE_STATUS_APPLIED
+            # Only APPLIED once nothing is left for an agent: a customer fix
+            # applied on its own must not hide a queue proposal that sits
+            # between the suggest and auto thresholds.
+            if not any(triage_service.open_halves(row, policy)):
+                row.status = TRIAGE_STATUS_APPLIED
             if "queue" in applied and row.suggested_queue_id is not None:
-                await _maybe_delay_reply(
+                await maybe_delay_reply(
                     session,
                     ticket_id=ticket.ticket_id,
                     queue_id=row.suggested_queue_id,
@@ -413,7 +429,7 @@ async def _persist_and_apply(
     return row.status
 
 
-async def _maybe_delay_reply(
+async def maybe_delay_reply(
     session: AsyncSession, *, ticket_id: int, queue_id: int, article_id: int
 ) -> None:
     """Honour the *destination* queue's ``triage_delay_reply``.
@@ -492,4 +508,4 @@ async def run_triage_tick(
     return totals
 
 
-__all__ = ["MAX_TICKET_AGE", "run_triage_tick"]
+__all__ = ["MAX_TICKET_AGE", "maybe_delay_reply", "run_triage_tick"]

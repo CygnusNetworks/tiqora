@@ -92,6 +92,35 @@ def queue_id_from_key(key: str) -> int | None:
         return None
 
 
+def open_halves(row: TiqoraAiTriage, policy: TiqoraAiQueuePolicy | None) -> tuple[bool, bool]:
+    """Which halves of a triage row still wait for an agent: ``(queue, customer)``.
+
+    The single definition the worker (row status), the ticket UI (what the
+    banner offers) and the accept route (what may be applied) share, so the
+    three can never disagree. ``policy`` is the *source* queue's policy.
+
+    - A half already applied is no longer open: auto-applying the customer
+      fix must not swallow a queue proposal still waiting for a human.
+    - The customer half only exists while ``triage_customer_fix_enabled`` is
+      on — the admin switched the feature off, so neither a banner nor an
+      accept may rewrite the ticket's customer.
+    """
+    if policy is None:
+        return False, False
+    queue_open = (
+        row.error is None
+        and row.suggested_queue_id is not None
+        and not row.queue_applied
+        and (row.queue_confidence or 0) >= policy.triage_suggest_threshold
+    )
+    customer_open = (
+        bool(policy.triage_customer_fix_enabled)
+        and row.suggested_customer_user_id is not None
+        and not row.customer_applied
+    )
+    return queue_open, customer_open
+
+
 # --------------------------------------------------------------------------
 # Data shapes
 # --------------------------------------------------------------------------
