@@ -797,7 +797,15 @@ async def test_destination_delay_reply_parks_the_reply(
 
 @pytest.mark.parametrize(
     "scenario",
-    ["not_first_article", "auto_generated", "agent_sender", "already_moved", "locked", "too_old"],
+    [
+        "not_first_article",
+        "auto_generated",
+        "agent_sender",
+        "already_moved",
+        "locked",
+        "too_old",
+        "agent_created",
+    ],
 )
 async def test_guards_prevent_triage(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, scenario: str
@@ -809,6 +817,7 @@ async def test_guards_prevent_triage(
         "already_moved": 13,
         "locked": 14,
         "too_old": 15,
+        "agent_created": 17,
     }[scenario]
     created = NOW - timedelta(days=5) if scenario == "too_old" else datetime.now()
     ids = _seed(mariadb_znuny_url, ns=ns, created=created)
@@ -853,6 +862,14 @@ async def test_guards_prevent_triage(
                 conn.execute(
                     text("UPDATE ticket SET ticket_lock_id = 2 WHERE id = :tid"),
                     {"tid": ids["ticket_id"]},
+                )
+            if scenario == "agent_created":
+                # An inbound phone ticket an agent filed into this queue: its
+                # first article is sender "customer", but the creator is a
+                # human, not the postmaster.
+                conn.execute(
+                    text("UPDATE ticket SET create_by = :uid WHERE id = :tid"),
+                    {"uid": ids["agent_id"], "tid": ids["ticket_id"]},
                 )
         sync.dispose()
 
@@ -1332,5 +1349,105 @@ async def test_customer_fix_disabled_records_but_never_writes(
         assert row["suggested_customer_user_id"] == address
         assert row["customer_applied"] == 0
     finally:
+        await engine.dispose()
+        _cleanup(mariadb_znuny_url, ns)
+
+
+async def test_customer_fix_disabled_does_not_open_a_proposal(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the customer fix off, a forwarded-sender match alone must not
+    make the row OPEN: that showed a "change customer" banner the admin had
+    disabled and held back auto-reply for the ticket."""
+    ns = 34
+    ids = _seed(mariadb_znuny_url, ns=ns, created=datetime.now())
+    address = f"s00mmust86{ns}@uni.example.org"
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    # Below the suggest threshold: no queue proposal either.
+    llm = TriageLlm(queue_key_value=queue_key(ids["target_queue_id"]), confidence=30)
+    _patch_llm(monkeypatch, llm)
+    try:
+        _add_customer_user(mariadb_znuny_url, login=address, email=address, customer_id="UNIBONN")
+        async with factory() as session:
+            await _setup_policies(
+                session, ids=ids, auto_threshold=80, suggest_threshold=50, customer_fix=False
+            )
+        await _reset_watermark(factory, mariadb_znuny_url)
+
+        article_id = _add_article(
+            mariadb_znuny_url,
+            ticket_id=ids["ticket_id"],
+            sender_type="customer",
+            body=FORWARDED_BODY_TEMPLATE.format(address=address),
+            from_address="hausmeister@example.org",
+        )
+        _insert_event(mariadb_znuny_url, ticket_id=ids["ticket_id"], article_id=article_id)
+
+        await run_triage_tick(session_factory=factory)
+
+        row = _triage_row(mariadb_znuny_url, ids["ticket_id"])
+        assert row is not None
+        assert row["suggested_customer_user_id"] == address
+        assert row["status"] == TRIAGE_STATUS_NO_ACTION
+    finally:
+        engine_sync = create_engine(mariadb_znuny_url)
+        with engine_sync.begin() as conn:
+            conn.execute(text("DELETE FROM customer_user WHERE email = :e"), {"e": address})
+        engine_sync.dispose()
+        await engine.dispose()
+        _cleanup(mariadb_znuny_url, ns)
+
+
+async def test_auto_applied_customer_keeps_the_queue_proposal_open(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Customer fix above its auto threshold, queue between suggest and
+    auto: the customer is applied, but the row must stay OPEN so the agent
+    still sees the queue proposal (it used to flip to APPLIED and vanish)."""
+    ns = 35
+    ids = _seed(mariadb_znuny_url, ns=ns, created=datetime.now())
+    address = f"s00mmust86{ns}@uni.example.org"
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    llm = TriageLlm(queue_key_value=queue_key(ids["target_queue_id"]), confidence=60)
+    _patch_llm(monkeypatch, llm)
+    try:
+        _add_customer_user(mariadb_znuny_url, login=address, email=address, customer_id="UNIBONN")
+        async with factory() as session:
+            await _setup_policies(
+                session,
+                ids=ids,
+                auto_threshold=80,
+                suggest_threshold=50,
+                customer_fix=True,
+                customer_fix_threshold=90,
+            )
+        await _reset_watermark(factory, mariadb_znuny_url)
+
+        article_id = _add_article(
+            mariadb_znuny_url,
+            ticket_id=ids["ticket_id"],
+            sender_type="customer",
+            body=FORWARDED_BODY_TEMPLATE.format(address=address),
+            from_address="hausmeister@example.org",
+        )
+        _insert_event(mariadb_znuny_url, ticket_id=ids["ticket_id"], article_id=article_id)
+
+        await run_triage_tick(session_factory=factory)
+
+        _cid, customer_user_id = _ticket_customer(mariadb_znuny_url, ids["ticket_id"])
+        assert customer_user_id == address
+        assert _ticket_queue(mariadb_znuny_url, ids["ticket_id"]) == ids["source_queue_id"]
+        row = _triage_row(mariadb_znuny_url, ids["ticket_id"])
+        assert row is not None
+        assert row["customer_applied"] == 1
+        assert row["queue_applied"] == 0
+        assert row["status"] == TRIAGE_STATUS_OPEN
+    finally:
+        engine_sync = create_engine(mariadb_znuny_url)
+        with engine_sync.begin() as conn:
+            conn.execute(text("DELETE FROM customer_user WHERE email = :e"), {"e": address})
+        engine_sync.dispose()
         await engine.dispose()
         _cleanup(mariadb_znuny_url, ns)

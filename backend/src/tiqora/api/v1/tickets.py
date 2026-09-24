@@ -232,7 +232,8 @@ _ESCALATING_WITHIN_DESC = (
 )
 _SORT_DESC = (
     "age | created | changed | tn | title | priority | activity (newest article's"
-    " create_time, falling back to the ticket's create_time)."
+    " create_time, falling back to the ticket's create_time) | deadline (nearest"
+    " SLA deadline that is set; tickets without one last when ascending)."
 )
 
 

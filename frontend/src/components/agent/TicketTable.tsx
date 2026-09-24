@@ -29,7 +29,10 @@ export type SortKey =
   | "owner"
   | "customer"
   | "age"
-  | "changed";
+  | "changed"
+  /** Nearest SLA deadline that is set; no column header, used by the
+   * pinned block and its "show all" link. */
+  | "deadline";
 
 /** How far ahead an SLA deadline counts as "due soon" in the list — the amber
  * spine/badge and the pinned "needs attention" block use the same window. */

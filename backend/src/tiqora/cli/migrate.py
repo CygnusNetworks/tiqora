@@ -68,8 +68,10 @@ def add_migrate_subparser(sub: argparse._SubParsersAction) -> None:  # type: ign
     p = sub.add_parser("migrate", help="Run Alembic migrations (ownership-gated)")
     m_sub = p.add_subparsers(dest="migrate_command")
 
-    up = m_sub.add_parser("upgrade", help="Upgrade to head (owned chain only if gated)")
-    up.add_argument("revision", nargs="?", default="head")
+    up = m_sub.add_parser("upgrade", help="Upgrade to heads (owned chain only if gated)")
+    # "heads", not "head": with the gate active the owned chain is a separate
+    # branch (see versions_owned/), so there are two heads to reach.
+    up.add_argument("revision", nargs="?", default="heads")
     up.set_defaults(func=_cmd_upgrade)
 
     down = m_sub.add_parser("downgrade", help="Downgrade to a revision")
