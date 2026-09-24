@@ -84,6 +84,7 @@ from tiqora.ai.summary import (
     summarize_ticket,
 )
 from tiqora.ai.summary import TRIGGER_MANUAL as SUMMARY_TRIGGER_MANUAL
+from tiqora.ai.triage_worker import maybe_delay_reply
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
@@ -457,9 +458,14 @@ async def _open_triage_out(session: DbSession, ticket_id: int) -> AiTriageOut | 
     ).scalar_one_or_none()
     if row is None:
         return None
+    queue_open, customer_open = triage_service.open_halves(
+        row, await get_queue_policy_by_queue(session, row.source_queue_id)
+    )
+    if not (queue_open or customer_open):
+        return None
 
     queue_name: str | None = None
-    if row.suggested_queue_id is not None:
+    if queue_open and row.suggested_queue_id is not None:
         queue_name = (
             await session.execute(
                 sa_text("SELECT name FROM queue WHERE id = :qid LIMIT 1"),
@@ -483,7 +489,7 @@ async def _open_triage_out(session: DbSession, ticket_id: int) -> AiTriageOut | 
             votes = None
 
     customer_name: str | None = None
-    if row.suggested_customer_user_id:
+    if customer_open and row.suggested_customer_user_id:
         first, last = await customer_user_name(session, row.suggested_customer_user_id)
         customer_name = " ".join(p for p in (first, last) if p) or None
 
@@ -491,15 +497,17 @@ async def _open_triage_out(session: DbSession, ticket_id: int) -> AiTriageOut | 
         id=row.id,
         status=row.status,
         source_queue_id=row.source_queue_id,
-        suggested_queue_id=row.suggested_queue_id,
+        # Each half only when it is still actionable (triage.open_halves):
+        # the UI renders a proposal for every non-null field it gets.
+        suggested_queue_id=row.suggested_queue_id if queue_open else None,
         suggested_queue_name=queue_name,
-        queue_confidence=row.queue_confidence,
-        queue_reason=row.queue_reason,
-        queue_votes=votes,
-        extracted_email=row.extracted_email,
-        suggested_customer_user_id=row.suggested_customer_user_id,
+        queue_confidence=row.queue_confidence if queue_open else None,
+        queue_reason=row.queue_reason if queue_open else None,
+        queue_votes=votes if queue_open else None,
+        extracted_email=row.extracted_email if customer_open else None,
+        suggested_customer_user_id=row.suggested_customer_user_id if customer_open else None,
         suggested_customer_name=customer_name,
-        customer_confidence=row.customer_confidence,
+        customer_confidence=row.customer_confidence if customer_open else None,
         created_at=row.create_time,
     )
 
@@ -941,6 +949,9 @@ async def accept_ai_triage(
         return
 
     decision = body or AiTriageDecisionIn()
+    queue_open, customer_open = triage_service.open_halves(
+        row, await get_queue_policy_by_queue(session, row.source_queue_id)
+    )
     writer = TicketWriteService(session, get_session_factory(), SysConfig(session))
 
     async def _move(new_queue_id: int) -> None:
@@ -960,8 +971,8 @@ async def accept_ai_triage(
             sysconfig=SysConfig(session),
             row=row,
             acting_user_id=user.id,
-            apply_queue=decision.queue,
-            apply_customer=decision.customer,
+            apply_queue=decision.queue and queue_open,
+            apply_customer=decision.customer and customer_open,
             move_fn=_move,
             set_customer_fn=_set_customer,
         )
@@ -972,6 +983,16 @@ async def accept_ai_triage(
         # allowlist) -- this asymmetry is deliberate and surfaced in the
         # admin UI as a warning when configuring the allowlist.
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+
+    if "queue" in applied and row.suggested_queue_id is not None:
+        # Same as the worker's auto-apply: the destination queue decides
+        # whether the opening mail gets an AI answer at all.
+        await maybe_delay_reply(
+            session,
+            ticket_id=ticket_id,
+            queue_id=row.suggested_queue_id,
+            article_id=row.article_id,
+        )
 
     row.status = TRIAGE_STATUS_ACCEPTED
     row.decided_by_user_id = user.id
