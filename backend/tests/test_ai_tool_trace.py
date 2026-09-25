@@ -13,6 +13,7 @@ from datetime import datetime
 
 from tiqora.ai.llm import LlmMessage, ToolCall
 from tiqora.ai.runtime import _tool_trace_wire
+from tiqora.ai.tool_trace import MAX_TOOL_TRACE_BYTES, encode_tool_trace
 from tiqora.api.v1.ai import AiDraftOut, _draft_out, parse_tool_trace
 
 
@@ -126,3 +127,44 @@ def test_draft_out_without_trace() -> None:
         tool_trace_json = None
 
     assert _draft_out(NoTrace()).tool_trace == []
+
+
+# ---------------------------------------------------------------------------
+# encode_tool_trace — stays inside the TEXT column
+# ---------------------------------------------------------------------------
+
+
+def _kb_step(n: int, size: int) -> dict[str, str]:
+    return {
+        "role": "tool",
+        "tool_call_id": f"c{n}",
+        "name": "kb_get_article",
+        "content": "ä" * size,
+        "arguments": json.dumps({"article_id": n}),
+    }
+
+
+def test_encode_tool_trace_leaves_a_small_trace_alone() -> None:
+    trace = [_kb_step(1, 100)]
+    assert encode_tool_trace(trace) == json.dumps(trace)
+
+
+def test_encode_tool_trace_shortens_results_but_keeps_every_step() -> None:
+    # The prod run: eleven full KB articles.
+    trace = [_kb_step(n, 20_000) for n in range(11)]
+    encoded = encode_tool_trace(trace)
+    assert len(encoded.encode()) <= MAX_TOOL_TRACE_BYTES
+    steps = parse_tool_trace(encoded)
+    assert len(steps) == 11
+    assert all(s.arguments == json.dumps({"article_id": n}) for n, s in enumerate(steps))
+    assert "Zeichen gekürzt]" in steps[0].content
+
+
+def test_encode_tool_trace_drops_the_oldest_steps_as_a_last_resort() -> None:
+    trace = [_kb_step(n, 1_000) for n in range(2_000)]
+    encoded = encode_tool_trace(trace)
+    assert len(encoded.encode()) <= MAX_TOOL_TRACE_BYTES
+    steps = parse_tool_trace(encoded)
+    assert steps[0].name == "trace"
+    assert "frühere Schritte ausgelassen" in steps[0].content
+    assert steps[-1].arguments == json.dumps({"article_id": 1_999})

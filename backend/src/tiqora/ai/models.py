@@ -40,6 +40,7 @@ from sqlalchemy import (
     func,
     true,
 )
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.tiqora.base import TiqoraBase
@@ -772,6 +773,10 @@ class TiqoraAiTicketState(TiqoraBase):
     ai_escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+AUDIT_PAYLOAD_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
+"""16 MiB on MariaDB; PostgreSQL ``TEXT`` has no practical limit."""
+
+
 class TiqoraAiAuditLog(TiqoraBase):
     """One LLM chat-completion call, in/out (full audit — separate from
     :class:`TiqoraAiUsage`, which is aggregate cost/budget reporting only).
@@ -790,11 +795,12 @@ class TiqoraAiAuditLog(TiqoraBase):
     non-sensitive ``{"EMAIL": 3, ...}`` summary shown in list/detail views
     without needing to decrypt anything.
 
-    Columns are plain ``Text`` rather than a MySQL-specific ``LONGTEXT`` to
-    stay portable across the MariaDB/PostgreSQL test fixtures (see the
-    module docstring's "not a dialect JSON type" convention) — image bytes
-    are already stripped before the row is built, so ordinary chat/tool
-    payloads comfortably fit.
+    The payload columns are :data:`AUDIT_PAYLOAD_TEXT` — ``MEDIUMTEXT`` on
+    MariaDB, plain ``TEXT`` on PostgreSQL. Plain ``TEXT`` (64 KiB on MariaDB)
+    was assumed to fit, but a tool run re-sends its whole grown conversation
+    on every round, and every later round of such a run failed to write its
+    row. :func:`tiqora.ai.audit.write_audit_log` caps each value below the
+    column size.
     """
 
     __tablename__ = "tiqora_ai_audit_log"
@@ -819,9 +825,9 @@ class TiqoraAiAuditLog(TiqoraBase):
     duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    request_json: Mapped[str] = mapped_column(Text, nullable=False)
-    response_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    pii_map_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_json: Mapped[str] = mapped_column(AUDIT_PAYLOAD_TEXT, nullable=False)
+    response_json: Mapped[str | None] = mapped_column(AUDIT_PAYLOAD_TEXT, nullable=True)
+    pii_map_enc: Mapped[str | None] = mapped_column(AUDIT_PAYLOAD_TEXT, nullable=True)
     pii_counts_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
