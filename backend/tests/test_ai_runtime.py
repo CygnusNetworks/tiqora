@@ -1718,6 +1718,67 @@ async def test_auto_send_writes_tool_trace_onto_origin_row(mariadb_znuny_url: st
         await engine.dispose()
 
 
+async def test_auto_send_keeps_the_article_when_the_origin_row_fails(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """In production, a tool trace over MariaDB's 64 KiB ``TEXT`` failed
+    the origin INSERT at commit, after the mail had left, and the rollback
+    took the sent article with it. The trace is capped now; this forces an
+    oversized one anyway to pin down that nothing after the send can undo it."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=84, ticket_state_id=STATE_NEW_ID)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = get_settings()
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                enabled_auto_reply=True,
+                allowed_state_types='["open", "closed"]',
+            )
+        monkeypatch.setattr("tiqora.ai.runtime.encode_tool_trace", lambda trace: "x" * 70_000)
+
+        llm = ScriptedLlm([_propose_response("reply", "Antwort trotz kaputtem Trace.")])
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=settings,
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-84",
+            )
+        assert result.status == "sent"
+        assert result.article_id is not None
+
+        async with factory() as session:
+            article = (
+                await session.execute(
+                    text("SELECT id FROM article WHERE id = :aid"), {"aid": result.article_id}
+                )
+            ).first()
+            assert article is not None
+            origin = (
+                await session.execute(
+                    text("SELECT 1 FROM tiqora_ai_article_origin WHERE article_id = :aid"),
+                    {"aid": result.article_id},
+                )
+            ).first()
+            assert origin is None
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.auto_reply_count == 1
+            assert state.last_customer_article_id == seed["customer_article_id"]
+            assert state.run_lock_owner is None
+        # The auto-state change shared the failed transaction, so it is gone too.
+        assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_NEW_ID
+    finally:
+        await engine.dispose()
+
+
 async def test_auto_send_stamps_audit_run_id_onto_origin_row(mariadb_znuny_url: str) -> None:
     """The origin row's ``run_id`` column (20260814_0037) is the exact audit
     ``run_id`` for the run that produced it — the backfill CLI
