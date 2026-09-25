@@ -6745,7 +6745,7 @@ export interface components {
         };
         /**
          * AiCustomSummaryIn
-         * @description The agent's own summary instruction ("für eine Mitarbeiterin des
+         * @description The agent's own summary instruction ("für eine Mitarbeiterin der
          *     Hausverwaltung, inkl. Timeline").
          */
         AiCustomSummaryIn: {
