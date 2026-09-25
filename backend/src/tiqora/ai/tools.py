@@ -181,7 +181,7 @@ async def _default_mcp_call(
 
 # Result fields whose values are credentials, never content for a customer
 # message: the PKZ is, together with the Wohnplatznummer, the key that
-# registers an account. Replays of a production ticket showed models copying
+# registers an account. Production replays showed models copying
 # ``user.pkz`` from diagnose_connection into the reply despite a prompt rule.
 _CREDENTIAL_RESULT_KEYS = frozenset({"pkz", "password", "passwort", "pin"})
 # Shorter values are too likely to occur in ordinary text by coincidence.
@@ -361,7 +361,7 @@ def _local_tool_schemas(
     # Deliberately NOT capability-gated. This is the only way for the model to
     # end a run without producing customer text, and a run that cannot express
     # "nothing to answer here" is forced to invent an answer — which is exactly
-    # how ticket 2026010310000013 (a sipgate newsletter) got a reply: the model
+    # how a sipgate newsletter got a reply: the model
     # said "keine Kommunikation notwendig" in five internal notes, then the
     # terminal-force offered only propose/escalate and it picked propose.
     schemas.append(

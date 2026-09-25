@@ -54,7 +54,7 @@ _HONORIFIC = r"(?:Herrn?|Frau|Hr\.|Fr\.|Dr\.|Prof\.)"
 
 
 # Organisational units the small models tag as PER ("Abteilung Wohnen",
-# a production ticket). A candidate containing one of these words is an office, not
+# seen in production). A candidate containing one of these words is an office, not
 # a person, and masking it hides who the customer should contact.
 _ORG_WORDS = frozenset(
     {"abteilung", "amt", "büro", "hotline", "referat", "service", "support", "team"}
@@ -72,7 +72,7 @@ _GREETING_RE = re.compile(
 def _clean_candidate(raw: str) -> str:
     """The name part of an entity span. Spans cross line breaks — a signature
     followed by a quoted-reply header came back as
-    "Lin Mei\r\n\r\n-----原始邮件-----" (a production ticket) — and such a string
+    "Lin Mei\r\n\r\n-----原始邮件-----" (seen in production) — and such a string
     never occurs verbatim, so it masked nothing. Keep the first line, drop a
     leading salutation and trailing punctuation."""
     first_line = next((ln.strip() for ln in raw.splitlines() if ln.strip()), "")

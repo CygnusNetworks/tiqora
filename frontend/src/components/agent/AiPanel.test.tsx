@@ -519,7 +519,7 @@ describe("AiPanel", () => {
   });
 
   it("shows the no-answer-needed run as a skipped box carrying the reason", async () => {
-    // Regression for ticket 2026010310000013: the agent recognised a
+    // Regression: the agent recognised a
     // newsletter but had no way to end the run without customer text, so it
     // wrote one. "no_reply" is that exit — the panel must render it as a
     // finished run rather than leaving the spinner up forever.

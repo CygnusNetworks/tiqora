@@ -93,7 +93,7 @@ _PHONE_LABEL_RE = re.compile(
 # A candidate right behind a JSON key ('"free_traffic": 6597069766656') is a
 # JSON *number*, and JSON carries phone numbers as strings — so a bare digit
 # run in that position is a counter/ID from a tool result, not a phone number.
-# Masking it hid traffic counters from the model in a production ticket.
+# Masking it hid traffic counters from the model in production.
 _JSON_NUMBER_VALUE_RE = re.compile(r'"\s*:\s*\Z')
 
 # How far in front of a PHONE candidate the label / JSON-key checks look. Both
@@ -119,7 +119,7 @@ def _in_front_of(pattern: re.Pattern[str], match: re.Match[str]) -> bool:
 # what follows them. "…T14:36:36Z" ends in a word character, so the only
 # possible match is the bare ":36:" — testing *that* span for time-likeness
 # said "not a time" and the tool call came back as "2026-09-10T14[IPV6_1]36Z"
-# (a production ticket), which destroys exactly what timestamps are read for:
+# (seen in production), which destroys exactly what timestamps are read for:
 # correlating events across tools. The span is therefore first widened over
 # the digits it may have cut into, then checked.
 _TIME_LIKE_RE = re.compile(r"\A:?\d{1,2}(:\d{2}){1,2}\Z")

@@ -975,7 +975,8 @@ Mit freundlichen Gruessen
 async def test_real_world_tickets_route_to_netadmin_queue(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, ns: int, body: str, subject: str
 ) -> None:
-    """The two tickets that motivated the feature (two production tickets), both technical and both mis-filed.
+    """The two production tickets that motivated the feature, both
+    technical and both mis-filed.
 
     The model is scripted, so this does not test the model's judgement. What
     it does test is that the prompt actually carries the subject and every
@@ -1181,7 +1182,7 @@ def _ticket_customer(sync_url: str, ticket_id: int) -> tuple[str | None, str | N
 async def test_forwarded_mail_sets_the_original_sender_as_customer(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The shape of prod ticket 2026011110000021: a caretaker forwards a
+    """The shape of a production ticket: a caretaker forwards a
     student's mail, so the postmaster files the caretaker as the customer."""
     ns = 30
     ids = _seed(mariadb_znuny_url, ns=ns, created=datetime.now())

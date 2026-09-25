@@ -349,7 +349,7 @@ async def test_customer_article_triggers_auto_reply(
 async def test_auto_generated_customer_article_is_not_answered(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Regression for ticket 2026010310000013: a sipgate newsletter from
+    """Regression: a sipgate newsletter from
     noreply@sipgate.de reached the runtime and was answered. The ingest-time
     machine-mail flag must stop it before any LLM call happens."""
     seed = _seed_ticket(mariadb_znuny_url, ns=20)

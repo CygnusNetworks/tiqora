@@ -77,7 +77,7 @@ def test_plausible_person_name_filters() -> None:
     assert _plausible_person_name("Kellbach", "Frau Kellbach hat angerufen.")
     assert _plausible_person_name("Meyer", "Sehr geehrter Herr Meyer,")
     assert _plausible_person_name("Weber", "Herrn Dr. Weber wurde mitgeteilt")
-    # Organisational units are not people (a production ticket).
+    # Organisational units are not people (seen in production).
     assert not _plausible_person_name("Abteilung Wohnen", "an die Abteilung Wohnen")
     assert not _plausible_person_name("Team Netadmin", "Dein Team Netadmin")
 

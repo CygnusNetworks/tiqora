@@ -954,7 +954,7 @@ async def test_pii_ner_enabled_masks_third_party_name_mentioned_in_body(
 async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
     mariadb_znuny_url: str,
 ) -> None:
-    """a production ticket: an invalidated placeholder customer_user ("Invalid User")
+    """In production, an invalidated placeholder customer_user ("Invalid User")
     and the queue's own sender display name ("Netadmin CampusNet Nord") became
     name-masking candidates, so every "user" (including the ``"user": {`` key
     of a diagnose_connection result and the KB text about it), "CampusNet" and
@@ -1182,9 +1182,7 @@ async def test_custom_summary_follows_instruction_and_never_touches_state(
             )
         assert result.summary_body == "Custom result with timeline."
         assert llm.last_system_message is not None
-        assert "Fasse für die Hausverwaltung zusammen, inkl. Timeline." in (
-            llm.last_system_message
-        )
+        assert "Fasse für die Hausverwaltung zusammen, inkl. Timeline." in (llm.last_system_message)
         assert llm.last_user_message is not None
         # Always the full conversation (no incremental previous-summary path),
         # with article dates so a requested timeline has something to go on.

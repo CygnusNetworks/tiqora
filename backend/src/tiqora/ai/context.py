@@ -304,7 +304,7 @@ _NAME_SPLIT_RE = re.compile(r"[\s,]+")
 # customer_user records (an invalidated one is "Invalid User"), role and
 # mailbox labels. PiiMapper masks a candidate as a whole word, case-
 # insensitively, *everywhere* — "User" masked the ``"user": {`` key of every
-# diagnose_connection result and the KB text about it (a production ticket), so the
+# diagnose_connection result and the KB text about it (seen in production), so the
 # model could no longer tie ``user.active = 0`` to the account.
 _GENERIC_NAME_WORDS = frozenset(
     {

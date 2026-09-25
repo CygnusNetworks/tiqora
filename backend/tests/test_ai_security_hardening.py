@@ -294,7 +294,7 @@ def test_strip_hallucinated_signoff_keeps_german_closing_drops_placeholder() -> 
 
 
 def test_strip_hallucinated_signoff_collapses_stacked_closings() -> None:
-    """a production ticket: the KB answer template prescribes a closing and the
+    """In production, the KB answer template prescribes a closing and the
     model wrote its own on top, so the customer got two in a row."""
     body = (
         "Deine Endgeräte verbindest du dann mit dem WLAN deines Routers.\n\n"
