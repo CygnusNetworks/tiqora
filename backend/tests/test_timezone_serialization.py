@@ -122,7 +122,7 @@ def test_admin_response_models_serialize_utc() -> None:
 def test_ticket_ai_response_models_serialize_utc() -> None:
     """The ticket zoom's AI panel and summary marker read these; the marker
     showed "Zusammenfassung bis hier" 2h early next to correctly localised
-    articles (a production ticket)."""
+    articles."""
     models = [
         model
         for _, model in inspect.getmembers(ticket_ai, inspect.isclass)
@@ -146,7 +146,7 @@ def test_ai_state_summary_time_round_trips_utc() -> None:
         operation_mode_ready=True,
         drafts=[],
         summary_body="…",
-        last_summary_upto_article_id=135872,
+        last_summary_upto_article_id=42,
         summary_created_at=datetime(2026, 9, 25, 9, 39, 6),
     )
     assert state.model_dump(mode="json")["summary_created_at"] == "2026-09-25T09:39:06+00:00"
