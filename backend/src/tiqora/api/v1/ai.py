@@ -88,6 +88,7 @@ from tiqora.ai.triage_worker import maybe_delay_reply
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.config import Settings
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.domain.ticket_write_service import (
     TicketAccessDenied as TicketWriteAccessDenied,
@@ -137,7 +138,7 @@ class AiDraftOut(BaseModel):
     status: str
     source: str
     accepted_article_id: int | None
-    create_time: datetime
+    create_time: UtcDateTime
     tool_trace: list[AiToolTraceOut]
 
 
@@ -160,7 +161,7 @@ class AiTriageOut(BaseModel):
     suggested_customer_user_id: str | None = None
     suggested_customer_name: str | None = None
     customer_confidence: int | None = None
-    created_at: datetime | None = None
+    created_at: UtcDateTime | None = None
 
 
 class AiTriageDecisionIn(BaseModel):
@@ -182,12 +183,12 @@ class AiStateOut(BaseModel):
     drafts: list[AiDraftOut]
     summary_body: str | None
     last_summary_upto_article_id: int | None
-    summary_created_at: datetime | None
+    summary_created_at: UtcDateTime | None
     manual_run_status: str | None = None
     manual_run_notes: str | None = None
     manual_run_error_code: str | None = None
-    manual_run_started_at: datetime | None = None
-    ai_escalated_at: datetime | None = None
+    manual_run_started_at: UtcDateTime | None = None
+    ai_escalated_at: UtcDateTime | None = None
     triage: AiTriageOut | None = None
 
 
@@ -283,7 +284,7 @@ class AiCustomSummaryIn(BaseModel):
 
 class AiCustomSummaryOut(BaseModel):
     summary_body: str
-    created_at: datetime
+    created_at: UtcDateTime
 
 
 class AiDraftRequestOut(BaseModel):
