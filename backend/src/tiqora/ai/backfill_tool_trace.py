@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.audit import FEATURE_AUTO_REPLY
 from tiqora.ai.models import SOURCE_AUTO, TiqoraAiArticleOrigin, TiqoraAiAuditLog
+from tiqora.ai.tool_trace import encode_tool_trace
 from tiqora.db.legacy.article import Article
 
 # Audit rows are only considered if their timestamp is no more than this far
@@ -168,7 +169,7 @@ async def run_backfill(
             continue
         assert tool_messages is not None  # noqa: S101 — guaranteed by _correlate contract
         if not dry_run:
-            origin.tool_trace_json = json.dumps(tool_messages)
+            origin.tool_trace_json = encode_tool_trace(tool_messages)
             origin.run_id = run_id
         result.items.append(
             BackfillItem(

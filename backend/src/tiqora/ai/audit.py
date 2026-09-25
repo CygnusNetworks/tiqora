@@ -52,6 +52,25 @@ DEFAULT_RETENTION_DAYS = 30
 MIN_RETENTION_DAYS = 1
 MAX_RETENTION_DAYS = 365
 
+MAX_AUDIT_PAYLOAD_BYTES = 4_000_000
+"""Per-column cap for ``request_json``/``response_json``.
+
+Well below the ``MEDIUMTEXT`` column (16 MiB) because the whole INSERT has to
+fit into one MariaDB packet (``max_allowed_packet``, 16 MiB by default). A
+377k-token request is about 1.5 MB, so real runs are stored whole; the cap only
+turns a pathological payload into a shortened row instead of no row."""
+
+
+def _fit_payload(value: str) -> str:
+    """``value`` cut to :data:`MAX_AUDIT_PAYLOAD_BYTES` UTF-8 bytes, with a
+    marker. The result is no longer valid JSON; the audit view and the
+    tool-trace backfill already treat unparseable payloads as raw text."""
+    raw = value.encode()
+    if len(raw) <= MAX_AUDIT_PAYLOAD_BYTES:
+        return value
+    head = raw[:MAX_AUDIT_PAYLOAD_BYTES].decode(errors="ignore")
+    return f"{head}\n[… {len(raw) - MAX_AUDIT_PAYLOAD_BYTES} Bytes gekürzt]"
+
 
 @dataclass(frozen=True, slots=True)
 class AuditContext:
@@ -152,8 +171,8 @@ async def write_audit_log(
         duration_ms=duration_ms,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        request_json=request_json,
-        response_json=response_json,
+        request_json=_fit_payload(request_json),
+        response_json=_fit_payload(response_json) if response_json is not None else None,
         pii_map_enc=pii_map_enc,
         pii_counts_json=pii_counts_json,
     )

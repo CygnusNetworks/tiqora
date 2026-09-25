@@ -7,6 +7,7 @@ session-scoped testcontainer DB is shared safely.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -21,6 +22,7 @@ from tiqora.ai.audit import (
     AuditContext,
     AuditingLlmClient,
     PiiRevealError,
+    _fit_payload,
     audit_log_stats,
     cleanup_audit_log,
     compute_entry_cost,
@@ -151,6 +153,47 @@ async def test_auditing_client_writes_row_on_failure(mariadb_znuny_url: str) -> 
             assert row.response_json is None
     finally:
         await engine.dispose()
+
+
+async def test_write_audit_log_stores_a_payload_beyond_64k(mariadb_znuny_url: str) -> None:
+    """In production, every later round of a tool run exceeded MariaDB
+    ``TEXT`` and its row was silently dropped. ``MEDIUMTEXT`` keeps it whole."""
+    run_id = "audit-test-large-1"
+    _cleanup_audit_rows(mariadb_znuny_url, run_id_prefix=run_id)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    request_json = json.dumps({"messages": [{"role": "tool", "content": "ä" * 200_000}]})
+    try:
+        async with factory() as session:
+            await write_audit_log(
+                session,
+                settings=get_settings(),
+                context=AuditContext(feature="auto_reply", run_id=run_id),
+                request_json=request_json,
+                response_json='{"content": "ok"}',
+                status_code=200,
+                error=None,
+                duration_ms=5,
+                prompt_tokens=1,
+                completion_tokens=1,
+            )
+
+        async with factory() as session:
+            row = (
+                await session.execute(
+                    select(TiqoraAiAuditLog).where(TiqoraAiAuditLog.run_id == run_id)
+                )
+            ).scalar_one()
+            assert row.request_json == request_json
+    finally:
+        await engine.dispose()
+
+
+def test_fit_payload_cuts_on_a_character_boundary(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("tiqora.ai.audit.MAX_AUDIT_PAYLOAD_BYTES", 5)
+    assert _fit_payload("abc") == "abc"
+    # "ä" is two bytes; the cut at byte 5 lands inside the third one.
+    assert _fit_payload("äääää") == "ää\n[… 5 Bytes gekürzt]"
 
 
 async def test_auditing_client_redacts_image_data_urls(mariadb_znuny_url: str) -> None:
