@@ -932,7 +932,7 @@
         "type": "object"
       },
       "AiCustomSummaryIn": {
-        "description": "The agent's own summary instruction (\"f\u00fcr eine Mitarbeiterin des\nHausverwaltung, inkl. Timeline\").",
+        "description": "The agent's own summary instruction (\"f\u00fcr eine Mitarbeiterin der\nHausverwaltung, inkl. Timeline\").",
         "properties": {
           "instruction": {
             "maxLength": 2000,
