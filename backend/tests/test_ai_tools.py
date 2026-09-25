@@ -46,7 +46,7 @@ def test_local_tools_always_present() -> None:
 def test_no_reply_needed_available_in_every_autonomy_mode() -> None:
     """The "this needs no answer" exit must never be capability-gated — a run
     that cannot express it is forced to invent a customer message instead
-    (regression: ticket 2026010310000013, a sipgate newsletter got answered)."""
+    (regression: a sipgate newsletter got answered)."""
     for autonomy in (AUTONOMY_OFF, AUTONOMY_CLARIFY_ONLY, AUTONOMY_FULL):
         registry = ToolRegistry(autonomy=autonomy)
         names = {s["function"]["name"] for s in registry.build_schemas()}
@@ -340,7 +340,7 @@ def test_mcp_result_payload_passes_plain_data_through() -> None:
 
 @pytest.mark.asyncio
 async def test_credential_values_from_tool_results_are_blocked_in_customer_messages() -> None:
-    """Replays of a production ticket: models copied ``user.pkz`` from
+    """Production replays: models copied ``user.pkz`` from
     diagnose_connection into the customer mail — together with the
     Wohnplatznummer that is the registration key. A proposal carrying such a
     value is rejected so the model rewrites it."""

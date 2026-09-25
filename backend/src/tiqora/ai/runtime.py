@@ -171,7 +171,7 @@ _TERMINAL_FORCE_PROMPT = (
     "this ticket needs no answer at all. Do not answer in plain text."
 )
 """Offering only propose/escalate here is what sent a reply to a sipgate
-newsletter (ticket 2026010310000013): the model had already written "keine
+newsletter in production: the model had already written "keine
 Kommunikation notwendig" into five internal notes, but "done, nothing to
 answer" was not among the tools it was allowed to finish with, so it wrote a
 customer message instead. ``no_reply_needed`` is the third exit."""
@@ -1763,7 +1763,7 @@ async def run_ticket_agent(
         )
         # The answer left the building, so the ticket must not stay in "new" —
         # a queue full of answered-but-new tickets is what a human sees
-        # otherwise (a production ticket). The model may call update_ticket_fields
+        # otherwise (seen in production). The model may call update_ticket_fields
         # itself; only when it did not do we park the ticket ourselves, and only
         # in a state type the queue policy already allows.
         if not executor.state_change_applied:

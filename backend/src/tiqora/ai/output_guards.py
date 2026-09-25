@@ -87,7 +87,7 @@ def strip_hallucinated_signoff(body: str) -> str:
 
     Stacked closings collapse to the first one: a KB answer template that
     prescribes a closing plus the model's own closing shipped
-    "Viele Grüße\\nMit freundlichen Grüßen" to a customer (a production ticket),
+    "Viele Grüße\\nMit freundlichen Grüßen" to a customer (seen in production),
     because anchoring on the *last* closing kept every line before it.
     """
     lines = body.rstrip().split("\n")

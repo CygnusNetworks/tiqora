@@ -162,7 +162,7 @@ _SYSTEM_PROMPT_DETAILED = (
 )
 
 
-# Custom summary — the agent phrases the task ("für eine Mitarbeiterin des
+# Custom summary — the agent phrases the task ("für eine Mitarbeiterin der
 # Hausverwaltung, inkl. Timeline"). The result is shown once and never
 # stored, so there is no previous summary to carry forward.
 _CUSTOM_SYSTEM_PROMPT = (

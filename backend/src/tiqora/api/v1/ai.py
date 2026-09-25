@@ -271,7 +271,7 @@ class AiSummarizeOut(BaseModel):
 
 
 class AiCustomSummaryIn(BaseModel):
-    """The agent's own summary instruction ("für eine Mitarbeiterin des
+    """The agent's own summary instruction ("für eine Mitarbeiterin der
     Hausverwaltung, inkl. Timeline")."""
 
     instruction: str = Field(min_length=1, max_length=CUSTOM_INSTRUCTION_MAX_CHARS)
