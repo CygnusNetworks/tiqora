@@ -186,7 +186,7 @@ def test_zulu_timestamps_in_tool_results_are_not_masked_as_ipv6() -> None:
     """A "Z"-terminated ISO timestamp is a word character right after the
     seconds, so the only IPV6 candidate is the bare ":36:" in the middle of
     the time — it used to reach the model as "2026-09-10T14[IPV6_1]36Z"
-    (a production ticket), leaving the timestamp useless for correlation."""
+    (seen in production), leaving the timestamp useless for correlation."""
     mapper = PiiMapper()
     for text in (
         '{"timestamp_utc": "2026-09-10T14:36:36Z"}',
@@ -202,7 +202,7 @@ def test_zulu_timestamps_in_tool_results_are_not_masked_as_ipv6() -> None:
 
 def test_json_number_values_are_not_masked_as_phone() -> None:
     """Traffic counters in a diagnose_connection result are JSON numbers;
-    JSON carries phone numbers as strings (a production ticket)."""
+    JSON carries phone numbers as strings (seen in production)."""
     pii = PiiMapper()
     raw = '{"free_traffic": 6597069766656, "current_traffic": 70793010637}'
     assert pii.mask(raw) == raw

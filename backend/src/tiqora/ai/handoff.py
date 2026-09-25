@@ -2,7 +2,7 @@
 
 Separate from Znuny SLA ``ticket.escalation_*``: those columns are rebuilt
 from queue minutes after every article/state change, and queues with
-``update_time = 0`` (e.g. cn-nord) would wipe a fake timestamp. This flag is
+``update_time = 0`` (common in production) would wipe a fake timestamp. This flag is
 the list-UI marker for "the model asked a human to take over".
 """
 

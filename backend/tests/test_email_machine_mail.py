@@ -1,6 +1,6 @@
 """Unit tests for tiqora.channels.email.machine_mail. No DB, no network.
 
-The regression these guard: ticket 2026010310000013 — a sipgate newsletter
+The regression these guard: a sipgate newsletter
 from ``noreply@sipgate.de`` reached the AI auto-reply and got answered.
 """
 
@@ -61,8 +61,8 @@ def test_clean_spam_verdict_is_not_auto_generated(header: str, value: str) -> No
 
 
 def test_sipgate_newsletter_shape_is_auto_generated() -> None:
-    """The exact header shape of the mail that produced ticket
-    2026010310000013 (bulk newsletter from a noreply sender)."""
+    """The exact header shape of the mail behind that regression
+    (bulk newsletter from a noreply sender)."""
     assert is_auto_generated(
         {
             "From": "sipgate GmbH <noreply@sipgate.de>",

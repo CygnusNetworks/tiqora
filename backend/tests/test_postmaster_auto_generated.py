@@ -5,7 +5,7 @@ detector alone) and ``tests/test_ai_auto_worker.py`` (which covers the consumer
 alone): this asserts the flag actually survives the pipeline into the payload
 the AI auto-worker reads.
 
-Regression for ticket 2026010310000013 — a sipgate newsletter from
+Regression: a sipgate newsletter from
 ``noreply@sipgate.de`` reached the AI runtime and was answered.
 """
 

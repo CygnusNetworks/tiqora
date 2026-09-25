@@ -75,7 +75,7 @@ async def test_kb_bundle_headers_carry_article_id_and_mark_truncation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Without ids in the headers the model guessed kb_get_article ids (old
-    drafts) in 6/6 replays of a production ticket; with them it fetched the right
+    drafts) in 6/6 production replays; with them it fetched the right
     article. A cut body says so and names the id to fetch."""
 
     class _LongKb(_FakeKbService):
