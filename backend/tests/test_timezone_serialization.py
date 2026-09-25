@@ -14,7 +14,9 @@ from datetime import UTC, datetime
 from pydantic import BaseModel
 from pydantic.functional_serializers import PlainSerializer
 
+from tiqora.api.v1 import ai as ticket_ai
 from tiqora.api.v1.admin import schemas as admin_schemas
+from tiqora.api.v1.tickets import AiOriginOut
 from tiqora.db.engine import _utc_connect_args
 from tiqora.domain.schemas import ArticleListItem, HistoryEntry, UtcDateTime
 
@@ -115,6 +117,39 @@ def test_admin_response_models_serialize_utc() -> None:
         f"{len(offenders)} admin response field(s) serialize a naive datetime and will "
         f"display in the wrong timezone: {offenders}"
     )
+
+
+def test_ticket_ai_response_models_serialize_utc() -> None:
+    """The ticket zoom's AI panel and summary marker read these; the marker
+    showed "Zusammenfassung bis hier" 2h early next to correctly localised
+    articles (a production ticket)."""
+    models = [
+        model
+        for _, model in inspect.getmembers(ticket_ai, inspect.isclass)
+        if issubclass(model, BaseModel) and model.__module__ == ticket_ai.__name__
+    ]
+    offenders = [
+        f"{model.__name__}.{field_name}"
+        for model in [*models, AiOriginOut]
+        for field_name, field in model.model_fields.items()
+        if _mentions_datetime(field.annotation)
+        and not _has_utc_serializer(field.annotation, list(field.metadata))
+    ]
+    assert offenders == []
+
+
+def test_ai_state_summary_time_round_trips_utc() -> None:
+    state = ticket_ai.AiStateOut(
+        manual_assist_available=True,
+        summary_available=True,
+        can_summarize=False,
+        operation_mode_ready=True,
+        drafts=[],
+        summary_body="…",
+        last_summary_upto_article_id=135872,
+        summary_created_at=datetime(2026, 9, 25, 9, 39, 6),
+    )
+    assert state.model_dump(mode="json")["summary_created_at"] == "2026-09-25T09:39:06+00:00"
 
 
 def test_admin_user_out_round_trips_utc() -> None:

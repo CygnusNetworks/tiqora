@@ -36,6 +36,7 @@ from tiqora.domain.schemas import (
     TicketLinkCreateRequest,
     TicketLinkTargetOut,
     TicketListItem,
+    UtcDateTime,
 )
 from tiqora.domain.search import SearchIndexService
 from tiqora.domain.ticket_service import (
@@ -953,7 +954,7 @@ class AiOriginOut(BaseModel):
     run_id: int | None
     audit_run_id: str | None
     source: str
-    created_at: datetime | None
+    created_at: UtcDateTime | None
     tool_trace: list[AiToolTraceOut] | None
 
 
