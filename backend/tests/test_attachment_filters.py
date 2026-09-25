@@ -33,7 +33,7 @@ def _meta(
     [
         ("file-1", "text/plain; charset=utf-8"),
         # HTML-only mails (no multipart/alternative) store the body as
-        # ``file-1`` with text/html — regression for ticket 2026011410000031.
+        # ``file-1`` with text/html — regression from production.
         ("file-1", "text/html; charset=utf-8"),
         ("file-2", "text/html; charset=utf-8"),
         ("file-1.html", "text/html"),

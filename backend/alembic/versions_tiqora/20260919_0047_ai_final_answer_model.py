@@ -6,7 +6,7 @@ Create Date: 2026-09-19
 
 ``final_answer_llm_provider_id`` / ``final_answer_model_override``: the
 primary model runs the tool loop, and the run is handed over to this model
-once the primary wants to write the customer message. a production ticket: the
+once the primary wants to write the customer message. In production, the
 primary (Qwen3-235B-Instruct) misread a correct diagnosis in 6 of 6 replays,
 while stronger models given the same conversation answered correctly.
 Both NULL = unchanged behaviour.

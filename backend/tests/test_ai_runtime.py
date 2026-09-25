@@ -3005,7 +3005,7 @@ def _no_reply_response(reason: str) -> LlmResponse:
 async def test_no_reply_needed_ends_run_without_customer_article(
     mariadb_znuny_url: str,
 ) -> None:
-    """Regression for ticket 2026010310000013: the model recognised a sipgate
+    """Regression: the model recognised a sipgate
     newsletter, but had no way to finish a run without customer text and so
     wrote one. ``no_reply_needed`` is that way — it must leave an internal
     note and no customer-visible article at all."""
@@ -3144,7 +3144,7 @@ async def test_terminal_force_without_tool_call_still_skips(
 
 
 # ---------------------------------------------------------------------------
-# Auto-state: an answered ticket must not stay in "new" (a production ticket)
+# Auto-state: an answered ticket must not stay in "new" (seen in production)
 # ---------------------------------------------------------------------------
 
 
@@ -3434,7 +3434,7 @@ async def _draft_body(factory: Any, draft_id: int) -> str:
 async def test_final_answer_model_writes_the_customer_message(
     mariadb_znuny_url: str,
 ) -> None:
-    """a production ticket: the primary model's proposal is discarded unexecuted and
+    """In production, the primary model's proposal is discarded unexecuted and
     the final-answer model answers from the same conversation, including
     everything the primary researched."""
     seed = _seed_ticket(mariadb_znuny_url, ns=73)

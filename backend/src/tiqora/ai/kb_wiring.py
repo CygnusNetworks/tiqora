@@ -228,7 +228,7 @@ async def kb_bundle(
     parts = []
     for article, tag_names in pairs[:_KB_ARTICLE_BUNDLE_LIMIT]:
         # The id is what kb_get_article takes: without it the model guessed
-        # ids and fetched unrelated draft articles (a production ticket replays).
+        # ids and fetched unrelated draft articles (production replays).
         meta = f"article_id: {article.id}" + (
             f"; tags: {', '.join(tag_names)}" if tag_names else ""
         )
