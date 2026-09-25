@@ -100,6 +100,7 @@ from tiqora.ai.reply_language import (
     detect_reply_language_detailed,
 )
 from tiqora.ai.tool_chain import analyze_tool_chain
+from tiqora.ai.tool_trace import encode_tool_trace
 from tiqora.ai.tools import (
     TOOL_ESCALATE_TO_HUMAN,
     TOOL_NO_REPLY_NEEDED,
@@ -360,6 +361,11 @@ async def _acquire_lock(session: AsyncSession, ticket_id: int, owner: str) -> Ti
 
 
 async def _release_lock(session: AsyncSession, ticket_id: int) -> None:
+    # Called from ``finally``: after a failed flush the session refuses all
+    # work until rolled back, and the resulting PendingRollbackError used to
+    # replace the original error in the log and leave the lock set.
+    if not session.is_active:
+        await session.rollback()
     state = await session.get(TiqoraAiTicketState, ticket_id)
     if state is not None:
         state.run_lock_owner = None
@@ -1663,7 +1669,7 @@ async def run_ticket_agent(
                 body=outcome.proposal["body"],
                 subject=outcome.proposal.get("subject") or None,
                 based_on_article_id=based_on_article_id,
-                tool_trace_json=json.dumps(_tool_trace_wire(messages)),
+                tool_trace_json=encode_tool_trace(_tool_trace_wire(messages)),
                 created_by_user_id=created_by_user_id,
                 source=source,
                 actor_user_id=actor_user_id,
@@ -1751,36 +1757,11 @@ async def run_ticket_agent(
                     sysconfig=sysconfig,
                 )
 
-        session.add(
-            TiqoraAiArticleOrigin(
-                article_id=article_id,
-                source=SOURCE_AUTO,
-                queue_id=ticket.queue_id,
-                service_user_id=actor_user_id,
-                tool_trace_json=json.dumps(_tool_trace_wire(messages)),
-                run_id=run_id,
-            )
-        )
-        # The answer left the building, so the ticket must not stay in "new" —
-        # a queue full of answered-but-new tickets is what a human sees
-        # otherwise (seen in production). The model may call update_ticket_fields
-        # itself; only when it did not do we park the ticket ourselves, and only
-        # in a state type the queue policy already allows.
-        if not executor.state_change_applied:
-            auto_state_id = await _resolve_auto_state_id(
-                session,
-                kind=outcome.proposal["kind"],
-                allowed_state_types=resolve_allowed_state_types(policy.allowed_state_types),
-            )
-            if auto_state_id is not None:
-                await domain_change_state(
-                    session,
-                    ticket_id=ticket_id,
-                    new_state_id=auto_state_id,
-                    user_id=actor_user_id,
-                    sysconfig=sysconfig,
-                )
-
+        # The message has left, so the article and the loop-guard bookkeeping
+        # are committed right here. Everything after this point is secondary: if
+        # it failed inside the same transaction it would roll back the record of
+        # a reply the customer already has (an oversized tool trace did
+        # exactly that in production).
         state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
         state.last_customer_article_id = based_on_article_id
         if outcome.proposal["kind"] == DRAFT_KIND_REPLY:
@@ -1788,6 +1769,43 @@ async def run_ticket_agent(
         else:
             state.clarification_count = (state.clarification_count or 0) + 1
         await session.commit()
+
+        try:
+            session.add(
+                TiqoraAiArticleOrigin(
+                    article_id=article_id,
+                    source=SOURCE_AUTO,
+                    queue_id=ticket.queue_id,
+                    service_user_id=actor_user_id,
+                    tool_trace_json=encode_tool_trace(_tool_trace_wire(messages)),
+                    run_id=run_id,
+                )
+            )
+            # The answer left the building, so the ticket must not stay in "new" —
+            # a queue full of answered-but-new tickets is what a human sees
+            # otherwise (seen in production). The model may call update_ticket_fields
+            # itself; only when it did not do we park the ticket ourselves, and only
+            # in a state type the queue policy already allows.
+            if not executor.state_change_applied:
+                auto_state_id = await _resolve_auto_state_id(
+                    session,
+                    kind=outcome.proposal["kind"],
+                    allowed_state_types=resolve_allowed_state_types(policy.allowed_state_types),
+                )
+                if auto_state_id is not None:
+                    await domain_change_state(
+                        session,
+                        ticket_id=ticket_id,
+                        new_state_id=auto_state_id,
+                        user_id=actor_user_id,
+                        sysconfig=sysconfig,
+                    )
+            await session.commit()
+        except Exception:  # noqa: BLE001 — the reply is sent and stored; only its extras failed
+            await session.rollback()
+            logger.exception(
+                "ai_runtime_post_send_failed", ticket_id=ticket_id, article_id=article_id
+            )
         return AgentRunResult(
             status=STATUS_SENT,
             article_id=article_id,
