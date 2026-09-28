@@ -4684,6 +4684,31 @@
         "title": "AppointmentUpdateIn",
         "type": "object"
       },
+      "ArticleAttachmentIn": {
+        "properties": {
+          "content_base64": {
+            "title": "Content Base64",
+            "type": "string"
+          },
+          "content_type": {
+            "default": "application/octet-stream",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "filename": {
+            "maxLength": 250,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "content_base64"
+        ],
+        "title": "ArticleAttachmentIn",
+        "type": "object"
+      },
       "ArticleBody": {
         "properties": {
           "article_id": {
@@ -4724,6 +4749,14 @@
               }
             ],
             "title": "Ai Draft Id"
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/ArticleAttachmentIn"
+            },
+            "maxItems": 10,
+            "title": "Attachments",
+            "type": "array"
           },
           "bcc": {
             "anyOf": [
@@ -4852,6 +4885,25 @@
           "subject": {
             "title": "Subject",
             "type": "string"
+          },
+          "telegram_buttons": {
+            "items": {
+              "$ref": "#/components/schemas/TelegramButtonIn"
+            },
+            "maxItems": 8,
+            "title": "Telegram Buttons",
+            "type": "array"
+          },
+          "telegram_reply_to_article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Reply To Article Id"
           },
           "to_address": {
             "anyOf": [
@@ -19237,6 +19289,219 @@
           "article_count"
         ],
         "title": "TagOut",
+        "type": "object"
+      },
+      "TelegramButtonIn": {
+        "properties": {
+          "action": {
+            "default": "reply",
+            "enum": [
+              "reply",
+              "resolve_yes",
+              "resolve_no"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "TelegramButtonIn",
+        "type": "object"
+      },
+      "TelegramChatOut": {
+        "properties": {
+          "ai_escalated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Escalated At"
+          },
+          "chat_id": {
+            "title": "Chat Id",
+            "type": "integer"
+          },
+          "consent_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Time"
+          },
+          "customer_user_login": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Login"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "identity_verified": {
+            "title": "Identity Verified",
+            "type": "boolean"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/TelegramMessageMeta"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "chat_id",
+          "username",
+          "display_name",
+          "identity_verified",
+          "customer_user_login",
+          "consent_time",
+          "ai_escalated_at",
+          "messages"
+        ],
+        "title": "TelegramChatOut",
+        "type": "object"
+      },
+      "TelegramEditRequest": {
+        "properties": {
+          "body": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Body",
+            "type": "string"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "TelegramEditRequest",
+        "type": "object"
+      },
+      "TelegramMessageMeta": {
+        "properties": {
+          "answered_button": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered Button"
+          },
+          "article_id": {
+            "title": "Article Id",
+            "type": "integer"
+          },
+          "buttons": {
+            "items": {
+              "$ref": "#/components/schemas/TelegramButtonIn"
+            },
+            "title": "Buttons",
+            "type": "array"
+          },
+          "direction": {
+            "enum": [
+              "in",
+              "out"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "edited_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited At"
+          },
+          "reply_to_article_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply To Article Id"
+          },
+          "retracted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retracted At"
+          }
+        },
+        "required": [
+          "article_id",
+          "direction",
+          "reply_to_article_id",
+          "buttons",
+          "answered_button",
+          "edited_at",
+          "retracted_at",
+          "editable"
+        ],
+        "title": "TelegramMessageMeta",
         "type": "object"
       },
       "TelegramWebhookRegisterRequest": {
@@ -56634,7 +56899,7 @@
         ]
       },
       "post": {
-        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.",
+        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored.\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.",
         "operationId": "create_article_api_v1_tickets__ticket_id__articles_post",
         "parameters": [
           {
@@ -57786,6 +58051,247 @@
           }
         },
         "summary": "Split Article Endpoint",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram": {
+      "patch": {
+        "description": "Edit a previously sent agent Telegram message's text (keeps its\nkeyboard unless already answered). Requires ``note``.",
+        "operationId": "edit_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelegramEditRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Telegram Article",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram/buttons": {
+      "delete": {
+        "description": "Remove the inline keyboard from a previously sent agent Telegram\nmessage that no button has been answered on yet. Requires ``note``\n(same as edit/retract).",
+        "operationId": "remove_telegram_article_buttons_api_v1_tickets__ticket_id__articles__article_id__telegram_buttons_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Telegram Article Buttons",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram/retract": {
+      "post": {
+        "description": "Delete a previously sent agent Telegram message (and its attachment\nparts). Requires ``note``.",
+        "operationId": "retract_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_retract_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retract Telegram Article",
         "tags": [
           "tickets"
         ]
@@ -59127,9 +59633,152 @@
         ]
       }
     },
+    "/api/v1/tickets/{ticket_id}/telegram": {
+      "get": {
+        "description": "Telegram chat info for a ticket: contact identity + per-article message\nmetadata (edit/retract state, buttons, answered button). Requires ``ro``.\n404 when the ticket has no Telegram chat to resolve.",
+        "operationId": "get_telegram_chat_api_v1_tickets__ticket_id__telegram_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramChatOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Telegram Chat",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/telegram/typing": {
+      "post": {
+        "description": "Best-effort typing indicator for the ticket's Telegram chat. Requires\n``note``. Meant to be called at most every few seconds while an agent is\ncomposing -- no server-side throttle, the frontend paces its own calls.",
+        "operationId": "send_telegram_typing_api_v1_tickets__ticket_id__telegram_typing_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Telegram Typing",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/v1/tickets/{ticket_id}/templates": {
       "get": {
-        "description": "Response templates (template_type='Answer') for the ticket's queue.",
+        "description": "Response templates for the ticket's queue (default template_type='Answer').",
         "operationId": "ticket_templates_api_v1_tickets__ticket_id__templates_get",
         "parameters": [
           {
@@ -59139,6 +59788,20 @@
             "schema": {
               "title": "Ticket Id",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "default": "Answer",
+              "enum": [
+                "Answer",
+                "Chat"
+              ],
+              "title": "Type",
+              "type": "string"
             }
           },
           {
