@@ -92,8 +92,27 @@ export function TelegramChatComposer({
   }, [hasContent]);
   useEffect(() => () => composingCb.current?.(false), []);
 
+  // A draft handed over from elsewhere (AiPanel's "Entwurf übernehmen") —
+  // same overwrite guard as the composer's own inline AI suggestion below.
+  const applyExternalDraft = async (draft: { id: number; body: string }) => {
+    if (body.trim() && body !== draft.body) {
+      const ok = await confirm({
+        title: t("ticket.telegram.composer.aiReplaceTitle"),
+        message: t("ticket.telegram.composer.aiReplaceMessage"),
+        confirmLabel: t("ticket.telegram.composer.aiReplaceConfirm"),
+        variant: "danger",
+      });
+      if (!ok) return;
+    }
+    setBody(draft.body);
+    setCaret(draft.body.length);
+    setAiDraftId(draft.id);
+    inputRef.current?.focus();
+  };
+
   useComposerRequests(ticketId, (req) => {
     if (req.quoteArticleId != null) setQuoteId(req.quoteArticleId);
+    if (req.draft) void applyExternalDraft(req.draft);
     if (req.focus) inputRef.current?.focus();
   });
 

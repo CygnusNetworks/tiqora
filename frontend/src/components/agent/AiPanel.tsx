@@ -18,7 +18,7 @@ import {
   saveSummaryPinned,
 } from "@/lib/customSummaryPrompts";
 import { articleSortKey } from "@/lib/article";
-import { channelNameOf } from "@/lib/articleChannel";
+import { channelNameOf, dominantChannel } from "@/lib/articleChannel";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
@@ -30,6 +30,7 @@ import { HelpPopover } from "@/components/ui/HelpPopover";
 import { HoverCard } from "@/components/ui/HoverCard";
 import { PencilIcon, PinIcon, SparkIcon } from "@/components/ui/icons";
 import { ToolTraceCard } from "@/components/ai/ToolResultView";
+import { requestComposer } from "./telegram/composerBus";
 import { ReplyDialog } from "./ReplyDialog";
 import { SummaryText } from "./SummaryText";
 import { AssistChip, ChipCount } from "./AssistChip";
@@ -267,12 +268,17 @@ export function AiPanel({
 
   // Shares the query key with TicketHeaderActions/ArticleMasterDetail, so in
   // the zoom page this is a cache hit, not a second request. Used for the
-  // coverage indicator and as reply-target fallback for drafts without
-  // based_on_article_id.
+  // coverage indicator, as reply-target fallback for drafts without
+  // based_on_article_id, and (below) to decide — before the agent even
+  // clicks "Entwurf übernehmen" — whether a Telegram ticket routes to the
+  // chat composer instead of opening ReplyDialog.
   const articlesQ = useQuery({
     queryKey: ["tickets", ticketId, "articles"],
     queryFn: () => api.listArticles(ticketId),
-    enabled: Boolean(stateQ.data?.summary_available) || Boolean(replyDraft),
+    enabled:
+      Boolean(stateQ.data?.summary_available) ||
+      Boolean(replyDraft) ||
+      (stateQ.data?.drafts.length ?? 0) > 0,
   });
 
   const draftMutation = useMutation({
@@ -451,6 +457,10 @@ export function AiPanel({
   };
 
   const articles = articlesQ.data ?? [];
+  // "Entwurf übernehmen" opens the email-style ReplyDialog by default; a
+  // Telegram ticket routes to the chat composer instead (see
+  // TicketHeaderActions/ArticleQuickActions for the same switch).
+  const isTelegramTicket = dominantChannel(articles) === "Telegram";
   const upto = state.last_summary_upto_article_id;
   const coveredCount =
     upto == null ? 0 : articles.filter((a) => a.id <= upto).length;
@@ -839,7 +849,14 @@ export function AiPanel({
                           variant="primary"
                           data-testid={`ai-panel-draft-use-${draft.id}`}
                           disabled={!canNote}
-                          onClick={() => setReplyDraft(draft)}
+                          onClick={() =>
+                            isTelegramTicket
+                              ? requestComposer(ticketId, {
+                                  draft: { id: draft.id, body: draft.body },
+                                  focus: true,
+                                })
+                              : setReplyDraft(draft)
+                          }
                         >
                           {t("ticket.ai.useDraft")}
                         </Button>

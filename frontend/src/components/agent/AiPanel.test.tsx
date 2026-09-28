@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { AiPanel } from "./AiPanel";
+import { useComposerRequests } from "./telegram/composerBus";
 
 const {
   getState,
@@ -967,24 +968,15 @@ describe("AiPanel", () => {
     expect(payload.ai_draft_id).toBe(9);
   });
 
-  it("opens the reply editor in Telegram mode when the AI draft's based-on article is a Telegram article", async () => {
+  it("routes 'Entwurf übernehmen' to the chat composer when the ticket is Telegram-dominant", async () => {
     listArticles.mockResolvedValue([
       {
         ...fakeArticle(3),
         communication_channel_id: 42,
         communication_channel_name: "Telegram",
+        sender_type: "customer",
       },
     ]);
-    getReplyDraft.mockResolvedValue({
-      to_address: null,
-      cc: "",
-      subject: "",
-      body: "quoted",
-      in_reply_to: null,
-      references: null,
-      signature: "",
-      signature_is_html: false,
-    });
     getState.mockResolvedValue({
       ...baseState,
       manual_assist_available: true,
@@ -1000,7 +992,18 @@ describe("AiPanel", () => {
       ],
     });
 
-    wrap(<AiPanel ticketId={1} canNote />);
+    const handler = vi.fn();
+    function Listener() {
+      useComposerRequests(1, handler);
+      return null;
+    }
+
+    wrap(
+      <>
+        <Listener />
+        <AiPanel ticketId={1} canNote />
+      </>,
+    );
     await openCards();
 
     await waitFor(() =>
@@ -1008,21 +1011,11 @@ describe("AiPanel", () => {
     );
     fireEvent.click(screen.getByTestId("ai-panel-draft-use-9"));
 
-    await waitFor(() =>
-      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
-    );
-    expect(screen.getByTestId("reply-telegram-hint")).toBeInTheDocument();
-    expect(screen.queryByTestId("reply-to")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("reply-send"));
-
-    await waitFor(() => expect(createArticle).toHaveBeenCalled());
-    const payload = createArticle.mock.calls[0][1] as {
-      channel: string;
-      to_address: string | null;
-    };
-    expect(payload.channel).toBe("telegram");
-    expect(payload.to_address).toBeNull();
+    expect(handler).toHaveBeenCalledWith({
+      draft: { id: 9, body: "AI drafted answer" },
+      focus: true,
+    });
+    expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
   });
 
   describe("header chips", () => {

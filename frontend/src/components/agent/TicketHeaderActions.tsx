@@ -17,7 +17,8 @@ import { formatDateTime } from "@/lib/format";
 import { escalationLevel, stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import { useReplyDraft } from "@/lib/replyDrafts";
-import { channelNameOf } from "@/lib/articleChannel";
+import { channelNameOf, dominantChannel } from "@/lib/articleChannel";
+import { requestComposer, requestConversationView } from "./telegram/composerBus";
 import { ReplyDialog } from "./ReplyDialog";
 import { TicketMetaCounters } from "./TicketMetaCounters";
 import { articleSortKey } from "@/lib/article";
@@ -152,6 +153,9 @@ export function TicketHeaderActions({
   const replyTarget = [...(visibleArticles.length > 0 ? visibleArticles : articles)].sort(
     (a, b) => articleSortKey(b) - articleSortKey(a),
   )[0];
+  // Telegram tickets reply through the messenger-style chat composer, not
+  // the email-style dialog — see composerBus.ts.
+  const isTelegramTicket = dominantChannel(articles) === "Telegram";
 
   const isLocked = Boolean(ticket.lock && ticket.lock.toLowerCase() !== "unlock");
 
@@ -223,7 +227,17 @@ export function TicketHeaderActions({
               data-testid="ticket-actions-reply"
               data-has-draft={headerHasDraft ? "true" : undefined}
               className={cn(ai?.draftsButton && "rounded-r-none")}
-              onClick={() => setReplyOpen(true)}
+              onClick={() => {
+                if (isTelegramTicket) {
+                  // Bring a manually-split ticket back to the conversation
+                  // view first — the composer only mounts there, and the
+                  // focus request is buffered until it does.
+                  requestConversationView(ticketId);
+                  requestComposer(ticketId, { focus: true });
+                } else {
+                  setReplyOpen(true);
+                }
+              }}
             >
               ↩ {headerHasDraft ? t("ticket.draftResume") : t("ticket.reply")}
               {headerHasDraft && (
