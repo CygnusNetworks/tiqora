@@ -5,6 +5,7 @@ import { channelNameOf, isInternalNote } from "@/lib/articleChannel";
 import { Button } from "@/components/ui/Button";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import { useReplyDraft } from "@/lib/replyDrafts";
+import { requestComposer } from "./telegram/composerBus";
 import { ReplyDialog } from "./ReplyDialog";
 import { BounceDialog, ForwardDialog, SplitDialog } from "./ArticleActionDialogs";
 import { useDeleteArticleNote } from "./useDeleteArticleNote";
@@ -41,6 +42,7 @@ export function ArticleQuickActions({
   );
   const hasMultipleRecipients =
     (article.to_address ?? "").includes(",") || Boolean(article.to_address && article.from_address);
+  const isTelegram = channelNameOf(article) === "Telegram";
   const noPerm = t("ticket.toolbar.noPermission");
   const showDelete = canDelete && isInternalNote(article);
   const del = useDeleteArticleNote(ticketId, article.id);
@@ -59,7 +61,11 @@ export function ArticleQuickActions({
           data-testid={replyTestId}
           data-has-draft={hasDraft ? "true" : undefined}
           title={compact ? (hasDraft ? t("ticket.draftResume") : t("ticket.reply")) : undefined}
-          onClick={() => setDialog("reply")}
+          onClick={() =>
+            isTelegram
+              ? requestComposer(ticketId, { quoteArticleId: article.id, focus: true })
+              : setDialog("reply")
+          }
         >
           ↩ {!compact && (hasDraft ? t("ticket.draftResume") : t("ticket.reply"))}
           {hasDraft && (

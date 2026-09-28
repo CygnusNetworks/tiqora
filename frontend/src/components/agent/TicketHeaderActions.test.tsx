@@ -4,6 +4,7 @@ import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import type { TicketDetail } from "@/lib/api";
+import { useComposerRequests, useConversationViewRequests } from "./telegram/composerBus";
 import { TicketHeaderActions } from "./TicketHeaderActions";
 
 const {
@@ -354,7 +355,7 @@ describe("TicketHeaderActions", () => {
     expect(await screen.findByTestId("reply-dialog")).toBeInTheDocument();
   });
 
-  it("opens the reply dialog in Telegram mode when the latest article is a Telegram article", async () => {
+  it("routes 'Antworten' to the chat composer for a Telegram ticket, switching from split view first", async () => {
     listArticles.mockResolvedValue([
       {
         id: 501,
@@ -371,26 +372,27 @@ describe("TicketHeaderActions", () => {
         to_address: null,
       },
     ]);
-    getReplyDraft.mockResolvedValue({
-      to_address: null,
-      cc: "",
-      subject: "",
-      body: "quoted",
-      in_reply_to: null,
-      references: null,
-      signature: "",
-      signature_is_html: false,
-    });
 
-    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    const viewHandler = vi.fn();
+    const composerHandler = vi.fn();
+    function Listener() {
+      useConversationViewRequests(7, viewHandler);
+      useComposerRequests(7, composerHandler);
+      return null;
+    }
+
+    wrap(
+      <>
+        <Listener />
+        <TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />
+      </>,
+    );
     await waitFor(() => expect(screen.getByTestId("ticket-actions-reply")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("ticket-actions-reply"));
-    await screen.findByTestId("reply-dialog");
 
-    expect(screen.getByTestId("reply-telegram-hint")).toBeInTheDocument();
-    expect(screen.queryByTestId("reply-to")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByTestId("reply-body"), { target: { value: "Antwort" } });
-    expect(screen.getByTestId("reply-send")).not.toBeDisabled();
+    expect(viewHandler).toHaveBeenCalledOnce();
+    expect(composerHandler).toHaveBeenCalledWith({ focus: true });
+    expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
   });
 
   it("calls onOpenNote from the Notiz button", () => {

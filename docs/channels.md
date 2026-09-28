@@ -192,6 +192,37 @@ continuity off the chat itself (see "Identity / contact mapping").
   `default_customer_user`, `queue_name`, `consent_required`, `consent_text`,
   `consent_confirmed_text`, `start_text`, `tone_prompt`.
 
+### Antworten im Chat
+
+Agent replies on a Telegram ticket go through a messenger-style chat composer
+under the conversation view, not the email-style reply dialog — the header's
+"Antworten", a per-article "Antworten" and AiPanel's "Entwurf übernehmen" all
+route there instead once the article set's dominant channel is Telegram
+(`channelNameOf`/`dominantChannel`, `frontend/src/lib/articleChannel.ts`). A
+ticket the agent had manually switched to the split view switches back to
+conversation first.
+
+- **Enter sends, Shift+Enter inserts a newline**; IME composition (e.g.
+  Japanese input) is respected.
+- **4096-character limit** — Telegram's own message cap, enforced before send.
+- **`/` snippets**: templates of type "Chat" — typing `/` opens a filtered
+  picker, Tab/Enter inserts the snippet text.
+- **Attachments** up to 18 MB total via the attach button, drag-drop or
+  paste — larger ones are rejected client-side before the request leaves the
+  browser.
+- **Quote**: "Zitieren" on a bubble, or "Antworten" on an older article, pre-
+  fills `telegram_reply_to_article_id` on the next outgoing message.
+- **Buttons**: an inline keyboard on the outgoing message, including a
+  "Problem gelöst? Ja / Nein" preset — "Ja" closes the ticket via the
+  callback handling described above.
+- **Edit / retract**: agents can edit or retract (`deleteMessage`) their own
+  delivered messages inline in the bubble; retract only within Telegram's
+  48-hour window (see "Outbound" above).
+- **Typing indicator**: a throttled `sendChatAction("typing")` ping fires
+  while the agent is composing.
+- **Contact header**: display name/username, identity/consent status and the
+  AI hand-over marker sit above the conversation.
+
 ### Known limitations
 
 - **Znuny renders Telegram articles as quasi-internal.** Znuny's own UI has

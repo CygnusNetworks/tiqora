@@ -427,6 +427,33 @@ describe("TelegramChatComposer: quote, buttons, AI", () => {
     await waitFor(() => expect(input.value).toBe("KI-Text"));
   });
 
+  it("applies a draft handed over from the composer bus and sends its id", async () => {
+    const input = await mount();
+    act(() =>
+      requestComposer(1, { draft: { id: 7, body: "Vom Panel übernommener Entwurf" }, focus: true }),
+    );
+    await waitFor(() => expect(input.value).toBe("Vom Panel übernommener Entwurf"));
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(lastPayload().ai_draft_id).toBe(7);
+  });
+
+  it("asks before a handed-over draft replaces typed text", async () => {
+    const input = await mount();
+    type(input, "mein eigener Text");
+
+    act(() => requestComposer(1, { draft: { id: 7, body: "Vom Panel übernommener Entwurf" } }));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("confirm-dialog")).toBeNull());
+    expect(input.value).toBe("mein eigener Text");
+
+    act(() => requestComposer(1, { draft: { id: 7, body: "Vom Panel übernommener Entwurf" } }));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(input.value).toBe("Vom Panel übernommener Entwurf"));
+  });
+
   it("offers an open AI draft and sends its id", async () => {
     getState.mockResolvedValue({
       drafts: [
