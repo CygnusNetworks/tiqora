@@ -258,6 +258,93 @@ export function useClearReplyDraft() {
   );
 }
 
+/* ── Telegram chat draft ───────────────────────────────────────────────── */
+
+/**
+ * The Telegram chat composer's unsent message. One per ticket (the ticket-
+ * wide row, `article_id` null) under its own action, so it never shows up
+ * as a reply-dialog draft: the composer sits right under the thread and
+ * restores the text itself, and a draft bubble opening the reply dialog
+ * for it would be a second editor for the same message.
+ */
+export const CHAT_ACTION = "TelegramChat";
+
+export type ChatDraft = {
+  body: string;
+  quoteArticleId: number | null;
+  aiDraftId: number | null;
+};
+
+export function chatDraftKey(ticketId: number) {
+  return ["ticket", ticketId, "form-drafts", "chat"] as const;
+}
+
+function chatDraftFromRows(rows: FormDraftOut[]): ChatDraft | null {
+  const row = rows.find((r) => r.action === CHAT_ACTION && r.article_id === null);
+  if (!row) return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(row.content);
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object") return null;
+  const c = parsed as Partial<ChatDraft>;
+  if (typeof c.body !== "string") return null;
+  return {
+    body: c.body,
+    quoteArticleId: typeof c.quoteArticleId === "number" ? c.quoteArticleId : null,
+    aiDraftId: typeof c.aiDraftId === "number" ? c.aiDraftId : null,
+  };
+}
+
+/** The stored chat draft (`draft`) and whether the lookup finished — seed
+ * only once `loaded`, for the same reason as `useReplyDraftsLoaded`. */
+export function useChatDraft(ticketId: number, enabled = true) {
+  const q = useQuery({
+    queryKey: chatDraftKey(ticketId),
+    queryFn: ({ signal }) => formDraftApi.list(ticketId, signal).then(chatDraftFromRows),
+    enabled,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+  return { draft: q.data ?? null, loaded: q.isSuccess || q.isError };
+}
+
+export function useSaveChatDraft() {
+  const qc = useQueryClient();
+  const { mutate } = useMutation({
+    mutationFn: ({ ticketId, draft }: { ticketId: number; draft: ChatDraft }) =>
+      formDraftApi.upsert(ticketId, {
+        action: CHAT_ACTION,
+        article_id: null,
+        content: JSON.stringify(draft),
+      }),
+  });
+  return useCallback(
+    (ticketId: number, draft: ChatDraft) => {
+      qc.setQueryData(chatDraftKey(ticketId), draft);
+      mutate({ ticketId, draft });
+    },
+    [qc, mutate],
+  );
+}
+
+export function useClearChatDraft() {
+  const qc = useQueryClient();
+  const { mutate } = useMutation({
+    mutationFn: (ticketId: number) => formDraftApi.remove(ticketId, CHAT_ACTION, null),
+  });
+  return useCallback(
+    (ticketId: number) => {
+      if (!qc.getQueryData(chatDraftKey(ticketId))) return;
+      qc.setQueryData(chatDraftKey(ticketId), null);
+      mutate(ticketId);
+    },
+    [qc, mutate],
+  );
+}
+
 /* ── Preview ───────────────────────────────────────────────────────────── */
 
 // The backend emits "On <date>, <who> wrote:" (tiqora.domain.quoting), but

@@ -52,6 +52,7 @@ export type {
   TelegramButtonIn,
   TelegramMessageMeta,
   TelegramChatOut,
+  TemplateOut,
   MutationRequest,
   SearchResponse,
   SearchHit,

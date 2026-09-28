@@ -37,6 +37,11 @@ vi.mock("@/lib/api", async () => {
       forwardArticle: vi.fn(),
       bounceArticle: vi.fn(),
       splitArticle: vi.fn(),
+      getTelegramChat: vi.fn().mockResolvedValue(null),
+      postTelegramTyping: vi.fn().mockResolvedValue(undefined),
+      acquireTicketLock: vi.fn().mockResolvedValue({ result: "acquired" }),
+      getTicket: vi.fn().mockResolvedValue({ id: 12, permissions: null }),
+      listReferenceStates: vi.fn().mockResolvedValue([]),
     },
   };
 });
@@ -478,5 +483,71 @@ describe("ArticleMasterDetail — delete internal note", () => {
     fireEvent.click(within(dialog).getByTestId("confirm-dialog-confirm"));
 
     await waitFor(() => expect(deleteArticle).toHaveBeenCalledWith(7, 3));
+  });
+});
+
+describe("ArticleMasterDetail — Telegram chat composer", () => {
+  const TG_ARTICLES = [
+    {
+      id: 30,
+      ticket_id: 12,
+      sender_type: "customer",
+      sender_type_id: 3,
+      communication_channel_id: 9,
+      communication_channel_name: "Telegram",
+      is_visible_for_customer: true,
+      create_time: "2024-06-04T09:00:00Z",
+      create_by: 40,
+      subject: "Telegram",
+      from_address: "Jona M.",
+      to_address: null,
+    },
+  ];
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    listArticles.mockReset().mockImplementation((ticketId: number) =>
+      Promise.resolve(ticketId === 12 ? TG_ARTICLES : ticketId === 8 ? CHAT_ARTICLES : ARTICLES),
+    );
+    getArticleBody.mockReset().mockResolvedValue({ article_id: 30, content_type: "text/plain", is_html: false, body: "Hallo" });
+    listAttachments.mockReset().mockResolvedValue([]);
+    listTemplates.mockReset().mockResolvedValue([]);
+  });
+
+  it("puts the chat composer between the conversation and the note composer", async () => {
+    wrap(<ArticleMasterDetail ticketId={12} />);
+    const composer = await screen.findByTestId("tg-composer");
+    const conversation = screen.getByTestId("article-conversation");
+    const note = screen.getByTestId("composer-open");
+    expect(conversation.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(composer.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("drops the chat composer in the split view and without note permission", async () => {
+    const { unmount } = wrap(<ArticleMasterDetail ticketId={12} />);
+    await screen.findByTestId("tg-composer");
+    fireEvent.click(screen.getByTestId("article-view-tab-split"));
+    expect(screen.queryByTestId("tg-composer")).toBeNull();
+    unmount();
+
+    // The manual switch is remembered per ticket — back to the auto default.
+    window.localStorage.clear();
+    wrap(<ArticleMasterDetail ticketId={12} canNote={false} />);
+    await screen.findByTestId("article-conversation");
+    expect(screen.queryByTestId("tg-composer")).toBeNull();
+  });
+
+  it("does not show the chat composer for a non-Telegram chat ticket", async () => {
+    wrap(<ArticleMasterDetail ticketId={8} />);
+    await screen.findByTestId("article-conversation");
+    expect(screen.queryByTestId("tg-composer")).toBeNull();
+  });
+
+  it("reports composing from the chat composer", async () => {
+    const onComposingChange = vi.fn();
+    wrap(<ArticleMasterDetail ticketId={12} onComposingChange={onComposingChange} />);
+    const input = await screen.findByTestId("tg-composer-input");
+    fireEvent.change(input, { target: { value: "Hallo Jona" } });
+    await waitFor(() => expect(onComposingChange).toHaveBeenLastCalledWith(true));
   });
 });
