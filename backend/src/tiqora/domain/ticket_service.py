@@ -6,7 +6,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator, Sequence
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from sqlalchemy import ColumnElement, Select, and_, case, func, or_, select
@@ -1635,7 +1635,10 @@ class TicketService:
         )
 
     async def list_templates(
-        self, user_id: int, ticket_id: int, template_type: str = "Answer"
+        self,
+        user_id: int,
+        ticket_id: int,
+        template_type: Literal["Answer", "Chat"] = "Answer",
     ) -> list[TemplateOut]:
         """Response templates for a ticket's queue (default template_type='Answer').
 
