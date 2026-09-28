@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.api.v1 import channels_telegram
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.channels.telegram.gateway import TelegramApiError, TelegramGateway
+from tiqora.channels.telegram.messages import get_by_message
 from tiqora.channels.telegram.outbound import TelegramDeliveryError, deliver_agent_telegram_reply
 from tiqora.channels.telegram.service import process_update
 from tiqora.db.tiqora.base import TiqoraBase
@@ -55,6 +56,7 @@ _WRITE_TABLES = (
     "article_data_mime_attachment",
     "article_data_mime",
     "ticket_history",
+    "tiqora_telegram_message",
     "article",
     "tiqora_cache_invalidation",
     "tiqora_event_outbox",
@@ -64,11 +66,22 @@ _WRITE_TABLES = (
     "communication_channel",
 )
 
+# tiqora_telegram_message has no autoincrement id -- it's keyed on article_id
+# (see its model docstring), which lives in the same numeric namespace as
+# article.id since record_message() is always called with the just-created
+# article's id. Every other table here is keyed on a real autoincrement id.
+_ID_COLUMN: dict[str, str] = {"tiqora_telegram_message": "article_id"}
+
 
 async def _snapshot_max_ids(session: AsyncSession) -> dict[str, int]:
     return {
         table: int(
-            (await session.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table}"))).scalar() or 0
+            (
+                await session.execute(
+                    text(f"SELECT COALESCE(MAX({_ID_COLUMN.get(table, 'id')}), 0) FROM {table}")
+                )
+            ).scalar()
+            or 0
         )
         for table in _WRITE_TABLES
     }
@@ -76,7 +89,8 @@ async def _snapshot_max_ids(session: AsyncSession) -> dict[str, int]:
 
 async def _cleanup_new_rows(session: AsyncSession, before: dict[str, int]) -> None:
     for table in _WRITE_TABLES:
-        await session.execute(text(f"DELETE FROM {table} WHERE id > :b"), {"b": before[table]})
+        col = _ID_COLUMN.get(table, "id")
+        await session.execute(text(f"DELETE FROM {table} WHERE {col} > :b"), {"b": before[table]})
     # tiqora_settings is keyed on `key` (a reserved word -- must be quoted),
     # not an autoincrement id.
     await session.execute(
@@ -214,23 +228,32 @@ async def test_gateway_delete_message_error_raises() -> None:
 
 
 def _text_message(
-    chat_id: int, text_body: str, *, user_id: int = 900, is_bot: bool = False
+    chat_id: int,
+    text_body: str,
+    *,
+    user_id: int = 900,
+    is_bot: bool = False,
+    message_id: int = 1,
+    reply_to_message_id: int | None = None,
 ) -> dict:
+    message: dict[str, Any] = {
+        "message_id": message_id,
+        "date": 1700000000,
+        "chat": {"id": chat_id, "type": "private"},
+        "from": {
+            "id": user_id,
+            "is_bot": is_bot,
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "username": "ada",
+        },
+        "text": text_body,
+    }
+    if reply_to_message_id is not None:
+        message["reply_to_message"] = {"message_id": reply_to_message_id}
     return {
         "update_id": 1,
-        "message": {
-            "message_id": 1,
-            "date": 1700000000,
-            "chat": {"id": chat_id, "type": "private"},
-            "from": {
-                "id": user_id,
-                "is_bot": is_bot,
-                "first_name": "Ada",
-                "last_name": "Lovelace",
-                "username": "ada",
-            },
-            "text": text_body,
-        },
+        "message": message,
     }
 
 
@@ -346,6 +369,130 @@ async def test_second_update_same_chat_appends_to_same_ticket(mariadb_znuny_url:
                 assert first["created_ticket"] is True
                 assert second["created_ticket"] is False
                 assert second["ticket_id"] == first["ticket_id"]
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_inbound_records_telegram_message_id(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                sysconfig = SysConfig(session)
+
+                result = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    None,
+                    _text_message(9701, "Need help with my order", message_id=101),
+                    user_id=1,
+                )
+                await session.commit()
+
+                row = await get_by_message(session, 9701, 101)
+                assert row is not None
+                assert row.article_id == result["article_id"]
+                assert row.ticket_id == result["ticket_id"]
+                assert row.direction == "in"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_inbound_quote_reply_records_reply_to_article_id(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                sysconfig = SysConfig(session)
+
+                first = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    None,
+                    _text_message(9702, "Original question", message_id=101),
+                    user_id=1,
+                )
+                await session.commit()
+
+                await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    None,
+                    _text_message(
+                        9702, "Quoting the first one", message_id=102, reply_to_message_id=101
+                    ),
+                    user_id=1,
+                )
+                await session.commit()
+
+                row = await get_by_message(session, 9702, 102)
+                assert row is not None
+                assert row.reply_to_article_id == first["article_id"]
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_inbound_quote_unknown_message_id_leaves_reply_to_article_id_none(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                sysconfig = SysConfig(session)
+
+                result = await process_update(
+                    session,
+                    factory,
+                    sysconfig,
+                    None,
+                    _text_message(
+                        9703,
+                        "Quoting something we never saw",
+                        message_id=201,
+                        reply_to_message_id=999,
+                    ),
+                    user_id=1,
+                )
+                await session.commit()
+
+                row = await get_by_message(session, 9703, 201)
+                assert row is not None
+                assert row.reply_to_article_id is None
+                assert result["article_id"] is not None
             finally:
                 await _cleanup_new_rows(session, before)
     finally:
