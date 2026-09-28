@@ -16,6 +16,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +30,8 @@ from tiqora.channels.telegram.messages import (
 )
 from tiqora.db.tiqora.models import TiqoraTelegramMessage
 from tiqora.znuny.history import TYPE_MISC, history_add
+
+logger = structlog.get_logger(__name__)
 
 
 class TelegramMessageNotFound(Exception):
@@ -205,6 +208,16 @@ async def edit_message(
     )
 
 
+def _already_gone(exc: TelegramApiError) -> bool:
+    """Telegram's refusal for a part that's already been deleted (by us on an
+    earlier attempt, or by the customer) -- e.g. "Bad Request: message to
+    delete not found". Treated the same as a successful delete: it means the
+    message is gone, which is the retract's whole goal, so a retry after a
+    partial failure doesn't get stuck forever re-deleting the same part.
+    """
+    return "not found" in str(exc).lower()
+
+
 async def retract_message(
     session: AsyncSession,
     *,
@@ -216,20 +229,42 @@ async def retract_message(
     """Delete a previously sent agent Telegram message and its attachment parts.
 
     Deletes ``message_id`` and each of ``extra_message_ids``, in that order.
-    A refused delete (Telegram's 48h window, or the customer already deleted
-    it) raises :class:`TelegramActionConflict` with Telegram's reason and
-    leaves the article/map row untouched -- nothing is written to the DB
-    until every delete has succeeded.
+
+    Before anything has been deleted, a refusal aborts the whole call: raises
+    :class:`TelegramActionConflict` with Telegram's reason and leaves the
+    article/map row untouched (so a genuinely-refused retract -- Telegram's
+    48h window, wrong chat -- is reported instead of silently half-applied).
+
+    Once at least one part is confirmed gone (deleted here, or already gone
+    from an earlier attempt), the retract is committed either way: later
+    refusals are logged and skipped rather than aborting, and the article is
+    marked retracted at the end. Otherwise a message that partially succeeds
+    could never be retried -- the parts already gone would keep refusing
+    "not found" forever while the DB stayed unretracted.
     """
     row = await _editable_message(session, ticket_id, article_id)
     gw = gateway if gateway is not None else await outbound.build_gateway(session)
     extra_ids = json.loads(row.extra_message_ids) if row.extra_message_ids else []
     message_ids = [row.message_id, *extra_ids]
+
+    any_gone = False
     for message_id in message_ids:
         try:
             await gw.delete_message(row.chat_id, message_id)
+            any_gone = True
         except TelegramApiError as exc:
-            raise TelegramActionConflict(str(exc)) from exc
+            if _already_gone(exc):
+                any_gone = True
+                continue
+            if not any_gone:
+                raise TelegramActionConflict(str(exc)) from exc
+            logger.warning(
+                "telegram_retract_partial_failure",
+                ticket_id=ticket_id,
+                article_id=article_id,
+                message_id=message_id,
+                error=str(exc),
+            )
 
     await session.execute(
         text(

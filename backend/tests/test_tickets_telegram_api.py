@@ -8,6 +8,7 @@ Uses the 784xx id range (queue/group/user/ticket/chat).
 from __future__ import annotations
 
 import base64
+import json
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any
@@ -35,6 +36,12 @@ TICKET_TITLE = "Telegram composer ticket"
 OUTSIDER = 78402
 CUSTOMER_ARTICLE_ID = 78490
 CUSTOMER_MESSAGE_ID = 78491
+# A map row whose ticket_id deliberately does not match TICKET_ID, while its
+# article row physically lives under TICKET_ID -- edit/retract must not trust
+# the article_id path param and reach across tickets.
+FOREIGN_TICKET_ID = 78472
+FOREIGN_ARTICLE_ID = 78493
+FOREIGN_MESSAGE_ID = 78494
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -47,6 +54,10 @@ def _cleanup(conn: Any) -> None:
     arts = f"(SELECT id FROM article WHERE ticket_id = {TICKET_ID})"
     for sql in (
         f"DELETE FROM tiqora_telegram_message WHERE ticket_id = {TICKET_ID}",
+        # A map row's ticket_id can deliberately differ from its article's
+        # real ticket_id (see FOREIGN_TICKET_ID) -- clean those up by article
+        # too, or they'd survive the ticket_id-scoped delete above.
+        f"DELETE FROM tiqora_telegram_message WHERE article_id IN {arts}",
         f"DELETE FROM ticket_history WHERE ticket_id = {TICKET_ID}",
         f"DELETE FROM article_data_mime_attachment WHERE article_id IN {arts}",
         f"DELETE FROM article_data_mime WHERE article_id IN {arts}",
@@ -178,6 +189,10 @@ class _FakeGateway:
         # Method names that should raise TelegramApiError instead of
         # succeeding, for testing the 409 paths (edit/retract).
         self.fail_methods: set[str] = set()
+        # delete_message only: message_id -> error text, for tests that need
+        # one specific part of a multi-part retract to fail (the others must
+        # still succeed).
+        self.fail_message_ids: dict[int, str] = {}
 
     def _ok(self, method: str, **kwargs: Any) -> dict[str, Any]:
         self.calls.append((method, kwargs))
@@ -199,6 +214,9 @@ class _FakeGateway:
         return self._ok("send_document", chat_id=chat_id, filename=filename, **kwargs)
 
     async def delete_message(self, chat_id: int | str, message_id: int) -> None:
+        if message_id in self.fail_message_ids:
+            self.calls.append(("delete_message", {"chat_id": chat_id, "message_id": message_id}))
+            raise TelegramApiError(self.fail_message_ids[message_id])
         self._ok("delete_message", chat_id=chat_id, message_id=message_id)
 
     async def edit_message_text(
@@ -479,6 +497,51 @@ def _insert_customer_article(sync_url: str) -> None:
     engine.dispose()
 
 
+def _insert_foreign_ticket_article(sync_url: str) -> None:
+    """An agent-sent Telegram article physically stored under TICKET_ID (so
+    the article row itself exists), but whose ``tiqora_telegram_message`` map
+    row points at a different ``ticket_id`` -- edit/retract must not trust
+    the article_id path param and reach across tickets."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        channel_id = conn.execute(
+            text("SELECT id FROM communication_channel WHERE name = 'Telegram'")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                " communication_channel_id, is_visible_for_customer, search_index_needs_rebuild,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :tid, 1, :cid, 1, 0, :t, 1, :t, 1)"
+            ),
+            {"aid": FOREIGN_ARTICLE_ID, "tid": TICKET_ID, "cid": channel_id, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO article_data_mime (id, article_id, a_from, a_subject,"
+                " a_content_type, a_body, a_message_id, incoming_time,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :aid, 'bot', 'Telegram', 'text/plain; charset=utf-8',"
+                " 'Fremdes Ticket', '<msg-foreign@x>', 1717243200, :t, 1, :t, 1)"
+            ),
+            {"aid": FOREIGN_ARTICLE_ID, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_telegram_message"
+                " (article_id, ticket_id, chat_id, message_id, direction)"
+                " VALUES (:aid, :tid, :chat, :mid, 'out')"
+            ),
+            {
+                "aid": FOREIGN_ARTICLE_ID,
+                "tid": FOREIGN_TICKET_ID,
+                "chat": CHAT_ID,
+                "mid": FOREIGN_MESSAGE_ID,
+            },
+        )
+    engine.dispose()
+
+
 def _history_names(sync_url: str) -> list[str]:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -600,6 +663,20 @@ async def test_edit_unknown_article_is_404(
     assert gateway.calls == []
 
 
+async def test_edit_article_from_a_different_ticket_is_404(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    _insert_foreign_ticket_article(url)
+    async with _client(factory) as client:
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{FOREIGN_ARTICLE_ID}/telegram",
+            json={"body": "Nope"},
+        )
+    assert resp.status_code == 404, resp.text
+    assert gateway.calls == []
+
+
 async def test_retract_telegram_article_success(
     seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
 ) -> None:
@@ -648,6 +725,105 @@ async def test_retract_telegram_article_gateway_failure_is_409_and_unchanged(
         ).one()
     engine.dispose()
     assert row[0] is None
+
+
+async def test_retract_telegram_article_partial_failure_still_retracts(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    """message_id + 2 extra (attachment) ids; the second delete overall
+    refuses with a real (non-"not found") error. All three deletes must
+    still be attempted, and -- because the first one already succeeded --
+    the retract must still go through (204, retracted) rather than getting
+    permanently stuck on a half-deleted chat."""
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(
+            client,
+            attachments=[
+                {
+                    "filename": "a.pdf",
+                    "content_type": "application/pdf",
+                    "content_base64": _b64(b"%PDF-1"),
+                },
+                {
+                    "filename": "b.pdf",
+                    "content_type": "application/pdf",
+                    "content_base64": _b64(b"%PDF-2"),
+                },
+            ],
+        )
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT message_id, extra_message_ids FROM tiqora_telegram_message"
+                " WHERE article_id = :a"
+            ),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    text_message_id = int(row[0])
+    extra_ids = [int(i) for i in json.loads(row[1])]
+    assert len(extra_ids) == 2
+
+    gateway.fail_message_ids[extra_ids[0]] = "Forbidden: bot was blocked by the user"
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram/retract"
+        )
+    assert resp.status_code == 204, resp.text
+
+    delete_calls = [c[1] for c in gateway.calls if c[0] == "delete_message"]
+    assert [c["message_id"] for c in delete_calls] == [text_message_id, *extra_ids]
+
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        retracted = conn.execute(
+            text(
+                "SELECT retracted_at, retracted_by FROM tiqora_telegram_message"
+                " WHERE article_id = :a"
+            ),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    assert retracted[0] is not None
+    assert int(retracted[1]) == AGENT
+
+
+async def test_retract_telegram_article_not_found_part_is_treated_as_gone(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    """Telegram refusing a delete with "... not found" (already deleted, by
+    us on an earlier attempt or by the customer) must count as success, not
+    as a conflict -- otherwise a retry after a partial failure could never
+    complete."""
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client)
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT message_id FROM tiqora_telegram_message WHERE article_id = :a"),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    message_id = int(row[0])
+    gateway.fail_message_ids[message_id] = "Bad Request: message to delete not found"
+
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram/retract"
+        )
+    assert resp.status_code == 204, resp.text
+
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        retracted = conn.execute(
+            text("SELECT retracted_at FROM tiqora_telegram_message WHERE article_id = :a"),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    assert retracted[0] is not None
 
 
 async def test_telegram_typing_sends_chat_action(
