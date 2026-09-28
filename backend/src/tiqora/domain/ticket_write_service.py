@@ -35,6 +35,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai.handoff import clear_ai_escalated
+from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
@@ -97,6 +98,18 @@ class ArticleNotDeletable(Exception):
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True, slots=True)
+class TelegramSendOptions:
+    """Chat-composer extras for an outgoing agent Telegram reply.
+
+    *reply_to_article_id* quotes that article's Telegram message (when it has
+    one in the same chat); *buttons* become an inline keyboard under the reply.
+    """
+
+    reply_to_article_id: int | None = None
+    buttons: tuple[ButtonSpec, ...] = ()
+
+
 @dataclass
 class ArticleIn:
     """Parameters for creating one article (MIME backend)."""
@@ -128,6 +141,8 @@ class ArticleIn:
     # use SendAutoReply/SendAutoFollowUp/SendAutoReject instead of the
     # channel/sender-derived EmailAgent/EmailCustomer names).
     history_type_override: str | None = None
+    # Only read by the outgoing agent Telegram path (channels.telegram.outbound).
+    telegram: TelegramSendOptions | None = None
 
 
 @dataclass
@@ -2637,6 +2652,7 @@ __all__ = [
     "ArticleIn",
     "ArticleNotDeletable",
     "InvalidInput",
+    "TelegramSendOptions",
     "TicketAccessDenied",
     "TicketIn",
     "TicketNotFound",
