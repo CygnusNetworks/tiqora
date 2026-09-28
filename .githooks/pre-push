@@ -1,11 +1,13 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Scans everything that is about to leave this clone for secrets and personal
-# data. Pushes to GitHub (the public mirror) additionally need an explicit
-# release approval and may only carry main and v* tags.
+# data: diffs, commit messages, tag messages and author/committer identities.
+# Pushes to GitHub (the public mirror) additionally need an explicit release
+# approval and may only carry main and v* tags.
 set -e
 remote_name=$1
 remote_url=$2
 root=$(git rev-parse --show-toplevel)
+hooks="$root/.githooks"
 zero=0000000000000000000000000000000000000000
 
 if ! command -v gitleaks >/dev/null 2>&1; then
@@ -37,17 +39,29 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 		esac
 	fi
 
+	# An annotated tag carries its own message.
+	if [ "$(git cat-file -t "$local_sha")" = tag ]; then
+		git cat-file -p "$local_sha" | sed '1,/^$/d' | python3 "$hooks/pii_check.py" text "tag message of $remote_ref"
+	fi
+
 	# New ref on the remote: everything the remote does not have yet.
 	if [ "$remote_sha" = "$zero" ] || ! git cat-file -e "$remote_sha" 2>/dev/null; then
 		range="$local_sha --not --remotes=$remote_name"
 	else
 		range="$remote_sha..$local_sha"
 	fi
-
 	[ -z "$(git rev-list $range | head -1)" ] && continue
+
+	bad=$(git log --format='%an <%ae>%n%cn <%ce>' $range | sort -u | grep -vxF -f <(grep -v '^#' "$hooks/allowed-identities") || true)
+	if [ -n "$bad" ]; then
+		echo "pre-push: $remote_ref contains commits by identities not in .githooks/allowed-identities:" >&2
+		echo "$bad" >&2
+		exit 1
+	fi
 
 	gitleaks git --redact --no-banner --log-level warn \
 		-c "$root/.gitleaks.toml" --log-opts="$range" "$root"
-	git log -p --no-color --format= $range | "$root/.githooks/pii-denylist-check" "$remote_ref"
+	git log -p --no-color --format= $range | python3 "$hooks/pii_check.py" patch "$remote_ref"
+	git log --format=%B $range | python3 "$hooks/pii_check.py" text "commit messages of $remote_ref"
 done
 exit 0
