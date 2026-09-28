@@ -518,3 +518,69 @@ describe("TelegramChatComposer: draft", () => {
     );
   });
 });
+
+describe("TelegramChatComposer: unclear and malformed failures", () => {
+  it("treats a gateway HTML error as unclear: no instant resend, text kept, history refreshed", async () => {
+    createArticle.mockRejectedValueOnce(
+      new ApiError(504, "<html><body><h1>504 Gateway Time-out</h1></body></html>", "/x"),
+    );
+    const invalidate = vi.spyOn(qc, "invalidateQueries");
+    const input = await mount();
+    type(input, "Vielleicht schon raus");
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    const error = await screen.findByTestId("tg-composer-error");
+    expect(error).toHaveTextContent(i18n.t("ticket.telegram.composer.sendUncertain"));
+    expect(error).not.toHaveTextContent("html");
+    expect(error).not.toHaveTextContent("Gateway");
+    expect(screen.queryByTestId("tg-composer-retry")).toBeNull();
+    expect(input.value).toBe("Vielleicht schon raus");
+    const keys = invalidate.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+    expect(keys).toContain(JSON.stringify(telegramChatKey(1)));
+    expect(keys).toContain(JSON.stringify(["tickets", 1, "articles"]));
+  });
+
+  it("treats a JSON 500 as unclear too", async () => {
+    createArticle.mockRejectedValueOnce(new ApiError(500, { detail: "Internal error" }, "/x"));
+    const input = await mount();
+    type(input, "Hallo");
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    expect(await screen.findByTestId("tg-composer-error")).toHaveTextContent(
+      i18n.t("ticket.telegram.composer.sendUncertain"),
+    );
+    expect(screen.queryByTestId("tg-composer-retry")).toBeNull();
+  });
+
+  it("shows a readable message for a 422 with a validation list, never [object Object]", async () => {
+    createArticle.mockRejectedValueOnce(
+      new ApiError(
+        422,
+        { detail: [{ type: "too_long", loc: ["body", "attachments"], msg: "List should have at most 10 items" }] },
+        "/x",
+      ),
+    );
+    const input = await mount();
+    type(input, "Hallo");
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    const error = await screen.findByTestId("tg-composer-error");
+    expect(error).not.toHaveTextContent("[object Object]");
+    expect(error).toHaveTextContent(i18n.t("ticket.telegram.composer.sendError"));
+    expect(screen.getByTestId("tg-composer-retry")).toBeInTheDocument();
+  });
+});
+
+describe("TelegramChatComposer: attachment count", () => {
+  it("refuses an 11th attachment with its own message", async () => {
+    await mount();
+    const fileInput = screen.getByTestId("tg-composer-file");
+    const ten = Array.from({ length: 10 }, (_, i) => new File([String(i)], `f${i}.txt`, { type: "text/plain" }));
+    fireEvent.change(fileInput, { target: { files: ten } });
+    await screen.findByTestId("tg-composer-attachment-9");
+    expect(screen.queryByTestId("tg-composer-attach-error")).toBeNull();
+
+    fireEvent.change(fileInput, { target: { files: [new File(["x"], "elf.txt", { type: "text/plain" })] } });
+    expect(await screen.findByTestId("tg-composer-attach-error")).toHaveTextContent(
+      i18n.t("ticket.telegram.composer.attachTooMany", { max: 10 }),
+    );
+    expect(screen.queryByTestId("tg-composer-attachment-10")).toBeNull();
+  });
+});
