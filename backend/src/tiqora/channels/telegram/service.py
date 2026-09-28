@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.common import channel_setting, ensure_channel_row
 from tiqora.channels.telegram.gateway import TelegramApiError, TelegramGateway
+from tiqora.channels.telegram.messages import get_by_message, record_message
 from tiqora.db.tiqora.models import TiqoraTelegramContact
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
 from tiqora.znuny.followup import detect_followup
@@ -524,6 +525,33 @@ async def process_update(
     article_id = await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
     )
+
+    inbound_message_id = int(message["message_id"])
+    # Duplicate delivery guard: the offset check in the poller/webhook caller
+    # is the normal dedup path (see tiqora.worker.telegram_poller and
+    # tiqora.api.v1.channels_telegram), but two webhook deliveries of the
+    # same update racing each other could both get past that check before
+    # either commits. Without this, the second insert would hit the unique
+    # (chat_id, message_id) index and crash the request instead of just
+    # leaving the first row in place.
+    if await get_by_message(session, contact.chat_id, inbound_message_id) is None:
+        reply_to_article_id: int | None = None
+        reply_to_message = message.get("reply_to_message")
+        if isinstance(reply_to_message, dict) and "message_id" in reply_to_message:
+            reply_row = await get_by_message(
+                session, contact.chat_id, int(reply_to_message["message_id"])
+            )
+            if reply_row is not None:
+                reply_to_article_id = reply_row.article_id
+        await record_message(
+            session,
+            article_id=article_id,
+            ticket_id=ticket_id,
+            chat_id=contact.chat_id,
+            message_id=inbound_message_id,
+            direction="in",
+            reply_to_article_id=reply_to_article_id,
+        )
 
     return {"ticket_id": ticket_id, "article_id": article_id, "created_ticket": created}
 
