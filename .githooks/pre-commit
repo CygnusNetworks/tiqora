@@ -1,0 +1,14 @@
+#!/bin/sh
+# Blocks commits that add secrets or personal data (see docs/development.md).
+set -e
+root=$(git rev-parse --show-toplevel)
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+	echo "pre-commit: gitleaks is not installed (brew install gitleaks)." >&2
+	exit 1
+fi
+
+gitleaks git --pre-commit --staged --redact --no-banner --log-level warn \
+	-c "$root/.gitleaks.toml" "$root"
+
+git diff --cached -U0 --no-color | "$root/.githooks/pii-denylist-check" "the staged changes"
