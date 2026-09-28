@@ -1,0 +1,43 @@
+# gitleaks config for Tiqora: the default secret rules plus rules for the
+# personal data this project handles (StudNet customers, Telegram chats).
+# Used by .githooks/pre-commit and .githooks/pre-push; see docs/development.md.
+#
+# Names have no pattern. Real names and identifiers that must never be
+# committed go into .git/info/pii-denylist (per clone, never committed).
+
+title = "tiqora"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "tiqora-wp-nummer"
+description = "StudNet WP-Nummer (Wohnplatz) of a real customer"
+regex = '''\b\d{3}-\d{2}-\d{2}-\d{2}-\d\b'''
+keywords = ["-"]
+
+[[rules.allowlists]]
+# Made-up values used in tests and docs.
+regexTarget = "match"
+regexes = ['''^(123-45-67-89-0|999-\d{2}-\d{2}-\d{2}-\d|599-99-99-99-9)$''']
+
+[[rules]]
+id = "tiqora-telegram-chat-id"
+description = "Real Telegram chat id in the synthetic address (tests use short ids)"
+regex = '''\b\d{7,}@telegram\.invalid\b'''
+keywords = ["@telegram.invalid"]
+
+[[rules]]
+id = "tiqora-personal-mail-domain"
+description = "Address at a university, free-mail or company domain instead of example.org"
+regex = '''[A-Za-z0-9._%+-]+@(uni-bonn\.de|stw-bonn\.de|studierendenwerk-bonn\.de|web\.de|gmx\.(de|net)|gmail\.com|googlemail\.com|t-online\.de|outlook\.com|hotmail\.com|yahoo\.(de|com)|icloud\.com|cygnusnetworks\.de|cygnusnet\.de|valerius\.email)\b'''
+keywords = ["@"]
+
+[[allowlists]]
+description = "Known false positives of the default rules"
+paths = ['''frontend/src/i18n/locales/.*\.json''']
+
+[[allowlists]]
+description = "Obvious test passwords"
+regexTarget = "match"
+regexes = ['''password="(s3cret-pw-1234|pw1234567890ab)"''']

@@ -1,0 +1,53 @@
+#!/bin/sh
+# Scans everything that is about to leave this clone for secrets and personal
+# data. Pushes to GitHub (the public mirror) additionally need an explicit
+# release approval and may only carry main and v* tags.
+set -e
+remote_name=$1
+remote_url=$2
+root=$(git rev-parse --show-toplevel)
+zero=0000000000000000000000000000000000000000
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+	echo "pre-push: gitleaks is not installed (brew install gitleaks)." >&2
+	exit 1
+fi
+
+public=0
+case "$remote_url" in
+*github.com*) public=1 ;;
+esac
+
+if [ "$public" = 1 ] && [ "${TIQORA_GITHUB_PUSH:-}" != "approved" ]; then
+	echo "pre-push: $remote_name is the public GitHub mirror. Only approved releases go there." >&2
+	echo "          Re-run with TIQORA_GITHUB_PUSH=approved once the release is signed off." >&2
+	exit 1
+fi
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[ "$local_sha" = "$zero" ] && continue # deleting a ref sends no content
+
+	if [ "$public" = 1 ]; then
+		case "$remote_ref" in
+		refs/heads/main | refs/tags/v*) ;;
+		*)
+			echo "pre-push: only main and v* tags may be pushed to GitHub, not $remote_ref." >&2
+			exit 1
+			;;
+		esac
+	fi
+
+	# New ref on the remote: everything the remote does not have yet.
+	if [ "$remote_sha" = "$zero" ] || ! git cat-file -e "$remote_sha" 2>/dev/null; then
+		range="$local_sha --not --remotes=$remote_name"
+	else
+		range="$remote_sha..$local_sha"
+	fi
+
+	[ -z "$(git rev-list $range | head -1)" ] && continue
+
+	gitleaks git --redact --no-banner --log-level warn \
+		-c "$root/.gitleaks.toml" --log-opts="$range" "$root"
+	git log -p --no-color --format= $range | "$root/.githooks/pii-denylist-check" "$remote_ref"
+done
+exit 0
