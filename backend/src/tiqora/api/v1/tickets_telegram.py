@@ -46,6 +46,9 @@ class TelegramMessageMeta(BaseModel):
     answered_button: int | None
     edited_at: datetime | None
     retracted_at: datetime | None
+    # False for inbound, retracted, and attachment-only messages (Telegram
+    # can only edit a text message's text).
+    editable: bool
 
 
 class TelegramChatOut(BaseModel):
@@ -61,6 +64,14 @@ class TelegramChatOut(BaseModel):
 
 class TelegramEditRequest(BaseModel):
     body: str = Field(min_length=1, max_length=4096)
+
+
+def _map_action_exc(exc: Exception) -> HTTPException:
+    """Edit/retract: a message was sent, so "can't reach Telegram" (no
+    bot_token, channel gone) is a conflict with a reason, not a 404."""
+    if isinstance(exc, TelegramDeliveryError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    return _map_exc(exc)
 
 
 def _map_exc(exc: Exception) -> HTTPException:
@@ -81,7 +92,7 @@ def _map_exc(exc: Exception) -> HTTPException:
     return HTTPException(status_code=500, detail="Internal error")
 
 
-def _message_meta(row: TiqoraTelegramMessage) -> TelegramMessageMeta:
+def _message_meta(row: TiqoraTelegramMessage, *, editable: bool) -> TelegramMessageMeta:
     buttons = buttons_from_json(row.buttons_json)
     return TelegramMessageMeta(
         article_id=row.article_id,
@@ -91,6 +102,7 @@ def _message_meta(row: TiqoraTelegramMessage) -> TelegramMessageMeta:
         answered_button=row.answered_button,
         edited_at=row.edited_at,
         retracted_at=row.retracted_at,
+        editable=editable,
     )
 
 
@@ -117,7 +129,10 @@ async def get_telegram_chat(
         customer_user_login=info.contact.customer_user_login,
         consent_time=info.contact.consent_time,
         ai_escalated_at=info.ai_escalated_at,
-        messages=[_message_meta(m) for m in info.messages],
+        messages=[
+            _message_meta(m, editable=m.article_id in info.editable_article_ids)
+            for m in info.messages
+        ],
     )
 
 
@@ -173,8 +188,9 @@ async def edit_telegram_article(
         WriteAccessDenied,
         chat_actions.TelegramMessageNotFound,
         chat_actions.TelegramActionConflict,
+        TelegramDeliveryError,
     ) as exc:
-        raise _map_exc(exc) from exc
+        raise _map_action_exc(exc) from exc
 
 
 @router.post(
@@ -204,8 +220,9 @@ async def retract_telegram_article(
         WriteAccessDenied,
         chat_actions.TelegramMessageNotFound,
         chat_actions.TelegramActionConflict,
+        TelegramDeliveryError,
     ) as exc:
-        raise _map_exc(exc) from exc
+        raise _map_action_exc(exc) from exc
 
 
 __all__ = ["router"]

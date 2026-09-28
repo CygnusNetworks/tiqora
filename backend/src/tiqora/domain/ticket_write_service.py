@@ -1633,6 +1633,7 @@ async def merge_tickets(
     2. Move article_search_index rows
     3. Move article-linked ticket_history rows (article_id IS NOT NULL)
     4. Move time_accounting rows
+    4b. Move tiqora_telegram_message map rows (Tiqora-only)
     5. Add merge-note article to merge ticket
     6. Write Merged history on both tickets
     7. Transfer watchers (skip duplicates)
@@ -1679,6 +1680,14 @@ async def merge_tickets(
         ),
         {"main": main_ticket_id, "uid": user_id, "merge": merge_ticket_id},
     )
+
+    # 4b. Tiqora: the articles' Telegram map rows follow them (not in Znuny;
+    # the table may be unmigrated on an install, like in delete_article).
+    if await _table_exists(session, "tiqora_telegram_message"):
+        await session.execute(
+            text("UPDATE tiqora_telegram_message SET ticket_id = :main WHERE ticket_id = :merge"),
+            {"main": main_ticket_id, "merge": merge_ticket_id},
+        )
 
     # 5. Add merge-note article to merge ticket (internal channel, agent sender)
     merge_note = ArticleIn(

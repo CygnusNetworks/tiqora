@@ -64,7 +64,7 @@ CONSENT_REPROMPT_SECONDS = 3600
 # Answer-button taps (Task 5): callback answer texts (informal German, as
 # every other Telegram-facing string) and the ticket_state name each
 # ``resolve_*`` action moves the ticket to. ``reply`` records the tap as a
-# customer article and changes nothing else.
+# customer article and only reopens a closed ticket.
 _BUTTON_ANSWER_TEXT = "Danke!"
 _BUTTON_INVALID_TEXT = "Diese Auswahl ist nicht mehr gültig."
 _BUTTON_ALREADY_ANSWERED_TEXT = "Schon beantwortet 👍"
@@ -480,6 +480,9 @@ async def _handle_button_callback(
         content_type="text/plain; charset=utf-8",
         from_address=from_address,
         channel=CHANNEL_NAME,
+        # A canned answer, not a question: without this the AI auto worker
+        # would answer the tap (e.g. reply to "Ja" on a just-closed ticket).
+        auto_generated=True,
     )
     article_id = await add_article(
         session, ticket_id=row.ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
@@ -502,24 +505,39 @@ async def _handle_button_callback(
     row.answered_at = datetime.now(UTC).replace(tzinfo=None)
     await session.flush()
 
+    current = (
+        await session.execute(
+            text(
+                "SELECT t.ticket_state_id, tst.name FROM ticket t"
+                " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+                " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                " WHERE t.id = :tid"
+            ),
+            {"tid": row.ticket_id},
+        )
+    ).first()
+    current_state_type = str(current[1]) if current is not None else None
     state_name = _BUTTON_RESOLVE_STATE_NAME.get(button.action)
-    if state_name is not None:
+    if state_name is None and current_state_type == "closed":
+        # A plain answer on a closed ticket is a customer follow-up: reopen,
+        # like a typed message would.
+        state_name = "open"
+    # Never touch a merged/removed ticket: changing its state would bring
+    # it back to life next to the ticket it was merged into.
+    if state_name is not None and current_state_type not in (None, "merged", "removed"):
         target_state_id = await _lookup_id(session, "ticket_state", "name", state_name)
-        if target_state_id is not None:
-            current = (
-                await session.execute(
-                    text("SELECT ticket_state_id FROM ticket WHERE id = :tid"),
-                    {"tid": row.ticket_id},
-                )
-            ).first()
-            if current is not None and int(current[0]) != target_state_id:
-                await change_state(
-                    session,
-                    ticket_id=row.ticket_id,
-                    new_state_id=target_state_id,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+        if (
+            target_state_id is not None
+            and current is not None
+            and int(current[0]) != target_state_id
+        ):
+            await change_state(
+                session,
+                ticket_id=row.ticket_id,
+                new_state_id=target_state_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
 
     if gateway is not None:
         await gateway.answer_callback_query(callback_query_id, _BUTTON_ANSWER_TEXT)

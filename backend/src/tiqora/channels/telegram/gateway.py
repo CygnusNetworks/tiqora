@@ -194,7 +194,9 @@ class TelegramGateway:
         reply_markup: dict[str, Any] | None = None,
     ) -> None:
         """Edit a previously sent message's text. *reply_markup*, when given,
-        replaces the keyboard; omitted, the existing keyboard is kept."""
+        becomes the message's keyboard; omitted, Telegram REMOVES any existing
+        inline keyboard -- a caller that wants to keep one must pass it again
+        (see ``chat_actions.edit_message``)."""
         payload: dict[str, Any] = {"chat_id": chat_id, "message_id": message_id, "text": text}
         if reply_markup is not None:
             payload["reply_markup"] = reply_markup
