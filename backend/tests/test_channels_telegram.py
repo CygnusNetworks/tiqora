@@ -136,6 +136,79 @@ async def test_gateway_error_scrubs_token() -> None:
 
 
 # ---------------------------------------------------------------------------
+# gateway: media, edit, delete
+# ---------------------------------------------------------------------------
+
+
+async def test_gateway_send_message_reply_to_message_id() -> None:
+    gateway, calls = _recording_gateway()
+    await gateway.send_message(123, "hi", reply_to_message_id=7)
+    _method, payload = next(c for c in calls if c[0] == "sendMessage")
+    assert payload["reply_parameters"] == {
+        "message_id": 7,
+        "allow_sending_without_reply": True,
+    }
+
+
+async def test_gateway_send_photo_multipart() -> None:
+    gateway, calls = _recording_gateway()
+    await gateway.send_photo(123, b"fake-jpeg-bytes", "cat.jpg", caption="Miau")
+    _method, payload = next(c for c in calls if c[0] == "sendPhoto")
+    assert payload["_content_type"].startswith("multipart/form-data")
+    body = payload["_body"]
+    assert b"cat.jpg" in body
+    assert b"fake-jpeg-bytes" in body
+
+
+async def test_gateway_send_document_multipart() -> None:
+    gateway, calls = _recording_gateway()
+    await gateway.send_document(123, b"%PDF-1.4 fake", "invoice.pdf", "application/pdf")
+    _method, payload = next(c for c in calls if c[0] == "sendDocument")
+    assert payload["_content_type"].startswith("multipart/form-data")
+    body = payload["_body"]
+    assert b"invoice.pdf" in body
+    assert b"%PDF-1.4 fake" in body
+
+
+async def test_gateway_edit_message_text() -> None:
+    gateway, calls = _recording_gateway()
+    await gateway.edit_message_text(123, 55, "updated text")
+    _method, payload = next(c for c in calls if c[0] == "editMessageText")
+    assert payload["chat_id"] == 123
+    assert payload["message_id"] == 55
+    assert payload["text"] == "updated text"
+    assert "reply_markup" not in payload
+
+
+async def test_gateway_edit_message_reply_markup_none_clears_keyboard() -> None:
+    gateway, calls = _recording_gateway()
+    await gateway.edit_message_reply_markup(123, 55, None)
+    _method, payload = next(c for c in calls if c[0] == "editMessageReplyMarkup")
+    assert payload["reply_markup"] == {"inline_keyboard": []}
+
+
+async def test_gateway_delete_message() -> None:
+    gateway, calls = _recording_gateway()
+    await gateway.delete_message(123, 55)
+    _method, payload = next(c for c in calls if c[0] == "deleteMessage")
+    assert payload == {"chat_id": 123, "message_id": 55}
+
+
+async def test_gateway_delete_message_error_raises() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"ok": False, "description": "message can't be deleted for everyone"}
+        )
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    gw = TelegramGateway(bot_token="test-token", client=client)
+    with pytest.raises(TelegramApiError) as exc_info:
+        await gw.delete_message(123, 55)
+    await client.aclose()
+    assert "message can't be deleted for everyone" in str(exc_info.value)
+
+
+# ---------------------------------------------------------------------------
 # DB-backed inbound processing
 # ---------------------------------------------------------------------------
 
@@ -457,12 +530,21 @@ def _callback_update(
 
 def _recording_gateway() -> tuple[TelegramGateway, list[tuple[str, dict]]]:
     """A Telegram gateway backed by ``httpx.MockTransport`` that always
-    succeeds and records every call as ``(method, json_payload)``."""
+    succeeds and records every call as ``(method, json_payload)``.
+
+    Multipart calls (``sendPhoto``/``sendDocument``) have no JSON body, so
+    their recorded payload is ``{"_content_type": ..., "_body": <raw bytes>}``
+    instead -- enough to assert the content-type and that the filename/bytes
+    made it into the upload."""
     calls: list[tuple[str, dict]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         method = str(request.url).rsplit("/", 1)[-1]
-        payload = json.loads(request.content or b"{}")
+        content_type = request.headers.get("content-type", "")
+        if content_type.startswith("multipart/form-data"):
+            payload: dict[str, Any] = {"_content_type": content_type, "_body": request.content}
+        else:
+            payload = json.loads(request.content or b"{}")
         calls.append((method, payload))
         if method == "answerCallbackQuery":
             return httpx.Response(200, json={"ok": True, "result": True})

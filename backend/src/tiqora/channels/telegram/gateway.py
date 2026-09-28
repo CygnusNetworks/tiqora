@@ -11,6 +11,7 @@ exception escape unscrubbed.
 
 from __future__ import annotations
 
+import json
 import mimetypes
 from typing import Any
 
@@ -67,6 +68,17 @@ class TelegramGateway:
         non-2xx responses, or ``{"ok": false, ...}``.
         """
         resp = await self._request("POST", self._url(method), json=payload or {})
+        return self._parse_result(method, resp)
+
+    async def _call_multipart(
+        self, method: str, data: dict[str, Any], files: dict[str, tuple[str, bytes, str]]
+    ) -> Any:
+        """POST *method* as ``multipart/form-data`` (file upload); return the
+        ``result`` payload. Same error handling as :meth:`_call`."""
+        resp = await self._request("POST", self._url(method), data=data, files=files)
+        return self._parse_result(method, resp)
+
+    def _parse_result(self, method: str, resp: httpx.Response) -> Any:
         try:
             data = resp.json()
         except ValueError:
@@ -102,15 +114,103 @@ class TelegramGateway:
         text: str,
         *,
         reply_markup: dict[str, Any] | None = None,
+        reply_to_message_id: int | None = None,
     ) -> dict[str, Any]:
         """Send a plain-text message (no ``parse_mode`` — caller text is not
         Markdown/HTML-escaped). *reply_markup*, when given, is sent verbatim
-        as the Bot API ``reply_markup`` field (e.g. an inline keyboard)."""
+        as the Bot API ``reply_markup`` field (e.g. an inline keyboard).
+        *reply_to_message_id*, when given, quotes that message; sending
+        without reply is still allowed if it has since been deleted."""
         payload: dict[str, Any] = {"chat_id": chat_id, "text": text}
         if reply_markup is not None:
             payload["reply_markup"] = reply_markup
+        if reply_to_message_id is not None:
+            payload["reply_parameters"] = {
+                "message_id": reply_to_message_id,
+                "allow_sending_without_reply": True,
+            }
         result = await self._call("sendMessage", payload)
         return dict(result or {})
+
+    async def send_photo(
+        self,
+        chat_id: int | str,
+        content: bytes,
+        filename: str,
+        *,
+        caption: str | None = None,
+        reply_to_message_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Upload a photo (Telegram limit 10 MB) as ``multipart/form-data``."""
+        data: dict[str, Any] = {"chat_id": str(chat_id)}
+        if caption is not None:
+            data["caption"] = caption
+        if reply_to_message_id is not None:
+            data["reply_parameters"] = json.dumps(
+                {"message_id": reply_to_message_id, "allow_sending_without_reply": True}
+            )
+        content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        files = {"photo": (filename, content, content_type)}
+        result = await self._call_multipart("sendPhoto", data, files)
+        return dict(result or {})
+
+    async def send_document(
+        self,
+        chat_id: int | str,
+        content: bytes,
+        filename: str,
+        content_type: str,
+        *,
+        caption: str | None = None,
+        reply_to_message_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Upload a document (Telegram limit 50 MB) as ``multipart/form-data``."""
+        data: dict[str, Any] = {"chat_id": str(chat_id)}
+        if caption is not None:
+            data["caption"] = caption
+        if reply_to_message_id is not None:
+            data["reply_parameters"] = json.dumps(
+                {"message_id": reply_to_message_id, "allow_sending_without_reply": True}
+            )
+        files = {"document": (filename, content, content_type)}
+        result = await self._call_multipart("sendDocument", data, files)
+        return dict(result or {})
+
+    async def edit_message_text(
+        self,
+        chat_id: int | str,
+        message_id: int,
+        text: str,
+        *,
+        reply_markup: dict[str, Any] | None = None,
+    ) -> None:
+        """Edit a previously sent message's text. *reply_markup*, when given,
+        replaces the keyboard; omitted, the existing keyboard is kept."""
+        payload: dict[str, Any] = {"chat_id": chat_id, "message_id": message_id, "text": text}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        await self._call("editMessageText", payload)
+
+    async def edit_message_reply_markup(
+        self,
+        chat_id: int | str,
+        message_id: int,
+        reply_markup: dict[str, Any] | None,
+    ) -> None:
+        """Replace a message's inline keyboard. ``None`` clears it (Telegram
+        has no "remove keyboard" shortcut — an empty ``inline_keyboard`` does
+        the same)."""
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "reply_markup": reply_markup if reply_markup is not None else {"inline_keyboard": []},
+        }
+        await self._call("editMessageReplyMarkup", payload)
+
+    async def delete_message(self, chat_id: int | str, message_id: int) -> None:
+        """Delete a message the bot previously sent (own messages only, and
+        only within Telegram's 48h window in private chats)."""
+        await self._call("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
 
     async def send_chat_action(self, chat_id: int | str, action: str = "typing") -> None:
         """Best-effort typing indicator — failures are logged, not raised."""
