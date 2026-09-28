@@ -366,18 +366,26 @@ falls straight through unchanged:
   identity-check exchange instead of the normal agent prompt: the model asks
   the customer to confirm the configured fields, and
   `tiqora.ai.identity.verify_identity_claim` matches the claimed values
-  (case/whitespace-insensitive) deterministically against `customer_user`
+  (ignoring case, spaces, `-`, `.` and `/`, so `1234567890` matches a stored
+  `123-45-67-89-0`; values shorter than 3 characters never match, because
+  some rows carry `0` as a placeholder) deterministically against `customer_user`
   rows (`valid_id = 1`) — a match is only accepted if it resolves to
   *exactly one* row (ambiguous or zero matches both fail). A successful
   match maps the contact (`customer_user_login`), re-points the ticket's
   customer, resets the attempt counter, and the run then continues normally.
-- **Escalation**: each failed claim increments
-  `tiqora_ai_ticket_state.identity_attempts`; after **`MAX_IDENTITY_ATTEMPTS`
-  (3)** failed attempts, the run stops asking and instead creates a
-  human-reviewed clarify draft ("Identity could not be confirmed after
-  multiple attempts — please review manually") rather than looping
-  indefinitely. A misconfigured policy (`clarify_schema` mode with no usable
-  schema) fails safe the same way, immediately.
+- **Failed claims**: each one increments
+  `tiqora_ai_ticket_state.identity_attempts` and the customer is told the
+  values did not match (`IDENTITY_NO_MATCH_TEXT`), never the model's
+  "checking that now" acknowledgement. The identity exchange only ever sees
+  the latest message, so the system prompt tells the model how many attempts
+  already failed (the count, not the values).
+- **Handoff**: after **`MAX_IDENTITY_ATTEMPTS` (2)** failed attempts the
+  customer is told a human takes over (`IDENTITY_HANDOFF_TEXT`), the agents
+  get an internal note, and `ai_escalated_at` is set, which stops further
+  automatic runs until an agent replies. A customer who is not in
+  `customer_user` yet (new tenancy) can never pass the check, so there is no
+  point asking more often. A misconfigured policy (`clarify_schema` mode with
+  no usable schema) fails safe to a human-reviewed draft, immediately.
 
 ### Per-queue policy and autonomy
 

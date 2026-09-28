@@ -14,6 +14,7 @@ class FakeVisionLlm:
         self.response = response
         self.calls = 0
         self.seen_messages: list[list[LlmMessage]] = []
+        self.seen_max_tokens: list[int] = []
 
     async def chat(
         self,
@@ -26,6 +27,7 @@ class FakeVisionLlm:
     ) -> LlmResponse:
         self.calls += 1
         self.seen_messages.append(messages)
+        self.seen_max_tokens.append(max_tokens)
         return LlmResponse(
             content=self.response, usage=LlmUsage(prompt_tokens=20, completion_tokens=10)
         )
@@ -94,3 +96,14 @@ async def test_describe_images_empty_response_yields_empty_description() -> None
     fake = FakeVisionLlm(response=None)
     results = await describe_images([("a.png", "image/png", b"x")], llm_factory=lambda: fake)
     assert results == [("a.png", "")]
+
+
+async def test_describe_images_leaves_room_for_a_reasoning_model() -> None:
+    """GLM-5.3-Flash thinks before it answers: one screenshot took ~400
+    reasoning plus ~600 visible tokens. At 512 the reply came back empty with
+    finish_reason=length."""
+    fake = FakeVisionLlm()
+
+    await describe_images([("a.png", "image/png", b"x")], llm_factory=lambda: fake)
+
+    assert fake.seen_max_tokens == [2048]

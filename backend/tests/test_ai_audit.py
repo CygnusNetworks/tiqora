@@ -236,6 +236,58 @@ async def test_auditing_client_redacts_image_data_urls(mariadb_znuny_url: str) -
         await engine.dispose()
 
 
+class _RecordingLlm:
+    def __init__(self) -> None:
+        self.sent_urls: list[str] = []
+
+    async def chat(self, *, messages: list[LlmMessage], **kwargs: Any) -> LlmResponse:
+        for message in messages:
+            if isinstance(message.content, list):
+                self.sent_urls.extend(
+                    part["image_url"]["url"]
+                    for part in message.content
+                    if part.get("type") == "image_url"
+                )
+        return LlmResponse(content="a photo", usage=LlmUsage())
+
+
+async def test_auditing_client_sends_the_unredacted_image_to_the_provider(
+    mariadb_znuny_url: str,
+) -> None:
+    """The redaction is for the log only. It used to rewrite the shared
+    content parts in place, so every vision call sent the placeholder
+    ``[image: N bytes]`` to the provider and got HTTP 400 back."""
+    run_id = "audit-test-vision-2"
+    _cleanup_audit_rows(mariadb_znuny_url, run_id_prefix=run_id)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    data_url = "data:image/png;base64," + ("A" * 500)
+    inner = _RecordingLlm()
+    try:
+        async with factory() as session:
+            client = AuditingLlmClient(
+                inner,
+                settings=get_settings(),
+                context=AuditContext(feature="vision", run_id=run_id),
+                session=session,
+            )
+            await client.chat(
+                messages=[
+                    LlmMessage(
+                        role="user",
+                        content=[
+                            {"type": "text", "text": "describe this"},
+                            {"type": "image_url", "image_url": {"url": data_url}},
+                        ],
+                    )
+                ]
+            )
+        assert inner.sent_urls == [data_url]
+    finally:
+        await engine.dispose()
+        _cleanup_audit_rows(mariadb_znuny_url, run_id_prefix=run_id)
+
+
 # ---------------------------------------------------------------------------
 # Wired into the real run: Manual Assist writes an audit row (feature=draft)
 # ---------------------------------------------------------------------------
