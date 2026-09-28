@@ -8,7 +8,6 @@ import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
-import { ticketPerms } from "@/lib/ticket";
 import {
   getDraft,
   useClearReplyDraft,
@@ -25,36 +24,18 @@ import { ComposerTimeChip } from "./ComposerTimeChip";
 import { MentionTextarea } from "./MentionTextarea";
 import { RefineControls } from "./RefineControls";
 import {
+  defaultPendingDate,
+  todayIso,
+  useNextStateOptions,
+  type NextState,
+} from "./replyNextState";
+import {
   RecipientsField,
   joinRecipients,
   moveRecipientBetween,
   parseRecipientList,
   type Recipient,
 } from "./RecipientsField";
-
-type NextState = "keep" | "pending" | "closed";
-
-/** Choices for the ticket after the reply is sent. `color` is the state colour
- * the segment takes when picked. */
-const NEXT_STATES: { key: NextState; color: string }[] = [
-  { key: "keep", color: "var(--color-state-open)" },
-  { key: "pending", color: "var(--color-state-pending)" },
-  { key: "closed", color: "var(--color-state-new)" },
-];
-
-function isoDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-function todayIso(): string {
-  return isoDate(new Date());
-}
-/** Default reminder for "Wartend": three days from today. */
-function defaultPendingDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  return isoDate(d);
-}
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -347,35 +328,14 @@ export function ReplyDialog({
 
   const templates = templatesQ.data ?? [];
 
-  // "Danach": the ticket and the state catalogue are cache hits on the
-  // ticket page. Only agents who may change the state get the control — the
-  // backend refuses `state_id` without `rw` (a note-only agent can still reply).
-  const ticketQ = useQuery({
-    queryKey: ["tickets", ticketId],
-    queryFn: () => api.getTicket(ticketId),
-    enabled: open,
-  });
-  const statesQ = useQuery({
-    queryKey: ["reference", "states"],
-    queryFn: () => api.listReferenceStates(),
-    enabled: open,
-  });
-  const states = statesQ.data ?? [];
-  const pendingState =
-    states.find((s) => s.name === "pending reminder") ??
-    states.find((s) => s.type_name === "pending reminder");
-  const closedState =
-    states.find((s) => s.name === "closed successful") ??
-    states.find((s) => s.type_name.startsWith("closed"));
-  const canSetState = Boolean(ticketQ.data && ticketPerms(ticketQ.data).rw);
-  const nextOptions = NEXT_STATES.filter(
-    (o) =>
-      o.key === "keep" ||
-      (o.key === "pending" && pendingState) ||
-      (o.key === "closed" && closedState),
-  );
-  const nextStateId =
-    nextState === "pending" ? pendingState?.id : nextState === "closed" ? closedState?.id : undefined;
+  // "Danach" — see `useNextStateOptions` for who gets the control.
+  const {
+    canSetState,
+    options: nextOptions,
+    stateIdFor,
+    payloadFor: nextStatePayload,
+  } = useNextStateOptions(ticketId, open);
+  const nextStateId = stateIdFor(nextState);
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -397,14 +357,7 @@ export function ReplyDialog({
         in_reply_to: isTelegram ? null : (draftQ.data?.in_reply_to ?? null),
         references: isTelegram ? null : (draftQ.data?.references ?? null),
         ai_draft_id: aiDraftId,
-        ...(canSetState && nextStateId != null
-          ? {
-              state_id: nextStateId,
-              // 08:00 local on the chosen day — a reminder for the morning.
-              pending_time:
-                nextState === "pending" ? new Date(`${pendingDate}T08:00`).toISOString() : null,
-            }
-          : {}),
+        ...nextStatePayload(nextState, pendingDate),
       });
       // The reply is out; mentions and the booking follow and may fail on
       // their own without costing the message.
