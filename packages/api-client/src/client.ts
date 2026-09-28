@@ -1422,6 +1422,14 @@ export class ApiClient {
     );
   }
 
+  removeTelegramButtons(ticketId: number, articleId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "DELETE",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/telegram/buttons`,
+      { signal },
+    );
+  }
+
   patchTicket(ticketId: number, body: MutationRequest, signal?: AbortSignal) {
     return this.request<void>("PATCH", `/api/v1/tickets/${ticketId}`, {
       body,

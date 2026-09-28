@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type ArticleListItem, type TelegramChatOut, type TelegramMessageMeta } from "@/lib/api";
@@ -73,6 +73,8 @@ export function ArticleConversationView({
   canNote,
   canDelete = false,
   locale,
+  newestFirst = false,
+  composer,
 }: {
   ticketId: number;
   /** Already filtered, chronological (oldest→newest) — see
@@ -86,8 +88,15 @@ export function ArticleConversationView({
   /** Whether the agent may delete internal notes (``rw`` permission). */
   canDelete?: boolean;
   locale: string;
+  /** Messenger order: newest message (and the composer) on top, no
+   * follow-to-bottom. Off = chronological with the composer below. */
+  newestFirst?: boolean;
+  /** Chat composer, placed under the contact header in newest-first order
+   * and below the thread otherwise. */
+  composer?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const threadRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { boundaryId, createdAt } = useSummaryBoundary(ticketId, articles);
   const drafts = useTicketReplyDrafts(ticketId);
@@ -104,31 +113,62 @@ export function ArticleConversationView({
   // A messenger thread follows new messages; a mail thread only jumps on open.
   const followId = isTelegram ? (articles[articles.length - 1]?.id ?? null) : null;
 
-  // Scroll to the newest message whenever this view mounts (tab switch) or
-  // the ticket changes. jsdom (tests) doesn't implement scrollIntoView.
+  // Keep the newest message in view whenever this view mounts (tab switch),
+  // the ticket changes, a new message arrives or the order flips: bottom of
+  // the thread chronologically, its top in newest-first order (scrolling
+  // only the thread there — the newest end is already where the page
+  // starts). jsdom (tests) doesn't implement scrollIntoView.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView?.({ block: "end" });
-  }, [ticketId, followId]);
+    if (newestFirst) {
+      if (threadRef.current) threadRef.current.scrollTop = 0;
+    } else {
+      bottomRef.current?.scrollIntoView?.({ block: "end" });
+    }
+  }, [ticketId, followId, newestFirst]);
 
-  const groups = groupByDay(articles, locale);
+  // Newest-first: whole day blocks newest day first, messages inside a
+  // block newest first too, the day label on top of its block.
+  const groups = groupByDay(newestFirst ? [...articles].reverse() : articles, locale);
+  // Where the reply will appear once sent — the thread's newest end.
+  const draftBubbles = drafts.map((d) => (
+    <DraftBubble
+      key={`draft-${d.articleId}`}
+      draft={d}
+      locale={locale}
+      channelName={draftChannelName(d.articleId)}
+    />
+  ));
 
   const thread = (
     <div
+      key="thread"
+      ref={threadRef}
       className="max-h-[60vh] space-y-4 overflow-y-auto rounded-lg border border-hairline bg-surface p-3"
       data-testid="article-conversation"
+      data-order={newestFirst ? "newest-first" : "oldest-first"}
     >
+      {newestFirst && draftBubbles}
       {articles.length === 0 ? (
         <p className="text-sm text-muted">{t("ticket.noArticles")}</p>
       ) : (
         groups.map((g) => (
           <section key={g.day} className="space-y-2">
             <div className="flex items-center justify-center">
-              <span className="rounded-full bg-surface-subtle px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted">
+              <span
+                data-testid="conversation-day"
+                className="rounded-full bg-surface-subtle px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted"
+              >
                 {g.day}
               </span>
             </div>
             {g.items.map((a) => (
               <Fragment key={a.id}>
+                {/* The marker sits between summarized and newer messages:
+                    above the boundary message in newest-first order, below
+                    it chronologically — same rule as the split view. */}
+                {newestFirst && a.id === boundaryId && (
+                  <SummaryMarker createdAt={createdAt} locale={locale} />
+                )}
                 {isInternalNote(a) ? (
                   <NotePill
                     ticketId={ticketId}
@@ -151,33 +191,32 @@ export function ArticleConversationView({
                     }
                   />
                 )}
-                {/* Chronological view → marker goes below the newest
-                    summarized article. */}
-                {a.id === boundaryId && <SummaryMarker createdAt={createdAt} locale={locale} />}
+                {!newestFirst && a.id === boundaryId && (
+                  <SummaryMarker createdAt={createdAt} locale={locale} />
+                )}
               </Fragment>
             ))}
           </section>
         ))
       )}
-      {/* After the last real article — where the reply will appear once sent. */}
-      {drafts.map((d) => (
-        <DraftBubble
-          key={`draft-${d.articleId}`}
-          draft={d}
-          locale={locale}
-          channelName={draftChannelName(d.articleId)}
-        />
-      ))}
+      {!newestFirst && draftBubbles}
       <div ref={bottomRef} />
     </div>
   );
 
   // Same wrapper with or without the header: swapping it in once the chat
   // loads would remount the scroll container and lose its scroll position.
+  // Keyed siblings: flipping the order moves the composer and the thread
+  // instead of remounting them (the text being typed survives).
+  const composerSlot = composer ? (
+    <div key="composer" data-testid="conversation-composer-slot">
+      {composer}
+    </div>
+  ) : null;
   return (
     <div className="space-y-2">
-      {chat && <TelegramContactHeader chat={chat} locale={locale} />}
-      {thread}
+      {chat && <TelegramContactHeader key="header" chat={chat} locale={locale} />}
+      {newestFirst ? [composerSlot, thread] : [thread, composerSlot]}
     </div>
   );
 }
@@ -227,6 +266,9 @@ function Bubble({
   const canQuote = Boolean(telegram?.chat) && canNote && channelNameOf(article) === "Telegram";
   const canModify = canQuote && isAgent && meta?.direction === "out" && !meta.retracted_at;
   const quotedId = meta?.reply_to_article_id ?? null;
+  // An answered keyboard is settled — only an open one can be taken back.
+  const canRemoveButtons =
+    canModify && (meta?.buttons.length ?? 0) > 0 && meta?.answered_button === null;
 
   return (
     <div
@@ -324,6 +366,9 @@ function Bubble({
                     }
                     onEdit={tgActions.startEdit}
                     onRetract={tgActions.startRetract}
+                    onRemoveButtons={
+                      canRemoveButtons && !tgActions.pending ? tgActions.removeButtons : undefined
+                    }
                   />
                 )}
                 <ArticleQuickActions
