@@ -26,6 +26,7 @@ from tiqora.channels.telegram.messages import (
     buttons_from_json,
     get_by_article,
     get_by_message,
+    record_message,
 )
 from tiqora.channels.telegram.outbound import TelegramDeliveryError, deliver_agent_telegram_reply
 from tiqora.channels.telegram.service import process_update
@@ -38,6 +39,7 @@ from tiqora.domain.ticket_write_service import (
     InvalidInput,
     TelegramSendOptions,
     TicketWriteService,
+    add_article,
 )
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
 from tiqora.znuny.password import hash_password
@@ -2779,6 +2781,290 @@ async def test_agent_reply_empty_subject_uses_ticket_title(mariadb_znuny_url: st
                 assert title
                 assert subject == title
                 await session.commit()
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Inbound button-tap callback (Task 5)
+# ---------------------------------------------------------------------------
+
+
+async def _agent_question_with_buttons(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    chat_id: int,
+    message_id: int,
+    buttons: tuple[ButtonSpec, ...],
+) -> int:
+    """Store an agent "question" article plus the outbound map row a real
+    :func:`deliver_agent_telegram_reply` send would have left behind, with a
+    caller-chosen ``message_id`` (button-tap tests need to control it
+    directly, unlike ``_FakeTelegramGateway``/``_recording_gateway``, whose
+    ``message_id`` is fixed)."""
+    article_id = await add_article(
+        session,
+        ticket_id=ticket_id,
+        article=_agent_article("Ist es jetzt wieder da?"),
+        user_id=1,
+        sysconfig=SysConfig(session),
+    )
+    await record_message(
+        session,
+        article_id=article_id,
+        ticket_id=ticket_id,
+        chat_id=chat_id,
+        message_id=message_id,
+        direction="out",
+        buttons=list(buttons),
+    )
+    await session.commit()
+    return article_id
+
+
+async def _ticket_state_name(session: AsyncSession, ticket_id: int) -> str:
+    row = (
+        await session.execute(
+            text(
+                "SELECT ts.name FROM ticket t"
+                " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+                " WHERE t.id = :tid"
+            ),
+            {"tid": ticket_id},
+        )
+    ).first()
+    return str(row[0]) if row is not None else ""
+
+
+_RESOLVE_BUTTONS = (ButtonSpec("Ja", "resolve_yes"), ButtonSpec("Nein", "resolve_no"))
+
+
+@pytest.mark.db
+async def test_button_tap_resolve_yes_then_repeat_tap_is_noop(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4601, "Internet down")
+                ticket_id = inbound["ticket_id"]
+                await _agent_question_with_buttons(
+                    session,
+                    ticket_id=ticket_id,
+                    chat_id=4601,
+                    message_id=777,
+                    buttons=_RESOLVE_BUTTONS,
+                )
+                articles_before = await _article_count(session, ticket_id)
+
+                gateway, calls = _recording_gateway()
+                result = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(777, 4601, 19601, data="tqb:0"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert result["ticket_id"] == ticket_id
+                assert result["button_action"] == "resolve_yes"
+                new_article_id = result["article_id"]
+
+                body_row = (
+                    await session.execute(
+                        text(
+                            "SELECT a_body, a_from FROM article_data_mime WHERE article_id = :aid"
+                        ),
+                        {"aid": new_article_id},
+                    )
+                ).first()
+                assert body_row is not None
+                assert body_row[0] == "Ja"
+                assert body_row[1] == "Ada Lovelace <4601@telegram.invalid>"
+
+                sender_row = (
+                    await session.execute(
+                        text(
+                            "SELECT ast.name FROM article a"
+                            " JOIN article_sender_type ast ON ast.id = a.article_sender_type_id"
+                            " WHERE a.id = :aid"
+                        ),
+                        {"aid": new_article_id},
+                    )
+                ).first()
+                assert sender_row is not None
+                assert sender_row[0] == "customer"
+
+                assert await _ticket_state_name(session, ticket_id) == "closed successful"
+                assert await _article_count(session, ticket_id) == articles_before + 1
+
+                map_row = await get_by_message(session, 4601, 777)
+                assert map_row is not None
+                assert map_row.answered_button == 0
+                assert map_row.answered_at is not None
+
+                answered = await get_by_article(session, new_article_id)
+                assert answered is not None
+                assert answered.message_id is None
+                assert answered.reply_to_article_id == map_row.article_id
+
+                answer_calls = [c for c in calls if c[0] == "answerCallbackQuery"]
+                assert len(answer_calls) == 1
+                assert answer_calls[0][1]["text"] == "Danke!"
+                edit_calls = [c for c in calls if c[0] == "editMessageReplyMarkup"]
+                assert len(edit_calls) == 1
+                assert edit_calls[0][1]["reply_markup"] == {"inline_keyboard": []}
+                assert edit_calls[0][1]["message_id"] == 777
+
+                # Second tap on the very same button: no new article, no
+                # state change -- just the "already answered" callback answer.
+                repeat = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(777, 4601, 19601, data="tqb:0"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert repeat == {"skipped": "already_answered"}
+                assert await _article_count(session, ticket_id) == articles_before + 1
+                answer_calls = [c for c in calls if c[0] == "answerCallbackQuery"]
+                assert answer_calls[-1][1]["text"] == "Schon beantwortet 👍"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_button_tap_resolve_no_reopens_ticket(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4602, "Immer noch kaputt")
+                ticket_id = inbound["ticket_id"]
+                assert await _ticket_state_name(session, ticket_id) != "open"
+                await _agent_question_with_buttons(
+                    session,
+                    ticket_id=ticket_id,
+                    chat_id=4602,
+                    message_id=778,
+                    buttons=_RESOLVE_BUTTONS,
+                )
+
+                gateway, calls = _recording_gateway()
+                result = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(778, 4602, 19602, data="tqb:1"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert result["button_action"] == "resolve_no"
+                assert await _ticket_state_name(session, ticket_id) == "open"
+
+                body = (
+                    await session.execute(
+                        text("SELECT a_body FROM article_data_mime WHERE article_id = :aid"),
+                        {"aid": result["article_id"]},
+                    )
+                ).scalar()
+                assert body == "Nein"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_button_tap_unknown_message_answers_invalid_and_creates_nothing(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                article_count_before = (
+                    await session.execute(text("SELECT COUNT(*) FROM article"))
+                ).scalar()
+
+                gateway, calls = _recording_gateway()
+                result = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(4603, 9603, 19603, data="tqb:0"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert result == {"skipped": "unknown_button"}
+                answer_calls = [c for c in calls if c[0] == "answerCallbackQuery"]
+                assert len(answer_calls) == 1
+                assert answer_calls[0][1]["text"] == "Diese Auswahl ist nicht mehr gültig."
+
+                article_count_after = (
+                    await session.execute(text("SELECT COUNT(*) FROM article"))
+                ).scalar()
+                assert article_count_after == article_count_before
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_button_tap_index_out_of_range_answers_invalid(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4604, "Frage")
+                await _agent_question_with_buttons(
+                    session,
+                    ticket_id=inbound["ticket_id"],
+                    chat_id=4604,
+                    message_id=779,
+                    buttons=_RESOLVE_BUTTONS,
+                )
+
+                gateway, calls = _recording_gateway()
+                result = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(779, 4604, 19604, data="tqb:5"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert result == {"skipped": "unknown_button"}
+                answer_calls = [c for c in calls if c[0] == "answerCallbackQuery"]
+                assert answer_calls[-1][1]["text"] == "Diese Auswahl ist nicht mehr gültig."
             finally:
                 await _cleanup_new_rows(session, before)
     finally:

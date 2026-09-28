@@ -29,9 +29,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.common import channel_setting, ensure_channel_row
 from tiqora.channels.telegram.gateway import TelegramApiError, TelegramGateway
-from tiqora.channels.telegram.messages import get_by_message, record_message
+from tiqora.channels.telegram.messages import (
+    CALLBACK_PREFIX,
+    ButtonAction,
+    buttons_from_json,
+    get_by_message,
+    record_message,
+)
 from tiqora.db.tiqora.models import TiqoraTelegramContact
-from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
+from tiqora.domain.ticket_write_service import (
+    ArticleIn,
+    TicketIn,
+    add_article,
+    change_state,
+    create_ticket,
+)
 from tiqora.znuny.followup import detect_followup
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -48,6 +60,18 @@ CONSENT_ACCEPT_CALLBACK_DATA = "tiqora_consent_accept"
 # Minimum gap between two consent prompts to the same chat (spam guard for
 # customers who keep messaging before tapping the button).
 CONSENT_REPROMPT_SECONDS = 3600
+
+# Answer-button taps (Task 5): callback answer texts (informal German, as
+# every other Telegram-facing string) and the ticket_state name each
+# ``resolve_*`` action moves the ticket to. ``reply`` records the tap as a
+# customer article and changes nothing else.
+_BUTTON_ANSWER_TEXT = "Danke!"
+_BUTTON_INVALID_TEXT = "Diese Auswahl ist nicht mehr gültig."
+_BUTTON_ALREADY_ANSWERED_TEXT = "Schon beantwortet 👍"
+_BUTTON_RESOLVE_STATE_NAME: dict[ButtonAction, str] = {
+    "resolve_yes": "closed successful",
+    "resolve_no": "open",
+}
 
 # ``/start`` = explicit new-dialog reset (Telegram-Chat-UX). Compared against
 # the stripped message text verbatim — no other command is understood yet.
@@ -389,6 +413,129 @@ async def _handle_consent_callback(
     return {"consent": "accepted"}
 
 
+async def _ticket_title(session: AsyncSession, ticket_id: int) -> str:
+    row = (
+        await session.execute(text("SELECT title FROM ticket WHERE id = :tid"), {"tid": ticket_id})
+    ).first()
+    return str(row[0]) if row is not None and row[0] else ""
+
+
+async def _handle_button_callback(
+    session: AsyncSession,
+    gateway: TelegramGateway | None,
+    sysconfig: SysConfig,
+    callback_query: dict[str, Any],
+    user_id: int,
+) -> dict[str, Any]:
+    """Handle a customer tapping an answer-button keyboard (Task 5).
+
+    The row is looked up by ``(chat_id, callback_query.message.message_id)``
+    -- that's the map row of the *outbound* message which carried the
+    keyboard (see ``messages.record_message``), not the tap itself. Order
+    matters: the "already answered" check happens before anything is
+    created, so two sequential taps on the same button (Telegram delivers
+    updates sequentially per bot) never create a second article or change
+    state twice -- see constraints.md's double-tap review focus.
+    """
+    callback_query_id = str(callback_query.get("id") or "")
+    message = callback_query.get("message") or {}
+    chat = message.get("chat") or {}
+    if "id" not in chat or "message_id" not in message:
+        # Structurally malformed callback_query -- nothing to answer either.
+        return {"skipped": "unsupported_callback"}
+    chat_id = int(chat["id"])
+    message_id = int(message["message_id"])
+
+    row = await get_by_message(session, chat_id, message_id)
+    buttons = buttons_from_json(row.buttons_json) if row is not None else []
+    try:
+        index = int(str(callback_query.get("data") or "")[len(CALLBACK_PREFIX) :])
+    except ValueError:
+        index = -1
+
+    if row is None or not (0 <= index < len(buttons)):
+        if gateway is not None:
+            await gateway.answer_callback_query(callback_query_id, _BUTTON_INVALID_TEXT)
+        return {"skipped": "unknown_button"}
+
+    if row.answered_at is not None:
+        if gateway is not None:
+            await gateway.answer_callback_query(callback_query_id, _BUTTON_ALREADY_ANSWERED_TEXT)
+        return {"skipped": "already_answered"}
+
+    button = buttons[index]
+    frm = callback_query.get("from") or {}
+    contact = await _upsert_contact_fields(session, chat_id=chat_id, frm=frm)
+    display_name = contact.display_name or (
+        f"@{contact.username}" if contact.username else str(contact.chat_id)
+    )
+    from_address = f"{display_name} <{contact.chat_id}@telegram.invalid>"
+    title = await _ticket_title(session, row.ticket_id)
+
+    article = ArticleIn(
+        sender_type="customer",
+        is_visible_for_customer=True,
+        subject=title,
+        body=button.label,
+        content_type="text/plain; charset=utf-8",
+        from_address=from_address,
+        channel=CHANNEL_NAME,
+    )
+    article_id = await add_article(
+        session, ticket_id=row.ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+    )
+    # A tap has no Telegram message of its own -- message_id=None. The
+    # unique index is on (chat_id, message_id); MariaDB treats NULL as
+    # distinct from every other NULL there, so several tapped-answer rows
+    # for the same chat never collide.
+    await record_message(
+        session,
+        article_id=article_id,
+        ticket_id=row.ticket_id,
+        chat_id=chat_id,
+        message_id=None,
+        direction="in",
+        reply_to_article_id=row.article_id,
+    )
+
+    row.answered_button = index
+    row.answered_at = datetime.now(UTC).replace(tzinfo=None)
+    await session.flush()
+
+    state_name = _BUTTON_RESOLVE_STATE_NAME.get(button.action)
+    if state_name is not None:
+        target_state_id = await _lookup_id(session, "ticket_state", "name", state_name)
+        if target_state_id is not None:
+            current = (
+                await session.execute(
+                    text("SELECT ticket_state_id FROM ticket WHERE id = :tid"),
+                    {"tid": row.ticket_id},
+                )
+            ).first()
+            if current is not None and int(current[0]) != target_state_id:
+                await change_state(
+                    session,
+                    ticket_id=row.ticket_id,
+                    new_state_id=target_state_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                )
+
+    if gateway is not None:
+        await gateway.answer_callback_query(callback_query_id, _BUTTON_ANSWER_TEXT)
+        try:
+            await gateway.edit_message_reply_markup(chat_id, message_id, None)
+        except TelegramApiError as exc:
+            logger.warning(
+                "telegram_button_keyboard_clear_failed",
+                chat_id=chat_id,
+                message_id=message_id,
+                error=str(exc),
+            )
+
+    return {"ticket_id": row.ticket_id, "article_id": article_id, "button_action": button.action}
+
+
 async def _maybe_prompt_consent(
     session: AsyncSession, gateway: TelegramGateway | None, contact: TiqoraTelegramContact
 ) -> None:
@@ -434,6 +581,10 @@ async def process_update(
     """
     callback_query = update.get("callback_query")
     if isinstance(callback_query, dict):
+        if str(callback_query.get("data") or "").startswith(CALLBACK_PREFIX):
+            return await _handle_button_callback(
+                session, gateway, sysconfig, callback_query, user_id
+            )
         return await _handle_consent_callback(session, gateway, callback_query)
 
     message = update.get("message")
