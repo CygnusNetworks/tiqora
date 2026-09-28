@@ -19451,6 +19451,10 @@
             "title": "Direction",
             "type": "string"
           },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
           "edited_at": {
             "anyOf": [
               {
@@ -19494,7 +19498,8 @@
           "buttons",
           "answered_button",
           "edited_at",
-          "retracted_at"
+          "retracted_at",
+          "editable"
         ],
         "title": "TelegramMessageMeta",
         "type": "object"

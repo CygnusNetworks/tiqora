@@ -29,6 +29,7 @@ function meta(over: Partial<TelegramMessageMeta> = {}): TelegramMessageMeta {
     answered_button: null,
     edited_at: null,
     retracted_at: null,
+    editable: true,
     ...over,
   };
 }

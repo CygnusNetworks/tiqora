@@ -318,6 +318,7 @@ function Bubble({
                   <TelegramBubbleActions
                     articleId={article.id}
                     canModify={canModify}
+                    canEdit={canModify && meta?.editable === true}
                     onQuote={() =>
                       requestComposer(ticketId, { quoteArticleId: article.id, focus: true })
                     }

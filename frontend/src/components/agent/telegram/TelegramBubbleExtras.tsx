@@ -118,6 +118,7 @@ export function TelegramStatusLine({ meta }: { meta: TelegramMessageMeta }) {
 export function TelegramBubbleActions({
   articleId,
   canModify,
+  canEdit = canModify,
   onQuote,
   onEdit,
   onRetract,
@@ -125,6 +126,9 @@ export function TelegramBubbleActions({
   articleId: number;
   /** Own delivered message that hasn't been retracted. */
   canModify: boolean;
+  /** Its text can be edited — not for an attachment-only message, which
+   * Telegram can't edit. */
+  canEdit?: boolean;
   onQuote: () => void;
   onEdit: () => void;
   onRetract: () => void;
@@ -150,15 +154,17 @@ export function TelegramBubbleActions({
       </button>
       {canModify && (
         <>
-          <button
-            type="button"
-            className={btn("hover:text-ink")}
-            title={t("ticket.telegram.edit")}
-            aria-label={t("ticket.telegram.edit")}
-            onClick={onEdit}
-          >
-            ✎
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              className={btn("hover:text-ink")}
+              title={t("ticket.telegram.edit")}
+              aria-label={t("ticket.telegram.edit")}
+              onClick={onEdit}
+            >
+              ✎
+            </button>
+          )}
           <button
             type="button"
             className={btn("hover:text-danger")}

@@ -71,6 +71,7 @@ function chat(): TelegramChatOut {
         answered_button: null,
         edited_at: null,
         retracted_at: null,
+        editable: false,
       },
       {
         article_id: 2,
@@ -83,6 +84,7 @@ function chat(): TelegramChatOut {
         answered_button: 0,
         edited_at: "2026-09-26T14:03:00Z",
         retracted_at: null,
+        editable: true,
       },
       {
         article_id: 3,
@@ -92,6 +94,18 @@ function chat(): TelegramChatOut {
         answered_button: null,
         edited_at: null,
         retracted_at: "2026-09-26T14:04:00Z",
+        editable: false,
+      },
+      {
+        // Attachment-only reply: its message is the file itself.
+        article_id: 4,
+        direction: "out",
+        reply_to_article_id: null,
+        buttons: [],
+        answered_button: null,
+        edited_at: null,
+        retracted_at: null,
+        editable: false,
       },
     ],
   };
@@ -182,6 +196,41 @@ describe("ArticleConversationView on a Telegram ticket", () => {
     expect(within(b2).getByRole("button", { name: "Zurückziehen" })).toBeInTheDocument();
     expect(within(b3).queryByRole("button", { name: "Bearbeiten" })).toBeNull();
     expect(within(b3).queryByRole("button", { name: "Zurückziehen" })).toBeNull();
+  });
+
+  it("offers no edit on an attachment-only message, only retract", async () => {
+    setup([...THREAD, article(4, "agent")]);
+    await screen.findByTestId("telegram-contact-header");
+    const b4 = screen.getByTestId("conversation-bubble-4");
+    expect(within(b4).queryByRole("button", { name: "Bearbeiten" })).toBeNull();
+    expect(within(b4).getByRole("button", { name: "Zurückziehen" })).toBeInTheDocument();
+  });
+
+  it("never shows a validation list or a proxy page as the action error", async () => {
+    api.editTelegramMessage.mockRejectedValue(
+      new ApiError(422, { detail: [{ type: "string_too_long", loc: ["body", "body"], msg: "too long" }] }, "/x"),
+    );
+    api.retractTelegramMessage.mockRejectedValue(
+      new ApiError(502, "<html><body>502 Bad Gateway</body></html>", "/x"),
+    );
+    setup(THREAD);
+    await screen.findByTestId("telegram-contact-header");
+    const b2 = screen.getByTestId("conversation-bubble-2");
+    await within(b2).findByText(BODIES[2]);
+    fireEvent.click(within(b2).getByRole("button", { name: "Bearbeiten" }));
+    fireEvent.change(within(b2).getByRole("textbox"), { target: { value: "Neu" } });
+    fireEvent.click(within(b2).getByRole("button", { name: "Speichern" }));
+    const editError = await within(b2).findByTestId("telegram-action-error-2");
+    expect(editError).not.toHaveTextContent("[object Object]");
+    expect(editError).toHaveTextContent(i18n.t("ticket.telegram.actionError"));
+
+    fireEvent.click(within(b2).getByRole("button", { name: "Abbrechen" }));
+    fireEvent.click(within(b2).getByRole("button", { name: "Zurückziehen" }));
+    fireEvent.click(within(b2).getByRole("button", { name: "Ja" }));
+    await waitFor(() => expect(api.retractTelegramMessage).toHaveBeenCalled());
+    const retractError = await within(b2).findByTestId("telegram-action-error-2");
+    expect(retractError).not.toHaveTextContent("html");
+    expect(retractError).toHaveTextContent(i18n.t("ticket.telegram.actionError"));
   });
 
   it("quote asks the composer to quote that message", async () => {

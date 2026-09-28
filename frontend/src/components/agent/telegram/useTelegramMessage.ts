@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ApiError, api } from "@/lib/api";
+import { api } from "@/lib/api";
 import { decodeEntities, stripHtml } from "@/lib/html";
 import { telegramChatKey } from "@/lib/telegramChatApi";
+import { isUncertainFailure, readableApiReason } from "./telegramErrors";
 
 /** Plain text of an article body, shared with the bubble's own body query
  * (same key) so quoting an already-rendered message costs no request. */
@@ -31,12 +32,17 @@ export function useTelegramMessageActions(ticketId: number, articleId: number) {
     void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
     void qc.invalidateQueries({ queryKey: telegramChatKey(ticketId) });
   };
+  // After an unclear failure the change may have gone through — refetch.
+  const refreshIfUncertain = (err: unknown) => {
+    if (isUncertainFailure(err)) refresh();
+  };
   const edit = useMutation({
     mutationFn: (body: string) => api.editTelegramMessage(ticketId, articleId, body),
     onSuccess: () => {
       setMode("idle");
       refresh();
     },
+    onError: refreshIfUncertain,
   });
   const retract = useMutation({
     mutationFn: () => api.retractTelegramMessage(ticketId, articleId),
@@ -44,16 +50,14 @@ export function useTelegramMessageActions(ticketId: number, articleId: number) {
       setMode("idle");
       refresh();
     },
+    onError: refreshIfUncertain,
   });
 
   const failure = edit.error ?? retract.error;
   // A 409 carries Telegram's refusal ("older than 48 h", "already deleted") —
-  // that reason is what the agent needs, not a generic failure.
-  const error = failure
-    ? failure instanceof ApiError && !failure.message.startsWith("HTTP ")
-      ? failure.message
-      : t("ticket.telegram.actionError")
-    : null;
+  // that reason is what the agent needs; anything else (validation list,
+  // proxy page, 5xx) gets the generic line.
+  const error = failure ? (readableApiReason(failure) ?? t("ticket.telegram.actionError")) : null;
 
   const start = (next: typeof mode) => {
     edit.reset();
