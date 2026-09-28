@@ -6,6 +6,7 @@ import i18n from "@/i18n";
 import { getDraft, useTicketReplyDrafts, type ReplyDraft } from "@/lib/replyDrafts";
 import { DraftListRow, DraftBubble } from "./DraftPlaceholder";
 import { ArticleQuickActions } from "./ArticleQuickActions";
+import { useComposerRequests } from "./telegram/composerBus";
 
 const { getReplyDraft, listTemplates, formDrafts } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
@@ -264,5 +265,47 @@ describe("ArticleQuickActions — draft affordance on the reply button", () => {
     await waitFor(() => expect(button).toHaveAttribute("data-has-draft", "true"));
     expect(button).toHaveTextContent("Continue draft");
     expect(screen.getByTestId("article-draft-dot-2")).toBeInTheDocument();
+  });
+});
+
+describe("ArticleQuickActions — Telegram routes Antworten to the chat composer", () => {
+  const TG_ARTICLE = {
+    ...ARTICLE,
+    id: 5,
+    communication_channel_id: 9,
+    communication_channel_name: "Telegram",
+  };
+
+  beforeEach(() => {
+    qc = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    formDrafts.list.mockReset().mockResolvedValue([]);
+    listTemplates.mockReset().mockResolvedValue([]);
+  });
+
+  it("requests a quote from the composer instead of opening the reply dialog", () => {
+    const handler = vi.fn();
+    function Listener() {
+      useComposerRequests(7, handler);
+      return null;
+    }
+
+    wrap(
+      <>
+        <Listener />
+        <ArticleQuickActions
+          ticketId={7}
+          article={TG_ARTICLE as never}
+          canNote
+          replyTestId="article-reader-reply"
+        />
+      </>,
+    );
+
+    fireEvent.click(screen.getByTestId("article-reader-reply"));
+
+    expect(handler).toHaveBeenCalledWith({ quoteArticleId: 5, focus: true });
+    expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
   });
 });
