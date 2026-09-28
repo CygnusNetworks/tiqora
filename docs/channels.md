@@ -26,6 +26,15 @@ tickets/articles directly — and shares building blocks from
   continuity heuristic — SMS/WhatsApp replies rarely echo the ticket hook tag
   the way email subjects do). Only creates a new ticket if neither matches.
 
+- **History types and agent notifications** — Znuny has no chat history
+  types, so `add_article` maps customer-visible SMS/WhatsApp/Telegram
+  messages onto the web-request ones: the customer's first message is
+  `WebRequestCustomer` (fires `NotificationNewTicket`), later ones are
+  `FollowUp` (`NotificationFollowUp` to owner, watchers, "My Queues"), and an
+  agent's reply is `SendAnswer` (no notification, like an email answer). The
+  agent who wrote an article is never notified about it unless
+  `AgentSelfNotifyOnAction` is on.
+
 Config lives in `tiqora_settings` (key/value, Alembic-managed already —
 no new migration), namespaced `channel.<name>.<key>`; see "Admin config"
 below.

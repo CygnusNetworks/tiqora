@@ -516,6 +516,10 @@ async def _build_notification_context(
                 body_text = html_to_text(body_text)
             context.customer_body = body_text
             context.customer_email_lines = body_text.splitlines()
+            # Znuny fills OTRS_AGENT_* from the same event article; the stock
+            # "new note" notification quotes <OTRS_AGENT_BODY[n]>.
+            context.agent_subject = context.customer_subject
+            context.agent_body = body_text
     await configure_notification_context(
         context,
         sysconfig,

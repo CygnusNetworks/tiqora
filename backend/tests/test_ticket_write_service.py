@@ -1109,6 +1109,99 @@ async def test_legacy_notification_events_for_articles_mariadb(mariadb_znuny_url
 
 
 @pytest.mark.db
+async def test_legacy_notification_events_for_chat_channels_mariadb(
+    mariadb_znuny_url: str,
+) -> None:
+    """Chat channels (Telegram, SMS, WhatsApp) map onto the web-request types:
+    the customer's first message opens the ticket (NotificationNewTicket),
+    later ones are follow-ups (NotificationFollowUp), and an agent's chat
+    reply is an answer (SendAnswer, no notification) -- not a note."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    def chat(sender_type: str) -> ArticleIn:
+        return ArticleIn(
+            subject="Chat",
+            body="b",
+            channel="telegram",
+            sender_type=sender_type,
+            is_visible_for_customer=True,
+        )
+
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+        ticket_id = await _make_ticket(factory, sysconfig, "Legacy Chat Events")
+        for sender_type in ("customer", "agent", "customer"):
+            async with factory() as session, session.begin():
+                await add_article(
+                    session,
+                    ticket_id=ticket_id,
+                    article=chat(sender_type),
+                    user_id=1,
+                    sysconfig=sysconfig,
+                )
+
+        async with factory() as session:
+            assert len(await _outbox_payloads(session, ticket_id, "NotificationNewTicket")) == 1
+            assert len(await _outbox_payloads(session, ticket_id, "NotificationFollowUp")) == 1
+            assert await _outbox_payloads(session, ticket_id, "NotificationAddNote") == []
+            history = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT tht.name FROM ticket_history th"
+                            " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
+                            " WHERE th.ticket_id = :tid AND th.article_id IS NOT NULL"
+                            " ORDER BY th.id"
+                        ),
+                        {"tid": ticket_id},
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert list(history) == ["WebRequestCustomer", "SendAnswer", "FollowUp"]
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_legacy_article_notification_skips_acting_agent_mariadb(
+    mariadb_znuny_url: str,
+) -> None:
+    """Znuny never notifies the agent who wrote the article about it
+    (NotificationEvent.pm, unless AgentSelfNotifyOnAction is on)."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+        ticket_id = await _make_ticket(factory, sysconfig, "Legacy Self Notify")
+        async with factory() as session, session.begin():
+            await add_article(
+                session,
+                ticket_id=ticket_id,
+                article=ArticleIn(
+                    subject="Note",
+                    body="b",
+                    channel="note",
+                    sender_type="agent",
+                    is_visible_for_customer=False,
+                ),
+                user_id=1,
+                sysconfig=sysconfig,
+            )
+        async with factory() as session:
+            events = await _outbox_payloads(session, ticket_id, "NotificationAddNote")
+        assert [e.get("skip_user_ids") for e in events] == [[1]]
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
 async def test_legacy_notification_lock_timeout_skips_acting_owner_mariadb(
     mariadb_znuny_url: str,
 ) -> None:

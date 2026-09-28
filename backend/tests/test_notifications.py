@@ -865,6 +865,70 @@ async def test_stock_notification_renders_recipient_article_and_tiqora_link(
 
 
 @pytest.mark.db
+async def test_agent_body_placeholder_quotes_the_event_article(mariadb_znuny_url: str) -> None:
+    """The stock "new note" notification quotes <OTRS_AGENT_BODY[n]>. It used
+    to render empty, so the mail said "X schrieb:" and nothing else."""
+    from tiqora.config import Settings
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            qid = await _insert_queue(session, "Notification agent body")
+            uid = 910_951
+            await _insert_agent(session, user_id=uid, login="notify.agentbody")
+            await _set_user_prefs(session, uid, "agentbody@example.com", "de")
+            tid = await _insert_ticket(session, "2026010410000046", owner_id=uid, queue_id=qid)
+            aid = await _insert_article(session, tid, sender_type="agent", is_visible=0)
+            await session.execute(
+                text(
+                    "INSERT INTO article_data_mime (article_id, a_from, a_subject, a_body,"
+                    " a_content_type, incoming_time, create_time, create_by, change_time,"
+                    " change_by)"
+                    " VALUES (:aid, 'Erika Beispiel', 'Rueckruf',"
+                    " 'Kunde zurueckrufen\nDose pruefen\nDritte Zeile', 'text/plain', 0,"
+                    " current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"aid": aid},
+            )
+            await _insert_notification_event(
+                session,
+                "agent-body-regression",
+                items={
+                    "Events": ["NotificationAddNote"],
+                    "QueueID": [str(qid)],
+                    "Recipients": ["AgentOwner"],
+                    "Transports": ["Email"],
+                },
+                language="de",
+                subject="Notiz: <OTRS_AGENT_SUBJECT[8]>",
+                body="schrieb:\n<OTRS_AGENT_BODY[2]>\n-- Ende",
+            )
+            await _insert_outbox_event(
+                session, "NotificationAddNote", tid, payload=f'{{"article_id": {aid}}}'
+            )
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+        result = await run_notifications_tick(
+            session_factory=factory,
+            mail_sender=sender,
+            settings=Settings(public_base_url="https://support.example.org/"),
+        )
+        assert result["errors"] == 0
+        # The seeded stock "new note" notification ("Ticket-Notiz: …") fires
+        # for the owner too.
+        (message,) = [m for m in sender.sent if str(m["Subject"]).endswith("] Notiz: Rueckruf")]
+        body = message.get_content()
+        assert "schrieb:\nKunde zurueckrufen\nDose pruefen\n-- Ende" in body
+        assert "Dritte Zeile" not in body
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
 async def test_notification_recipient_placeholders_are_rendered_per_actual_agent(
     mariadb_znuny_url: str,
 ) -> None:
