@@ -46,7 +46,9 @@ _PHOTO_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 _PHOTO_MAX_BYTES = 10 * 1024 * 1024
 
 # Stored body of an attachment-only reply (the article needs some body text).
-_ATTACHMENT_ONLY_BODY = "[Anhang]"
+# chat_actions reads it back: such a reply's map row points at an attachment,
+# which editMessageText can't edit.
+ATTACHMENT_ONLY_BODY = "[Anhang]"
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"[ \t]+")
@@ -258,11 +260,23 @@ async def deliver_agent_telegram_reply(
             quote = quote_message_id if index == 0 else None
             carries_keyboard = not send_text and index == len(article.attachments) - 1
             markup = keyboard if carries_keyboard else None
+            result: dict[str, Any] | None = None
             if _is_photo(content_type, content):
-                result = await gw.send_photo(
-                    chat_id, content, filename, reply_to_message_id=quote, reply_markup=markup
-                )
-            else:
+                try:
+                    result = await gw.send_photo(
+                        chat_id, content, filename, reply_to_message_id=quote, reply_markup=markup
+                    )
+                except TelegramApiError as exc:
+                    # sendPhoto is pickier than sendDocument (e.g.
+                    # PHOTO_INVALID_DIMENSIONS for tall screenshots: > 10000 px
+                    # total or aspect ratio > 20) -- send the file as a document.
+                    logger.info(
+                        "agent_telegram_photo_as_document",
+                        ticket_id=ticket_id,
+                        filename=filename,
+                        error=str(exc),
+                    )
+            if result is None:
                 result = await gw.send_document(
                     chat_id,
                     content,
@@ -303,7 +317,7 @@ async def deliver_agent_telegram_reply(
     prepared = replace(
         article,
         subject=subject,
-        body=body if send_text else _ATTACHMENT_ONLY_BODY,
+        body=body if send_text else ATTACHMENT_ONLY_BODY,
         channel=CHANNEL_NAME,
         to_address=f"{chat_id}@telegram.invalid",
         is_visible_for_customer=True,
@@ -324,7 +338,11 @@ async def deliver_agent_telegram_reply(
             message_id=row_message_id,
             direction="out",
             extra_message_ids=extra_ids or None,
-            reply_to_article_id=options.reply_to_article_id,
+            # Only a quote Telegram actually shows counts -- an unmapped
+            # article went out unquoted (see _resolve_quote).
+            reply_to_article_id=(
+                options.reply_to_article_id if quote_message_id is not None else None
+            ),
             buttons=buttons or None,
         )
     except Exception:

@@ -2574,7 +2574,8 @@ async def test_agent_reply_quote_of_unmapped_article_sends_without_quote(
                 assert gw.calls[0][1]["reply_to_message_id"] is None
                 row = await get_by_article(session, article_id)
                 assert row is not None
-                assert row.reply_to_article_id == inbound["article_id"]
+                # The quote never reached Telegram, so the row doesn't claim one.
+                assert row.reply_to_article_id is None
                 await session.commit()
             finally:
                 await _cleanup_new_rows(session, before)
@@ -3065,6 +3066,236 @@ async def test_button_tap_index_out_of_range_answers_invalid(mariadb_znuny_url: 
                 assert result == {"skipped": "unknown_button"}
                 answer_calls = [c for c in calls if c[0] == "answerCallbackQuery"]
                 assert answer_calls[-1][1]["text"] == "Diese Auswahl ist nicht mehr gültig."
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+async def _set_ticket_state(session: AsyncSession, ticket_id: int, state_name: str) -> None:
+    """Force a ticket's state directly (test setup only -- no history row)."""
+    await session.execute(
+        text(
+            "UPDATE ticket SET ticket_state_id ="
+            " (SELECT id FROM ticket_state WHERE name = :name) WHERE id = :tid"
+        ),
+        {"name": state_name, "tid": ticket_id},
+    )
+    await session.commit()
+
+
+@pytest.mark.db
+async def test_button_tap_article_is_marked_auto_generated(mariadb_znuny_url: str) -> None:
+    """A tap is a canned answer, not a customer message the AI should reply
+    to: its ArticleCreate outbox event carries ``auto_generated`` so the auto
+    worker skips it (otherwise it would answer "Ja" on a just-closed ticket)."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4605, "Geht wieder?")
+                await _agent_question_with_buttons(
+                    session,
+                    ticket_id=inbound["ticket_id"],
+                    chat_id=4605,
+                    message_id=780,
+                    buttons=_RESOLVE_BUTTONS,
+                )
+                gateway, _calls = _recording_gateway()
+                result = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(780, 4605, 19605, data="tqb:0"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                raw = (
+                    await session.execute(
+                        text(
+                            "SELECT payload FROM tiqora_event_outbox"
+                            " WHERE event_type = 'ArticleCreate' AND ticket_id = :tid"
+                            " ORDER BY id DESC LIMIT 1"
+                        ),
+                        {"tid": inbound["ticket_id"]},
+                    )
+                ).scalar()
+                payload = json.loads(raw)
+                assert payload["article_id"] == result["article_id"]
+                assert payload["auto_generated"] is True
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_button_tap_reply_action_reopens_closed_ticket(mariadb_znuny_url: str) -> None:
+    """A plain "reply" tap on a closed ticket is a customer follow-up and
+    reopens it, the same as a typed message would."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4606, "Frage")
+                ticket_id = inbound["ticket_id"]
+                await _agent_question_with_buttons(
+                    session,
+                    ticket_id=ticket_id,
+                    chat_id=4606,
+                    message_id=781,
+                    buttons=(ButtonSpec("Morgen passt"),),
+                )
+                await _set_ticket_state(session, ticket_id, "closed successful")
+
+                gateway, _calls = _recording_gateway()
+                result = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(781, 4606, 19606, data="tqb:0"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert result["button_action"] == "reply"
+                assert await _ticket_state_name(session, ticket_id) == "open"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_button_tap_reply_action_leaves_open_ticket_state(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4607, "Frage")
+                ticket_id = inbound["ticket_id"]
+                await _agent_question_with_buttons(
+                    session,
+                    ticket_id=ticket_id,
+                    chat_id=4607,
+                    message_id=782,
+                    buttons=(ButtonSpec("Morgen passt"),),
+                )
+                await _set_ticket_state(session, ticket_id, "pending reminder")
+
+                gateway, _calls = _recording_gateway()
+                await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(782, 4607, 19607, data="tqb:0"),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert await _ticket_state_name(session, ticket_id) == "pending reminder"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    ("data", "chat_id", "message_id"), [("tqb:1", 4608, 783), ("tqb:0", 4609, 784)]
+)
+async def test_button_tap_on_merged_ticket_keeps_its_state(
+    mariadb_znuny_url: str, data: str, chat_id: int, message_id: int
+) -> None:
+    """A map row still pointing at a merged ticket (merged before the merge
+    moved map rows along, or a race): the tap is recorded, but a merged
+    ticket is never reopened/closed -- that would resurrect it."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, chat_id, "Frage")
+                ticket_id = inbound["ticket_id"]
+                await _agent_question_with_buttons(
+                    session,
+                    ticket_id=ticket_id,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    buttons=_RESOLVE_BUTTONS,
+                )
+                await _set_ticket_state(session, ticket_id, "merged")
+
+                gateway, _calls = _recording_gateway()
+                result = await process_update(
+                    session,
+                    factory,
+                    SysConfig(session),
+                    gateway,
+                    _callback_update(message_id, chat_id, 19608, data=data),
+                    user_id=1,
+                )
+                await session.commit()
+
+                assert "article_id" in result
+                assert await _ticket_state_name(session, ticket_id) == "merged"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_photo_refused_falls_back_to_document(mariadb_znuny_url: str) -> None:
+    """sendPhoto refuses e.g. tall screenshots (PHOTO_INVALID_DIMENSIONS);
+    the same file then goes out as a document instead of failing the reply."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4113, "Screenshot?")
+                gw = _FakeTelegramGateway(fail_on={"send_photo"})
+                buttons = (ButtonSpec("Passt"),)
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=_agent_article(
+                            "",
+                            attachments=[("lang.png", "image/png", b"png")],
+                            telegram=TelegramSendOptions(buttons=buttons),
+                        ),
+                        gateway=gw,
+                    )
+                assert [c[0] for c in gw.calls] == ["send_document"]
+                sent = gw.calls[0][1]
+                assert sent["filename"] == "lang.png"
+                assert sent["content_type"] == "image/png"
+                assert sent["reply_markup"] is not None
+                row = await get_by_article(session, article_id)
+                assert row is not None
+                assert row.message_id == sent["message_id"]
+                await session.commit()
             finally:
                 await _cleanup_new_rows(session, before)
     finally:
