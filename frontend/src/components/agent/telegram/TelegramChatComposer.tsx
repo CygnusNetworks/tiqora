@@ -24,8 +24,9 @@ import {
 import { AttachmentChips, QuoteChip } from "./ComposerChips";
 import { ComposerFooter } from "./ComposerFooter";
 import { useComposerRequests } from "./composerBus";
-import { MAX_ATTACHMENT_BYTES, formatBytes, useChatAttachments } from "./useChatAttachments";
+import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, formatBytes, useChatAttachments } from "./useChatAttachments";
 import { useChatDraftSync } from "./useChatDraftSync";
+import { isUncertainFailure as isUncertain, readableApiReason } from "./telegramErrors";
 import { useTypingPing } from "./useTypingPing";
 
 /**
@@ -179,6 +180,13 @@ export function TelegramChatComposer({
 
   const send = useMutation({
     mutationFn: (sent: Sent) => api.createArticle(ticketId, sent.payload),
+    onError: (err) => {
+      // The reply may have gone out after all — show it if it did.
+      if (isUncertain(err)) {
+        void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
+        void qc.invalidateQueries({ queryKey: telegramChatKey(ticketId) });
+      }
+    },
     onSuccess: (_res, sent) => {
       const { payload } = sent;
       draftSync.markSent();
@@ -236,15 +244,23 @@ export function TelegramChatComposer({
     });
   };
 
-  const sendError = !send.error
+  // 413 first: nginx refuses the body before the API sees it, so that one is
+  // certain — and its HTML page is no message for the agent.
+  const sendErrorKind = !send.error
     ? null
     : send.error instanceof ApiError && send.error.status === 413
-      ? // nginx refuses the body before the API sees it — its HTML page is
-        // no message for the agent.
-        t("ticket.telegram.composer.attachTooLargeServer")
-      : send.error instanceof ApiError && !send.error.message.startsWith("HTTP ")
-        ? send.error.message
-        : t("ticket.telegram.composer.sendError");
+      ? "tooLarge"
+      : isUncertain(send.error)
+        ? "uncertain"
+        : "failed";
+  const sendError =
+    sendErrorKind === "tooLarge"
+      ? t("ticket.telegram.composer.attachTooLargeServer")
+      : sendErrorKind === "uncertain"
+        ? t("ticket.telegram.composer.sendUncertain")
+        : sendErrorKind === "failed"
+          ? (readableApiReason(send.error) ?? t("ticket.telegram.composer.sendError"))
+          : null;
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // IME composition (e.g. Japanese input) uses Enter to confirm a word.
@@ -411,21 +427,28 @@ export function TelegramChatComposer({
         <p className="text-xs text-danger" data-testid="tg-composer-attach-error">
           {attachments.error === "tooLarge"
             ? t("ticket.telegram.composer.attachTooLarge", { max: formatBytes(MAX_ATTACHMENT_BYTES) })
-            : t("ticket.telegram.composer.attachReadFailed")}
+            : attachments.error === "tooMany"
+              ? t("ticket.telegram.composer.attachTooMany", { max: MAX_ATTACHMENTS })
+              : t("ticket.telegram.composer.attachReadFailed")}
         </p>
       )}
       {sendError && (
         <p className="flex flex-wrap items-center gap-2 text-xs text-danger" data-testid="tg-composer-error">
           <span>{sendError}</span>
-          <button
-            type="button"
-            data-testid="tg-composer-retry"
-            disabled={!canSend || send.isPending}
-            onClick={submit}
-            className="font-semibold underline disabled:opacity-50"
-          >
-            {t("ticket.telegram.composer.retry")}
-          </button>
+          {/* No instant resend when it's unclear whether the first one
+              arrived; the text stays, so the agent can send it after
+              checking the history. */}
+          {sendErrorKind !== "uncertain" && (
+            <button
+              type="button"
+              data-testid="tg-composer-retry"
+              disabled={!canSend || send.isPending}
+              onClick={submit}
+              className="font-semibold underline disabled:opacity-50"
+            >
+              {t("ticket.telegram.composer.retry")}
+            </button>
+          )}
         </p>
       )}
 

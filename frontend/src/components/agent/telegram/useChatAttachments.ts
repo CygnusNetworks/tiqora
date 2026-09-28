@@ -9,6 +9,9 @@ import type { ArticleAttachmentIn } from "@/lib/api";
  * half-attached. */
 export const MAX_ATTACHMENT_BYTES = 18 * 1024 * 1024;
 
+/** The API takes at most 10 attachments per reply (`max_length=10`). */
+export const MAX_ATTACHMENTS = 10;
+
 export type ChatAttachment = {
   id: number;
   name: string;
@@ -43,7 +46,7 @@ export function formatBytes(n: number): string {
  */
 export function useChatAttachments() {
   const [items, setItems] = useState<ChatAttachment[]>([]);
-  const [error, setError] = useState<"tooLarge" | "readFailed" | null>(null);
+  const [error, setError] = useState<"tooLarge" | "tooMany" | "readFailed" | null>(null);
   const nextId = useRef(0);
   // Source of truth for the size check: two adds in the same tick (a paste
   // and a drop, a multi-event drop) must both see each other, which the
@@ -58,6 +61,10 @@ export function useChatAttachments() {
     (files: FileList | File[]) => {
       const list = Array.from(files);
       if (list.length === 0) return;
+      if (itemsRef.current.length + list.length > MAX_ATTACHMENTS) {
+        setError("tooMany");
+        return;
+      }
       const total =
         itemsRef.current.reduce((sum, a) => sum + a.size, 0) +
         list.reduce((sum, f) => sum + f.size, 0);

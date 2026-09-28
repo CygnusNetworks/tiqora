@@ -12763,6 +12763,8 @@ export interface components {
              * @enum {string}
              */
             direction: "in" | "out";
+            /** Editable */
+            editable: boolean;
             /** Edited At */
             edited_at: string | null;
             /** Reply To Article Id */
