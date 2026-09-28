@@ -28,6 +28,33 @@ aurix/   # repository root (Tiqora monorepo)
   Dockerfile
 ```
 
+### Secret and personal-data guard (required once per clone)
+
+Tiqora handles real customer data (StudNet WP-Nummer/PKZ, Telegram chats,
+e-mail addresses). None of it may end up in a commit — tests and docs use
+made-up values (`example.org`, `123-45-67-89-0`, `999-…`). Two hooks enforce
+that:
+
+```bash
+brew install gitleaks                 # or your distro's package
+git config core.hooksPath .githooks
+```
+
+- `pre-commit` scans the staged changes with gitleaks (`.gitleaks.toml`: the
+  default secret rules plus WP-Nummer, Telegram chat ids and university /
+  free-mail / company addresses).
+- `pre-push` scans every commit that is about to leave the clone.
+- Both also check `.git/info/pii-denylist`: one real name or identifier per
+  line that has no pattern (names, a customer's login). The file lives inside
+  `.git` and is never committed — keep your own list there.
+
+**GitHub is a release mirror.** Day-to-day work goes to `origin`
+(git.cygnusnet.de). The `github` remote only receives `main` and `v*` tags
+of a signed-off release, and `pre-push` refuses anything else unless the push
+runs with `TIQORA_GITHUB_PUSH=approved`. Never use `--no-verify` to get past a
+finding; replace the value instead. History once published cannot be taken
+back.
+
 ## Start infrastructure
 
 ```bash
@@ -295,7 +322,10 @@ workflow dispatch where available). Before tagging a release:
    # also refresh packages/api-client/openapi.json and regenerate types
    pnpm --filter @tiqora/api-client generate && pnpm --filter @tiqora/api-client build
    ```
-3. **Tag** `vX.Y.Z` → CI (with e2e), multi-arch Docker push, product site + demo deploy.
+3. **Tag** `vX.Y.Z` and push tag + `main` to `origin`. Once the release is
+   signed off, publish it:
+   `TIQORA_GITHUB_PUSH=approved git push github main vX.Y.Z` → CI (with e2e),
+   multi-arch Docker push, product site + demo deploy.
 4. **Optional:** run golden-master via Actions (`workflow_dispatch`) if ticket-write
    invariants or the GenericInterface layer changed.
 5. **Optional:** deploy the product site without a tag via
