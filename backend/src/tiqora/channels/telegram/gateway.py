@@ -140,8 +140,11 @@ class TelegramGateway:
         *,
         caption: str | None = None,
         reply_to_message_id: int | None = None,
+        reply_markup: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Upload a photo (Telegram limit 10 MB) as ``multipart/form-data``."""
+        """Upload a photo (Telegram limit 10 MB) as ``multipart/form-data``.
+        *reply_markup* (e.g. an inline keyboard) is JSON-encoded like
+        ``reply_parameters``, since multipart fields are plain strings."""
         data: dict[str, Any] = {"chat_id": str(chat_id)}
         if caption is not None:
             data["caption"] = caption
@@ -149,6 +152,8 @@ class TelegramGateway:
             data["reply_parameters"] = json.dumps(
                 {"message_id": reply_to_message_id, "allow_sending_without_reply": True}
             )
+        if reply_markup is not None:
+            data["reply_markup"] = json.dumps(reply_markup)
         content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         files = {"photo": (filename, content, content_type)}
         result = await self._call_multipart("sendPhoto", data, files)
@@ -163,8 +168,10 @@ class TelegramGateway:
         *,
         caption: str | None = None,
         reply_to_message_id: int | None = None,
+        reply_markup: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Upload a document (Telegram limit 50 MB) as ``multipart/form-data``."""
+        """Upload a document (Telegram limit 50 MB) as ``multipart/form-data``.
+        *reply_markup* is JSON-encoded as in :meth:`send_photo`."""
         data: dict[str, Any] = {"chat_id": str(chat_id)}
         if caption is not None:
             data["caption"] = caption
@@ -172,6 +179,8 @@ class TelegramGateway:
             data["reply_parameters"] = json.dumps(
                 {"message_id": reply_to_message_id, "allow_sending_without_reply": True}
             )
+        if reply_markup is not None:
+            data["reply_markup"] = json.dumps(reply_markup)
         files = {"document": (filename, content, content_type)}
         result = await self._call_multipart("sendDocument", data, files)
         return dict(result or {})

@@ -1,0 +1,395 @@
+"""DB integration tests: POST /tickets/{id}/articles with the Telegram chat
+composer options (attachments, inline buttons, quote reply).
+
+Uses the 784xx id range (queue/group/user/ticket/chat).
+"""
+
+from __future__ import annotations
+
+import base64
+from collections.abc import AsyncIterator
+from datetime import datetime
+from typing import Any
+
+import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from tiqora.db.tiqora.base import TiqoraBase
+
+pytestmark = pytest.mark.db
+
+NOW = datetime(2024, 6, 1, 12, 0, 0)
+
+QUEUE_ID = 78400
+GROUP_ID = 78430
+TICKET_ID = 78470
+AGENT = 78401
+CHAT_ID = 78455
+CUSTOMER_LOGIN = "tg-composer@example.com"
+TICKET_TITLE = "Telegram composer ticket"
+
+
+def _to_async_url(sync_url: str) -> str:
+    if sync_url.startswith("mysql+pymysql://"):
+        return sync_url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
+    return sync_url
+
+
+def _cleanup(conn: Any) -> None:
+    arts = f"(SELECT id FROM article WHERE ticket_id = {TICKET_ID})"
+    for sql in (
+        f"DELETE FROM tiqora_telegram_message WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM ticket_history WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM article_data_mime_attachment WHERE article_id IN {arts}",
+        f"DELETE FROM article_data_mime WHERE article_id IN {arts}",
+        f"DELETE FROM article_data_mime_plain WHERE article_id IN {arts}",
+        f"DELETE FROM article_flag WHERE article_id IN {arts}",
+        f"DELETE FROM article WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM ticket_flag WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM ticket_index WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM ticket_lock_index WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM tiqora_event_outbox WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM tiqora_cache_invalidation WHERE ticket_id = {TICKET_ID}",
+        f"DELETE FROM ticket WHERE id = {TICKET_ID}",
+        f"DELETE FROM queue WHERE id = {QUEUE_ID}",
+        f"DELETE FROM group_user WHERE user_id = {AGENT} OR group_id = {GROUP_ID}",
+        f"DELETE FROM permission_groups WHERE id = {GROUP_ID}",
+        f"DELETE FROM users WHERE id = {AGENT}",
+        f"DELETE FROM tiqora_telegram_contact WHERE chat_id = {CHAT_ID}",
+        "DELETE FROM tiqora_settings WHERE `key` LIKE 'channel.telegram.%'",
+    ):
+        conn.execute(text(sql))
+
+
+def _seed(sync_url: str) -> bool:
+    """Seed agent/queue/ticket plus a linked Telegram contact. Returns whether
+    the ``Telegram`` communication_channel row was created here (and so must
+    be removed again on teardown)."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+        _cleanup(conn)
+        conn.execute(
+            text(
+                "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:uid, 'tgcomposer.agent', 'x', 'Tg', 'Agent', 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW, "uid": AGENT},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO permission_groups (id, name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:gid, 'tg-composer-grp', 1, :t, 1, :t, 1)"
+            ),
+            {"gid": GROUP_ID, "t": NOW},
+        )
+        for key in ("ro", "rw", "create", "note"):
+            conn.execute(
+                text(
+                    "INSERT INTO group_user (user_id, group_id, permission_key,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:uid, :gid, :k, :t, 1, :t, 1)"
+                ),
+                {"uid": AGENT, "gid": GROUP_ID, "k": key, "t": NOW},
+            )
+        conn.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:qid, 'TgComposerQueue', :gid, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+            ),
+            {"qid": QUEUE_ID, "gid": GROUP_ID, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
+                " user_id, responsible_user_id, ticket_priority_id, ticket_state_id,"
+                " customer_id, customer_user_id, timeout, until_time, escalation_time,"
+                " escalation_update_time, escalation_response_time, escalation_solution_time,"
+                " archive_flag, create_time, create_by, change_time, change_by)"
+                " VALUES (:tid, '20240601784701', :title, :qid, 1, 1,"
+                " :uid, 1, 3, 4, 'CUST1', :cu,"
+                " 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
+            ),
+            {
+                "tid": TICKET_ID,
+                "title": TICKET_TITLE,
+                "qid": QUEUE_ID,
+                "uid": AGENT,
+                "cu": CUSTOMER_LOGIN,
+                "t": NOW,
+            },
+        )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_telegram_contact (chat_id, customer_user_login,"
+                " create_time, change_time) VALUES (:chat, :cu, :t, :t)"
+            ),
+            {"chat": CHAT_ID, "cu": CUSTOMER_LOGIN, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_settings (`key`, value) VALUES"
+                " ('channel.telegram.enabled', '1')"
+            )
+        )
+        has_channel = conn.execute(
+            text("SELECT id FROM communication_channel WHERE name = 'Telegram'")
+        ).first()
+        if has_channel is None:
+            conn.execute(
+                text(
+                    "INSERT INTO communication_channel"
+                    " (name, module, package_name, channel_data, valid_id,"
+                    "  create_time, create_by, change_time, change_by)"
+                    " SELECT 'Telegram', 'Tiqora::CommunicationChannel::Telegram', 'Tiqora',"
+                    " channel_data, 1, :t, 1, :t, 1 FROM communication_channel"
+                    " WHERE name = 'Internal'"
+                ),
+                {"t": NOW},
+            )
+    engine.dispose()
+    return has_channel is None
+
+
+def _teardown(sync_url: str, *, drop_channel: bool) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        _cleanup(conn)
+        if drop_channel:
+            conn.execute(text("DELETE FROM communication_channel WHERE name = 'Telegram'"))
+    engine.dispose()
+
+
+class _FakeGateway:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    def _ok(self, method: str, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append((method, kwargs))
+        return {"message_id": 5000 + len(self.calls)}
+
+    async def send_message(self, chat_id: int | str, text_body: str, **kwargs: Any) -> dict:
+        return self._ok("send_message", chat_id=chat_id, text=text_body, **kwargs)
+
+    async def send_photo(
+        self, chat_id: int | str, content: bytes, filename: str, **kwargs: Any
+    ) -> dict:
+        return self._ok("send_photo", chat_id=chat_id, filename=filename, **kwargs)
+
+    async def send_document(
+        self, chat_id: int | str, content: bytes, filename: str, content_type: str, **kwargs: Any
+    ) -> dict:
+        return self._ok("send_document", chat_id=chat_id, filename=filename, **kwargs)
+
+    async def delete_message(self, chat_id: int | str, message_id: int) -> None:
+        self.calls.append(("delete_message", {"message_id": message_id}))
+
+
+@pytest.fixture
+async def seeded(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> AsyncIterator[tuple[str, async_sessionmaker[AsyncSession], _FakeGateway]]:
+    drop_channel = _seed(mariadb_znuny_url)
+    engine = create_async_engine(_to_async_url(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    from tiqora.api.v1 import tickets as tickets_api
+
+    monkeypatch.setattr(tickets_api, "get_session_factory", lambda *a, **kw: factory)
+    gateway = _FakeGateway()
+
+    async def _build_gateway(_session: AsyncSession) -> _FakeGateway:
+        return gateway
+
+    monkeypatch.setattr("tiqora.channels.telegram.outbound.build_gateway", _build_gateway)
+    try:
+        yield mariadb_znuny_url, factory, gateway
+    finally:
+        await engine.dispose()
+        _teardown(mariadb_znuny_url, drop_channel=drop_channel)
+
+
+def _client(factory: async_sessionmaker[AsyncSession]) -> Any:
+    from httpx import ASGITransport, AsyncClient
+
+    from tiqora.api.app import create_app
+    from tiqora.api.deps import get_current_user, get_db
+    from tiqora.config import Settings
+    from tiqora.domain.auth import AuthenticatedUser
+
+    async def _override_get_db() -> Any:
+        async with factory() as session:
+            yield session
+
+    fake_user = AuthenticatedUser(
+        id=AGENT,
+        login="tgcomposer.agent",
+        first_name="Tg",
+        last_name="Agent",
+        auth_method="session",
+    )
+    app = create_app(Settings(environment="test"))
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+    app.dependency_overrides[get_db] = _override_get_db
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+def _b64(data: bytes) -> str:
+    return base64.b64encode(data).decode()
+
+
+def _article_rows(sync_url: str) -> list[tuple[int, str, str]]:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT a.id, m.a_subject, m.a_body FROM article a"
+                " JOIN article_data_mime m ON m.article_id = a.id"
+                " WHERE a.ticket_id = :t ORDER BY a.id"
+            ),
+            {"t": TICKET_ID},
+        ).all()
+    engine.dispose()
+    return [(int(r[0]), str(r[1]), str(r[2])) for r in rows]
+
+
+def _reply(**extra: Any) -> dict[str, Any]:
+    return {
+        "subject": "",
+        "body": "Hallo!",
+        "channel": "telegram",
+        "is_visible_for_customer": True,
+        **extra,
+    }
+
+
+async def test_attachments_on_email_reply_are_422(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles",
+            json=_reply(
+                channel="email",
+                subject="Re",
+                attachments=[{"filename": "a.txt", "content_base64": _b64(b"a")}],
+            ),
+        )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["detail"] == (
+        "attachments/buttons/quotes are only supported for Telegram replies"
+    )
+    assert _article_rows(url) == []
+    assert gateway.calls == []
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"telegram_buttons": [{"label": "Ja"}]},
+        {"telegram_reply_to_article_id": 1},
+    ],
+)
+async def test_buttons_or_quote_on_note_are_422(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway], extra: dict[str, Any]
+) -> None:
+    _url, factory, _gateway = seeded
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles",
+            json=_reply(channel="note", subject="n", **extra),
+        )
+    assert resp.status_code == 422, resp.text
+
+
+async def test_bad_base64_is_422_and_nothing_sent(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles",
+            json=_reply(attachments=[{"filename": "a.bin", "content_base64": "not*base64!"}]),
+        )
+    assert resp.status_code == 422, resp.text
+    assert _article_rows(url) == []
+    assert gateway.calls == []
+
+
+async def test_attachments_over_total_limit_are_422(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tiqora.api.v1 import tickets as tickets_api
+
+    # Shrink the 50 MB cap instead of posting 50 MB through the test client.
+    monkeypatch.setattr(tickets_api, "_TELEGRAM_ATTACHMENTS_MAX_BYTES", 10)
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles",
+            json=_reply(
+                attachments=[
+                    {"filename": "a.bin", "content_base64": _b64(b"123456")},
+                    {"filename": "b.bin", "content_base64": _b64(b"123456")},
+                ]
+            ),
+        )
+    assert resp.status_code == 422, resp.text
+    assert _article_rows(url) == []
+    assert gateway.calls == []
+
+
+async def test_telegram_reply_with_empty_subject_attachment_and_buttons(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles",
+            json=_reply(
+                attachments=[
+                    {
+                        "filename": "info.pdf",
+                        "content_type": "application/pdf",
+                        "content_base64": _b64(b"%PDF-1.4"),
+                    }
+                ],
+                telegram_buttons=[
+                    {"label": "Ja, geht wieder", "action": "resolve_yes"},
+                    {"label": "Rückfrage"},
+                ],
+            ),
+        )
+    assert resp.status_code == 201, resp.text
+    article_id = resp.json()["article_id"]
+
+    assert [c[0] for c in gateway.calls] == ["send_document", "send_message"]
+    assert gateway.calls[0][1]["filename"] == "info.pdf"
+    keyboard = gateway.calls[1][1]["reply_markup"]
+    assert [row[0]["callback_data"] for row in keyboard["inline_keyboard"]] == ["tqb:0", "tqb:1"]
+
+    assert _article_rows(url) == [(article_id, TICKET_TITLE, "Hallo!")]
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        filenames = conn.execute(
+            text("SELECT filename FROM article_data_mime_attachment WHERE article_id = :a"),
+            {"a": article_id},
+        ).all()
+        row = conn.execute(
+            text(
+                "SELECT chat_id, direction, buttons_json FROM tiqora_telegram_message"
+                " WHERE article_id = :a"
+            ),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    assert [r[0] for r in filenames] == ["info.pdf"]
+    assert int(row[0]) == CHAT_ID
+    assert row[1] == "out"
+    assert "resolve_yes" in row[2]

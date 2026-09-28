@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 
@@ -20,14 +21,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.api.v1 import channels_telegram
 from tiqora.api.v1.admin.deps import get_admin_user
 from tiqora.channels.telegram.gateway import TelegramApiError, TelegramGateway
-from tiqora.channels.telegram.messages import get_by_message
+from tiqora.channels.telegram.messages import (
+    ButtonSpec,
+    buttons_from_json,
+    get_by_article,
+    get_by_message,
+)
 from tiqora.channels.telegram.outbound import TelegramDeliveryError, deliver_agent_telegram_reply
 from tiqora.channels.telegram.service import process_update
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraTelegramContact
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.settings_store import KEY_TELEGRAM_UPDATE_OFFSET, get_setting, set_setting
-from tiqora.domain.ticket_write_service import ArticleIn, TicketWriteService
+from tiqora.domain.ticket_write_service import (
+    ArticleIn,
+    InvalidInput,
+    TelegramSendOptions,
+    TicketWriteService,
+)
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
@@ -182,6 +193,21 @@ async def test_gateway_send_document_multipart() -> None:
     body = payload["_body"]
     assert b"invoice.pdf" in body
     assert b"%PDF-1.4 fake" in body
+
+
+async def test_gateway_send_photo_and_document_carry_reply_markup() -> None:
+    """With an empty text body the last attachment carries the inline
+    keyboard, so the multipart sends must be able to attach one."""
+    gateway, calls = _recording_gateway()
+    keyboard = {"inline_keyboard": [[{"text": "Ja", "callback_data": "tqb:0"}]]}
+    await gateway.send_photo(123, b"img", "cat.jpg", reply_markup=keyboard)
+    await gateway.send_document(123, b"doc", "a.pdf", "application/pdf", reply_markup=keyboard)
+    for method in ("sendPhoto", "sendDocument"):
+        _method, payload = next(c for c in calls if c[0] == method)
+        assert b'name="reply_markup"' in payload["_body"]
+        assert json.dumps(keyboard).encode() in payload["_body"]
+    await gateway.send_photo(123, b"img", "cat.jpg")
+    assert b'name="reply_markup"' not in calls[-1][1]["_body"]
 
 
 async def test_gateway_edit_message_text() -> None:
@@ -1834,17 +1860,101 @@ async def test_webhook_register_403_for_non_admin(mariadb_znuny_url: str) -> Non
 
 
 class _FakeTelegramGateway:
-    """Records sends; can be made to fail like a real Bot API error."""
+    """Records sends; can be made to fail like a real Bot API error.
 
-    def __init__(self, *, fail: bool = False) -> None:
+    ``fail=True`` fails every send; ``fail_on`` names the methods that fail
+    (e.g. ``{"send_message"}`` to fail the text after a photo went out).
+    ``calls`` records ``(method, kwargs)`` for every successful send in
+    order; ``sent`` keeps the plain ``(chat_id, text)`` view of
+    ``send_message`` the older tests assert on. Message ids count up from
+    1000 so they never collide with an inbound message id in the same chat
+    (``(chat_id, message_id)`` is unique in the map table)."""
+
+    _SENDS = frozenset({"send_message", "send_photo", "send_document"})
+
+    def __init__(
+        self,
+        *,
+        fail: bool = False,
+        fail_on: set[str] | None = None,
+        fail_delete: bool = False,
+    ) -> None:
         self.sent: list[tuple[int, str]] = []
-        self._fail = fail
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.deleted: list[tuple[int, int]] = []
+        self._fail_on = set(self._SENDS) if fail else set(fail_on or ())
+        self._fail_delete = fail_delete
+        self._next_id = 1000
 
-    async def send_message(self, chat_id: int | str, text_body: str) -> dict:
-        if self._fail:
+    def _record(self, method: str, **kwargs: Any) -> dict:
+        if method in self._fail_on:
             raise TelegramApiError("boom")
+        self._next_id += 1
+        self.calls.append((method, {**kwargs, "message_id": self._next_id}))
+        return {"message_id": self._next_id}
+
+    async def send_message(
+        self,
+        chat_id: int | str,
+        text_body: str,
+        *,
+        reply_markup: dict | None = None,
+        reply_to_message_id: int | None = None,
+    ) -> dict:
+        result = self._record(
+            "send_message",
+            chat_id=int(chat_id),
+            text=text_body,
+            reply_markup=reply_markup,
+            reply_to_message_id=reply_to_message_id,
+        )
         self.sent.append((int(chat_id), text_body))
-        return {"message_id": 999}
+        return result
+
+    async def send_photo(
+        self,
+        chat_id: int | str,
+        content: bytes,
+        filename: str,
+        *,
+        caption: str | None = None,
+        reply_to_message_id: int | None = None,
+        reply_markup: dict | None = None,
+    ) -> dict:
+        return self._record(
+            "send_photo",
+            chat_id=int(chat_id),
+            filename=filename,
+            content=content,
+            reply_markup=reply_markup,
+            reply_to_message_id=reply_to_message_id,
+        )
+
+    async def send_document(
+        self,
+        chat_id: int | str,
+        content: bytes,
+        filename: str,
+        content_type: str,
+        *,
+        caption: str | None = None,
+        reply_to_message_id: int | None = None,
+        reply_markup: dict | None = None,
+    ) -> dict:
+        return self._record(
+            "send_document",
+            chat_id=int(chat_id),
+            filename=filename,
+            content=content,
+            content_type=content_type,
+            reply_markup=reply_markup,
+            reply_to_message_id=reply_to_message_id,
+        )
+
+    async def delete_message(self, chat_id: int | str, message_id: int) -> None:
+        if self._fail_delete:
+            raise TelegramApiError("message can't be deleted")
+        self.deleted.append((int(chat_id), message_id))
 
 
 @pytest.mark.db
@@ -2117,6 +2227,558 @@ async def test_agent_reply_disabled_channel_raises(mariadb_znuny_url: str) -> No
                             gateway=fake_gateway,
                         )
                 assert fake_gateway.sent == []
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Outbound composer options: attachments, buttons, quote (chat composer Task 4)
+# ---------------------------------------------------------------------------
+
+
+async def _telegram_ticket(
+    session: AsyncSession,
+    factory: async_sessionmaker[AsyncSession],
+    chat_id: int,
+    text_body: str,
+    *,
+    message_id: int = 1,
+) -> dict:
+    """Enable the channel and open a ticket from one inbound customer message."""
+    await set_setting(session, "channel.telegram.default_customer_user", "portal-default")
+    await set_setting(session, "channel.telegram.consent_required", "0")
+    await set_setting(session, "channel.telegram.enabled", "1")
+    inbound = await process_update(
+        session,
+        factory,
+        SysConfig(session),
+        None,
+        _text_message(chat_id, text_body, message_id=message_id),
+        user_id=1,
+    )
+    await session.commit()
+    return inbound
+
+
+def _agent_article(body: str, **extra: Any) -> ArticleIn:
+    return ArticleIn(
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject="Re: test",
+        body=body,
+        channel="telegram",
+        **extra,
+    )
+
+
+async def _article_count(session: AsyncSession, ticket_id: int) -> int:
+    count = (
+        await session.execute(
+            text("SELECT COUNT(*) FROM article WHERE ticket_id = :tid"), {"tid": ticket_id}
+        )
+    ).scalar()
+    await session.commit()
+    return int(count or 0)
+
+
+@pytest.mark.db
+async def test_agent_reply_buttons_send_keyboard_and_store_them(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4101, "Geht nicht")
+                buttons = (
+                    ButtonSpec("Ja, geht wieder", "resolve_yes"),
+                    ButtonSpec("Nein", "resolve_no"),
+                )
+                gw = _FakeTelegramGateway()
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=_agent_article(
+                            "Geht es wieder?", telegram=TelegramSendOptions(buttons=buttons)
+                        ),
+                        gateway=gw,
+                    )
+
+                assert [c[0] for c in gw.calls] == ["send_message"]
+                sent = gw.calls[0][1]
+                assert sent["reply_markup"] == {
+                    "inline_keyboard": [
+                        [{"text": "Ja, geht wieder", "callback_data": "tqb:0"}],
+                        [{"text": "Nein", "callback_data": "tqb:1"}],
+                    ]
+                }
+                assert sent["reply_to_message_id"] is None
+
+                row = await get_by_article(session, article_id)
+                assert row is not None
+                assert row.direction == "out"
+                assert row.chat_id == 4101
+                assert row.message_id == sent["message_id"]
+                assert row.extra_message_ids is None
+                assert buttons_from_json(row.buttons_json) == list(buttons)
+                await session.commit()
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_attachments_sent_before_text_and_stored(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4102, "Schick mal")
+                gw = _FakeTelegramGateway()
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=_agent_article(
+                            "Hier die Unterlagen.",
+                            attachments=[
+                                ("screen.png", "image/png", b"png-bytes"),
+                                ("rechnung.pdf", "application/pdf", b"%PDF-1.4"),
+                            ],
+                        ),
+                        gateway=gw,
+                    )
+
+                assert [c[0] for c in gw.calls] == ["send_photo", "send_document", "send_message"]
+                assert gw.calls[0][1]["filename"] == "screen.png"
+                assert gw.calls[1][1]["content_type"] == "application/pdf"
+                photo_id, doc_id, text_id = (c[1]["message_id"] for c in gw.calls)
+
+                stored = (
+                    await session.execute(
+                        text(
+                            "SELECT filename, content FROM article_data_mime_attachment"
+                            " WHERE article_id = :aid ORDER BY id"
+                        ),
+                        {"aid": article_id},
+                    )
+                ).all()
+                assert [(r[0], bytes(r[1])) for r in stored] == [
+                    ("screen.png", b"png-bytes"),
+                    ("rechnung.pdf", b"%PDF-1.4"),
+                ]
+
+                row = await get_by_article(session, article_id)
+                assert row is not None
+                assert row.message_id == text_id
+                assert json.loads(row.extra_message_ids or "null") == [photo_id, doc_id]
+                assert row.buttons_json is None
+                await session.commit()
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_big_image_goes_out_as_document(mariadb_znuny_url: str) -> None:
+    """Photos over Telegram's 10 MB photo limit (and non-photo image types)
+    are sent as documents instead of failing."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4103, "Bilder")
+                gw = _FakeTelegramGateway()
+                big = b"x" * (10 * 1024 * 1024 + 1)
+                async with session.begin():
+                    await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=_agent_article(
+                            "Bilder",
+                            attachments=[
+                                ("gross.jpg", "image/jpeg", big),
+                                ("klein.webp", "image/webp; name=klein.webp", b"w"),
+                                ("anim.gif", "image/gif", b"g"),
+                            ],
+                        ),
+                        gateway=gw,
+                    )
+                assert [c[0] for c in gw.calls] == [
+                    "send_document",
+                    "send_photo",
+                    "send_document",
+                    "send_message",
+                ]
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_empty_body_last_attachment_carries_keyboard(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(
+                    session, factory, 4104, "Foto bitte", message_id=77
+                )
+                gw = _FakeTelegramGateway()
+                buttons = (ButtonSpec("Passt"),)
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=_agent_article(
+                            "",
+                            attachments=[
+                                ("a.pdf", "application/pdf", b"a"),
+                                ("b.png", "image/png", b"b"),
+                            ],
+                            telegram=TelegramSendOptions(
+                                reply_to_article_id=inbound["article_id"], buttons=buttons
+                            ),
+                        ),
+                        gateway=gw,
+                    )
+
+                assert [c[0] for c in gw.calls] == ["send_document", "send_photo"]
+                first, last = gw.calls[0][1], gw.calls[1][1]
+                # Quote on the first message sent, keyboard on the last one.
+                assert first["reply_to_message_id"] == 77
+                assert first["reply_markup"] is None
+                assert last["reply_to_message_id"] is None
+                assert last["reply_markup"] is not None
+
+                body = (
+                    await session.execute(
+                        text("SELECT a_body FROM article_data_mime WHERE article_id = :aid"),
+                        {"aid": article_id},
+                    )
+                ).scalar()
+                assert body == "[Anhang]"
+
+                row = await get_by_article(session, article_id)
+                assert row is not None
+                assert row.message_id == last["message_id"]
+                assert json.loads(row.extra_message_ids or "null") == [first["message_id"]]
+                assert row.reply_to_article_id == inbound["article_id"]
+                assert buttons_from_json(row.buttons_json) == list(buttons)
+                await session.commit()
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_quotes_mapped_customer_message(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(
+                    session, factory, 4105, "Router blinkt rot", message_id=42
+                )
+                gw = _FakeTelegramGateway()
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=_agent_article(
+                            "Zieh mal den Stecker.",
+                            telegram=TelegramSendOptions(reply_to_article_id=inbound["article_id"]),
+                        ),
+                        gateway=gw,
+                    )
+                assert gw.calls[0][1]["reply_to_message_id"] == 42
+                row = await get_by_article(session, article_id)
+                assert row is not None
+                assert row.reply_to_article_id == inbound["article_id"]
+                await session.commit()
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_quote_of_unmapped_article_sends_without_quote(
+    mariadb_znuny_url: str,
+) -> None:
+    """A customer message from before the map table existed has no row: the
+    reply still goes out, just without ``reply_parameters``."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4106, "Alt", message_id=43)
+                await session.execute(
+                    text("DELETE FROM tiqora_telegram_message WHERE article_id = :aid"),
+                    {"aid": inbound["article_id"]},
+                )
+                await session.commit()
+                gw = _FakeTelegramGateway()
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=_agent_article(
+                            "Antwort",
+                            telegram=TelegramSendOptions(reply_to_article_id=inbound["article_id"]),
+                        ),
+                        gateway=gw,
+                    )
+                assert gw.sent == [(4106, "Antwort")]
+                assert gw.calls[0][1]["reply_to_message_id"] is None
+                row = await get_by_article(session, article_id)
+                assert row is not None
+                assert row.reply_to_article_id == inbound["article_id"]
+                await session.commit()
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_quote_of_other_ticket_rejected_before_send(
+    mariadb_znuny_url: str,
+) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                mine = await _telegram_ticket(session, factory, 4107, "Meins")
+                other = await _telegram_ticket(session, factory, 4108, "Fremd")
+                gw = _FakeTelegramGateway()
+                with pytest.raises(InvalidInput):
+                    async with session.begin():
+                        await deliver_agent_telegram_reply(
+                            session,
+                            SysConfig(session),
+                            ticket_id=mine["ticket_id"],
+                            user_id=1,
+                            article=_agent_article(
+                                "x",
+                                telegram=TelegramSendOptions(
+                                    reply_to_article_id=other["article_id"]
+                                ),
+                            ),
+                            gateway=gw,
+                        )
+                assert gw.calls == []
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_text_failure_retracts_sent_photo(mariadb_znuny_url: str) -> None:
+    """Attachments go out first; if the text then fails, the photo already in
+    the customer's chat is deleted again and nothing is stored, so the agent
+    can retry without the customer seeing half a reply twice."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4109, "Halb")
+                count_before = await _article_count(session, inbound["ticket_id"])
+                gw = _FakeTelegramGateway(fail_on={"send_message"})
+                with pytest.raises(TelegramDeliveryError):
+                    async with session.begin():
+                        await deliver_agent_telegram_reply(
+                            session,
+                            SysConfig(session),
+                            ticket_id=inbound["ticket_id"],
+                            user_id=1,
+                            article=_agent_article(
+                                "Text", attachments=[("p.jpg", "image/jpeg", b"jpg")]
+                            ),
+                            gateway=gw,
+                        )
+                photo_id = gw.calls[0][1]["message_id"]
+                assert gw.deleted == [(4109, photo_id)]
+                assert await _article_count(session, inbound["ticket_id"]) == count_before
+                out_rows = (
+                    await session.execute(
+                        text(
+                            "SELECT COUNT(*) FROM tiqora_telegram_message"
+                            " WHERE ticket_id = :tid AND direction = 'out'"
+                        ),
+                        {"tid": inbound["ticket_id"]},
+                    )
+                ).scalar()
+                assert out_rows == 0
+                await session.commit()
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_retract_failure_still_raises_delivery_error(
+    mariadb_znuny_url: str,
+) -> None:
+    """The cleanup delete is best effort: a refused delete must not mask the
+    original send failure."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4110, "Halb")
+                gw = _FakeTelegramGateway(fail_on={"send_document"}, fail_delete=True)
+                with pytest.raises(TelegramDeliveryError):
+                    async with session.begin():
+                        await deliver_agent_telegram_reply(
+                            session,
+                            SysConfig(session),
+                            ticket_id=inbound["ticket_id"],
+                            user_id=1,
+                            article=_agent_article(
+                                "Text",
+                                attachments=[
+                                    ("p.jpg", "image/jpeg", b"jpg"),
+                                    ("d.pdf", "application/pdf", b"pdf"),
+                                ],
+                            ),
+                            gateway=gw,
+                        )
+                assert [c[0] for c in gw.calls] == ["send_photo"]
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_store_failure_retracts_everything_sent(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sent but not stored is the other half-state: the customer would see a
+    reply the agent's ticket does not show (and a retry would repeat it)."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4111, "DB kaputt")
+
+                async def _broken_add_article(*_a: Any, **_kw: Any) -> int:
+                    raise RuntimeError("db gone")
+
+                monkeypatch.setattr(
+                    "tiqora.channels.telegram.outbound.add_article", _broken_add_article
+                )
+                gw = _FakeTelegramGateway()
+                with pytest.raises(RuntimeError, match="db gone"):
+                    async with session.begin():
+                        await deliver_agent_telegram_reply(
+                            session,
+                            SysConfig(session),
+                            ticket_id=inbound["ticket_id"],
+                            user_id=1,
+                            article=_agent_article(
+                                "Text", attachments=[("p.jpg", "image/jpeg", b"jpg")]
+                            ),
+                            gateway=gw,
+                        )
+                sent_ids = [c[1]["message_id"] for c in gw.calls]
+                assert len(sent_ids) == 2
+                assert sorted(m for _chat, m in gw.deleted) == sorted(sent_ids)
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_agent_reply_empty_subject_uses_ticket_title(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                inbound = await _telegram_ticket(session, factory, 4112, "Titel hier")
+                title = (
+                    await session.execute(
+                        text("SELECT title FROM ticket WHERE id = :tid"),
+                        {"tid": inbound["ticket_id"]},
+                    )
+                ).scalar()
+                await session.commit()
+                async with session.begin():
+                    article_id = await deliver_agent_telegram_reply(
+                        session,
+                        SysConfig(session),
+                        ticket_id=inbound["ticket_id"],
+                        user_id=1,
+                        article=replace(_agent_article("Antwort"), subject="  "),
+                        gateway=_FakeTelegramGateway(),
+                    )
+                subject = (
+                    await session.execute(
+                        text("SELECT a_subject FROM article_data_mime WHERE article_id = :aid"),
+                        {"aid": article_id},
+                    )
+                ).scalar()
+                assert title
+                assert subject == title
+                await session.commit()
             finally:
                 await _cleanup_new_rows(session, before)
     finally:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import csv
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -17,6 +19,7 @@ from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
 from tiqora.api.v1.ai import AiToolTraceOut, parse_tool_trace
 from tiqora.channels.email.outbound_reply import OutboundMailError
+from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.customer_link import ResolvedCustomerLink, resolve_customer_link
@@ -48,6 +51,7 @@ from tiqora.domain.ticket_write_service import (
     ArticleIn,
     ArticleNotDeletable,
     InvalidInput,
+    TelegramSendOptions,
     TicketIn,
     TicketWriteService,
 )
@@ -86,6 +90,17 @@ class TicketCreateResponse(BaseModel):
     ticket_id: int
 
 
+class ArticleAttachmentIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=250)
+    content_type: str = "application/octet-stream"
+    content_base64: str
+
+
+class TelegramButtonIn(BaseModel):
+    label: str = Field(min_length=1, max_length=64)
+    action: Literal["reply", "resolve_yes", "resolve_no"] = "reply"
+
+
 class ArticleCreateRequest(BaseModel):
     sender_type: str = "agent"
     is_visible_for_customer: bool = True
@@ -117,6 +132,11 @@ class ArticleCreateRequest(BaseModel):
     # Required when ``state_id`` is a pending-type state (422 otherwise);
     # ignored for non-pending states. Same type/format as PATCH ``pending_time``.
     pending_time: datetime | None = None
+    # Telegram chat composer only (422 on any other channel): files sent
+    # before the text, a quoted article of this ticket, and inline buttons.
+    attachments: list[ArticleAttachmentIn] = Field(default_factory=list, max_length=10)
+    telegram_reply_to_article_id: int | None = None
+    telegram_buttons: list[TelegramButtonIn] = Field(default_factory=list, max_length=8)
 
 
 class ArticleCreateResponse(BaseModel):
@@ -211,6 +231,53 @@ def _map_exc(exc: Exception) -> HTTPException:
     if isinstance(exc, TelegramDeliveryError):
         return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     return HTTPException(status_code=500, detail="Internal error")
+
+
+# Telegram's bot upload limit for a document; checked on the decoded total.
+_TELEGRAM_ATTACHMENTS_MAX_BYTES = 50 * 1024 * 1024
+
+
+def _telegram_extras(
+    body: ArticleCreateRequest,
+) -> tuple[list[tuple[str, str, bytes]], TelegramSendOptions | None]:
+    """Validate and decode the chat-composer fields of an article request.
+
+    Returns the decoded attachments and the send options (``None`` when the
+    request uses none of them). 422 when they are used off Telegram, on bad
+    base64, or when the decoded total exceeds Telegram's 50 MB upload limit.
+    """
+    uses_extras = bool(
+        body.attachments or body.telegram_buttons or body.telegram_reply_to_article_id is not None
+    )
+    if not uses_extras:
+        return [], None
+    if body.channel.lower() != "telegram":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="attachments/buttons/quotes are only supported for Telegram replies",
+        )
+    attachments: list[tuple[str, str, bytes]] = []
+    total = 0
+    for item in body.attachments:
+        try:
+            content = base64.b64decode(item.content_base64, validate=True)
+        except (binascii.Error, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"attachment {item.filename!r} is not valid base64",
+            ) from None
+        total += len(content)
+        if total > _TELEGRAM_ATTACHMENTS_MAX_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="attachments exceed Telegram's 50 MB upload limit",
+            )
+        attachments.append((item.filename, item.content_type, content))
+    options = TelegramSendOptions(
+        reply_to_article_id=body.telegram_reply_to_article_id,
+        buttons=tuple(ButtonSpec(b.label, b.action) for b in body.telegram_buttons),
+    )
+    return attachments, options
 
 
 def _write_service(session: Any, settings: Any) -> TicketWriteService:
@@ -1226,11 +1293,16 @@ async def create_article(
     delivered then stored (send-then-store). Delivery failure returns HTTP 502
     and does not leave a silent no-op 201.
 
+    Telegram replies may carry ``attachments``, ``telegram_buttons`` and
+    ``telegram_reply_to_article_id`` (422 on any other channel); a failed
+    Telegram send returns 409 with nothing stored.
+
     With ``state_id`` the ticket's state is changed after the article, in the
     same transaction (PATCH semantics). The state change is validated before
     the article is created, so an invalid one returns 403/404/422 without
     sending or storing anything.
     """
+    attachments, telegram_options = _telegram_extras(body)
     svc = _write_service(session, settings)
     try:
         async with session.begin():
@@ -1256,6 +1328,8 @@ async def create_article(
                     in_reply_to=body.in_reply_to,
                     references=body.references,
                     channel=body.channel,
+                    attachments=attachments,
+                    telegram=telegram_options,
                 ),
             )
             if body.state_id is not None:
