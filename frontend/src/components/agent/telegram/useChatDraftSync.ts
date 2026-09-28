@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   chatDraftKey,
@@ -12,7 +12,8 @@ import {
  * Keeps the chat composer's unsent message in the server-side draft store:
  * restores it once when the lookup finishes, then autosaves on the same
  * 400 ms debounce as ReplyDialog. `markSent` drops the draft and voids any
- * autosave still queued from the last keystroke before the send.
+ * autosave still queued from before the send; text left in the composer
+ * after it is saved afresh.
  */
 export function useChatDraftSync(
   ticketId: number,
@@ -25,6 +26,10 @@ export function useChatDraftSync(
   const clearDraft = useClearChatDraft();
   const seededRef = useRef(false);
   const sendEpochRef = useRef(0);
+  // Re-arms the autosave after a send: whatever was typed while the request
+  // was in flight survives it, and must be saved again even though the body
+  // itself may not change any more.
+  const [sentTick, setSentTick] = useState(0);
   const restoreRef = useRef(restore);
   restoreRef.current = restore;
 
@@ -58,11 +63,12 @@ export function useChatDraftSync(
       saveDraft(ticketId, { body, quoteArticleId, aiDraftId });
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [qc, ticketId, body, quoteArticleId, aiDraftId, saveDraft, clearDraft, loaded]);
+  }, [qc, ticketId, body, quoteArticleId, aiDraftId, saveDraft, clearDraft, loaded, sentTick]);
 
   const markSent = useCallback(() => {
     sendEpochRef.current += 1;
     clearDraft(ticketId);
+    setSentTick((n) => n + 1);
   }, [clearDraft, ticketId]);
 
   return { markSent };
