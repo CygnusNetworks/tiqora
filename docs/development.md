@@ -31,22 +31,41 @@ aurix/   # repository root (Tiqora monorepo)
 ### Secret and personal-data guard (required once per clone)
 
 Tiqora handles real customer data (StudNet WP-Nummer/PKZ, Telegram chats,
-e-mail addresses). None of it may end up in a commit — tests and docs use
-made-up values (`example.org`, `123-45-67-89-0`, `999-…`). Two hooks enforce
-that:
+e-mail addresses, names). None of it may end up in a commit, a commit message
+or a screenshot — tests and docs use made-up values (`example.org`,
+`123-45-67-89-0`, `999-…`, names like "Erika Beispiel").
 
 ```bash
-brew install gitleaks                 # or your distro's package
+brew install gitleaks tesseract tesseract-lang   # tesseract: OCR for images
 git config core.hooksPath .githooks
+git config user.name <github-handle>             # see .githooks/allowed-identities
+git config user.email <id>+<handle>@users.noreply.github.com
+TIQORA_PII_SYNC_PRE="<port knock, if needed>" scripts/pii-hash-sync
 ```
 
-- `pre-commit` scans the staged changes with gitleaks (`.gitleaks.toml`: the
-  default secret rules plus WP-Nummer, Telegram chat ids and university /
-  free-mail / company addresses).
-- `pre-push` scans every commit that is about to leave the clone.
-- Both also check `.git/info/pii-denylist`: one real name or identifier per
-  line that has no pattern (names, a customer's login). The file lives inside
-  `.git` and is never committed — keep your own list there.
+What runs where:
+
+| Hook / job | Checks |
+|---|---|
+| `pre-commit` | your git identity, gitleaks on the staged diff, personal-data check, binary files (only `docs/images/*.png`, `frontend/public/`, `site/*.pdf`; their OCR/PDF text is checked too) |
+| `commit-msg` | the commit message (gitleaks + personal-data check) |
+| `pre-push` | every outgoing commit: diffs, messages, tag messages, author/committer identities |
+| `.claude/settings.json` | Claude Code refuses Write/Edit calls whose new text contains personal data |
+| `.github/workflows/pii-scan.yml` | gitleaks over the full history and the identity allowlist on every GitHub push and nightly |
+| `scripts/pii-scan-history` | full local history against the production hashes (run after a sync) |
+
+The personal-data check (`.githooks/pii_check.py`) uses two per-clone files in
+`.git/info`, never committed:
+
+- `pii-hashes.json`, written by `scripts/pii-hash-sync`: HMAC-SHA256 digests of
+  every real customer and agent mail address, WP-Nummer, customer id, phone
+  number and full name. The key is generated locally; production only returns
+  digests, so no plaintext leaves the server. Refresh it now and then.
+- `pii-denylist`: extra literals, one per line.
+
+Placeholder rows that look like names (`Invalid User`) are listed in
+`.githooks/pii-allowlist`. People appear in history only by GitHub handle and
+noreply address (`.githooks/allowed-identities`).
 
 **GitHub is a release mirror.** Day-to-day work goes to `origin`
 (git.cygnusnet.de). The `github` remote only receives `main` and `v*` tags
