@@ -1,0 +1,24 @@
+#!/bin/sh
+# Reads diff/patch text on stdin and fails when an added line contains an
+# entry of the per-clone denylist .git/info/pii-denylist (one literal per
+# line, case-insensitive, "#" starts a comment). The list itself holds real
+# names and identifiers, so it lives inside .git and is never committed.
+#
+# Usage: <patch text> | .githooks/pii-denylist-check "<what is checked>"
+
+list="$(git rev-parse --git-common-dir)/info/pii-denylist"
+[ -s "$list" ] || exit 0
+
+patterns=$(mktemp)
+trap 'rm -f "$patterns"' EXIT
+grep -v '^[[:space:]]*#' "$list" | grep -v '^[[:space:]]*$' >"$patterns"
+[ -s "$patterns" ] || exit 0
+
+hits=$(grep '^+' | grep -v '^+++' | grep -i -F -f "$patterns" | head -5)
+if [ -n "$hits" ]; then
+	echo "pii-denylist: $1 contains entries from .git/info/pii-denylist:" >&2
+	echo "$hits" | cut -c1-160 >&2
+	echo "Replace them with made-up values (example.org, 123-45-67-89-0, ...)." >&2
+	exit 1
+fi
+exit 0
