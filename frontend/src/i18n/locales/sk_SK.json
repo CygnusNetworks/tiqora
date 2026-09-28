@@ -741,6 +741,27 @@
         "pending": "Send · pending",
         "closed": "Send & close"
       }
+    },
+    "telegram": {
+      "identityVerified": "Identity verified",
+      "identityUnverified": "Identity not verified",
+      "consentGiven": "Consent given",
+      "aiEscalated": "AI handed over to team",
+      "edited": "edited",
+      "retracted": "retracted",
+      "delivered": "Delivered",
+      "quote": "Quote",
+      "edit": "Edit",
+      "editLabel": "Edit message",
+      "retract": "Retract",
+      "retractConfirm": "Really retract?",
+      "yes": "Yes",
+      "cancel": "Cancel",
+      "save": "Save",
+      "replyTo": "Reply to {{name}}",
+      "buttons": "Answer buttons",
+      "answered": "Chosen by the customer",
+      "actionError": "The action failed. Please try again."
     }
   },
   "search": {
