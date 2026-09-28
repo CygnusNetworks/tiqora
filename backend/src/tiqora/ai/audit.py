@@ -21,6 +21,7 @@ run's own DB transaction.
 
 from __future__ import annotations
 
+import copy
 import json
 import time
 from collections.abc import Iterable
@@ -215,7 +216,9 @@ class AuditingLlmClient:
         max_tokens: int = 1024,
         temperature: float = 0.2,
     ) -> LlmResponse:
-        wire_messages = [m.to_wire() for m in messages]
+        # to_wire() shares the content parts with ``messages``; redacting them
+        # in place would send the placeholder to the provider instead of the image.
+        wire_messages = copy.deepcopy([m.to_wire() for m in messages])
         _redact_image_urls(wire_messages)
         request_payload: dict[str, Any] = {
             "messages": wire_messages,

@@ -48,6 +48,8 @@ from tiqora.ai.context import (
 from tiqora.ai.gate import AiGateError, require_feature_allowed
 from tiqora.ai.handoff import mark_ai_escalated
 from tiqora.ai.identity import (
+    IDENTITY_HANDOFF_TEXT,
+    IDENTITY_NO_MATCH_TEXT,
     MAX_IDENTITY_ATTEMPTS,
     get_customer_id_for_login,
     is_identified,
@@ -679,7 +681,9 @@ async def _resolve_auto_state_id(
     return None
 
 
-def _build_identity_system_prompt(fields: list[Any], *, tone_prompt: str | None = None) -> str:
+def _build_identity_system_prompt(
+    fields: list[Any], *, tone_prompt: str | None = None, failed_attempts: int = 0
+) -> str:
     """System prompt for the identity-check mini-exchange (Task 6). Replaces
     the normal system prompt entirely — the model must not see the queue's
     configured prompt/tools while identity is unconfirmed.
@@ -704,6 +708,16 @@ def _build_identity_system_prompt(fields: list[Any], *, tone_prompt: str | None 
             f"Required fields:\n{field_lines}"
         ),
     ]
+    if failed_attempts:
+        # Only the count: the exchange never sees earlier messages (see
+        # _build_identity_user_message), so it would otherwise greet the
+        # customer afresh and ask for values they have just sent.
+        parts.append(
+            f"The customer has already given values {failed_attempts} time(s) that did "
+            "not match any customer record, and was told so. Do not greet them again. "
+            "If their latest message has no new values, briefly ask them to re-check "
+            "and resend them."
+        )
     if tone_prompt:
         parts.append(tone_prompt)
     return "\n\n".join(parts)
@@ -927,7 +941,11 @@ async def _run_identity_exchange(
     identity_tone_prompt = await _resolve_telegram_tone_prompt(
         session, source_channel=_TELEGRAM_CHANNEL, based_on_channel=None
     )
-    system_prompt = _build_identity_system_prompt(fields, tone_prompt=identity_tone_prompt)
+    system_prompt = _build_identity_system_prompt(
+        fields,
+        tone_prompt=identity_tone_prompt,
+        failed_attempts=state.identity_attempts or 0,
+    )
     user_message = _build_identity_user_message(articles)
     messages: list[LlmMessage] = [
         LlmMessage(role="system", content=system_prompt),
@@ -1014,29 +1032,26 @@ async def _run_identity_exchange(
 
         attempts = await record_identity_attempt(session, state)
         await session.commit()
+        # The model's body is an acknowledgement written before the check
+        # ran ("checking that now"); the customer gets the actual outcome.
+        kind = DRAFT_KIND_CLARIFY
         if attempts >= MAX_IDENTITY_ATTEMPTS:
-            draft = await draft_service.create_draft(
+            return await _hand_off_unidentified(
                 session,
-                ticket_id=ticket_id,
-                queue_id=ticket.queue_id,
-                kind=DRAFT_KIND_CLARIFY,
-                body=(
-                    "Identity could not be confirmed after multiple attempts — "
-                    "please review manually."
-                ),
+                sysconfig,
+                ticket=ticket,
+                state=state,
+                attempts=attempts,
+                fields=fields,
+                actor_user_id=actor_user_id,
+                trigger=trigger,
+                autonomy=policy.autonomy,
                 based_on_article_id=based_on_article_id,
                 created_by_user_id=created_by_user_id,
-                source=source,
-                actor_user_id=actor_user_id,
-            )
-            state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
-            await session.commit()
-            return AgentRunResult(
-                status=STATUS_DRAFTED,
-                draft_id=draft.id,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
             )
+        body = IDENTITY_NO_MATCH_TEXT.format(fields=", ".join(f.label for f in fields))
 
     result = await _dispatch_identity_message(
         session,
@@ -1056,6 +1071,71 @@ async def _run_identity_exchange(
     state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
     await session.commit()
     return result
+
+
+async def _hand_off_unidentified(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    *,
+    ticket: TicketSnapshot,
+    state: TiqoraAiTicketState,
+    attempts: int,
+    fields: list[Any],
+    actor_user_id: int,
+    trigger: str,
+    autonomy: str,
+    based_on_article_id: int | None,
+    created_by_user_id: int | None,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> AgentRunResult:
+    """Identity failed :data:`MAX_IDENTITY_ATTEMPTS` times: tell the customer
+    a human takes over, leave the agents a note, and set the handoff flag so
+    the auto worker stops answering until an agent replies."""
+    sent = await _dispatch_identity_message(
+        session,
+        sysconfig,
+        ticket=ticket,
+        actor_user_id=actor_user_id,
+        trigger=trigger,
+        autonomy=autonomy,
+        kind=DRAFT_KIND_CLARIFY,
+        subject="",
+        body=IDENTITY_HANDOFF_TEXT,
+        based_on_article_id=based_on_article_id,
+        created_by_user_id=created_by_user_id,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+    labels = ", ".join(f.label for f in fields)
+    reason = (
+        f"identity could not be confirmed after {attempts} attempts ({labels}). "
+        "The customer may not be in customer_user yet; please verify manually."
+    )
+    await add_article(
+        session,
+        ticket_id=ticket.ticket_id,
+        article=ArticleIn(
+            sender_type="agent",
+            is_visible_for_customer=False,
+            subject="AI agent escalation",
+            body=f"Escalated to human: {reason}",
+            channel="note",
+        ),
+        user_id=actor_user_id,
+        sysconfig=sysconfig,
+    )
+    await mark_ai_escalated(session, ticket.ticket_id)
+    state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+    await session.commit()
+    return AgentRunResult(
+        status=STATUS_ESCALATED,
+        article_id=sent.article_id,
+        draft_id=sent.draft_id,
+        notes=reason,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
 
 
 async def _resolve_final_answer_llm(

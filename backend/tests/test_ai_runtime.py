@@ -24,7 +24,11 @@ from tiqora.ai.gate import (
     OPERATION_MODE_TIQORA_PRIMARY,
     set_operation_mode,
 )
-from tiqora.ai.identity import MAX_IDENTITY_ATTEMPTS
+from tiqora.ai.identity import (
+    IDENTITY_HANDOFF_TEXT,
+    IDENTITY_NO_MATCH_TEXT,
+    MAX_IDENTITY_ATTEMPTS,
+)
 from tiqora.ai.llm import LlmEmptyOutputError, LlmMessage, LlmResponse, LlmUsage, ToolCall
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
@@ -44,6 +48,7 @@ from tiqora.ai.runtime import (
     AclDeniedError,
     AclLimitExceededError,
     AgentRunError,
+    AgentRunResult,
     LockHeldError,
     PolicyDisabledError,
     _build_system_prompt,
@@ -2400,71 +2405,162 @@ async def test_identity_correct_claim_maps_contact_and_continues_normal_flow(
         await engine.dispose()
 
 
-async def test_identity_wrong_claim_three_times_escalates_to_draft(
+def _install_recording_telegram_deliver(monkeypatch: pytest.MonkeyPatch, sent: list[str]) -> None:
+    async def _fake_telegram_deliver(
+        session: AsyncSession,
+        sysconfig: Any,
+        *,
+        ticket_id: int,
+        user_id: int,
+        article: Any,
+        gateway: Any = None,
+    ) -> int:
+        sent.append(article.body)
+        return await add_article(
+            session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+        )
+
+    monkeypatch.setattr(
+        "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
+        _fake_telegram_deliver,
+    )
+
+
+async def _run_wrong_identity_claim(
+    factory: async_sessionmaker[AsyncSession], seed: dict[str, Any], *, run_id: str
+) -> tuple[AgentRunResult, ScriptedLlm]:
+    llm = ScriptedLlm(
+        [
+            _identity_response(
+                "clarify", "Danke, prüfe das gerade.", identity_claim={"phone": "+49wrong"}
+            )
+        ]
+    )
+    async with factory() as session:
+        result = await run_ticket_agent(
+            session,
+            settings=get_settings(),
+            llm=llm,
+            ticket_id=seed["ticket_id"],
+            trigger=TRIGGER_AUTO,
+            acting_user_id=None,
+            run_id=run_id,
+            source_channel="telegram",
+        )
+    return result, llm
+
+
+async def test_identity_wrong_claim_tells_the_customer_it_did_not_match(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Three wrong identity_claim attempts (across separate runs) escalate to
-    a human-reviewed draft instead of asking a fourth time."""
-    seed = _seed_ticket(mariadb_znuny_url, ns=24)
+    """The model's acknowledgement ("checking that now") used to go out even
+    when the check had already failed, and the customer waited for a result
+    that never came. A failed claim now answers with what actually happened."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=28)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
-    settings = get_settings()
-    chat_id = 900024
     try:
         async with factory() as session:
             await _setup_identity_policy(session, seed=seed)
             await _seed_telegram_article(
-                session, article_id=seed["customer_article_id"], chat_id=chat_id
+                session, article_id=seed["customer_article_id"], chat_id=900028
             )
+        sent: list[str] = []
+        _install_recording_telegram_deliver(monkeypatch, sent)
 
-        async def _fake_telegram_deliver(
-            session: AsyncSession,
-            sysconfig: Any,
-            *,
-            ticket_id: int,
-            user_id: int,
-            article: Any,
-            gateway: Any = None,
-        ) -> int:
-            return await add_article(
-                session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+        result, _ = await _run_wrong_identity_claim(factory, seed, run_id="run-28")
+
+        assert result.status == "sent"
+        assert sent == [IDENTITY_NO_MATCH_TEXT.format(fields="Phone number")]
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.identity_attempts == 1
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_prompt_mentions_earlier_failed_attempts(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exchange only ever sees the latest message (see the security test
+    below), so without this the model greets the customer from scratch and
+    asks for data they just sent. It learns the count, never the values."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=29)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=900029
             )
+        _install_recording_telegram_deliver(monkeypatch, [])
 
-        monkeypatch.setattr(
-            "tiqora.channels.telegram.outbound.deliver_agent_telegram_reply",
-            _fake_telegram_deliver,
-        )
+        _, first_llm = await _run_wrong_identity_claim(factory, seed, run_id="run-29-0")
+        _, second_llm = await _run_wrong_identity_claim(factory, seed, run_id="run-29-1")
 
-        results = []
-        for i in range(MAX_IDENTITY_ATTEMPTS):
-            llm = ScriptedLlm(
-                [
-                    _identity_response(
-                        "clarify", "That does not match.", identity_claim={"phone": "+49wrong"}
-                    )
-                ]
+        def system_prompt(llm: ScriptedLlm) -> str:
+            return next(str(m.content) for m in llm.last_messages if m.role == "system")
+
+        assert "did not match" not in system_prompt(first_llm)
+        assert "1 time(s)" in system_prompt(second_llm)
+        assert "+49wrong" not in system_prompt(second_llm)
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_wrong_claims_hand_off_to_a_human(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After MAX_IDENTITY_ATTEMPTS failed claims the customer is told a human
+    takes over, the agents get an internal note, and the handoff flag stops
+    further automatic runs. It used to create a clarify *draft* whose body was
+    an English note for agents, while the customer heard nothing."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=24)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=900024
             )
-            async with factory() as session:
-                result = await run_ticket_agent(
-                    session,
-                    settings=settings,
-                    llm=llm,
-                    ticket_id=seed["ticket_id"],
-                    trigger=TRIGGER_AUTO,
-                    acting_user_id=None,
-                    run_id=f"run-24-{i}",
-                    source_channel="telegram",
-                )
-            results.append(result)
+        sent: list[str] = []
+        _install_recording_telegram_deliver(monkeypatch, sent)
+
+        results = [
+            (await _run_wrong_identity_claim(factory, seed, run_id=f"run-24-{i}"))[0]
+            for i in range(MAX_IDENTITY_ATTEMPTS)
+        ]
 
         assert [r.status for r in results[:-1]] == ["sent"] * (MAX_IDENTITY_ATTEMPTS - 1)
-        assert results[-1].status == "drafted"
-        assert results[-1].draft_id is not None
-
+        assert results[-1].status == "escalated"
+        assert sent[-1] == IDENTITY_HANDOFF_TEXT
         async with factory() as session:
             state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
             assert state is not None
             assert state.identity_attempts == MAX_IDENTITY_ATTEMPTS
+            assert state.ai_escalated_at is not None
+            drafts = (
+                await session.execute(
+                    text("SELECT COUNT(*) FROM tiqora_ai_draft WHERE ticket_id = :t"),
+                    {"t": seed["ticket_id"]},
+                )
+            ).scalar_one()
+            assert drafts == 0
+            note = (
+                await session.execute(
+                    text(
+                        "SELECT m.a_body FROM article a"
+                        " JOIN article_data_mime m ON m.article_id = a.id"
+                        " WHERE a.ticket_id = :t AND a.is_visible_for_customer = 0"
+                        " ORDER BY a.id DESC LIMIT 1"
+                    ),
+                    {"t": seed["ticket_id"]},
+                )
+            ).scalar_one()
+            assert "identity could not be confirmed" in note
     finally:
         await engine.dispose()
 
