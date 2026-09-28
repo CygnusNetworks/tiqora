@@ -565,4 +565,43 @@ describe("ArticleMasterDetail — Telegram chat composer", () => {
     const input = await screen.findByTestId("tg-composer-input");
     expect(input).toHaveFocus();
   });
+
+  it("a Telegram quick action's 'Antworten' in the split view switches to conversation and delivers the quote", async () => {
+    // Reproduces the real trigger path (ArticleQuickActions, unlike the bus
+    // calls above) — proves it calls requestConversationView before
+    // requestComposer, not just requestComposer alone.
+    wrap(<ArticleMasterDetail ticketId={12} />);
+    await screen.findByTestId("tg-composer");
+
+    fireEvent.click(screen.getByTestId("article-view-tab-split"));
+    expect(screen.queryByTestId("tg-composer")).toBeNull();
+
+    fireEvent.click(await screen.findByTestId("article-reader-reply"));
+
+    await screen.findByTestId("tg-composer");
+    const chip = await screen.findByTestId("tg-composer-quote");
+    await waitFor(() => expect(chip).toHaveTextContent("Hallo"));
+  });
+
+  it("a draft hand-off (AiPanel's 'Entwurf übernehmen') in the split view switches to conversation and applies the draft text", async () => {
+    wrap(<ArticleMasterDetail ticketId={12} />);
+    await screen.findByTestId("tg-composer");
+
+    fireEvent.click(screen.getByTestId("article-view-tab-split"));
+    expect(screen.queryByTestId("tg-composer")).toBeNull();
+
+    // Mirrors what AiPanel's "Entwurf übernehmen" now does for a Telegram
+    // ticket: switch the view, then hand the draft over — same two calls,
+    // in the same order, as the quick action above.
+    act(() => requestConversationView(12));
+    act(() =>
+      requestComposer(12, {
+        draft: { id: 99, body: "Vom Panel übernommener Entwurf" },
+        focus: true,
+      }),
+    );
+
+    const input = (await screen.findByTestId("tg-composer-input")) as HTMLTextAreaElement;
+    await waitFor(() => expect(input.value).toBe("Vom Panel übernommener Entwurf"));
+  });
 });

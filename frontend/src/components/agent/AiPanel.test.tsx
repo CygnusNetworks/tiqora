@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { AiPanel } from "./AiPanel";
-import { useComposerRequests } from "./telegram/composerBus";
+import { useComposerRequests, useConversationViewRequests } from "./telegram/composerBus";
 
 const {
   getState,
@@ -992,9 +992,11 @@ describe("AiPanel", () => {
       ],
     });
 
-    const handler = vi.fn();
+    const viewHandler = vi.fn();
+    const composerHandler = vi.fn();
     function Listener() {
-      useComposerRequests(1, handler);
+      useConversationViewRequests(1, viewHandler);
+      useComposerRequests(1, composerHandler);
       return null;
     }
 
@@ -1011,10 +1013,16 @@ describe("AiPanel", () => {
     );
     fireEvent.click(screen.getByTestId("ai-panel-draft-use-9"));
 
-    expect(handler).toHaveBeenCalledWith({
+    expect(viewHandler).toHaveBeenCalledOnce();
+    expect(composerHandler).toHaveBeenCalledWith({
       draft: { id: 9, body: "AI drafted answer" },
       focus: true,
     });
+    // The view switch must happen first — a split-view composer isn't
+    // mounted yet to receive the draft (see composerBus.ts's buffering).
+    expect(viewHandler.mock.invocationCallOrder[0]).toBeLessThan(
+      composerHandler.mock.invocationCallOrder[0],
+    );
     expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
   });
 

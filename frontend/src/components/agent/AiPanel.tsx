@@ -30,7 +30,7 @@ import { HelpPopover } from "@/components/ui/HelpPopover";
 import { HoverCard } from "@/components/ui/HoverCard";
 import { PencilIcon, PinIcon, SparkIcon } from "@/components/ui/icons";
 import { ToolTraceCard } from "@/components/ai/ToolResultView";
-import { requestComposer } from "./telegram/composerBus";
+import { requestComposer, requestConversationView } from "./telegram/composerBus";
 import { ReplyDialog } from "./ReplyDialog";
 import { SummaryText } from "./SummaryText";
 import { AssistChip, ChipCount } from "./AssistChip";
@@ -849,14 +849,21 @@ export function AiPanel({
                           variant="primary"
                           data-testid={`ai-panel-draft-use-${draft.id}`}
                           disabled={!canNote}
-                          onClick={() =>
-                            isTelegramTicket
-                              ? requestComposer(ticketId, {
-                                  draft: { id: draft.id, body: draft.body },
-                                  focus: true,
-                                })
-                              : setReplyDraft(draft)
-                          }
+                          onClick={() => {
+                            if (isTelegramTicket) {
+                              // The ticket may be showing the split view
+                              // (manual override) — bring the composer's
+                              // view back first, like TicketHeaderActions;
+                              // the request is buffered until it mounts.
+                              requestConversationView(ticketId);
+                              requestComposer(ticketId, {
+                                draft: { id: draft.id, body: draft.body },
+                                focus: true,
+                              });
+                            } else {
+                              setReplyDraft(draft);
+                            }
+                          }}
                         >
                           {t("ticket.ai.useDraft")}
                         </Button>
