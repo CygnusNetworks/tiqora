@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api, type ArticleListItem } from "@/lib/api";
+import { api, type ArticleListItem, type TelegramChatOut, type TelegramMessageMeta } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { decodeEntities, stripHtml } from "@/lib/html";
 import { groupByDay } from "@/lib/article";
@@ -26,12 +26,34 @@ import { DraftBubble } from "./DraftPlaceholder";
 import { SummaryMarker } from "./SummaryMarker";
 import { useSummaryBoundary } from "./useSummaryBoundary";
 import { useDeleteArticleNote } from "./useDeleteArticleNote";
+import { AttachmentList } from "./ArticleTimeline";
+import { useTelegramChat } from "@/lib/telegramChatApi";
+import { TelegramContactHeader } from "./telegram/TelegramContactHeader";
+import {
+  TelegramBubbleActions,
+  TelegramButtonPills,
+  TelegramEditForm,
+  TelegramQuote,
+  TelegramRetractConfirm,
+  TelegramStatusLine,
+} from "./telegram/TelegramBubbleExtras";
+import { useArticlePlainText, useTelegramMessageActions } from "./telegram/useTelegramMessage";
+import { requestComposer } from "./telegram/composerBus";
 
 /** Collapsed-preview length in characters — a rough proxy for "~6 lines" of
  * chat-bubble text without depending on CSS line-clamp (which doesn't work
  * against the sandboxed HTML iframe `ArticleBodyRenderer` uses for rich
  * bodies — see the collapsed/expanded split in `Bubble` below). */
 const PREVIEW_CHARS = 400;
+
+/** What a bubble on a Telegram ticket needs beyond its own article. `chat`
+ * is null when the ticket has no Telegram chat (404) — then only the inline
+ * attachments apply, no quote/status/actions. */
+type TelegramBubbleContext = {
+  chat: TelegramChatOut | null;
+  meta: TelegramMessageMeta | undefined;
+  lookup: ArticleListItem[];
+};
 
 function bubbleSide(senderType: string | null | undefined): "left" | "right" {
   const s = (senderType || "").toLowerCase();
@@ -75,15 +97,22 @@ export function ArticleConversationView({
     return target ? channelNameOf(target) : (dominantChannel(lookupArticles) ?? undefined);
   };
 
+  const isTelegram = dominantChannel(lookupArticles) === "Telegram";
+  const chatQ = useTelegramChat(ticketId, isTelegram);
+  const chat = isTelegram ? (chatQ.data ?? null) : null;
+  const metaById = new Map((chat?.messages ?? []).map((m) => [m.article_id, m]));
+  // A messenger thread follows new messages; a mail thread only jumps on open.
+  const followId = isTelegram ? (articles[articles.length - 1]?.id ?? null) : null;
+
   // Scroll to the newest message whenever this view mounts (tab switch) or
   // the ticket changes. jsdom (tests) doesn't implement scrollIntoView.
   useEffect(() => {
     bottomRef.current?.scrollIntoView?.({ block: "end" });
-  }, [ticketId]);
+  }, [ticketId, followId]);
 
   const groups = groupByDay(articles, locale);
 
-  return (
+  const thread = (
     <div
       className="max-h-[60vh] space-y-4 overflow-y-auto rounded-lg border border-hairline bg-surface p-3"
       data-testid="article-conversation"
@@ -115,6 +144,11 @@ export function ArticleConversationView({
                     canDelete={canDelete}
                     locale={locale}
                     side={bubbleSide(a.sender_type)}
+                    telegram={
+                      isTelegram
+                        ? { chat, meta: metaById.get(a.id), lookup: lookupArticles }
+                        : undefined
+                    }
                   />
                 )}
                 {/* Chronological view → marker goes below the newest
@@ -137,6 +171,15 @@ export function ArticleConversationView({
       <div ref={bottomRef} />
     </div>
   );
+
+  // Same wrapper with or without the header: swapping it in once the chat
+  // loads would remount the scroll container and lose its scroll position.
+  return (
+    <div className="space-y-2">
+      {chat && <TelegramContactHeader chat={chat} locale={locale} />}
+      {thread}
+    </div>
+  );
 }
 
 function useArticleBody(ticketId: number, articleId: number) {
@@ -153,6 +196,7 @@ function Bubble({
   canDelete,
   locale,
   side,
+  telegram,
 }: {
   ticketId: number;
   article: ArticleListItem;
@@ -160,6 +204,7 @@ function Bubble({
   canDelete: boolean;
   locale: string;
   side: "left" | "right";
+  telegram?: TelegramBubbleContext;
 }) {
   const { t } = useTranslation();
   const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
@@ -174,6 +219,14 @@ function Bubble({
       : "border border-green/35 bg-green/10 rounded-bl-md";
   const nameTone = isSystem ? "text-muted" : side === "right" ? "text-accent" : "text-green";
   const aiOrigin = useAiOriginTrace({ ticketId, articleId: article.id });
+  const tgActions = useTelegramMessageActions(ticketId, article.id);
+  const editing = tgActions.mode === "editing";
+  const editText = useArticlePlainText(ticketId, article.id, editing);
+  const meta = telegram?.chat ? telegram.meta : undefined;
+  const isAgent = (article.sender_type || "").toLowerCase() === "agent";
+  const canQuote = Boolean(telegram?.chat) && canNote && channelNameOf(article) === "Telegram";
+  const canModify = canQuote && isAgent && meta?.direction === "out" && !meta.retracted_at;
+  const quotedId = meta?.reply_to_article_id ?? null;
 
   return (
     <div
@@ -216,12 +269,62 @@ function Bubble({
                   }
                 />
               </div>
-              <BubbleBody ticketId={ticketId} article={article} />
+              {quotedId !== null && (
+                <TelegramQuote
+                  ticketId={ticketId}
+                  quotedId={quotedId}
+                  quoted={telegram?.lookup.find((x) => x.id === quotedId)}
+                />
+              )}
+              {editing && editText.plain !== null ? (
+                <TelegramEditForm
+                  initial={editText.plain}
+                  pending={tgActions.pending}
+                  onSave={tgActions.save}
+                  onCancel={tgActions.cancel}
+                />
+              ) : meta?.retracted_at ? (
+                <div className="text-muted line-through" data-testid="telegram-retracted-body">
+                  <BubbleBody ticketId={ticketId} article={article} />
+                </div>
+              ) : (
+                <BubbleBody ticketId={ticketId} article={article} />
+              )}
+              {telegram && <AttachmentList ticketId={ticketId} articleId={article.id} compact />}
+              {meta && <TelegramStatusLine meta={meta} />}
+              {tgActions.mode === "confirmRetract" && (
+                <TelegramRetractConfirm
+                  pending={tgActions.pending}
+                  onConfirm={tgActions.confirmRetract}
+                  onCancel={tgActions.cancel}
+                />
+              )}
+              {tgActions.error && (
+                <p className="text-xs text-danger" data-testid={`telegram-action-error-${article.id}`}>
+                  {tgActions.error}
+                </p>
+              )}
             </div>
+            {meta?.direction === "out" && meta.buttons.length > 0 && (
+              <div className={cn("mt-1 flex", side === "right" ? "justify-end" : "justify-start")}>
+                <TelegramButtonPills buttons={meta.buttons} answered={meta.answered_button} />
+              </div>
+            )}
             {/* Hover/focus action island — same handlers as the split view's
                 reading pane, just icon-only to fit a bubble. */}
             <div className="pointer-events-none absolute -top-3 right-1 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100">
-              <div className="pointer-events-auto rounded-md border border-hairline bg-surface p-0.5 shadow-sm">
+              <div className="pointer-events-auto flex items-center gap-0.5 rounded-md border border-hairline bg-surface p-0.5 shadow-sm">
+                {canQuote && (
+                  <TelegramBubbleActions
+                    articleId={article.id}
+                    canModify={canModify}
+                    onQuote={() =>
+                      requestComposer(ticketId, { quoteArticleId: article.id, focus: true })
+                    }
+                    onEdit={tgActions.startEdit}
+                    onRetract={tgActions.startRetract}
+                  />
+                )}
                 <ArticleQuickActions
                   ticketId={ticketId}
                   article={article}

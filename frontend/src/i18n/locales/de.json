@@ -741,6 +741,27 @@
         "pending": "Senden · wartend",
         "closed": "Senden & schließen"
       }
+    },
+    "telegram": {
+      "identityVerified": "Identität bestätigt",
+      "identityUnverified": "Identität nicht bestätigt",
+      "consentGiven": "Einwilligung erteilt",
+      "aiEscalated": "KI an Team übergeben",
+      "edited": "bearbeitet",
+      "retracted": "zurückgezogen",
+      "delivered": "Zugestellt",
+      "quote": "Zitieren",
+      "edit": "Bearbeiten",
+      "editLabel": "Nachricht bearbeiten",
+      "retract": "Zurückziehen",
+      "retractConfirm": "Wirklich zurückziehen?",
+      "yes": "Ja",
+      "cancel": "Abbrechen",
+      "save": "Speichern",
+      "replyTo": "Antwort auf {{name}}",
+      "buttons": "Antwortknöpfe",
+      "answered": "Vom Kunden gewählt",
+      "actionError": "Aktion fehlgeschlagen. Bitte erneut versuchen."
     }
   },
   "search": {

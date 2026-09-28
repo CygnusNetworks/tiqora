@@ -543,9 +543,13 @@ function isPreviewable(a: { content_type?: string | null; content_size?: string 
 export function AttachmentList({
   ticketId,
   articleId,
+  compact = false,
 }: {
   ticketId: number;
   articleId: number;
+  /** Inside a chat bubble: no "Attachments" heading — a photo in a
+   * messenger thread is the message, not an appendix to it. */
+  compact?: boolean;
 }) {
   const { t } = useTranslation();
   const [lightboxAt, setLightboxAt] = useState<number | null>(null);
@@ -609,7 +613,9 @@ export function AttachmentList({
     <div data-testid="attachment-list">
       {real.length > 0 && (
         <>
-          <h4 className="mb-1 text-xs font-semibold text-muted">{t("ticket.attachments")}</h4>
+          {!compact && (
+            <h4 className="mb-1 text-xs font-semibold text-muted">{t("ticket.attachments")}</h4>
+          )}
           {images.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2" data-testid="attachment-strip">
               {shown.map((a, i) => (
