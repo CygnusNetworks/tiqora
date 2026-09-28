@@ -1,0 +1,10 @@
+#!/bin/sh
+# Commit messages go public with the code; ticket excerpts pasted into them
+# are how personal data reached GitHub before. Same checks as for the diff.
+set -e
+root=$(git rev-parse --show-toplevel)
+msg=$1
+
+# Strip comment lines git adds to the editor template.
+grep -v '^#' "$msg" | gitleaks stdin --redact --no-banner --log-level warn -c "$root/.gitleaks.toml"
+grep -v '^#' "$msg" | python3 "$root/.githooks/pii_check.py" text "the commit message"

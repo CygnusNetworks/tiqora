@@ -1,14 +1,51 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Blocks commits that add secrets or personal data (see docs/development.md).
 set -e
 root=$(git rev-parse --show-toplevel)
+hooks="$root/.githooks"
 
 if ! command -v gitleaks >/dev/null 2>&1; then
 	echo "pre-commit: gitleaks is not installed (brew install gitleaks)." >&2
 	exit 1
 fi
 
+# The repo is mirrored to GitHub: commit under your handle, never your name.
+ident=$(git var GIT_AUTHOR_IDENT | sed -E 's/ [0-9]+ [-+][0-9]{4}$//')
+if ! grep -qxF "$ident" "$hooks/allowed-identities"; then
+	echo "pre-commit: author '$ident' is not in .githooks/allowed-identities." >&2
+	echo "            git config user.name <github-handle>; git config user.email <id>+<handle>@users.noreply.github.com" >&2
+	exit 1
+fi
+
 gitleaks git --pre-commit --staged --redact --no-banner --log-level warn \
 	-c "$root/.gitleaks.toml" "$root"
 
-git diff --cached -U0 --no-color | "$root/.githooks/pii-denylist-check" "the staged changes"
+git diff --cached -U0 --no-color | python3 "$hooks/pii_check.py" patch "the staged changes"
+
+# Binary files: only generated assets in known places, and their text (OCR /
+# PDF text) must pass the same check.
+git diff --cached --name-only --diff-filter=AM -z | while IFS= read -r -d '' f; do
+	case "$f" in
+	*.png | *.jpg | *.jpeg | *.gif | *.webp | *.pdf | *.ico | *.zip | *.gz | *.tgz | *.xlsx | *.docx | *.mp4 | *.webm) ;;
+	*) continue ;;
+	esac
+	case "$f" in
+	docs/images/*.png | frontend/public/* | site/*.pdf) ;;
+	*)
+		echo "pre-commit: binary file $f is outside the allowed places (docs/images/*.png," >&2
+		echo "            frontend/public/, site/*.pdf). Screenshots come from the mock-data pipeline." >&2
+		exit 1
+		;;
+	esac
+	tmp=$(mktemp)
+	git show ":$f" >"$tmp"
+	case "$f" in
+	*.pdf) command -v pdftotext >/dev/null 2>&1 && pdftotext -q "$tmp" - ;;
+	*.ico) ;;
+	*) command -v tesseract >/dev/null 2>&1 && tesseract "$tmp" - -l deu+eng 2>/dev/null ;;
+	esac | python3 "$hooks/pii_check.py" text "$f" || {
+		rm -f "$tmp"
+		exit 1
+	}
+	rm -f "$tmp"
+done

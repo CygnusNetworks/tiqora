@@ -1,0 +1,9 @@
+# Author/committer identities allowed in this repository's history. It is
+# mirrored to the public GitHub repo, so people appear by handle and GitHub
+# noreply address only. Checked by pre-commit (your configured identity) and
+# pre-push (every outgoing commit). Format: Name <email>
+cygnusb <cygnusb@users.noreply.github.com>
+p3dda <2871413+p3dda@users.noreply.github.com>
+GitHub <noreply@github.com>
+github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
+dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
