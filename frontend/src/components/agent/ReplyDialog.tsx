@@ -341,7 +341,10 @@ export function ReplyDialog({
     mutationFn: async () => {
       await api.createArticle(ticketId, {
         sender_type: "agent",
-        subject,
+        // Telegram has no subject line — the backend fills the ticket
+        // title in. The field is hidden below, but seed it explicitly
+        // rather than trusting `subject` never got edited some other way.
+        subject: isTelegram ? "" : subject,
         body,
         content_type: "text/plain; charset=utf-8",
         channel: isTelegram ? "telegram" : "email",
@@ -691,15 +694,17 @@ export function ReplyDialog({
               </div>
             </>
           )}
-          <label className="block text-xs text-muted">
-            {t("ticket.replySubject")}
-            <input
-              className={inputCls}
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-            />
-          </label>
-          {templates.length > 0 && (
+          {!isTelegram && (
+            <label className="block text-xs text-muted">
+              {t("ticket.replySubject")}
+              <input
+                className={inputCls}
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+              />
+            </label>
+          )}
+          {!isTelegram && templates.length > 0 && (
             <label className="block text-xs text-muted">
               {t("ticket.replyTemplate")}
               <SelectField
@@ -737,8 +742,9 @@ export function ReplyDialog({
               readOnly={extrasFailed.length > 0}
             />
             {/* Read-only signature preview — backend appends on send; do not
-                put this into the editable body (would double on send). */}
-            {Boolean(draftQ.data?.signature?.trim()) && (
+                put this into the editable body (would double on send).
+                Telegram never appends a signature. */}
+            {!isTelegram && Boolean(draftQ.data?.signature?.trim()) && (
               <div
                 className="mx-3 mb-2.5 border-t border-dashed border-hairline pt-2"
                 data-testid="reply-signature-preview"
@@ -764,15 +770,19 @@ export function ReplyDialog({
             )}
             <div className="flex flex-wrap items-center gap-2 border-t border-hairline bg-surface px-2 py-1.5">
               {/* Rewrites only the agent's own text; the quoted original below
-                  it is re-assembled from the untouched original (see replyQuote). */}
-              <RefineControls
-                target={{ ticket_id: ticketId }}
-                body={body}
-                onChange={setBody}
-                disabled={extrasFailed.length > 0}
-                testIdPrefix="reply-refine"
-                variant="toolbar"
-              />
+                  it is re-assembled from the untouched original (see replyQuote).
+                  Not offered on Telegram — a chat reply has no tone/length to
+                  refine against a quoted original. */}
+              {!isTelegram && (
+                <RefineControls
+                  target={{ ticket_id: ticketId }}
+                  body={body}
+                  onChange={setBody}
+                  disabled={extrasFailed.length > 0}
+                  testIdPrefix="reply-refine"
+                  variant="toolbar"
+                />
+              )}
               <span className="ml-auto">
                 <ComposerTimeChip value={timeUnits} onChange={setTimeUnits} testId="reply-time" />
               </span>

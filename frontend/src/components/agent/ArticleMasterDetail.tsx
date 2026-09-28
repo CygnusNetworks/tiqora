@@ -8,6 +8,7 @@ import { dominantChannel } from "@/lib/articleChannel";
 import { ArticleSplitView } from "./ArticleSplitView";
 import { ArticleConversationView } from "./ArticleConversationView";
 import { ArticleComposer } from "./ArticleTimeline";
+import { useConversationViewRequests } from "./telegram/composerBus";
 import { TelegramChatComposer } from "./telegram/TelegramChatComposer";
 import { useArticleListState } from "./useArticleListState";
 import { useArticleView, type ArticleViewMode } from "./useArticleView";
@@ -51,6 +52,10 @@ export function ArticleMasterDetail({
   const locale = toBcp47(i18n.language);
   const state = useArticleListState({ ticketId, descending, onToggleDescending });
   const { view, isAuto, setView } = useArticleView(ticketId, state.articles);
+  // The header's "Antworten" on a Telegram ticket switches a manually-split
+  // view back to conversation before it asks the (only-then-mounted)
+  // composer to focus — see composerBus.ts.
+  useConversationViewRequests(ticketId, () => setView("conversation"));
   // Both composers feed one presence flag — reporting them separately would
   // let the closed note composer clear the chat composer's "composing".
   const [noteComposing, setNoteComposing] = useState(false);

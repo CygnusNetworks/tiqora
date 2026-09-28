@@ -719,6 +719,63 @@ describe("ReplyDialog Telegram routing", () => {
     expect(payload.reply_to).toBeNull();
   });
 
+  it("hides the signature preview, subject input and template picker for Telegram", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: null,
+      subject: "Some subject",
+      signature: "Alice Example",
+    });
+    listTemplates.mockResolvedValue([{ id: 1, name: "Greeting", text: "Hi!" }]);
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+        channelName="Telegram"
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+
+    expect(screen.queryByTestId("reply-signature-preview")).toBeNull();
+    expect(screen.queryByTestId("reply-template-select")).toBeNull();
+    expect(screen.queryByTestId("reply-refine-button")).toBeNull();
+    expect(screen.queryByDisplayValue("Some subject")).toBeNull();
+  });
+
+  it("always sends an empty subject for Telegram, ignoring the server-seeded one", async () => {
+    getReplyDraft.mockResolvedValue({
+      ...baseDraft,
+      to_address: null,
+      subject: "Some subject",
+    });
+
+    wrap(
+      <ReplyDialog
+        ticketId={1}
+        articleId={2}
+        replyAll={false}
+        open
+        onClose={vi.fn()}
+        channelName="Telegram"
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("reply-dialog")).toBeTruthy());
+    fireEvent.change(screen.getByTestId("reply-body"), {
+      target: { value: "Antwort" },
+    });
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as { subject: string };
+    expect(payload.subject).toBe("");
+  });
+
   it("keeps exactly today's email behavior when replying on a non-Telegram article", async () => {
     getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
 
