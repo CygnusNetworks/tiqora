@@ -1227,10 +1227,11 @@ async def ticket_templates(
     ticket_id: int,
     user: CurrentUser,
     session: DbSession,
+    type: Literal["Answer", "Chat"] = Query("Answer"),
 ) -> list[TemplateOut]:
-    """Response templates (template_type='Answer') for the ticket's queue."""
+    """Response templates for the ticket's queue (default template_type='Answer')."""
     try:
-        return await TicketService(session).list_templates(user.id, ticket_id)
+        return await TicketService(session).list_templates(user.id, ticket_id, type)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
 

@@ -1634,11 +1634,15 @@ class TicketService:
             signature_is_html=signature_is_html,
         )
 
-    async def list_templates(self, user_id: int, ticket_id: int) -> list[TemplateOut]:
-        """Response templates for a ticket's queue (template_type='Answer').
+    async def list_templates(
+        self, user_id: int, ticket_id: int, template_type: str = "Answer"
+    ) -> list[TemplateOut]:
+        """Response templates for a ticket's queue (default template_type='Answer').
 
         Znuny join: ``queue_standard_template`` → ``standard_template`` on the
-        ticket's current ``queue_id``, valid Answer templates only.
+        ticket's current ``queue_id``, valid templates of the given type only.
+        ``template_type='Chat'`` selects the Telegram chat snippets instead of
+        the e-mail Answer templates.
 
         ``<OTRS_...>`` placeholders are expanded server-side against the ticket
         context (and the acting agent) so the frontend can insert the returned
@@ -1658,7 +1662,7 @@ class TicketService:
                     )
                     .where(
                         QueueStandardTemplate.queue_id == ticket.queue_id,
-                        StandardTemplate.template_type == "Answer",
+                        StandardTemplate.template_type == template_type,
                         StandardTemplate.valid_id == 1,
                     )
                     .order_by(StandardTemplate.name)
