@@ -1,11 +1,14 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
+import { dominantChannel } from "@/lib/articleChannel";
 import { ArticleSplitView } from "./ArticleSplitView";
 import { ArticleConversationView } from "./ArticleConversationView";
 import { ArticleComposer } from "./ArticleTimeline";
+import { TelegramChatComposer } from "./telegram/TelegramChatComposer";
 import { useArticleListState } from "./useArticleListState";
 import { useArticleView, type ArticleViewMode } from "./useArticleView";
 import type { ReactNode } from "react";
@@ -48,6 +51,16 @@ export function ArticleMasterDetail({
   const locale = toBcp47(i18n.language);
   const state = useArticleListState({ ticketId, descending, onToggleDescending });
   const { view, isAuto, setView } = useArticleView(ticketId, state.articles);
+  // Both composers feed one presence flag — reporting them separately would
+  // let the closed note composer clear the chat composer's "composing".
+  const [noteComposing, setNoteComposing] = useState(false);
+  const [chatComposing, setChatComposing] = useState(false);
+  const composing = noteComposing || chatComposing;
+  useEffect(() => {
+    onComposingChange?.(composing);
+  }, [composing, onComposingChange]);
+  const showChatComposer =
+    view === "conversation" && canNote && dominantChannel(state.articles) === "Telegram";
 
   if (state.isLoading) {
     return (
@@ -118,11 +131,17 @@ export function ArticleMasterDetail({
         />
       )}
 
+      {/* Messenger-style input right under the chat; the internal-note
+          composer stays below it for notes. */}
+      {showChatComposer && (
+        <TelegramChatComposer ticketId={ticketId} onComposingChange={setChatComposing} />
+      )}
+
       {canNote && (
         <ArticleComposer
           ticketId={ticketId}
           articles={state.articles}
-          onComposingChange={onComposingChange}
+          onComposingChange={setNoteComposing}
           open={noteOpen}
           onOpenChange={onNoteOpenChange}
         />
