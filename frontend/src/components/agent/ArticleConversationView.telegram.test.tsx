@@ -6,6 +6,7 @@ import i18n from "@/i18n";
 import { ApiError, type ArticleListItem, type TelegramChatOut } from "@/lib/api";
 import { ArticleConversationView } from "./ArticleConversationView";
 import { useComposerRequests } from "./telegram/composerBus";
+import { ticketDraftsKey, type ReplyDraft } from "@/lib/replyDrafts";
 
 const api = vi.hoisted(() => ({
   getArticleBody: vi.fn(),
@@ -13,6 +14,7 @@ const api = vi.hoisted(() => ({
   listAttachments: vi.fn(),
   editTelegramMessage: vi.fn(),
   retractTelegramMessage: vi.fn(),
+  removeTelegramButtons: vi.fn(),
   attachmentDownloadUrl: vi.fn(() => "/att"),
 }));
 const { getState } = vi.hoisted(() => ({ getState: vi.fn() }));
@@ -111,19 +113,66 @@ function chat(): TelegramChatOut {
   };
 }
 
-function setup(articles: ArticleListItem[], canNote = true) {
+function setup(
+  articles: ArticleListItem[],
+  canNote = true,
+  opts: { newestFirst?: boolean; drafts?: ReplyDraft[] } = {},
+) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  if (opts.drafts) qc.setQueryData(ticketDraftsKey(7), opts.drafts);
   const invalidate = vi.spyOn(qc, "invalidateQueries");
-  const ui = (list: ArticleListItem[]) => (
+  const ui = (list: ArticleListItem[], newestFirst = opts.newestFirst ?? false) => (
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <ArticleConversationView ticketId={7} articles={list} canNote={canNote} locale="de" />
+        <ArticleConversationView
+          ticketId={7}
+          articles={list}
+          canNote={canNote}
+          locale="de"
+          newestFirst={newestFirst}
+          composer={<div data-testid="fake-composer" />}
+        />
       </I18nextProvider>
     </QueryClientProvider>
   );
   const r = render(ui(articles));
-  return { ...r, invalidate, rerenderWith: (list: ArticleListItem[]) => r.rerender(ui(list)) };
+  return {
+    ...r,
+    invalidate,
+    rerenderWith: (list: ArticleListItem[], newestFirst?: boolean) =>
+      r.rerender(ui(list, newestFirst)),
+  };
 }
+
+/** data-testids of the thread's rows (bubbles, day labels, marker, drafts)
+ * plus header/composer, in document order. */
+function readingOrder(): string[] {
+  return Array.from(
+    document.querySelectorAll(
+      '[data-testid^="conversation-bubble-"], [data-testid="conversation-day"], [data-testid="summary-marker"], [data-testid^="conversation-draft-"], [data-testid="telegram-contact-header"], [data-testid="fake-composer"], [data-testid="article-conversation"]',
+    ),
+  )
+    .map((el) => el.getAttribute("data-testid") ?? "")
+    .filter((id) => !id.startsWith("conversation-draft-edit-"));
+}
+
+function dayArticle(id: number, sender: "agent" | "customer", createTime: string): ArticleListItem {
+  return { ...article(id, sender), create_time: createTime };
+}
+
+const DRAFT: ReplyDraft = {
+  ticketId: 7,
+  articleId: 3,
+  replyAll: false,
+  subject: "",
+  body: "Entwurf",
+  to: "",
+  cc: "",
+  bcc: "",
+  replyTo: "",
+  aiDraftId: null,
+  updatedAt: Date.parse("2026-09-27T10:00:00Z"),
+};
 
 const THREAD = [article(1, "customer"), article(2, "agent"), article(3, "agent")];
 
@@ -315,6 +364,134 @@ describe("ArticleConversationView on a Telegram ticket", () => {
     setup([article(1, "customer", "Email"), article(2, "agent", "Email")]);
     expect(api.getTelegramChat).not.toHaveBeenCalled();
     expect(screen.queryByTestId("telegram-contact-header")).toBeNull();
+  });
+
+  it("newest-first: composer under the header, newest day and message on top, day label heads its block", async () => {
+    getState.mockResolvedValue({
+      manual_assist_available: false,
+      summary_available: true,
+      can_summarize: false,
+      operation_mode_ready: true,
+      drafts: [],
+      summary_body: "Zusammenfassung",
+      last_summary_upto_article_id: 2,
+      summary_created_at: "2026-09-27T10:00:00Z",
+    });
+    const list = [
+      dayArticle(1, "customer", "2026-09-26T09:00:00Z"),
+      dayArticle(2, "agent", "2026-09-26T10:00:00Z"),
+      dayArticle(3, "customer", "2026-09-28T09:00:00Z"),
+    ];
+    setup(list, true, { newestFirst: true, drafts: [DRAFT] });
+    await screen.findByTestId("telegram-contact-header");
+    await screen.findByTestId("summary-marker");
+    await screen.findByTestId("conversation-draft-3");
+    expect(readingOrder()).toEqual([
+      "telegram-contact-header",
+      "fake-composer",
+      "article-conversation",
+      "conversation-draft-3",
+      "conversation-day",
+      "conversation-bubble-3",
+      "conversation-day",
+      // Directly above the newest summarized message.
+      "summary-marker",
+      "conversation-bubble-2",
+      "conversation-bubble-1",
+    ]);
+    const days = screen.getAllByTestId("conversation-day").map((d) => d.textContent);
+    expect(days[0]).toMatch(/28/);
+    expect(days[1]).toMatch(/26/);
+    expect(screen.getByTestId("article-conversation")).toHaveAttribute("data-order", "newest-first");
+  });
+
+  it("oldest-first keeps the chronological layout with the composer below", async () => {
+    getState.mockResolvedValue({
+      manual_assist_available: false,
+      summary_available: true,
+      can_summarize: false,
+      operation_mode_ready: true,
+      drafts: [],
+      summary_body: "Zusammenfassung",
+      last_summary_upto_article_id: 2,
+      summary_created_at: "2026-09-27T10:00:00Z",
+    });
+    setup(THREAD, true, { drafts: [DRAFT] });
+    await screen.findByTestId("telegram-contact-header");
+    await screen.findByTestId("summary-marker");
+    await screen.findByTestId("conversation-draft-3");
+    expect(readingOrder()).toEqual([
+      "telegram-contact-header",
+      "article-conversation",
+      "conversation-day",
+      "conversation-bubble-1",
+      "conversation-bubble-2",
+      "summary-marker",
+      "conversation-bubble-3",
+      "conversation-draft-3",
+      "fake-composer",
+    ]);
+  });
+
+  it("newest-first doesn't scroll to the bottom; flipping the order keeps the composer mounted", async () => {
+    const scroll = vi.spyOn(Element.prototype, "scrollIntoView");
+    const { rerenderWith } = setup(THREAD.slice(0, 2), true, { newestFirst: true });
+    await screen.findByTestId("telegram-contact-header");
+    const composer = screen.getByTestId("fake-composer");
+    const thread = screen.getByTestId("article-conversation");
+    thread.scrollTop = 120;
+    rerenderWith(THREAD, true);
+    expect(scroll).not.toHaveBeenCalled();
+    expect(thread.scrollTop).toBe(0);
+
+    rerenderWith(THREAD, false);
+    expect(scroll).toHaveBeenCalled();
+    expect(screen.getByTestId("fake-composer")).toBe(composer);
+    expect(screen.getByTestId("article-conversation")).toBe(thread);
+  });
+
+  it("removes the buttons of an own message with an open keyboard", async () => {
+    const open = chat();
+    open.messages[1] = { ...open.messages[1], answered_button: null };
+    api.getTelegramChat.mockResolvedValue(open);
+    api.removeTelegramButtons.mockReset().mockResolvedValue(undefined);
+    const { invalidate } = setup(THREAD);
+    await screen.findByTestId("telegram-contact-header");
+    const b2 = screen.getByTestId("conversation-bubble-2");
+    fireEvent.click(await within(b2).findByRole("button", { name: "Buttons entfernen" }));
+    await waitFor(() => expect(api.removeTelegramButtons).toHaveBeenCalledWith(7, 2));
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ["tickets", 7, "telegram"] }),
+    );
+  });
+
+  it("offers no button removal once answered, without buttons or on a customer message", async () => {
+    setup(THREAD);
+    await screen.findByTestId("telegram-contact-header");
+    // Article 2 has an answered keyboard, 1 is the customer's, 3 is retracted.
+    for (const id of [1, 2, 3]) {
+      expect(
+        within(screen.getByTestId(`conversation-bubble-${id}`)).queryByRole("button", {
+          name: "Buttons entfernen",
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("shows Telegram's reason when the button removal is refused", async () => {
+    const open = chat();
+    open.messages[1] = { ...open.messages[1], answered_button: null };
+    api.getTelegramChat.mockResolvedValue(open);
+    api.removeTelegramButtons
+      .mockReset()
+      .mockRejectedValue(new ApiError(409, { detail: "Bad Request: chat not found" }, "/x"));
+    setup(THREAD);
+    await screen.findByTestId("telegram-contact-header");
+    const b2 = screen.getByTestId("conversation-bubble-2");
+    fireEvent.click(await within(b2).findByRole("button", { name: "Buttons entfernen" }));
+    expect(await within(b2).findByTestId("telegram-action-error-2")).toHaveTextContent(
+      "Bad Request: chat not found",
+    );
   });
 
   it("scrolls to the bottom when a newer message arrives", async () => {

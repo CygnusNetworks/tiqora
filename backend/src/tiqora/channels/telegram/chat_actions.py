@@ -39,7 +39,8 @@ class TelegramMessageNotFound(Exception):
 
 
 class TelegramActionConflict(Exception):
-    """The article exists but the edit/retract can't be applied (route -> 409)."""
+    """The article exists but the edit/retract/button removal can't be applied
+    (route -> 409)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,6 +322,63 @@ async def retract_message(
     )
 
 
+_NO_BUTTONS = "Die Nachricht hat keine Buttons (mehr)."
+_BUTTONS_ANSWERED = "Ein Button wurde bereits beantwortet."
+
+
+def _keyboard_already_gone(exc: TelegramApiError) -> bool:
+    """Telegram's refusal when there's nothing left to change: the keyboard is
+    already empty ("message is not modified") or the message itself is gone
+    ("message to edit not found"). Either way the customer no longer sees
+    the buttons -- which is all the removal wants."""
+    reason = str(exc).lower()
+    return "message is not modified" in reason or "message to edit not found" in reason
+
+
+async def remove_buttons(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    article_id: int,
+    user_id: int,
+    gateway: TelegramGateway | None = None,
+) -> None:
+    """Remove the inline keyboard from a previously sent agent Telegram message.
+
+    Only while no button has been answered (an answer already settles the
+    keyboard). Clears ``buttons_json`` so the chat stops showing the pills
+    and a late tap on a stale client resolves to "unknown button". Writes a
+    ``Misc`` ``%%TelegramButtonsRemoved%%<article_id>`` history row.
+    """
+    row = await _editable_message(session, ticket_id, article_id)
+    assert row.message_id is not None  # _editable_message already checked this
+    if not buttons_from_json(row.buttons_json):
+        raise TelegramActionConflict(_NO_BUTTONS)
+    if row.answered_button is not None:
+        raise TelegramActionConflict(_BUTTONS_ANSWERED)
+    gw = gateway if gateway is not None else await outbound.build_gateway(session)
+    try:
+        # The keyboard always sits on the row's message_id -- the text
+        # message, or the last attachment of an attachment-only reply.
+        await gw.edit_message_reply_markup(row.chat_id, row.message_id, None)
+    except TelegramApiError as exc:
+        if not _keyboard_already_gone(exc):
+            raise TelegramActionConflict(str(exc)) from exc
+
+    await session.execute(
+        text("UPDATE tiqora_telegram_message SET buttons_json = NULL WHERE article_id = :aid"),
+        {"aid": article_id},
+    )
+    await history_add(
+        session,
+        ticket_id=ticket_id,
+        history_type=TYPE_MISC,
+        name=f"%%TelegramButtonsRemoved%%{article_id}",
+        user_id=user_id,
+        article_id=article_id,
+    )
+
+
 __all__ = [
     "ChatContact",
     "ChatInfo",
@@ -328,6 +386,7 @@ __all__ = [
     "TelegramMessageNotFound",
     "edit_message",
     "get_chat_info",
+    "remove_buttons",
     "retract_message",
     "send_typing",
 ]

@@ -122,6 +122,7 @@ export function TelegramBubbleActions({
   onQuote,
   onEdit,
   onRetract,
+  onRemoveButtons,
 }: {
   articleId: number;
   /** Own delivered message that hasn't been retracted. */
@@ -132,6 +133,8 @@ export function TelegramBubbleActions({
   onQuote: () => void;
   onEdit: () => void;
   onRetract: () => void;
+  /** Set only while the message still has an unanswered keyboard. */
+  onRemoveButtons?: () => void;
 }) {
   const { t } = useTranslation();
   // cn() is plain clsx (no tailwind-merge), so the hover colour is chosen
@@ -163,6 +166,18 @@ export function TelegramBubbleActions({
               onClick={onEdit}
             >
               ✎
+            </button>
+          )}
+          {onRemoveButtons && (
+            <button
+              type="button"
+              className={btn("hover:text-danger")}
+              title={t("ticket.telegram.removeButtons")}
+              aria-label={t("ticket.telegram.removeButtons")}
+              data-testid={`telegram-remove-buttons-${articleId}`}
+              onClick={onRemoveButtons}
+            >
+              ⊟
             </button>
           )}
           <button

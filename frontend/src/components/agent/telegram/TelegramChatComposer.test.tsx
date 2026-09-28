@@ -409,6 +409,46 @@ describe("TelegramChatComposer: quote, buttons, AI", () => {
     expect(lastPayload().telegram_buttons).toEqual([{ label: "Morgen", action: "reply" }]);
   });
 
+  it("removes a single button, clears all, and drops an empty one on Backspace", async () => {
+    await mount();
+    fireEvent.click(screen.getByTestId("tg-composer-buttons-toggle"));
+    fireEvent.click(screen.getByTestId("tg-buttons-preset"));
+    expect(screen.getByTestId("tg-buttons-label-1")).toHaveValue("Nein");
+
+    fireEvent.click(screen.getByTestId("tg-buttons-remove-0"));
+    expect(screen.getByTestId("tg-buttons-label-0")).toHaveValue("Nein");
+    expect(screen.queryByTestId("tg-buttons-label-1")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("tg-buttons-add"));
+    const empty = screen.getByTestId("tg-buttons-label-1");
+    fireEvent.keyDown(empty, { key: "Backspace" });
+    expect(screen.queryByTestId("tg-buttons-label-1")).toBeNull();
+    // A label with text is edited by Backspace, not removed.
+    fireEvent.keyDown(screen.getByTestId("tg-buttons-label-0"), { key: "Backspace" });
+    expect(screen.getByTestId("tg-buttons-label-0")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tg-buttons-clear"));
+    expect(screen.queryByTestId("tg-buttons-label-0")).toBeNull();
+    expect(screen.queryByTestId("tg-buttons-clear")).toBeNull();
+  });
+
+  it("turning the Buttons toggle off discards the buttons", async () => {
+    const input = await mount();
+    const toggle = screen.getByTestId("tg-composer-buttons-toggle");
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByTestId("tg-buttons-preset"));
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("tg-button-editor")).toBeNull();
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("tg-buttons-label-0")).toBeNull();
+
+    fireEvent.click(toggle);
+    type(input, "Ohne Buttons");
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(lastPayload().telegram_buttons).toBeUndefined();
+  });
+
   it("asks before the AI suggestion replaces typed text", async () => {
     getState.mockResolvedValue({
       drafts: [{ id: 3, status: "open", kind: "reply", body: "KI-Text" }],
