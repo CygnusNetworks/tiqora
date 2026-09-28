@@ -87,6 +87,10 @@ _TICKET_DELETE_ORDER: tuple[tuple[str, str, str], ...] = (
     ("article_data_otrs_chat", "article_id", "article"),
     ("article_data_mime", "article_id", "article"),
     ("mail_queue", "article_id", "article"),
+    # tiqora-owned, no FK (like tiqora_ai_article_origin) but article_id-keyed;
+    # deleted here too so a hard ticket delete never leaves a dangling map row
+    # holding original_body (agent-written text, see messages.py).
+    ("tiqora_telegram_message", "article_id", "article"),
     ("article_search_index", "ticket_id", "ticket"),  # FK to article + ticket
     ("time_accounting", "ticket_id", "ticket"),  # FK to article + ticket
     ("ticket_history", "ticket_id", "ticket"),  # FK to article + ticket
@@ -1120,6 +1124,7 @@ async def run_erasure(
         "article_data_mime_plain": 0,
         "article_data_mime_attachment": 0,
         "article_search_index": 0,
+        "tiqora_telegram_message": 0,
         "customer_preferences": 0,
         "customer_user_customer": 0,
         "group_customer_user": 0,
@@ -1737,6 +1742,22 @@ async def run_erasure(
                     {"v": new_val, "id": int(srow.id)},
                 )
                 counts["article_search_index"] += 1
+
+            # ---- tiqora_telegram_message: delete map rows for these articles ----
+            # No column-level scrub target here (tiqora-owned side table, not a
+            # Znuny column the loops above touch); original_body can hold
+            # agent-written pre-edit text tied to this customer's ticket, so the
+            # whole row is removed rather than partially anonymized. Backed up
+            # via the same helper the hard-delete path uses (_TICKET_DELETE_ORDER).
+            n_tg = await _backup_and_delete_by(
+                session,
+                job_id=job_id,
+                table="tiqora_telegram_message",
+                fk_col="article_id",
+                ids=article_ids,
+                now=now,
+            )
+            counts["tiqora_telegram_message"] = counts.get("tiqora_telegram_message", 0) + n_tg
 
         # ---- customer_company: anonymize PII (keep PK) or delete if orphan ----
         company_ids = sorted({str(c.customer_id) for c in ordered if c.customer_id})

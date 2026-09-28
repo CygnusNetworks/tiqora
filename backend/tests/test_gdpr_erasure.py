@@ -1974,3 +1974,65 @@ async def test_run_erasure_mime_plain_body_preserves_structure(mariadb_znuny_url
         assert msg.get_content_type() == "text/plain"
 
     await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_run_erasure_anonymize_deletes_telegram_map_row(mariadb_znuny_url: str) -> None:
+    """``tiqora_telegram_message`` rows for an erased customer's articles are
+    removed -- ``original_body`` can hold agent-written pre-edit text tied to
+    this customer's ticket, which nothing else in run_erasure scrubs."""
+    from sqlalchemy import create_engine
+
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    sync_engine = create_engine(mariadb_znuny_url)
+    with sync_engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+    sync_engine.dispose()
+
+    engine, factory = await _factory(mariadb_znuny_url)
+    login = "erase.telegram.my@example.com"
+    company = "ERASE-TG-MY"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        await _insert_company(session, customer_id=company, name="Acme Telegram")
+        cuid = await _insert_customer(session, login=login, customer_id=company)
+        tid = await _insert_ticket(
+            session, customer_user_id=login, customer_id=company, tn=f"2026TG{cuid}"
+        )
+        article_id = await _insert_article_bundle(
+            session, ticket_id=tid, from_addr=login, body="Telegram-relayed note"
+        )
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_telegram_message (article_id, ticket_id, chat_id,"
+                " message_id, direction, created)"
+                " VALUES (:aid, :tid, :chat_id, :mid, 'out', :ct)"
+            ),
+            {"aid": article_id, "tid": tid, "chat_id": 424242, "mid": 99, "ct": NOW},
+        )
+        await session.commit()
+
+    result = await run_erasure(
+        factory,
+        Settings(),
+        customer_user_ids=[cuid],
+        mode="anonymize",
+        seed=13,
+        force_parallel=True,
+        actor="test",
+    )
+    assert result.counts["tiqora_telegram_message"] == 1
+
+    async with factory() as session:
+        row = (
+            await session.execute(
+                text("SELECT 1 FROM tiqora_telegram_message WHERE article_id = :aid"),
+                {"aid": article_id},
+            )
+        ).first()
+        assert row is None
+
+    await engine.dispose()
