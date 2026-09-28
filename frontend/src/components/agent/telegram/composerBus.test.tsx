@@ -40,7 +40,7 @@ describe("composerBus", () => {
     expect(second).toHaveBeenCalledWith({ quoteArticleId: 1 });
   });
 
-  it("is a no-op without subscribers", () => {
+  it("does not throw without subscribers — the request is buffered, not dropped (see the buffering tests below)", () => {
     expect(() => requestComposer(11, { focus: true })).not.toThrow();
   });
 

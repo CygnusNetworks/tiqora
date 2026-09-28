@@ -92,9 +92,11 @@ export function TelegramChatComposer({
   }, [hasContent]);
   useEffect(() => () => composingCb.current?.(false), []);
 
-  // A draft handed over from elsewhere (AiPanel's "Entwurf übernehmen") —
-  // same overwrite guard as the composer's own inline AI suggestion below.
-  const applyExternalDraft = async (draft: { id: number; body: string }) => {
+  // Loads an AI draft into the body — the inline suggestion below and a
+  // draft handed over from elsewhere (AiPanel's "Entwurf übernehmen") both
+  // go through this: an overwrite confirm when there is already different,
+  // non-empty typed text, then body + ai_draft_id + focus.
+  const applyDraft = async (draft: { id: number; body: string }) => {
     if (body.trim() && body !== draft.body) {
       const ok = await confirm({
         title: t("ticket.telegram.composer.aiReplaceTitle"),
@@ -112,7 +114,7 @@ export function TelegramChatComposer({
 
   useComposerRequests(ticketId, (req) => {
     if (req.quoteArticleId != null) setQuoteId(req.quoteArticleId);
-    if (req.draft) void applyExternalDraft(req.draft);
+    if (req.draft) void applyDraft(req.draft);
     if (req.focus) inputRef.current?.focus();
   });
 
@@ -281,23 +283,7 @@ export function TelegramChatComposer({
     if (value.trim()) ping();
   };
 
-  const takeSuggestion = async () => {
-    if (!suggestion) return;
-    // Taking the suggestion replaces the field — don't lose typed text silently.
-    if (body.trim() && body !== suggestion.body) {
-      const ok = await confirm({
-        title: t("ticket.telegram.composer.aiReplaceTitle"),
-        message: t("ticket.telegram.composer.aiReplaceMessage"),
-        confirmLabel: t("ticket.telegram.composer.aiReplaceConfirm"),
-        variant: "danger",
-      });
-      if (!ok) return;
-    }
-    setBody(suggestion.body);
-    setCaret(suggestion.body.length);
-    setAiDraftId(suggestion.id);
-    inputRef.current?.focus();
-  };
+  const takeSuggestion = () => (suggestion ? applyDraft(suggestion) : undefined);
 
   const applyPreset = () => {
     setButtons(RESOLVED_PRESET_BUTTONS.map((b) => ({ ...b })));

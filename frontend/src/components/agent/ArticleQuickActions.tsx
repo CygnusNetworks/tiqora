@@ -5,7 +5,7 @@ import { channelNameOf, isInternalNote } from "@/lib/articleChannel";
 import { Button } from "@/components/ui/Button";
 import { Menu, MenuItem } from "@/components/ui/Menu";
 import { useReplyDraft } from "@/lib/replyDrafts";
-import { requestComposer } from "./telegram/composerBus";
+import { requestComposer, requestConversationView } from "./telegram/composerBus";
 import { ReplyDialog } from "./ReplyDialog";
 import { BounceDialog, ForwardDialog, SplitDialog } from "./ArticleActionDialogs";
 import { useDeleteArticleNote } from "./useDeleteArticleNote";
@@ -61,11 +61,18 @@ export function ArticleQuickActions({
           data-testid={replyTestId}
           data-has-draft={hasDraft ? "true" : undefined}
           title={compact ? (hasDraft ? t("ticket.draftResume") : t("ticket.reply")) : undefined}
-          onClick={() =>
-            isTelegram
-              ? requestComposer(ticketId, { quoteArticleId: article.id, focus: true })
-              : setDialog("reply")
-          }
+          onClick={() => {
+            if (isTelegram) {
+              // May be reached from the split view (a Telegram ticket the
+              // agent manually switched away from conversation) — bring the
+              // composer's view back first, like TicketHeaderActions; the
+              // request is buffered until it mounts there.
+              requestConversationView(ticketId);
+              requestComposer(ticketId, { quoteArticleId: article.id, focus: true });
+            } else {
+              setDialog("reply");
+            }
+          }}
         >
           ↩ {!compact && (hasDraft ? t("ticket.draftResume") : t("ticket.reply"))}
           {hasDraft && (

@@ -6,7 +6,7 @@ import i18n from "@/i18n";
 import { getDraft, useTicketReplyDrafts, type ReplyDraft } from "@/lib/replyDrafts";
 import { DraftListRow, DraftBubble } from "./DraftPlaceholder";
 import { ArticleQuickActions } from "./ArticleQuickActions";
-import { useComposerRequests } from "./telegram/composerBus";
+import { useComposerRequests, useConversationViewRequests } from "./telegram/composerBus";
 
 const { getReplyDraft, listTemplates, formDrafts } = vi.hoisted(() => ({
   getReplyDraft: vi.fn(),
@@ -284,10 +284,12 @@ describe("ArticleQuickActions — Telegram routes Antworten to the chat composer
     listTemplates.mockReset().mockResolvedValue([]);
   });
 
-  it("requests a quote from the composer instead of opening the reply dialog", () => {
-    const handler = vi.fn();
+  it("switches to the conversation view before requesting a quote from the composer, instead of opening the reply dialog", () => {
+    const viewHandler = vi.fn();
+    const composerHandler = vi.fn();
     function Listener() {
-      useComposerRequests(7, handler);
+      useConversationViewRequests(7, viewHandler);
+      useComposerRequests(7, composerHandler);
       return null;
     }
 
@@ -305,7 +307,13 @@ describe("ArticleQuickActions — Telegram routes Antworten to the chat composer
 
     fireEvent.click(screen.getByTestId("article-reader-reply"));
 
-    expect(handler).toHaveBeenCalledWith({ quoteArticleId: 5, focus: true });
+    expect(viewHandler).toHaveBeenCalledOnce();
+    expect(composerHandler).toHaveBeenCalledWith({ quoteArticleId: 5, focus: true });
+    // The view switch must happen first — a split-view composer isn't
+    // mounted yet to receive the quote (see composerBus.ts's buffering).
+    expect(viewHandler.mock.invocationCallOrder[0]).toBeLessThan(
+      composerHandler.mock.invocationCallOrder[0],
+    );
     expect(screen.queryByTestId("reply-dialog")).not.toBeInTheDocument();
   });
 });
