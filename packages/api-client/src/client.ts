@@ -61,6 +61,7 @@ export type PresenceIn = Schemas["PresenceIn"];
 export type PresenceEntry = Schemas["PresenceEntry"];
 /** Global online-agent presence (``GET /agents/online``). */
 export type OnlineAgentOut = Schemas["OnlineAgentOut"];
+export type ArticleAttachmentIn = Schemas["ArticleAttachmentIn"];
 export type ArticleCreateRequest = Schemas["ArticleCreateRequest"];
 export type ArticleCreateResponse = Schemas["ArticleCreateResponse"];
 export type ReplyDraftOut = Schemas["ReplyDraftOut"];
@@ -77,6 +78,11 @@ export type BounceRequest = Schemas["BounceRequest"];
 export type SplitRequest = Schemas["SplitRequest"];
 export type TicketLinkTargetOut = Schemas["TicketLinkTargetOut"];
 export type TicketLinkCreateRequest = Schemas["TicketLinkCreateRequest"];
+
+// ── Telegram chat composer ───────────────────────────────────────────────
+export type TelegramButtonIn = Schemas["TelegramButtonIn"];
+export type TelegramMessageMeta = Schemas["TelegramMessageMeta"];
+export type TelegramChatOut = Schemas["TelegramChatOut"];
 
 // ── Portal ────────────────────────────────────────────────────────────────
 export type CustomerMe = Schemas["CustomerMe"];
@@ -1370,10 +1376,48 @@ export class ApiClient {
     );
   }
 
-  listTemplates(ticketId: number, signal?: AbortSignal) {
+  listTemplates(ticketId: number, type?: "Answer" | "Chat", signal?: AbortSignal) {
+    const q = type ? `?type=${type}` : "";
     return this.request<TemplateOut[]>(
       "GET",
-      `/api/v1/tickets/${ticketId}/templates`,
+      `/api/v1/tickets/${ticketId}/templates${q}`,
+      { signal },
+    );
+  }
+
+  getTelegramChat(ticketId: number, signal?: AbortSignal) {
+    return this.request<TelegramChatOut>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/telegram`,
+      { signal },
+    );
+  }
+
+  postTelegramTyping(ticketId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/telegram/typing`,
+      { signal },
+    );
+  }
+
+  editTelegramMessage(
+    ticketId: number,
+    articleId: number,
+    body: string,
+    signal?: AbortSignal,
+  ) {
+    return this.request<void>(
+      "PATCH",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/telegram`,
+      { body: { body }, signal },
+    );
+  }
+
+  retractTelegramMessage(ticketId: number, articleId: number, signal?: AbortSignal) {
+    return this.request<void>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/telegram/retract`,
       { signal },
     );
   }

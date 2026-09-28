@@ -40,6 +40,7 @@ export {
   type PresenceIn,
   type PresenceEntry,
   type OnlineAgentOut,
+  type ArticleAttachmentIn,
   type ArticleCreateRequest,
   type ArticleCreateResponse,
   type ReplyDraftOut,
@@ -56,6 +57,9 @@ export {
   type SplitRequest,
   type TicketLinkTargetOut,
   type TicketLinkCreateRequest,
+  type TelegramButtonIn,
+  type TelegramMessageMeta,
+  type TelegramChatOut,
   // Portal
   type CustomerMe,
   type CustomerLoginResponse,

@@ -224,6 +224,16 @@ def _seed(sync_url: str) -> dict[str, Any]:
             ),
             {"t": NOW},
         )
+        # A Chat template linked to the same queue (only listed with type=Chat)
+        conn.execute(
+            text(
+                "INSERT INTO standard_template (id, name, text, content_type, template_type,"
+                " valid_id, create_time, create_by, change_time, change_by)"
+                " VALUES (7403, 'ChatGreeting', 'Hey there', 'text/plain', 'Chat',"
+                " 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
         conn.execute(
             text(
                 "INSERT INTO queue_standard_template (queue_id, standard_template_id,"
@@ -237,6 +247,14 @@ def _seed(sync_url: str) -> dict[str, Any]:
                 "INSERT INTO queue_standard_template (queue_id, standard_template_id,"
                 " create_time, create_by, change_time, change_by)"
                 " VALUES (7300, 7402, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO queue_standard_template (queue_id, standard_template_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (7300, 7403, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
@@ -329,6 +347,11 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         tpls = await ts.list_templates(ids["agent"], ids["ticket"])
         assert [t.name for t in tpls] == ["Greeting"]
         assert tpls[0].text == "Hello from support"
+
+        # Templates: type="Chat" lists only the Chat template, not Answer/Forward.
+        chat_tpls = await ts.list_templates(ids["agent"], ids["ticket"], template_type="Chat")
+        assert [t.name for t in chat_tpls] == ["ChatGreeting"]
+        assert chat_tpls[0].text == "Hey there"
 
         # Permission: no-access user rejected.
         with pytest.raises(TicketAccessDenied):

@@ -25,6 +25,7 @@ const TEMPLATE_TYPE_OPTIONS = [
   { value: "Create", label: "Create" },
   { value: "Note", label: "Note" },
   { value: "Email", label: "Email" },
+  { value: "Chat", label: "Chat" },
 ];
 
 export function TemplatesPage() {
