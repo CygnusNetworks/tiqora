@@ -19,7 +19,7 @@ export function useArticlePlainText(ticketId: number, articleId: number, enabled
 }
 
 /**
- * Edit/retract state for one Telegram bubble. The mode lives here rather than
+ * Edit/retract/button-removal state for one Telegram bubble. The mode lives here rather than
  * in the hover island because the island hides on mouse-out, while the editor
  * and the confirmation must stay put.
  */
@@ -53,7 +53,13 @@ export function useTelegramMessageActions(ticketId: number, articleId: number) {
     onError: refreshIfUncertain,
   });
 
-  const failure = edit.error ?? retract.error;
+  const removeButtons = useMutation({
+    mutationFn: () => api.removeTelegramButtons(ticketId, articleId),
+    onSuccess: refresh,
+    onError: refreshIfUncertain,
+  });
+
+  const failure = edit.error ?? retract.error ?? removeButtons.error;
   // A 409 carries Telegram's refusal ("older than 48 h", "already deleted") —
   // that reason is what the agent needs; anything else (validation list,
   // proxy page, 5xx) gets the generic line.
@@ -62,6 +68,7 @@ export function useTelegramMessageActions(ticketId: number, articleId: number) {
   const start = (next: typeof mode) => {
     edit.reset();
     retract.reset();
+    removeButtons.reset();
     setMode(next);
   };
 
@@ -72,7 +79,12 @@ export function useTelegramMessageActions(ticketId: number, articleId: number) {
     cancel: () => start("idle"),
     save: (body: string) => edit.mutate(body),
     confirmRetract: () => retract.mutate(),
-    pending: edit.isPending || retract.isPending,
+    removeButtons: () => {
+      edit.reset();
+      retract.reset();
+      removeButtons.mutate();
+    },
+    pending: edit.isPending || retract.isPending || removeButtons.isPending,
     error,
   };
 }

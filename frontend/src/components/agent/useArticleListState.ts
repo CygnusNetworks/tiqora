@@ -96,8 +96,8 @@ export function useArticleListState({
     return descending ? list.reverse() : list;
   }, [filtered, descending]);
 
-  // Conversation view always renders oldest→newest, independent of the
-  // split view's sort toggle.
+  // Conversation view input, always oldest→newest; a Telegram chat flips it
+  // itself for newest-first (see ArticleConversationView's `newestFirst`).
   const chronological = useMemo(
     () => [...filtered].sort((a, b) => articleSortKey(a) - articleSortKey(b)),
     [filtered],

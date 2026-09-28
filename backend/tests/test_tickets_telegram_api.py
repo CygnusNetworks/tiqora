@@ -206,6 +206,8 @@ class _FakeGateway:
         # one specific part of a multi-part retract to fail (the others must
         # still succeed).
         self.fail_message_ids: dict[int, str] = {}
+        # edit_message_reply_markup only: Telegram's refusal text to raise.
+        self.reply_markup_error: str | None = None
 
     def _ok(self, method: str, **kwargs: Any) -> dict[str, Any]:
         self.calls.append((method, kwargs))
@@ -241,6 +243,19 @@ class _FakeGateway:
 
     async def send_chat_action(self, chat_id: int | str, action: str = "typing") -> None:
         self._ok("send_chat_action", chat_id=chat_id, action=action)
+
+    async def edit_message_reply_markup(
+        self, chat_id: int | str, message_id: int, reply_markup: dict[str, Any] | None
+    ) -> None:
+        if self.reply_markup_error is not None:
+            self.calls.append(("edit_message_reply_markup", {"message_id": message_id}))
+            raise TelegramApiError(self.reply_markup_error)
+        self._ok(
+            "edit_message_reply_markup",
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=reply_markup,
+        )
 
 
 @pytest.fixture
@@ -1055,3 +1070,150 @@ async def test_merge_moves_telegram_map_rows_to_main_ticket(
         info = await client.get(f"/api/v1/tickets/{TICKET_ID}/telegram")
     assert info.status_code == 200, info.text
     assert MERGE_ARTICLE_ID in {m["article_id"] for m in info.json()["messages"]}
+
+
+# ---------------------------------------------------------------------------
+# Removing the inline keyboard from a sent message
+# ---------------------------------------------------------------------------
+
+_YES_NO = [{"label": "Ja", "action": "resolve_yes"}, {"label": "Nein", "action": "resolve_no"}]
+
+
+def _map_row(sync_url: str, article_id: int) -> tuple[int, str | None]:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT message_id, buttons_json FROM tiqora_telegram_message WHERE article_id = :a"
+            ),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    return int(row[0]), row[1]
+
+
+def _buttons_path(article_id: int) -> str:
+    return f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram/buttons"
+
+
+async def test_remove_buttons_clears_keyboard_and_meta(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client, telegram_buttons=_YES_NO)
+        message_id, _ = _map_row(url, article_id)
+        resp = await client.delete(_buttons_path(article_id))
+        info = await client.get(f"/api/v1/tickets/{TICKET_ID}/telegram")
+    assert resp.status_code == 204, resp.text
+    assert gateway.calls[-1] == (
+        "edit_message_reply_markup",
+        {"chat_id": CHAT_ID, "message_id": message_id, "reply_markup": None},
+    )
+    assert _map_row(url, article_id)[1] is None
+    meta = {m["article_id"]: m for m in info.json()["messages"]}[article_id]
+    assert meta["buttons"] == []
+    assert meta["retracted_at"] is None
+    assert any(n.startswith(f"%%TelegramButtonsRemoved%%{article_id}") for n in _history_names(url))
+
+
+async def test_remove_buttons_without_buttons_is_409(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    _url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client)
+        calls_before = len(gateway.calls)
+        resp = await client.delete(_buttons_path(article_id))
+    assert resp.status_code == 409, resp.text
+    assert "keine Buttons" in resp.json()["detail"]
+    assert len(gateway.calls) == calls_before
+
+
+async def test_remove_buttons_after_answer_is_409(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client, telegram_buttons=_YES_NO)
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "UPDATE tiqora_telegram_message SET answered_button = 0,"
+                " answered_at = current_timestamp WHERE article_id = :a"
+            ),
+            {"a": article_id},
+        )
+    engine.dispose()
+    calls_before = len(gateway.calls)
+    async with _client(factory) as client:
+        resp = await client.delete(_buttons_path(article_id))
+    assert resp.status_code == 409, resp.text
+    assert len(gateway.calls) == calls_before
+    assert _map_row(url, article_id)[1] is not None
+
+
+async def test_remove_buttons_on_customer_article_is_409(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    _insert_customer_article(url)
+    async with _client(factory) as client:
+        resp = await client.delete(_buttons_path(CUSTOMER_ARTICLE_ID))
+    assert resp.status_code == 409, resp.text
+    assert gateway.calls == []
+
+
+async def test_remove_buttons_on_foreign_ticket_article_is_404(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    _insert_foreign_ticket_article(url)
+    async with _client(factory) as client:
+        resp = await client.delete(_buttons_path(FOREIGN_ARTICLE_ID))
+    assert resp.status_code == 404, resp.text
+    assert gateway.calls == []
+
+
+async def test_remove_buttons_requires_note_permission(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, _gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client, telegram_buttons=_YES_NO)
+    async with _client(factory, user_id=OUTSIDER, login="outsider") as client:
+        resp = await client.delete(_buttons_path(article_id))
+    assert resp.status_code == 403, resp.text
+    assert _map_row(url, article_id)[1] is not None
+
+
+async def test_remove_buttons_refused_by_telegram_is_409_and_unchanged(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client, telegram_buttons=_YES_NO)
+        gateway.reply_markup_error = "Bad Request: chat not found"
+        resp = await client.delete(_buttons_path(article_id))
+    assert resp.status_code == 409, resp.text
+    assert "chat not found" in resp.json()["detail"]
+    assert _map_row(url, article_id)[1] is not None
+    assert not any(n.startswith("%%TelegramButtonsRemoved%%") for n in _history_names(url))
+
+
+async def test_remove_buttons_already_gone_counts_as_success(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    """Keyboard already empty at Telegram ("message is not modified") -- the
+    goal is reached, so the stored buttons are cleared anyway."""
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client, telegram_buttons=_YES_NO)
+        gateway.reply_markup_error = (
+            "Bad Request: message is not modified: specified new message content"
+            " and reply markup are exactly the same"
+        )
+        resp = await client.delete(_buttons_path(article_id))
+    assert resp.status_code == 204, resp.text
+    assert _map_row(url, article_id)[1] is None

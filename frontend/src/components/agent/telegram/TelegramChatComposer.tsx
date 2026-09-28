@@ -455,7 +455,12 @@ export function TelegramChatComposer({
       <ComposerFooter
         length={body.length}
         buttonsOn={buttonsOn}
-        onToggleButtons={() => setButtonsOn((v) => !v)}
+        onToggleButtons={() => {
+          // Off = discard: hidden buttons must not come back (or be sent)
+          // the next time the editor opens.
+          if (buttonsOn) setButtons([]);
+          setButtonsOn(!buttonsOn);
+        }}
         nextOptions={next.canSetState ? next.options : []}
         nextState={nextState}
         onNextState={setNextState}
