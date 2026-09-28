@@ -515,13 +515,35 @@ describe("ArticleMasterDetail — Telegram chat composer", () => {
     listTemplates.mockReset().mockResolvedValue([]);
   });
 
-  it("puts the chat composer between the conversation and the note composer", async () => {
+  const follows = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it("defaults to newest-first with the chat composer above the conversation", async () => {
     wrap(<ArticleMasterDetail ticketId={12} />);
     const composer = await screen.findByTestId("tg-composer");
     const conversation = screen.getByTestId("article-conversation");
-    const note = screen.getByTestId("composer-open");
-    expect(conversation.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(composer.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(conversation).toHaveAttribute("data-order", "newest-first");
+    expect(follows(composer, conversation)).toBe(true);
+    expect(follows(composer, screen.getByTestId("composer-open"))).toBe(true);
+    expect(screen.getByTestId("article-sort-toggle")).toBeEnabled();
+  });
+
+  it("the sort toggle puts the chat composer between the conversation and the note composer", async () => {
+    wrap(<ArticleMasterDetail ticketId={12} />);
+    await screen.findByTestId("tg-composer");
+    fireEvent.click(screen.getByTestId("article-sort-toggle"));
+    const composer = screen.getByTestId("tg-composer");
+    const conversation = screen.getByTestId("article-conversation");
+    expect(conversation).toHaveAttribute("data-order", "oldest-first");
+    expect(follows(conversation, composer)).toBe(true);
+    expect(follows(composer, screen.getByTestId("composer-open"))).toBe(true);
+  });
+
+  it("keeps the sort toggle disabled in a non-Telegram conversation", async () => {
+    wrap(<ArticleMasterDetail ticketId={8} />);
+    await screen.findByTestId("article-conversation");
+    expect(screen.getByTestId("article-sort-toggle")).toBeDisabled();
+    expect(screen.getByTestId("article-conversation")).toHaveAttribute("data-order", "oldest-first");
   });
 
   it("drops the chat composer in the split view and without note permission", async () => {

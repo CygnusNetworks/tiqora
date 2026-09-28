@@ -64,8 +64,11 @@ export function ArticleMasterDetail({
   useEffect(() => {
     onComposingChange?.(composing);
   }, [composing, onComposingChange]);
-  const showChatComposer =
-    view === "conversation" && canNote && dominantChannel(state.articles) === "Telegram";
+  const isTelegram = dominantChannel(state.articles) === "Telegram";
+  const showChatComposer = view === "conversation" && canNote && isTelegram;
+  // A Telegram chat follows the shared sort toggle (newest-first = newest
+  // message and the composer on top); other conversations stay chronological.
+  const sortLocked = view === "conversation" && !isTelegram;
 
   if (state.isLoading) {
     return (
@@ -103,12 +106,12 @@ export function ArticleMasterDetail({
               {t("ticket.filterNotes")}
             </FilterButton>
           </div>
-          <span title={view === "conversation" ? t("ticket.sortDisabledInConversation") : undefined}>
+          <span title={sortLocked ? t("ticket.sortDisabledInConversation") : undefined}>
             <Button
               size="sm"
               variant="ghost"
               data-testid="article-sort-toggle"
-              disabled={view === "conversation"}
+              disabled={sortLocked}
               onClick={state.toggleDescending}
             >
               ⇅ {state.descending ? t("ticket.sortNewestFirst") : t("ticket.sortOldestFirst")}
@@ -133,13 +136,13 @@ export function ArticleMasterDetail({
           canNote={canNote}
           canDelete={canDelete}
           locale={locale}
+          newestFirst={isTelegram && state.descending}
+          composer={
+            showChatComposer ? (
+              <TelegramChatComposer ticketId={ticketId} onComposingChange={setChatComposing} />
+            ) : undefined
+          }
         />
-      )}
-
-      {/* Messenger-style input right under the chat; the internal-note
-          composer stays below it for notes. */}
-      {showChatComposer && (
-        <TelegramChatComposer ticketId={ticketId} onComposingChange={setChatComposing} />
       )}
 
       {canNote && (

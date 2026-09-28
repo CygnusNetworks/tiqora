@@ -5869,6 +5869,28 @@ export interface paths {
         patch: operations["edit_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_patch"];
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram/buttons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Telegram Article Buttons
+         * @description Remove the inline keyboard from a previously sent agent Telegram
+         *     message that no button has been answered on yet. Requires ``note``
+         *     (same as edit/retract).
+         */
+        delete: operations["remove_telegram_article_buttons_api_v1_tickets__ticket_id__articles__article_id__telegram_buttons_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram/retract": {
         parameters: {
             query?: never;
@@ -29205,6 +29227,40 @@ export interface operations {
                 "application/json": components["schemas"]["TelegramEditRequest"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_telegram_article_buttons_api_v1_tickets__ticket_id__articles__article_id__telegram_buttons_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {

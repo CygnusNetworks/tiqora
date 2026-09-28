@@ -1,4 +1,5 @@
-"""Telegram chat-composer endpoints: chat info, typing, edit, retract (Task 6).
+"""Telegram chat-composer endpoints: chat info, typing, edit, retract, button
+removal (Task 6).
 
 Split out of ``api.v1.tickets`` (already large) into its own router, still
 mounted under the same ``/tickets`` prefix. Reuses ``tickets.py``'s
@@ -213,6 +214,39 @@ async def retract_telegram_article(
             t = await _ticket_must_exist(session, ticket_id)
             await svc._assert(user.id, int(t["queue_id"]), "note")
             await chat_actions.retract_message(
+                session, ticket_id=ticket_id, article_id=article_id, user_id=user.id
+            )
+    except (
+        WriteNotFound,
+        WriteAccessDenied,
+        chat_actions.TelegramMessageNotFound,
+        chat_actions.TelegramActionConflict,
+        TelegramDeliveryError,
+    ) as exc:
+        raise _map_action_exc(exc) from exc
+
+
+@router.delete(
+    "/{ticket_id}/articles/{article_id}/telegram/buttons",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def remove_telegram_article_buttons(
+    ticket_id: int,
+    article_id: int,
+    user: CurrentUser,
+    session: DbSession,
+    settings: AppSettings,
+) -> None:
+    """Remove the inline keyboard from a previously sent agent Telegram
+    message that no button has been answered on yet. Requires ``note``
+    (same as edit/retract).
+    """
+    svc = _write_service(session, settings)
+    try:
+        async with session.begin():
+            t = await _ticket_must_exist(session, ticket_id)
+            await svc._assert(user.id, int(t["queue_id"]), "note")
+            await chat_actions.remove_buttons(
                 session, ticket_id=ticket_id, article_id=article_id, user_id=user.id
             )
     except (

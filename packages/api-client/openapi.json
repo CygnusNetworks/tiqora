@@ -58143,6 +58143,83 @@
         ]
       }
     },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram/buttons": {
+      "delete": {
+        "description": "Remove the inline keyboard from a previously sent agent Telegram\nmessage that no button has been answered on yet. Requires ``note``\n(same as edit/retract).",
+        "operationId": "remove_telegram_article_buttons_api_v1_tickets__ticket_id__articles__article_id__telegram_buttons_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Telegram Article Buttons",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram/retract": {
       "post": {
         "description": "Delete a previously sent agent Telegram message (and its attachment\nparts). Requires ``note``.",
