@@ -115,7 +115,8 @@ def added_lines(patch: str) -> str:
 
 def main() -> int:
     mode, label = sys.argv[1], sys.argv[2]
-    raw = sys.stdin.read()
+    # Diffs may carry binary or non-UTF-8 content; decode what is text.
+    raw = sys.stdin.buffer.read().decode("utf-8", errors="replace")
     text = added_lines(raw) if mode == "patch" else raw
     problems = check(text)
     if not problems:
