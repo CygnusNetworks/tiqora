@@ -500,6 +500,56 @@ async def test_inbound_quote_unknown_message_id_leaves_reply_to_article_id_none(
 
 
 @pytest.mark.db
+async def test_inbound_duplicate_delivery_does_not_crash_message_map(
+    mariadb_znuny_url: str,
+) -> None:
+    """Webhook retry racing the offset advance: two ``process_update`` calls
+    for the very same ``(chat_id, message_id)`` must not raise -- the second
+    call's ``record_message`` is a no-op thanks to the ``get_by_message``
+    guard in ``process_update`` (see module docstring / Task 3 report), so
+    exactly one map row survives and it still points at the first article."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                await set_setting(
+                    session, "channel.telegram.default_customer_user", "portal-default"
+                )
+                await set_setting(session, "channel.telegram.consent_required", "0")
+                sysconfig = SysConfig(session)
+
+                update = _text_message(9704, "Duplicate delivery", message_id=301)
+
+                first = await process_update(session, factory, sysconfig, None, update, user_id=1)
+                await session.commit()
+
+                # Same update delivered a second time, as if a webhook retry
+                # raced the offset advance -- must not raise IntegrityError
+                # on the (chat_id, message_id) unique index.
+                await process_update(session, factory, sysconfig, None, update, user_id=1)
+                await session.commit()
+
+                rows = (
+                    await session.execute(
+                        text(
+                            "SELECT article_id FROM tiqora_telegram_message"
+                            " WHERE chat_id = :cid AND message_id = :mid"
+                        ),
+                        {"cid": 9704, "mid": 301},
+                    )
+                ).all()
+                assert len(rows) == 1
+                assert rows[0][0] == first["article_id"]
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
 async def test_two_unknown_chat_ids_create_two_tickets(mariadb_znuny_url: str) -> None:
     """Regression guard: two different Telegram users both falling back to the
     same default_customer_user must NOT be merged into one ticket."""
