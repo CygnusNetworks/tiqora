@@ -99,6 +99,10 @@ class PlaceholderContext:
     config_overrides: dict[str, str] = field(default_factory=dict)
     customer_body: str | None = None
     customer_realname: str | None = None
+    # The triggering article for OTRS_AGENT_SUBJECT/BODY/NOTE (notifications);
+    # None outside an article context, where those tags stay empty.
+    agent_subject: str | None = None
+    agent_body: str | None = None
     escape_html: bool = False
     queue_name: str = ""
     customer_subject: str = ""
@@ -575,6 +579,13 @@ async def _resolve_tag(
         field = tag[len("AGENT_") :]
         field_u = field.upper()
         # Agent article subject/body need article context — empty when absent.
+        if field_u.startswith("SUBJECT") and ctx.agent_subject is not None:
+            if bracket and bracket.isdigit():
+                return ctx.agent_subject[: int(bracket)]
+            return ctx.agent_subject
+        if field_u in {"BODY", "NOTE"} and ctx.agent_body is not None:
+            lines = ctx.agent_body.splitlines()
+            return "\n".join(lines[: int(bracket)] if bracket and bracket.isdigit() else lines)
         if field_u in {"SUBJECT", "BODY", "NOTE", "EMAIL"}:
             return ""
         found = _lookup(ctx.current_user, field)

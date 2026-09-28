@@ -46,6 +46,8 @@ from tiqora.znuny.history import (
     TYPE_FOLLOW_UP,
     TYPE_MISC,
     TYPE_PHONE_CALL_AGENT,
+    TYPE_SEND_ANSWER,
+    TYPE_WEB_REQUEST_CUSTOMER,
     add_archive_flag_update,
     add_article_history,
     add_customer_update,
@@ -210,6 +212,9 @@ async def _emit_event(
 # have their notification rules bound to these names. Emitting them keeps
 # those rules working after the takeover.
 # ---------------------------------------------------------------------------
+
+# Chat-like channels without a history type of their own in Znuny.
+_CHAT_CHANNELS: Final = frozenset({"telegram", "sms", "whatsapp"})
 
 # ArticleCreate history types that make the *first* article of a ticket a
 # ``NotificationNewTicket`` (MIMEBase.pm: EmailAgent|EmailCustomer|
@@ -709,6 +714,24 @@ async def add_article(
             from tiqora.znuny.history import TYPE_PHONE_CALL_CUSTOMER
 
             history_type = TYPE_PHONE_CALL_CUSTOMER
+    elif channel_lower in _CHAT_CHANNELS and article.is_visible_for_customer:
+        # Znuny has no chat history types; a chat message is a web request.
+        # Customer: the first message opens the ticket (NotificationNewTicket),
+        # later ones are follow-ups (NotificationFollowUp) -- as AddNote they
+        # reached agents as a "new note" mail without its text. Agent: an
+        # answer to the customer, like an email reply (no notification).
+        if article.sender_type == "agent":
+            history_type = TYPE_SEND_ANSWER
+        elif article.sender_type == "customer":
+            earlier = (
+                await session.execute(
+                    text("SELECT 1 FROM article WHERE ticket_id = :tid AND id < :aid LIMIT 1"),
+                    {"tid": ticket_id, "aid": article_id},
+                )
+            ).first()
+            history_type = TYPE_WEB_REQUEST_CUSTOMER if earlier is None else TYPE_FOLLOW_UP
+        else:
+            history_type = TYPE_ADD_NOTE
     else:
         history_type = TYPE_ADD_NOTE
 
@@ -785,8 +808,16 @@ async def add_article(
     elif history_type == TYPE_FOLLOW_UP:
         legacy_event = "NotificationFollowUp"
     if legacy_event is not None:
+        # NotificationEvent.pm never mails the agent who wrote the article
+        # (unless AgentSelfNotifyOnAction) -- an agent's own Telegram reply
+        # used to come back to them as a notification.
+        self_notify = str(await sysconfig.get("AgentSelfNotifyOnAction")) in {"1", "True"}
         await _emit_legacy_notification(
-            session, legacy_event, ticket_id, {"article_id": article_id}
+            session,
+            legacy_event,
+            ticket_id,
+            {"article_id": article_id},
+            skip_user_ids=() if self_notify else (user_id,),
         )
 
     # Outbox event
