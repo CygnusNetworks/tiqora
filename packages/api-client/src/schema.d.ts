@@ -5597,6 +5597,10 @@ export interface paths {
          *     delivered then stored (send-then-store). Delivery failure returns HTTP 502
          *     and does not leave a silent no-op 201.
          *
+         *     Telegram replies may carry ``attachments``, ``telegram_buttons`` and
+         *     ``telegram_reply_to_article_id`` (422 on any other channel); a failed
+         *     Telegram send returns 409 with nothing stored.
+         *
          *     With ``state_id`` the ticket's state is changed after the article, in the
          *     same transaction (PATCH semantics). The state change is validated before
          *     the article is created, so an invalid one returns 403/404/422 without
@@ -5838,6 +5842,48 @@ export interface paths {
          * @description Split an article into a new linked ticket. Requires ``rw`` + ``create``.
          */
         post: operations["split_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit Telegram Article
+         * @description Edit a previously sent agent Telegram message's text (keeps its
+         *     keyboard unless already answered). Requires ``note``.
+         */
+        patch: operations["edit_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_patch"];
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/telegram/retract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retract Telegram Article
+         * @description Delete a previously sent agent Telegram message (and its attachment
+         *     parts). Requires ``note``.
+         */
+        post: operations["retract_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_retract_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6109,6 +6155,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Telegram Chat
+         * @description Telegram chat info for a ticket: contact identity + per-article message
+         *     metadata (edit/retract state, buttons, answered button). Requires ``ro``.
+         *     404 when the ticket has no Telegram chat to resolve.
+         */
+        get: operations["get_telegram_chat_api_v1_tickets__ticket_id__telegram_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/telegram/typing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Telegram Typing
+         * @description Best-effort typing indicator for the ticket's Telegram chat. Requires
+         *     ``note``. Meant to be called at most every few seconds while an agent is
+         *     composing -- no server-side throttle, the frontend paces its own calls.
+         */
+        post: operations["send_telegram_typing_api_v1_tickets__ticket_id__telegram_typing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/templates": {
         parameters: {
             query?: never;
@@ -6118,7 +6208,7 @@ export interface paths {
         };
         /**
          * Ticket Templates
-         * @description Response templates (template_type='Answer') for the ticket's queue.
+         * @description Response templates for the ticket's queue (default template_type='Answer').
          */
         get: operations["ticket_templates_api_v1_tickets__ticket_id__templates_get"];
         put?: never;
@@ -7846,6 +7936,18 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** ArticleAttachmentIn */
+        ArticleAttachmentIn: {
+            /** Content Base64 */
+            content_base64: string;
+            /**
+             * Content Type
+             * @default application/octet-stream
+             */
+            content_type: string;
+            /** Filename */
+            filename: string;
+        };
         /** ArticleBody */
         ArticleBody: {
             /** Article Id */
@@ -7861,6 +7963,8 @@ export interface components {
         ArticleCreateRequest: {
             /** Ai Draft Id */
             ai_draft_id?: number | null;
+            /** Attachments */
+            attachments?: components["schemas"]["ArticleAttachmentIn"][];
             /** Bcc */
             bcc?: string | null;
             /** Body */
@@ -7903,6 +8007,10 @@ export interface components {
             state_id?: number | null;
             /** Subject */
             subject: string;
+            /** Telegram Buttons */
+            telegram_buttons?: components["schemas"]["TelegramButtonIn"][];
+            /** Telegram Reply To Article Id */
+            telegram_reply_to_article_id?: number | null;
             /** To Address */
             to_address?: string | null;
         };
@@ -12606,6 +12714,61 @@ export interface components {
             article_count: number;
             /** Name */
             name: string;
+        };
+        /** TelegramButtonIn */
+        TelegramButtonIn: {
+            /**
+             * Action
+             * @default reply
+             * @enum {string}
+             */
+            action: "reply" | "resolve_yes" | "resolve_no";
+            /** Label */
+            label: string;
+        };
+        /** TelegramChatOut */
+        TelegramChatOut: {
+            /** Ai Escalated At */
+            ai_escalated_at: string | null;
+            /** Chat Id */
+            chat_id: number;
+            /** Consent Time */
+            consent_time: string | null;
+            /** Customer User Login */
+            customer_user_login: string | null;
+            /** Display Name */
+            display_name: string | null;
+            /** Identity Verified */
+            identity_verified: boolean;
+            /** Messages */
+            messages: components["schemas"]["TelegramMessageMeta"][];
+            /** Username */
+            username: string | null;
+        };
+        /** TelegramEditRequest */
+        TelegramEditRequest: {
+            /** Body */
+            body: string;
+        };
+        /** TelegramMessageMeta */
+        TelegramMessageMeta: {
+            /** Answered Button */
+            answered_button: number | null;
+            /** Article Id */
+            article_id: number;
+            /** Buttons */
+            buttons: components["schemas"]["TelegramButtonIn"][];
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "in" | "out";
+            /** Edited At */
+            edited_at: string | null;
+            /** Reply To Article Id */
+            reply_to_article_id: number | null;
+            /** Retracted At */
+            retracted_at: string | null;
         };
         /** TelegramWebhookRegisterRequest */
         TelegramWebhookRegisterRequest: {
@@ -29021,6 +29184,78 @@ export interface operations {
             };
         };
     };
+    edit_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TelegramEditRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retract_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_retract_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ticket_customer_link_api_v1_tickets__ticket_id__customer_link_get: {
         parameters: {
             query?: never;
@@ -29613,9 +29848,79 @@ export interface operations {
             };
         };
     };
-    ticket_templates_api_v1_tickets__ticket_id__templates_get: {
+    get_telegram_chat_api_v1_tickets__ticket_id__telegram_get: {
         parameters: {
             query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_telegram_typing_api_v1_tickets__ticket_id__telegram_typing_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_templates_api_v1_tickets__ticket_id__templates_get: {
+        parameters: {
+            query?: {
+                type?: "Answer" | "Chat";
+            };
             header?: {
                 authorization?: string | null;
             };
