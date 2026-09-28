@@ -29,6 +29,9 @@ logger = structlog.get_logger(__name__)
 
 MAX_IMAGES_PER_RUN = 4
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
+# Vision models on offer are mostly reasoning models: their hidden thinking
+# counts against max_tokens, so 512 left an empty description.
+VISION_MAX_TOKENS = 2048
 
 _DESCRIBE_PROMPT = (
     "Beschreibe präzise und sachlich, was auf dem Bild zu sehen ist, inkl. lesbarem Text."
@@ -81,7 +84,9 @@ async def describe_images(
                     content=_build_content(filename, content_type, content),
                 )
             ]
-            response = await client.chat(messages=messages, tools=None, max_tokens=512)
+            response = await client.chat(
+                messages=messages, tools=None, max_tokens=VISION_MAX_TOKENS
+            )
             description = (response.content or "").strip()
             if usage_sink is not None:
                 usage_sink.append(response.usage)

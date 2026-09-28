@@ -26,11 +26,32 @@ from tiqora.ai.models import IDENTITY_CLARIFY_SCHEMA, TiqoraAiQueuePolicy, Tiqor
 from tiqora.channels.telegram.outbound import TelegramDeliveryError, resolve_chat_id
 from tiqora.db.tiqora.models import TiqoraTelegramContact
 
-# Max failed identity-claim attempts before the run escalates to a
-# human-reviewed draft instead of asking again (plan: identity verification).
-MAX_IDENTITY_ATTEMPTS = 3
+# Failed identity claims before a human takes over. One retry covers a typo;
+# a customer who is not in customer_user yet (new tenancy) can never pass, so
+# asking a third time only delays the handoff.
+MAX_IDENTITY_ATTEMPTS = 2
+
+# Sent verbatim instead of the model's acknowledgement once a claim has been
+# checked. The channel is Telegram only (see the module docstring), where the
+# configured tone is informal German. ``{fields}`` lists the field labels.
+IDENTITY_NO_MATCH_TEXT = (
+    "Mit diesen Angaben ({fields}) konnte ich dich leider nicht finden. "
+    "Bitte prüf sie noch einmal und schick sie mir erneut."
+)
+IDENTITY_HANDOFF_TEXT = (
+    "Ich konnte dich leider nicht zuordnen. Ich gebe dein Anliegen an unser Team "
+    "weiter, jemand meldet sich bei dir."
+)
 
 _COLUMN_NAME_RE = re.compile(r"^[a-z0-9_]+$")
+
+# Characters people add or drop when typing an identifier ("123-45-67-89-0"
+# vs "1234567890"). Stripped on both sides before comparing.
+_CLAIM_SEPARATORS = (" ", "-", ".", "/")
+
+# Shorter claimed values never identify anyone: some rows carry "0" as a
+# placeholder, and matching it would let a WP number alone take over a chat.
+MIN_CLAIM_VALUE_LENGTH = 3
 
 _TELEGRAM_CHANNEL = "telegram"
 
@@ -115,10 +136,11 @@ async def verify_identity_claim(
     fields: list[ClarifySchemaField],
     values: dict[str, str],
 ) -> str | None:
-    """Deterministic match: every configured field must equal (case/trim
-    insensitive) the claimed value, against a *valid* (``valid_id = 1``)
-    ``customer_user`` row. Returns the login on exactly one match, else
-    ``None`` (no match or ambiguous)."""
+    """Deterministic match: every configured field must equal the claimed
+    value, ignoring case and :data:`_CLAIM_SEPARATORS`, against a *valid*
+    (``valid_id = 1``) ``customer_user`` row. Returns the login on exactly one
+    match, else ``None`` (no match, ambiguous, or a value shorter than
+    :data:`MIN_CLAIM_VALUE_LENGTH`)."""
     if not fields:
         return None
     conditions: list[str] = []
@@ -129,10 +151,16 @@ async def verify_identity_claim(
             # never interpolate an unvalidated column name into SQL.
             return None
         value = values.get(field.column)
-        if not isinstance(value, str) or not value.strip():
+        if not isinstance(value, str):
             return None
-        conditions.append(f"TRIM(LOWER(cu.{field.column})) = TRIM(LOWER(:v{idx}))")
-        params[f"v{idx}"] = value.strip()
+        normalized = _normalize_claim_value(value)
+        if len(normalized) < MIN_CLAIM_VALUE_LENGTH:
+            return None
+        column_sql = f"LOWER(cu.{field.column})"
+        for sep in _CLAIM_SEPARATORS:
+            column_sql = f"REPLACE({column_sql}, '{sep}', '')"
+        conditions.append(f"{column_sql} = :v{idx}")
+        params[f"v{idx}"] = normalized
     where_clause = " AND ".join(conditions)
     rows = (
         await session.execute(
@@ -143,6 +171,13 @@ async def verify_identity_claim(
     if len(rows) == 1:
         return str(rows[0][0])
     return None
+
+
+def _normalize_claim_value(value: str) -> str:
+    normalized = value.lower()
+    for sep in _CLAIM_SEPARATORS:
+        normalized = normalized.replace(sep, "")
+    return normalized
 
 
 async def get_customer_id_for_login(session: AsyncSession, login: str) -> str | None:
@@ -163,7 +198,10 @@ async def record_identity_attempt(session: AsyncSession, ticket_state: TiqoraAiT
 
 
 __all__ = [
+    "IDENTITY_HANDOFF_TEXT",
+    "IDENTITY_NO_MATCH_TEXT",
     "MAX_IDENTITY_ATTEMPTS",
+    "MIN_CLAIM_VALUE_LENGTH",
     "ClarifySchemaField",
     "get_customer_id_for_login",
     "get_customer_user_columns",

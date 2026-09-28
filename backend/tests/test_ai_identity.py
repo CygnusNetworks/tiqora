@@ -311,3 +311,46 @@ async def test_verify_identity_claim_requires_all_fields() -> None:
 
     result = await verify_identity_claim(_NoCallSession(), fields, {"phone": "123"})  # type: ignore[arg-type]
     assert result is None
+
+
+async def test_verify_identity_claim_ignores_separators(mariadb_znuny_url: str) -> None:
+    """Production stores the WP number as ``999-99-99-99-9``; customers type
+    it without dashes. The claim has to match either way."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await session.execute(text("DELETE FROM customer_user WHERE login = 'idclaim5'"))
+            await _insert_customer_user(session, login="idclaim5", phone="123-45-67-89-0")
+            await session.commit()
+
+            assert (
+                await verify_identity_claim(session, _PHONE_FIELD, {"phone": "1234567890"})
+                == "idclaim5"
+            )
+            assert (
+                await verify_identity_claim(session, _PHONE_FIELD, {"phone": "123 45 67.89/0"})
+                == "idclaim5"
+            )
+            await session.execute(text("DELETE FROM customer_user WHERE login = 'idclaim5'"))
+            await session.commit()
+    finally:
+        await engine.dispose()
+
+
+async def test_verify_identity_claim_rejects_placeholder_values(mariadb_znuny_url: str) -> None:
+    """Some rows carry ``0`` as PKZ. A claim of "0" must not identify anyone,
+    or knowing a WP number would be enough to take over its chat."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await session.execute(text("DELETE FROM customer_user WHERE login = 'idclaim6'"))
+            await _insert_customer_user(session, login="idclaim6", phone="0")
+            await session.commit()
+
+            assert await verify_identity_claim(session, _PHONE_FIELD, {"phone": "0"}) is None
+            await session.execute(text("DELETE FROM customer_user WHERE login = 'idclaim6'"))
+            await session.commit()
+    finally:
+        await engine.dispose()
