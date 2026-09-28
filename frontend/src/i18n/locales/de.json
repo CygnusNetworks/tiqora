@@ -792,7 +792,11 @@
         "attachTooLarge": "Anhänge zusammen über {{max}} – nicht angehängt.",
         "attachReadFailed": "Datei konnte nicht gelesen werden.",
         "encoding": "lädt …",
-        "snippets": "Textbausteine"
+        "snippets": "Textbausteine",
+        "attachTooLargeServer": "Anhänge sind zu groß für den Versand.",
+        "aiReplaceTitle": "Text ersetzen?",
+        "aiReplaceMessage": "Der KI-Vorschlag ersetzt den Text, den du schon geschrieben hast.",
+        "aiReplaceConfirm": "Ersetzen"
       }
     }
   },

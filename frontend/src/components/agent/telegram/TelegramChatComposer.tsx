@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type ArticleCreateRequest, type TelegramButtonIn, type TemplateOut } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
 import { useComposerLock } from "@/lib/composerLock";
 import { telegramChatKey, useTelegramChat } from "@/lib/telegramChatApi";
@@ -45,6 +46,7 @@ export function TelegramChatComposer({
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -141,9 +143,23 @@ export function TelegramChatComposer({
     ticketLock.lockedBy === null &&
     !(nextState === "pending" && !pendingDate);
 
+  // What the in-flight send took, so success clears exactly that and keeps
+  // anything the agent typed, attached or changed while it was on its way.
+  type Sent = {
+    payload: ArticleCreateRequest;
+    attachmentIds: number[];
+    quoteId: number | null;
+    aiDraftId: number | null;
+    buttons: TelegramButtonIn[];
+    nextState: NextState;
+  };
+  const latest = useRef({ buttons, nextState });
+  latest.current = { buttons, nextState };
+
   const send = useMutation({
-    mutationFn: (payload: ArticleCreateRequest) => api.createArticle(ticketId, payload),
-    onSuccess: (_res, payload) => {
+    mutationFn: (sent: Sent) => api.createArticle(ticketId, sent.payload),
+    onSuccess: (_res, sent) => {
+      const { payload } = sent;
       draftSync.markSent();
       void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
       void qc.invalidateQueries({ queryKey: ["tickets", ticketId] });
@@ -157,15 +173,18 @@ export function TelegramChatComposer({
         // Sending with ai_draft_id accepts the draft server-side.
         void qc.invalidateQueries({ queryKey: ["tickets", ticketId, "ai"] });
       }
-      setBody("");
-      setCaret(0);
-      attachments.clear();
-      setQuoteId(null);
-      setAiDraftId(null);
-      setButtonsOn(false);
-      setButtons([]);
-      setNextState("keep");
-      setPendingDate(defaultPendingDate());
+      setBody((b) => (b === payload.body ? "" : b));
+      attachments.removeMany(sent.attachmentIds);
+      setQuoteId((q) => (q === sent.quoteId ? null : q));
+      setAiDraftId((a) => (a === sent.aiDraftId ? null : a));
+      if (latest.current.buttons === sent.buttons) {
+        setButtons([]);
+        setButtonsOn(false);
+      }
+      if (latest.current.nextState === sent.nextState) {
+        setNextState("keep");
+        setPendingDate(defaultPendingDate());
+      }
       inputRef.current?.focus();
     },
   });
@@ -174,26 +193,37 @@ export function TelegramChatComposer({
     if (!canSend || send.isPending) return;
     const telegramButtons = buttonsOn ? cleanButtons(buttons) : [];
     send.mutate({
-      sender_type: "agent",
-      // Empty on purpose: the backend uses the ticket title for Telegram.
-      subject: "",
-      body,
-      content_type: "text/plain; charset=utf-8",
-      channel: "telegram",
-      is_visible_for_customer: true,
-      ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
-      telegram_reply_to_article_id: quoteId,
-      ...(telegramButtons.length > 0 ? { telegram_buttons: telegramButtons } : {}),
-      ai_draft_id: aiDraftId,
-      ...next.payloadFor(nextState, pendingDate),
+      payload: {
+        sender_type: "agent",
+        // Empty on purpose: the backend uses the ticket title for Telegram.
+        subject: "",
+        body,
+        content_type: "text/plain; charset=utf-8",
+        channel: "telegram",
+        is_visible_for_customer: true,
+        ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
+        telegram_reply_to_article_id: quoteId,
+        ...(telegramButtons.length > 0 ? { telegram_buttons: telegramButtons } : {}),
+        ai_draft_id: aiDraftId,
+        ...next.payloadFor(nextState, pendingDate),
+      },
+      attachmentIds: attachments.payloadIds,
+      quoteId,
+      aiDraftId,
+      buttons,
+      nextState,
     });
   };
 
-  const sendError = send.error
-    ? send.error instanceof ApiError && !send.error.message.startsWith("HTTP ")
-      ? send.error.message
-      : t("ticket.telegram.composer.sendError")
-    : null;
+  const sendError = !send.error
+    ? null
+    : send.error instanceof ApiError && send.error.status === 413
+      ? // nginx refuses the body before the API sees it — its HTML page is
+        // no message for the agent.
+        t("ticket.telegram.composer.attachTooLargeServer")
+      : send.error instanceof ApiError && !send.error.message.startsWith("HTTP ")
+        ? send.error.message
+        : t("ticket.telegram.composer.sendError");
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // IME composition (e.g. Japanese input) uses Enter to confirm a word.
@@ -232,8 +262,18 @@ export function TelegramChatComposer({
     if (value.trim()) ping();
   };
 
-  const takeSuggestion = () => {
+  const takeSuggestion = async () => {
     if (!suggestion) return;
+    // Taking the suggestion replaces the field — don't lose typed text silently.
+    if (body.trim() && body !== suggestion.body) {
+      const ok = await confirm({
+        title: t("ticket.telegram.composer.aiReplaceTitle"),
+        message: t("ticket.telegram.composer.aiReplaceMessage"),
+        confirmLabel: t("ticket.telegram.composer.aiReplaceConfirm"),
+        variant: "danger",
+      });
+      if (!ok) return;
+    }
     setBody(suggestion.body);
     setCaret(suggestion.body.length);
     setAiDraftId(suggestion.id);
@@ -255,7 +295,11 @@ export function TelegramChatComposer({
         e.preventDefault();
         setDragOver(true);
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragLeave={(e) => {
+        // Moving over a child fires dragleave on the parent too.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragOver(false);
+      }}
       onDrop={(e) => {
         setDragOver(false);
         if (e.dataTransfer.files.length === 0) return;
@@ -267,6 +311,7 @@ export function TelegramChatComposer({
         dragOver ? "border-accent ring-1 ring-accent" : "border-hairline",
       )}
     >
+      {confirmDialog}
       <ComposerLockBanner
         lockedBy={ticketLock.lockedBy}
         onTakeOver={ticketLock.takeOver}
@@ -283,7 +328,7 @@ export function TelegramChatComposer({
           <button
             type="button"
             data-testid="tg-composer-ai-take"
-            onClick={takeSuggestion}
+            onClick={() => void takeSuggestion()}
             className="shrink-0 font-semibold text-purple hover:underline"
           >
             {t("ticket.telegram.composer.aiTake")}

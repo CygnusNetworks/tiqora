@@ -792,7 +792,11 @@
         "attachTooLarge": "Attachments exceed {{max}} in total – not attached.",
         "attachReadFailed": "The file could not be read.",
         "encoding": "loading …",
-        "snippets": "Snippets"
+        "snippets": "Snippets",
+        "attachTooLargeServer": "The attachments are too large to send.",
+        "aiReplaceTitle": "Replace text?",
+        "aiReplaceMessage": "The AI suggestion replaces the text you have already written.",
+        "aiReplaceConfirm": "Replace"
       }
     }
   },

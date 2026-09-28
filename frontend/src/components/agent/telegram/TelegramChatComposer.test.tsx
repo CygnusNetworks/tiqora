@@ -289,6 +289,56 @@ describe("TelegramChatComposer: attachments", () => {
     await waitFor(() => expect(screen.queryByTestId("tg-composer-attachment-0")).toBeNull());
   });
 
+  it("checks the cap against both of two adds in the same tick", async () => {
+    await mount();
+    const a = new File(["a"], "a.bin", { type: "application/octet-stream" });
+    const b = new File(["b"], "b.bin", { type: "application/octet-stream" });
+    Object.defineProperty(a, "size", { value: 10 * 1024 * 1024 });
+    Object.defineProperty(b, "size", { value: 10 * 1024 * 1024 });
+    const fileInput = screen.getByTestId("tg-composer-file");
+    act(() => {
+      fireEvent.change(fileInput, { target: { files: [a] } });
+      fireEvent.change(fileInput, { target: { files: [b] } });
+    });
+    expect(await screen.findByTestId("tg-composer-attach-error")).toBeTruthy();
+    expect(screen.getByTestId("tg-composer-attachment-0")).toHaveTextContent("a.bin");
+    expect(screen.queryByTestId("tg-composer-attachment-1")).toBeNull();
+  });
+
+  it("names a 413 from the proxy instead of a generic failure", async () => {
+    createArticle.mockRejectedValueOnce(new ApiError(413, "<html>413 Request Entity Too Large</html>", "/x"));
+    const input = await mount();
+    type(input, "mit Anhang");
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    const error = await screen.findByTestId("tg-composer-error");
+    expect(error).toHaveTextContent(i18n.t("ticket.telegram.composer.attachTooLargeServer"));
+    expect(error).not.toHaveTextContent("html");
+  });
+
+  it("keeps text and files added while a send was in flight", async () => {
+    let resolveSend: (v: unknown) => void = () => undefined;
+    createArticle.mockImplementationOnce(() => new Promise((r) => (resolveSend = r)));
+    const input = await mount();
+    const fileInput = screen.getByTestId("tg-composer-file");
+    type(input, "erste Nachricht");
+    fireEvent.change(fileInput, { target: { files: [new File(["1"], "first.txt", { type: "text/plain" })] } });
+    await waitFor(() => expect(screen.getByTestId("tg-composer-send")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+
+    type(input, "zweite Nachricht");
+    fireEvent.change(fileInput, { target: { files: [new File(["2"], "second.txt", { type: "text/plain" })] } });
+    await screen.findByTestId("tg-composer-attachment-1");
+    await act(async () => resolveSend({ article_id: 99 }));
+
+    await waitFor(() => expect(screen.queryByTestId("tg-composer-attachment-1")).toBeNull());
+    expect(input.value).toBe("zweite Nachricht");
+    expect(screen.getByTestId("tg-composer-attachment-0")).toHaveTextContent("second.txt");
+    expect(lastPayload().attachments).toEqual([
+      { filename: "first.txt", content_type: "text/plain", content_base64: "MQ==" },
+    ]);
+  });
+
   it("removes an attachment chip", async () => {
     await mount();
     const file = new File(["x"], "a.png", { type: "image/png" });
@@ -298,10 +348,10 @@ describe("TelegramChatComposer: attachments", () => {
     expect(screen.queryByTestId("tg-composer-attachment-0")).toBeNull();
   });
 
-  it("rejects files above 50 MB in total", async () => {
+  it("rejects files above 18 MB in total", async () => {
     await mount();
     const big = new File(["x"], "video.mp4", { type: "video/mp4" });
-    Object.defineProperty(big, "size", { value: 51 * 1024 * 1024 });
+    Object.defineProperty(big, "size", { value: 18 * 1024 * 1024 + 1 });
     fireEvent.change(screen.getByTestId("tg-composer-file"), { target: { files: [big] } });
     expect(await screen.findByTestId("tg-composer-attach-error")).toBeTruthy();
     expect(screen.queryByTestId("tg-composer-attachment-0")).toBeNull();
@@ -357,6 +407,24 @@ describe("TelegramChatComposer: quote, buttons, AI", () => {
     fireEvent.click(screen.getByTestId("tg-composer-send"));
     await waitFor(() => expect(createArticle).toHaveBeenCalled());
     expect(lastPayload().telegram_buttons).toEqual([{ label: "Morgen", action: "reply" }]);
+  });
+
+  it("asks before the AI suggestion replaces typed text", async () => {
+    getState.mockResolvedValue({
+      drafts: [{ id: 3, status: "open", kind: "reply", body: "KI-Text" }],
+    });
+    const input = await mount();
+    await screen.findByTestId("tg-composer-ai");
+    type(input, "mein eigener Text");
+
+    fireEvent.click(screen.getByTestId("tg-composer-ai-take"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-cancel"));
+    await waitFor(() => expect(screen.queryByTestId("confirm-dialog")).toBeNull());
+    expect(input.value).toBe("mein eigener Text");
+
+    fireEvent.click(screen.getByTestId("tg-composer-ai-take"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(input.value).toBe("KI-Text"));
   });
 
   it("offers an open AI draft and sends its id", async () => {
