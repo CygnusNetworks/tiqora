@@ -672,6 +672,50 @@ class TiqoraTelegramContact(TiqoraBase):
     __table_args__ = (Index("ix_tiqora_telegram_contact_customer_login", "customer_user_login"),)
 
 
+class TiqoraTelegramMessage(TiqoraBase):
+    """Maps one Tiqora article to the Telegram message(s) it was sent/received as.
+
+    One row per article, keyed by ``article_id`` (no FK, like
+    ``TiqoraAiArticleOrigin`` — Znuny's ``article`` table lives outside
+    ``tiqora_metadata``). ``direction`` is ``"out"`` for an agent-composed
+    message sent to the customer's chat, ``"in"`` for a customer message
+    stored as an article. ``chat_id``/``message_id`` identify the Telegram
+    message so inbound button callbacks and edit/retract actions (later
+    tasks) can look the row up either by article or by
+    ``(chat_id, message_id)``.
+
+    ``extra_message_ids`` holds a JSON list of message ids for additional
+    attachment messages sent alongside the primary text message (bot uploads
+    are one Telegram message per file). ``buttons_json`` records the inline
+    keyboard actually sent (if any); ``answered_button``/``answered_at`` are
+    set once a customer taps one. ``original_body`` preserves the
+    pre-edit text when an agent edits a sent message (Task 6).
+    """
+
+    __tablename__ = "tiqora_telegram_message"
+
+    article_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, nullable=False)
+    ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    message_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    direction: Mapped[str] = mapped_column(String(3), nullable=False)
+    extra_message_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reply_to_article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    buttons_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answered_button: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    original_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retracted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    retracted_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_tiqora_telegram_message_ticket_id", "ticket_id"),
+        Index("ux_tiqora_telegram_message_chat_msg", "chat_id", "message_id", unique=True),
+    )
+
+
 class TiqoraQueueCustomerLink(TiqoraBase):
     """Per-queue external customer-management-tool link (ticket zoom).
 
