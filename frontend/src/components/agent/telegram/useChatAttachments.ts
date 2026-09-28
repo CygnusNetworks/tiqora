@@ -1,9 +1,13 @@
 import { useCallback, useRef, useState } from "react";
 import type { ArticleAttachmentIn } from "@/lib/api";
 
-/** Bot API upload ceiling for documents; the batch is refused as a whole
- * rather than half-attached. */
-export const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024;
+/** Total raw size the composer accepts. Telegram would take 50 MB per
+ * document, but the files travel base64-encoded (×4/3) inside one JSON POST
+ * and production nginx caps request bodies at 25 MB (`client_max_body_size
+ * 25M`) — 18 MB raw is ~24 MB on the wire, leaving room for the rest of the
+ * payload. A batch that would cross it is refused as a whole rather than
+ * half-attached. */
+export const MAX_ATTACHMENT_BYTES = 18 * 1024 * 1024;
 
 export type ChatAttachment = {
   id: number;
@@ -41,13 +45,22 @@ export function useChatAttachments() {
   const [items, setItems] = useState<ChatAttachment[]>([]);
   const [error, setError] = useState<"tooLarge" | "readFailed" | null>(null);
   const nextId = useRef(0);
+  // Source of truth for the size check: two adds in the same tick (a paste
+  // and a drop, a multi-event drop) must both see each other, which the
+  // render-time `items` would not.
+  const itemsRef = useRef<ChatAttachment[]>([]);
+  const commit = useCallback((next: ChatAttachment[]) => {
+    itemsRef.current = next;
+    setItems(next);
+  }, []);
 
   const add = useCallback(
     (files: FileList | File[]) => {
       const list = Array.from(files);
       if (list.length === 0) return;
       const total =
-        items.reduce((sum, a) => sum + a.size, 0) + list.reduce((sum, f) => sum + f.size, 0);
+        itemsRef.current.reduce((sum, a) => sum + a.size, 0) +
+        list.reduce((sum, f) => sum + f.size, 0);
       if (total > MAX_ATTACHMENT_BYTES) {
         setError("tooLarge");
         return;
@@ -63,33 +76,44 @@ export function useChatAttachments() {
           data: null,
         } as ChatAttachment,
       }));
-      setItems((prev) => [...prev, ...added.map((a) => a.item)]);
+      commit([...itemsRef.current, ...added.map((a) => a.item)]);
       for (const { file, item } of added) {
         readBase64(file).then(
-          (data) => setItems((prev) => prev.map((a) => (a.id === item.id ? { ...a, data } : a))),
+          (data) => commit(itemsRef.current.map((a) => (a.id === item.id ? { ...a, data } : a))),
           () => {
-            setItems((prev) => prev.filter((a) => a.id !== item.id));
+            commit(itemsRef.current.filter((a) => a.id !== item.id));
             setError("readFailed");
           },
         );
       }
     },
-    [items],
+    [commit],
   );
 
-  const remove = useCallback((id: number) => {
-    setItems((prev) => prev.filter((a) => a.id !== id));
-    setError(null);
-  }, []);
+  const remove = useCallback(
+    (id: number) => {
+      commit(itemsRef.current.filter((a) => a.id !== id));
+      setError(null);
+    },
+    [commit],
+  );
 
-  const clear = useCallback(() => {
-    setItems([]);
-    setError(null);
-  }, []);
+  /** Drops the given chips (the ones that just went out) and keeps anything
+   * attached meanwhile. */
+  const removeMany = useCallback(
+    (ids: number[]) => {
+      commit(itemsRef.current.filter((a) => !ids.includes(a.id)));
+      setError(null);
+    },
+    [commit],
+  );
 
-  const payload: ArticleAttachmentIn[] = items
-    .filter((a) => a.data !== null)
-    .map((a) => ({ filename: a.name, content_type: a.type, content_base64: a.data as string }));
+  const ready = items.filter((a) => a.data !== null);
+  const payload: ArticleAttachmentIn[] = ready.map((a) => ({
+    filename: a.name,
+    content_type: a.type,
+    content_base64: a.data as string,
+  }));
 
   return {
     items,
@@ -97,7 +121,9 @@ export function useChatAttachments() {
     encoding: items.some((a) => a.data === null),
     add,
     remove,
-    clear,
+    removeMany,
     payload,
+    /** Ids behind `payload`, same order. */
+    payloadIds: ready.map((a) => a.id),
   };
 }
