@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import structlog
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.channels.telegram import outbound
@@ -58,6 +58,38 @@ class ChatInfo:
     contact: ChatContact
     ai_escalated_at: datetime | None
     messages: list[TiqoraTelegramMessage]
+    # Articles whose text an agent can still edit (see _is_editable).
+    editable_article_ids: frozenset[int]
+
+
+_NOT_EDITABLE_ATTACHMENT_ONLY = (
+    "Die Nachricht ist nur ein Anhang ohne Text und kann nicht bearbeitet werden."
+)
+
+
+async def _attachment_only_article_ids(session: AsyncSession, article_ids: list[int]) -> set[int]:
+    """Which of *article_ids* are attachment-only replies: stored with the
+    placeholder body and carrying attachments. Their map row's message_id is
+    the last attachment, not a text message (see
+    :func:`outbound.deliver_agent_telegram_reply`)."""
+    if not article_ids:
+        return set()
+    rows = (
+        await session.execute(
+            text(
+                "SELECT m.article_id FROM article_data_mime m"
+                " WHERE m.article_id IN :ids AND m.a_body = :placeholder"
+                " AND EXISTS (SELECT 1 FROM article_data_mime_attachment att"
+                " WHERE att.article_id = m.article_id)"
+            ).bindparams(bindparam("ids", expanding=True)),
+            {"ids": article_ids, "placeholder": outbound.ATTACHMENT_ONLY_BODY},
+        )
+    ).all()
+    return {int(r[0]) for r in rows}
+
+
+def _is_live_out(row: TiqoraTelegramMessage) -> bool:
+    return row.direction == "out" and row.message_id is not None and row.retracted_at is None
 
 
 async def get_chat_info(session: AsyncSession, ticket_id: int) -> ChatInfo:
@@ -107,10 +139,13 @@ async def get_chat_info(session: AsyncSession, ticket_id: int) -> ChatInfo:
         )
     ).first()
     messages = await list_for_ticket(session, ticket_id)
+    live_out = [m.article_id for m in messages if _is_live_out(m)]
+    attachment_only = await _attachment_only_article_ids(session, live_out)
     return ChatInfo(
         contact=contact,
         ai_escalated_at=ai_row[0] if ai_row is not None else None,
         messages=messages,
+        editable_article_ids=frozenset(set(live_out) - attachment_only),
     )
 
 
@@ -169,6 +204,8 @@ async def edit_message(
     """
     row = await _editable_message(session, ticket_id, article_id)
     assert row.message_id is not None  # _editable_message already checked this
+    if await _attachment_only_article_ids(session, [article_id]):
+        raise TelegramActionConflict(_NOT_EDITABLE_ATTACHMENT_ONLY)
     gw = gateway if gateway is not None else await outbound.build_gateway(session)
     buttons = buttons_from_json(row.buttons_json)
     reply_markup = keyboard_for(buttons) if buttons and row.answered_button is None else None
@@ -210,12 +247,13 @@ async def edit_message(
 
 def _already_gone(exc: TelegramApiError) -> bool:
     """Telegram's refusal for a part that's already been deleted (by us on an
-    earlier attempt, or by the customer) -- e.g. "Bad Request: message to
-    delete not found". Treated the same as a successful delete: it means the
+    earlier attempt, or by the customer): "Bad Request: message to delete
+    not found". Only that exact reason -- "chat not found" and friends are
+    real refusals and must abort the retract. Treated the same as a successful delete: it means the
     message is gone, which is the retract's whole goal, so a retry after a
     partial failure doesn't get stuck forever re-deleting the same part.
     """
-    return "not found" in str(exc).lower()
+    return "message to delete not found" in str(exc).lower()
 
 
 async def retract_message(

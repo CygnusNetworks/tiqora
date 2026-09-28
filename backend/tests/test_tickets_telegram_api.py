@@ -42,6 +42,10 @@ CUSTOMER_MESSAGE_ID = 78491
 FOREIGN_TICKET_ID = 78472
 FOREIGN_ARTICLE_ID = 78493
 FOREIGN_MESSAGE_ID = 78494
+# Merged into TICKET_ID by the merge test (a real second ticket, same queue).
+MERGE_TICKET_ID = 78473
+MERGE_ARTICLE_ID = 78495
+MERGE_MESSAGE_ID = 78496
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -51,31 +55,40 @@ def _to_async_url(sync_url: str) -> str:
 
 
 def _cleanup(conn: Any) -> None:
-    arts = f"(SELECT id FROM article WHERE ticket_id = {TICKET_ID})"
+    for tid in (TICKET_ID, MERGE_TICKET_ID):
+        _cleanup_ticket(conn, tid)
     for sql in (
-        f"DELETE FROM tiqora_telegram_message WHERE ticket_id = {TICKET_ID}",
-        # A map row's ticket_id can deliberately differ from its article's
-        # real ticket_id (see FOREIGN_TICKET_ID) -- clean those up by article
-        # too, or they'd survive the ticket_id-scoped delete above.
-        f"DELETE FROM tiqora_telegram_message WHERE article_id IN {arts}",
-        f"DELETE FROM ticket_history WHERE ticket_id = {TICKET_ID}",
-        f"DELETE FROM article_data_mime_attachment WHERE article_id IN {arts}",
-        f"DELETE FROM article_data_mime WHERE article_id IN {arts}",
-        f"DELETE FROM article_data_mime_plain WHERE article_id IN {arts}",
-        f"DELETE FROM article_flag WHERE article_id IN {arts}",
-        f"DELETE FROM article WHERE ticket_id = {TICKET_ID}",
-        f"DELETE FROM ticket_flag WHERE ticket_id = {TICKET_ID}",
-        f"DELETE FROM ticket_index WHERE ticket_id = {TICKET_ID}",
-        f"DELETE FROM ticket_lock_index WHERE ticket_id = {TICKET_ID}",
-        f"DELETE FROM tiqora_event_outbox WHERE ticket_id = {TICKET_ID}",
-        f"DELETE FROM tiqora_cache_invalidation WHERE ticket_id = {TICKET_ID}",
-        f"DELETE FROM ticket WHERE id = {TICKET_ID}",
         f"DELETE FROM queue WHERE id = {QUEUE_ID}",
         f"DELETE FROM group_user WHERE user_id = {AGENT} OR group_id = {GROUP_ID}",
         f"DELETE FROM permission_groups WHERE id = {GROUP_ID}",
         f"DELETE FROM users WHERE id = {AGENT}",
         f"DELETE FROM tiqora_telegram_contact WHERE chat_id = {CHAT_ID}",
         "DELETE FROM tiqora_settings WHERE `key` LIKE 'channel.telegram.%'",
+    ):
+        conn.execute(text(sql))
+
+
+def _cleanup_ticket(conn: Any, ticket_id: int) -> None:
+    arts = f"(SELECT id FROM article WHERE ticket_id = {ticket_id})"
+    for sql in (
+        f"DELETE FROM tiqora_telegram_message WHERE ticket_id = {ticket_id}",
+        # A map row's ticket_id can deliberately differ from its article's
+        # real ticket_id (see FOREIGN_TICKET_ID) -- clean those up by article
+        # too, or they'd survive the ticket_id-scoped delete above.
+        f"DELETE FROM tiqora_telegram_message WHERE article_id IN {arts}",
+        f"DELETE FROM ticket_history WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM article_data_mime_attachment WHERE article_id IN {arts}",
+        f"DELETE FROM article_data_mime WHERE article_id IN {arts}",
+        f"DELETE FROM article_data_mime_plain WHERE article_id IN {arts}",
+        f"DELETE FROM article_flag WHERE article_id IN {arts}",
+        f"DELETE FROM article_search_index WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM article WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM ticket_flag WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM ticket_index WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM ticket_lock_index WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM tiqora_event_outbox WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM tiqora_cache_invalidation WHERE ticket_id = {ticket_id}",
+        f"DELETE FROM ticket WHERE id = {ticket_id}",
     ):
         conn.execute(text(sql))
 
@@ -576,6 +589,7 @@ async def test_telegram_chat_info_returns_contact_and_messages(
     assert meta["answered_button"] is None
     assert meta["edited_at"] is None
     assert meta["retracted_at"] is None
+    assert meta["editable"] is True
     assert gateway.calls[-1][0] == "send_message"
 
 
@@ -793,7 +807,7 @@ async def test_retract_telegram_article_partial_failure_still_retracts(
 async def test_retract_telegram_article_not_found_part_is_treated_as_gone(
     seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
 ) -> None:
-    """Telegram refusing a delete with "... not found" (already deleted, by
+    """Telegram refusing a delete with "message to delete not found" (already deleted, by
     us on an earlier attempt or by the customer) must count as success, not
     as a conflict -- otherwise a retry after a partial failure could never
     complete."""
@@ -845,3 +859,199 @@ async def test_telegram_typing_requires_note_permission(
         resp = await client.post(f"/api/v1/tickets/{TICKET_ID}/telegram/typing")
     assert resp.status_code == 403, resp.text
     assert gateway.calls == []
+
+
+async def test_attachment_only_reply_is_not_editable(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    """Without text the map row points at the attachment itself, which
+    editMessageText can't change -- the meta says so and the edit is 409."""
+    _url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(
+            client,
+            body="",
+            attachments=[
+                {
+                    "filename": "a.pdf",
+                    "content_type": "application/pdf",
+                    "content_base64": _b64(b"%PDF-1"),
+                }
+            ],
+        )
+        info = await client.get(f"/api/v1/tickets/{TICKET_ID}/telegram")
+        calls_before = len(gateway.calls)
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram",
+            json={"body": "Doch mit Text"},
+        )
+    assert info.status_code == 200, info.text
+    meta = {m["article_id"]: m for m in info.json()["messages"]}[article_id]
+    assert meta["editable"] is False
+    assert resp.status_code == 409, resp.text
+    assert "Anhang" in resp.json()["detail"]
+    assert len(gateway.calls) == calls_before
+
+
+async def test_inbound_message_is_not_editable(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, _gateway = seeded
+    _insert_customer_article(url)
+    async with _client(factory) as client:
+        info = await client.get(f"/api/v1/tickets/{TICKET_ID}/telegram")
+    assert info.status_code == 200, info.text
+    meta = {m["article_id"]: m for m in info.json()["messages"]}[CUSTOMER_ARTICLE_ID]
+    assert meta["editable"] is False
+
+
+@pytest.mark.parametrize("action", ["edit", "retract"])
+async def test_edit_and_retract_without_bot_token_are_409(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+) -> None:
+    from tiqora.channels.telegram.outbound import TelegramDeliveryError
+
+    _url, factory, _gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client)
+
+        async def _no_gateway(_session: AsyncSession) -> Any:
+            raise TelegramDeliveryError("Telegram channel has no bot_token configured")
+
+        monkeypatch.setattr("tiqora.channels.telegram.outbound.build_gateway", _no_gateway)
+        path = f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram"
+        if action == "edit":
+            resp = await client.patch(path, json={"body": "Neu"})
+        else:
+            resp = await client.post(f"{path}/retract")
+    assert resp.status_code == 409, resp.text
+    assert "bot_token" in resp.json()["detail"]
+
+
+async def test_retract_chat_not_found_is_a_conflict_not_already_gone(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    """Only "message to delete not found" means the message is gone; "chat
+    not found" is a real refusal and must not mark the article retracted."""
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client)
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        message_id = int(
+            conn.execute(
+                text("SELECT message_id FROM tiqora_telegram_message WHERE article_id = :a"),
+                {"a": article_id},
+            ).scalar_one()
+        )
+    gateway.fail_message_ids[message_id] = "Bad Request: chat not found"
+    async with _client(factory) as client:
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram/retract"
+        )
+    assert resp.status_code == 409, resp.text
+    with engine.begin() as conn:
+        retracted = conn.execute(
+            text("SELECT retracted_at FROM tiqora_telegram_message WHERE article_id = :a"),
+            {"a": article_id},
+        ).scalar()
+    engine.dispose()
+    assert retracted is None
+
+
+def _insert_merge_ticket_with_message(sync_url: str) -> None:
+    """A second real ticket in the same queue with one agent Telegram
+    article and its map row -- to be merged into TICKET_ID."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
+                " user_id, responsible_user_id, ticket_priority_id, ticket_state_id,"
+                " customer_id, customer_user_id, timeout, until_time, escalation_time,"
+                " escalation_update_time, escalation_response_time, escalation_solution_time,"
+                " archive_flag, create_time, create_by, change_time, change_by)"
+                " VALUES (:tid, '20240601784731', 'Merge me', :qid, 1, 1,"
+                " :uid, 1, 3, 4, 'CUST1', :cu,"
+                " 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
+            ),
+            {
+                "tid": MERGE_TICKET_ID,
+                "qid": QUEUE_ID,
+                "uid": AGENT,
+                "cu": CUSTOMER_LOGIN,
+                "t": NOW,
+            },
+        )
+        channel_id = conn.execute(
+            text("SELECT id FROM communication_channel WHERE name = 'Telegram'")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                " communication_channel_id, is_visible_for_customer, search_index_needs_rebuild,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :tid, 1, :cid, 1, 0, :t, 1, :t, 1)"
+            ),
+            {"aid": MERGE_ARTICLE_ID, "tid": MERGE_TICKET_ID, "cid": channel_id, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO article_data_mime (id, article_id, a_from, a_subject,"
+                " a_content_type, a_body, a_message_id, incoming_time,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :aid, 'bot', 'Telegram', 'text/plain; charset=utf-8',"
+                " 'Vor dem Merge', '<msg-merge@x>', 1717243200, :t, 1, :t, 1)"
+            ),
+            {"aid": MERGE_ARTICLE_ID, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_telegram_message"
+                " (article_id, ticket_id, chat_id, message_id, direction)"
+                " VALUES (:aid, :tid, :chat, :mid, 'out')"
+            ),
+            {
+                "aid": MERGE_ARTICLE_ID,
+                "tid": MERGE_TICKET_ID,
+                "chat": CHAT_ID,
+                "mid": MERGE_MESSAGE_ID,
+            },
+        )
+    engine.dispose()
+
+
+async def test_merge_moves_telegram_map_rows_to_main_ticket(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    """Merged articles keep their Telegram meta: the map rows follow the
+    articles to the main ticket (else edit/retract/quote there 404)."""
+    from tiqora.domain.ticket_write_service import merge_tickets
+    from tiqora.znuny.sysconfig import SysConfig
+
+    url, factory, _gateway = seeded
+    _insert_merge_ticket_with_message(url)
+    async with factory() as session, session.begin():
+        await merge_tickets(
+            session,
+            main_ticket_id=TICKET_ID,
+            merge_ticket_id=MERGE_TICKET_ID,
+            user_id=AGENT,
+            sysconfig=SysConfig(session),
+        )
+
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        moved = conn.execute(
+            text("SELECT ticket_id FROM tiqora_telegram_message WHERE article_id = :a"),
+            {"a": MERGE_ARTICLE_ID},
+        ).scalar_one()
+    engine.dispose()
+    assert int(moved) == TICKET_ID
+
+    async with _client(factory) as client:
+        info = await client.get(f"/api/v1/tickets/{TICKET_ID}/telegram")
+    assert info.status_code == 200, info.text
+    assert MERGE_ARTICLE_ID in {m["article_id"] for m in info.json()["messages"]}
