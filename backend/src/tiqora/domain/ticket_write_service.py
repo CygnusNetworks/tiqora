@@ -1856,7 +1856,8 @@ async def delete_article(
     never removable via this path (raises :class:`ArticleNotDeletable`).
     Cascading delete order (children first): article_flag,
     article_data_mime_attachment, article_data_mime_plain,
-    article_search_index, tiqora_ai_article_origin (if migrated),
+    article_search_index, tiqora_ai_article_origin, tiqora_telegram_message
+    (both if migrated),
     time_accounting (article_id set to NULL — booked time is kept, not lost),
     ticket_history rows for the article, article_data_mime, article.
 
@@ -1914,6 +1915,11 @@ async def delete_article(
     if await _table_exists(session, "tiqora_ai_article_origin"):
         await session.execute(
             text("DELETE FROM tiqora_ai_article_origin WHERE article_id = :aid"),
+            {"aid": article_id},
+        )
+    if await _table_exists(session, "tiqora_telegram_message"):
+        await session.execute(
+            text("DELETE FROM tiqora_telegram_message WHERE article_id = :aid"),
             {"aid": article_id},
         )
     await session.execute(
