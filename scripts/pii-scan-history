@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Full-history scan with the local checks the GitHub workflow can't run: the
+# production hashes and denylist from .git/info (see .githooks/pii_check.py).
+# Refresh the hashes first (scripts/pii-hash-sync) — new customers since the
+# last sync are otherwise invisible. Default range: every ref.
+#
+#   scripts/pii-scan-history            # all refs
+#   scripts/pii-scan-history main       # one ref
+set -euo pipefail
+root=$(git rev-parse --show-toplevel)
+refs=${*:---all}
+
+gitleaks git --redact --no-banner --log-level warn -c "$root/.gitleaks.toml" --log-opts="$refs" "$root"
+# shellcheck disable=SC2086
+git log $refs -p --no-color --format= | python3 "$root/.githooks/pii_check.py" patch "history ($refs)"
+# shellcheck disable=SC2086
+git log $refs --format=%B | python3 "$root/.githooks/pii_check.py" text "commit messages ($refs)"
+git for-each-ref refs/tags --format='%(contents)' | python3 "$root/.githooks/pii_check.py" text "tag messages"
+echo "pii-scan-history: clean"

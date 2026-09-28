@@ -1,0 +1,3 @@
+# Values that match the production hashes but are not personal data
+# (placeholder rows). Format: kind:value — kinds: email, wp, phone, cid, name.
+name:invalid user
