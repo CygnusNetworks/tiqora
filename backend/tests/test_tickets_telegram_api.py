@@ -1,5 +1,6 @@
 """DB integration tests: POST /tickets/{id}/articles with the Telegram chat
-composer options (attachments, inline buttons, quote reply).
+composer options (attachments, inline buttons, quote reply), plus the Task 6
+edit/retract/chat-info/typing endpoints.
 
 Uses the 784xx id range (queue/group/user/ticket/chat).
 """
@@ -15,6 +16,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tiqora.channels.telegram.gateway import TelegramApiError
 from tiqora.db.tiqora.base import TiqoraBase
 
 pytestmark = pytest.mark.db
@@ -28,6 +30,11 @@ AGENT = 78401
 CHAT_ID = 78455
 CUSTOMER_LOGIN = "tg-composer@example.com"
 TICKET_TITLE = "Telegram composer ticket"
+# Not seeded anywhere (no users/group_user rows): PermissionEngine.check finds
+# no group membership for it, so it always fails a "note" permission check.
+OUTSIDER = 78402
+CUSTOMER_ARTICLE_ID = 78490
+CUSTOMER_MESSAGE_ID = 78491
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -168,9 +175,14 @@ def _teardown(sync_url: str, *, drop_channel: bool) -> None:
 class _FakeGateway:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        # Method names that should raise TelegramApiError instead of
+        # succeeding, for testing the 409 paths (edit/retract).
+        self.fail_methods: set[str] = set()
 
     def _ok(self, method: str, **kwargs: Any) -> dict[str, Any]:
         self.calls.append((method, kwargs))
+        if method in self.fail_methods:
+            raise TelegramApiError("simulated Telegram failure")
         return {"message_id": 5000 + len(self.calls)}
 
     async def send_message(self, chat_id: int | str, text_body: str, **kwargs: Any) -> dict:
@@ -187,7 +199,17 @@ class _FakeGateway:
         return self._ok("send_document", chat_id=chat_id, filename=filename, **kwargs)
 
     async def delete_message(self, chat_id: int | str, message_id: int) -> None:
-        self.calls.append(("delete_message", {"message_id": message_id}))
+        self._ok("delete_message", chat_id=chat_id, message_id=message_id)
+
+    async def edit_message_text(
+        self, chat_id: int | str, message_id: int, text_body: str, **kwargs: Any
+    ) -> None:
+        self._ok(
+            "edit_message_text", chat_id=chat_id, message_id=message_id, text=text_body, **kwargs
+        )
+
+    async def send_chat_action(self, chat_id: int | str, action: str = "typing") -> None:
+        self._ok("send_chat_action", chat_id=chat_id, action=action)
 
 
 @pytest.fixture
@@ -213,7 +235,12 @@ async def seeded(
         _teardown(mariadb_znuny_url, drop_channel=drop_channel)
 
 
-def _client(factory: async_sessionmaker[AsyncSession]) -> Any:
+def _client(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    user_id: int = AGENT,
+    login: str = "tgcomposer.agent",
+) -> Any:
     from httpx import ASGITransport, AsyncClient
 
     from tiqora.api.app import create_app
@@ -226,8 +253,8 @@ def _client(factory: async_sessionmaker[AsyncSession]) -> Any:
             yield session
 
     fake_user = AuthenticatedUser(
-        id=AGENT,
-        login="tgcomposer.agent",
+        id=user_id,
+        login=login,
         first_name="Tg",
         last_name="Agent",
         auth_method="session",
@@ -393,3 +420,252 @@ async def test_telegram_reply_with_empty_subject_attachment_and_buttons(
     assert int(row[0]) == CHAT_ID
     assert row[1] == "out"
     assert "resolve_yes" in row[2]
+
+
+# ---------------------------------------------------------------------------
+# Task 6: chat info, typing, edit, retract
+# ---------------------------------------------------------------------------
+
+
+async def _send_out_reply(client: Any, **extra: Any) -> int:
+    resp = await client.post(
+        f"/api/v1/tickets/{TICKET_ID}/articles",
+        json=_reply(**extra),
+    )
+    assert resp.status_code == 201, resp.text
+    return int(resp.json()["article_id"])
+
+
+def _insert_customer_article(sync_url: str) -> None:
+    """A customer-sent (inbound) Telegram article + map row, outside the
+    normal add_article path -- Task 6 must refuse to edit/retract it."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        channel_id = conn.execute(
+            text("SELECT id FROM communication_channel WHERE name = 'Telegram'")
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                " communication_channel_id, is_visible_for_customer, search_index_needs_rebuild,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :tid, 3, :cid, 1, 0, :t, 1, :t, 1)"
+            ),
+            {"aid": CUSTOMER_ARTICLE_ID, "tid": TICKET_ID, "cid": channel_id, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO article_data_mime (id, article_id, a_from, a_subject,"
+                " a_content_type, a_body, a_message_id, incoming_time,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:aid, :aid, :from_, 'Telegram', 'text/plain; charset=utf-8',"
+                " 'Hallo vom Kunden', '<msg-customer@x>', 1717243200, :t, 1, :t, 1)"
+            ),
+            {"aid": CUSTOMER_ARTICLE_ID, "from_": f"{CHAT_ID}@telegram.invalid", "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_telegram_message"
+                " (article_id, ticket_id, chat_id, message_id, direction)"
+                " VALUES (:aid, :tid, :chat, :mid, 'in')"
+            ),
+            {
+                "aid": CUSTOMER_ARTICLE_ID,
+                "tid": TICKET_ID,
+                "chat": CHAT_ID,
+                "mid": CUSTOMER_MESSAGE_ID,
+            },
+        )
+    engine.dispose()
+
+
+def _history_names(sync_url: str) -> list[str]:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        rows = conn.execute(
+            text("SELECT name FROM ticket_history WHERE ticket_id = :t ORDER BY id"),
+            {"t": TICKET_ID},
+        ).all()
+    engine.dispose()
+    return [str(r[0]) for r in rows]
+
+
+async def test_telegram_chat_info_returns_contact_and_messages(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    _url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(
+            client, telegram_buttons=[{"label": "Ja", "action": "resolve_yes"}]
+        )
+        resp = await client.get(f"/api/v1/tickets/{TICKET_ID}/telegram")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["chat_id"] == CHAT_ID
+    assert data["customer_user_login"] == CUSTOMER_LOGIN
+    assert data["identity_verified"] is True
+    assert data["ai_escalated_at"] is None
+    messages = {m["article_id"]: m for m in data["messages"]}
+    assert article_id in messages
+    meta = messages[article_id]
+    assert meta["direction"] == "out"
+    assert meta["buttons"] == [{"label": "Ja", "action": "resolve_yes"}]
+    assert meta["answered_button"] is None
+    assert meta["edited_at"] is None
+    assert meta["retracted_at"] is None
+    assert gateway.calls[-1][0] == "send_message"
+
+
+async def test_telegram_chat_info_requires_ro_permission(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    _url, factory, _gateway = seeded
+    async with _client(factory, user_id=OUTSIDER, login="outsider") as client:
+        resp = await client.get(f"/api/v1/tickets/{TICKET_ID}/telegram")
+    assert resp.status_code == 403, resp.text
+
+
+async def test_edit_telegram_article_updates_body_and_meta(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(
+            client, telegram_buttons=[{"label": "Ja", "action": "resolve_yes"}]
+        )
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram",
+            json={"body": "Aktualisierter Text"},
+        )
+    assert resp.status_code == 204, resp.text
+
+    assert gateway.calls[-1][0] == "edit_message_text"
+    edit_kwargs = gateway.calls[-1][1]
+    assert edit_kwargs["text"] == "Aktualisierter Text"
+    assert edit_kwargs["reply_markup"]["inline_keyboard"][0][0]["callback_data"] == "tqb:0"
+
+    assert _article_rows(url) == [(article_id, TICKET_TITLE, "Aktualisierter Text")]
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT edited_at, original_body FROM tiqora_telegram_message WHERE article_id = :a"
+            ),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    assert row[0] is not None
+    assert row[1] == "Hallo!"
+    assert any(n.startswith(f"%%TelegramEdited%%{article_id}") for n in _history_names(url))
+
+    # A second edit must not overwrite the already-stored original_body.
+    async with _client(factory) as client:
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram",
+            json={"body": "Noch ein Text"},
+        )
+    assert resp.status_code == 204, resp.text
+    with engine.begin() as conn:
+        row2 = conn.execute(
+            text("SELECT original_body FROM tiqora_telegram_message WHERE article_id = :a"),
+            {"a": article_id},
+        ).one()
+    assert row2[0] == "Hallo!"
+
+
+async def test_edit_customer_article_is_409(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    _insert_customer_article(url)
+    async with _client(factory) as client:
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{CUSTOMER_ARTICLE_ID}/telegram",
+            json={"body": "Nope"},
+        )
+    assert resp.status_code == 409, resp.text
+    assert gateway.calls == []
+
+
+async def test_edit_unknown_article_is_404(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    _url, factory, gateway = seeded
+    async with _client(factory) as client:
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}/articles/999999999/telegram",
+            json={"body": "Nope"},
+        )
+    assert resp.status_code == 404, resp.text
+    assert gateway.calls == []
+
+
+async def test_retract_telegram_article_success(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client)
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram/retract"
+        )
+    assert resp.status_code == 204, resp.text
+    assert gateway.calls[-1][0] == "delete_message"
+
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT retracted_at, retracted_by FROM tiqora_telegram_message"
+                " WHERE article_id = :a"
+            ),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    assert row[0] is not None
+    assert int(row[1]) == AGENT
+    assert any(n.startswith(f"%%TelegramRetracted%%{article_id}") for n in _history_names(url))
+
+
+async def test_retract_telegram_article_gateway_failure_is_409_and_unchanged(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    url, factory, gateway = seeded
+    async with _client(factory) as client:
+        article_id = await _send_out_reply(client)
+        gateway.fail_methods.add("delete_message")
+        resp = await client.post(
+            f"/api/v1/tickets/{TICKET_ID}/articles/{article_id}/telegram/retract"
+        )
+    assert resp.status_code == 409, resp.text
+    assert _article_rows(url) == [(article_id, TICKET_TITLE, "Hallo!")]
+
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT retracted_at FROM tiqora_telegram_message WHERE article_id = :a"),
+            {"a": article_id},
+        ).one()
+    engine.dispose()
+    assert row[0] is None
+
+
+async def test_telegram_typing_sends_chat_action(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    _url, factory, gateway = seeded
+    async with _client(factory) as client:
+        resp = await client.post(f"/api/v1/tickets/{TICKET_ID}/telegram/typing")
+    assert resp.status_code == 204, resp.text
+    assert [c[0] for c in gateway.calls] == ["send_chat_action"]
+    assert gateway.calls[0][1] == {"chat_id": CHAT_ID, "action": "typing"}
+
+
+async def test_telegram_typing_requires_note_permission(
+    seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
+) -> None:
+    _url, factory, gateway = seeded
+    async with _client(factory, user_id=OUTSIDER, login="outsider") as client:
+        resp = await client.post(f"/api/v1/tickets/{TICKET_ID}/telegram/typing")
+    assert resp.status_code == 403, resp.text
+    assert gateway.calls == []
