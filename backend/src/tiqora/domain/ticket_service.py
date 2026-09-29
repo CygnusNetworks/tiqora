@@ -12,6 +12,7 @@ import yaml
 from sqlalchemy import ColumnElement, Select, and_, case, func, or_, select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from tiqora.ai.handoff import ai_escalated_ticket_ids as _ai_escalated_ticket_ids
 from tiqora.ai.models import TiqoraAiArticleOrigin, TiqoraAiTicketState
@@ -107,7 +108,11 @@ UNASSIGNED_OWNER_ID = 1
 #: everything else is "email". "Chat" is Znuny's seeded chat channel, the
 #: slot a web chat uses.
 LIST_CHANNELS: dict[str, str] = {"Telegram": "telegram", "Chat": "webchat"}
-LIST_CHANNEL_KEYS: tuple[str, ...] = ("email", "telegram", "webchat")
+#: A ticket opened by a phone call (its FIRST article is on Znuny's ``Phone``
+#: channel) is listed as "phone" -- unless a chat channel above applies.
+#: Unlike chats, a later phone call does not change an e-mail ticket's channel.
+PHONE_CHANNEL = "Phone"
+LIST_CHANNEL_KEYS: tuple[str, ...] = ("email", "telegram", "webchat", "phone")
 
 
 def _has_article_on(ticket_id_col: Any, channel_names: Sequence[str]) -> ColumnElement[bool]:
@@ -119,10 +124,33 @@ def _has_article_on(ticket_id_col: Any, channel_names: Sequence[str]) -> ColumnE
     )
 
 
+def _first_article_on_phone(ticket_id_col: Any) -> ColumnElement[bool]:
+    first = aliased(Article)
+    # Correlated to the article of the EXISTS below, not to ``ticket_id_col``:
+    # auto-correlation only reaches the immediately enclosing SELECT, so a
+    # reference to the outer ticket would pull ``ticket`` into this FROM.
+    first_id = (
+        select(func.min(first.id)).where(first.ticket_id == Article.ticket_id).scalar_subquery()
+    )
+    return (
+        select(Article.id)
+        .join(CommunicationChannel, CommunicationChannel.id == Article.communication_channel_id)
+        .where(
+            Article.ticket_id == ticket_id_col,
+            Article.id == first_id,
+            CommunicationChannel.name == PHONE_CHANNEL,
+        )
+        .exists()
+    )
+
+
 def _channel_condition(ticket_id_col: Any, key: str) -> ColumnElement[bool]:
     """``key`` from :data:`LIST_CHANNEL_KEYS` as a condition on a ticket id column."""
+    no_chat = ~_has_article_on(ticket_id_col, list(LIST_CHANNELS))
     if key == "email":
-        return ~_has_article_on(ticket_id_col, list(LIST_CHANNELS))
+        return and_(no_chat, ~_first_article_on_phone(ticket_id_col))
+    if key == "phone":
+        return and_(no_chat, _first_article_on_phone(ticket_id_col))
     return _has_article_on(ticket_id_col, [n for n, k in LIST_CHANNELS.items() if k == key])
 
 
@@ -582,7 +610,8 @@ class TicketService:
     async def _channel_by_ticket(self, ticket_ids: list[int]) -> dict[int, str]:
         """List channel key per ticket (see :data:`LIST_CHANNELS`); tickets
         without a conversational message are absent (= "email"). With messages
-        on several conversational channels, the earliest one wins."""
+        on several conversational channels, the earliest one wins. Tickets
+        without one whose first article is a phone call are "phone"."""
         if not ticket_ids:
             return {}
         rows = await self._session.execute(
@@ -597,6 +626,24 @@ class TicketService:
         out: dict[int, str] = {}
         for ticket_id, name in rows.all():
             out.setdefault(ticket_id, LIST_CHANNELS[name])
+        rest = [t for t in ticket_ids if t not in out]
+        if rest:
+            first_ids = (
+                select(func.min(Article.id))
+                .where(Article.ticket_id.in_(rest))
+                .group_by(Article.ticket_id)
+                .scalar_subquery()
+            )
+            phone_rows = await self._session.execute(
+                select(Article.ticket_id)
+                .join(
+                    CommunicationChannel,
+                    CommunicationChannel.id == Article.communication_channel_id,
+                )
+                .where(Article.id.in_(first_ids), CommunicationChannel.name == PHONE_CHANNEL)
+            )
+            for (ticket_id,) in phone_rows.all():
+                out[ticket_id] = "phone"
         return out
 
     async def _telegram_contact_by_ticket(

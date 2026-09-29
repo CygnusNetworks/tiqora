@@ -140,7 +140,7 @@ function ticketFacets() {
       unassigned: ticketItems.filter((t) => t.owner_id === 1).length,
     },
     // Demo tickets are all e-mail, so the channel chips stay hidden.
-    channels: { email: ticketItems.length, telegram: 0, webchat: 0 },
+    channels: { email: ticketItems.length, telegram: 0, webchat: 0, phone: 0 },
   };
 }
 const ticketById = new Map(ticketItems.map((t) => [t.id, t]));

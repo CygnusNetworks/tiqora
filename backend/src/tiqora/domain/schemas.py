@@ -191,9 +191,10 @@ class TicketListItem(BaseModel):
     for the queue list when no customer is assigned. ``None`` if the ticket
     has no articles (or that article has no MIME row)."""
     channel: str = "email"
-    """``email`` | ``telegram`` | ``webchat``: ``telegram``/``webchat`` when the
-    ticket has a message on that conversational channel (its origin), else
-    ``email``. See ``ticket_service.LIST_CHANNELS``."""
+    """``email`` | ``telegram`` | ``webchat`` | ``phone``: ``telegram``/``webchat``
+    when the ticket has a message on that conversational channel (its origin),
+    ``phone`` when its first article is a phone call, else ``email``. See
+    ``ticket_service.LIST_CHANNELS``."""
     chat_display_name: str | None = None
     """Telegram contact's display name when the chat is not linked to a
     customer user — the ticket's customer is then only the channel's shared

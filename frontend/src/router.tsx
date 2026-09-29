@@ -35,6 +35,8 @@ import {
   type TimeAccountingSearch,
 } from "@/routes/agent/TimeAccountingReportPage";
 import { CustomerDetailPage } from "@/routes/agent/CustomerDetailPage";
+import type { TicketListChannel } from "@/lib/api";
+import { TICKET_CHANNEL_KEYS } from "@/lib/ticketChannel";
 import { TicketAttributeRelationsPage } from "@/routes/admin/TicketAttributeRelationsPage";
 import { AgentShell } from "@/components/layout/AgentShell";
 import { PortalShell } from "@/components/layout/PortalShell";
@@ -201,7 +203,8 @@ const agentQueuesRoute = createRoute({
     // One value comes back from the URL as a plain string, several as an array.
     const channels = (v: unknown): QueuesSearch["channel"] => {
       const list = (Array.isArray(v) ? v : [v]).filter(
-        (c): c is "email" | "telegram" | "webchat" => c === "email" || c === "telegram" || c === "webchat",
+        (c): c is TicketListChannel =>
+          typeof c === "string" && (TICKET_CHANNEL_KEYS as string[]).includes(c),
       );
       return list.length ? [...new Set(list)] : undefined;
     };

@@ -44,6 +44,7 @@ export default {
         channel: {
           telegram: themeColor("--color-channel-telegram"),
           webchat: themeColor("--color-channel-webchat"),
+          phone: themeColor("--color-channel-phone"),
         },
         state: {
           new: themeColor("--color-state-new"),

@@ -20774,6 +20774,10 @@
             "title": "Email",
             "type": "integer"
           },
+          "phone": {
+            "title": "Phone",
+            "type": "integer"
+          },
           "telegram": {
             "title": "Telegram",
             "type": "integer"
@@ -20786,7 +20790,8 @@
         "required": [
           "email",
           "telegram",
-          "webchat"
+          "webchat",
+          "phone"
         ],
         "title": "TicketFacetChannels",
         "type": "object"
@@ -55384,7 +55389,7 @@
             }
           },
           {
-            "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+            "description": "Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them.",
             "in": "query",
             "name": "channel",
             "required": false,
@@ -55395,7 +55400,8 @@
                     "enum": [
                       "email",
                       "telegram",
-                      "webchat"
+                      "webchat",
+                      "phone"
                     ],
                     "type": "string"
                   },
@@ -55405,7 +55411,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+              "description": "Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them.",
               "title": "Channel"
             }
           },
@@ -55886,7 +55892,7 @@
             }
           },
           {
-            "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+            "description": "Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them.",
             "in": "query",
             "name": "channel",
             "required": false,
@@ -55897,7 +55903,8 @@
                     "enum": [
                       "email",
                       "telegram",
-                      "webchat"
+                      "webchat",
+                      "phone"
                     ],
                     "type": "string"
                   },
@@ -55907,7 +55914,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+              "description": "Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them.",
               "title": "Channel"
             }
           },
@@ -56231,7 +56238,7 @@
             }
           },
           {
-            "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+            "description": "Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them.",
             "in": "query",
             "name": "channel",
             "required": false,
@@ -56242,7 +56249,8 @@
                     "enum": [
                       "email",
                       "telegram",
-                      "webchat"
+                      "webchat",
+                      "phone"
                     ],
                     "type": "string"
                   },
@@ -56252,7 +56260,7 @@
                   "type": "null"
                 }
               ],
-              "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+              "description": "Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them.",
               "title": "Channel"
             }
           },
