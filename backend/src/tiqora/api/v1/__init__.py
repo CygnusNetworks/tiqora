@@ -22,6 +22,7 @@ from tiqora.api.v1 import (
     stats,
     templates,
     tickets,
+    tickets_crypto,
     tickets_telegram,
 )
 from tiqora.api.v1.admin import admin_router
@@ -32,6 +33,8 @@ api_v1_router.include_router(oauth2_callback.router)
 api_v1_router.include_router(agents.router)
 api_v1_router.include_router(calendar.router)
 api_v1_router.include_router(queues.router)
+# Before tickets.router: /tickets/crypto-options must not hit /tickets/{ticket_id}.
+api_v1_router.include_router(tickets_crypto.router)
 api_v1_router.include_router(tickets.router)
 api_v1_router.include_router(tickets_telegram.router)
 api_v1_router.include_router(ai.router)

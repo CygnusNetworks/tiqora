@@ -1,40 +1,43 @@
-"""Outbound crypto: honor GenericInterface ``EmailSecurity`` params.
+"""GenericInterface ``EmailSecurity`` (TicketCreate / TicketUpdate articles).
 
-Mirrors Znuny's ``EmailSecurity`` block on ``TicketCreate``/``TicketUpdate``
-articles (``Kernel::GenericInterface::Operation::Ticket::TicketCreate``,
-``ArticleParams`` docs)::
+Znuny's ``Article`` block may carry::
 
     EmailSecurity => {
-        Backend     => 'PGP',                       # PGP or SMIME
-        SignKey     => '81877F5E',                   # optional
-        EncryptKeys => [ '81877F5E', '3b630c80' ],    # optional
+        Backend     => 'PGP',                        # PGP or SMIME
+        Method      => 'Detached',                   # or Inline (PGP only)
+        SignKey     => '81877F5E',                    # optional
+        EncryptKeys => [ '81877F5E', '3b630c80' ],     # optional
     }
 
-Applied to the *stored* article body. Agent UI email replies now go through
-the live SMTP path (``channels.email.outbound_reply``); GenericInterface-
-created articles still primarily store then rely on workers/notifications.
-This module makes the persisted content reflect sign/encrypt so an operator
-inspecting the ticket sees what was intended. Gated behind
-``TIQORA_CRYPTO_PGP_ENABLED``/``TIQORA_CRYPTO_SMIME_ENABLED`` (both default
-OFF); when disabled — or on any crypto failure — ``EmailSecurity`` is
-silently ignored (logged at WARNING/ERROR), same as before this module
-existed: a malformed or unusable EmailSecurity block must never block
-ticket creation.
+Two cases, both built by the same :mod:`tiqora.crypto.mime_build`:
+
+* ``ArticleSend => 1`` (Znuny: only then is ``EmailSecurity`` used) — the
+  article is sent through the agent email path
+  (:func:`tiqora.channels.email.outbound_reply.deliver_agent_email_reply`)
+  with :func:`email_security_from_znuny` as its ``email_security``: signed/
+  encrypted on the wire, stored in clear, the sent raw mail kept as the
+  article's plain source. Key problems fail the operation.
+* no ``ArticleSend`` — nothing is sent, so Tiqora keeps its earlier
+  behaviour and rewrites the **stored** body (:func:`apply_email_security`):
+  PGP as inline PGP (clear-signed / armored text), S/MIME as the
+  signed/encrypted MIME entity. Best effort: a disabled backend or a crypto
+  failure leaves the body untouched (logged), never blocking ticket creation.
 """
 
 from __future__ import annotations
 
 import asyncio
+from email.message import EmailMessage
 from typing import Any
 
 import structlog
+from pydantic import ValidationError
 
 from tiqora.config import Settings
-from tiqora.crypto import CryptoError, CryptoUnavailableError
+from tiqora.crypto import CryptoError
+from tiqora.crypto.compose import EmailSecurityIn, resolve_plan_sync, split_addresses
 from tiqora.crypto.config import CryptoConfig
-from tiqora.crypto.pgp import PgpEngine
-from tiqora.crypto.smime import SmimeEngine
-from tiqora.crypto.smime_store import FILENAME_RE, SmimeEntry, SmimeStore
+from tiqora.crypto.mime_build import secure_message
 from tiqora.domain.ticket_write_service import ArticleIn
 
 logger = structlog.get_logger(__name__)
@@ -48,77 +51,25 @@ def _as_list(value: Any) -> list[str]:
     return [str(v) for v in value]
 
 
-def _apply_pgp(
-    article: ArticleIn, sign_key: str | None, encrypt_keys: list[str], config: CryptoConfig
-) -> None:
-    if not config.pgp.enabled:
-        logger.warning("email_security_pgp_disabled")
-        return
-    body_bytes = article.body.encode("utf-8")
+def email_security_from_znuny(security: dict[str, Any] | None) -> EmailSecurityIn | None:
+    """Znuny ``EmailSecurity`` hash → :class:`EmailSecurityIn` (``None`` = invalid/empty)."""
+    if not isinstance(security, dict) or not security:
+        return None
+    backend = str(security.get("Backend") or "").strip().upper()
+    if backend not in ("PGP", "SMIME"):
+        return None
+    method = str(security.get("Method") or "Detached").strip().lower()
+    encrypt_keys = _as_list(security.get("EncryptKeys"))
     try:
-        engine = PgpEngine.from_config(config.pgp)
-        if encrypt_keys:
-            body_bytes = engine.encrypt(body_bytes, encrypt_keys, sign_key_id=sign_key)
-        elif sign_key:
-            signature = engine.sign(body_bytes, sign_key)
-            body_bytes = body_bytes + b"\n" + signature
-        else:
-            return
-    except (CryptoError, CryptoUnavailableError):
-        logger.exception("email_security_pgp_failed")
-        return
-    article.body = body_bytes.decode("utf-8", "replace")
-    article.content_type = "text/plain; charset=utf-8"
-
-
-def _smime_lookup(store: SmimeStore, ref: str, *, private: bool) -> SmimeEntry:
-    """Resolve a store filename (``<hash>.<n>``) or an email address to one entry."""
-    if FILENAME_RE.match(ref):
-        entry = store.entry(ref)
-        if private and not entry.has_private:
-            raise CryptoError(f"no S/MIME private key for {ref!r}")
-        return entry
-    found = store.search(ref, private=private, valid_only=True)
-    if not found:
-        raise CryptoError(f"no valid S/MIME {'key' if private else 'cert'} on file for {ref!r}")
-    return found[0]
-
-
-def _apply_smime(
-    article: ArticleIn, sign_key: str | None, encrypt_keys: list[str], config: CryptoConfig
-) -> None:
-    if not config.smime.enabled:
-        logger.warning("email_security_smime_disabled")
-        return
-    body_bytes = article.body.encode("utf-8")
-    engine = SmimeEngine(openssl_bin=config.smime.openssl_bin)
-    try:
-        store = SmimeStore.from_config(config.smime)
-        if encrypt_keys:
-            cert_paths = [
-                str(store.cert_dir / _smime_lookup(store, r, private=False).filename)
-                for r in encrypt_keys
-            ]
-            body_bytes = engine.encrypt(body_bytes, cert_paths)
-        elif sign_key:
-            entry = _smime_lookup(store, sign_key, private=True)
-            paths = store.private_paths(entry.filename)
-            private = store.get_private(entry.filename)
-            if paths is None or private is None:
-                raise CryptoError(f"no S/MIME private key for {sign_key!r}")
-            body_bytes = engine.sign(
-                body_bytes,
-                str(store.cert_dir / entry.filename),
-                str(paths[0]),
-                secret=private[1],
-            )
-        else:
-            return
-    except (CryptoError, CryptoUnavailableError):
-        logger.exception("email_security_smime_failed")
-        return
-    article.content_type = "application/pkcs7-mime"
-    article.body = body_bytes.decode("utf-8", "replace")
+        return EmailSecurityIn(
+            backend="pgp" if backend == "PGP" else "smime",
+            method="inline" if method == "inline" and backend == "PGP" else "detached",
+            sign_key=str(security.get("SignKey") or "").strip() or None,
+            encrypt=bool(encrypt_keys),
+            encrypt_keys=encrypt_keys or None,
+        )
+    except ValidationError:
+        return None
 
 
 def apply_email_security_sync(
@@ -127,22 +78,41 @@ def apply_email_security_sync(
     settings: Settings,
     config: CryptoConfig | None = None,
 ) -> ArticleIn:
-    """Sign and/or encrypt ``article.body`` in place per an EmailSecurity dict.
+    """Rewrite ``article.body`` in place per an EmailSecurity dict (no send).
 
     *config* is the SysConfig-resolved crypto config; without it only the
     ``TIQORA_CRYPTO_*`` env view of *settings* is used.
     """
     cfg = config or CryptoConfig.from_settings(settings)
-    backend = (security.get("Backend") or "").strip().upper()
-    sign_key = security.get("SignKey") or None
-    encrypt_keys = _as_list(security.get("EncryptKeys"))
-
-    if backend == "PGP":
-        _apply_pgp(article, sign_key, encrypt_keys, cfg)
-    elif backend == "SMIME":
-        _apply_smime(article, sign_key, encrypt_keys, cfg)
+    sec = email_security_from_znuny(security)
+    if sec is None or not sec.active:
+        logger.warning("email_security_ignored", backend=security.get("Backend"))
+        return article
+    if sec.backend == "pgp":
+        # A stored body can only carry PGP inline; PGP/MIME needs a mail.
+        sec = sec.model_copy(update={"method": "inline"})
+    try:
+        plan = resolve_plan_sync(
+            cfg,
+            sec,
+            recipients=split_addresses(article.to_address, article.cc, article.bcc),
+            check_recipients=False,
+        )
+        if plan is None:
+            return article
+        msg = EmailMessage()
+        subtype = "html" if "html" in (article.content_type or "").lower() else "plain"
+        msg.set_content(article.body or "", subtype=subtype, charset="utf-8")
+        secured = secure_message(msg, plan, cfg)
+    except CryptoError as exc:
+        logger.error("email_security_failed", backend=sec.backend, error=str(exc))
+        return article
+    if sec.backend == "pgp":
+        article.body = str(secured.message.get_content())
+        article.content_type = "text/plain; charset=utf-8"
     else:
-        logger.warning("email_security_unknown_backend", backend=backend)
+        article.body = secured.raw.decode("ascii", "replace")
+        article.content_type = secured.message.get_content_type()
     return article
 
 
@@ -154,3 +124,6 @@ async def apply_email_security(
 ) -> ArticleIn:
     """Async wrapper: runs the blocking gpg/openssl subprocess calls in a thread."""
     return await asyncio.to_thread(apply_email_security_sync, article, security, settings, config)
+
+
+__all__ = ["apply_email_security", "apply_email_security_sync", "email_security_from_znuny"]
