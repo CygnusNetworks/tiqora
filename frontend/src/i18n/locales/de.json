@@ -1517,7 +1517,7 @@
         "followUp": "Verhalten, wenn ein Kunde auf ein bereits geschlossenes Ticket antwortet: je nach Option wird das Ticket wieder geöffnet, die Antwort abgewiesen, oder ein komplett neues Ticket angelegt.",
         "followUpLock": "Entsperrt ein gesperrtes Ticket automatisch zurück an den Besitzer, sobald ein Kunden-Follow-up eintrifft.",
         "calendarName": "Referenziert einen Geschäftszeiten-Kalender (Feiertage, Öffnungszeiten) für die Eskalationsberechnung. Leer = Standardkalender rund um die Uhr.",
-        "defaultSignKey": "Name eines PGP/S-MIME-Schlüssels, mit dem ausgehende Mails aus dieser Queue automatisch signiert werden. Leer = keine automatische Signatur."
+        "defaultSignKey": "Schlüssel, mit dem ausgehende E-Mails dieser Queue standardmäßig signiert werden (Znuny-Format, z. B. PGP::Detached::<ID> oder SMIME::Detached::<Datei>). Angeboten werden nur Schlüssel mit geheimem/privatem Teil."
       },
       "states": {
         "typeId": "Der Typ steuert das Verhalten des Status, nicht der Name: Zustände vom Typ „Neu“/„Offen“/„Wartend“ zählen als offene Tickets, „Zusammengeführt“ blendet das Ticket aus der normalen Suche aus (der Datensatz bleibt erhalten). Mehrere Status-Namen können sich denselben Typ teilen."
@@ -1643,7 +1643,9 @@
       "slas": "SLAs",
       "systemAddresses": "Systemadressen",
       "notificationEvents": "Benachrichtigungen",
-      "ticketAttributeRelations": "Attribut­beziehungen"
+      "ticketAttributeRelations": "Attribut­beziehungen",
+      "pgp": "PGP-Schlüssel",
+      "smime": "S/MIME-Zertifikate"
     },
     "table": {
       "id": "ID",
@@ -1839,7 +1841,9 @@
       "calendarName": "Kalender",
       "defaultSignKey": "Standard-Signierschlüssel",
       "yes": "Ja",
-      "no": "Nein"
+      "no": "Nein",
+      "defaultSignKeyNone": "Nicht automatisch signieren",
+      "defaultSignKeyUnknown": "{{value}} (nicht verfügbar)"
     },
     "states": {
       "title_plural": "Status",
@@ -2296,7 +2300,8 @@
         "services": "Hintergrund-Dienste",
         "datastores": "Datenspeicher & Suche",
         "containers": "Container",
-        "host": "Host-Auslastung"
+        "host": "Host-Auslastung",
+        "crypto": "PGP & S/MIME"
       },
       "tier": {
         "live": "Live",
@@ -2357,6 +2362,11 @@
         "disk": "Festplatte",
         "cores": "{{count}} Kerne · Load {{load}}",
         "notConfiguredHint": "psutil nicht installiert — Host-Metriken nicht verfügbar."
+      },
+      "crypto": {
+        "pgp": "PGP",
+        "smime": "S/MIME",
+        "noProblems": "Keine Probleme gefunden."
       }
     },
     "daemons": {
@@ -2798,7 +2808,9 @@
       "slas": "Service-Level-Agreements und Fristen verwalten.",
       "systemAddresses": "Absenderadressen für Queues und Auto-Antworten.",
       "notificationEvents": "Ereignisbasierte Agenten-Benachrichtigungen konfigurieren.",
-      "ticketAttributeRelations": "Znuny-kompatible Abhängigkeitsmatrizen (z. B. Service → Queue) im CSV-Format."
+      "ticketAttributeRelations": "Znuny-kompatible Abhängigkeitsmatrizen (z. B. Service → Queue) im CSV-Format.",
+      "pgp": "PGP-Schlüssel zum Signieren, Verschlüsseln und Entschlüsseln importieren, prüfen und löschen.",
+      "smime": "S/MIME-Zertifikate, private Schlüssel und Signer-Beziehungen verwalten."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -2845,6 +2857,110 @@
       "new": "Neue Beziehung",
       "help": "CSV mit Kopfzeile Attribute1;Attribute2 und Wertepaaren (Znuny AdminTicketAttributeRelations). Beschränkt Formularauswahlen (z. B. Service → Queue).",
       "confirmDelete": "Diese Beziehung löschen?"
+    },
+    "crypto": {
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert",
+      "usable": "Einsatzbereit",
+      "unusable": "Nicht nutzbar",
+      "disabledHint": "Schlüssel lassen sich verwalten, Tiqora signiert, verschlüsselt, entschlüsselt und prüft aber erst, wenn das Backend aktiviert ist (SysConfig „{{setting}}“ oder TIQORA_CRYPTO_{{setting}}_ENABLED).",
+      "path": {
+        "homedir": "Schlüsselbund (--homedir)",
+        "cert_path": "Zertifikate (SMIME::CertPath)",
+        "private_path": "Private Schlüssel (SMIME::PrivatePath)"
+      }
+    },
+    "pgp": {
+      "title": "PGP-Schlüssel",
+      "description": "Der Schlüsselbund wird mit Znuny geteilt (PGP::Options --homedir). Passphrasen kommen aus der SysConfig-Einstellung PGP::Key::Password.",
+      "upload": "Schlüssel importieren",
+      "uploading": "Importiere …",
+      "uploadTitle": "PGP-Schlüssel importieren",
+      "uploadDescription": "ASCII-armored öffentlicher oder geheimer Schlüssel. Geheime Schlüssel bleiben im Schlüsselbund und werden nie wieder angezeigt.",
+      "file": "Schlüsseldatei",
+      "armor": "Oder Schlüssel einfügen",
+      "uploaded_one": "{{count}} Schlüssel importiert.",
+      "uploaded_other": "{{count}} Schlüssel importiert.",
+      "type": "Typ",
+      "typeSecret": "Geheim",
+      "typePublic": "Öffentlich",
+      "keyId": "Schlüssel-ID",
+      "keyIdLong": "Lange Schlüssel-ID",
+      "identity": "Identität",
+      "created": "Erstellt",
+      "expires": "Läuft ab",
+      "never": "nie",
+      "fingerprint": "Fingerabdruck",
+      "subkeys": "Unterschlüssel",
+      "algorithm": "Algorithmus",
+      "status": {
+        "good": "gültig",
+        "expired": "abgelaufen",
+        "revoked": "widerrufen"
+      },
+      "details": "Details",
+      "detailsTitle": "PGP-Schlüssel {{key}}",
+      "download": "Öffentlichen Schlüssel herunterladen",
+      "deleteSecret": "Geheimen Schlüssel löschen",
+      "deleteSecretConfirm": "Geheimen Schlüssel von {{key}} löschen? Der öffentliche Schlüssel bleibt; signieren und entschlüsseln ist damit nicht mehr möglich.",
+      "delete": "Schlüssel löschen",
+      "deleteConfirm": "Schlüssel {{key}} samt geheimem Teil aus dem gemeinsamen Schlüsselbund löschen?",
+      "deleted": "Schlüssel gelöscht.",
+      "empty": "Keine PGP-Schlüssel im Schlüsselbund.",
+      "loadError": "PGP-Schlüssel konnten nicht geladen werden"
+    },
+    "smime": {
+      "title": "S/MIME-Zertifikate",
+      "description": "Zertifikate und private Schlüssel im Znuny-Layout (<Hash>.<n>, Secret in .P) — gemeinsam mit Znuny genutzt.",
+      "addCertificate": "Zertifikat hinzufügen",
+      "addPrivateKey": "Privaten Schlüssel hinzufügen",
+      "certTitle": "S/MIME-Zertifikat hinzufügen",
+      "certDescription": "PEM- oder DER-Zertifikat. Das Zertifikat vor dem zugehörigen privaten Schlüssel hinzufügen.",
+      "certFile": "Zertifikatsdatei",
+      "certPem": "Oder PEM-Zertifikat einfügen",
+      "certAdded": "Zertifikat als {{filename}} gespeichert.",
+      "keyTitle": "Privaten Schlüssel hinzufügen",
+      "keyDescription": "Der Schlüssel wird dem gespeicherten Zertifikat zugeordnet, zu dem er gehört.",
+      "keyFile": "Schlüsseldatei",
+      "keyPem": "Oder PEM-Schlüssel einfügen",
+      "secret": "Secret (Passphrase des Schlüssels)",
+      "secretHelp": "Bei unverschlüsseltem Schlüssel leer lassen — er wird dann mit einem erzeugten Secret verschlüsselt abgelegt, weil Znuny eines verlangt.",
+      "keyAdded": "Privater Schlüssel für {{filename}} gespeichert.",
+      "keyAddedGenerated": "Privater Schlüssel für {{filename}} gespeichert (mit erzeugtem Secret geschützt).",
+      "filename": "Datei",
+      "subject": "Inhaber",
+      "issuer": "Aussteller",
+      "emails": "E-Mail-Adressen",
+      "expires": "Gültig bis",
+      "notBefore": "Gültig ab",
+      "fingerprint": "Fingerabdruck (SHA-1)",
+      "serial": "Seriennummer",
+      "hash": "Subject-Hash",
+      "ca": "CA",
+      "privateKey": "Privater Schlüssel",
+      "status": {
+        "valid": "gültig",
+        "expired": "abgelaufen",
+        "invalid": "ungültige Datei"
+      },
+      "details": "Details",
+      "download": "Zertifikat herunterladen",
+      "relations": "Signer-Beziehungen",
+      "relationsTitle": "Signer-Beziehungen von {{filename}}",
+      "relationsDescription": "CA-Zertifikate, die jeder mit diesem Zertifikat erstellten Signatur beigelegt werden, damit Empfänger die Kette prüfen können.",
+      "relationsEmpty": "Keine CA-Zertifikate zugeordnet.",
+      "relationSelect": "CA-Zertifikat",
+      "relationAdd": "Zuordnen",
+      "relationRemove": "Entfernen",
+      "relationMissing": "Zertifikat nicht mehr vorhanden",
+      "deletePrivate": "Privaten Schlüssel löschen",
+      "deletePrivateConfirm": "Privaten Schlüssel und Secret von {{filename}} löschen? Das Zertifikat bleibt erhalten.",
+      "delete": "Zertifikat löschen",
+      "deleteConfirm": "Zertifikat {{filename}} samt privatem Schlüssel und Signer-Beziehungen löschen?",
+      "deleted": "Gelöscht.",
+      "renamed": "Neu nummeriert: {{renamed}}.",
+      "empty": "Keine S/MIME-Zertifikate gespeichert.",
+      "loadError": "S/MIME-Zertifikate konnten nicht geladen werden"
     }
   },
   "kb": {

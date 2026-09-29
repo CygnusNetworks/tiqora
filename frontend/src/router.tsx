@@ -86,6 +86,8 @@ import { AutoResponsesPage } from "@/routes/admin/AutoResponsesPage";
 import { DynamicFieldsPage } from "@/routes/admin/DynamicFieldsPage";
 import { WebhooksPage } from "@/routes/admin/WebhooksPage";
 import { MailOutboundPage } from "@/routes/admin/MailOutboundPage";
+import { PgpKeysPage } from "@/routes/admin/PgpKeysPage";
+import { SmimePage } from "@/routes/admin/SmimePage";
 import { MailAccountsPage } from "@/routes/admin/MailAccountsPage";
 import { TelegramChannelPage } from "@/routes/admin/TelegramChannelPage";
 import { OAuth2TokensPage } from "@/routes/admin/OAuth2TokensPage";
@@ -762,6 +764,18 @@ const adminMailOutboundRoute = createRoute({
   component: MailOutboundPage,
 });
 
+const adminPgpRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/pgp",
+  component: PgpKeysPage,
+});
+
+const adminSmimeRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/smime",
+  component: SmimePage,
+});
+
 const adminMailAccountsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/mail-accounts",
@@ -1007,6 +1021,8 @@ const routeTree = rootRoute.addChildren([
     adminWebhooksRoute,
     adminApiKeysRoute,
     adminMailOutboundRoute,
+    adminPgpRoute,
+    adminSmimeRoute,
     adminMailAccountsRoute,
     adminTelegramRoute,
     adminOAuth2TokensRoute,
