@@ -4726,6 +4726,16 @@
           "is_html": {
             "title": "Is Html",
             "type": "boolean"
+          },
+          "security": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArticleSecurity"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -5066,6 +5076,16 @@
             "title": "Is Visible For Customer",
             "type": "boolean"
           },
+          "security": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArticleSecurity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sender_type": {
             "anyOf": [
               {
@@ -5195,6 +5215,68 @@
           "change_time"
         ],
         "title": "ArticleOut",
+        "type": "object"
+      },
+      "ArticleSecurity": {
+        "description": "PGP / S/MIME result of an email article (``TiqoraCrypto*`` article flags).\n\n``status``: ``verified`` (good signature, trusted signer), ``signed_untrusted``\n(valid signature but untrusted chain / expired or revoked key / signer\ndoes not match the sender), ``unknown_key`` (signer key not available),\n``verify_failed`` (bad signature), ``decrypted`` (encrypted, decrypted,\nno signature), ``decrypt_failed``, ``unavailable`` (gpg/openssl missing),\n``error``. For signed+encrypted mail the signature decides the status.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "encrypted": {
+            "title": "Encrypted",
+            "type": "boolean"
+          },
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "signed": {
+            "title": "Signed",
+            "type": "boolean"
+          },
+          "signer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "signed",
+          "encrypted",
+          "status"
+        ],
+        "title": "ArticleSecurity",
         "type": "object"
       },
       "ArticleSummary": {

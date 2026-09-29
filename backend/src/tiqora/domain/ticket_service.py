@@ -6,7 +6,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator, Sequence
 from datetime import datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
 from sqlalchemy import ColumnElement, Select, and_, case, func, or_, select
@@ -58,6 +58,7 @@ from tiqora.domain.quoting import (
 )
 from tiqora.domain.schemas import (
     ArticleListItem,
+    ArticleSecurity,
     AttachmentMetaOut,
     DynamicFieldValueOut,
     HistoryEntry,
@@ -72,7 +73,14 @@ from tiqora.domain.subject_hook import load_subject_config
 from tiqora.permissions.engine import PERMISSION_KEYS, PermissionEngine
 from tiqora.storage.backend import AttachmentContent, AttachmentMeta, DbMimeStorage
 
+if TYPE_CHECKING:
+    from tiqora.crypto.article_view import DecryptedView
+    from tiqora.crypto.mime_walk import SecurityResult
+
 logger = logging.getLogger(__name__)
+
+#: Body Znuny's EmailParser stores when a mail has no text part (S/MIME, PGP/MIME).
+_NO_TEXT_BODY = "- no text message => see attachment -"
 
 #: Named ``state_type`` query-param views resolved to one-or-more
 #: ``ticket_state_type.name`` values. Mirrors Znuny's
@@ -1389,9 +1397,14 @@ class TicketService:
             .all()
         )
 
+        from tiqora.crypto.article_security import load_security
+
+        security_by_aid = await load_security(self._session, article_ids)
+
         out: list[ArticleListItem] = []
         for a in articles:
             m = mime_by_aid.get(a.id)
+            sec = security_by_aid.get(a.id)
             out.append(
                 ArticleListItem(
                     id=a.id,
@@ -1409,6 +1422,7 @@ class TicketService:
                     content_type=m.a_content_type if m else None,
                     incoming_time=m.incoming_time if m else None,
                     ai_origin=a.id in origin_ids,
+                    security=ArticleSecurity.from_result(sec) if sec else None,
                 )
             )
         return out
@@ -1416,6 +1430,19 @@ class TicketService:
     async def get_article_body(
         self, user_id: int, ticket_id: int, article_id: int
     ) -> RenderedArticleBody:
+        rendered, _security = await self.get_article_body_with_security(
+            user_id, ticket_id, article_id
+        )
+        return rendered
+
+    async def get_article_body_with_security(
+        self, user_id: int, ticket_id: int, article_id: int
+    ) -> tuple[RenderedArticleBody, SecurityResult | None]:
+        """Rendered body plus the article's PGP/S-MIME security summary.
+
+        Legacy Znuny articles that are still encrypted are decrypted on view
+        (read-only, see :mod:`tiqora.crypto.article_view`).
+        """
         await self._assert_ticket_ro(user_id, ticket_id)
         art = (
             await self._session.execute(
@@ -1431,11 +1458,41 @@ class TicketService:
         ).scalar_one_or_none()
         body = mime.a_body if mime else None
         ct = mime.a_content_type if mime else "text/plain"
-        return render_article_body(
+        security, view = await self._crypto_view(user_id, article_id, body)
+        if view is not None and view.body is not None:
+            body, ct = view.body, view.content_type
+        rendered = render_article_body(
             body=body,
             content_type=ct,
             ticket_id=ticket_id,
             article_id=article_id,
+        )
+        return rendered, security
+
+    async def _crypto_view(
+        self,
+        user_id: int,
+        article_id: int,
+        body: str | None,
+        attachments: list[AttachmentMeta] | None = None,
+    ) -> tuple[SecurityResult | None, DecryptedView | None]:
+        """Security flags, and the decrypted view of a still-encrypted legacy article."""
+        from tiqora.crypto.article_security import load_security
+        from tiqora.crypto.article_view import article_crypto_view, might_need_view
+
+        stripped = (body or "").strip()
+        if attachments is None and (
+            not stripped or stripped == _NO_TEXT_BODY or "-----BEGIN PGP" in stripped
+        ):
+            attachments = await self._storage.list_attachments(article_id)
+        if attachments is None or not might_need_view(body, attachments):
+            return (await load_security(self._session, [article_id])).get(article_id), None
+        return await article_crypto_view(
+            self._session,
+            article_id=article_id,
+            body=body,
+            attachments=attachments,
+            user_id=user_id,
         )
 
     async def get_article_plain_body(
@@ -1505,6 +1562,10 @@ class TicketService:
         if art is None:
             raise TicketNotFound(article_id)
         atts = await self._storage.list_attachments(article_id)
+        body = await self._article_body_text(article_id)
+        _security, view = await self._crypto_view(user_id, article_id, body, atts)
+        if view is not None and view.body is not None:
+            atts = view.attachment_meta(article_id)
         return [
             AttachmentMetaOut(
                 id=a.id,
@@ -1535,10 +1596,37 @@ class TicketService:
         ).scalar_one_or_none()
         if art is None:
             raise TicketNotFound(article_id)
+        if attachment_id < 0:
+            # Virtual attachment of a decrypted-on-view legacy article.
+            view_att = await self._decrypted_attachments(user_id, article_id)
+            index = -attachment_id - 1
+            if index >= len(view_att):
+                raise TicketNotFound(attachment_id)
+            return view_att[index]
         content = await self._storage.get_attachment(attachment_id)
         if content is None or content.meta.article_id != article_id:
             raise TicketNotFound(attachment_id)
         return content
+
+    async def _article_body_text(self, article_id: int) -> str | None:
+        return (
+            await self._session.execute(
+                select(ArticleDataMime.a_body).where(ArticleDataMime.article_id == article_id)
+            )
+        ).scalar_one_or_none()
+
+    async def _decrypted_attachments(
+        self, user_id: int, article_id: int
+    ) -> list[AttachmentContent]:
+        atts = await self._storage.list_attachments(article_id)
+        body = await self._article_body_text(article_id)
+        _security, view = await self._crypto_view(user_id, article_id, body, atts)
+        if view is None or view.body is None:
+            return []
+        return [
+            AttachmentContent(meta=meta, content=parsed.content)
+            for meta, parsed in zip(view.attachment_meta(article_id), view.attachments, strict=True)
+        ]
 
     async def get_attachment_by_cid(
         self,
@@ -1557,6 +1645,10 @@ class TicketService:
             raise TicketNotFound(article_id)
         content = await self._storage.get_by_content_id(article_id, content_id)
         if content is None:
+            wanted = content_id.strip("<>")
+            for virtual in await self._decrypted_attachments(user_id, article_id):
+                if (virtual.meta.content_id or "").strip("<>") == wanted:
+                    return virtual
             raise TicketNotFound(content_id)
         return content
 
