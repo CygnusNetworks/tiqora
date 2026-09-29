@@ -21,8 +21,24 @@ from tiqora.api.v1.admin.schemas import (
     NotificationEventWrite,
     NotificationMessageIn,
 )
+from tiqora.crypto.notification import validate_security_items
 
 router = APIRouter(prefix="/notification-events", tags=["admin:notification-events"])
+
+
+def _validate_items(items: dict[str, list[str]]) -> None:
+    """Refuse email-security values Znuny's AdminNotificationEvent cannot produce.
+
+    ``EmailSecuritySettings`` / ``EmailSigningCrypting`` /
+    ``EmailMissingSigningKeys`` / ``EmailMissingCryptingKeys`` are read by
+    Znuny's daemon as well; an unknown value would silently change what it
+    does (any policy other than ``Skip`` sends unsigned/unencrypted).
+    """
+    problems = validate_security_items(items)
+    if problems:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="; ".join(problems)
+        )
 
 
 async def _load_items(session: DbSession, notification_id: int) -> dict[str, list[str]]:
@@ -165,6 +181,7 @@ async def get_notification_event(
 async def create_notification_event(
     body: NotificationEventWrite, admin: AdminUser, session: DbSession
 ) -> NotificationEventOut:
+    _validate_items(body.items)
     ts = now()
     result = await session.execute(
         text(
@@ -207,6 +224,8 @@ async def update_notification_event(
     admin: AdminUser,
     session: DbSession,
 ) -> NotificationEventOut:
+    if body.items is not None:
+        _validate_items(body.items)
     existing = (
         await session.execute(
             text("SELECT id FROM notification_event WHERE id = :id"),
