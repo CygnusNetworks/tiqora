@@ -14,6 +14,7 @@ const salutationsList = vi.fn();
 const signaturesList = vi.fn();
 const listSystemAddresses = vi.fn();
 const listFollowUpPossible = vi.fn();
+const signKeyOptions = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -40,6 +41,9 @@ vi.mock("@/lib/api", () => ({
     },
     listSystemAddresses: (...args: unknown[]) => listSystemAddresses(...args),
     listFollowUpPossible: (...args: unknown[]) => listFollowUpPossible(...args),
+    adminCrypto: {
+      signKeyOptions: (...args: unknown[]) => signKeyOptions(...args),
+    },
   },
 }));
 
@@ -91,6 +95,19 @@ describe("QueuesPage", () => {
     signaturesList.mockReset();
     listSystemAddresses.mockReset();
     listFollowUpPossible.mockReset();
+    signKeyOptions.mockReset();
+    signKeyOptions.mockResolvedValue([
+      {
+        value: "SMIME::Detached::1a2b3c4d.0",
+        backend: "SMIME",
+        method: "Detached",
+        key: "1a2b3c4d.0",
+        label: "SMIME-Detached: [valid] 1a2b3c4d.0 [2027-01-01] znuny@localhost",
+        status: "valid",
+        expires: "2027-01-01T00:00:00Z",
+        emails: ["znuny@localhost"],
+      },
+    ]);
 
     list.mockResolvedValue({
       items: [sampleQueue],
@@ -190,5 +207,32 @@ describe("QueuesPage", () => {
       expect(el.tagName).toBe("INPUT");
       expect(el).toHaveAttribute("type", "number");
     }
+  });
+
+  it("offers default sign keys from sign-key-options and keeps unknown stored values", async () => {
+    list.mockResolvedValue({
+      items: [{ ...sampleQueue, default_sign_key: "PGP::Detached::DEADBEEF" }],
+      total: 1,
+      page: 1,
+      page_size: 25,
+    });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("Support")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-7"));
+    fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
+
+    const trigger = await screen.findByTestId("admin-form-default_sign_key");
+    expect(trigger.tagName).toBe("BUTTON");
+    await waitFor(() => {
+      expect(trigger).toHaveTextContent("PGP::Detached::DEADBEEF");
+    });
+    fireEvent.click(trigger);
+    const panel = screen.getByTestId("admin-form-default_sign_key-menu");
+    expect(
+      within(panel).getByText("SMIME-Detached: [valid] 1a2b3c4d.0 [2027-01-01] znuny@localhost"),
+    ).toBeInTheDocument();
+    expect(within(panel).getByText("No automatic signing")).toBeInTheDocument();
   });
 });

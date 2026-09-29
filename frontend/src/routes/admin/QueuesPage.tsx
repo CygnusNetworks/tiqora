@@ -44,6 +44,18 @@ export function QueuesPage() {
     queryFn: () => api.adminSignatures.list({ valid: "valid", pageSize: 500 }),
     staleTime: 5 * 60 * 1000,
   });
+  // Znuny-format default sign keys (PGP::Detached::<id>, SMIME::Detached::<file>)
+  // of every enabled backend; the backend validates the saved value.
+  const signKeysQ = useQuery({
+    queryKey: ["admin", "crypto", "sign-key-options"],
+    queryFn: ({ signal }) => api.adminCrypto.signKeyOptions({}, signal),
+    staleTime: 60 * 1000,
+  });
+  const queueSignKeysQ = useQuery({
+    queryKey: ["admin", "queues", "sign-keys"],
+    queryFn: () => api.adminQueues.list({ valid: "all", pageSize: 500 }),
+    staleTime: 60 * 1000,
+  });
   const followUpQ = useQuery({
     queryKey: ["admin", "follow-up-possible"],
     queryFn: () => api.listFollowUpPossible(),
@@ -80,6 +92,23 @@ export function QueuesPage() {
     () => (signaturesQ.data?.items ?? []).map((s) => ({ value: s.id, label: s.name })),
     [signaturesQ.data],
   );
+  const signKeyOptions = useMemo(() => {
+    const opts = [
+      { value: "", label: t("admin.queues.defaultSignKeyNone") },
+      ...(signKeysQ.data ?? []).map((o) => ({ value: o.value, label: o.label })),
+    ];
+    // Keep a value Tiqora cannot see (backend off here, key only in Znuny)
+    // selectable so editing other fields does not silently drop it.
+    const known = new Set(opts.map((o) => o.value));
+    for (const q of queueSignKeysQ.data?.items ?? []) {
+      const v = q.default_sign_key;
+      if (v && !known.has(v)) {
+        opts.push({ value: v, label: t("admin.queues.defaultSignKeyUnknown", { value: v }) });
+        known.add(v);
+      }
+    }
+    return opts;
+  }, [signKeysQ.data, queueSignKeysQ.data, t]);
   const followUpOptions = useMemo(
     () => (followUpQ.data ?? []).map((f) => ({ value: f.id, label: f.name })),
     [followUpQ.data],
@@ -216,7 +245,8 @@ export function QueuesPage() {
     {
       name: "default_sign_key",
       label: t("admin.queues.defaultSignKey"),
-      type: "text",
+      type: "select",
+      options: signKeyOptions,
       help: {
         title: t("admin.queues.defaultSignKey"),
         description: t("admin.help.queues.defaultSignKey"),
