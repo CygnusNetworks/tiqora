@@ -168,6 +168,33 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/phone-calls" \
 
 Details: [`../channels.md`](../channels.md) (Phone / CTI).
 
+**Incoming-call popup (CTI).** The PBX posts call events (shared secret,
+JSON or form-encoded); agents with that extension get an SSE `call_event`:
+
+```sh
+curl -X POST "$TIQORA_URL/api/v1/channels/phone/events" \
+  -H 'X-Tiqora-Phone-Secret: change-me' -H 'Content-Type: application/json' \
+  -d '{"event": "ringing", "call_id": "1727600000.42",
+       "caller_number": "+49 228 5550101", "extension": "100"}'
+# -> 202 {"accepted": true, "delivered_to": 1}   (0 = unknown extension, ignored)
+
+# The agent's running calls + those ended <= 15 min ago (popup restore)
+curl -b cookies.txt "$TIQORA_URL/api/v1/phone/calls/active"
+# -> [{"call_id": "1727600000.42", "state": "answered", "number": "+49 228 5550101",
+#      "extension": "100", "direction": "inbound", "user_ids": [7],
+#      "ringing_at": "…", "answered_at": "…", "ended_at": null}]
+
+# Hide a card in all of the agent's tabs
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/phone/calls/1727600000.42/dismiss"   # 204
+
+# Own extension(s), comma separated (admins: phone_extension on /admin/users/{id})
+curl -b cookies.txt "$TIQORA_URL/api/v1/auth/me/phone"          # {"extension": "100,101"}
+curl -b cookies.txt -X PUT "$TIQORA_URL/api/v1/auth/me/phone" \
+  -H 'Content-Type: application/json' -d '{"extension": "100, 101"}'
+```
+
+API keys reach `/api/v1/phone/*` with the `events` scope.
+
 **Update — one endpoint for every field mutation.** `PATCH
 /api/v1/tickets/{id}` takes a sparse body; only the keys you send are
 applied, each as its own permission-checked, history-logged operation, all
@@ -455,7 +482,8 @@ curl -b cookies.txt -N "$TIQORA_URL/api/v1/events/stream"
 ```
 
 Server-Sent Events stream of ticket change notifications, used by the UI to
-drive live invalidation. Also see `GET/PUT /api/v1/tickets/{id}/presence`
+drive live invalidation. `call_event` messages (CTI popup) are delivered only to
+the agents listed in their `user_ids`. Also see `GET/PUT /api/v1/tickets/{id}/presence`
 for the "who's viewing this ticket" indicator. A long-lived idle connection
 sends a `: heartbeat` comment every 25s — reverse proxies must not buffer or
 time out this connection early (see
