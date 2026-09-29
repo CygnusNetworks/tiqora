@@ -38,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.crypto import CryptoError, CryptoNotFoundError
 from tiqora.crypto import keystore as ks
 from tiqora.crypto.pgp import PgpEngine, PgpKeyInfo
+from tiqora.crypto.pgp import _emails as uid_emails
 from tiqora.crypto.smime_store import SmimeEntry, SmimeStore, SmimeStoreError, validate_filename
 from tiqora.db.legacy.customer import CustomerPreferences
 
@@ -207,8 +208,7 @@ async def add_customer_pgp_key(
         raise CustomerKeyError("Upload exactly one PGP public key")
     if require_own_email:
         uids = [str(u) for u in scanned[0].get("uids") or []]  # type: ignore[attr-defined]
-        wanted = _emails(email)
-        if not any(e in u.lower() for u in uids for e in wanted):
+        if not (_emails(email) & set(uid_emails(uids))):
             raise CustomerKeyError("The key does not carry your email address")
     fingerprints = await asyncio.to_thread(engine.import_key, armored)
     key = await asyncio.to_thread(engine.find_key, fingerprints[0])
