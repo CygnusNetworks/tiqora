@@ -18,7 +18,7 @@ copy Znuny code into packages.
 ## Clone and layout
 
 ```
-aurix/   # repository root (Tiqora monorepo)
+tiqora/  # repository root (Tiqora monorepo)
   backend/          # Python package tiqora
   frontend/         # Vite React app
   docs/             # English documentation
@@ -186,6 +186,10 @@ make lint   # ruff + mypy
 make fmt    # auto-fix
 ```
 
+Running pytest directly: use `cd backend && uv run python -m pytest -q` (not
+`uv run pytest`, which can pick up a stale pytest entry script). CI fails on
+`ruff format --check` as well as `ruff check` and `mypy` — run all three.
+
 - **Unit tests** (`not db`): password hashes, SysConfig YAML resolution, config/health.
 - **DB tests** (`pytest -m db`): start MariaDB 10.11 and Postgres 16 via testcontainers,
   load Znuny 6.5 DDL from `backend/tests/fixtures/znuny-schema/`, assert legacy models
@@ -283,6 +287,8 @@ Route stubs: `/agent`, `/portal`, `/admin`. i18n: **49 locales** (Znuny’s 48
 `.po` codes + plain `en`) — registry in `src/i18n/locales.ts`, full JSON under
 `src/i18n/locales/*.json`. Commands: `pnpm i18n:check`, `pnpm i18n:scaffold`
 (translations are maintained by hand; there is no machine-translate pipeline).
+`pnpm lint` = ESLint + `tsc --noEmit` (the frontend has no Prettier/Biome
+formatter); `pnpm test` = Vitest; `pnpm e2e` = Playwright.
 Theme via `data-theme` on `<html>`; UI language sets `lang` + `dir` and
 persists to Znuny `UserLanguage` when logged in. Comparison with Znuny and the
 full code list: [i18n.md](./i18n.md).
@@ -303,7 +309,8 @@ documented in `tiqora.config.Settings` and [deployment.md](./deployment.md).
 - **i18n**: user-visible strings go through keys from day one. Add new keys to
   `en.json` (source) and keep `de.json` in sync for the day-one pair; run
   `pnpm i18n:check` (all 49 locale files must match). Fill other locales via
-  scaffold/translate or review — see [i18n.md](./i18n.md). Prefer
+  `node scripts/propagate-i18n-keys.mjs` (English placeholders) and translate
+  — never re-run `scaffold` on an existing locale; see [i18n.md](./i18n.md). Prefer
   `toBcp47(i18n.language)` for `Intl` formatting and `setAppLanguage()` for
   switches (not ad-hoc `localStorage` / `startsWith("de")`).
 

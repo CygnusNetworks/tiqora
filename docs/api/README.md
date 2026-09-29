@@ -37,7 +37,10 @@ This does **not** require a live database, Redis, or Meilisearch connection —
 inspects the route table (routes are registered at import time; the app's
 `lifespan` — which does need those dependencies — never runs). Re-run this
 after adding or changing any `/api/v1`, `/api/portal`, or `/znuny-compat`
-route and commit the updated file.
+route and commit the updated file. Copy the same output to
+`packages/api-client/openapi.json` as well — the frontend's typed client
+(`schema.d.ts`) is generated from that copy, and CI's frontend type-check
+fails when it lags behind the backend.
 
 The MCP server does not speak OpenAPI (it is not a REST API); its tool
 surface is documented by hand in [`mcp.md`](mcp.md) from the tool registry in
@@ -67,8 +70,9 @@ surface is documented by hand in [`mcp.md`](mcp.md) from the tool registry in
   created by Znuny itself still works against Tiqora's compat layer during
   parallel operation.
 - **Auth method discovery**: `GET /api/v1/auth/methods` tells the login UI
-  which of password / OIDC / SPNEGO / LDAP are enabled for this deployment
-  (`TIQORA_OIDC_ENABLED`, `TIQORA_SPNEGO_ENABLED`, `TIQORA_LDAP_ENABLED`).
+  which of password / OIDC / SPNEGO / LDAP / WebAuthn are enabled for this
+  deployment (`TIQORA_OIDC_ENABLED`, `TIQORA_SPNEGO_ENABLED`,
+  `TIQORA_LDAP_ENABLED`, `TIQORA_WEBAUTHN_*`), plus `portal_enabled`.
 
 ## Conventions
 

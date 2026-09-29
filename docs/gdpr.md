@@ -95,7 +95,7 @@ run repeatedly (e.g. daily) without re-scrubbing already-anonymized tickets.
 ### Worker task
 
 `tiqora.worker.gdpr_retention.run_gdpr_retention_tick` is scheduled daily
-(03:00, `gdpr_retention_task` in `tiqora.worker.broker`) but is a no-op
+(03:00, `_daily_loop("gdpr_retention", ...)` in `tiqora.worker.__main__`) but is a no-op
 unless the `gdpr.retention.enabled` tiqora_settings key is set to a truthy
 value (default OFF — see `tiqora.domain.settings_store`). Flip it via the
 existing settings-store helpers (there is no dedicated CLI toggle yet; use
