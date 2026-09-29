@@ -88,10 +88,110 @@ phone-number-id and an access token — see Meta's
 
 ## Phone / CTI (`channels/phone/`)
 
-The simplest plugin — no gateway, just a thin logging API over `add_article`
-with the sender/history type Znuny already uses for calls
-(`PhoneCallCustomer` for inbound, `PhoneCallAgent` for outbound), reusing
-the built-in `Phone` communication channel.
+Znuny 6.5 phone parity (AgentTicketPhone, AgentTicketPhoneInbound/Outbound)
+plus the CTI logging webhook. Every phone call becomes an article through one
+service function, `log_phone_call_on_ticket` (`channels/phone/service.py`):
+a `Phone`-channel article with sender `customer` (inbound, history
+`PhoneCallCustomer`) or `agent` (outbound, `PhoneCallAgent`), the booked time
+bound to that article, ticket dynamic fields, attachments and the next state
+(+ pending time) — all in the caller's transaction, validated before the
+first write. The agent endpoint, the new phone ticket flow and the CTI
+webhook all use it.
+
+### Logging a call on a ticket (agent UI / API)
+
+`POST /api/v1/tickets/{id}/phone-calls` (session or API key with
+`tickets:rw`; needs `rw` on the queue — Znuny's `phone` permission key is not
+part of Tiqora's permission engine):
+
+```json
+{"direction": "outbound", "subject": "Anruf an Jane Doe", "body": "…",
+ "content_type": "text/plain", "is_visible_for_customer": true,
+ "state_id": 6, "pending_time": "2026-09-30T07:00:00Z", "time_unit": 4,
+ "dynamic_fields": {"Topic": ["Drucker"]}, "attachments": [], "caller_number": "+49 228 1"}
+```
+
+→ `201 {"article_id", "ticket_id", "time_accounting_id", "locked"}`.
+
+- **Lock**: `Ticket::Frontend::AgentTicketPhoneOutbound###RequiredLock`
+  (default on) / `…PhoneInbound###RequiredLock` (default off). With a
+  required lock an unlocked ticket is locked and the agent becomes owner
+  (`locked: true`); a ticket locked by another agent is **409** with
+  `detail.locked_by_name`. A closing next state unlocks again (Znuny).
+- **Errors**: 403 without `rw`, 404 unknown ticket, 422 for an unknown state,
+  a pending state without `pending_time`, bad base64 attachments.
+- **From/To**: inbound From is the ticket customer as `"Full Name" <email>`
+  (else `caller_number`); outbound From is the agent, To the customer.
+
+**Ticket header ("Anruf")**: menu with *Eingehend* / *Ausgehend* and, when
+the ticket's customer has phone/mobile numbers, click-to-call links (see
+below). `PhoneCallDialog`: direction toggle, call timer (starts on open,
+pause/resume; the booked minutes follow the timer rounded up to whole minutes
+until the agent types a value), subject "Anruf von/an ‹Kunde›", notes with
+**Notiz aufbereiten** (AI refine in `call_note` mode — structures the notes
+into *Anliegen / Vereinbart / Nächste Schritte* in the UI language, adds no
+facts), next state *Status unverändert* / Znuny default per direction
+(outbound → `closed successful`, inbound → `open`) / **Rückruf** (first
+`pending reminder` state) with presets *in 1 Std · heute 16:00 · morgen 9:00 ·
+Datum…*, customer visibility, the screen's dynamic fields and attachments.
+Text, direction and elapsed time are kept per ticket in localStorage until the
+call is saved or discarded.
+
+### New phone ticket
+
+`POST /api/v1/tickets` with `phone_call` creates the ticket and logs the call
+as its first article in one transaction (`subject` defaults to the title;
+`time_unit`, `attachments`, `caller_number`), plus `pending_time` for a
+pending initial state (422 without it) and `responsible_id` / type / service /
+SLA / dynamic fields as before. With `send_auto_response: true` and an
+**inbound** call the queue's `auto reply` goes to the ticket's customer after
+the commit — same code path as the email pipeline (placeholders, loop
+protection, `SendAutoReply` history), gated by SysConfig
+`AutoResponseForWebTickets` (default on) and only when an outbound relay is
+configured. Failures are logged and never fail the ticket creation. Outbound
+phone tickets never auto-reply.
+
+The New-ticket page's phone mode has a **caller number** field with a live
+lookup (`GET /api/v1/reference/caller`): matching customers can be taken over
+as the ticket's customer, and the caller's open tickets offer *Anruf zu diesem
+Ticket erfassen*, which opens that ticket's `PhoneCallDialog` with the typed
+text and the running timer. It also offers owner, responsible, type, service,
+SLA, pending/closed initial states (with callback presets), the booked time
+(timer from page open), dynamic fields and attachments.
+
+### Caller lookup, phone search, dynamic fields
+
+- `GET /api/v1/reference/caller?number=…` → `{number_normalized, customers:
+  [{login, customer_id, name, email, phone, mobile, company}], open_tickets:
+  [{id, tn, title, state, queue, customer_user_id, changed}]}`. Phone/mobile
+  are compared digits-only on the last nine digits (`domain/phone_match.py`),
+  all matches (max 10); open tickets are those of the matched customer users
+  in queues the agent may read, state type not closed/removed/merged, newest
+  first, max 10. Fewer than five digits match nothing.
+- The customer searches (`/reference/customers`, `/reference/customer-search`)
+  also match phone/mobile once the query has five or more digits.
+- `GET /api/v1/reference/dynamic-fields?screen=AgentTicketPhone|AgentTicketPhoneInbound|AgentTicketPhoneOutbound`
+  lists the ticket dynamic fields the screen's `###DynamicField` SysConfig
+  enables (`2` = required); when it enables none, every valid, non-internal
+  ticket field of an editable type. Article-level dynamic fields are not
+  supported by the write paths and are not offered.
+
+### Click-to-call
+
+Customer phone and mobile are `tel:` links — or `sip:` when
+`channel.phone.dial_scheme` is `sip` (read by agents via
+`GET /api/v1/reference/phone-config`). In the ticket header's *Anruf* menu a
+click dials and opens `PhoneCallDialog` outbound with the timer running; on
+the customer page (`/agent/customers/{login}`) it opens the New-ticket page in
+phone mode, outbound, with the customer and number prefilled.
+
+### Queue list
+
+A ticket whose **first** article is on the `Phone` channel is listed as
+`phone` (see *Channel in the queue list* below) unless a chat channel applies;
+a later phone call does not change an e-mail ticket's channel.
+
+### CTI webhook
 
 - **Endpoint**: `POST /api/v1/channels/phone/note`
   `{"direction": "inbound"|"outbound", "caller_number", "note",
@@ -103,8 +203,11 @@ the built-in `Phone` communication channel.
   - With `ticket_id`: appends directly to that ticket.
   - Without: resolves the caller number to a `customer_user` and dispatches
     through the same follow-up-or-create logic as SMS/WhatsApp.
+  - Logged through `log_phone_call_on_ticket` without the agent permission
+    and lock checks (the caller is an integration, not an agent).
 - **Config keys** (`channel.phone.*`): `enabled`, `inbound_shared_secret`,
-  `default_customer_user`, `queue_name`.
+  `default_customer_user`, `queue_name`, `dial_scheme` (`tel`|`sip`, default
+  `tel`; used by click-to-call even while the CTI channel is disabled).
 
 ## Telegram (`channels/telegram/`)
 
@@ -275,9 +378,10 @@ Telegram can't be reached (no bot token, channel gone):
 
 ### Channel in the queue list
 
-`TicketListItem.channel` is `email`, `telegram` or `webchat`: a ticket with a
-message on a conversational channel is that channel (its origin — a later
-e-mail reply does not change it; with several, the earliest wins), everything
+`TicketListItem.channel` is `email`, `telegram`, `webchat` or `phone`: a
+ticket with a message on a conversational channel is that channel (its origin
+— a later e-mail reply does not change it; with several, the earliest wins);
+otherwise a ticket whose first article is a phone call is `phone`; everything
 else is `email`. `webchat` maps to Znuny's seeded "Chat" channel, reserved for
 the web chat (`LIST_CHANNELS` in `domain/ticket_service.py`). For Telegram
 chats not linked to a customer user, `chat_display_name` / `chat_username`
@@ -286,14 +390,16 @@ channel's shared guest customer.
 
 - **Filter**: `channel` (repeatable, any-of) on `GET /api/v1/tickets`,
   `/facets` and `/export.csv`; the facets response gains `channels` counts
-  (`email`/`telegram`/`webchat`, computed over every filter except `channel`).
+  (`email`/`telegram`/`webchat`/`phone`, computed over every filter except
+  `channel`).
 - **Queue list UI**: a channel pill in the row's meta line, and the row's
   left edge takes the channel colour for chat tickets (an escalation still
   wins). "Kanal" chips next to the "Nur" flags filter by channel; they only
   appear once a chat channel has tickets in the current view (a chat channel
   without tickets, e.g. web chat, stays hidden), and reset clears them too.
   Colours come from the theme tokens `--color-channel-telegram` (cyan, kept
-  clearly apart from the open-state blue) and `--color-channel-webchat`.
+  clearly apart from the open-state blue), `--color-channel-webchat` and
+  `--color-channel-phone` (olive green).
 
 ### Known limitations
 
