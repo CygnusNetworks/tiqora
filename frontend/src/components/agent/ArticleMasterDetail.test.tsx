@@ -213,6 +213,14 @@ describe("ArticleMasterDetail", () => {
     expect(screen.queryByTestId("article-list-item-3")).toBeNull();
   });
 
+  it("shows the Chats filter only on tickets with chat messages, with counts", async () => {
+    wrap(<ArticleMasterDetail ticketId={7} />);
+    await screen.findByTestId("article-list-item-1");
+    expect(screen.queryByTestId("article-filter-chat")).toBeNull();
+    expect(screen.getByTestId("article-filter-email")).toHaveTextContent("2");
+    expect(screen.getByTestId("article-filter-note")).toHaveTextContent("1");
+  });
+
   it("reverses the list order on sort toggle", async () => {
     wrap(<ArticleMasterDetail ticketId={7} />);
     await screen.findByTestId("article-list-item-1");
@@ -537,6 +545,17 @@ describe("ArticleMasterDetail — Telegram chat composer", () => {
     expect(conversation).toHaveAttribute("data-order", "oldest-first");
     expect(follows(conversation, composer)).toBe(true);
     expect(follows(composer, screen.getByTestId("composer-open"))).toBe(true);
+  });
+
+  it("filters Telegram messages under Chats, which E-Mails never covered", async () => {
+    wrap(<ArticleMasterDetail ticketId={12} />);
+    await screen.findByTestId("article-conversation");
+    const chats = screen.getByTestId("article-filter-chat");
+    expect(chats).toHaveTextContent("1");
+    expect(screen.getByTestId("article-filter-email")).toHaveTextContent("0");
+    fireEvent.click(chats);
+    expect(chats).toHaveAttribute("aria-pressed", "true");
+    expect(window.localStorage.getItem("tiqora.articleList.filter")).toBe("chat");
   });
 
   it("keeps the sort toggle disabled in a non-Telegram conversation", async () => {
