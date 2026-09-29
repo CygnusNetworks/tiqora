@@ -222,8 +222,18 @@ async def log_phone_call_on_ticket(
             session, ticket_id=ticket_id, field_name=name, values=values, user_id=user_id
         )
 
-    if call.state_id is not None:
-        closing = (await _state_type_name(session, call.state_id)).lower().startswith("close")
+    state_type = (
+        (await _state_type_name(session, call.state_id)).lower()
+        if call.state_id is not None
+        else ""
+    )
+    # TicketStateSet: "check if update is needed" -- the same state again is
+    # a no-op (a pending state still takes its new time).
+    same_state = call.state_id == int(ticket["ticket_state_id"]) and not state_type.startswith(
+        "pending"
+    )
+    if call.state_id is not None and not same_state:
+        closing = state_type.startswith("close")
         if closing and enforce_permissions:
             # Same as the close screen: closing needs the lock first.
             await acquire_lock(
