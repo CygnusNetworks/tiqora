@@ -292,6 +292,18 @@ async def test_inbound_call_logs_customer_article_with_time_and_fields(
     assert float(ta[0][2]) == 7.0
     assert data["time_accounting_id"] == ta[0][0]
 
+    # Inbound default "open" on an open ticket: no StateUpdate (Znuny no-op).
+    async with _client(factory, AGENT_RW) as client:
+        again = await client.post(URL, json=_call(state_id=STATE_OPEN))
+    assert again.status_code == 201, again.text
+    updates = _query(
+        url,
+        "SELECT COUNT(*) FROM ticket_history h JOIN ticket_history_type ht"
+        " ON ht.id = h.history_type_id WHERE h.ticket_id = :t AND ht.name = 'StateUpdate'",
+        t=TICKET_ID,
+    )
+    assert updates[0][0] == 0
+
     df = _query(
         url,
         "SELECT value_text FROM dynamic_field_value WHERE field_id = :f AND object_id = :t",

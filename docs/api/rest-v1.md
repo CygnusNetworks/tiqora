@@ -474,7 +474,7 @@ curl -b cookies.txt "$TIQORA_URL/api/v1/reference/caller?number=%2B49%20228%2055
 # Click-to-call scheme for agent UIs: {"dial_scheme": "tel"|"sip"}
 curl -b cookies.txt "$TIQORA_URL/api/v1/reference/phone-config"
 
-# Ticket dynamic fields of a phone screen (### DynamicField config, 2 = required)
+# Ticket dynamic fields of a phone screen (###DynamicField config, 2 = required)
 curl -b cookies.txt "$TIQORA_URL/api/v1/reference/dynamic-fields?screen=AgentTicketPhoneOutbound"
 ```
 
