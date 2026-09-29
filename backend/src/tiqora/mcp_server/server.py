@@ -397,6 +397,7 @@ async def ticket_search(
         limit: Maximum results (1-100).
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("ticket_search")
     state = _get_state()
     limit = max(1, min(limit, 100))
 
@@ -733,6 +734,7 @@ async def ticket_get(
         include_internal_notes: Include internal (not customer-visible) notes.
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("ticket_get")
     state = _get_state()
 
     async with state.session_factory() as session:
@@ -768,6 +770,7 @@ async def ticket_get_by_number(
         include_internal_notes: Include internal (not customer-visible) notes.
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("ticket_get_by_number")
     state = _get_state()
 
     async with state.session_factory() as session:
@@ -1300,6 +1303,7 @@ async def list_queues(
         movable: If true, only queues with ``rw``; otherwise queues with ``ro``.
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("list_queues")
     state = _get_state()
     perm = "rw" if movable else "ro"
 
@@ -1326,6 +1330,7 @@ async def list_states(ctx: Context) -> list[dict[str, Any]]:
         (none — auth required)
     """
     _get_user_id(ctx)
+    _assert_tool_allowed("list_states")
     state = _get_state()
 
     async with state.session_factory() as session:
@@ -1348,6 +1353,7 @@ async def list_priorities(ctx: Context) -> list[dict[str, Any]]:
         (none — auth required)
     """
     _get_user_id(ctx)
+    _assert_tool_allowed("list_priorities")
     state = _get_state()
 
     async with state.session_factory() as session:
@@ -1374,6 +1380,7 @@ async def list_agents(ctx: Context) -> list[dict[str, Any]]:
         (none — auth required)
     """
     _get_user_id(ctx)
+    _assert_tool_allowed("list_agents")
     state = _get_state()
 
     async with state.session_factory() as session:
@@ -1416,6 +1423,7 @@ async def kb_search(
         limit: Maximum results (1-100).
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("kb_search")
     state = _get_state()
     limit = max(1, min(limit, 100))
 
@@ -1451,6 +1459,7 @@ async def kb_get_article(
         article_id: The KB article ID (as returned by ``kb_search``).
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("kb_get_article")
     state = _get_state()
 
     async with state.session_factory() as session:
@@ -1498,6 +1507,7 @@ async def kb_list(
         state: Lifecycle state filter (default ``published``; pass null for any).
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("kb_list")
     state_obj = _get_state()
 
     async with state_obj.session_factory() as session:
@@ -1548,6 +1558,7 @@ async def kb_upsert_article(
         state: Lifecycle state (draft/review/published/archived).
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("kb_upsert_article")
     try:
         _assert_mcp_write_scope()
     except TicketAccessDenied as exc:
@@ -1625,6 +1636,7 @@ async def kb_publish_article(
         article_id: The KB article id to publish.
     """
     user_id = _get_user_id(ctx)
+    _assert_tool_allowed("kb_publish_article")
     try:
         _assert_mcp_write_scope()
     except TicketAccessDenied as exc:
@@ -2150,6 +2162,7 @@ async def customer_lookup(
         customer_login: Customer user login (username).
     """
     _get_user_id(ctx)  # auth check
+    _assert_tool_allowed("customer_lookup")
     state = _get_state()
 
     async with state.session_factory() as session:
