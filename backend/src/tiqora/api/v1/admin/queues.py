@@ -146,8 +146,30 @@ async def list_queue_physical_variables(
     return out
 
 
+async def _check_sign_key(session: DbSession, value: str | None) -> str | None:
+    """Validate ``default_sign_key`` (Znuny format, key must exist); return the value to store.
+
+    Empty strings become NULL. Valid values are the ones offered by
+    ``GET /admin/crypto-keys/sign-key-options``.
+    """
+    value = (value or "").strip() or None
+    if value is None:
+        return None
+    from tiqora.crypto.config import load_crypto_config
+    from tiqora.crypto.keystore import validate_sign_key
+
+    error = await validate_sign_key(await load_crypto_config(session), value)
+    if error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"default_sign_key: {error}",
+        )
+    return value
+
+
 @router.post("", response_model=QueueOut, status_code=status.HTTP_201_CREATED)
 async def create_queue(body: QueueCreate, admin: AdminUser, session: DbSession) -> Queue:
+    body.default_sign_key = await _check_sign_key(session, body.default_sign_key)
     ts = now()
     queue = Queue(
         **body.model_dump(),
@@ -170,7 +192,14 @@ async def update_queue(
     queue = await session.get(Queue, queue_id)
     if queue is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Queue not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+    if "default_sign_key" in changes and (changes["default_sign_key"] or None) != (
+        queue.default_sign_key or None
+    ):
+        # Only a *changed* value is checked: a key Znuny set that Tiqora cannot
+        # see (backend off here) must not block unrelated edits.
+        changes["default_sign_key"] = await _check_sign_key(session, changes["default_sign_key"])
+    for field, value in changes.items():
         setattr(queue, field, value)
     queue.change_time = now()
     queue.change_by = admin.id

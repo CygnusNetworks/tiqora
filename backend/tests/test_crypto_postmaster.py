@@ -59,6 +59,12 @@ async def _seed_tiqora_tables(session: AsyncSession) -> None:
         with contextlib.suppress(Exception):
             await session.execute(text(ddl))
     await session.commit()
+    # Everything else the pipeline touches (tiqora_settings, mail log, ...) so
+    # the module also passes when run on its own.
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    await session.run_sync(lambda s: TiqoraBase.metadata.create_all(s.connection()))
+    await session.commit()
 
 
 def _make_sysconfig() -> SysConfig:

@@ -279,14 +279,12 @@ class TiqoraUserAuthConfig(TiqoraBase):
 
 
 class TiqoraCryptoKey(TiqoraBase):
-    """Bookkeeping record for an imported PGP/S/MIME key (Phase 2c).
+    """Audit trail of PGP/S-MIME key-store mutations (never key material).
 
-    Not the key material itself: PGP private/public key material lives in
-    the gpg keyring at ``TIQORA_CRYPTO_GNUPG_HOME``; S/MIME cert/key material
-    lives as files under the configured cert/private directories (see
-    ``tiqora.crypto.keystore``). This table only records *who imported what,
-    when* — an audit trail for `tiqora crypto pgp-import` /
-    `tiqora crypto smime-register`.
+    PGP keys live in the gpg keyring, S/MIME certificates/keys in Znuny's
+    ``SMIME::CertPath``/``SMIME::PrivatePath`` layout (see
+    :mod:`tiqora.crypto.smime_store`). One row per mutation from the admin
+    API or the ``tiqora crypto`` CLI: *who* did *what* to *which* key, when.
     """
 
     __tablename__ = "tiqora_crypto_key"
@@ -294,7 +292,7 @@ class TiqoraCryptoKey(TiqoraBase):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
     # "pgp" | "smime"
     key_type: Mapped[str] = mapped_column(String(20), nullable=False)
-    # PGP: fingerprint. S/MIME: the email the cert/key pair is filed under.
+    # PGP: fingerprint. S/MIME: the store filename (<hash>.<n>).
     identifier: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # "sign" | "encrypt" | "both"
@@ -307,6 +305,13 @@ class TiqoraCryptoKey(TiqoraBase):
         nullable=False,
         server_default=func.now(),
     )
+    # import | delete | delete_secret | add_certificate | add_private |
+    # delete_private | relation_add | relation_delete | migrate | rehash
+    action: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="import", server_default="import"
+    )
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     __table_args__ = (Index("ix_tiqora_crypto_key_type_identifier", "key_type", "identifier"),)
 

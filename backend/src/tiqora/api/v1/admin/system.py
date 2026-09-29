@@ -36,6 +36,7 @@ from tiqora.api.v1.admin.schemas import (
     AppInfoOut,
     ContainerOut,
     ContainersOut,
+    CryptoBackendStatusOut,
     DatastoresOut,
     DbStatusOut,
     HostOut,
@@ -354,4 +355,18 @@ async def get_system_info(
         datastores=DatastoresOut(database=database, redis=redis_status, search=search),
         containers=containers,
         host=host,
+        crypto=await _crypto_status(session, cfg),
     )
+
+
+async def _crypto_status(session: DbSession, cfg: Settings) -> list[CryptoBackendStatusOut]:
+    """PGP / S-MIME self-check (best-effort like every other probe here)."""
+    from tiqora.api.v1.admin.crypto_keys import status_out
+    from tiqora.crypto.config import backend_status_sync, load_crypto_config
+
+    try:
+        crypto_cfg = await load_crypto_config(session, cfg)
+        return [status_out(s) for s in await asyncio.to_thread(backend_status_sync, crypto_cfg)]
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("system_info_crypto_failed", error=str(exc))
+        return []

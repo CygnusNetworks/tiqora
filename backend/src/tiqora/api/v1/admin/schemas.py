@@ -1654,6 +1654,24 @@ class HostOut(BaseModel):
     disk_percent: float | None = None
 
 
+class BinaryStatusOut(BaseModel):
+    available: bool
+    path: str
+    version: str
+    reason: str = ""
+
+
+class CryptoBackendStatusOut(BaseModel):
+    """PGP / S-MIME self-check: SysConfig switch, gpg/openssl binary, key directories."""
+
+    backend: str  # "pgp" | "smime"
+    enabled: bool
+    available: bool
+    binary: BinaryStatusOut
+    paths: dict[str, str]
+    problems: list[str]
+
+
 class SystemInfoOut(BaseModel):
     """Everything the admin System-Info page renders in one payload."""
 
@@ -1662,3 +1680,4 @@ class SystemInfoOut(BaseModel):
     datastores: DatastoresOut
     containers: ContainersOut
     host: HostOut
+    crypto: list[CryptoBackendStatusOut] = []

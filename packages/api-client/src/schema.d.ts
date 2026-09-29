@@ -1200,11 +1200,32 @@ export interface paths {
         };
         /**
          * List Crypto Keys
-         * @description List audit rows for imported crypto keys (not key material).
+         * @description Audit trail of key-store mutations (newest first; never key material).
          */
         get: operations["list_crypto_keys_api_v1_admin_crypto_keys_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/pgp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pgp Keys */
+        get: operations["list_pgp_keys_api_v1_admin_crypto_keys_pgp_get"];
+        put?: never;
+        /**
+         * Upload Pgp Key
+         * @description Import an ASCII-armored public or secret key (Znuny AdminPGP ``AddKey``).
+         */
+        post: operations["upload_pgp_key_api_v1_admin_crypto_keys_pgp_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1222,9 +1243,83 @@ export interface paths {
         put?: never;
         /**
          * Admin Pgp Import
-         * @description Import a PGP key into the configured keyring + write audit rows.
+         * @description Alias of ``POST /pgp`` (kept for existing API clients).
          */
         post: operations["admin_pgp_import_api_v1_admin_crypto_keys_pgp_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/pgp/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Pgp Key */
+        delete: operations["delete_pgp_key_api_v1_admin_crypto_keys_pgp__key_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/pgp/{key_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Pgp Key
+         * @description Armored **public** key (secret keys are never exported).
+         */
+        get: operations["export_pgp_key_api_v1_admin_crypto_keys_pgp__key_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/sign-key-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sign Key Options
+         * @description Values for ``queue.default_sign_key`` in Znuny format (``PGP::Detached::<id>`` …).
+         */
+        get: operations["sign_key_options_api_v1_admin_crypto_keys_sign_key_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/smime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Smime */
+        get: operations["list_smime_api_v1_admin_crypto_keys_smime_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1242,9 +1337,115 @@ export interface paths {
         put?: never;
         /**
          * Admin Smime Register
-         * @description Write S/MIME cert/key files under configured dirs + audit row.
+         * @description Alias: add a certificate and/or its private key to the Znuny-layout store.
+         *
+         *     ``email`` is informational only — the store files certificates by subject
+         *     hash, the addresses come from the certificate itself.
          */
         post: operations["admin_smime_register_api_v1_admin_crypto_keys_smime_register_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/smime/certificates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Smime Certificate */
+        post: operations["upload_smime_certificate_api_v1_admin_crypto_keys_smime_certificates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/smime/private-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Smime Private Key
+         * @description Private key + secret for an already stored certificate (Znuny ``AddPrivate``).
+         */
+        post: operations["upload_smime_private_key_api_v1_admin_crypto_keys_smime_private_keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/smime/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download Smime Certificate
+         * @description The certificate PEM (never the private key).
+         */
+        get: operations["download_smime_certificate_api_v1_admin_crypto_keys_smime__filename__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Smime
+         * @description Delete a certificate (with its private key and relations) or only the private key.
+         */
+        delete: operations["delete_smime_api_v1_admin_crypto_keys_smime__filename__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/smime/{filename}/relations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Smime Relations
+         * @description CA certificates attached to signatures made with this certificate.
+         */
+        get: operations["list_smime_relations_api_v1_admin_crypto_keys_smime__filename__relations_get"];
+        put?: never;
+        /** Add Smime Relation */
+        post: operations["add_smime_relation_api_v1_admin_crypto_keys_smime__filename__relations_post"];
+        /** Delete Smime Relation */
+        delete: operations["delete_smime_relation_api_v1_admin_crypto_keys_smime__filename__relations_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-keys/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Crypto Status
+         * @description Per backend: SysConfig switch, binary self-check, key directories.
+         */
+        get: operations["crypto_status_api_v1_admin_crypto_keys_status_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8570,6 +8771,20 @@ export interface components {
             /** Points */
             points: components["schemas"]["BacklogPointOut"][];
         };
+        /** BinaryStatusOut */
+        BinaryStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Path */
+            path: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Version */
+            version: string;
+        };
         /** Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post */
         Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post: {
             /** File */
@@ -8764,10 +8979,39 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
-        /** CryptoKeyOut */
+        /**
+         * CryptoBackendStatusOut
+         * @description PGP / S-MIME self-check: SysConfig switch, gpg/openssl binary, key directories.
+         */
+        CryptoBackendStatusOut: {
+            /** Available */
+            available: boolean;
+            /** Backend */
+            backend: string;
+            binary: components["schemas"]["BinaryStatusOut"];
+            /** Enabled */
+            enabled: boolean;
+            /** Paths */
+            paths: {
+                [key: string]: string;
+            };
+            /** Problems */
+            problems: string[];
+        };
+        /**
+         * CryptoKeyOut
+         * @description One audit row (not key material).
+         */
         CryptoKeyOut: {
+            /**
+             * Action
+             * @default import
+             */
+            action: string;
             /** Created */
             created?: string | null;
+            /** Detail */
+            detail?: string | null;
             /** Email */
             email?: string | null;
             /** Has Private Key */
@@ -8780,6 +9024,8 @@ export interface components {
             key_type: string;
             /** Purpose */
             purpose: string;
+            /** User Id */
+            user_id?: number | null;
         };
         /** CustomerCompanyCreate */
         CustomerCompanyCreate: {
@@ -11186,6 +11432,47 @@ export interface components {
             /** Fingerprints */
             fingerprints: string[];
         };
+        /** PgpKeyOut */
+        PgpKeyOut: {
+            /** Algorithm */
+            algorithm: string;
+            /** Bits */
+            bits?: number | null;
+            /** Created */
+            created?: string | null;
+            /** Emails */
+            emails: string[];
+            /** Expires */
+            expires?: string | null;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Has Secret */
+            has_secret: boolean;
+            /** Key Id */
+            key_id: string;
+            /** Short Id */
+            short_id: string;
+            /** Status */
+            status: string;
+            /** Subkey Ids */
+            subkey_ids: string[];
+            /** Uids */
+            uids: string[];
+            /** Znuny Key Id */
+            znuny_key_id: string;
+        };
+        /** PgpUploadIn */
+        PgpUploadIn: {
+            /** Ascii Armor */
+            ascii_armor: string;
+        };
+        /** PgpUploadOut */
+        PgpUploadOut: {
+            /** Fingerprints */
+            fingerprints: string[];
+            /** Keys */
+            keys: components["schemas"]["PgpKeyOut"][];
+        };
         /** PhoneNoteRequest */
         PhoneNoteRequest: {
             /** Agent User Id */
@@ -12101,6 +12388,25 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** SignKeyOptionOut */
+        SignKeyOptionOut: {
+            /** Backend */
+            backend: string;
+            /** Emails */
+            emails: string[];
+            /** Expires */
+            expires?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Method */
+            method: string;
+            /** Status */
+            status: string;
+            /** Value */
+            value: string;
+        };
         /** SignatureOut */
         SignatureOut: {
             /** Change Time */
@@ -12297,6 +12603,63 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** SmimeCertOut */
+        SmimeCertOut: {
+            /** Emails */
+            emails: string[];
+            /** Filename */
+            filename: string;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Has Private */
+            has_private: boolean;
+            /** Hash */
+            hash: string;
+            /** Is Ca */
+            is_ca: boolean;
+            /** Issuer */
+            issuer: string;
+            /** Not After */
+            not_after?: string | null;
+            /** Not Before */
+            not_before?: string | null;
+            /** Serial */
+            serial: string;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject: string;
+            /** Valid */
+            valid: boolean;
+        };
+        /** SmimeCertificateIn */
+        SmimeCertificateIn: {
+            /** Certificate */
+            certificate: string;
+        };
+        /** SmimeDeleteOut */
+        SmimeDeleteOut: {
+            /** Renamed */
+            renamed: {
+                [key: string]: string;
+            };
+        };
+        /** SmimePrivateKeyIn */
+        SmimePrivateKeyIn: {
+            /** Private Key */
+            private_key: string;
+            /**
+             * Secret
+             * @default
+             */
+            secret: string;
+        };
+        /** SmimePrivateKeyOut */
+        SmimePrivateKeyOut: {
+            certificate: components["schemas"]["SmimeCertOut"];
+            /** Secret Generated */
+            secret_generated: boolean;
+        };
         /** SmimeRegisterIn */
         SmimeRegisterIn: {
             /** Cert Pem */
@@ -12310,15 +12673,40 @@ export interface components {
              * @default both
              */
             purpose: string;
+            /**
+             * Secret
+             * @default
+             */
+            secret: string;
         };
         /** SmimeRegisterOut */
         SmimeRegisterOut: {
             /** Email */
             email: string;
+            /** Filename */
+            filename?: string | null;
             /** Has Cert */
             has_cert: boolean;
             /** Has Key */
             has_key: boolean;
+        };
+        /** SmimeRelationIn */
+        SmimeRelationIn: {
+            /** Ca Filename */
+            ca_filename: string;
+        };
+        /** SmimeRelationOut */
+        SmimeRelationOut: {
+            /** Ca Filename */
+            ca_filename?: string | null;
+            /** Ca Fingerprint */
+            ca_fingerprint: string;
+            /** Ca Not After */
+            ca_not_after?: string | null;
+            /** Ca Subject */
+            ca_subject?: string | null;
+            /** Created */
+            created?: string | null;
         };
         /** SmsInboundRequest */
         SmsInboundRequest: {
@@ -12693,6 +13081,11 @@ export interface components {
         SystemInfoOut: {
             app: components["schemas"]["AppInfoOut"];
             containers: components["schemas"]["ContainersOut"];
+            /**
+             * Crypto
+             * @default []
+             */
+            crypto: components["schemas"]["CryptoBackendStatusOut"][];
             datastores: components["schemas"]["DatastoresOut"];
             host: components["schemas"]["HostOut"];
             /** Services */
@@ -17037,6 +17430,76 @@ export interface operations {
             };
         };
     };
+    list_pgp_keys_api_v1_admin_crypto_keys_pgp_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PgpKeyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_pgp_key_api_v1_admin_crypto_keys_pgp_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PgpUploadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PgpUploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admin_pgp_import_api_v1_admin_crypto_keys_pgp_import_post: {
         parameters: {
             query?: never;
@@ -17074,6 +17537,148 @@ export interface operations {
             };
         };
     };
+    delete_pgp_key_api_v1_admin_crypto_keys_pgp__key_id__delete: {
+        parameters: {
+            query?: {
+                /** @description Delete only the secret key, keep the public key */
+                secret?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_pgp_key_api_v1_admin_crypto_keys_pgp__key_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pgp-keys": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sign_key_options_api_v1_admin_crypto_keys_sign_key_options_get: {
+        parameters: {
+            query?: {
+                /** @description Only keys for this queue's system address (Znuny AdminQueue) */
+                queue_id?: number | null;
+                /** @description Only keys for this address */
+                email?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignKeyOptionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_smime_api_v1_admin_crypto_keys_smime_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmimeCertOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     admin_smime_register_api_v1_admin_crypto_keys_smime_register_post: {
         parameters: {
             query?: never;
@@ -17098,6 +17703,295 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SmimeRegisterOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_smime_certificate_api_v1_admin_crypto_keys_smime_certificates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmimeCertificateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmimeCertOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_smime_private_key_api_v1_admin_crypto_keys_smime_private_keys_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmimePrivateKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmimePrivateKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_smime_certificate_api_v1_admin_crypto_keys_smime__filename__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                filename: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-pem-file": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_smime_api_v1_admin_crypto_keys_smime__filename__delete: {
+        parameters: {
+            query?: {
+                /** @description Delete only the private key + secret */
+                private_only?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                filename: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmimeDeleteOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_smime_relations_api_v1_admin_crypto_keys_smime__filename__relations_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                filename: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmimeRelationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_smime_relation_api_v1_admin_crypto_keys_smime__filename__relations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                filename: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmimeRelationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmimeRelationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_smime_relation_api_v1_admin_crypto_keys_smime__filename__relations_delete: {
+        parameters: {
+            query: {
+                ca_fingerprint: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                filename: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    crypto_status_api_v1_admin_crypto_keys_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CryptoBackendStatusOut"][];
                 };
             };
             /** @description Validation Error */
