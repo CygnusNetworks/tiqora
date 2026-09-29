@@ -63,6 +63,24 @@ def test_der_certificate_is_stored_as_pem(store: SmimeStore) -> None:
     assert (store.cert_dir / entry.filename).read_bytes() == leaf.cert_pem
 
 
+def test_der_certificate_ending_in_whitespace_byte(store: SmimeStore) -> None:
+    """DER is binary: a trailing 0x0a/0x20 signature byte must not be stripped."""
+    from cryptography.hazmat.primitives import serialization
+
+    from tests._smime_fixtures import _key
+
+    key = _key()
+    for _ in range(2000):
+        leaf = make_leaf("der-ws@example.org", key=key)
+        der = leaf.cert.public_bytes(serialization.Encoding.DER)
+        if der[-1:].isspace():
+            break
+    else:  # pragma: no cover — astronomically unlikely
+        pytest.skip("no DER certificate ending in a whitespace byte generated")
+    entry = store.add_certificate(der)
+    assert (store.cert_dir / entry.filename).read_bytes() == leaf.cert_pem
+
+
 def test_same_subject_gets_collision_index(store: SmimeStore) -> None:
     first = make_leaf("same@example.org")
     second = make_leaf("same@example.org")  # same DN, different key

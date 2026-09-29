@@ -98,12 +98,15 @@ def validate_filename(filename: str) -> str:
 
 
 def load_certificate(data: bytes) -> x509.Certificate:
-    """Parse PEM or DER certificate bytes."""
-    stripped = data.strip()
+    """Parse PEM or DER certificate bytes.
+
+    Only PEM is whitespace-stripped: DER is binary, and its last signature
+    byte can be 0x0a/0x20/… — stripping it corrupted ~2% of DER uploads.
+    """
     try:
-        if b"-----BEGIN" in stripped:
-            return x509.load_pem_x509_certificate(stripped)
-        return x509.load_der_x509_certificate(stripped)
+        if b"-----BEGIN" in data:
+            return x509.load_pem_x509_certificate(data.strip())
+        return x509.load_der_x509_certificate(data)
     except ValueError as exc:
         raise SmimeStoreError(f"not a valid X.509 certificate: {exc}") from exc
 
