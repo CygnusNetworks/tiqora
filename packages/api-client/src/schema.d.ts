@@ -8401,6 +8401,7 @@ export interface components {
             content_type: string;
             /** Is Html */
             is_html: boolean;
+            security?: components["schemas"]["ArticleSecurity"] | null;
         };
         /** ArticleCreateRequest */
         ArticleCreateRequest: {
@@ -8510,6 +8511,7 @@ export interface components {
             incoming_time?: number | null;
             /** Is Visible For Customer */
             is_visible_for_customer: boolean;
+            security?: components["schemas"]["ArticleSecurity"] | null;
             /** Sender Type */
             sender_type?: string | null;
             /** Sender Type Id */
@@ -8555,6 +8557,33 @@ export interface components {
             title: string;
             /** Version */
             version: number;
+        };
+        /**
+         * ArticleSecurity
+         * @description PGP / S/MIME result of an email article (``TiqoraCrypto*`` article flags).
+         *
+         *     ``status``: ``verified`` (good signature, trusted signer), ``signed_untrusted``
+         *     (valid signature but untrusted chain / expired or revoked key / signer
+         *     does not match the sender), ``unknown_key`` (signer key not available),
+         *     ``verify_failed`` (bad signature), ``decrypted`` (encrypted, decrypted,
+         *     no signature), ``decrypt_failed``, ``unavailable`` (gpg/openssl missing),
+         *     ``error``. For signed+encrypted mail the signature decides the status.
+         */
+        ArticleSecurity: {
+            /** Detail */
+            detail?: string | null;
+            /** Encrypted */
+            encrypted: boolean;
+            /** Key Id */
+            key_id?: string | null;
+            /** Method */
+            method: string;
+            /** Signed */
+            signed: boolean;
+            /** Signer */
+            signer?: string | null;
+            /** Status */
+            status: string;
         };
         /** ArticleSummary */
         ArticleSummary: {

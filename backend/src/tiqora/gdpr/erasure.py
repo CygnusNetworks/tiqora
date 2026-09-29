@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from sqlalchemy import select, text
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings
@@ -1663,6 +1663,15 @@ async def run_erasure(
                     {"body": new_body, "id": int(plain.id)},
                 )
                 counts["article_data_mime_plain"] += 1
+
+            # The crypto signer flag holds the sender's address / PGP uid.
+            await session.execute(
+                text(
+                    "DELETE FROM article_flag WHERE article_key = 'TiqoraCryptoSigner'"
+                    " AND article_id IN :ids"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": list(article_ids)},
+            )
 
             attach_rows = (
                 (
