@@ -91,6 +91,35 @@
     "allTickets": "全部工單 →",
     "recentTickets": "最近的工單"
   },
+  "cryptoKeys": {
+    "title": "Encryption keys",
+    "pgpTitle": "PGP keys",
+    "smimeTitle": "S/MIME certificates",
+    "none": "No key stored.",
+    "uploadPgp": "Upload PGP key",
+    "uploadSmime": "Upload S/MIME certificate",
+    "uploading": "Uploading…",
+    "pgpHint": "ASCII-armored public key (.asc).",
+    "smimeHint": "Certificate as PEM, DER, PKCS#7 or PKCS#12 without password.",
+    "expires": "expires {{date}}",
+    "delete": "Delete",
+    "deleteConfirmPgp": "Delete PGP key {{key}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "deleteConfirmSmime": "Delete certificate {{file}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "uploaded": "Key stored.",
+    "deleted": "Key deleted.",
+    "adminManaged": "has a private part — managed in the admin area",
+    "readOnly": "Changing keys needs rw permission in the admin or users group.",
+    "disabled": "PGP and S/MIME are switched off.",
+    "openButton": "Keys",
+    "dialogTitle": "Keys of {{login}}",
+    "status": {
+      "good": "valid",
+      "valid": "valid",
+      "expired": "expired",
+      "revoked": "revoked",
+      "invalid": "invalid"
+    }
+  },
   "timeAccounting": {
     "title": "工時統計",
     "hint": "您可存取的工單上已登記的時間單位。",
@@ -1002,7 +1031,8 @@
     "nav": {
       "myTickets": "我的門票",
       "newTicket": "新票",
-      "kb": "幫助文章"
+      "kb": "幫助文章",
+      "preferences": "Preferences"
     },
     "login": {
       "subtitle": "登入您的支援帳戶",
@@ -1051,6 +1081,22 @@
       "noResultsHint": "嘗試不同的搜尋字詞，或開啟新的請求協助。",
       "loadError": "無法載入這篇文章。",
       "backToSearch": "返回搜尋"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": "Interface language",
+      "languageDesc": "Select the main interface language.",
+      "languageSaved": "Language saved.",
+      "password": "Change password",
+      "passwordDesc": "Set a new password by filling in your current password and a new one.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "repeatPassword": "Repeat new password",
+      "passwordMismatch": "The new passwords do not match.",
+      "passwordSaved": "Password changed.",
+      "save": "Save",
+      "keys": "Encryption",
+      "keysDesc": "Upload your PGP key or S/MIME certificate so that we can send you encrypted email. It must contain your email address {{email}}."
     }
   },
   "admin": {

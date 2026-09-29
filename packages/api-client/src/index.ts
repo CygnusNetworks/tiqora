@@ -186,6 +186,8 @@ export {
   type SmimeDeleteOut,
   type SmimeRelationOut,
   type SignKeyOptionOut,
+  type CustomerCryptoKeysOut,
+  type PortalPreferencesOut,
   type WebhookCreate,
   type WebhookUpdate,
   type AuthConfigAgentOut,

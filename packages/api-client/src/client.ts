@@ -301,6 +301,8 @@ export type SmimePrivateKeyOut = Schemas["SmimePrivateKeyOut"];
 export type SmimeDeleteOut = Schemas["SmimeDeleteOut"];
 export type SmimeRelationOut = Schemas["SmimeRelationOut"];
 export type SignKeyOptionOut = Schemas["SignKeyOptionOut"];
+export type CustomerCryptoKeysOut = Schemas["CustomerCryptoKeysOut"];
+export type PortalPreferencesOut = Schemas["PortalPreferencesOut"];
 export type ApiKeyOut = Schemas["ApiKeyOut"];
 export type ApiKeyCreate = Schemas["ApiKeyCreate"];
 export type ApiKeyUpdate = Schemas["ApiKeyUpdate"];
@@ -1626,6 +1628,35 @@ export class ApiClient {
       `/api/v1/customers/${encodeURIComponent(login)}`,
       { signal },
     );
+  }
+
+  /** A customer's PGP keys / S-MIME certificates (Znuny customer preferences PGP/SMIME). */
+  get customerCryptoKeys() {
+    const enc = encodeURIComponent;
+    const base = (login: string) => `/api/v1/customers/${enc(login)}/crypto-keys`;
+    return {
+      list: (login: string, signal?: AbortSignal) =>
+        this.request<CustomerCryptoKeysOut>("GET", base(login), { signal }),
+      uploadPgp: (login: string, asciiArmor: string, signal?: AbortSignal) =>
+        this.request<CustomerCryptoKeysOut>("POST", `${base(login)}/pgp`, {
+          body: { ascii_armor: asciiArmor },
+          signal,
+        }),
+      /** PEM text, or base64 of a DER / PKCS#7 / PKCS#12 file. */
+      uploadSmime: (login: string, certificate: string, signal?: AbortSignal) =>
+        this.request<CustomerCryptoKeysOut>("POST", `${base(login)}/smime`, {
+          body: { certificate },
+          signal,
+        }),
+      deletePgp: (login: string, keyId: string, signal?: AbortSignal) =>
+        this.request<CustomerCryptoKeysOut>("DELETE", `${base(login)}/pgp/${enc(keyId)}`, {
+          signal,
+        }),
+      deleteSmime: (login: string, filename: string, signal?: AbortSignal) =>
+        this.request<CustomerCryptoKeysOut>("DELETE", `${base(login)}/smime/${enc(filename)}`, {
+          signal,
+        }),
+    };
   }
 
   /**
@@ -3088,6 +3119,40 @@ export class ApiClient {
 
   portalLogout(signal?: AbortSignal) {
     return this.request<void>("POST", "/api/portal/auth/logout", { signal });
+  }
+
+  /** Customer preferences: language, password, own PGP key / S-MIME certificate. */
+  portalPreferences(signal?: AbortSignal) {
+    return this.request<PortalPreferencesOut>("GET", "/api/portal/preferences", { signal });
+  }
+
+  portalSetLanguage(language: string, signal?: AbortSignal) {
+    return this.request<PortalPreferencesOut>("PUT", "/api/portal/preferences/language", {
+      body: { language },
+      signal,
+    });
+  }
+
+  portalChangePassword(currentPassword: string, newPassword: string, signal?: AbortSignal) {
+    return this.request<void>("POST", "/api/portal/preferences/password", {
+      body: { current_password: currentPassword, new_password: newPassword },
+      signal,
+    });
+  }
+
+  portalUploadPgpKey(asciiArmor: string, signal?: AbortSignal) {
+    return this.request<PortalPreferencesOut>("POST", "/api/portal/preferences/pgp-key", {
+      body: { ascii_armor: asciiArmor },
+      signal,
+    });
+  }
+
+  portalUploadSmimeCertificate(certificate: string, signal?: AbortSignal) {
+    return this.request<PortalPreferencesOut>(
+      "POST",
+      "/api/portal/preferences/smime-certificate",
+      { body: { certificate }, signal },
+    );
   }
 
   portalListTickets(

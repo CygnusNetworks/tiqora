@@ -91,6 +91,35 @@
     "allTickets": "सभी टिकट →",
     "recentTickets": "हाल के टिकट"
   },
+  "cryptoKeys": {
+    "title": "Encryption keys",
+    "pgpTitle": "PGP keys",
+    "smimeTitle": "S/MIME certificates",
+    "none": "No key stored.",
+    "uploadPgp": "Upload PGP key",
+    "uploadSmime": "Upload S/MIME certificate",
+    "uploading": "Uploading…",
+    "pgpHint": "ASCII-armored public key (.asc).",
+    "smimeHint": "Certificate as PEM, DER, PKCS#7 or PKCS#12 without password.",
+    "expires": "expires {{date}}",
+    "delete": "Delete",
+    "deleteConfirmPgp": "Delete PGP key {{key}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "deleteConfirmSmime": "Delete certificate {{file}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "uploaded": "Key stored.",
+    "deleted": "Key deleted.",
+    "adminManaged": "has a private part — managed in the admin area",
+    "readOnly": "Changing keys needs rw permission in the admin or users group.",
+    "disabled": "PGP and S/MIME are switched off.",
+    "openButton": "Keys",
+    "dialogTitle": "Keys of {{login}}",
+    "status": {
+      "good": "valid",
+      "valid": "valid",
+      "expired": "expired",
+      "revoked": "revoked",
+      "invalid": "invalid"
+    }
+  },
   "timeAccounting": {
     "title": "समय लेखांकन",
     "hint": "उन टिकटों पर बुक की गई समय इकाइयाँ जिन तक आपकी पहुँच है।",
@@ -1002,7 +1031,8 @@
     "nav": {
       "myTickets": "मेरे टिकट",
       "newTicket": "नया टिकट",
-      "kb": "सहायता लेख"
+      "kb": "सहायता लेख",
+      "preferences": "Preferences"
     },
     "login": {
       "subtitle": "अपने सहायता खाते में साइन इन करें",
@@ -1051,6 +1081,22 @@
       "noResultsHint": "कोई भिन्न खोज शब्द आज़माएँ, या सहायता के लिए एक नया टिकट खोलें।",
       "loadError": "यह आलेख लोड नहीं किया जा सका.",
       "backToSearch": "खोज पर वापस जाएँ"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": "Interface language",
+      "languageDesc": "Select the main interface language.",
+      "languageSaved": "Language saved.",
+      "password": "Change password",
+      "passwordDesc": "Set a new password by filling in your current password and a new one.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "repeatPassword": "Repeat new password",
+      "passwordMismatch": "The new passwords do not match.",
+      "passwordSaved": "Password changed.",
+      "save": "Save",
+      "keys": "Encryption",
+      "keysDesc": "Upload your PGP key or S/MIME certificate so that we can send you encrypted email. It must contain your email address {{email}}."
     }
   },
   "admin": {

@@ -6,6 +6,7 @@ import { TicketTable, type SortKey } from "@/components/agent/TicketTable";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { DialLink } from "@/components/agent/phone/DialLink";
+import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
 
 /**
  * Customer Information Centre (agent): contact master data + open/closed
@@ -169,6 +170,8 @@ export function CustomerDetailPage() {
           )}
         </div>
       </div>
+
+      <CustomerCryptoKeys login={c.login} />
 
       <div>
         <h2 className="mb-2 text-sm font-semibold text-ink">{t("customerCentre.recentTickets")}</h2>

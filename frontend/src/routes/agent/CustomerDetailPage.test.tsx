@@ -1,15 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { CustomerDetailPage } from "./CustomerDetailPage";
 
-const { navigate, getCustomer, listTickets, phoneConfig } = vi.hoisted(() => ({
+const { navigate, getCustomer, listTickets, phoneConfig, customerCryptoKeys } = vi.hoisted(() => ({
   navigate: vi.fn(),
   getCustomer: vi.fn(),
   listTickets: vi.fn(),
   phoneConfig: vi.fn(),
+  customerCryptoKeys: {
+    list: vi.fn(),
+    uploadPgp: vi.fn(),
+    uploadSmime: vi.fn(),
+    deletePgp: vi.fn(),
+    deleteSmime: vi.fn(),
+  },
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -22,7 +29,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { getCustomer, listTickets } };
+  return { ...actual, api: { getCustomer, listTickets, customerCryptoKeys } };
 });
 
 vi.mock("@/lib/phoneApi", async () => {
@@ -46,6 +53,8 @@ beforeEach(() => {
   });
   listTickets.mockReset().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 1 });
   phoneConfig.mockReset().mockResolvedValue({ dial_scheme: "tel" });
+  for (const fn of Object.values(customerCryptoKeys)) fn.mockReset();
+  customerCryptoKeys.list.mockResolvedValue(keys({ pgp_enabled: false, smime_enabled: false }));
 });
 
 describe("CustomerDetailPage click-to-call", () => {
@@ -67,5 +76,111 @@ describe("CustomerDetailPage click-to-call", () => {
       to: "/agent/tickets/new",
       search: { type: "phone", direction: "outbound", customer: "jane.doe", number: "0171 1234567" },
     });
+  });
+});
+
+function renderPage() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <I18nextProvider i18n={i18n}>
+        <CustomerDetailPage />
+      </I18nextProvider>
+    </QueryClientProvider>,
+  );
+}
+
+const pgpKey = {
+  fingerprint: "A".repeat(40),
+  key_id: "AAAAAAAAAAAAAAAA",
+  short_id: "AAAAAAAA",
+  znuny_key_id: "AAAAAAAA",
+  uids: ["Jane Doe <jane@example.com>"],
+  emails: ["jane@example.com"],
+  created: null,
+  expires: "2030-01-01T00:00:00Z",
+  status: "good",
+  has_secret: false,
+  bits: 2048,
+  algorithm: "RSA",
+  subkey_ids: [],
+};
+
+function keys(over: Record<string, unknown> = {}) {
+  return {
+    pgp_enabled: true,
+    smime_enabled: true,
+    can_edit: true,
+    pgp_keys: [pgpKey],
+    smime_certificates: [],
+    pgp_key_id: "AAAAAAAAAAAAAAAA",
+    smime_filename: null,
+    problems: [],
+    ...over,
+  };
+}
+
+describe("CustomerDetailPage keys", () => {
+  it("lists the customer's keys and uploads a certificate", async () => {
+    customerCryptoKeys.list.mockResolvedValue(keys());
+    customerCryptoKeys.uploadSmime.mockResolvedValue(
+      keys({
+        smime_certificates: [
+          {
+            filename: "abcd1234.0",
+            valid: true,
+            hash: "abcd1234",
+            subject: "CN=jane",
+            issuer: "CN=ca",
+            fingerprint: "AA:BB",
+            serial: "01",
+            not_before: null,
+            not_after: "2030-01-01T00:00:00Z",
+            emails: ["jane@example.com"],
+            status: "valid",
+            has_private: false,
+            is_ca: false,
+          },
+        ],
+      }),
+    );
+    renderPage();
+    expect(await screen.findByTestId("customer-keys-card")).toBeInTheDocument();
+    expect(screen.getAllByTestId("customer-keys-pgp-row")).toHaveLength(1);
+    expect(screen.getByText(/Jane Doe <jane@example.com>/)).toBeInTheDocument();
+
+    const pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
+    const file = new File([pem], "c.pem");
+    // jsdom's File has no arrayBuffer().
+    Object.defineProperty(file, "arrayBuffer", {
+      value: async () => new TextEncoder().encode(pem).buffer,
+    });
+    fireEvent.change(screen.getByTestId("customer-keys-smime-upload-file"), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId("customer-keys-smime-upload-submit"));
+    await waitFor(() =>
+      expect(customerCryptoKeys.uploadSmime).toHaveBeenCalledWith(
+        "jane.doe",
+        expect.stringContaining("BEGIN CERTIFICATE"),
+      ),
+    );
+    expect(await screen.findAllByTestId("customer-keys-smime-row")).toHaveLength(1);
+  });
+
+  it("is read-only without edit permission", async () => {
+    customerCryptoKeys.list.mockResolvedValue(keys({ can_edit: false }));
+    renderPage();
+    expect(await screen.findByTestId("customer-keys-readonly")).toBeInTheDocument();
+    expect(screen.queryByTestId("customer-keys-pgp-delete")).toBeNull();
+    expect(screen.queryByTestId("customer-keys-smime-upload-file")).toBeNull();
+  });
+
+  it("renders nothing while PGP and S/MIME are disabled", async () => {
+    customerCryptoKeys.list.mockResolvedValue(keys({ pgp_enabled: false, smime_enabled: false }));
+    renderPage();
+    await screen.findByTestId("customer-detail-page");
+    await waitFor(() => expect(customerCryptoKeys.list).toHaveBeenCalled());
+    expect(screen.queryByTestId("customer-keys-card")).toBeNull();
   });
 });
