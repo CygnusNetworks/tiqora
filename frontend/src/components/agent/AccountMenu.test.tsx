@@ -67,6 +67,7 @@ describe("AccountMenu", () => {
     expect(within(langPanel).getByText("English")).toBeInTheDocument();
     fireEvent.click(langTrigger);
     expect(screen.getByTestId("account-menu-theme-light")).toBeInTheDocument();
+    expect(screen.getByTestId("account-menu-theme-system")).toBeInTheDocument();
     expect(screen.getByTestId("logout-btn")).toBeInTheDocument();
   });
 
@@ -125,6 +126,12 @@ describe("AccountMenu", () => {
     open();
     fireEvent.click(screen.getByTestId("account-menu-theme-light"));
     expect(setTheme).toHaveBeenCalledWith("light");
+  });
+
+  it("offers the system theme", () => {
+    open();
+    fireEvent.click(screen.getByTestId("account-menu-theme-system"));
+    expect(setTheme).toHaveBeenCalledWith("system");
   });
 
   it("fires logout from the sign-out item", () => {

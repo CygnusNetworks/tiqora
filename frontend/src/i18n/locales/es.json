@@ -1004,7 +1004,8 @@
     "language": "Idioma",
     "theme": "Tema",
     "themeLight": "Luz",
-    "themeDark": "oscuro"
+    "themeDark": "oscuro",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Nuevo",

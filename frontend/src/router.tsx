@@ -15,7 +15,6 @@ import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
 import { KbPage, type KbSearch } from "@/routes/agent/KbPage";
 import { KbArticlePage as AgentKbArticlePage } from "@/routes/agent/KbArticlePage";
 import { SecurityPage } from "@/routes/agent/SecurityPage";
-import { SettingsPage } from "@/routes/agent/SettingsPage";
 import { CalendarPage } from "@/routes/agent/CalendarPage";
 import { TemplatesPage as AgentTemplatesPage } from "@/routes/agent/TemplatesPage";
 import {
@@ -409,10 +408,13 @@ const agentSecurityRoute = createRoute({
   component: SecurityPage,
 });
 
+// Personal preferences live in the account menu now; keep old bookmarks working.
 const agentSettingsRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/settings",
-  component: SettingsPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/agent" });
+  },
 });
 
 const agentStatsRoute = createRoute({

@@ -9,6 +9,7 @@ import {
   ChevronDownIcon,
   GlobeIcon,
   LogOutIcon,
+  MonitorIcon,
   MoonIcon,
   SettingsIcon,
   ShieldIcon,
@@ -20,10 +21,12 @@ import { getLocale, localePickerItems, resolveLocaleCode, setAppLanguage } from 
 
 /**
  * Avatar dropdown for account actions, shared by the agent and admin shells.
- * Opens a Menu with the signed-in identity, a link to security / 2FA settings
- * (general preferences live in the sidebar), a language picker (full Znuny
- * locale set via the portal-based `SelectMenu`), a light/dark theme toggle,
- * and finally sign-out.
+ * Opens a Menu with the signed-in identity, a link to security / 2FA settings,
+ * a language picker (full Znuny locale set via the portal-based `SelectMenu`),
+ * the theme choice (light / dark / system) and finally sign-out. This menu is
+ * the only place for personal preferences — there is no separate settings
+ * page; admin-managed per-user values (e.g. the phone extension) live in
+ * the user admin.
  * Admins additionally get a highlighted "Admin-Bereich" entry.
  *
  * `logoutTestId` keeps the existing `logout-btn` (mobile) / `logout-btn-desktop`
@@ -172,6 +175,15 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
         onSelect={() => setTheme("dark")}
       >
         {t("account.themeDark")}
+      </MenuItem>
+      <MenuItem
+        icon={<MonitorIcon />}
+        keepOpen
+        selected={theme === "system"}
+        testId="account-menu-theme-system"
+        onSelect={() => setTheme("system")}
+      >
+        {t("account.themeSystem")}
       </MenuItem>
 
       <MenuSeparator />

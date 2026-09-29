@@ -21,7 +21,7 @@ function switchPortalLanguage(code: string) {
 export function PortalShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
   const { customer, logout } = useCustomerAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { resolvedTheme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const currentLang = resolveLocaleCode(i18n.language);
@@ -48,7 +48,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
           </Link>
           <div className="ml-auto flex items-center gap-1.5 text-sm">
             <Button variant="ghost" size="sm" onClick={toggleTheme}>
-              {theme === "dark" ? "☀" : "☾"}
+              {resolvedTheme === "dark" ? "☀" : "☾"}
             </Button>
             <SelectMenu
               items={languageItems}

@@ -1004,7 +1004,8 @@
     "language": "Lugha",
     "theme": "Mandhari",
     "themeLight": "Mwanga",
-    "themeDark": "Giza"
+    "themeDark": "Giza",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Mpya",

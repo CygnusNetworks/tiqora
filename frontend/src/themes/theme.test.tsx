@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, renderHook, act } from "@testing-library/react";
 import { ThemeProvider, useTheme } from "./theme";
 
@@ -8,16 +8,59 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <ThemeProvider>{children}</ThemeProvider>;
 }
 
+/** Controllable `prefers-color-scheme: dark` media query. */
+function mockSystemScheme(dark: boolean) {
+  const listeners = new Set<() => void>();
+  const mq = {
+    matches: dark,
+    addEventListener: (_: string, cb: () => void) => listeners.add(cb),
+    removeEventListener: (_: string, cb: () => void) => listeners.delete(cb),
+  };
+  vi.stubGlobal("matchMedia", vi.fn(() => mq));
+  return (next: boolean) => {
+    mq.matches = next;
+    listeners.forEach((cb) => cb());
+  };
+}
+
 describe("ThemeProvider / useTheme", () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute("data-theme");
+    mockSystemScheme(true);
   });
 
-  it("defaults to dark theme when nothing is stored", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("defaults to the system scheme when nothing is stored", () => {
+    mockSystemScheme(false);
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.theme).toBe("dark");
+    expect(result.current.theme).toBe("system");
+    expect(result.current.resolvedTheme).toBe("light");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+  });
+
+  it("system mode follows live OS scheme changes", () => {
+    const setSystem = mockSystemScheme(false);
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    act(() => setSystem(true));
+    expect(result.current.resolvedTheme).toBe("dark");
     expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+  });
+
+  it("an explicit choice ignores the OS scheme and is stored", () => {
+    const setSystem = mockSystemScheme(true);
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => result.current.setTheme("light"));
+    act(() => setSystem(true));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    expect(localStorage.getItem(STORAGE_KEY)).toBe("light");
+    act(() => result.current.setTheme("system"));
+    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
+    expect(localStorage.getItem(STORAGE_KEY)).toBe("system");
   });
 
   it("initializes from a stored theme", () => {
@@ -39,9 +82,9 @@ describe("ThemeProvider / useTheme", () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe("light");
   });
 
-  it("toggleTheme flips between light and dark", () => {
+  it("toggleTheme flips the applied scheme between light and dark", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.theme).toBe("dark");
+    expect(result.current.resolvedTheme).toBe("dark");
 
     act(() => {
       result.current.toggleTheme();
@@ -79,6 +122,6 @@ describe("ThemeProvider / useTheme", () => {
         <Display />
       </ThemeProvider>,
     );
-    expect(screen.getByTestId("theme-value")).toHaveTextContent("dark");
+    expect(screen.getByTestId("theme-value")).toHaveTextContent("system");
   });
 });
