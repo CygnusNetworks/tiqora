@@ -129,17 +129,20 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Render README for Docker Hub
-        if: env.HAS_DOCKERHUB == 'true' && github.ref == 'refs/heads/main'
+        if: env.HAS_DOCKERHUB == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        env:
+          REF: ${{ github.ref_name }}
         run: |
           # Docker Hub has no base URL to resolve GitHub-relative links/images
-          # against, so rewrite them to absolute GitHub URLs for the synced copy.
+          # against, so rewrite them to absolute GitHub URLs for the synced copy,
+          # pinned to the tag being released (or main on manual dispatch).
           sed -E \
-            -e 's#!\[([^]]*)\]\(\./#![\1](https://raw.githubusercontent.com/CygnusNetworks/tiqora/main/#g' \
-            -e 's#\]\(\./#](https://github.com/CygnusNetworks/tiqora/blob/main/#g' \
+            -e 's#!\[([^]]*)\]\(\./#![\1](https://raw.githubusercontent.com/CygnusNetworks/tiqora/'"${REF}"'/#g' \
+            -e 's#\]\(\./#](https://github.com/CygnusNetworks/tiqora/blob/'"${REF}"'/#g' \
             README.md > README.dockerhub.md
 
       - name: Sync README to Docker Hub
-        if: env.HAS_DOCKERHUB == 'true' && github.ref == 'refs/heads/main'
+        if: env.HAS_DOCKERHUB == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa  # v5.0.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
