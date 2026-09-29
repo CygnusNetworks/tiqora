@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { TicketTable, type SortKey } from "@/components/agent/TicketTable";
 import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
+import { DialLink } from "@/components/agent/phone/DialLink";
 
 /**
  * Customer Information Centre (agent): contact master data + open/closed
@@ -12,6 +13,7 @@ import { Spinner } from "@/components/ui/Spinner";
  */
 export function CustomerDetailPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { login: loginParam } = useParams({ from: "/agent/customers/$login" });
   const login = decodeURIComponent(loginParam ?? "");
 
@@ -109,10 +111,34 @@ export function CustomerDetailPage() {
             <dt className="text-xs text-muted">{t("customerCentre.email")}</dt>
             <dd>{c.email || "—"}</dd>
           </div>
-          <div>
-            <dt className="text-xs text-muted">{t("customerCentre.phone")}</dt>
-            <dd>{c.phone || "—"}</dd>
-          </div>
+          {(["phone", "mobile"] as const).map((kind) => {
+            const number = c[kind]?.trim();
+            return (
+              <div key={kind}>
+                <dt className="text-xs text-muted">
+                  {kind === "phone" ? t("customerCentre.phone") : t("phone.mobileLabel")}
+                </dt>
+                <dd>
+                  {number ? (
+                    <DialLink
+                      number={number}
+                      testId={`customer-dial-${kind}`}
+                      // Dialling opens the phone ticket form, outbound, for
+                      // this customer — the call gets logged right away.
+                      onDial={() =>
+                        void navigate({
+                          to: "/agent/tickets/new",
+                          search: { type: "phone", direction: "outbound", customer: c.login, number },
+                        })
+                      }
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+            );
+          })}
           <div>
             <dt className="text-xs text-muted">{t("customerCentre.customerId")}</dt>
             <dd className="font-mono">{c.customer_id}</dd>
