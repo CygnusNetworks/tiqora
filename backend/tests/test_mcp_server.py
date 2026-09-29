@@ -296,6 +296,69 @@ def test_meili_filter_state_type_allowlist() -> None:
     assert bad == "queue_id IN [1]"
 
 
+# Every registered tool with a representative minimal payload. A key whose
+# scopes carry a ``tool:`` allowlist must be refused by every tool not on it —
+# before any DB access, so the mocked state's session factory stays untouched.
+_ALLOWLIST_PAYLOADS: dict[str, dict[str, Any]] = {
+    "ticket_search": {"query": "x"},
+    "ticket_get": {"ticket_id": 1},
+    "ticket_get_by_number": {"tn": "1"},
+    "list_queues": {},
+    "list_states": {},
+    "list_priorities": {},
+    "list_agents": {},
+    "kb_search": {"query": "x"},
+    "kb_get_article": {"article_id": 1},
+    "kb_list": {},
+    "kb_upsert_article": {"title": "t", "content_md": "x", "category_id": 1},
+    "kb_publish_article": {"article_id": 1},
+    "customer_lookup": {"customer_login": "x"},
+}
+
+
+@pytest.mark.parametrize("tool_name", sorted(_ALLOWLIST_PAYLOADS))
+async def test_mcp_tool_allowlist_enforced(tool_name: str) -> None:
+    """A key restricted to ``tool:ticket_history`` must not reach other tools."""
+    from contextvars import ContextVar
+
+    import tiqora.mcp_server.server as srv
+
+    scopes: ContextVar[frozenset[str] | None] = ContextVar(
+        "scopes", default=frozenset({"mcp:rw", "tool:ticket_history"})
+    )
+    state = MagicMock()
+    srv._mcp_state = state
+    try:
+        with (
+            _patch_user_id(1),
+            patch("tiqora.mcp_server.server._current_api_key_scopes", scopes),
+        ):
+            async with Client(mcp) as client:
+                result = await client.call_tool(
+                    tool_name, _ALLOWLIST_PAYLOADS[tool_name], raise_on_error=False
+                )
+        assert result.is_error, f"{tool_name} ran despite tool allowlist"
+        state.session_factory.assert_not_called()
+    finally:
+        srv._mcp_state = None
+
+
+async def test_mcp_every_tool_checks_allowlist() -> None:
+    """Guard against new tools forgetting ``_assert_tool_allowed``."""
+    import inspect
+
+    async with Client(mcp) as client:
+        names = {t.name for t in await client.list_tools()}
+    import tiqora.mcp_server.server as srv
+
+    missing = [
+        n
+        for n in sorted(names)
+        if f'_assert_tool_allowed("{n}")' not in inspect.getsource(getattr(srv, n))
+    ]
+    assert not missing, f"tools without allowlist check: {missing}"
+
+
 @pytest.mark.db
 async def test_mcp_ticket_create_and_get(mcp_mariadb: dict[str, Any]) -> None:
     """ticket_create creates a ticket; ticket_get retrieves it."""
@@ -986,7 +1049,7 @@ async def test_mcp_ticket_mutation_tools_happy_and_invalid_ids(
 async def test_mcp_mutation_tools_deny_agent_without_queue_permission(
     mcp_mariadb: dict[str, Any],
 ) -> None:
-    """Regression test for API_GAPS.md §0: the ticket-mutation MCP tools call
+    """Regression test: the ticket-mutation MCP tools call
     ``ticket_write_service`` module functions directly rather than through
     ``TicketWriteService`` (whose methods run the permission check
     internally), so each tool now runs its own ``_assert_queue_permission``

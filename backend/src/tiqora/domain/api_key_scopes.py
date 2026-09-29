@@ -260,7 +260,7 @@ def assert_scope_allows(
 
 
 def mcp_scopes_allow_connect(scopes: frozenset[str] | None) -> bool:
-    """MCP session open: needs mcp:ro, mcp:rw, or legacy mcp/write/*."""
+    """MCP session open: needs mcp:ro, mcp:rw, or legacy mcp/* (legacy write is REST-only)."""
     expanded = expand_scopes(scopes)
     if expanded is None:
         return True
@@ -268,7 +268,7 @@ def mcp_scopes_allow_connect(scopes: frozenset[str] | None) -> bool:
 
 
 def mcp_scopes_allow_write(scopes: frozenset[str] | None) -> bool:
-    """Mutating MCP tools: need mcp:rw (or unrestricted / legacy write)."""
+    """Mutating MCP tools: need mcp:rw (or unrestricted / legacy mcp)."""
     expanded = expand_scopes(scopes)
     if expanded is None:
         return True
