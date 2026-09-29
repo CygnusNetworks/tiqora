@@ -22,7 +22,7 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
 | Process | Image / command | Responsibility |
 |---|---|---|
 | `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1`, compat routes, `/health`, `/ready`, `/metrics` |
-| `tiqora-worker` | `worker` | taskiq consumers: indexer, mailer, pollers, postmaster/escalation/GA (feature-flagged) |
+| `tiqora-worker` | `worker` | Plain asyncio tick loops (no external scheduler or task queue): Znuny-write poller, outbox drain, postmaster/escalation/notifications/GA/unlock-timeout/pending-check (feature-flagged), Telegram poller, housekeeping |
 | `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: new-ticket triage (queue routing), auto-reply worker + auto-summary scan, isolated so a hung LLM call never stalls the main worker. Inert unless `daemon.ai_worker.enabled`; triage and auto-reply additionally require `operation_mode=tiqora_primary` (auto-reply is exempt on Tiqora-only channels, currently Telegram) |
 | `tiqora-mcp` | `mcp` | FastMCP over streamable HTTP; imports `domain/` directly (no second business layer) |
 
@@ -67,17 +67,22 @@ Adapters (REST, MCP, workers) must not invent partial writes.
 - Two Alembic version chains:
   - `alembic/versions_tiqora/` — active; creates only `tiqora_*` tables
   - `alembic/versions_owned/` — gated until schema-ownership mode is enabled
-    after cutover (additive indexes, FKs, orphan reports)
+    after cutover (additive indexes, FKs, orphan reports). It is its own
+    branch (`branch_labels = ("owned",)`) off a **fixed** `versions_tiqora`
+    revision, never rebased onto the newest one, so the two chains advance
+    independently; `tiqora migrate upgrade` therefore targets `heads`, not
+    `head`.
 
 ### Search and attachments
 
 - **Meilisearch** holds ticket indexes (`tickets` by default). Document shape:
   id, tn, title, queue, state/state_type, priority, owner, customer, escalation
   flags, latest article excerpt, flattened dynamic fields.
-- **Filterable:** `queue_id`, `state_type`, `owner_id`, `customer_id`.
-  **Sortable:** `changed`, `created`. Search always applies
+- **Filterable:** `queue_id`, `state_type`, `owner_id`, `customer_id`,
+  `has_escalation`, `created_ts`, `changed_ts`, `archive_flag`.
+  **Sortable:** `changed`, `created`, `id`. Search always applies
   `queue_id IN [allowed]` from the permission engine.
-- **Bulk backfill:** `tiqora index rebuild` (taskiq task too) batches of 500
+- **Bulk backfill:** `tiqora index rebuild` batches of 500
   with resumable watermark in `tiqora_settings` (`index.rebuild.ticket_id`).
 - **Znuny-write poller** (worker, default every 15s): watermarks on
   `ticket_history.id` and `article.id` in `tiqora_settings`; re-indexes distinct
@@ -194,7 +199,7 @@ as UI/REST. Admin manages **LLM providers** (`tiqora_llm_provider` — OpenAI-
 compatible or Anthropic, credentials encrypted with `TIQORA_SECRET_KEY`),
 **MCP clients** (external MCP servers exposed to the agent as tools), and
 **per-queue policies** (`tiqora_ai_queue_policy`: which features are on, the
-autonomy level, provider/model, PII-masking, budgets) at `/admin/ai/*`. Three
+autonomy level, provider/model, PII-masking, budgets) at `/admin/ai/*`. These
 features run off those policies:
 
 - **Drafts / manual assist** — an agent-triggered draft reply the agent must
@@ -204,6 +209,14 @@ features run off those policies:
   vision pre-pass for images).
 - **Auto-reply** — the isolated `ai-worker` autonomously answers customer
   articles within the queue's autonomy/caps/budget.
+- **Triage** (`ai/triage.py`) — on a new ticket's first article, before
+  auto-reply, the `ai-worker` proposes a target queue from the policy's
+  allowlist and corrects the customer of a forwarded mail; applied
+  automatically above the policy's auto threshold, otherwise offered as a
+  suggestion on the ticket. Runs only under `operation_mode=tiqora_primary`.
+- **Refine** (`ai/refine.py`) — agent-triggered polish of text typed in a
+  composer (spelling, grammar, tone); quoted text is never rewritten and
+  nothing is persisted.
 
 Cross-cutting: sensitive data is **PII-masked (spaCy NER)** before any LLM call;
 every request is written to an **audit log** (`/admin/ai/audit`) with a PII-
@@ -463,8 +476,11 @@ supported-vs-deferred breakdown and REST endpoint list.
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).
-- taskiq (Redis) drains the outbox for Meilisearch updates, mail, webhooks,
-  and daemon-equivalent jobs once flags allow.
+- The worker's outbox-drain loop re-indexes affected tickets in Meilisearch,
+  publishes Redis pub/sub events for the live UI and fans out webhooks; the
+  notification engine reads the same outbox through its own watermark. The
+  daemon-equivalent jobs run as further asyncio loops once their flags
+  allow — there is no task queue.
 
 ### Frontend
 

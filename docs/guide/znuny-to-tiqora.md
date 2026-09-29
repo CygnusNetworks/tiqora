@@ -123,6 +123,15 @@ disabled, so agents can start evaluating the UI without any risk to Znuny.
    ```sh
    tiqora index rebuild
    ```
+   Both are subcommands of the `tiqora` CLI inside the image. In a Docker
+   Compose deployment run them as one-off containers with the `--entrypoint
+   tiqora` override (the API container also runs `migrate upgrade` itself on
+   start unless `TIQORA_RUN_MIGRATIONS=0` — see
+   [`../deploy/docker-compose.md`](../deploy/docker-compose.md#running-migrations-on-first-start)):
+   ```sh
+   docker compose run --rm --entrypoint tiqora tiqora-api migrate upgrade
+   docker compose run --rm --entrypoint tiqora tiqora-api index rebuild
+   ```
 5. Start `tiqora-api` and `tiqora-worker` with `TIQORA_SCHEMA_OWNERSHIP`
    unset (or `false`) — this is the default and must stay this way for the
    whole parallel-operation period.
@@ -174,7 +183,8 @@ you're only changing which UI agents use.
 ## Stage 3 — Take over daemon functions, one at a time
 
 **Goal**: move background responsibilities (mail fetch, escalation sweep,
-notifications, GenericAgent) from Znuny's daemon to Tiqora's worker, in a
+notifications, GenericAgent, automatic unlock, pending checks) from Znuny's
+daemon to Tiqora's worker, in a
 controlled order, each individually verified and reversible.
 
 Each function is gated by its own `daemon.<name>.enabled` key in
@@ -193,10 +203,18 @@ in [`../parallel-operation.md`](../parallel-operation.md)):
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-escalation-index-rebuild)
 2. **Notifications** — verify no double-send before moving on.
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-event-notifications)
-3. **GenericAgent** — verify job matches against a read-only run before
-   enabling `daemon.generic_agent.allow_delete`.
+3. **Automatic unlock and pending checks** (`daemon.unlock_timeout.enabled`,
+   `daemon.pending_check.enabled`) — independent of each other; verify a due
+   ticket is unlocked / transitioned exactly once. Pending reminders are
+   only delivered once notifications (step 2) are live.
+   → [`../parallel-operation.md`](../parallel-operation.md#taking-over-automatic-unlock),
+   [`../parallel-operation.md`](../parallel-operation.md#taking-over-pending-checks)
+4. **GenericAgent** — verify job matches against a read-only run before
+   enabling `daemon.generic_agent.allow_delete`. Znuny's scheduled
+   GenericAgent executor is usually a *required* setting that cannot be
+   switched off on its own; see [`../cutover.md`](../cutover.md) §0.
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-genericagent)
-4. **Postmaster (inbound mail) — last.** This is the highest-risk takeover:
+5. **Postmaster (inbound mail) — last.** This is the highest-risk takeover:
    getting it wrong risks duplicate-processed or (for POP3/IMAP
    delete-after-fetch) lost mail.
    → [`../parallel-operation.md`](../parallel-operation.md#taking-over-mail-processing)
@@ -233,8 +251,12 @@ stage, in [`../cutover.md`](../cutover.md). Summary of what it covers:
 
 1. **Freeze Znuny web** — block new logins/writes via the Znuny frontend
    (nginx maintenance response), Tiqora's UI stays up.
-2. **Verify daemon-flag takeover is complete** — every `daemon.*.enabled`
-   flag from Stage 3 above is `1`; stop the Znuny daemon process itself.
+2. **Verify daemon-flag takeover is complete** — each of the six takeover
+   flags from Stage 3 above (`postmaster`, `escalation`, `notifications`,
+   `generic_agent`, `unlock_timeout`, `pending_check`) is `1`; stop the
+   Znuny daemon process itself. Other `daemon.*.enabled` keys —
+   `ai_worker`, `telegram_poller` and Tiqora-only housekeeping — are not
+   Znuny-duty takeovers and are not part of this check.
 3. **Repoint GenericInterface integrations** — reverse-proxy rewrite from
    Znuny's `nph-genericinterface.pl` to Tiqora's `/znuny-compat` (see
    [`../api/compat.md`](../api/compat.md) for the compat layer itself).
