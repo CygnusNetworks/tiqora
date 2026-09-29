@@ -201,6 +201,15 @@ export function UsersPage() {
       tab: tabPerson,
     },
     { name: "mobile", label: t("admin.users.mobile"), type: "text", width: "half", tab: tabPerson },
+    {
+      name: "phone_extension",
+      label: t("admin.users.phoneExtension"),
+      type: "text",
+      width: "half",
+      placeholder: "100, 101",
+      helpText: t("admin.users.phoneExtensionHelp"),
+      tab: tabPerson,
+    },
     { name: "title", label: t("admin.users.title"), type: "text", width: "half", tab: tabPerson },
   ];
 
@@ -272,6 +281,7 @@ export function UsersPage() {
               last_name: row.last_name,
               email: row.email ?? "",
               mobile: row.mobile ?? "",
+              phone_extension: row.phone_extension ?? "",
               valid_id: row.valid_id,
             }
           : { valid_id: 1, password_mode: "auto" }
@@ -284,6 +294,7 @@ export function UsersPage() {
         last_name: v.last_name as string,
         email: (v.email as string) || null,
         mobile: (v.mobile as string) || null,
+        phone_extension: (v.phone_extension as string) || null,
         valid_id: Number(v.valid_id) || 1,
       })}
       toUpdateBody={(v: FieldValues): UserUpdate => ({
@@ -293,6 +304,7 @@ export function UsersPage() {
         last_name: v.last_name as string,
         email: (v.email as string) || null,
         mobile: (v.mobile as string) || null,
+        phone_extension: (v.phone_extension as string) || null,
         valid_id: Number(v.valid_id) || 1,
         ...(v.password ? { password: v.password as string } : {}),
       })}

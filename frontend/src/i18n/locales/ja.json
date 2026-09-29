@@ -24,7 +24,12 @@
     "themeDark": "ダーク",
     "security": "セキュリティ",
     "securityHint": "アカウントの2要素認証を管理します。",
-    "securityLink": "セキュリティ設定を開く"
+    "securityLink": "セキュリティ設定を開く",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "ホーム",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "代わりにアカウントを「無効」にし、チケット・記事・履歴の帰属を保てます。",
       "resendSetupLink": "セットアップリンクを再送信",
       "setupLinkSent": "セットアップリンクを送信しました。",
-      "setupLinkFailed": "セットアップリンクを送信できませんでした。"
+      "setupLinkFailed": "セットアップリンクを送信できませんでした。",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "グループ",
@@ -3280,5 +3287,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

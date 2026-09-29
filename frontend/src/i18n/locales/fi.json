@@ -24,7 +24,12 @@
     "themeDark": "Tumma",
     "security": "Turvallisuus",
     "securityHint": "Hallinnoi tilisi kaksivaiheista todennusta.",
-    "securityLink": "Avaa suojausasetukset"
+    "securityLink": "Avaa suojausasetukset",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "Kotiin",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Aseta tili tilaan ”Virheellinen”, jotta tiketit, artikkelit ja historia pysyvät kohdistettavina.",
       "resendSetupLink": "Lähetä asennuslinkki uudelleen",
       "setupLinkSent": "Asennuslinkki lähetetty.",
-      "setupLinkFailed": "Asennuslinkkiä ei voitu lähettää."
+      "setupLinkFailed": "Asennuslinkkiä ei voitu lähettää.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "ryhmät",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

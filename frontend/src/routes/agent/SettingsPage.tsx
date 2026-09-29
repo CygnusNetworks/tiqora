@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { getLocale, localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
 import { cn } from "@/lib/cn";
+import { PhoneExtensionSettings } from "@/components/agent/phone/PhoneExtensionSettings";
 
 /**
  * Agent preferences hub reached from the sidebar user card. Composes the
@@ -97,6 +98,11 @@ export function SettingsPage() {
             {t("settings.themeDark")}
           </Button>
         </div>
+      </section>
+
+      <section className="space-y-2 rounded-lg border border-hairline bg-surface p-4">
+        <h2 className="text-sm font-semibold text-ink">{t("settings.phoneExtension")}</h2>
+        <PhoneExtensionSettings />
       </section>
 
       <section className="space-y-2 rounded-lg border border-hairline bg-surface p-4">

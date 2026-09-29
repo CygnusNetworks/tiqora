@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/cn";
 import { appVersion } from "@/lib/appVersion";
 import { SSEProvider } from "@/lib/useSSE";
+import { CallPopup } from "@/components/agent/phone/CallPopup";
 
 /** Small "Beta" pill rendered next to the Tiqora wordmark. Replaces the old
  * full-width "not production ready" dev ribbon. */
@@ -714,6 +715,7 @@ export function AgentShell({ children }: { children: ReactNode }) {
         </div>
         <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
         <NotificationToaster />
+        <CallPopup />
       </div>
     </SSEProvider>
   );

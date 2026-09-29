@@ -24,7 +24,12 @@
     "themeDark": "الظلام",
     "security": "الأمن",
     "securityHint": "إدارة المصادقة الثنائية لحسابك.",
-    "securityLink": "افتح إعدادات الأمان"
+    "securityLink": "افتح إعدادات الأمان",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "الصفحة الرئيسية",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "اضبط الحساب على «غير صالح» بدلًا من ذلك لتبقى التذاكر والمقالات والسجل قابلة للإسناد.",
       "resendSetupLink": "إعادة إرسال رابط الإعداد",
       "setupLinkSent": "تم إرسال رابط الإعداد.",
-      "setupLinkFailed": "تعذّر إرسال رابط الإعداد."
+      "setupLinkFailed": "تعذّر إرسال رابط الإعداد.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "المجموعات",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }
