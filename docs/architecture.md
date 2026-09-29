@@ -23,8 +23,8 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
 |---|---|---|
 | `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1`, compat routes, `/health`, `/ready`, `/metrics` |
 | `tiqora-worker` | `worker` | taskiq consumers: indexer, mailer, pollers, postmaster/escalation/GA (feature-flagged) |
-| `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: auto-reply worker + auto-summary scan, isolated so a hung LLM call never stalls the main worker. Inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
-| `tiqora-mcp` | `mcp` | FastMCP over SSE; imports `domain/` directly (no second business layer) |
+| `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: new-ticket triage (queue routing), auto-reply worker + auto-summary scan, isolated so a hung LLM call never stalls the main worker. Inert unless `daemon.ai_worker.enabled`; triage and auto-reply additionally require `operation_mode=tiqora_primary` (auto-reply is exempt on Tiqora-only channels, currently Telegram) |
+| `tiqora-mcp` | `mcp` | FastMCP over streamable HTTP; imports `domain/` directly (no second business layer) |
 
 All four share the same container image with a switchable entrypoint.
 
@@ -184,7 +184,8 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   rejected. Optional group-membership gate (`GroupDN`/`AccessAttr`, mirrors
   the Perl module). Simplified vs. Znuny: no `Die`/`UserSuffix`/
   `UserLowerCase`/per-directory charset knobs.
-- Planned: GenericInterface SessionIDs against Znuny `sessions`.
+- GenericInterface SessionIDs are validated against Znuny `sessions` (see
+  [GenericInterface compat layer](#genericinterface-compat-layer)).
 
 ### AI subsystem (`tiqora.ai.*`)
 
@@ -207,8 +208,9 @@ features run off those policies:
 Cross-cutting: sensitive data is **PII-masked (spaCy NER)** before any LLM call;
 every request is written to an **audit log** (`/admin/ai/audit`) with a PII-
 inspection view; per-subject **ACL and token/request limits** live in
-`tiqora_ai_acl`. The whole subsystem is gated by the **operation mode** — nothing
-autonomous runs until `tiqora_primary` (see [parallel-operation.md](parallel-operation.md)
+`tiqora_ai_acl`. Autonomous features are gated by the **operation mode** — nothing
+autonomous runs until `tiqora_primary`, except auto-replies on Tiqora-only
+channels (currently Telegram); drafts and summaries are never gated (see [parallel-operation.md](parallel-operation.md)
 and [ai-integration.md](ai-integration.md) §5).
 
 ### Webhooks
@@ -461,8 +463,8 @@ supported-vs-deferred breakdown and REST endpoint list.
 ### Events and workers
 
 - Writes emit events via a transactional outbox (`tiqora_event_outbox`).
-- taskiq (Redis) drains the outbox for Meilisearch updates, mail, webhooks
-  (later), and daemon-equivalent jobs once flags allow.
+- taskiq (Redis) drains the outbox for Meilisearch updates, mail, webhooks,
+  and daemon-equivalent jobs once flags allow.
 
 ### Frontend
 
@@ -502,7 +504,7 @@ possible-values editing UI.
 | `GET /ready` | Readiness (DB/Redis connectivity) |
 | `GET /metrics` | Prometheus metrics (latencies, queue depth, poller lag) |
 | structlog JSON | Request and worker logs |
-| `deploy/zabbix/` | Zabbix template (HTTP agent on metrics/JSON) |
+| `deploy/zabbix/` | Zabbix template placeholder (planned: HTTP agent on metrics/JSON; not yet authored) |
 
 ### MCP server
 
@@ -524,10 +526,12 @@ Uses `fastmcp.http_app(transport="streamable-http")`.
 `Authorization: Bearer` header validated on every request via `TiqoraBearerAuth`
 middleware. The `user_id` is injected into `request.state.user_id` for tools.
 
-**Tools (25):** ticket read (`ticket_search`, `ticket_get`, `ticket_get_by_number`),
-ticket write (`ticket_create`, `ticket_reply`, `ticket_note`,
+**Tools (40):** ticket read (`ticket_search`, `ticket_get`, `ticket_get_by_number`,
+`ticket_history`, `list_attachments`, `get_attachment_meta`), ticket write
+(`ticket_create`, `ticket_reply`, `ticket_note`, `ticket_forward`, `ticket_bounce`,
 `ticket_update_state`/`queue`/`priority`/`owner`, `ticket_set_title`/`customer`/
-`dynamic_field`, `ticket_lock`/`unlock`), reference/discovery (`list_queues`,
+`dynamic_field`/`type`/`service`/`sla`/`responsible`, `ticket_lock`/`unlock`,
+`ticket_watch`/`unwatch`, `ticket_archive`/`unarchive`, `ticket_merge`, `ticket_link`), reference/discovery (`list_queues`,
 `list_states`, `list_priorities`, `list_agents`), knowledge base (`kb_search`,
 `kb_get_article`, `kb_list`, `kb_upsert_article`, `kb_publish_article`), and
 `customer_lookup`. Full catalogue: [`api/mcp.md`](api/mcp.md).
@@ -561,6 +565,5 @@ Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
 
 ## Non-goals (V1)
 
-- calendar, stats, PGP/S-MIME
 - Znuny package manager / OPM marketplace (except the small TiqoraSync addon)
 - Shipping any Znuny source code in this repository

@@ -40,6 +40,7 @@ S/MIME are **OFF by default** and require their respective external tool.
 | `TIQORA_CRYPTO_SMIME_ENABLED` | Master switch for S/MIME |
 | `TIQORA_CRYPTO_SMIME_CERT_DIR` | Directory of `<email>.crt` files |
 | `TIQORA_CRYPTO_SMIME_PRIVATE_DIR` | Directory of `<email>.key` files |
+| `TIQORA_CRYPTO_SMIME_CA_PATH` | CA bundle for S/MIME chain validation; without it a valid signature is reported `signed_untrusted`, not `verified` |
 | `TIQORA_CRYPTO_OPENSSL_BIN` | `openssl` binary path (default `"openssl"`, PATH lookup) |
 
 ## CLI
@@ -48,6 +49,10 @@ S/MIME are **OFF by default** and require their respective external tool.
 tiqora crypto pgp-import <key-file.asc> [--email x@example.com] [--purpose sign|encrypt|both]
 tiqora crypto smime-register <email> [--cert-file cert.pem] [--key-file key.pem] [--purpose ...]
 ```
+
+The same operations are available to admins via
+`GET /api/v1/admin/crypto-keys`, `POST .../crypto-keys/pgp-import` and
+`POST .../crypto-keys/smime-register`.
 
 ## Inbound: postmaster wiring
 
@@ -64,7 +69,7 @@ tiqora crypto smime-register <email> [--cert-file cert.pem] [--key-file key.pem]
 3. Once the article id is known, records the outcome as an `article_flag`
    row: `article_key = "TiqoraCryptoVerify"`, `article_value =
    "<method>:<status>"` (e.g. `pgp:decrypted_verified`,
-   `pgp:verify_failed`, `smime:verified`).
+   `pgp:verify_failed`, `smime:verified`, `smime:signed_untrusted`).
 4. A decrypt/verify failure **never blocks delivery** — the article is
    still created with whatever body was parsed (mirrors Znuny's
    `ArticleCheck::PGP`/`::SMIME`, which annotate rather than reject).

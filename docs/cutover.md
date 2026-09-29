@@ -164,7 +164,7 @@ duty before the Znuny daemon is stopped.
 2. Confirm fresh successful `daemon.<slug>.status.last_ok` timestamps and
    inspect `last_result` for per-item errors. A completed tick may still
    report errors. When eligible work exists, verify corresponding counters
-   and resulting ticket changes (`tiqora_postmaster_fetched_total`,
+   and resulting ticket changes (`tiqora_postmaster_messages_fetched_total`,
    `tiqora_escalation_tickets_swept_total`,
    `tiqora_notifications_sent_total`, `tiqora_generic_agent_jobs_run_total`).
    A zero counter is normal when no work is due; test each duty with controlled
@@ -242,8 +242,9 @@ supported natively by `tiqora.api.compat.router`, see
    [`compatibility.md`](compatibility.md#what-is-not-emulated-and-why)
    for known partial fidelity).
 
-**Verify**: `tiqora_http_requests_total{path="/znuny-compat/..."}` starts
-incrementing; Znuny's own GI access log stops receiving traffic.
+**Verify**: compat requests are counted in `tiqora_http_requests_total`
+under `path="other"` (only `/api/v1` paths get their own label), so that
+series starts incrementing; Znuny's own GI access log stops receiving traffic.
 
 **Rollback**: revert the nginx location block to point back at
 `nph-genericinterface.pl` and reload nginx. No data was touched — Znuny's
@@ -356,15 +357,19 @@ migration has a downgrade; future migrations may require a database restore
    gate.
 
 4. Set `TIQORA_SCHEMA_OWNERSHIP=1` in the environment of every Tiqora
-   process (API, worker, MCP, and wherever `alembic upgrade` is run from)
-   and restart them.
+   process (API, worker, AI worker, MCP, and wherever `tiqora migrate` is run
+   from) and restart them. Note that the API container's entrypoint runs
+   `tiqora migrate upgrade` on start (unless `TIQORA_RUN_MIGRATIONS=0`), so
+   this restart already applies the owned migration.
 
-5. Run the owned migration:
+5. Run the owned migration (if the API restart has not already done so):
    ```sh
-   cd backend && uv run alembic upgrade head
+   tiqora migrate upgrade
    ```
-   With both gates now active, `alembic/env.py` includes
-   `alembic/versions_owned` in `version_locations` and applies
+   Use this gated command, not a bare `alembic upgrade head`: `alembic.ini`
+   only lists `versions_tiqora`, and with ownership active there are two heads.
+   With both gates active, `tiqora migrate` adds `alembic/versions_owned` to
+   `version_locations`, upgrades to `heads`, and applies
    `20260719_0006_owned_indexes` (three additive composite indexes — see
    `alembic/versions_owned/README.md`). This is index-only DDL: it does not
    modify any row.
@@ -376,9 +381,9 @@ migration has a downgrade; future migrations may require a database restore
    ```
 
 **Verify**: `tiqora ownership status` shows both gates active and
-`versions_owned chain active: YES`. `alembic current` (with
-`TIQORA_SCHEMA_OWNERSHIP=1` set) shows revision `20260719_0006` as the head
-of the combined chain.
+`versions_owned chain active: YES`. `tiqora migrate current` (with
+`TIQORA_SCHEMA_OWNERSHIP=1` set) lists two heads: the newest tiqora revision
+and `20260719_0006` (branch `owned`).
 
 ### Rollback — two distinct cases
 
@@ -386,7 +391,7 @@ of the combined chain.
 owned migrations not yet applied).**
 
 The gate requires *both* to be true, so the chain is still inert. Simply do
-not set the env flag / do not run `alembic upgrade`. To fully revert, delete
+not set the env flag / do not run `tiqora migrate upgrade`. To fully revert, delete
 the marker rows:
 
 ```sql
@@ -399,12 +404,17 @@ No schema changes occurred. This is a config-only rollback.
 the current head).**
 
 The composite indexes added by `20260719_0006` **can** be dropped cleanly
-using that migration's matching `downgrade()`. Determine the immediate
-`down_revision` from the **deployed** revision file and downgrade to that
-revision with both ownership gates still active. Do not use an old hard-coded
-target: the owned migration is rebased as the normal chain advances, and an
-older target could also undo application migrations and remove data. Disable
-the gates only after the schema downgrade succeeds. However:
+using that migration's matching `downgrade()`. With both ownership gates
+still active, step back on the `owned` branch only:
+
+```sh
+tiqora migrate downgrade owned@-1
+```
+
+Do **not** downgrade to the owned migration's `down_revision`
+(`20260720_0007`): the owned chain is a separate branch on that fixed branch
+point, so that target would also undo every later application migration and
+remove data. Disable the gates only after the schema downgrade succeeds. However:
 
 - Any **future** owned migration that is not purely additive (e.g. a
   destructive orphan cleanup, should one ever be added in a later version)

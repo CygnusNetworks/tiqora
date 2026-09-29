@@ -12,7 +12,8 @@ than duplicating them:
   for the final cutover stages (freeze Znuny, stop its daemon, repoint
   GenericInterface traffic, enable schema ownership).
 - [`../deploy/docker-compose.md`](../deploy/docker-compose.md) — how to
-  actually deploy the `tiqora-api`/`tiqora-worker`/`tiqora-mcp` containers.
+  actually deploy the `tiqora-api`/`tiqora-worker`/`tiqora-ai-worker`/`tiqora-mcp`
+  containers.
 
 Read all three before starting a real migration. This page is the map; they
 are the territory.
@@ -247,8 +248,9 @@ stage, in [`../cutover.md`](../cutover.md). Summary of what it covers:
    **This is the point of no return** — see `cutover.md` for why rollback
    beyond this point requires restoring the Stage 0 dump, not a config
    revert.
-6. **Post-cutover cleanup** — uninstall `TiqoraSync`, archive/disable the
-   Znuny crontab, decommission the Znuny frontend.
+6. **Post-cutover cleanup** — retire `TiqoraSync` together with Znuny (do not
+   restart the peer just to uninstall it), archive/disable the Znuny crontab,
+   decommission the Znuny frontend.
 
 Read [`../cutover.md`](../cutover.md) in full before starting Stage 4 — it
 is the authoritative, checklist-driven version of this summary, including

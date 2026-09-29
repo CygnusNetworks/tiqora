@@ -28,7 +28,7 @@ schema (with a warning), re-applies migrations, and updates the admin password.
 
 - Docker and Docker Compose
 - A copy of [`docker-compose.example.yml`](../../docker-compose.example.yml)
-- Strong secrets for `POSTGRES_PASSWORD` / `MEILI_MASTER_KEY` / `TIQORA_SECRET_KEY`
+- Strong secrets for `POSTGRES_PASSWORD` / `REDIS_PASSWORD` / `MEILI_MASTER_KEY` / `TIQORA_SECRET_KEY`
 
 ## Steps
 
@@ -36,12 +36,12 @@ schema (with a warning), re-applies migrations, and updates the admin password.
 
 ```bash
 cp docker-compose.example.yml docker-compose.yml
-# Edit secrets: POSTGRES_PASSWORD, MEILI_MASTER_KEY, TIQORA_SECRET_KEY, DATABASE_URL
+# Put POSTGRES_PASSWORD, REDIS_PASSWORD, MEILI_MASTER_KEY, TIQORA_SECRET_KEY in .env
 docker compose up -d
 ```
 
 The example file starts Postgres (or MariaDB if you switch the commented
-blocks), Redis, Meilisearch, and the Tiqora API/worker/MCP images. The
+blocks), Redis, Meilisearch, and the Tiqora API/worker/AI-worker/MCP containers. The
 bundled DB is **empty** — the API container will run `tiqora migrate upgrade`
 on start (creating only `tiqora_*` tables), but the Znuny base tables and the
 seeded `root@localhost` user appear only after bootstrap.
@@ -49,8 +49,8 @@ seeded `root@localhost` user appear only after bootstrap.
 ### 2. Bootstrap the database
 
 ```bash
-docker compose run --rm tiqora-api \
-  tiqora bootstrap \
+docker compose run --rm --entrypoint tiqora tiqora-api \
+  bootstrap \
   --admin-password 'choose-a-strong-password' \
   --seed
 ```
@@ -85,7 +85,8 @@ uv run tiqora bootstrap --admin-password '…' --seed
 - Terminate TLS at a reverse proxy (nginx, Caddy, Traefik). Do not expose
   Postgres/Redis/Meili ports publicly — the example file leaves them
   unpublished by default.
-- Set `TIQORA_SESSION_COOKIE_SECURE=1` when serving over HTTPS.
+- Serve over HTTPS: with `TIQORA_ENV=production` (the image default) session
+  cookies are `Secure`, and `TIQORA_SESSION_COOKIE_SECURE=0` refuses to start.
 - Rotate `TIQORA_SECRET_KEY` and Meili/DB passwords; never keep the
   `change-me` defaults.
 - See [deploy/docker-compose.md](../deploy/docker-compose.md) for env vars,

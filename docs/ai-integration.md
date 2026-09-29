@@ -70,7 +70,7 @@ appearing over time.
 ## 2. MCP as the primary AI interface
 
 `tiqora.mcp_server.server` runs a FastMCP streamable-HTTP server (default
-port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **~39 tools**.
+port `8001`, `tiqora mcp` / `tiqora-mcp` entry points) exposing **~40 tools**.
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR.
 Mutations use `TicketWriteService` (queue permissions + SMTP parity for
 agent email replies). Optional per-key `tool:<name>` allowlist and rate limit.
@@ -84,6 +84,7 @@ agent email replies). Optional per-key `tool:<name>` allowlist and rate limit.
 | `ticket_get_by_number` | Same payload as `ticket_get`, resolved by Znuny ticket number (`tn`). |
 | `ticket_history` | Recent history rows. |
 | `list_attachments` | Attachment metadata (no binary download). |
+| `get_attachment_meta` | Metadata for one attachment by id (no binary content). |
 
 #### Ticket write
 

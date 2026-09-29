@@ -27,8 +27,8 @@ Tests included under `-m schema_matrix`:
 
 ```sh
 cd backend
-SCHEMA_MATRIX=1 uv run pytest -q -m schema_matrix              # release anchors
-SCHEMA_MATRIX=1 SCHEMA_MATRIX_FULL=1 uv run pytest -q -m schema_matrix  # all fixtures
+SCHEMA_MATRIX=1 uv run python -m pytest -q -m schema_matrix              # release anchors
+SCHEMA_MATRIX=1 SCHEMA_MATRIX_FULL=1 uv run python -m pytest -q -m schema_matrix  # all fixtures
 ```
 
 Day-to-day `pytest -q` / PR CI still use the single **Znuny 6.5** bootstrap

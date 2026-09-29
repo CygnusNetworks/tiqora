@@ -39,7 +39,7 @@ are the code defaults, not necessarily sane production values.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `TIQORA_ENV` | `development` | Set to `production` in deployment. |
+| `TIQORA_ENV` | `development` (code) / `production` (image) | The Docker image sets `TIQORA_ENV=production`; the code default applies only outside the image. |
 | `TIQORA_DEBUG` | `false` | Never `true` in production (verbose errors). **Startup hard-fails** if true when `TIQORA_ENV=production`. |
 | `TIQORA_LOG_LEVEL` | `INFO` | Standard Python logging levels. |
 | `TIQORA_SECRET_KEY` | *(insecure placeholder)* | **Must** be overridden — generate with `openssl rand -hex 32`. Used for Fernet at-rest encryption (SMTP passwords, TOTP seeds, channel credentials). **Startup hard-fails** in production if still the default or shorter than 32 characters. |
@@ -60,8 +60,12 @@ are the code defaults, not necessarily sane production values.
 | Variable | Default | Notes |
 |---|---|---|
 | `TIQORA_CORS_ORIGINS` | `http://localhost:5173,http://localhost:8000` | Comma-separated origin list for the frontend. Set to your real UI origin(s), e.g. `https://tickets.example.com`. **Startup hard-fails** if the list contains `*` when `TIQORA_ENV=production` (credentialed wildcard CORS). |
-| `TIQORA_METRICS_ENABLED` | `true` | Expose Prometheus `GET /metrics` on the app port. Keep `true` for internal scrapes; set `false` if the app port is internet-facing and metrics must not be public (nginx deny is still recommended). |
-| `TIQORA_CSP_ENFORCE` | `false` | When `false` (default), the SPA CSP is sent as `Content-Security-Policy-Report-Only` so a too-strict policy cannot brick the UI. Set `true` only after verifying CSP reports are clean. |
+| `TIQORA_METRICS_ENABLED` | `true`; **`false` when `TIQORA_ENV=production` and the var is unset** | Expose Prometheus `GET /metrics` on the app port. Set `true` explicitly for internal scrapes in production (nginx deny on the public vhost is still recommended). |
+| `TIQORA_CSP_ENFORCE` | `false`; **`true` when `TIQORA_ENV=production` and the var is unset** | When `false`, the SPA CSP is sent as `Content-Security-Policy-Report-Only`. Production enforces it by default (the built SPA has no inline scripts); set `false` explicitly to fall back to report-only. |
+| `TIQORA_PUBLIC_BASE_URL` | *(empty)* | Public browser URL, no trailing slash (e.g. `https://tickets.example.com`). Used for notification/password-setup links and the OAuth2 mail callback; set it on API **and** worker. Empty falls back to the first absolute `TIQORA_CORS_ORIGINS` entry. |
+| `TIQORA_FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxy IPs whose `X-Forwarded-For`/`X-Real-IP` uvicorn trusts for `request.client.host`. **Set to the proxy / Docker gateway IP** when the proxy is not on `127.0.0.1` inside the container, or the per-IP rate limit keys every request on the proxy IP. |
+| `TIQORA_SERVE_FRONTEND` | `true` | Serve the bundled SPA from the API container at `/`. |
+| `TIQORA_PORTAL_ENABLED` | `true` | `false` hard-disables the customer portal (`/api/portal/*` → 404) regardless of the admin setting. |
 
 ### Sessions
 
@@ -71,7 +75,7 @@ are the code defaults, not necessarily sane production values.
 | `TIQORA_SESSION_TTL` | `3600` (seconds = 1h) | **Sliding** TTL: renewed on every authenticated request, so it is effectively the maximum idle time before logout. SSO/Kerberos agents re-authenticate transparently on expiry, so a short value is low-friction for them. Raise for password-only setups if 1h idle logout is too aggressive. |
 | `TIQORA_SESSION_ABSOLUTE_TTL` | `43200` (12h) | Absolute maximum session age regardless of activity — a stolen token cannot be kept alive indefinitely by periodic requests. |
 | `TIQORA_TRUSTED_PROXIES` | *(empty)* | Reverse-proxy IPs/CIDRs whose `X-Forwarded-For` is trusted for per-IP rate-limit keys. Set to your proxy so login lockout keys on the real client IP, not the shared proxy IP. |
-| `TIQORA_SESSION_COOKIE_SECURE` | `false` in non-production; **`true` when `TIQORA_ENV=production` and the var is unset** | Override explicitly if needed. Always use Secure cookies behind HTTPS. |
+| `TIQORA_SESSION_COOKIE_SECURE` | `false` in non-production; **`true` when `TIQORA_ENV=production` and the var is unset** | **Startup hard-fails** if set `false` when `TIQORA_ENV=production`. |
 | `TIQORA_SESSION_COOKIE_SAMESITE` | `lax` | |
 | `TIQORA_CUSTOMER_SESSION_COOKIE` | `tiqora_customer_session` | Separate cookie for the customer portal; reuses the same TTL/secure/samesite settings above (so `TIQORA_SESSION_TTL` also governs portal sessions). |
 
@@ -91,7 +95,8 @@ policies, ACL/limits and the operation-mode gate are all managed in admin
 | Variable | Default | Notes |
 |---|---|---|
 | `TIQORA_LLM_TIMEOUT` | `180.0` (seconds) | Per-request HTTP timeout for one LLM chat completion; also used by the attachment vision pre-pass. Detailed multi-document summaries can run long — raise if you see `LlmTimeoutError`. |
-| `TIQORA_AI_WORKER_HEARTBEAT_FILE` | *(unset)* | Optional liveness file the `ai-worker` process touches each loop (for container healthchecks / monitoring). |
+| `TIQORA_AI_WORKER_HEARTBEAT_FILE` | `/tmp/tiqora-ai-worker.heartbeat` | Liveness file the `ai-worker` process touches each loop (used by the example healthcheck). `TIQORA_WORKER_HEARTBEAT_FILE` (default `/tmp/tiqora-worker.heartbeat`) is the same for `tiqora-worker`. |
+| `TIQORA_AI_WORKER_INTERVAL` | `10` (seconds) | AI worker tick cadence once `daemon.ai_worker.enabled` is on. |
 
 ### Schema ownership (parallel-operation gate)
 
@@ -197,6 +202,7 @@ instead of `TIQORA_LDAP_*` (`ENABLED`, `HOST`, `PORT`, `USE_SSL`,
 | Variable | Default |
 |---|---|
 | `TIQORA_POSTMASTER_INTERVAL` | `60` (seconds) — poll cadence once the `daemon.postmaster.enabled` takeover flag (a `tiqora_settings` DB row, not an env var) is on. |
+| `TIQORA_SMTP_ENABLED` | `false` — outbound SMTP is **off** until set to `true`; agent email replies are stored but not sent. |
 | `TIQORA_SMTP_HOST` | `localhost` |
 | `TIQORA_SMTP_PORT` | `25` |
 | `TIQORA_SMTP_USE_TLS` | `false` |
@@ -210,6 +216,10 @@ instead of `TIQORA_LDAP_*` (`ENABLED`, `HOST`, `PORT`, `USE_SSL`,
 | `TIQORA_ESCALATION_INTERVAL` | `300` (seconds) |
 | `TIQORA_NOTIFICATIONS_INTERVAL` | `60` (seconds) |
 | `TIQORA_GENERIC_AGENT_INTERVAL` | `60` (seconds) |
+| `TIQORA_UNLOCK_TIMEOUT_INTERVAL` | `300` (seconds) |
+| `TIQORA_PENDING_CHECK_INTERVAL` | `600` (seconds) |
+| `TIQORA_OUTBOX_DRAIN_INTERVAL` | `60` (seconds) — `daemon.outbox.enabled` defaults **on** |
+| `TIQORA_TELEGRAM_POLLER_INTERVAL` | `5` (seconds) |
 
 Each function's actual on/off switch is a `tiqora_settings` DB row
 (`daemon.<name>.enabled`), not an environment variable — these env vars only
@@ -227,7 +237,7 @@ those flags.
 | `tiqora_redis` | `redis` | Redis RDB/AOF persistence. |
 | `tiqora_meili` | `meilisearch` | Search index data. |
 
-The `tiqora-api`/`tiqora-worker`/`tiqora-mcp` containers themselves are
+The `tiqora-api`/`tiqora-worker`/`tiqora-ai-worker`/`tiqora-mcp` containers themselves are
 stateless — no application-data volume is needed for them.
 
 ## Connecting to an existing Znuny database
@@ -237,8 +247,8 @@ For a **fresh, standalone Tiqora deployment**, use the bundled `postgres` (or
 compose up`, run:
 
 ```bash
-docker compose run --rm tiqora-api \
-  tiqora bootstrap --admin-password '…' --seed
+docker compose run --rm --entrypoint tiqora tiqora-api \
+  bootstrap --admin-password '…' --seed
 ```
 
 `tiqora bootstrap` loads the Znuny 6.5 base schema for greenfield installs
@@ -397,8 +407,8 @@ streaming connections.
 ## Running migrations on first start
 
 The API container entrypoint runs `python -m tiqora.main migrate upgrade`
-before serving traffic, unless `TIQORA_RUN_MIGRATIONS=0` is set. Worker and
-MCP roles do not run migrations. Both ownership gates still control whether
+before serving traffic, unless `TIQORA_RUN_MIGRATIONS=0` is set. Worker,
+AI-worker and MCP roles do not run migrations. Both ownership gates still control whether
 the owned migration chain is available.
 
 To migrate explicitly before starting the other roles:

@@ -54,7 +54,7 @@ These issues appear in real Znuny deployments and must not regress:
 | Error shape | Error codes/messages should stay parseable by common clients |
 | Empty search | Empty result sets return the same structure as Znuny (not HTTP 404) |
 
-Golden-behaviour tests in `tests/test_compat_operations.py` cover the
+Golden-behaviour tests in `backend/tests/test_compat_operations.py` cover the
 core operations including the gotchas above with seeded MariaDB data.
 
 ## Implemented routes
@@ -256,14 +256,13 @@ framework. Items below are intentionally incomplete or out of scope.
 | Article-level DynamicFields on TicketGet | Ticket DFs yes; per-article DFs not loaded |
 | TimeAccounting queue “as of entry date” | Znuny uses HistoryTicketGet snapshot; we return the ticket’s **current** queue name |
 | SessionCreate writes only Redis (not Znuny `sessions` rows) | Avoid dual-writer races in parallel-op; SessionGet/auth still **read** both stores |
-| Session TTL / `UserLastRequest` | Still not enforced — see [Known limitations](#known-limitations-compat-layer) |
 | TicketSearch: Created\* filters, TicketFlag/ArticleFlag/Mention, attachment filename search, Result=COUNT | Low traffic on GenericTicketConnector; core filters (queue/state/owner/MIME/sort/DF ops) are in |
 | OutOfOffice CSV bulk (`OutOfOfficeEntriesCSVString`) | JSON `OutOfOfficeEntries` list is implemented; CSV path is bulk-admin only |
 
 ### Golden-master coverage
 
 DB/unit tests cover SessionGet/Remove, TicketHistoryGet, OwnerIDs/SortBy, and
-the original five ops. Peer golden (`tests/golden/test_compat_conformance.py`)
+the original five ops. Peer golden (`tests/golden/test_compat_conformance.py`, repo root)
 still focuses on SessionCreate / TicketSearch / StateType / empty-search —
 not every new op. Treat production soak against real Znuny GI as required
 before cutover of history/time-accounting/OutOfOffice clients.
@@ -295,10 +294,10 @@ MariaDB and validated:
 
 ## Known limitations (compat layer)
 
-- **SessionID TTL**: The compat layer validates `UserID`/`UserLogin`/`UserType`
-  from the `sessions` table but does not check `UserLastRequest` or TTL. Expired
-  but un-purged sessions will still authenticate. Mitigated: Znuny’s session
-  cleanup daemon removes stale rows; a future release can add TTL checks.
+- **SessionID TTL**: Znuny `sessions` rows are checked for idle and absolute
+  expiry (`UserLastRequest` / `UserSessionStart`, ported from Znuny's
+  `CheckSessionID`); rows with missing or unparseable timestamps are treated
+  as expired.
 - **CustomerUserLogin auth**: Customer principals use sentinel `user_id=0` for
   ACL (never elevated to root/agent). Ticket/article writes still attribute
   `create_by` via the portal system user (`PORTAL_SYSTEM_USER_ID`, typically
@@ -345,12 +344,6 @@ MariaDB and validated:
   application-enforced only.
 - Soft deletes: categories → `valid = False`; articles → `state = "archived"`
   (content/chunks retained for audit/citation, not indexed for search).
-- Migration `20260719_0001_api_key_and_settings.py`
-  fails to apply on PostgreSQL (`server_default=sa.text("1")` on a boolean
-  column → `DatatypeMismatchError`). Discovered while validating the new KB
-  migration (0004) on Postgres; 0004 itself applies/downgrades cleanly on
-  MariaDB. The Postgres leg of the full migration chain needs a follow-up fix
-  to 0001, tracked separately.
 
 **Admin CRUD API**
 
@@ -379,6 +372,6 @@ MariaDB and validated:
   attribute relations (`acl_ticket_attribute_relations`) have CSV admin + the
   same field-options chain. Queue *access* remains group/role.
 - Deferred relative to full Znuny admin breadth:
-  `group_customer`/`group_customer_user` assignment endpoints (not in the
-  originally requested resource list), SysConfig deploy UI, GI webservice
+  `group_customer` (company-level) assignment endpoints
+  (`group_customer_user` is implemented), SysConfig deploy UI, GI webservice
   admin, package manager.

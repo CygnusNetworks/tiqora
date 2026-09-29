@@ -48,7 +48,7 @@ fork of Znuny — no Znuny source code is included or redistributed.
   arguments it was made with. The agent can **hand off to a human**, which really
   stops the auto-reply until someone takes over. Bring your own OpenAI-compatible or
   Anthropic providers. Gated by the operation mode so nothing autonomous runs during
-  parallel operation.
+  parallel operation (except auto-replies on Tiqora-only channels such as Telegram).
 - **GDPR tooling** — anonymization, retention jobs, and audit trails in admin.
 - **Modern design** — dark/light themes, compact cobalt design system.
 - **49 UI languages** — full Znuny language catalogue (48 Znuny `.po` codes +
@@ -58,7 +58,7 @@ fork of Znuny — no Znuny source code is included or redistributed.
   (optional small Znuny OPM addon only if you co-run Znuny for cache coherence).
 - **Customer portal & knowledge base** — self-service tickets and Markdown KB.
 - **Integration-friendly** — REST `/api/v1`, GenericInterface REST/SOAP compatibility,
-  webhooks, channel plugins (email, SMS, WhatsApp, phone/CTI).
+  webhooks, channel plugins (email, SMS, WhatsApp, Telegram, phone/CTI).
 - **Modern auth** — legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO (with
   **seamless re-auth** when a session expires), enforceable TOTP, and passkeys.
 
@@ -173,8 +173,8 @@ below shows every tool the agent called <em>and what it called it with</em></sub
                     │  Agent UI · Portal · Admin · AI agents    │
                     └───────────┬──────────────┬────────────────┘
                                 │              │
-                     /api/v1    │              │  MCP (SSE)
-                     /compat/*  │              │
+                     /api/v1    │              │  MCP (streamable HTTP)
+              /znuny-compat/*   │              │
                                 ▼              ▼
                     ┌────────────────┐  ┌─────────────┐
                     │  tiqora-api    │  │ tiqora-mcp  │
@@ -256,7 +256,7 @@ backend/src/tiqora/
   domain/           # Services — sole write paths, bundling invariants
   permissions/      # Groups/roles + ACL for UI, REST, MCP
   events/           # Async bus + transactional outbox
-  channels/         # Channel plugin protocol (email, web, …)
+  channels/         # Channel plugins (email, SMS, WhatsApp, Telegram, phone)
   storage/          # StorageBackend interface (DB MIME in V1)
   api/              # v1 routers + GenericInterface compat layer
   mcp_server/       # FastMCP process
