@@ -68,6 +68,7 @@ export type ArticleCreateRequest = Schemas["ArticleCreateRequest"];
 export type ArticleCreateResponse = Schemas["ArticleCreateResponse"];
 export type ReplyDraftOut = Schemas["ReplyDraftOut"];
 export type AiOriginOut = Schemas["AiOriginOut"];
+export type ArticleSecurity = Schemas["ArticleSecurity"];
 export type TemplateOut = Schemas["TemplateOut"];
 export type MutationRequest = Schemas["MutationRequest"];
 export type MergeRequest = Schemas["MergeRequest"];
