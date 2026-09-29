@@ -19,6 +19,8 @@ import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { AiOriginMarker, AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
+import { ArticleSecurityBadge } from "./ArticleSecurityBadge";
+import { useArticleSecurity } from "./useArticleSecurity";
 import { useAiOriginTrace } from "./useAiOriginTrace";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { ArticleQuickActions } from "./ArticleQuickActions";
@@ -214,6 +216,7 @@ function ArticleReader({
 }) {
   const { t } = useTranslation();
   const aiOrigin = useAiOriginTrace({ ticketId, articleId: article.id });
+  const security = useArticleSecurity(ticketId, article);
   return (
     <div className="space-y-3 rounded-lg border border-hairline bg-surface p-3">
       <div className="space-y-1.5 border-b border-hairline pb-2">
@@ -243,6 +246,7 @@ function ArticleReader({
               onToggle={aiOrigin.toggle}
             />
           )}
+          {security && <ArticleSecurityBadge articleId={article.id} security={security} />}
         </div>
       </div>
       {article.ai_origin && (

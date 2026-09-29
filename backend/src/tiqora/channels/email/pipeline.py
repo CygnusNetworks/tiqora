@@ -11,8 +11,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy import text
@@ -31,6 +30,9 @@ from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
 from tiqora.znuny.followup import detect_followup
 from tiqora.znuny.sysconfig import SysConfig
+
+if TYPE_CHECKING:
+    from tiqora.crypto.inbound import InboundCryptoOutcome
 
 logger = structlog.get_logger(__name__)
 
@@ -330,18 +332,25 @@ async def _process_message_inner(
     raw: bytes,
     account: MailAccount,
     user_id: int,
-    body_override: str | None = None,
+    crypto: InboundCryptoOutcome | None = None,
 ) -> PipelineResult:
     """Process one raw email against *account* within the caller's transaction.
 
-    ``body_override`` (set by :func:`process_message` when inbound crypto
-    successfully decrypted a PGP block) replaces the parsed plaintext body
-    before article creation — everything else (subject, from/to headers,
-    routing) still comes from the original, undecrypted ``raw``.
+    ``crypto`` (set by :func:`process_message` when inbound crypto decrypted
+    or unwrapped the mail) replaces the parsed body and attachments before
+    article creation, so the article holds the content in clear (Znuny's
+    ArticleCheck does the same on first view). Headers and routing still come
+    from the original ``raw``; a placeholder outer subject ("...") gives way
+    to the protected subject of an encrypted Thunderbird mail.
     """
     parsed = parse_email(raw)
-    if body_override is not None:
-        parsed.body = body_override
+    if crypto is not None:
+        if crypto.body is not None:
+            parsed.body = crypto.body
+            parsed.content_type = crypto.content_type or parsed.content_type
+        if crypto.attachments is not None:
+            parsed.attachments = crypto.attachments
+        parsed.subject = crypto.subject_for(parsed.subject)
     get_param = _build_get_param(parsed, trusted=bool(account.trusted))
 
     await apply_filters(session, get_param)
@@ -588,23 +597,6 @@ async def _process_message_inner(
     )
 
 
-async def _write_crypto_flag(
-    session: AsyncSession, article_id: int, flag_value: str, user_id: int
-) -> None:
-    """Record inbound PGP/S/MIME status as an ``article_flag`` row."""
-    from tiqora.db.legacy.article import ArticleFlag
-
-    session.add(
-        ArticleFlag(
-            article_id=article_id,
-            article_key="TiqoraCryptoVerify",
-            article_value=flag_value[:50],
-            create_time=datetime.now(UTC).replace(tzinfo=None),
-            create_by=user_id,
-        )
-    )
-
-
 async def process_message(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
@@ -620,8 +612,9 @@ async def process_message(
     enabled (SysConfig ``PGP``/``SMIME`` or ``TIQORA_CRYPTO_*_ENABLED``) —
     the common case, so this adds no overhead by default. A decrypt/verify
     failure never blocks delivery: the article is still created, and the
-    outcome (``pgp:decrypted_verified``, ``smime:verify_failed``, etc.) is
-    recorded as an ``article_flag`` row once the article id is known.
+    outcome is recorded as ``TiqoraCrypto*`` article flags (see
+    :mod:`tiqora.crypto.article_security`) once the article id is known, and
+    the original mail is kept in ``article_data_mime_plain``.
     """
     from tiqora.config import get_settings
     from tiqora.crypto.config import resolve_crypto_config
@@ -629,7 +622,7 @@ async def process_message(
 
     settings = get_settings()
     crypto_config = await resolve_crypto_config(settings, sysconfig)
-    body_override, crypto_result = await process_inbound_crypto(raw, settings, crypto_config)
+    crypto_outcome = await process_inbound_crypto(raw, settings, crypto_config)
 
     # Lightweight header parse for the communication log (same raw as pipeline).
     try:
@@ -651,7 +644,7 @@ async def process_message(
             raw=raw,
             account=account,
             user_id=user_id,
-            body_override=body_override,
+            crypto=crypto_outcome,
         )
     except Exception as exc:
         duration_ms = int((time.perf_counter() - t0) * 1000)
@@ -672,7 +665,7 @@ async def process_message(
 
     duration_ms = int((time.perf_counter() - t0) * 1000)
 
-    if crypto_result is not None:
+    if crypto_outcome is not None:
         article_id = result.article_id
         if article_id is None and result.ticket_id is not None:
             # New-ticket path: create_ticket() only returns the ticket id, not
@@ -687,9 +680,10 @@ async def process_message(
             if article_id is not None:
                 result.article_id = int(article_id)
         if result.article_id is not None:
-            await _write_crypto_flag(
-                session, int(result.article_id), crypto_result.article_flag_value, user_id
-            )
+            from tiqora.crypto.article_security import store_raw_message, write_security
+
+            await write_security(session, int(result.article_id), crypto_outcome.security, user_id)
+            await store_raw_message(session, int(result.article_id), raw, user_id)
     elif result.article_id is None and result.ticket_id is not None:
         # Ensure received logs get article_id for new_ticket path even without crypto.
         article_id = (

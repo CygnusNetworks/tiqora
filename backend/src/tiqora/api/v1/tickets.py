@@ -29,6 +29,7 @@ from tiqora.domain.customer_link import ResolvedCustomerLink, resolve_customer_l
 from tiqora.domain.schemas import (
     ArticleBody,
     ArticleListItem,
+    ArticleSecurity,
     AttachmentMetaOut,
     BounceRequest,
     ForwardRequest,
@@ -1125,7 +1126,9 @@ async def get_article_body(
     session: DbSession,
 ) -> ArticleBody:
     try:
-        rendered = await TicketService(session).get_article_body(user.id, ticket_id, article_id)
+        rendered, security = await TicketService(session).get_article_body_with_security(
+            user.id, ticket_id, article_id
+        )
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
     return ArticleBody(
@@ -1133,6 +1136,7 @@ async def get_article_body(
         content_type=rendered.content_type,
         is_html=rendered.is_html,
         body=rendered.body,
+        security=ArticleSecurity.from_result(security) if security else None,
     )
 
 

@@ -1,0 +1,46 @@
+From: Carla Customer <customer@example.com>
+To: Tiqora Support <support@tiqora.test>
+Subject: ...
+Date: Tue, 29 Sep 2026 10:00:00 +0200
+Message-ID: <9069295261917668737@example.com>
+MIME-Version: 1.0
+User-Agent: Mozilla Thunderbird
+Content-Language: en-US
+Content-Type: multipart/encrypted;
+ protocol="application/pgp-encrypted";
+ boundary="------------tbOuterBoundary0042"
+
+This is an OpenPGP/MIME encrypted message (RFC 4880 and 3156)
+--------------tbOuterBoundary0042
+Content-Type: application/pgp-encrypted
+Content-Description: PGP/MIME version identification
+
+Version: 1
+
+--------------tbOuterBoundary0042
+Content-Type: application/octet-stream; name="encrypted.asc"
+Content-Description: OpenPGP encrypted message
+Content-Disposition: inline; filename="encrypted.asc"
+
+-----BEGIN PGP MESSAGE-----
+
+hF4DYHRsMQtxp10SAQdARV5VOSp9yOcPV6v70mXI4QVTbwuwfZeIjjOPGAOxLn0w
+rmXqyPuYBHk61GclyCQE0snuyNJnA82+rjmVMYAPsTWMd8/UjNEA2V2Yrb5odUNb
+1OkBCQIQKNaw14QzGtBN2FVDyu+95mKSU/gGPcliUcD0/WSPakJFgp3AsKnvK2lA
+mUN951ViEzqj48vtGaq3YoYzybjoFFN5yl8xs005EjYsIT7XgQtK8UZb5KOg+Xm9
+Hw9x9mWAMoWVxzQs8rBnyVcPEZ8ToeAt9JYOW+Y4hb5Q9ybTBbEDK9mEplfvx4yV
+5p6pDJ09DBLlyeDn10ADNqMDn2pLy/TxC/TTYahYDdl1mZ7Ph9XgrBwNdwsT/4qk
+MmGfw56cn/7SGu0F/qJWOSXsujrwbcQZT4z0Bq8tz1vCmbh0V8TXqKuwFUnWv0nR
+p8+Jx73Ps3r9tAOOoPuBb1/MnaxMDacvNLYhq9bcMUQHUbbX8KMGGs0WICqhWZNG
+jqeNVN2XjS363JcisVtqdOYFDCTJvNaz34Wdei8OdbsyEeu8Jfu7RkeByWvK3q8s
+AQN/Y6V8VC4kAdLYnjCakUcdTMI4ytenHqR5LHS49DWtlakoX3GDwZA+9q9q8TlK
+RsER+rlbhwlBabaEUZzsnw9CsVl+FZzmDrkJA7DpYxr00wPSfGGs9qSJnhaTDQb6
+nbTWidDpY3S9THJd/KtZHseVH+SKAbla/AVroYj6JiDa74Ljb6YqNuzZxB5FUWZA
+wAw1QxZ55EsMBLvMcdD7/WABfvJGVFT+jCUT57Rh/pIJKH1x6BoL74NoO1DQVlB2
+/ILnriTssoPKsLK+g158JwNyWB8map8aDGfNoeDinWfOagWi8sSVo7B9NWMRZacn
+AC/GtXAY8NeNdU4NqY4MA0QLCdOciBCGiF6JaAZzb/ugXYKFtjbh56jZx4XgAmBd
+03AF5CA2yQ7ZUaG3xxBe8Q==
+=ciUm
+-----END PGP MESSAGE-----
+
+--------------tbOuterBoundary0042--

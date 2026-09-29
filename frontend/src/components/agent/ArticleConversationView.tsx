@@ -20,6 +20,8 @@ import { Avatar } from "@/components/ui/Avatar";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
+import { ArticleSecurityBadge } from "./ArticleSecurityBadge";
+import { useArticleSecurity } from "./useArticleSecurity";
 import { useAiOriginTrace } from "./useAiOriginTrace";
 import { ArticleQuickActions } from "./ArticleQuickActions";
 import { DraftBubble } from "./DraftPlaceholder";
@@ -258,6 +260,7 @@ function Bubble({
       : "border border-green/35 bg-green/10 rounded-bl-md";
   const nameTone = isSystem ? "text-muted" : side === "right" ? "text-accent" : "text-green";
   const aiOrigin = useAiOriginTrace({ ticketId, articleId: article.id });
+  const security = useArticleSecurity(ticketId, article);
   const tgActions = useTelegramMessageActions(ticketId, article.id);
   const editing = tgActions.mode === "editing";
   const editText = useArticlePlainText(ticketId, article.id, editing);
@@ -297,6 +300,9 @@ function Bubble({
                     open={aiOrigin.open}
                     onToggle={aiOrigin.toggle}
                   />
+                )}
+                {security && (
+                  <ArticleSecurityBadge articleId={article.id} security={security} compact />
                 )}
                 <span className="font-mono tabular-nums">{formatDateTime(article.create_time, locale)}</span>
                 <span
