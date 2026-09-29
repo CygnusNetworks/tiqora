@@ -3780,6 +3780,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/me/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get My Phone
+         * @description The agent's extension(s) for the CTI call popup (``TiqoraPhoneExtension``).
+         */
+        get: operations["get_my_phone_api_v1_auth_me_phone_get"];
+        /** Set My Phone */
+        put: operations["set_my_phone_api_v1_auth_me_phone_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/methods": {
         parameters: {
             query?: never;
@@ -4295,6 +4316,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/channels/phone/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Call Event
+         * @description PBX call events (ringing / answered / hangup) for the agent call popup.
+         *
+         *     The extension is mapped to agents via their ``TiqoraPhoneExtension``
+         *     preference; an event nobody is assigned to is accepted and ignored. See
+         *     :mod:`tiqora.channels.phone.cti`.
+         */
+        post: operations["call_event_api_v1_channels_phone_events_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/channels/phone/note": {
         parameters: {
             query?: never;
@@ -4776,6 +4821,43 @@ export interface paths {
         get: operations["oauth2_authorization_callback_api_v1_oauth2_callback_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone/calls/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active Calls
+         * @description The agent's ringing/answered calls and those ended ≤ 15 min ago.
+         */
+        get: operations["active_calls_api_v1_phone_calls_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone/calls/{call_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss */
+        post: operations["dismiss_api_v1_phone_calls__call_id__dismiss_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6934,6 +7016,36 @@ export interface components {
             result: "not_required" | "acquired" | "already_mine" | "taken_over" | "locked_by_other";
         };
         /**
+         * ActiveCall
+         * @description One call as the popup sees it.
+         */
+        ActiveCall: {
+            /** Answered At */
+            answered_at: string | null;
+            /** Call Id */
+            call_id: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "inbound" | "outbound";
+            /** Ended At */
+            ended_at: string | null;
+            /** Extension */
+            extension: string | null;
+            /** Number */
+            number: string;
+            /** Ringing At */
+            ringing_at: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ringing" | "answered" | "ended";
+            /** User Ids */
+            user_ids: number[];
+        };
+        /**
          * ActivityDialogDetailOut
          * @description Full field definitions for one activity dialog.
          */
@@ -8929,6 +9041,38 @@ export interface components {
             name: string;
             /** Valid */
             valid: boolean;
+        };
+        /** CallEventAccepted */
+        CallEventAccepted: {
+            /** Accepted */
+            accepted: boolean;
+            /** Delivered To */
+            delivered_to: number;
+        };
+        /**
+         * CallEventIn
+         * @description Webhook body of ``POST /channels/phone/events``.
+         */
+        CallEventIn: {
+            /** Call Id */
+            call_id: string;
+            /** Caller Number */
+            caller_number?: string | null;
+            /**
+             * Direction
+             * @default inbound
+             * @enum {string}
+             */
+            direction: "inbound" | "outbound";
+            /**
+             * Event
+             * @enum {string}
+             */
+            event: "ringing" | "answered" | "hangup";
+            /** Extension */
+            extension?: string | null;
+            /** Timestamp */
+            timestamp?: string | null;
         };
         /** CallerCustomerOut */
         CallerCustomerOut: {
@@ -11733,6 +11877,16 @@ export interface components {
              */
             dial_scheme: "tel" | "sip";
         };
+        /** PhoneExtensionOut */
+        PhoneExtensionOut: {
+            /** Extension */
+            extension: string | null;
+        };
+        /** PhoneExtensionUpdate */
+        PhoneExtensionUpdate: {
+            /** Extension */
+            extension?: string | null;
+        };
         /** PhoneNoteRequest */
         PhoneNoteRequest: {
             /** Agent User Id */
@@ -14215,6 +14369,8 @@ export interface components {
             mobile?: string | null;
             /** Password */
             password?: string | null;
+            /** Phone Extension */
+            phone_extension?: string | null;
             /** Title */
             title?: string | null;
             /**
@@ -14298,6 +14454,8 @@ export interface components {
             login: string;
             /** Mobile */
             mobile?: string | null;
+            /** Phone Extension */
+            phone_extension?: string | null;
             /** Title */
             title: string | null;
             /** Valid Id */
@@ -14324,6 +14482,8 @@ export interface components {
             mobile?: string | null;
             /** Password */
             password?: string | null;
+            /** Phone Extension */
+            phone_extension?: string | null;
             /** Title */
             title?: string | null;
             /** Valid Id */
@@ -25725,6 +25885,76 @@ export interface operations {
             };
         };
     };
+    get_my_phone_api_v1_auth_me_phone_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneExtensionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_my_phone_api_v1_auth_me_phone_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneExtensionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneExtensionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     auth_methods_api_v1_auth_methods_get: {
         parameters: {
             query?: never;
@@ -26709,6 +26939,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    call_event_api_v1_channels_phone_events_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-tiqora-phone-secret"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallEventIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallEventAccepted"];
                 };
             };
             /** @description Validation Error */
@@ -27904,6 +28169,72 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+        };
+    };
+    active_calls_api_v1_phone_calls_active_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveCall"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_api_v1_phone_calls__call_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                call_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

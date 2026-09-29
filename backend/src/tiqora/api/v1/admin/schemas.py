@@ -13,6 +13,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from tiqora.channels.phone.cti import normalize_extensions
 from tiqora.domain.password_policy import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from tiqora.domain.schemas import UtcDateTime
 
@@ -41,6 +42,9 @@ class UserOut(BaseModel):
     """From ``user_preferences`` (key ``UserEmail``) — not a ``users`` column."""
     mobile: str | None = None
     """From ``user_preferences`` (key ``UserMobile``) — not a ``users`` column."""
+    phone_extension: str | None = None
+    """PBX extension(s) for the CTI call popup, comma separated — from
+    ``user_preferences`` (key ``TiqoraPhoneExtension``)."""
 
     invited_at: UtcDateTime | None = None
     """When the agent's most recent setup link was mailed, from
@@ -70,6 +74,12 @@ class UserCreate(BaseModel):
     valid_id: int = 1
     email: str | None = None
     mobile: str | None = None
+    phone_extension: str | None = None
+
+    @field_validator("phone_extension")
+    @classmethod
+    def _check_phone_extension(cls, value: str | None) -> str | None:
+        return normalize_extensions(value)
 
     @model_validator(mode="after")
     def _email_required_without_password(self) -> UserCreate:
@@ -87,6 +97,13 @@ class UserUpdate(BaseModel):
     valid_id: int | None = None
     email: str | None = None
     mobile: str | None = None
+    #: Empty string clears the extension.
+    phone_extension: str | None = None
+
+    @field_validator("phone_extension")
+    @classmethod
+    def _check_phone_extension(cls, value: str | None) -> str | None:
+        return normalize_extensions(value)
 
 
 class UserLanguageOut(BaseModel):
