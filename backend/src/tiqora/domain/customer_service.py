@@ -59,6 +59,7 @@ class CustomerService:
             last_name=cu.last_name,
             title=cu.title,
             phone=cu.phone,
+            mobile=cu.mobile,
             company_name=company_name,
         )
 

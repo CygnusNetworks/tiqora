@@ -8399,6 +8399,17 @@
             "title": "Login",
             "type": "string"
           },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
           "phone": {
             "anyOf": [
               {
@@ -8884,6 +8895,49 @@
           "field_type"
         ],
         "title": "DynamicFieldCreate",
+        "type": "object"
+      },
+      "DynamicFieldDefOut": {
+        "properties": {
+          "field_type": {
+            "title": "Field Type",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "possible_values": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Possible Values"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "field_type",
+          "required",
+          "possible_values"
+        ],
+        "title": "DynamicFieldDefOut",
         "type": "object"
       },
       "DynamicFieldOut": {
@@ -52064,6 +52118,92 @@
           }
         },
         "summary": "Search Customers",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/reference/dynamic-fields": {
+      "get": {
+        "description": "Ticket dynamic fields to show on a screen, in field order.\n\nReads ``Ticket::Frontend::<screen>###DynamicField`` (1 = shown, 2 =\nrequired); when that config enables nothing, every valid, non-internal\nticket field of an editable type is offered (optional). Article-level\nfields are not offered -- the write paths set ticket fields only.",
+        "operationId": "screen_dynamic_fields_api_v1_reference_dynamic_fields_get",
+        "parameters": [
+          {
+            "description": "Znuny frontend module",
+            "in": "query",
+            "name": "screen",
+            "required": true,
+            "schema": {
+              "description": "Znuny frontend module",
+              "enum": [
+                "AgentTicketPhone",
+                "AgentTicketPhoneInbound",
+                "AgentTicketPhoneOutbound"
+              ],
+              "title": "Screen",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DynamicFieldDefOut"
+                  },
+                  "title": "Response Screen Dynamic Fields Api V1 Reference Dynamic Fields Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Screen Dynamic Fields",
         "tags": [
           "reference"
         ]
