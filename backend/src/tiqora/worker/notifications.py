@@ -32,6 +32,10 @@ OFF — see ``tiqora.domain.settings_store``). Ports the parts of
   ``domain.ticket_write_service.add_article`` with history type
   ``SendCustomerNotification``, matching the ``ArticleSend`` call in
   ``Transport::Email::SendNotification``.
+- ``Transport::Email::SecurityOptionsGet``: the notification's
+  ``EmailSecuritySettings``/``EmailSigningCrypting``/``EmailMissing*Keys``
+  items sign and/or encrypt the mail (``tiqora.crypto.notification``), or
+  drop it when a key is missing and the policy says ``Skip``.
 
 Loop-safety: each ``tiqora_event_outbox`` row is consumed exactly once via a
 monotonic watermark (mirrors ``tiqora.worker.poller``'s watermark pattern),
@@ -60,6 +64,7 @@ Parallel-operation safety: this engine only drains ``tiqora_event_outbox``
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass, field, replace
 from email.utils import parseaddr
@@ -84,6 +89,14 @@ from tiqora.channels.email.smtp import (
     message_id_domain,
 )
 from tiqora.config import Settings, get_settings
+from tiqora.crypto.article_security import store_raw_message, write_security
+from tiqora.crypto.config import CryptoConfig
+from tiqora.crypto.mime_build import SecuredMessage, SecurityPlan, secure_message
+from tiqora.crypto.notification import (
+    NotificationSecurityConfig,
+    NotificationSecurityDecision,
+    notification_security_sync,
+)
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.mail_outbound import build_outbound_sender
 from tiqora.domain.quoting import build_ticket_subject
@@ -113,6 +126,11 @@ NOTIFICATIONS_EVENTS_PROCESSED = Counter(
 )
 NOTIFICATIONS_SENT = Counter(
     "tiqora_notifications_sent_total", "Notifications sent", ["recipient_type"]
+)
+NOTIFICATIONS_SKIPPED = Counter(
+    "tiqora_notifications_security_skipped_total",
+    "Notifications not sent because a signing/encryption key was missing (policy Skip)"
+    " or the crypto backend was unavailable",
 )
 NOTIFICATIONS_ERRORS = Counter(
     "tiqora_notifications_errors_total", "Per-event or per-recipient notification errors"
@@ -633,6 +651,76 @@ async def _render_message(
     return subject, body, content_type
 
 
+_SECURITY_LOG_LEVELS = {"error": "error", "notice": "info"}
+
+
+def _sysconfig_flag(value: object) -> bool:
+    """SysConfig checkbox values arrive as ``1``/``0`` ints or strings."""
+    if isinstance(value, str):
+        return value.strip() not in ("", "0")
+    return bool(value)
+
+
+async def _notification_security(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    settings: Settings,
+    security: NotificationSecurityConfig,
+    *,
+    notification: _NotificationRow,
+    recipient: _Recipient,
+    sender_address: str,
+    ticket: dict[str, object],
+) -> tuple[NotificationSecurityDecision, CryptoConfig]:
+    """Resolve Znuny's ``SecurityOptionsGet`` for one recipient and log the outcome.
+
+    Keys are searched for the ``From`` address the notification is really sent
+    with. Only customer notifications consider the queue's default sign key,
+    as in Znuny (agent notifications carry no queue there).
+    """
+    from tiqora.crypto.compose import smime_chain_paths
+    from tiqora.crypto.config import resolve_crypto_config
+
+    config = await resolve_crypto_config(settings, sysconfig)
+    default_sign_key: str | None = None
+    if recipient.kind == "Customer":
+        row = (
+            await session.execute(
+                text("SELECT default_sign_key FROM queue WHERE id = :qid"),
+                {"qid": ticket.get("queue_id")},
+            )
+        ).first()
+        default_sign_key = str(row[0]) if row is not None and row[0] else None
+    rich_text = _sysconfig_flag(await sysconfig.get("Frontend::RichText", 1))
+    pgp_method = await sysconfig.get_str("PGP::Method", "Detached")
+    decision = await asyncio.to_thread(
+        notification_security_sync,
+        config,
+        security,
+        notification_name=notification.name,
+        sender_email=parseaddr(sender_address)[1],
+        recipient_email=recipient.email,
+        queue_default_sign_key=default_sign_key,
+        rich_text=rich_text,
+        pgp_method=pgp_method,
+    )
+    for level, message in decision.log:
+        getattr(logger, _SECURITY_LOG_LEVELS.get(level, "info"))(
+            "notification_security",
+            detail=message,
+            notification_id=notification.id,
+            ticket_id=ticket.get("id"),
+            recipient=recipient.email,
+            skipped=decision.skip,
+        )
+    plan = decision.plan
+    if plan is not None and plan.backend == "smime" and plan.sign_key:
+        chain = await smime_chain_paths(session, config, plan.sign_key)
+        if chain:
+            decision.plan = replace(plan, smime_chain=chain)
+    return decision, config
+
+
 async def _send_to_recipient(
     session: AsyncSession,
     sysconfig: SysConfig,
@@ -644,6 +732,7 @@ async def _send_to_recipient(
     user_id: int,
     base_context: PlaceholderContext,
     hook_cfg: SubjectHookConfig | None,
+    settings: Settings | None = None,
 ) -> bool:
     rendered = await _render_message(
         session,
@@ -670,6 +759,25 @@ async def _send_to_recipient(
         )
         sender_address = _FALLBACK_SENDER
 
+    security = NotificationSecurityConfig.from_items(notification.items)
+    plan: SecurityPlan | None = None
+    crypto_config: CryptoConfig | None = None
+    if security.active:
+        decision, crypto_config = await _notification_security(
+            session,
+            sysconfig,
+            settings or get_settings(),
+            security,
+            notification=notification,
+            recipient=recipient,
+            sender_address=sender_address,
+            ticket=ticket,
+        )
+        if decision.skip:
+            NOTIFICATIONS_SKIPPED.inc()
+            return False
+        plan = decision.plan
+
     # One id for both the mail and the article stored for a customer notification,
     # so a reply threads onto the row the portal shows.
     message_id = generate_message_id(domain=message_id_domain(sender_address))
@@ -684,6 +792,19 @@ async def _send_to_recipient(
         message_id=message_id,
         extra_headers=await sysconfig.mail_banner_headers(),
     )
+    secured: SecuredMessage | None = None
+    if plan is not None and crypto_config is not None:
+        # Built before anything is sent or stored: a gpg/openssl failure
+        # fails this recipient -- never a silent unsigned/unencrypted send.
+        secured = await asyncio.to_thread(secure_message, message, plan, crypto_config)
+        message = secured.message
+        logger.info(
+            "notification_secured",
+            notification_id=notification.id,
+            ticket_id=_as_int(ticket["id"]),
+            recipient=recipient.email,
+            detail=", ".join(secured.detail),
+        )
     # Znuny sends notifications with Loop => 1: the null envelope sender keeps
     # bounces out of the queue mailbox (SendmailNotificationEnvelopeFrom).
     await mail_sender.send(
@@ -716,13 +837,18 @@ async def _send_to_recipient(
             channel="email",
             history_type_override="SendCustomerNotification",
         )
-        await add_article(
+        article_id = await add_article(
             session,
             ticket_id=_as_int(ticket["id"]),
             article=article,
             user_id=user_id,
             sysconfig=sysconfig,
         )
+        if secured is not None:
+            # As for agent replies: the article holds the clear text, the sent
+            # (signed/encrypted) mail is its plain source, the flags the badge.
+            await store_raw_message(session, article_id, secured.raw, user_id)
+            await write_security(session, article_id, secured.security, user_id)
         NOTIFICATIONS_SENT.labels(recipient_type="customer").inc()
 
     return True
@@ -808,6 +934,7 @@ async def process_event(
                     user_id=user_id,
                     base_context=base_context,
                     hook_cfg=hook_cfg,
+                    settings=settings,
                 ):
                     sent += 1
             except Exception:  # noqa: BLE001 — one bad recipient must not stop the others
