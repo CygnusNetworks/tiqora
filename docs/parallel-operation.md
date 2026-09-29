@@ -74,8 +74,13 @@ Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileI
 
 ## `tiqora_*` tables
 
-All Tiqora-owned state lives in these additive tables (models in
-`backend/src/tiqora/db/tiqora/models.py`). Znuny never reads or writes them
+All Tiqora-owned state lives in additive `tiqora_*` tables (models in
+`backend/src/tiqora/db/tiqora/models.py`, plus `tiqora/ai/models.py` and
+`tiqora/kb/models.py`). The core ones are listed below; the AI subsystem
+(`tiqora_ai_*`, `tiqora_llm_provider`, `tiqora_mcp_*`), the knowledge base
+(`tiqora_kb_*`), Telegram (`tiqora_telegram_*`) and a few smaller helpers
+(`tiqora_password_setup_token`, `tiqora_queue_customer_link`,
+`tiqora_standard_template_*`) add further tables of the same kind. Znuny never reads or writes them
 except optionally via the TiqoraSync OPM for cache invalidation.
 
 | Table | Purpose |
@@ -341,7 +346,9 @@ POP3/IMAP delete-after-fetch semantics, race to delete) messages.
    ```sql
    INSERT INTO tiqora_settings (key, value) VALUES ('daemon.postmaster.enabled', '1')
      ON CONFLICT (key) DO UPDATE SET value = '1';  -- Postgres
-   -- MySQL/MariaDB: INSERT ... ON DUPLICATE KEY UPDATE value = '1';
+   -- MySQL/MariaDB (`key` is reserved, quote it):
+   -- INSERT INTO tiqora_settings (`key`, value) VALUES ('daemon.postmaster.enabled', '1')
+   --   ON DUPLICATE KEY UPDATE value = '1';
    ```
 3. Tiqora's worker process polls this flag every tick (default 60s,
    `TIQORA_POSTMASTER_INTERVAL`) — no restart required to flip it.

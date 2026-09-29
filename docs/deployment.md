@@ -11,7 +11,7 @@ built frontend static assets. Process role is selected at start:
 | Command / env | Process |
 |---|---|
 | `api` (default) | FastAPI (uvicorn) |
-| `worker` | taskiq worker |
+| `worker` | Background worker (Znuny-write poller, indexing, outbox/webhooks, daemon takeovers) |
 | `ai-worker` | AI subsystem loop (auto-reply + auto-summary), isolated from the main worker; inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
 | `mcp` | FastMCP server |
 
@@ -20,14 +20,16 @@ Registry targets (CI):
 - `ghcr.io/cygnusnetworks/tiqora`
 - `docker.io/cygnusnetworks/tiqora`
 
-Tags: `latest` (main), semver on release tags, `sha-<shortsha>`.
+Built only on release tags (`v*`): `latest`, `stable`, `<major>.<minor>.<patch>`,
+`<major>.<minor>`, `sha-<shortsha>`. Day-to-day `main` pushes are not published
+to these registries.
 
 ## Compose example
 
 See [docker-compose.example.yml](../docker-compose.example.yml) for a commented
 deployment skeleton with:
 
-- `tiqora-api`, `tiqora-worker`, `tiqora-mcp`
+- `tiqora-api`, `tiqora-worker`, `tiqora-ai-worker`, `tiqora-mcp`
 - Choice of **PostgreSQL or MariaDB** (comments show both; enable one)
 - Redis, Meilisearch
 - Optional Mailpit for non-production mail sinks
@@ -40,7 +42,7 @@ and never commit real credentials.
 | Variable | Example | Notes |
 |---|---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://user:pass@db:5432/tiqora` | Or `mysql+aiomysql://…` |
-| `REDIS_URL` | `redis://redis:6379/0` | Sessions + taskiq |
+| `REDIS_URL` | `redis://redis:6379/0` | Sessions, presence, SSE pub/sub, rate limiting |
 | `MEILI_URL` | `http://meilisearch:7700` | |
 | `MEILI_MASTER_KEY` | strong secret | Production required |
 | `TIQORA_SECRET_KEY` | random 32+ bytes | Cookie/session material |
@@ -49,7 +51,10 @@ and never commit real credentials.
 | `TIQORA_SESSION_TTL` | `3600` | Session lifetime in seconds (1h). **Sliding** — renewed on every authenticated request, so effectively the max idle time. SSO/Kerberos agents re-auth transparently on expiry. Also governs customer-portal sessions. |
 | `TIQORA_SESSION_ABSOLUTE_TTL` | `43200` | Absolute max session age (12h), independent of the sliding TTL — a session is killed this long after creation even if continuously active, so a stolen token can't be kept alive forever. |
 | `TIQORA_TRUSTED_PROXIES` | *(empty)* | Comma-separated reverse-proxy IPs/CIDRs whose `X-Forwarded-For` may be trusted for rate-limit client-IP derivation. Set to your proxy so per-IP login lockout keys on the real client, not the shared proxy IP. |
+| `TIQORA_FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxy IPs whose `X-Forwarded-For`/`X-Real-IP` uvicorn honours for `request.client.host`. **Required behind a proxy** that is not on `127.0.0.1` (e.g. the Docker gateway), otherwise every request keys on the proxy IP. |
+| `TIQORA_PUBLIC_BASE_URL` | `https://helpdesk.example.com` | Public browser URL (no trailing slash) for links in notifications, password-setup mails and the OAuth2 mail callback. Set on API **and** worker. |
 | `TIQORA_CSP_ENFORCE` | `false` (dev) / **`true` (production)** | Enforce the SPA Content-Security-Policy. Auto-enabled in production; set `0` to keep report-only. |
+| `TIQORA_METRICS_ENABLED` | `true` (dev) / **`false` (production)** | Expose unauthenticated `GET /metrics` on the app port. Off by default in production; set `1` to scrape it (keep it off the public vhost). |
 | `TIQORA_CRYPTO_SMIME_CA_PATH` | *(empty)* | CA bundle for S/MIME chain validation. Without it, inbound S/MIME signatures are reported `signed_untrusted` (valid signature, untrusted signer) rather than `verified`. |
 | `TIQORA_STEP_UP_MAX_AGE` | `900` | "Sudo mode" window (seconds): how long after logging in a session may still register or delete a passkey. Past this the agent must sign in again. Only enforced once the account already has a second factor, so first-time and forced enrollment stay frictionless. |
 | `TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP` | `false` | Bind Znuny session ids presented to the compat GenericInterface to the client IP Znuny recorded (its `SessionCheckRemoteIP`). Off by default: Znuny stored the address **its own** webserver saw, which differs from Tiqora's socket peer behind a reverse proxy, so enabling it there rejects valid sessions. Turn on only when both peers observe the same client address. Idle/absolute session expiry is always enforced regardless of this flag. |
@@ -222,7 +227,8 @@ streams (no aggressive idle kills).
 
 ## Observability
 
-- Scrape `GET /metrics` with Prometheus or Zabbix HTTP agent.
+- Scrape `GET /metrics` with Prometheus or Zabbix HTTP agent (requires
+  `TIQORA_METRICS_ENABLED=1` in production).
 - A Zabbix template will live under `deploy/zabbix/` (placeholder for now).
 - Ship stdout JSON logs (structlog) to your log stack.
 

@@ -204,7 +204,8 @@ continuity off the chat itself (see "Identity / contact mapping").
 ### Antworten im Chat
 
 Agent replies on a Telegram ticket go through a messenger-style chat composer
-under the conversation view, not the email-style reply dialog — the header's
+in the conversation view (under the contact header in the default
+newest-first order, at the bottom in oldest-first), not the email-style reply dialog — the header's
 "Antworten", a per-article "Antworten" and AiPanel's "Entwurf übernehmen" all
 route there instead once the article set's dominant channel is Telegram
 (`channelNameOf`/`dominantChannel`, `frontend/src/lib/articleChannel.ts`). A
@@ -249,7 +250,7 @@ conversation first.
 
 ## Admin config
 
-`GET/PUT /api/v1/admin/channels` and `/api/v1/admin/channels/{sms,whatsapp,phone,telegram}`
+`GET /api/v1/admin/channels` and `GET/PUT /api/v1/admin/channels/{sms,whatsapp,phone,telegram}`
 (admin group required) read/write the `tiqora_settings` keys above.
 `PUT` accepts `{"enabled": bool, "config": {...}}`; unknown config keys are
 rejected (422) rather than silently written. `GET` responses mask any key

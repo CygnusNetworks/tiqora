@@ -65,7 +65,7 @@ missing trailing slash in a way that breaks concurrent MCP session setup;
 see the reverse-proxy notes in
 [`../deploy/docker-compose.md`](../deploy/docker-compose.md).)
 
-## Tools (~39)
+## Tools (~40)
 
 MCP deliberately does **not** mirror admin/portal/calendar/BPM/stats/GDPR —
 those stay on REST. Source of truth: `@mcp.tool` handlers in
@@ -86,6 +86,7 @@ only those tools may run. Rate limit: `TIQORA_API_KEY_RATE_LIMIT_*` (default
 | `ticket_get_by_number` | Same Markdown payload as `ticket_get`, resolved by Znuny ticket number (`tn`). |
 | `ticket_history` | Recent history rows (`type`, `name`, `create_time`). |
 | `list_attachments` | Attachment metadata for a ticket (no binary download). |
+| `get_attachment_meta` | Metadata for one attachment by id within a ticket article (no binary content). |
 
 ### Ticket write
 
