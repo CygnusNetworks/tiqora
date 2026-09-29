@@ -19,12 +19,15 @@ in both paths; only the send attempt is gated.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import secrets
 import socket
 import time
 from collections.abc import Mapping
 from dataclasses import replace
+from email.message import EmailMessage
+from typing import TYPE_CHECKING
 
 import structlog
 from sqlalchemy import text
@@ -37,6 +40,9 @@ from tiqora.domain.quoting import build_ticket_subject
 from tiqora.domain.subject_hook import load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, InvalidInput, add_article
 from tiqora.znuny.sysconfig import SysConfig
+
+if TYPE_CHECKING:
+    from tiqora.crypto.mime_build import SecuredMessage
 
 logger = structlog.get_logger(__name__)
 
@@ -309,22 +315,16 @@ async def prepare_outgoing_agent_email(
     )
 
 
-async def send_prepared_agent_email(
-    mail_sender: MailSender,
+def build_agent_email_message(
     article: ArticleIn,
     *,
     auto_submitted: str | None = None,
     extra_headers: Mapping[str, str] | None = None,
-) -> None:
-    """SMTP-send a prepared agent email article. Raises :class:`OutboundMailError` on failure.
-
-    *auto_submitted* marks a reply nobody reviewed before it went out (the AI
-    answering on its own): ``auto-replied`` per RFC 3834. A reply an agent
-    typed or approved is not automated mail and must not carry it.
-    """
+) -> EmailMessage:
+    """The plain (unsigned, unencrypted) MIME message for a prepared article."""
     if not article.to_address:
         raise InvalidInput("Agent email reply requires to_address")
-    message = build_message(
+    return build_message(
         from_addr=article.from_address or "Tiqora <noreply@localhost>",
         to_addrs=article.to_address,
         cc_addrs=article.cc,
@@ -340,6 +340,65 @@ async def send_prepared_agent_email(
         auto_submitted=auto_submitted,
         extra_headers=extra_headers,
     )
+
+
+async def secure_agent_email(
+    session: AsyncSession,
+    article: ArticleIn,
+    message: EmailMessage,
+) -> SecuredMessage | None:
+    """Sign/encrypt *message* per ``article.email_security`` (Znuny ``EmailSecurity``).
+
+    Raises :class:`InvalidInput` (HTTP 422) when the keys do not allow what
+    was asked — e.g. a recipient without a usable encryption key — and
+    :class:`OutboundMailError` (HTTP 502) when gpg/openssl fail. Either way
+    nothing is sent: a mail that was meant to be encrypted never goes out
+    in clear.
+    """
+    sec = article.email_security
+    if sec is None or not sec.active:
+        return None
+    from tiqora.crypto import CryptoError
+    from tiqora.crypto.compose import EmailSecurityError, resolve_plan, split_addresses
+    from tiqora.crypto.config import load_crypto_config
+    from tiqora.crypto.mime_build import secure_message
+
+    config = await load_crypto_config(session)
+    recipients = split_addresses(article.to_address, article.cc, article.bcc)
+    try:
+        plan = await resolve_plan(session, config, sec, recipients=recipients)
+    except EmailSecurityError as exc:
+        raise InvalidInput(f"email_security: {exc}") from exc
+    if plan is None:
+        return None
+    try:
+        return await asyncio.to_thread(secure_message, message, plan, config)
+    except CryptoError as exc:
+        logger.exception("agent_email_security_failed", backend=plan.backend)
+        raise OutboundMailError(f"{plan.backend} signing/encryption failed: {exc}") from exc
+
+
+async def send_prepared_agent_email(
+    mail_sender: MailSender,
+    article: ArticleIn,
+    *,
+    auto_submitted: str | None = None,
+    extra_headers: Mapping[str, str] | None = None,
+    message: EmailMessage | None = None,
+) -> None:
+    """SMTP-send a prepared agent email article. Raises :class:`OutboundMailError` on failure.
+
+    *auto_submitted* marks a reply nobody reviewed before it went out (the AI
+    answering on its own): ``auto-replied`` per RFC 3834. A reply an agent
+    typed or approved is not automated mail and must not carry it.
+
+    *message* is an already built (e.g. signed/encrypted) message to send
+    instead of building one from *article*.
+    """
+    if message is None:
+        message = build_agent_email_message(
+            article, auto_submitted=auto_submitted, extra_headers=extra_headers
+        )
     try:
         await mail_sender.send(message)
     except OutboundMailError:
@@ -351,6 +410,22 @@ async def send_prepared_agent_email(
             subject=article.subject,
         )
         raise OutboundMailError(f"SMTP send failed: {exc}") from exc
+
+
+async def _store_security(
+    session: AsyncSession, article_id: int, secured: SecuredMessage | None, user_id: int
+) -> None:
+    """Keep the sent (signed/encrypted) mail as the article's plain source + badge flags.
+
+    The article itself holds the clear content; Znuny likewise stores the
+    sent raw mail in ``article_data_mime_plain``.
+    """
+    if secured is None:
+        return
+    from tiqora.crypto.article_security import store_raw_message, write_security
+
+    await store_raw_message(session, article_id, secured.raw, user_id)
+    await write_security(session, article_id, secured.security, user_id)
 
 
 async def deliver_agent_email_reply(
@@ -390,6 +465,18 @@ async def deliver_agent_email_reply(
     )
     resolved = await resolve_outbound_smtp(session)
     should_dispatch = resolved.enabled if dispatch is None else dispatch
+    # Signing/encryption is resolved and applied before anything is sent or
+    # stored, so a key problem fails the request without side effects.
+    secured: SecuredMessage | None = None
+    banner = await sysconfig.mail_banner_headers()
+    if prepared.email_security is not None and prepared.email_security.active:
+        secured = await secure_agent_email(
+            session,
+            prepared,
+            build_agent_email_message(
+                prepared, auto_submitted=auto_submitted, extra_headers=banner
+            ),
+        )
     queue_name: str | None = None
     try:
         _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
@@ -421,7 +508,8 @@ async def deliver_agent_email_reply(
                 sender,
                 prepared,
                 auto_submitted=auto_submitted,
-                extra_headers=await sysconfig.mail_banner_headers(),
+                extra_headers=banner,
+                message=secured.message if secured is not None else None,
             )
         except OutboundMailError as exc:
             duration_ms = int((time.perf_counter() - t0) * 1000)
@@ -454,6 +542,7 @@ async def deliver_agent_email_reply(
             user_id=user_id,
             sysconfig=sysconfig,
         )
+        await _store_security(session, article_id, secured, user_id)
         await write_mail_log(
             session,
             direction="out",
@@ -496,6 +585,7 @@ async def deliver_agent_email_reply(
         user_id=user_id,
         sysconfig=sysconfig,
     )
+    await _store_security(session, article_id, secured, user_id)
     # SMTP disabled: still record a queued row so the admin log shows the
     # prepared outbound message (no SMTP attempt, no 502).
     await write_mail_log(
@@ -532,10 +622,12 @@ queue_outbound_meta = _queue_outbound_meta
 __all__ = [
     "OutboundMailError",
     "append_signature",
+    "build_agent_email_message",
     "build_references_chain",
     "deliver_agent_email_reply",
     "generate_message_id",
     "prepare_outgoing_agent_email",
     "queue_outbound_meta",
+    "secure_agent_email",
     "send_prepared_agent_email",
 ]

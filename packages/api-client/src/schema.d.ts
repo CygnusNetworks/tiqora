@@ -5553,6 +5553,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/crypto-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * New Ticket Crypto Options
+         * @description Crypto compose options for a new email ticket in *queue_id* (``create`` right).
+         */
+        get: operations["new_ticket_crypto_options_api_v1_tickets_crypto_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/dashboard-summary": {
         parameters: {
             query?: never;
@@ -6109,6 +6129,9 @@ export interface paths {
         /**
          * Forward Article Endpoint
          * @description Forward an article by email (history type 'Forward'). Requires ``rw``.
+         *
+         *     Sent like a reply (send-then-store, HTTP 502 on SMTP failure); optional
+         *     ``email_security`` signs/encrypts it (422 on missing/unusable keys).
          */
         post: operations["forward_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__forward_post"];
         delete?: never;
@@ -6262,6 +6285,26 @@ export interface paths {
          *     parts). Requires ``note``.
          */
         post: operations["retract_telegram_article_api_v1_tickets__ticket_id__articles__article_id__telegram_retract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/crypto-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ticket Crypto Options
+         * @description Crypto compose options for a reply/forward on *ticket_id* (sender = its queue).
+         */
+        get: operations["ticket_crypto_options_api_v1_tickets__ticket_id__crypto_options_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8425,6 +8468,7 @@ export interface components {
              * @default text/plain; charset=utf-8
              */
             content_type: string;
+            email_security?: components["schemas"]["EmailSecurityIn"] | null;
             /** From Address */
             from_address?: string | null;
             /** In Reply To */
@@ -9300,6 +9344,55 @@ export interface components {
             /** Problems */
             problems: string[];
         };
+        /** CryptoComposeBackendOut */
+        CryptoComposeBackendOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Backend
+             * @enum {string}
+             */
+            backend: "pgp" | "smime";
+            /**
+             * Can Encrypt
+             * @default false
+             */
+            can_encrypt: boolean;
+            /** Methods */
+            methods: ("detached" | "inline")[];
+            /** Problem */
+            problem?: string | null;
+            /** Recipients */
+            recipients?: components["schemas"]["CryptoComposeRecipientOut"][];
+            /** Sign Keys */
+            sign_keys?: components["schemas"]["CryptoComposeKeyOut"][];
+        };
+        /** CryptoComposeKeyOut */
+        CryptoComposeKeyOut: {
+            /** Emails */
+            emails?: string[];
+            /** Expires */
+            expires?: string | null;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Status */
+            status: string;
+            /** Usable */
+            usable: boolean;
+        };
+        /** CryptoComposeRecipientOut */
+        CryptoComposeRecipientOut: {
+            /** Address */
+            address: string;
+            /** Keys */
+            keys?: components["schemas"]["CryptoComposeKeyOut"][];
+            /** Selected */
+            selected?: string[];
+            /** Status */
+            status: string;
+        };
         /**
          * CryptoKeyOut
          * @description One audit row (not key material).
@@ -9328,6 +9421,18 @@ export interface components {
             purpose: string;
             /** User Id */
             user_id?: number | null;
+        };
+        /** CryptoOptionsOut */
+        CryptoOptionsOut: {
+            /** Backends */
+            backends?: components["schemas"]["CryptoComposeBackendOut"][];
+            default?: components["schemas"]["EmailSecurityIn"] | null;
+            /** Enabled */
+            enabled: boolean;
+            /** From Address */
+            from_address?: string | null;
+            /** Warnings */
+            warnings?: string[];
         };
         /** CustomerCompanyCreate */
         CustomerCompanyCreate: {
@@ -9919,6 +10024,37 @@ export interface components {
             valid_id: number;
         };
         /**
+         * EmailSecurityIn
+         * @description ``email_security`` of an outgoing email (reply, forward, new email ticket).
+         *
+         *     Signing happens when ``sign_key`` is set (PGP key id/fingerprint or
+         *     S/MIME ``<hash>.<n>``; the Znuny form ``PGP::Detached::<id>`` is
+         *     accepted too). ``encrypt`` encrypts for ``encrypt_keys`` or — when
+         *     omitted — for the first usable key of every recipient.
+         */
+        EmailSecurityIn: {
+            /**
+             * Backend
+             * @enum {string}
+             */
+            backend: "pgp" | "smime";
+            /**
+             * Encrypt
+             * @default false
+             */
+            encrypt: boolean;
+            /** Encrypt Keys */
+            encrypt_keys?: string[] | null;
+            /**
+             * Method
+             * @default detached
+             * @enum {string}
+             */
+            method: "detached" | "inline";
+            /** Sign Key */
+            sign_key?: string | null;
+        };
+        /**
          * ErasureSelectorIn
          * @description Combinable AND filter for customer_user resolution.
          */
@@ -10015,6 +10151,7 @@ export interface components {
             body: string;
             /** Cc */
             cc?: string | null;
+            email_security?: components["schemas"]["EmailSecurityIn"] | null;
             /** Note */
             note?: string | null;
             /** Subject */
@@ -29706,6 +29843,44 @@ export interface operations {
             };
         };
     };
+    new_ticket_crypto_options_api_v1_tickets_crypto_options_get: {
+        parameters: {
+            query: {
+                queue_id: number;
+                to?: string | null;
+                cc?: string | null;
+                bcc?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CryptoOptionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     dashboard_summary_api_v1_tickets_dashboard_summary_get: {
         parameters: {
             query?: never;
@@ -30984,6 +31159,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_crypto_options_api_v1_tickets__ticket_id__crypto_options_get: {
+        parameters: {
+            query?: {
+                to?: string | null;
+                cc?: string | null;
+                bcc?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CryptoOptionsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -4922,6 +4922,16 @@
             "title": "Content Type",
             "type": "string"
           },
+          "email_security": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailSecurityIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "from_address": {
             "anyOf": [
               {
@@ -7505,6 +7515,149 @@
         "title": "CryptoBackendStatusOut",
         "type": "object"
       },
+      "CryptoComposeBackendOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "backend": {
+            "enum": [
+              "pgp",
+              "smime"
+            ],
+            "title": "Backend",
+            "type": "string"
+          },
+          "can_encrypt": {
+            "default": false,
+            "title": "Can Encrypt",
+            "type": "boolean"
+          },
+          "methods": {
+            "items": {
+              "enum": [
+                "detached",
+                "inline"
+              ],
+              "type": "string"
+            },
+            "title": "Methods",
+            "type": "array"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          },
+          "recipients": {
+            "items": {
+              "$ref": "#/components/schemas/CryptoComposeRecipientOut"
+            },
+            "title": "Recipients",
+            "type": "array"
+          },
+          "sign_keys": {
+            "items": {
+              "$ref": "#/components/schemas/CryptoComposeKeyOut"
+            },
+            "title": "Sign Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "backend",
+          "available",
+          "methods"
+        ],
+        "title": "CryptoComposeBackendOut",
+        "type": "object"
+      },
+      "CryptoComposeKeyOut": {
+        "properties": {
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "usable": {
+            "title": "Usable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "status",
+          "usable"
+        ],
+        "title": "CryptoComposeKeyOut",
+        "type": "object"
+      },
+      "CryptoComposeRecipientOut": {
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/CryptoComposeKeyOut"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "selected": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "status"
+        ],
+        "title": "CryptoComposeRecipientOut",
+        "type": "object"
+      },
       "CryptoKeyOut": {
         "description": "One audit row (not key material).",
         "properties": {
@@ -7587,6 +7740,54 @@
           "has_private_key"
         ],
         "title": "CryptoKeyOut",
+        "type": "object"
+      },
+      "CryptoOptionsOut": {
+        "properties": {
+          "backends": {
+            "items": {
+              "$ref": "#/components/schemas/CryptoComposeBackendOut"
+            },
+            "title": "Backends",
+            "type": "array"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailSecurityIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "from_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Address"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "CryptoOptionsOut",
         "type": "object"
       },
       "CustomerCompanyCreate": {
@@ -9557,6 +9758,64 @@
         "title": "EffectiveQueuePermission",
         "type": "object"
       },
+      "EmailSecurityIn": {
+        "description": "``email_security`` of an outgoing email (reply, forward, new email ticket).\n\nSigning happens when ``sign_key`` is set (PGP key id/fingerprint or\nS/MIME ``<hash>.<n>``; the Znuny form ``PGP::Detached::<id>`` is\naccepted too). ``encrypt`` encrypts for ``encrypt_keys`` or \u2014 when\nomitted \u2014 for the first usable key of every recipient.",
+        "properties": {
+          "backend": {
+            "enum": [
+              "pgp",
+              "smime"
+            ],
+            "title": "Backend",
+            "type": "string"
+          },
+          "encrypt": {
+            "default": false,
+            "title": "Encrypt",
+            "type": "boolean"
+          },
+          "encrypt_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encrypt Keys"
+          },
+          "method": {
+            "default": "detached",
+            "enum": [
+              "detached",
+              "inline"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "sign_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sign Key"
+          }
+        },
+        "required": [
+          "backend"
+        ],
+        "title": "EmailSecurityIn",
+        "type": "object"
+      },
       "ErasureSelectorIn": {
         "description": "Combinable AND filter for customer_user resolution.",
         "properties": {
@@ -9821,6 +10080,16 @@
               }
             ],
             "title": "Cc"
+          },
+          "email_security": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailSecurityIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "note": {
             "anyOf": [
@@ -58147,6 +58416,129 @@
         ]
       }
     },
+    "/api/v1/tickets/crypto-options": {
+      "get": {
+        "description": "Crypto compose options for a new email ticket in *queue_id* (``create`` right).",
+        "operationId": "new_ticket_crypto_options_api_v1_tickets_crypto_options_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "queue_id",
+            "required": true,
+            "schema": {
+              "title": "Queue Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cc",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cc"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bcc",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcc"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "New Ticket Crypto Options",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
     "/api/v1/tickets/dashboard-summary": {
       "get": {
         "description": "Counts for the dashboard KPI tiles: owned open/new, unclaimed new, SLA-escalated, AI handoff.\n\nRegistered before ``/{ticket_id}`` so \"dashboard-summary\" is not parsed as\na ticket id.",
@@ -60862,7 +61254,7 @@
     },
     "/api/v1/tickets/{ticket_id}/articles/{article_id}/forward": {
       "post": {
-        "description": "Forward an article by email (history type 'Forward'). Requires ``rw``.",
+        "description": "Forward an article by email (history type 'Forward'). Requires ``rw``.\n\nSent like a reply (send-then-store, HTTP 502 on SMTP failure); optional\n``email_security`` signs/encrypts it (422 on missing/unusable keys).",
         "operationId": "forward_article_endpoint_api_v1_tickets__ticket_id__articles__article_id__forward_post",
         "parameters": [
           {
@@ -61556,6 +61948,129 @@
           }
         },
         "summary": "Retract Telegram Article",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/crypto-options": {
+      "get": {
+        "description": "Crypto compose options for a reply/forward on *ticket_id* (sender = its queue).",
+        "operationId": "ticket_crypto_options_api_v1_tickets__ticket_id__crypto_options_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cc",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cc"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bcc",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bcc"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ticket Crypto Options",
         "tags": [
           "tickets"
         ]
