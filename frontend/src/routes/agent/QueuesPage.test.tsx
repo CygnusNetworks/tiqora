@@ -591,7 +591,7 @@ describe("QueuesPage status segments and flag chips", () => {
   });
 
   it("channel chips show once a chat channel has tickets, combine, and reset with the flags", async () => {
-    ticketFacets.mockResolvedValue({ ...FACETS, channels: { email: 12, telegram: 3, webchat: 0 } });
+    ticketFacets.mockResolvedValue({ ...FACETS, channels: { email: 12, telegram: 3, webchat: 0, phone: 0 } });
     const router = await renderQueuesPage();
     await screen.findByTestId("ticket-row-101");
 
@@ -617,7 +617,7 @@ describe("QueuesPage status segments and flag chips", () => {
   });
 
   it("shows no channel chips while every ticket is an e-mail", async () => {
-    ticketFacets.mockResolvedValue({ ...FACETS, channels: { email: 16, telegram: 0, webchat: 0 } });
+    ticketFacets.mockResolvedValue({ ...FACETS, channels: { email: 16, telegram: 0, webchat: 0, phone: 0 } });
     await renderQueuesPage();
     await screen.findByTestId("ticket-row-101");
     await waitFor(() => expect(ticketFacets).toHaveBeenCalled());
@@ -636,6 +636,21 @@ describe("QueuesPage status segments and flag chips", () => {
     expect(screen.queryByTestId("ticket-customer-name-301")).toBeNull();
     expect(row.style.getPropertyValue("--spine-color")).toBe("var(--color-channel-telegram)");
     expect(screen.getByTestId("ticket-channel-302")).toHaveAttribute("data-channel", "email");
+  });
+
+  it("shows a phone ticket's pill, edge colour and phone chip", async () => {
+    ticketFacets.mockResolvedValue({ ...FACETS, channels: { email: 15, telegram: 0, webchat: 0, phone: 1 } });
+    serveTickets([makeTicket({ id: 303, channel: "phone" }), makeTicket({ id: 304 })]);
+    await renderQueuesPage();
+    const row = await screen.findByTestId("ticket-row-303");
+    expect(screen.getByTestId("ticket-channel-303")).toHaveAttribute("data-channel", "phone");
+    expect(row.style.getPropertyValue("--spine-color")).toBe("var(--color-channel-phone)");
+    const chip = await screen.findByTestId("queue-channel-phone");
+    expect(chip).toHaveTextContent("1");
+    fireEvent.click(chip);
+    await waitFor(() =>
+      expect(listTickets).toHaveBeenCalledWith(expect.objectContaining({ channel: ["phone"] })),
+    );
   });
 
   it("pins overdue / due-soon tickets above the list, nearest deadline first", async () => {

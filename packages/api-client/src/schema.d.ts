@@ -13316,6 +13316,8 @@ export interface components {
         TicketFacetChannels: {
             /** Email */
             email: number;
+            /** Phone */
+            phone: number;
             /** Telegram */
             telegram: number;
             /** Webchat */
@@ -28271,8 +28273,8 @@ export interface operations {
                 unassigned?: boolean | null;
                 /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
                 escalating_within?: number | null;
-                /** @description Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them. */
-                channel?: ("email" | "telegram" | "webchat")[] | null;
+                /** @description Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them. */
+                channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
                 offset?: number;
                 limit?: number;
                 /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
@@ -28399,8 +28401,8 @@ export interface operations {
                 unassigned?: boolean | null;
                 /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
                 escalating_within?: number | null;
-                /** @description Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them. */
-                channel?: ("email" | "telegram" | "webchat")[] | null;
+                /** @description Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them. */
+                channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
                 /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
@@ -28459,8 +28461,8 @@ export interface operations {
                 unassigned?: boolean | null;
                 /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
                 escalating_within?: number | null;
-                /** @description Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them. */
-                channel?: ("email" | "telegram" | "webchat")[] | null;
+                /** @description Repeatable; any of: email (no message on a chat channel, not opened by a phone call), telegram, webchat, phone (first article on the Phone channel and no chat message). Several values match tickets of any of them. */
+                channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
                 /** @description Also count archived tickets (admins only; ignored otherwise). */
                 include_archived?: boolean;
             };

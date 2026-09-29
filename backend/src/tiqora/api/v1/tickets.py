@@ -326,10 +326,11 @@ _ESCALATING_WITHIN_DESC = (
     "Seconds: any escalation_* epoch set and due before now + this window"
     " (already-overdue tickets included)."
 )
-ListChannel = Literal["email", "telegram", "webchat"]
+ListChannel = Literal["email", "telegram", "webchat", "phone"]
 _CHANNEL_DESC = (
-    "Repeatable; any of: email (no message on a chat channel), telegram, webchat."
-    " Several values match tickets of any of them."
+    "Repeatable; any of: email (no message on a chat channel, not opened by a"
+    " phone call), telegram, webchat, phone (first article on the Phone channel"
+    " and no chat message). Several values match tickets of any of them."
 )
 # Annotated form: a list default via ``= Query(...)`` trips B008.
 ChannelQuery = Annotated[list[ListChannel] | None, Query(description=_CHANNEL_DESC)]
@@ -464,6 +465,7 @@ class TicketFacetChannels(BaseModel):
     email: int
     telegram: int
     webchat: int
+    phone: int
 
 
 class TicketFacets(BaseModel):

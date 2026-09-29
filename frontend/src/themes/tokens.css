@@ -44,6 +44,7 @@
      the edge otherwise shows. */
   --color-channel-telegram: #0e9fb4;
   --color-channel-webchat: #c2508a;
+  --color-channel-phone: #6d8f2f;
 
   /* Aliases kept for existing component usage */
   --color-surface-elevated: var(--color-surface);
@@ -96,6 +97,7 @@
   --color-danger: #f26d6d;
   --color-channel-telegram: #2fd0e0;
   --color-channel-webchat: #e07ab0;
+  --color-channel-phone: #a3c95a;
 
   --color-surface-elevated: var(--color-surface);
   --color-border: var(--color-hairline);

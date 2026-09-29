@@ -383,6 +383,15 @@ export function PaperPlaneIcon(props: IconProps) {
   );
 }
 
+/** Telephone handset — the phone channel / phone calls. */
+export function PhoneIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
+    </Icon>
+  );
+}
+
 /** Speech bubble with lines — a web chat. */
 export function ChatBubbleIcon(props: IconProps) {
   return (

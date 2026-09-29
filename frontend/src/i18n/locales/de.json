@@ -318,7 +318,8 @@
       "label": "Kanal",
       "email": "E-Mail",
       "telegram": "Telegram",
-      "webchat": "Webchat"
+      "webchat": "Webchat",
+      "phone": "Telefon"
     }
   },
   "ticket": {
