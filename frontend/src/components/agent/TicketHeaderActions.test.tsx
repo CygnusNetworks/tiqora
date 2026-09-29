@@ -20,6 +20,8 @@ const {
   listReferenceAgents,
   ticketAclFieldOptions,
   getTicketCustomerLink,
+  getCustomer,
+  phoneConfig,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
@@ -33,7 +35,21 @@ const {
   listReferenceAgents: vi.fn(),
   ticketAclFieldOptions: vi.fn(),
   getTicketCustomerLink: vi.fn(),
+  getCustomer: vi.fn(),
+  phoneConfig: vi.fn(),
 }));
+
+vi.mock("@/lib/phoneApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/phoneApi")>("@/lib/phoneApi");
+  return {
+    ...actual,
+    phoneApi: {
+      phoneConfig,
+      screenDynamicFields: vi.fn().mockResolvedValue([]),
+      logPhoneCall: vi.fn(),
+    },
+  };
+});
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -52,6 +68,7 @@ vi.mock("@/lib/api", async () => {
       listReferenceAgents,
       ticketAclFieldOptions,
       getTicketCustomerLink,
+      getCustomer,
       listTemplates: vi.fn().mockResolvedValue([]),
       // Queried by the header's @ / ⏱ counters.
       listTicketMentions: vi.fn().mockResolvedValue([]),
@@ -477,5 +494,46 @@ describe("TicketHeaderActions", () => {
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
     const link = await screen.findByTestId("ticket-customer-external-link");
     expect(link).toHaveTextContent(/Customer data|Kundendaten/);
+  });
+
+  it("offers inbound/outbound calls and dials the customer's numbers", async () => {
+    getCustomer.mockResolvedValue({
+      login: "bob",
+      email: "bob@example.com",
+      customer_id: "C-9",
+      first_name: "Bob",
+      last_name: "B",
+      phone: "+49 228 555-0101",
+      mobile: "0171 1234567",
+    });
+    phoneConfig.mockResolvedValue({ dial_scheme: "sip" });
+    wrap(
+      <TicketHeaderActions
+        ticket={makeTicket({ customer_email: "bob@example.com" })}
+        canNote
+        onOpenNote={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("ticket-actions-phone"));
+    expect(await screen.findByTestId("phone-menu-inbound")).toBeInTheDocument();
+    const dial = await screen.findByTestId("phone-dial-mobile");
+    expect(dial).toHaveAttribute("href", "sip:01711234567");
+    expect(screen.getByTestId("phone-dial-phone")).toHaveAttribute("href", "sip:+492285550101");
+
+    fireEvent.click(screen.getByTestId("phone-menu-inbound"));
+    expect(await screen.findByTestId("phone-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("phone-direction-inbound")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("hides the call button without write permission", async () => {
+    wrap(
+      <TicketHeaderActions
+        ticket={makeTicket({ permissions: { ...ALL_PERMS, rw: false } })}
+        canNote
+        onOpenNote={vi.fn()}
+      />,
+    );
+    await screen.findByTestId("ticket-actions-reply");
+    expect(screen.queryByTestId("ticket-actions-phone")).toBeNull();
   });
 });

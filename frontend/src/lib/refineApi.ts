@@ -31,9 +31,15 @@ export type RefineTarget =
   | { ticket_id: number }
   | { queue_id: number; customer_user_id?: string | null };
 
+/** `message` polishes a reply; `call_note` structures phone-call notes into
+ * Anliegen / Vereinbart / Nächste Schritte (headings in `language`). */
+export type RefineMode = "message" | "call_note";
+
 export type RefineRequest = RefineTarget & {
   tone: RefineTone;
   segments: Segment[];
+  mode?: RefineMode;
+  language?: string | null;
 };
 
 export type RefineSection = { id: number; text: string };
