@@ -145,8 +145,13 @@ surface.
 
 ## 3. Recommended integration patterns
 
-These are architectural patterns for future agents to follow — none of them
-are implemented in this codebase.
+These are architectural patterns for **external** agents built against the
+webhook + MCP surface above. Tiqora's built-in AI (section 5) covers the same
+ground in-process, with its own guards: the triage pattern as **AI triage**
+(queue routing + forwarded-mail customer fix, see "AI triage" in §5), the
+draft-reply and KB-answer patterns as Manual Assist / auto-reply. The
+patterns below remain the recommended shape for an agent that runs outside
+Tiqora.
 
 ### Triage agent
 
@@ -306,11 +311,33 @@ cooldown, in which case the full list is tried anyway rather than failing
 outright).
 
 **PII masking** is a pipeline step, not an afterthought: when a queue policy has
-`pii_masking` on, article bodies (and extracted attachment text) are run through
-a masker (`tiqora.ai.pii`, regex + optional spaCy NER for names) that replaces
-emails, phone numbers, IPs, IDs and detected names with stable placeholders
-**before** anything is sent to the LLM, then un-masked on the way back for
-storage/display. `never_mask` protects the ticket's own customer identifiers.
+`pii_masking` on (the default), the text sent to the LLM is run through a
+`tiqora.ai.pii.PiiMapper` — one instance per run, so a value keeps the same
+placeholder across the whole tool loop — and placeholders are un-masked again
+before a tool call reaches the real MCP/domain layer and before a draft,
+summary or refined text is stored or sent. What it masks, in this order:
+
+| Token | Matches | Deliberately *not* masked |
+|---|---|---|
+| `[EMAIL_n]` | e-mail addresses | — |
+| `[MAC_n]` | MAC addresses (`aa:bb:…` / `aa-bb-…`) | — |
+| `[IPV6_n]` | IPv6 addresses | clock times (`07:53:55`, `…T14:36:36Z`) that fit the IPv6 group shape |
+| `[IPV4_n]` | dotted IPv4 addresses | — |
+| `[PHONE_n]` | digit runs of 8+ characters (≥ 7 digits) with spaces/dots/dashes/slashes/parens, optional `+` | dates (`23.07.2026`, `2026-07-23`); bare digit runs directly after a JSON key (counters/ids in tool results); bare 6-, 9- or 10-digit identifiers without leading zero (PKZ / WP-Nummer) unless a `+`/paren or a phone label (`Tel:`, `Mobil`, `Fax`, …) says otherwise |
+| `[NAME_n]` | only names the caller supplies: the ticket customer's first/last name, display names from article `From:` headers (not from Tiqora's own system addresses, not generic placeholder names), plus — when `pii_ner_enabled` is also on (default) — person names spaCy NER (de + en) finds in the raw article/attachment text | any name nobody supplied; there is no heuristic name detection |
+
+Masking covers article subject + body, extracted attachment text, and — when
+`pii_masking` is on — KB and MCP tool results fed back to the model.
+`never_mask` (`tiqora.ai.context.pii_never_mask`) keeps the ticket's
+`customer_id`, `customer_user_id` and ticket number readable, since MCP tools
+need them verbatim. Images cannot be masked (see "Attachments"). This is
+defence in depth, not a complete PII filter: free-text data without one of
+these shapes (street addresses, account numbers of other lengths, a name no
+source knew about) goes to the provider as written, so provider choice
+(`eu_hosted`, contract terms) remains the primary control. The run's
+placeholder → value map is stored **encrypted** on the audit entry
+(`pii_map_enc`, `TIQORA_SECRET_KEY`) and only decrypted on an explicit reveal
+(see "Audit log").
 
 ### Readiness-Gate
 
@@ -335,6 +362,15 @@ double up with: Znuny never sees a Telegram message in the first place, so
 the double-answer risk the `parallel`/`tiqora_primary` distinction exists to
 prevent doesn't apply. See [parallel-operation.md](parallel-operation.md)
 §Feature-flag daemon takeover.
+
+**AI triage is gated too**, for a related reason: a Tiqora-side queue move is
+invisible to Znuny's queue-driven automation (escalation times,
+autoresponders, GenericAgent jobs), so in `parallel` operation the two
+systems would disagree on where a ticket lives. Enabling `enabled_triage` on
+a policy requires `tiqora_primary` (`_enforce_gate_on_enable`, 409 otherwise;
+the admin editor locks the switch), and the triage tick only processes events
+while `is_tiqora_primary` holds. Unlike auto-reply there is no Telegram
+exemption, and the `ai.auto_reply.paused` kill-switch does not stop triage.
 
 Manual Assist (drafts) and Summaries are **not** gated (v1.1 relaxation —
 they were originally gated too, but neither writes anything Sync-relevant):
@@ -439,6 +475,14 @@ The stamp is cleared, and automation resumes, exactly when a human has taken
 the ticket over: an agent sends a customer-visible reply, or the ticket moves
 to `closed`/`merged`/`removed` (`domain.ticket_write_service`).
 
+**Manual resume.** When an agent decides the ticket can go back to the AI
+*without* writing a customer-visible reply (e.g. after fixing the KB entry or
+prompt that caused a bad escalation), the escalation banner in the ticket's
+AI panel offers a resume button: `POST /api/v1/tickets/{id}/ai/resume`
+(requires `note` on the ticket's queue) clears `ai_escalated_at` and writes
+an internal note ("AI-Automatisierung reaktiviert") as the audit trail
+(`resume_ai_automation`).
+
 Note what this does **not** cover: `escalate_to_human` is the model's own
 judgement. The deterministic counterpart is `escalation_rules` on the queue
 policy, which stops autonomous sending when an MCP tool result matches a
@@ -516,6 +560,136 @@ Everything the agent does is visible without opening the admin audit:
 | Article list (split view **and** timeline) | Non-interactive 🤖 marker (`AiOriginMarker`) on the same articles — a list row is itself clickable and selects the article, so a button inside it would fire both actions, and the trace only renders in the reader anyway. Its tooltip is deliberately shorter for the same reason: promising "click to see the tool trace" on something that does not respond to a click would be a lie. |
 | Ticket list | `TicketListItem.ai_reply_source` — how the most recent AI-written article on that ticket got sent: `auto` (the agent sent it itself) or `manual_accept` (a human accepted a draft). One field rather than two booleans, since the question is "how was this last handled". Read through a bulk join per page, with the same missing-table tolerance as the other AI lookups, so a Znuny-only deployment still gets its list. |
 | Ticket list + dashboard | `ai_escalated` filter/count — the tickets where the agent handed off to a human and stopped (see "Handing off to a human"). |
+| AI panel banners (ticket header) | Escalation banner with a **resume** button (see "Manual resume"), and the **AI triage suggestion** banner with *Apply* / *Dismiss* (see "AI triage"). Both only render when they apply, and their buttons are disabled without `note` permission. |
+
+### AI triage
+
+Routes a brand-new ticket into the right queue, and fixes the customer when
+the first mail is a forward (`tiqora.ai.triage`, `tiqora.ai.triage_worker`).
+It is decided **once per ticket, on its first article**, and produces two
+independent proposals, each with its own confidence (int 0–100):
+
+- **Queue.** The model gets the subject, `From:` and body (first 3,000 + last
+  1,000 chars) plus the allowlisted target queues, each described by *its own*
+  policy's `routing_description` (falling back to `queue.comments`, then the
+  bare name — the admin editor warns about targets without a description).
+  It answers via a forced `route_ticket` tool call with an opaque key
+  (`q_<id>`) or `none`; the source queue's own `routing_description` is shown
+  under `none`, so staying put is argued for as concretely as moving. Any
+  key outside the offered set counts as invention.
+- **Customer (forwarded mail).** Purely deterministic, never the model:
+  `extract_forwarded_sender` looks for a forward marker (`-----Original
+  Message-----`, `-----Ursprüngliche Nachricht-----`, `Begin forwarded
+  message:`, `---------- Forwarded message ---------`, `Weitergeleitete
+  Nachricht` variants), reads the first `From:`/`Von:`/`Absender:`
+  line in the 15 lines after it, and takes the outermost forward's sender
+  (confidence 100, or 70 when several forwards were found). The forwarder's
+  own address and the current customer are excluded. The address must
+  resolve to **exactly one** valid `customer_user` (by `email`, then
+  `login`); otherwise the address is recorded on the row but nothing is
+  proposed.
+
+**Confidence** comes from self-consistency voting: the model is sampled
+`triage_samples` times (default 3, 1–5; temperature 0.7, or 0.2 for a single
+sample) and the result is `min(agreement, median self-reported confidence)`,
+where agreement is the winner's share of **all** samples — invalid or
+invented keys still count against the denominator. This is not a
+probability: a misleading `routing_description` produces unanimous votes for
+the wrong queue. It is meant to be thresholded once real accept/reject data
+exists (see stats below). The ticket's current queue is never proposed.
+
+**When it runs.** Inside `tiqora-ai-worker`, on every tick while
+`daemon.ai_worker.enabled` is on, **before** the auto-reply tick, so an
+auto-applied move commits first and the reply agent then answers under the
+*destination* queue's policy in the same tick. It consumes `ArticleCreate`
+events from `tiqora_event_outbox` with its own watermark
+(`daemon.ai_worker.triage_watermark`, seeded from the current max outbox id on
+first run — never replays history), drains the batch even outside
+`tiqora_primary` but only processes events in `tiqora_primary` (see
+"Readiness-Gate"). The auto-reply tick never overtakes the triage watermark.
+Per event it skips (cheapest check first) unless: the article is
+customer-authored and not `auto_generated`; the ticket's queue has a valid
+policy with `enabled_triage`, a `service_user_id` and a provider; the article
+is the ticket's first (`MIN(article.id)`) and no later article exists; the
+ticket has no `tiqora_ai_triage` row yet, no `Move` history, is unlocked, was
+created by the system/postmaster user (an agent-created ticket is a human
+routing decision), is not AI-escalated and is at most 24 h old; the sender
+is not in `ignored_senders`; the provider's cost budget is not exhausted; and
+at least one target queue remains. Masking uses the queue's `pii_masking`
+(regex + known names, but **no** spaCy NER — too expensive per new ticket);
+queue descriptions are admin config and never masked. Every LLM call is
+audited (feature `triage`) and metered in `tiqora_ai_usage` (feature
+`triage`), and triage tokens count against the queue's `budget_tokens_day`.
+
+**Outcome.** One `tiqora_ai_triage` row per ticket (`UNIQUE(ticket_id)`),
+written for every processed ticket — it is both the "already triaged" guard
+and the calibration record:
+
+| Status | Meaning |
+|---|---|
+| `applied` | the worker applied everything open itself |
+| `open` | a proposal waits for an agent (queue confidence ≥ `triage_suggest_threshold` but < `triage_auto_threshold`, or a customer fix below its auto threshold) |
+| `accepted` / `rejected` | an agent decided in the ticket UI |
+| `no_action` | nothing reached the suggest threshold |
+| `error` | no usable model response; the row is only the guard |
+
+- Queue confidence ≥ `triage_auto_threshold` → moved automatically.
+- Customer confidence ≥ `triage_customer_fix_auto_threshold` (and
+  `triage_customer_fix_enabled`) → customer changed automatically.
+
+Both auto thresholds default to **100**, i.e. "suggest only" on a fresh
+install. The automatic path acts as the policy's `service_user_id` with the
+permission-free mutators: the admin's `triage_target_queue_ids` allowlist
+*is* the authorization. Apply-time guards re-check everything against the
+live ticket: the address must occur verbatim in the article body and still
+resolve to exactly one customer; a queue move is skipped if the ticket is no
+longer in the source queue (someone else moved it meanwhile). Customer is
+applied before queue. Anything applied is recorded in an internal
+"KI-Triage" note (old → new, confidence, votes, reason, run id), marked as
+AI-origin so the reply agent does not read it back as context.
+
+While a row is `open`, auto-reply **defers** customer articles on that
+ticket instead of answering under the source queue's policy; the deferred
+article is answered once the row is accepted or rejected (unless an agent
+has written to the customer since). If the *destination* queue sets
+`triage_delay_reply`, a triage move (automatic or accepted) parks the reply
+agent until the customer writes again — the opening mail then gets no AI
+answer at all.
+
+**Configuration** (per source-queue policy, *Triage* tab of the queue policy
+editor):
+
+| Field | Default | Notes |
+|---|---|---|
+| `enabled_triage` | off | Requires `tiqora_primary`, a `service_user_id`, a provider and at least one target. |
+| `routing_description` | — | What belongs in **this** queue; shown to other queues' runs and under "stay" in this queue's run. Set it on every target. |
+| `triage_target_queue_ids` | — | JSON array of queue ids this queue may route into; validated at save (real, valid, not the queue itself). |
+| `triage_suggest_threshold` / `triage_auto_threshold` | 50 / 100 | 0–100; suggest must not exceed auto. |
+| `triage_samples` | 3 | 1–5; every sample is one LLM call per new ticket. |
+| `triage_customer_fix_enabled` / `triage_customer_fix_auto_threshold` | off / 100 | With the fix disabled no customer proposal is shown or accepted. |
+| `triage_delay_reply` | off | Read on the **destination** queue. |
+| `triage_llm_provider_id` / `triage_model_override` | — | Optional cheaper model; falls back to `llm_provider_id` / `model_override` (and `llm_fallback_json`). |
+
+**In the ticket UI**, an `open` row appears as the "AI triage suggestion"
+banner in the AI panel (`GET /api/v1/tickets/{id}/ai` → `triage`, only the
+halves still actionable): "Move to *queue* (confidence n%)" with the model's
+reason, and/or "Sender of the forwarded mail: *address* (*name*)". *Apply*
+calls `POST /api/v1/tickets/{id}/ai/triage/{triage_id}/accept`
+(body `{"queue": bool, "customer": bool}`, both default `true`) and runs with
+the **agent's own permissions** — a 403 means the agent may not move into
+that queue even though the worker could have. *Dismiss* calls
+`…/reject` (optional `{"note": "…"}`). Both require `note` on the ticket's
+queue and are idempotent (a row that is no longer `open` returns 204 without
+effect).
+
+**Admin review and calibration**: `GET /api/v1/admin/ai/triage`
+(`?status_filter=open|applied|accepted|rejected|no_action|error`,
+`&source_queue_id=`, `&limit=` ≤ 500; newest first) lists the rows,
+`GET /api/v1/admin/ai/triage/stats` reports per source queue and 10-point
+confidence bucket how many rows were accepted, rejected, applied or are still
+open, with `accept_rate = (accepted + applied) / (accepted + rejected +
+applied)` (`null` while nothing was decided). Set `triage_auto_threshold` to
+the lowest bucket whose accept rate you are willing to live with.
 
 ### Summaries
 
@@ -531,6 +705,78 @@ least one new article. The auto-worker separately decides *when* to call
 summarization at all, once `summary_article_threshold` or
 `summary_char_threshold` is exceeded (`NULL` = no auto-summary for that
 queue).
+
+**Custom summaries** (`POST /api/v1/tickets/{id}/ai/summarize/custom`,
+body `{"instruction": "…"}`, 1–2,000 chars): a summary of the whole ticket
+along the agent's own instruction (e.g. "for the housing office, with a
+timeline"). Same `note` permission, `enabled_summary` and ACL gates,
+attachment context and PII masking as the regular summary — the instruction
+itself goes through the same `PiiMapper`, so a name the agent types maps to
+the placeholder the model sees. The result is **returned only, never
+stored**; the ticket's regular summary is untouched. Saved instructions in
+the AI panel are a per-browser preference (`localStorage`), not server state.
+
+### Text refine
+
+`POST /api/v1/ai/refine` (`tiqora.ai.refine`) polishes text the agent typed
+into the reply dialog or the New-ticket form — spelling, grammar, style,
+optionally a `tone` (`standard`, `formal`, `friendly`, `concise`). A plain
+completion: no tools, nothing written to the ticket or persisted anywhere;
+the agent still has to press Send. The request addresses the policy with
+exactly one of `ticket_id` (reply; the ticket's own queue is used and `note`
+is required) or `queue_id` (New-ticket form; `create` is required, optional
+`customer_user_id` for name masking). The composer body is sent as
+`segments` of `kind: "own" | "quote"` (60,000 chars total at most): quotes
+travel into the prompt as read-only context but are never rewritten and
+never returned — only `own` sections come back, keyed by their index, and
+the client reassembles the body around the original quote bytes. All own
+sections are refined in one call; if the answer does not cover exactly the
+requested sections, each is retried alone within a 45 s budget, and the
+result is all sections or none. Gated by the queue's `enabled_refine` (409
+`refine_disabled`) and the per-agent ACL/limits for feature `refine`
+(403/429); PII masking follows `pii_masking` / `pii_ner_enabled`. Not
+Readiness-Gate gated. `GET /api/v1/ai/refine/availability?ticket_id=|queue_id=`
+tells the composer whether to show the button at all (`{"available": bool}`,
+never an error).
+
+### Per-queue prompt parts
+
+Besides the policy's `system_prompt`, each queue policy can carry ordered,
+individually switchable prompt fragments ("Prompt-Bausteine",
+`tiqora_ai_prompt_part`, `kind` `file` or `note` — metadata only, both are
+rendered the same). The reply agent (auto-reply and Manual Assist) appends
+every **enabled** part's `content`, in `position` order, after the system
+prompt and the fixed runtime instructions; summaries, refine and triage do
+not use them. Managed in the queue policy editor via
+`/api/v1/admin/ai/queues/{policy_id}/prompt-parts` (`GET`, `POST` appends at
+the end, `PUT /{part_id}` for `title`/`content`/`enabled`, `DELETE
+/{part_id}`, `PUT /reorder` with `{"ordered_ids": [...]}`). Note the path
+parameter is the **policy** id, not the queue id.
+
+### Escalation-rule tester
+
+`POST /api/v1/admin/ai/escalation-test` with `{"rules_json": "[…]", "tool":
+"<full tool name>", "sample_json": "{…}"}` dry-runs a policy's
+`escalation_rules` against a sample raw tool result, using the same
+validation and matching as the runtime guard (`tiqora.ai.escalation`). It
+reads and writes nothing; the response is `{"valid", "error", "hit"}`, with
+`hit` naming the matching rule index, tool, field, match mode and value (or
+`null`). The queue policy editor embeds it next to the rules field.
+
+### Usage and pricing
+
+Every summary, auto-reply, manual-assist, refine and triage run is
+recorded in `tiqora_ai_usage` (queue, ticket, user, provider, model,
+prompt/completion tokens, success/error). `cost_hint` is computed at record
+time from the provider's `price_input_per_1m` / `price_output_per_1m`
+(`tokens × price / 1e6` per side; a missing side counts as 0 only if the
+other is set, both unset = `null`, "no pricing configured", not "free"), in
+the provider's `price_currency`. Changing a price therefore does not
+re-price past rows. The same `cost_hint` sums drive the provider cost budget
+(see "Cost budget per provider"). `GET /api/v1/admin/ai/usage` lists rows
+with `queue_id`, `feature`, `from`, `to`, `page`, `page_size` (≤ 500)
+filters and returns total prompt/completion tokens for the filter; the admin
+AI queue page shows it.
 
 ### Attachments
 
@@ -606,13 +852,27 @@ default (`ai.disclosure.default_text`).
 
 ### Audit log
 
-Every LLM call (drafts, summaries, auto-reply, and the vision pre-pass) is
-written to `tiqora_ai_audit_log` and browsable at **`/admin/ai/audit`** — with
+Every LLM call (drafts, summaries, auto-reply, refine, triage, provider
+tests, and the vision pre-pass) is written to `tiqora_ai_audit_log` and browsable at **`/admin/ai/audit`** — with
 the rendered prompt/response and a PII-inspection view so an operator can see
 exactly what left the building (and that masking worked) without digging through
 provider logs. Retention is trimmed by the `ai_audit_cleanup` daemon task. The
 per-request HTTP timeout for a chat completion is `TIQORA_LLM_TIMEOUT` (default
 `180.0` s) — raise it if long detailed summaries surface `LlmTimeoutError`.
+
+#### Revealing masked PII
+
+When masking was active for a request, the audit entry stores the run's
+placeholder → original map encrypted (`pii_map_enc`, `TIQORA_SECRET_KEY`)
+plus per-kind counts; the detail view shows only the placeholders until an
+admin explicitly reveals them. `POST
+/api/v1/admin/ai/audit/{entry_id}/reveal-pii` decrypts the map and returns
+`{"mapping": {"[EMAIL_1]": "…", …}}`; the drawer then shows the original
+value in place of each token. Every reveal is logged
+(`ai_audit_pii_reveal` structlog event with the admin's user id) and, where
+the table is reachable, recorded in the GDPR audit (`tiqora_gdpr_audit`,
+action `ai_audit_pii_reveal`). An entry without a stored map, or one whose
+map no longer decrypts (e.g. rotated secret key), returns **409**.
 
 #### PDF export
 
@@ -621,7 +881,7 @@ Any single audit entry can be exported to a PDF from its detail drawer
 table and role-coloured message blocks (system / user / response), laid out to
 match the on-screen view. The export follows the drawer's **PII toggle**:
 
-- **Masked (default):** placeholder tokens (`[PERSON_1]`, `[EMAIL_1]`, …) are
+- **Masked (default):** placeholder tokens (`[NAME_1]`, `[EMAIL_1]`, …) are
   kept exactly as they were sent to the provider, and the PDF carries a grey
   “PII masked” badge. This is the safe artefact to hand to auditors or attach to
   a ticket.
