@@ -168,6 +168,21 @@ def parse_email(raw: bytes) -> ParsedEmail:
                 plain_body = _decode_part_text(part)
             elif content_type == "text/html" and html_body is None:
                 html_body = _decode_part_text(part)
+    elif msg.get_content_maintype() not in ("text", "multipart") or (
+        (msg.get_content_disposition() or "").lower() == "attachment" and msg.get_filename()
+    ):
+        # Single-part non-text mail (e.g. an undecryptable S/MIME smime.p7m or
+        # a bare PDF): keep it as an attachment, like Znuny's EmailParser,
+        # instead of decoding binary data into the body.
+        decoded = msg.get_payload(decode=True)
+        attachments.append(
+            ParsedAttachment(
+                filename=msg.get_filename() or "unnamed",
+                content_type=msg.get_content_type(),
+                content=decoded if isinstance(decoded, bytes) else b"",
+                disposition="attachment",
+            )
+        )
     else:
         content_type = msg.get_content_type()
         if content_type == "text/html":

@@ -46,6 +46,7 @@ export {
   type ArticleCreateResponse,
   type ReplyDraftOut,
   type AiOriginOut,
+  type ArticleSecurity,
   type TemplateOut,
   type MutationRequest,
   type MergeRequest,

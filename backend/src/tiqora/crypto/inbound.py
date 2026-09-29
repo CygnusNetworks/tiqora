@@ -1,158 +1,85 @@
-"""Inbound crypto: best-effort PGP/S/MIME decrypt+verify for postmaster mail.
+"""Inbound crypto for postmaster mail: decrypt + verify via the MIME-tree walk.
 
 Wired into the postmaster pipeline (:mod:`tiqora.channels.email.pipeline`)
-right after ``parse_email(raw)``. Gated by ``TIQORA_CRYPTO_PGP_ENABLED`` /
-``TIQORA_CRYPTO_SMIME_ENABLED`` (both OFF by default) — when disabled this
-is a no-op. A decrypt/verify failure never blocks delivery: the article is
-still created with whatever body was parsed, and the failure is recorded as
-the crypto status (mirrors Znuny's ``ArticleCheck::PGP``/``::SMIME``, which
-annotate rather than reject).
+before the article is built. A no-op unless PGP or S/MIME is enabled
+(SysConfig ``PGP``/``SMIME`` or ``TIQORA_CRYPTO_*_ENABLED``). A
+decrypt/verify failure never blocks delivery: the article is still created
+from whatever could be parsed and the failure is recorded as its security
+status (Znuny's ``ArticleCheck::PGP``/``::SMIME`` annotate rather than
+reject).
 
-Scope note (simplification vs Znuny): this operates on the inline PGP block
-(``-----BEGIN PGP MESSAGE-----...``) found in the raw message, and on the
-raw message as a whole for S/MIME (``openssl smime`` parses the MIME
-structure itself) — not a full MIME-tree walk that decrypts/verifies
-individual ``multipart/encrypted`` or ``multipart/signed`` sub-parts while
-preserving attachments. Good enough for the common "PGP/Inline in the body"
-and "S/MIME as the whole message" cases; see docs/crypto.md.
+The heavy lifting — PGP/MIME, inline PGP, S/MIME detached/opaque/enveloped,
+nesting, trust — lives in :mod:`tiqora.crypto.mime_walk`. This module adds
+the pipeline-facing view: the decrypted body and attachments to store *in
+clear* on the article (Znuny does the same via ``ArticleUpdate`` on first
+view; Tiqora does it once at ingest) and the security summary for the
+``TiqoraCrypto*`` article flags.
 """
 
 from __future__ import annotations
 
 import asyncio
-import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from tiqora.channels.email.parser import ParsedAttachment, parse_email
 from tiqora.config import Settings
-from tiqora.crypto import CryptoError, CryptoUnavailableError
 from tiqora.crypto.config import CryptoConfig
-from tiqora.crypto.pgp import PgpEngine
-from tiqora.crypto.smime import SmimeEngine
+from tiqora.crypto.mime_walk import SecurityResult, walk_message
 
-_PGP_MESSAGE_RE = re.compile(rb"-----BEGIN PGP MESSAGE-----.*?-----END PGP MESSAGE-----", re.DOTALL)
-_PGP_SIGNED_RE = re.compile(
-    rb"-----BEGIN PGP SIGNED MESSAGE-----.*?-----END PGP SIGNATURE-----", re.DOTALL
-)
-_SMIME_CONTENT_TYPE_RE = re.compile(
-    rb"^Content-Type:\s*application/(?:x-)?pkcs7-mime", re.IGNORECASE | re.MULTILINE
-)
+#: Subjects mail clients put on the outside when the real one is protected.
+_PLACEHOLDER_SUBJECTS = {"", "...", "…", "encrypted message", "[...]"}
 
 
-@dataclass(frozen=True)
-class CryptoInboundResult:
-    method: str  # "pgp" | "smime"
-    # "decrypted_verified" | "decrypted_unverified" | "verified" | "verify_failed"
-    # | "decrypt_failed" | "unavailable" | "error"
-    status: str
-    detail: str
+@dataclass
+class InboundCryptoOutcome:
+    """What the pipeline applies to the parsed mail.
 
-    @property
-    def article_flag_value(self) -> str:
-        """Value stored in the ``TiqoraCryptoVerify`` article_flag row."""
-        return f"{self.method}:{self.status}"
-
-
-def _find_pgp_block(raw: bytes) -> tuple[bytes, bool] | None:
-    """Return (block, is_encrypted) for the first PGP block found, if any."""
-    m = _PGP_MESSAGE_RE.search(raw)
-    if m:
-        return m.group(0), True
-    m = _PGP_SIGNED_RE.search(raw)
-    if m:
-        return m.group(0), False
-    return None
-
-
-def _process_pgp(raw: bytes, config: CryptoConfig) -> tuple[str | None, CryptoInboundResult]:
-    found = _find_pgp_block(raw)
-    if found is None:
-        return None, CryptoInboundResult("pgp", "not_present", "no PGP block found")
-    block, is_encrypted = found
-    try:
-        engine = PgpEngine.from_config(config.pgp)
-    except CryptoUnavailableError as exc:
-        return None, CryptoInboundResult("pgp", "unavailable", str(exc))
-    try:
-        if is_encrypted:
-            result = engine.decrypt(block)
-            if not result.ok:
-                return None, CryptoInboundResult("pgp", "decrypt_failed", result.status)
-            status = (
-                "decrypted_verified"
-                if result.verify is not None and result.verify.valid
-                else "decrypted_unverified"
-            )
-            return result.plaintext.decode("utf-8", "replace"), CryptoInboundResult(
-                "pgp", status, result.status
-            )
-        verify = engine.verify(block)
-        status = "verified" if verify.valid else "verify_failed"
-        return None, CryptoInboundResult("pgp", status, verify.status)
-    except CryptoError as exc:
-        return None, CryptoInboundResult("pgp", "error", str(exc))
-
-
-def _process_smime(raw: bytes, config: CryptoConfig) -> tuple[str | None, CryptoInboundResult]:
-    """Verify-only: signature check on a signed S/MIME message.
-
-    Simplification: encrypted (``-encrypt``) S/MIME inbound decrypt is not
-    wired up at the postmaster level — it would need the *receiving* mail
-    account's own private key resolved from :class:`~tiqora.crypto.keystore.
-    SmimeKeyStore` by recipient address, which the pipeline does not thread
-    through to this call (B2 of the crypto parity work).
+    ``body``/``content_type``/``attachments`` are ``None`` when the mail
+    content is unchanged (only signature-checked in place, or nothing could
+    be decrypted).
     """
-    if not _SMIME_CONTENT_TYPE_RE.search(raw):
-        return None, CryptoInboundResult("smime", "not_present", "no pkcs7-mime content-type")
-    engine = SmimeEngine(openssl_bin=config.smime.openssl_bin)
-    try:
-        ca_path = config.smime.ca_path or None
-        verify = engine.verify(raw, ca_path=ca_path)
-        # "verified" ONLY when the chain was validated against a trust root;
-        # a valid-but-untrusted (self-signed) signature is "signed_untrusted"
-        # so agents don't see a spoofable trust badge (M4).
-        if verify.chain_trusted:
-            status = "verified"
-        elif verify.valid:
-            status = "signed_untrusted"
-        else:
-            status = "verify_failed"
-        return None, CryptoInboundResult("smime", status, verify.detail)
-    except (CryptoError, CryptoUnavailableError) as exc:
-        return None, CryptoInboundResult("smime", "error", str(exc))
+
+    security: SecurityResult
+    body: str | None = None
+    content_type: str | None = None
+    attachments: list[ParsedAttachment] | None = field(default=None)
+    protected_subject: str | None = None
+
+    def subject_for(self, outer_subject: str) -> str:
+        """Outer subject, or the protected one when the outer is a placeholder."""
+        if self.protected_subject and outer_subject.strip().lower() in _PLACEHOLDER_SUBJECTS:
+            return self.protected_subject
+        return outer_subject
 
 
-def process_inbound_crypto_sync(
-    raw: bytes, settings: Settings, config: CryptoConfig | None = None
-) -> tuple[str | None, CryptoInboundResult | None]:
-    """Synchronous core (shells out to gpg/openssl) — see :func:`process_inbound_crypto`
-    for the async wrapper used by the (async) postmaster pipeline.
-
-    Returns ``(body_override, result)``. ``body_override`` is the decrypted
-    plaintext to use as the article body (``None`` = keep the parsed body
-    unchanged). ``result`` is ``None`` when both PGP and S/MIME are disabled
-    or neither method was detected in the message.
-    """
-    cfg = config or CryptoConfig.from_settings(settings)
-    if cfg.pgp.enabled:
-        body, result = _process_pgp(raw, cfg)
-        if result.status != "not_present":
-            return body, result
-    if cfg.smime.enabled:
-        body, result = _process_smime(raw, cfg)
-        if result.status != "not_present":
-            return body, result
-    return None, None
+def process_inbound_crypto_sync(raw: bytes, config: CryptoConfig) -> InboundCryptoOutcome | None:
+    """Blocking core (gpg/openssl subprocesses). ``None`` = no crypto found / disabled."""
+    outcome = walk_message(raw, config)
+    if outcome.security is None:
+        return None
+    result = InboundCryptoOutcome(
+        security=outcome.security, protected_subject=outcome.protected_subject
+    )
+    if outcome.content is not None:
+        inner = parse_email(outcome.content)
+        result.body = inner.body
+        result.content_type = inner.content_type
+        result.attachments = inner.attachments
+    return result
 
 
 async def process_inbound_crypto(
     raw: bytes, settings: Settings, config: CryptoConfig | None = None
-) -> tuple[str | None, CryptoInboundResult | None]:
-    """Async wrapper: runs the blocking gpg/openssl subprocess calls in a thread.
+) -> InboundCryptoOutcome | None:
+    """Async wrapper: runs the walk in a worker thread.
 
-    *config* is the SysConfig-resolved crypto config (``PGP``/``SMIME``
-    switches and paths); without it the env-only view of *settings* applies.
+    *config* is the SysConfig-resolved crypto config; without it the env-only
+    view of *settings* applies.
     """
     cfg = config or CryptoConfig.from_settings(settings)
     if not cfg.pgp.enabled and not cfg.smime.enabled:
-        return None, None
-    return await asyncio.to_thread(process_inbound_crypto_sync, raw, settings, cfg)
+        return None
+    return await asyncio.to_thread(process_inbound_crypto_sync, raw, cfg)
+
+
+__all__ = ["InboundCryptoOutcome", "process_inbound_crypto", "process_inbound_crypto_sync"]

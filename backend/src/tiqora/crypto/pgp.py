@@ -15,8 +15,10 @@ short primary id, long or short subkey id — case-insensitively.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
+import tempfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -382,16 +384,11 @@ class PgpEngine:
             if result.ok:
                 break
         assert result is not None
-        verify = None
-        if result.fingerprint:
-            verify = PgpVerifyStatus(
-                valid=bool(result.valid),
-                fingerprint=result.fingerprint,
-                username=result.username,
-                status=result.status or "",
-                key_id=getattr(result, "key_id", None),
-                trust_level=getattr(result, "trust_level", None),
-            )
+        # A signature inside the payload shows up as a signer fingerprint —
+        # also for an unknown signer (ERRSIG), which python-gnupg reports only
+        # in ``problems``. Unsigned payloads carry the *encryption* key id in
+        # ``key_id`` but no fingerprint.
+        verify = _verify_status(result) if result.fingerprint else None
         return PgpDecryptResult(
             ok=bool(result.ok),
             plaintext=bytes(result.data),
@@ -401,12 +398,43 @@ class PgpEngine:
 
     def verify(self, data: bytes) -> PgpVerifyStatus:
         """Verify a clear-signed or inline-signed message (no decryption)."""
-        result = self._gpg().verify(data)
-        return PgpVerifyStatus(
-            valid=bool(result.valid),
-            fingerprint=result.fingerprint,
-            username=result.username,
-            status=result.status or "",
-            key_id=getattr(result, "key_id", None),
-            trust_level=getattr(result, "trust_level", None),
-        )
+        return _verify_status(self._gpg().verify(data))
+
+    def verify_detached(self, data: bytes, signature: bytes) -> PgpVerifyStatus:
+        """Verify a detached signature (PGP/MIME ``multipart/signed``, RFC 3156).
+
+        *data* must be the exact signed bytes (the first body part, CRLF
+        line endings); gpg reads the signature from a temp file.
+        """
+        gpg = self._gpg()
+        fd, sig_path = tempfile.mkstemp(prefix="tiqora-sig-", suffix=".asc")
+        try:
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(signature)
+            return _verify_status(gpg.verify_data(sig_path, data))
+        finally:
+            with contextlib.suppress(OSError):
+                os.unlink(sig_path)
+
+
+def _verify_status(result: Any) -> PgpVerifyStatus:
+    """Normalise a python-gnupg verify/decrypt result.
+
+    ``status`` is python-gnupg's text, except that an unknown signer (gpg
+    ``ERRSIG`` + ``NO_PUBKEY``, which python-gnupg only lists in
+    ``problems`` after a decrypt) is reported as ``"no public key"``.
+    """
+    status = str(getattr(result, "status", "") or "")
+    problems = [str(p.get("status", "")) for p in getattr(result, "problems", None) or []]
+    if not result.valid and "no public key" in problems:
+        status = "no public key"
+    elif not result.valid and problems and status in ("", "decryption ok"):
+        status = problems[0]
+    return PgpVerifyStatus(
+        valid=bool(result.valid),
+        fingerprint=result.fingerprint,
+        username=result.username,
+        status=status,
+        key_id=getattr(result, "key_id", None),
+        trust_level=getattr(result, "trust_level", None),
+    )
