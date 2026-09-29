@@ -820,6 +820,36 @@
         "snippetsEmptyBody": "Textbausteine sind Antwortvorlagen vom Typ „Chat“, die der Queue des Tickets zugeordnet sind.",
         "snippetsEmptyLink": "Vorlagen verwalten"
       }
+    },
+    "security": {
+      "title": "Signatur und Verschlüsselung",
+      "method": "Verfahren",
+      "layers": "Schutz",
+      "signed": "signiert",
+      "encrypted": "verschlüsselt",
+      "signer": "Signiert von",
+      "keyId": "Schlüssel-ID",
+      "detail": "Detail",
+      "short": {
+        "verified": "Signiert",
+        "decrypted": "Verschlüsselt",
+        "signed_untrusted": "Nicht vertrauenswürdig",
+        "unknown_key": "Unbekannter Schlüssel",
+        "verify_failed": "Signatur ungültig",
+        "decrypt_failed": "Nicht entschlüsselt",
+        "unavailable": "Nicht geprüft",
+        "error": "Krypto-Fehler"
+      },
+      "status": {
+        "verified": "Signatur geprüft – der Absender ist vertrauenswürdig.",
+        "decrypted": "Die Nachricht war verschlüsselt und wurde entschlüsselt.",
+        "signed_untrusted": "Die Signatur ist gültig, aber der Signierende ist nicht vertrauenswürdig (unbekannte CA, abgelaufener oder widerrufener Schlüssel oder Signierender und Absender stimmen nicht überein).",
+        "unknown_key": "Mit einem Schlüssel signiert, der nicht im Schlüsselspeicher liegt – die Signatur konnte nicht geprüft werden.",
+        "verify_failed": "Die Signatur passt nicht zur Nachricht – sie wurde möglicherweise verändert.",
+        "decrypt_failed": "Die Nachricht ist verschlüsselt, konnte aber nicht entschlüsselt werden (kein passender privater Schlüssel).",
+        "unavailable": "Signatur/Verschlüsselung konnte nicht geprüft werden: gpg oder openssl ist nicht verfügbar.",
+        "error": "Die Prüfung von Signatur oder Verschlüsselung ist fehlgeschlagen."
+      }
     }
   },
   "search": {
