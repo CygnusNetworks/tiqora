@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -9,7 +9,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ExternalLinkIcon, MoreIcon, UserIcon } from "@/components/ui/icons";
+import { ExternalLinkIcon, MoreIcon, PhoneIcon, UserIcon } from "@/components/ui/icons";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip } from "@/components/ui/StatusChip";
@@ -28,6 +28,14 @@ import { ticketPerms, usePatchTicket } from "@/lib/ticket";
 import { stateColorVar } from "@/lib/status";
 import type { TicketAiSlots } from "./AiPanel";
 import { TicketBackNav } from "./TicketBackNav";
+import { PhoneCallDialog } from "./phone/PhoneCallDialog";
+import { phoneApi, type PhoneDirection } from "@/lib/phoneApi";
+import {
+  consumePhoneCallRequest,
+  dialHref,
+  peekPhoneCallRequest,
+  type PhoneCallRequestIntent,
+} from "@/lib/phoneCall";
 
 /**
  * Ticket-zoom header ("3b"). Rows:
@@ -184,6 +192,29 @@ export function TicketHeaderActions({
   // independent trigger surface for the same dialogs.
   const [dialog, setDialog] = useState<"customer" | "pending" | "link" | "merge" | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
+  // Phone-call dialog: opened from the "Anruf" menu, by click-to-call, or by
+  // a request left for this ticket before navigating here (caller lookup).
+  const [phoneCall, setPhoneCall] = useState<PhoneCallRequestIntent | null>(() =>
+    peekPhoneCallRequest(ticketId),
+  );
+  useEffect(() => consumePhoneCallRequest(ticketId), [ticketId]);
+  const customerQ = useQuery({
+    queryKey: ["customers", ticket.customer_user_id],
+    queryFn: () => api.getCustomer(ticket.customer_user_id as string),
+    enabled: customerResolved && perms.rw,
+  });
+  const phoneConfigQ = useQuery({
+    queryKey: ["reference", "phone-config"],
+    queryFn: () => phoneApi.phoneConfig(),
+    enabled: perms.rw,
+    staleTime: 10 * 60 * 1000,
+  });
+  const customerNumbers = [
+    { kind: "phone" as const, number: customerQ.data?.phone },
+    { kind: "mobile" as const, number: customerQ.data?.mobile },
+  ].filter((n): n is { kind: "phone" | "mobile"; number: string } => Boolean(n.number?.trim()));
+  const openPhoneCall = (direction: PhoneDirection, number?: string) =>
+    setPhoneCall({ direction, number: number ?? null });
   // Only badge the header button when the draft belongs to the article this
   // button actually opens — a draft on some other article is advertised by
   // the placeholder in the article view, not here.
@@ -261,6 +292,49 @@ export function TicketHeaderActions({
               ＋ {t("ticket.addNote")}
             </Button>
           </span>
+          {perms.rw && (
+            <Menu
+              align="right"
+              panelTestId="ticket-actions-phone-menu"
+              trigger={({ ref, toggleProps }) => (
+                <button
+                  ref={ref}
+                  type="button"
+                  data-testid="ticket-actions-phone"
+                  {...toggleProps}
+                  className="inline-flex items-center gap-1 rounded border border-hairline bg-surface px-2 py-1 text-xs text-ink transition-colors duration-100 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                >
+                  <PhoneIcon className="h-3.5 w-3.5" /> {t("phone.button")} ⌄
+                </button>
+              )}
+            >
+              <MenuLabel>{t("phone.menuLabel")}</MenuLabel>
+              <MenuItem testId="phone-menu-inbound" onSelect={() => openPhoneCall("inbound")}>
+                ↙ {t("phone.inbound")}
+              </MenuItem>
+              <MenuItem testId="phone-menu-outbound" onSelect={() => openPhoneCall("outbound")}>
+                ↗ {t("phone.outbound")}
+              </MenuItem>
+              {customerNumbers.length > 0 && (
+                <>
+                  <MenuSeparator />
+                  <MenuLabel>{t("phone.callCustomer")}</MenuLabel>
+                  {customerNumbers.map((n) => (
+                    <a
+                      key={n.kind}
+                      href={dialHref(n.number, phoneConfigQ.data?.dial_scheme)}
+                      data-testid={`phone-dial-${n.kind}`}
+                      onClick={() => openPhoneCall("outbound", n.number)}
+                      className="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-ink hover:bg-surface-subtle"
+                    >
+                      <span className="text-xs text-muted">{t(`phone.${n.kind}Label`)}</span>
+                      <span className="font-mono text-[12.5px]">{n.number}</span>
+                    </a>
+                  ))}
+                </>
+              )}
+            </Menu>
+          )}
           <Menu
             align="right"
             panelTestId="ticket-actions-more-menu"
@@ -581,6 +655,14 @@ export function TicketHeaderActions({
           open={replyOpen}
           onClose={() => setReplyOpen(false)}
           channelName={channelNameOf(replyTarget)}
+        />
+      )}
+      {phoneCall && (
+        <PhoneCallDialog
+          ticket={ticket}
+          initialDirection={phoneCall.direction}
+          callerNumber={phoneCall.number}
+          onClose={() => setPhoneCall(null)}
         />
       )}
       {ai?.overlays}
