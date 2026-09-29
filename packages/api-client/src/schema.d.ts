@@ -106,6 +106,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Preferences */
+        get: operations["get_preferences_api_portal_preferences_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/preferences/language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Language */
+        put: operations["set_language_api_portal_preferences_language_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/preferences/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Password
+         * @description Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.
+         */
+        post: operations["change_password_api_portal_preferences_password_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/preferences/pgp-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Pgp Key */
+        post: operations["upload_pgp_key_api_portal_preferences_pgp_key_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/preferences/smime-certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Smime Certificate */
+        post: operations["upload_smime_certificate_api_portal_preferences_smime_certificate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/process/": {
         parameters: {
             query?: never;
@@ -4544,6 +4632,97 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/crypto-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Crypto Keys */
+        get: operations["get_customer_crypto_keys_api_v1_customers__login__crypto_keys_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/crypto-keys/pgp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Customer Pgp Key
+         * @description Import the customer's public key (Znuny customer preference ``PGP``).
+         */
+        post: operations["upload_customer_pgp_key_api_v1_customers__login__crypto_keys_pgp_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/crypto-keys/pgp/{key_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Customer Pgp Key */
+        delete: operations["delete_customer_pgp_key_api_v1_customers__login__crypto_keys_pgp__key_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/crypto-keys/smime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Customer Smime Certificate
+         * @description Store the customer's certificate (Znuny customer preference ``SMIME``).
+         */
+        post: operations["upload_customer_smime_certificate_api_v1_customers__login__crypto_keys_smime_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/crypto-keys/smime/{filename}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Customer Smime Certificate */
+        delete: operations["delete_customer_smime_certificate_api_v1_customers__login__crypto_keys_smime__filename__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -9419,6 +9598,31 @@ export interface components {
             /** Login */
             login: string;
         };
+        /**
+         * CustomerCryptoKeysOut
+         * @description A customer's keys in the shared stores + the Znuny preferences pointing at them.
+         */
+        CustomerCryptoKeysOut: {
+            /**
+             * Can Edit
+             * @default false
+             */
+            can_edit: boolean;
+            /** Pgp Enabled */
+            pgp_enabled: boolean;
+            /** Pgp Key Id */
+            pgp_key_id?: string | null;
+            /** Pgp Keys */
+            pgp_keys?: components["schemas"]["PgpKeyOut"][];
+            /** Problems */
+            problems?: string[];
+            /** Smime Certificates */
+            smime_certificates?: components["schemas"]["SmimeCertOut"][];
+            /** Smime Enabled */
+            smime_enabled: boolean;
+            /** Smime Filename */
+            smime_filename?: string | null;
+        };
         /** CustomerLoginResponse */
         CustomerLoginResponse: {
             customer: components["schemas"]["CustomerMe"];
@@ -9438,6 +9642,11 @@ export interface components {
             /** Login */
             login: string;
         };
+        /** CustomerPgpKeyIn */
+        CustomerPgpKeyIn: {
+            /** Ascii Armor */
+            ascii_armor: string;
+        };
         /** CustomerRefOut */
         CustomerRefOut: {
             /** Customer Id */
@@ -9455,6 +9664,11 @@ export interface components {
             companies: components["schemas"]["CustomerCompanyRefOut"][];
             /** Contacts */
             contacts: components["schemas"]["CustomerContactRefOut"][];
+        };
+        /** CustomerSmimeCertificateIn */
+        CustomerSmimeCertificateIn: {
+            /** Certificate */
+            certificate: string;
         };
         /** CustomerUserAdminCreate */
         CustomerUserAdminCreate: {
@@ -12013,6 +12227,32 @@ export interface components {
             article_id: number;
             /** Attachment Ids */
             attachment_ids: number[];
+        };
+        /** PortalLanguageIn */
+        PortalLanguageIn: {
+            /** Language */
+            language: string;
+        };
+        /** PortalPasswordIn */
+        PortalPasswordIn: {
+            /** Current Password */
+            current_password: string;
+            /** New Password */
+            new_password: string;
+        };
+        /** PortalPreferencesOut */
+        PortalPreferencesOut: {
+            keys: components["schemas"]["CustomerCryptoKeysOut"];
+            /** Language */
+            language?: string | null;
+            /** Language Enabled */
+            language_enabled: boolean;
+            /** Password Enabled */
+            password_enabled: boolean;
+            /** Pgp Enabled */
+            pgp_enabled: boolean;
+            /** Smime Enabled */
+            smime_enabled: boolean;
         };
         /** PortalReplyRequest */
         PortalReplyRequest: {
@@ -14768,6 +15008,175 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KbSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_preferences_api_portal_preferences_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalPreferencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_language_api_portal_preferences_language_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalLanguageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalPreferencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_password_api_portal_preferences_password_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortalPasswordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_pgp_key_api_portal_preferences_pgp_key_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerPgpKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalPreferencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_smime_certificate_api_portal_preferences_smime_certificate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerSmimeCertificateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalPreferencesOut"];
                 };
             };
             /** @description Validation Error */
@@ -27437,6 +27846,191 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerUserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_crypto_keys_api_v1_customers__login__crypto_keys_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCryptoKeysOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_customer_pgp_key_api_v1_customers__login__crypto_keys_pgp_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerPgpKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCryptoKeysOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_pgp_key_api_v1_customers__login__crypto_keys_pgp__key_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+                key_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCryptoKeysOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_customer_smime_certificate_api_v1_customers__login__crypto_keys_smime_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerSmimeCertificateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCryptoKeysOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_smime_certificate_api_v1_customers__login__crypto_keys_smime__filename__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+                filename: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCryptoKeysOut"];
                 };
             };
             /** @description Validation Error */
