@@ -14,9 +14,9 @@ Docker image).
 Status of the parity work
 ([design](superpowers/specs/2026-09-29-crypto-parity-design.md)): B1
 (foundation + key management), B2 (inbound MIME-tree handling, article
-security status, decrypt-on-view), B3 (signed/encrypted sending) and of B4
-the customer keys and `SMIME::FetchFromCustomer` are done.
-Signed/encrypted notifications (rest of B4) follow.
+security status, decrypt-on-view), B3 (signed/encrypted sending) and B4
+(customer keys, `SMIME::FetchFromCustomer`, signed/encrypted event
+notifications) are done.
 
 ## Configuration
 
@@ -446,6 +446,70 @@ both disabled.
   (clear-signed / armored), S/MIME as the signed/encrypted MIME entity.
   Best effort — a disabled backend or failure leaves the body as it is.
 
+## Notifications: signed and encrypted event notifications
+
+Port of Znuny's `Transport::Email::SecurityOptionsGet`
+(`tiqora.crypto.notification`, applied in `worker.notifications`). The
+configuration is the notification's `notification_event_item` rows exactly
+as Znuny's *AdminNotificationEvent* writes them, so Znuny and Tiqora read
+one setting:
+
+| `event_key` | Values |
+|---|---|
+| `EmailSecuritySettings` | `1` = "Enable email security" (no row = off) |
+| `EmailSigningCrypting` | `PGPSign`, `PGPCrypt`, `PGPSignCrypt`, `SMIMESign`, `SMIMECrypt`, `SMIMESignCrypt` (no row = none) |
+| `EmailMissingSigningKeys` | `Skip` (skip notification delivery) or `Send` (send unsigned) |
+| `EmailMissingCryptingKeys` | `Skip` or `Send` (send unencrypted) |
+
+Per notification **and recipient** (every notification mail has one `To`):
+
+1. Nothing happens unless the checkbox row is set **and** a level is chosen.
+2. The level's backend must be enabled and working; otherwise the
+   notification is **not sent** (Znuny: `No PGP support!` and `return`) —
+   logged as `notification_security` at error level.
+3. Sign key: the valid (PGP `good` with secret part / S/MIME private key with
+   an unexpired certificate) keys of the notification's `From` address. For
+   **customer** notifications the queue's `default_sign_key` wins when it is
+   one of them (Znuny's `PGP::Detached::<id>`, `SMIME::Detached::<file>` or
+   the legacy two-part form; a default of the other backend does not match);
+   otherwise the first key. Agent notifications have no queue in Znuny, so
+   only the first sender key counts.
+4. Encryption: the recipient's first valid key/certificate (CA certificates
+   excluded).
+5. Missing key: `Skip` drops the notification (`notification_security`,
+   "…, skipping notification distribution!", counter
+   `tiqora_notifications_security_skipped_total`); any other value — also no
+   row — sends it unsigned / unencrypted with a log line ("…, sending
+   unsigned!"). A sign+encrypt notification can thus go out signed only or
+   encrypted only; with nothing left it is sent plain.
+6. PGP method: PGP/MIME (detached); `PGP::Method` (`Inline`) only when
+   `Frontend::RichText` is off — Znuny reads it only then. S/MIME is always
+   detached; signer-relation CAs are included.
+
+The mail is built with the same `mime_build` as agent replies (outer
+headers, exact bytes on the wire, `notification_secured` log line). A
+gpg/openssl failure while building counts as a failed recipient and nothing
+is sent. Customer notifications keep the clear text in the article, the
+sent raw mail in `article_data_mime_plain` and `TiqoraCrypto*` flags (badge
+in the ticket view), as for replies.
+
+Differences from Znuny: keys are matched on the exact email address of a
+key/certificate (Znuny runs a gpg/openssl substring search, where
+`support@x` also finds `mysupport@x`); and the `From` Tiqora sends
+notifications with (`notification.sender_email` → `NotificationSenderEmail`
+→ queue address, for agents *and* customers — see
+[parallel-operation](parallel-operation.md#notification-templates-and-public-links))
+is the address keys are searched for, where Znuny uses the queue's system
+address for customer notifications. Configure a sign key for that address.
+
+**Admin UI**: *Notification events* → **Email security** per notification:
+checkbox, level (only the levels of enabled backends, like Znuny; a stored
+level of a disabled backend stays selectable and is flagged because the
+notification is then not sent at all), the two missing-key policies. The
+admin API (`POST`/`PATCH /api/v1/admin/notification-events`, generic
+`items`) refuses values Znuny cannot produce with 422 — any policy other
+than `Skip` would otherwise silently send unencrypted in both systems.
+
 ## Tests
 
 All crypto tests run against real `gpg`/`openssl` and skip when the binary is
@@ -500,11 +564,24 @@ limited to ~104 bytes on macOS).
   backends; portal preferences (language, keys, password change).
 - `test_crypto_inbound_articles.py` — the fetch pre-step runs before inbound
   crypto and only when enabled.
+- `test_crypto_notification_security.py` — notification key choice
+  (Znuny `SecurityOptionsGet`): item parsing, queue default sign key vs
+  first sender key, missing-key `Skip`/`Send`/no policy, disabled backend,
+  S/MIME files, PGP method without rich text, admin value validation.
+- `test_crypto_notifications.py` (`db`) — `process_event` with Znuny-style
+  item rows and a recording sender, read back with the recipient's keys:
+  customer notification PGP sign+encrypt (article clear, raw mail, flags),
+  agent notification S/MIME sign+encrypt, `Skip` sends nothing, `Send`
+  goes out signed only, checkbox off = plain; admin API rows and 422.
+- Frontend: `PgpKeysPage.test.tsx`, `SmimePage.test.tsx`,
+  `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`,
+  `ArticleSecurityBadge.test.tsx`, `EmailSecurityControl.test.tsx`,
+  `NotificationEventsPage.test.tsx`.
 - Frontend: `PgpKeysPage.test.tsx`, `SmimePage.test.tsx`,
   `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`,
   `ArticleSecurityBadge.test.tsx`, `EmailSecurityControl.test.tsx`,
   `CustomerDetailPage.test.tsx`, `CustomerUsersPage.test.tsx`, portal
-  `PreferencesPage.test.tsx`.
+  `PreferencesPage.test.tsx`, `NotificationEventsPage.test.tsx`.
 
 Fixtures (`tests/_smime_fixtures.py`) build throwaway CA and leaf
 certificates with `cryptography`; `tests/_crypto_mail_fixtures.py` builds

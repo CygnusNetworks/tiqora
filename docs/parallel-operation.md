@@ -525,6 +525,16 @@ is sent twice.
    recipient, with a `SendAgentNotification`/`SendCustomerNotification`
    history row.
 
+### Signed/encrypted notifications
+
+A notification's *Email security* settings (`EmailSecuritySettings`,
+`EmailSigningCrypting`, `EmailMissingSigningKeys`,
+`EmailMissingCryptingKeys` in `notification_event_item`) are honoured like
+Znuny's `SecurityOptionsGet`, with the shared key stores — including
+`Skip` (no mail) and a disabled PGP/S-MIME backend (no mail at all). Keys are
+looked up for the `From` Tiqora sends with, so the notification sender
+address needs its own sign key. Details: [crypto.md](crypto.md#notifications-signed-and-encrypted-event-notifications).
+
 ### Notification templates and public links
 
 Set `TIQORA_PUBLIC_BASE_URL` to the public Tiqora browser URL on **both the
