@@ -39,6 +39,8 @@ import {
   savePhoneDraft,
   timerFromCall,
 } from "@/lib/phoneCall";
+import { EmailSecurityControl } from "@/components/agent/EmailSecurityControl";
+import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
@@ -319,7 +321,18 @@ export function NewTicketPage() {
     !attachments.encoding &&
     (!pendingSelected || pendingIso(phoneFields.pendingAt) !== null);
 
+  // PGP / S/MIME for the email (separate component; nothing shown when off).
+  const emailSecurity = useEmailSecurity({
+    ticketId: null,
+    queueId: queue === "" ? null : queue,
+    to: joinRecipients(to),
+    cc: joinRecipients(cc),
+    bcc: joinRecipients(bcc),
+    enabled: ticketType === "email",
+  });
+
   const canSubmit =
+    (ticketType === "phone" || emailSecurity.blocked === null) &&
     formUnlocked &&
     queue !== "" &&
     priority !== "" &&
@@ -404,10 +417,15 @@ export function NewTicketPage() {
           to_address: joinRecipients(to),
           cc: joinRecipients(cc),
           bcc: joinRecipients(bcc),
+          email_security: emailSecurity.payload,
         });
       } catch (articleErr) {
         if (!(articleErr instanceof ApiError)) throw articleErr;
-        setError(t("newTicket.sendError"));
+        setError(
+          articleErr.status === 422
+            ? `${t("newTicket.sendError")} ${articleErr.message}`
+            : t("newTicket.sendError"),
+        );
         return;
       }
       await navigate({
@@ -885,6 +903,13 @@ export function NewTicketPage() {
                 </div>
               )}
           </fieldset>
+
+          {ticketType === "email" && (
+            <EmailSecurityControl
+              security={emailSecurity}
+              testId="new-ticket-security"
+            />
+          )}
 
           {error && (
             <p

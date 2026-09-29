@@ -157,7 +157,22 @@ class SmtpMailSender:
             kwargs["oauth_token_generator"] = self._oauth_token_generator
         else:
             kwargs["password"] = self._password
-        recipients, _message_id = await aiosmtplib.send(message, **kwargs)  # type: ignore[arg-type]
+        raw = getattr(message, "tiqora_raw", None)
+        if raw:
+            # Signed/encrypted mail (tiqora.crypto.mime_build): send the exact
+            # bytes — re-serialising the message could re-fold a header or
+            # re-encode a part and break the signature. Bcc is on the object
+            # only (for the envelope), never in the raw bytes.
+            values = [str(v) for f in ("To", "Cc", "Bcc") for v in message.get_all(f, [])]
+            rcpts = kwargs["recipients"] or [a for _n, a in getaddresses(values) if a]
+            kwargs["recipients"] = rcpts
+            if "sender" not in kwargs:
+                kwargs["sender"] = next(
+                    (a for _n, a in getaddresses([str(message.get("From", ""))]) if a), ""
+                )
+            recipients, _message_id = await aiosmtplib.send(raw, **kwargs)  # type: ignore[arg-type]
+        else:
+            recipients, _message_id = await aiosmtplib.send(message, **kwargs)  # type: ignore[arg-type]
         # aiosmtplib returns dict[recipient, SMTPResponse]; pick first for log.
         self.last_smtp_code = None
         self.last_smtp_detail = None

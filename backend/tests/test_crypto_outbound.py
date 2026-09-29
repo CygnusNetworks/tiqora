@@ -59,6 +59,8 @@ def test_pgp_sign_applies_detached_signature_to_body() -> None:
         settings = Settings(TIQORA_CRYPTO_PGP_ENABLED="1", TIQORA_CRYPTO_PGP_GNUPGHOME=gnupghome)
         result = apply_email_security_sync(article, {"Backend": "PGP", "SignKey": fp}, settings)
         assert "hello world" in result.body
+        # stored as inline PGP: a clear-signed text
+        assert result.body.startswith("-----BEGIN PGP SIGNED MESSAGE-----")
         assert "BEGIN PGP SIGNATURE" in result.body
 
 
@@ -117,7 +119,9 @@ def test_smime_sign_applies_signature_via_znuny_store(by: str) -> None:
             article, {"Backend": "SMIME", "SignKey": sign_key}, settings
         )
         assert "MIME-Version" in result.body
-        assert result.content_type == "application/pkcs7-mime"
+        # The stored body is the signed MIME entity (built by mime_build).
+        assert result.content_type == "multipart/signed"
+        assert 'protocol="application/pkcs7-signature"' in result.body
 
 
 def test_smime_sign_missing_cert_leaves_body_unchanged() -> None:
@@ -135,3 +139,23 @@ def test_smime_sign_missing_cert_leaves_body_unchanged() -> None:
             article, {"Backend": "SMIME", "SignKey": "nobody@example.com"}, settings
         )
         assert result.body == "hello world"
+
+
+def test_email_security_from_znuny_maps_the_gi_hash() -> None:
+    from tiqora.crypto.outbound import email_security_from_znuny
+
+    sec = email_security_from_znuny(
+        {"Backend": "PGP", "Method": "Inline", "SignKey": "81877F5E", "EncryptKeys": ["A", "B"]}
+    )
+    assert sec is not None
+    assert (sec.backend, sec.method, sec.sign_key, sec.encrypt, sec.encrypt_keys) == (
+        "pgp",
+        "inline",
+        "81877F5E",
+        True,
+        ["A", "B"],
+    )
+    smime = email_security_from_znuny({"Backend": "SMIME", "Method": "Inline", "SignKey": "x"})
+    assert smime is not None and smime.method == "detached" and not smime.encrypt
+    assert email_security_from_znuny({"Backend": "ROT13"}) is None
+    assert email_security_from_znuny({}) is None

@@ -7,6 +7,8 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
 
+from tiqora.crypto.compose import EmailSecurityIn
+
 
 def _serialize_as_utc(value: datetime) -> str:
     """Serialize a DB datetime as a UTC-aware ISO string.
@@ -416,6 +418,8 @@ class ForwardRequest(BaseModel):
     subject: str | None = None
     body: str
     note: str | None = None
+    # PGP / S/MIME signing and encryption (see docs/crypto.md).
+    email_security: EmailSecurityIn | None = None
 
 
 class BounceRequest(BaseModel):
