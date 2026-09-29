@@ -205,9 +205,113 @@ a later phone call does not change an e-mail ticket's channel.
     through the same follow-up-or-create logic as SMS/WhatsApp.
   - Logged through `log_phone_call_on_ticket` without the agent permission
     and lock checks (the caller is an integration, not an agent).
-- **Config keys** (`channel.phone.*`): `enabled`, `inbound_shared_secret`,
+- **Config keys** (`channel.phone.*`): `enabled`, `inbound_shared_secret`
+  (both also gate the call-events webhook below),
   `default_customer_user`, `queue_name`, `dial_scheme` (`tel`|`sip`, default
   `tel`; used by click-to-call even while the CTI channel is disabled).
+
+### Incoming-call popup (CTI events)
+
+The PBX reports each call's progress; agents whose extension rings get a
+popup card (bottom right, one per call, stacked) with the caller looked up
+via `/reference/caller` — matching customers and their open tickets in queues
+the agent can read.
+
+- **Endpoint**: `POST /api/v1/channels/phone/events`, same
+  `X-Tiqora-Phone-Secret` / `channel.phone.enabled` gate as `/note` (401 bad
+  secret, 404 channel disabled). Body as JSON **or** form-encoded (same
+  fields — Asterisk's `CURL()` posts form data):
+  `event` (`ringing`|`answered`|`hangup`), `call_id` (PBX-unique, e.g.
+  Asterisk `${UNIQUEID}` of the caller leg), `caller_number`, `extension`
+  (the agent's extension that rings/answered; optional on `hangup`),
+  `direction` (`inbound` default | `outbound`), `timestamp` (ISO 8601 or
+  epoch seconds, naive = UTC; default: time of receipt).
+  Answers `202 {"accepted": true, "delivered_to": n}`; an unknown extension
+  is accepted with `delivered_to: 0` and ignored. Redis unavailable → 503.
+- **Agent ↔ extension**: Znuny user preference `TiqoraPhoneExtension`,
+  several extensions comma separated; one extension may belong to several
+  agents (shared phone). Agents set it under *Settings → Phone*
+  (`GET/PUT /api/v1/auth/me/phone`), admins in the user form
+  (`phone_extension`). Allowed characters: letters, digits, `* # + _ . @ / : -`.
+- **Call state**: one Redis document per call, `tiqora:call:<call_id>`, TTL
+  2 h (number, extension, direction, agents, ringing/answered/ended times).
+  A ring group sends one `ringing` per extension with the same `call_id` —
+  the audience grows; `answered` narrows the call to the answering
+  extension's agents (the others' cards disappear); `hangup` ends it. Late
+  events never reopen an ended call. Nothing is written to the database until
+  the agent logs the call.
+- **Push**: SSE message `{"type": "call_event", "user_ids": [...], "event",
+  "call": {...}}`, forwarded by `/events/stream` only to the listed agents.
+- **Popup**: *ringing* → *Im Gespräch* with a running timer from `answered`
+  → *Anruf beendet – erfassen?* (fixed duration) or *Verpasster Anruf*; an
+  ended call stays up to 15 minutes. Actions: **Zu Ticket erfassen** on one of
+  the caller's open tickets (opens the ticket with `PhoneCallDialog`, same
+  direction, timer counting from the answered time or showing the final
+  duration), **Neues Telefon-Ticket** (phone mode prefilled with number,
+  customer when exactly one matches, and the call times), **Ignorieren**.
+  Acting on or dismissing a card hides it in all the agent's tabs
+  (`POST /api/v1/phone/calls/{call_id}/dismiss`); later events of that call
+  are no longer sent to them. After a reload (or an SSE reconnect) the cards
+  come back from `GET /api/v1/phone/calls/active`.
+
+#### Asterisk example
+
+Pre-dial handler on each ringing agent channel, `U()` gosub on the answering
+channel, hangup handler on the caller channel. `${CHANNEL(endpoint)}` is the
+PJSIP endpoint name — set it to the value agents enter as their extension.
+`CURLOPT(httpheader)` needs a current Asterisk (older releases lack the
+option — then put the secret in a reverse proxy in front of Tiqora); the short
+`conntimeout`/`httptimeout` keep a slow Tiqora from delaying the call.
+
+```ini
+; extensions.conf
+[globals]
+TIQORA_EVENTS=https://tiqora.example.com/api/v1/channels/phone/events
+TIQORA_SECRET=change-me   ; channel.phone.inbound_shared_secret
+
+[tiqora-notify]   ; Gosub(tiqora-notify,s,1(event,extension))
+; httpheader accumulates per channel — add it only once
+exten => s,1,ExecIf($["${TIQORA_HDR}" = ""]?Set(CURLOPT(httpheader)=X-Tiqora-Phone-Secret: ${TIQORA_SECRET}))
+ same => n,Set(TIQORA_HDR=1)
+ same => n,Set(CURLOPT(conntimeout)=2)
+ same => n,Set(CURLOPT(httptimeout)=3)
+ same => n,Set(TIQORA_RES=${CURL(${TIQORA_EVENTS},event=${ARG1}&call_id=${TIQORA_CALL}&caller_number=${URIENCODE(${TIQORA_FROM})}&extension=${URIENCODE(${ARG2})}&timestamp=${EPOCH})})
+ same => n,Return()
+
+[tiqora-ring]     ; pre-dial handler, runs on every called channel
+exten => s,1,Gosub(tiqora-notify,s,1(ringing,${CHANNEL(endpoint)}))
+ same => n,Return()
+
+[tiqora-answer]   ; Dial U() option, runs on the channel that answered
+exten => s,1,Gosub(tiqora-notify,s,1(answered,${CHANNEL(endpoint)}))
+ same => n,Return()
+
+[tiqora-hangup]   ; hangup handler on the caller channel
+exten => s,1,Gosub(tiqora-notify,s,1(hangup,))
+ same => n,Return()
+
+[from-trunk]
+exten => _X.,1,Set(__TIQORA_CALL=${UNIQUEID})       ; __ = inherited by the agent legs
+ same => n,Set(__TIQORA_FROM=${CALLERID(num)})
+ same => n,Set(CHANNEL(hangup_handler_push)=tiqora-hangup,s,1)
+ same => n,Dial(PJSIP/100&PJSIP/101,30,b(tiqora-ring^s^1)U(tiqora-answer))
+ same => n,Hangup()
+```
+
+Outbound calls from a desk phone can be reported the same way with
+`direction=outbound` added to the POST data in a separate notify context.
+
+#### Generic PBX / testing with curl
+
+```sh
+S="X-Tiqora-Phone-Secret: change-me"
+URL="$TIQORA_URL/api/v1/channels/phone/events"
+curl -X POST "$URL" -H "$S" -H 'Content-Type: application/json' \
+  -d '{"event": "ringing", "call_id": "c-4711", "caller_number": "+49 228 5550101", "extension": "100"}'
+curl -X POST "$URL" -H "$S" -d event=answered -d call_id=c-4711 -d extension=100
+curl -X POST "$URL" -H "$S" -d event=hangup -d call_id=c-4711
+# -> 202 {"accepted": true, "delivered_to": 1}
+```
 
 ## Telegram (`channels/telegram/`)
 
