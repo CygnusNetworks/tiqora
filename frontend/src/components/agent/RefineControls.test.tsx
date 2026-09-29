@@ -40,9 +40,11 @@ beforeEach(() => {
 function Harness({
   initial,
   variant,
+  mode,
 }: {
   initial: string;
   variant?: "split" | "toolbar";
+  mode?: "message" | "call_note";
 }) {
   const [body, setBody] = useState(initial);
   return (
@@ -57,16 +59,21 @@ function Harness({
         body={body}
         onChange={setBody}
         variant={variant}
+        mode={mode}
       />
     </>
   );
 }
 
-function renderHarness(initial: string, variant?: "split" | "toolbar") {
+function renderHarness(
+  initial: string,
+  variant?: "split" | "toolbar",
+  mode?: "message" | "call_note",
+) {
   return render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <Harness initial={initial} variant={variant} />
+        <Harness initial={initial} variant={variant} mode={mode} />
       </I18nextProvider>
     </QueryClientProvider>,
   );
@@ -288,5 +295,23 @@ describe("RefineControls toolbar variant", () => {
     await waitFor(() => expect(screen.getByTestId("refine-button")).toBeEnabled());
     expect(screen.getByTestId("refine-help")).toBeInTheDocument();
     expect(screen.queryByText(/Quotes stay unchanged|Zitate bleiben unverändert/)).toBeNull();
+  });
+});
+
+describe("RefineControls call-note mode", () => {
+  it("offers one structure button without tones and sends mode + UI language", async () => {
+    const note = "Anliegen\n- Drucker\nVereinbart\n- Techniker Di\nNächste Schritte\n-";
+    refine.mockResolvedValue({ sections: [{ id: 0, text: note }] });
+    renderHarness("drucker kaputt, techniker di", "toolbar", "call_note");
+
+    await waitFor(() => expect(screen.getByTestId("refine-button")).toBeEnabled());
+    expect(screen.queryByTestId("refine-tone-standard")).toBeNull();
+    fireEvent.click(screen.getByTestId("refine-button"));
+
+    await waitFor(() => expect(body()).toBe(note));
+    const sent = refine.mock.calls[0][0];
+    expect(sent.mode).toBe("call_note");
+    expect(sent.language).toBe(i18n.language);
+    expect(sent.ticket_id).toBe(42);
   });
 });

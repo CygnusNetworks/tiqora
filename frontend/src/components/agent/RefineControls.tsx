@@ -10,6 +10,7 @@ import { applyRefined, ownSections, segmentBody } from "@/lib/replyQuote";
 import {
   REFINE_TONES,
   refineApi,
+  type RefineMode,
   type RefineTarget,
   type RefineTone,
 } from "@/lib/refineApi";
@@ -45,6 +46,7 @@ export function RefineControls({
   disabled,
   testIdPrefix = "refine",
   variant = "split",
+  mode = "message",
 }: {
   /** `{ticket_id}` when replying inside a ticket (the server reads its queue),
    * `{queue_id}` for the New-ticket form, `null` while no queue is picked
@@ -55,8 +57,11 @@ export function RefineControls({
   disabled?: boolean;
   testIdPrefix?: string;
   variant?: "split" | "toolbar";
+  /** `call_note`: one "Notiz aufbereiten" button, no tones — structures
+   * phone-call notes instead of polishing a message. */
+  mode?: RefineMode;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [tone, setTone] = useState<RefineTone>(loadRefineTone);
   /** The body as the agent last typed it, kept so one refine can be undone. */
   const [beforeRefine, setBeforeRefine] = useState<string | null>(null);
@@ -73,7 +78,17 @@ export function RefineControls({
 
   const refineMutation = useMutation({
     mutationFn: () =>
-      refineApi.refine({ ...(target as RefineTarget), tone, segments }),
+      refineApi.refine(
+        mode === "call_note"
+          ? {
+              ...(target as RefineTarget),
+              tone: "standard",
+              segments,
+              mode,
+              language: i18n.language,
+            }
+          : { ...(target as RefineTarget), tone, segments },
+      ),
     onSuccess: (response) => {
       const refined = new Map(response.sections.map((s) => [s.id, s.text]));
       setBeforeRefine(body);
@@ -115,6 +130,26 @@ export function RefineControls({
       {refineErrorMessage(refineMutation.error, t)}
     </span>
   );
+
+  if (mode === "call_note") {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-xs" data-testid={`${testIdPrefix}-toolbar`}>
+        <button
+          type="button"
+          data-testid={`${testIdPrefix}-button`}
+          disabled={!canRefine}
+          title={nothingToRefine ? t("ticket.refine.nothingToRefine") : t("phone.refineNoteHint")}
+          onClick={() => refineMutation.mutate()}
+          className="inline-flex items-center gap-1.5 rounded-md border border-accent/35 bg-accent/10 px-2.5 py-1 font-semibold text-accent transition-colors duration-100 enabled:hover:bg-accent/20 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        >
+          {busy ? <Spinner className="h-3 w-3" /> : <span aria-hidden>✦</span>}
+          {busy ? t("ticket.refine.running") : t("phone.refineNote")}
+        </button>
+        {undoButton}
+        {errorText}
+      </div>
+    );
+  }
 
   if (variant === "toolbar") {
     return (
