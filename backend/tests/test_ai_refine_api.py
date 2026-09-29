@@ -106,3 +106,21 @@ def test_request_defaults_to_the_standard_tone() -> None:
     assert body.tone == "standard"
     assert body.ticket_id is None
     assert body.segments == [AiRefineSegmentIn(kind="own", text="hallo")]
+
+
+def test_request_defaults_to_message_mode() -> None:
+    body = AiRefineIn(queue_id=1, segments=_segments(("own", "x")))
+    assert body.mode == "message"
+    assert body.language is None
+
+
+def test_request_accepts_call_note_mode_with_language() -> None:
+    body = AiRefineIn(
+        ticket_id=1, mode="call_note", language="de", segments=_segments(("own", "x"))
+    )
+    assert (body.mode, body.language) == ("call_note", "de")
+
+
+def test_request_rejects_an_unknown_mode() -> None:
+    with pytest.raises(ValidationError):
+        AiRefineIn(queue_id=1, mode="poem", segments=_segments(("own", "x")))
