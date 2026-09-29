@@ -7955,6 +7955,73 @@
         "title": "CustomerContactRefOut",
         "type": "object"
       },
+      "CustomerCryptoKeysOut": {
+        "description": "A customer's keys in the shared stores + the Znuny preferences pointing at them.",
+        "properties": {
+          "can_edit": {
+            "default": false,
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "pgp_enabled": {
+            "title": "Pgp Enabled",
+            "type": "boolean"
+          },
+          "pgp_key_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pgp Key Id"
+          },
+          "pgp_keys": {
+            "items": {
+              "$ref": "#/components/schemas/PgpKeyOut"
+            },
+            "title": "Pgp Keys",
+            "type": "array"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "smime_certificates": {
+            "items": {
+              "$ref": "#/components/schemas/SmimeCertOut"
+            },
+            "title": "Smime Certificates",
+            "type": "array"
+          },
+          "smime_enabled": {
+            "title": "Smime Enabled",
+            "type": "boolean"
+          },
+          "smime_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Smime Filename"
+          }
+        },
+        "required": [
+          "pgp_enabled",
+          "smime_enabled"
+        ],
+        "title": "CustomerCryptoKeysOut",
+        "type": "object"
+      },
       "CustomerLoginResponse": {
         "properties": {
           "customer": {
@@ -8003,6 +8070,20 @@
           "last_name"
         ],
         "title": "CustomerMe",
+        "type": "object"
+      },
+      "CustomerPgpKeyIn": {
+        "properties": {
+          "ascii_armor": {
+            "minLength": 20,
+            "title": "Ascii Armor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ascii_armor"
+        ],
+        "title": "CustomerPgpKeyIn",
         "type": "object"
       },
       "CustomerRefOut": {
@@ -8055,6 +8136,20 @@
           "contacts"
         ],
         "title": "CustomerSearchOut",
+        "type": "object"
+      },
+      "CustomerSmimeCertificateIn": {
+        "properties": {
+          "certificate": {
+            "minLength": 20,
+            "title": "Certificate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "certificate"
+        ],
+        "title": "CustomerSmimeCertificateIn",
         "type": "object"
       },
       "CustomerUserAdminCreate": {
@@ -15659,6 +15754,86 @@
           "attachment_ids"
         ],
         "title": "PortalAttachmentUploadResponse",
+        "type": "object"
+      },
+      "PortalLanguageIn": {
+        "properties": {
+          "language": {
+            "maxLength": 10,
+            "minLength": 2,
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "PortalLanguageIn",
+        "type": "object"
+      },
+      "PortalPasswordIn": {
+        "properties": {
+          "current_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "PortalPasswordIn",
+        "type": "object"
+      },
+      "PortalPreferencesOut": {
+        "properties": {
+          "keys": {
+            "$ref": "#/components/schemas/CustomerCryptoKeysOut"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "language_enabled": {
+            "title": "Language Enabled",
+            "type": "boolean"
+          },
+          "password_enabled": {
+            "title": "Password Enabled",
+            "type": "boolean"
+          },
+          "pgp_enabled": {
+            "title": "Pgp Enabled",
+            "type": "boolean"
+          },
+          "smime_enabled": {
+            "title": "Smime Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "language_enabled",
+          "password_enabled",
+          "pgp_enabled",
+          "smime_enabled",
+          "keys"
+        ],
+        "title": "PortalPreferencesOut",
         "type": "object"
       },
       "PortalReplyRequest": {
@@ -23751,6 +23926,285 @@
         "summary": "Search",
         "tags": [
           "portal-kb"
+        ]
+      }
+    },
+    "/api/portal/preferences": {
+      "get": {
+        "operationId": "get_preferences_api_portal_preferences_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalPreferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Preferences",
+        "tags": [
+          "portal-preferences"
+        ]
+      }
+    },
+    "/api/portal/preferences/language": {
+      "put": {
+        "operationId": "set_language_api_portal_preferences_language_put",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalLanguageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalPreferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Language",
+        "tags": [
+          "portal-preferences"
+        ]
+      }
+    },
+    "/api/portal/preferences/password": {
+      "post": {
+        "description": "Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.",
+        "operationId": "change_password_api_portal_preferences_password_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalPasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Password",
+        "tags": [
+          "portal-preferences"
+        ]
+      }
+    },
+    "/api/portal/preferences/pgp-key": {
+      "post": {
+        "operationId": "upload_pgp_key_api_portal_preferences_pgp_key_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerPgpKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalPreferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Pgp Key",
+        "tags": [
+          "portal-preferences"
+        ]
+      }
+    },
+    "/api/portal/preferences/smime-certificate": {
+      "post": {
+        "operationId": "upload_smime_certificate_api_portal_preferences_smime_certificate_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerSmimeCertificateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalPreferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Smime Certificate",
+        "tags": [
+          "portal-preferences"
         ]
       }
     },
@@ -51727,6 +52181,416 @@
           }
         },
         "summary": "Get Customer",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{login}/crypto-keys": {
+      "get": {
+        "operationId": "get_customer_crypto_keys_api_v1_customers__login__crypto_keys_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCryptoKeysOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Customer Crypto Keys",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{login}/crypto-keys/pgp": {
+      "post": {
+        "description": "Import the customer's public key (Znuny customer preference ``PGP``).",
+        "operationId": "upload_customer_pgp_key_api_v1_customers__login__crypto_keys_pgp_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerPgpKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCryptoKeysOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Customer Pgp Key",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{login}/crypto-keys/pgp/{key_id}": {
+      "delete": {
+        "operationId": "delete_customer_pgp_key_api_v1_customers__login__crypto_keys_pgp__key_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCryptoKeysOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Customer Pgp Key",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{login}/crypto-keys/smime": {
+      "post": {
+        "description": "Store the customer's certificate (Znuny customer preference ``SMIME``).",
+        "operationId": "upload_customer_smime_certificate_api_v1_customers__login__crypto_keys_smime_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerSmimeCertificateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCryptoKeysOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Customer Smime Certificate",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{login}/crypto-keys/smime/{filename}": {
+      "delete": {
+        "operationId": "delete_customer_smime_certificate_api_v1_customers__login__crypto_keys_smime__filename__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerCryptoKeysOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Customer Smime Certificate",
         "tags": [
           "customers"
         ]
