@@ -201,7 +201,7 @@ continuity off the chat itself (see "Identity / contact mapping").
   `default_customer_user`, `queue_name`, `consent_required`, `consent_text`,
   `consent_confirmed_text`, `start_text`, `tone_prompt`.
 
-### Antworten im Chat
+### Replying in the chat
 
 Agent replies on a Telegram ticket go through a messenger-style chat composer
 in the conversation view (under the contact header in the default
@@ -214,24 +214,86 @@ conversation first.
 
 - **Enter sends, Shift+Enter inserts a newline**; IME composition (e.g.
   Japanese input) is respected.
+- **Split send button** (`telegram/SendMenuButton.tsx`): a plain "Senden"
+  (Enter) always leaves the ticket state as it is; the ▾ menu offers
+  "Senden und warten" (pending, with a date picker, Alt/⌥+Enter) and
+  "Senden und schließen" (closed successfully, Cmd/Ctrl+Enter) for that one
+  message. Without `rw` on the ticket there is no menu, and a state shortcut
+  the agent may not use sends nothing rather than falling back to a plain send.
 - **4096-character limit** — Telegram's own message cap, enforced before send.
-- **`/` snippets**: templates of type "Chat" — typing `/` opens a filtered
-  picker, Tab/Enter inserts the snippet text.
+- **Snippets**: templates of type "Chat" assigned to the ticket's queue —
+  typing `/` opens a filtered picker, Tab/Enter inserts the snippet text. The
+  footer's "/ Textbausteine" button opens the same picker and shows the
+  snippet count; if the queue has no Chat templates the picker says so
+  instead (with a "Manage templates" link to `/admin/templates` for admins).
 - **Attachments** up to 18 MB total via the attach button, drag-drop or
   paste — larger ones are rejected client-side before the request leaves the
   browser.
 - **Quote**: "Zitieren" on a bubble, or "Antworten" on an older article, pre-
   fills `telegram_reply_to_article_id` on the next outgoing message.
-- **Buttons**: an inline keyboard on the outgoing message, including a
-  "Problem gelöst? Ja / Nein" preset — "Ja" closes the ticket via the
-  callback handling described above.
+- **Buttons**: an inline keyboard on the outgoing message, edited in a
+  closable button bar (`telegram/ButtonEditor.tsx`; its toggle sits next to
+  the attach button). Each button has its own × (Backspace in an empty label
+  removes it too); "× Keine Buttons" in the bar's header discards all of them
+  and closes the bar. The "Problem gelöst? Ja / Nein" preset is inserted via a
+  link; its buttons are tagged "schließt"/"öffnet wieder" — "Ja" closes the
+  ticket and "Nein" sets it to open via the callback handling described
+  above. Free-text buttons come back as a normal customer reply.
+- **Removing buttons from a sent message**: "Buttons entfernen" on a bubble
+  whose keyboard nobody has answered yet strips the inline keyboard
+  (`editMessageReplyMarkup`), clears the stored buttons (a late tap from a
+  stale client then resolves to "unknown button") and writes a
+  `%%TelegramButtonsRemoved%%<article_id>` history entry. Once a button was
+  answered, the keyboard is settled and removal is refused (409).
 - **Edit / retract**: agents can edit or retract (`deleteMessage`) their own
   delivered messages inline in the bubble; retract only within Telegram's
   48-hour window (see "Outbound" above).
 - **Typing indicator**: a throttled `sendChatAction("typing")` ping fires
-  while the agent is composing.
+  while the agent is composing (the frontend paces the calls; there is no
+  server-side throttle).
 - **Contact header**: display name/username, identity/consent status and the
   AI hand-over marker sit above the conversation.
+- **"Chats" article filter**: next to All / Emails / Notes, the article list
+  offers "Chats" (Telegram and other conversational channels, which "Emails"
+  never covered), each filter with its count. The "Chats" filter is only shown
+  on tickets that have a chat message.
+
+**Ticket-scoped endpoints** (`api/v1/tickets_telegram.py`, mounted under
+`/api/v1/tickets`). The read requires `ro`; every write requires queue `note`
+permission. They answer 404 when the ticket/article has no Telegram message to
+act on, and 409 when the action conflicts (already retracted, buttons
+already answered, not an agent-sent message) or — for the writes —
+Telegram can't be reached (no bot token, channel gone):
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/{ticket_id}/telegram` | Contact identity, consent, AI escalation and per-article message metadata (editable/retracted, buttons, answered button) |
+| `POST` | `/{ticket_id}/telegram/typing` | Best-effort typing indicator (204) |
+| `PATCH` | `/{ticket_id}/articles/{article_id}/telegram` | Edit a sent agent message's text (`{"body": ...}`, 1–4096 chars; keyboard kept unless already answered) |
+| `POST` | `/{ticket_id}/articles/{article_id}/telegram/retract` | Delete a sent agent message (and its attachment parts) |
+| `DELETE` | `/{ticket_id}/articles/{article_id}/telegram/buttons` | Remove an unanswered inline keyboard |
+
+### Channel in the queue list
+
+`TicketListItem.channel` is `email`, `telegram` or `webchat`: a ticket with a
+message on a conversational channel is that channel (its origin — a later
+e-mail reply does not change it; with several, the earliest wins), everything
+else is `email`. `webchat` maps to Znuny's seeded "Chat" channel, reserved for
+the web chat (`LIST_CHANNELS` in `domain/ticket_service.py`). For Telegram
+chats not linked to a customer user, `chat_display_name` / `chat_username`
+carry the contact's identity, so the row shows e.g. "Kim @kim" instead of the
+channel's shared guest customer.
+
+- **Filter**: `channel` (repeatable, any-of) on `GET /api/v1/tickets`,
+  `/facets` and `/export.csv`; the facets response gains `channels` counts
+  (`email`/`telegram`/`webchat`, computed over every filter except `channel`).
+- **Queue list UI**: a channel pill in the row's meta line, and the row's
+  left edge takes the channel colour for chat tickets (an escalation still
+  wins). "Kanal" chips next to the "Nur" flags filter by channel; they only
+  appear once a chat channel has tickets in the current view (a chat channel
+  without tickets, e.g. web chat, stays hidden), and reset clears them too.
+  Colours come from the theme tokens `--color-channel-telegram` (cyan, kept
+  clearly apart from the open-state blue) and `--color-channel-webchat`.
 
 ### Known limitations
 
@@ -256,6 +318,15 @@ conversation first.
 rejected (422) rather than silently written. `GET` responses mask any key
 whose name contains `secret` or `token` (returned as `********`) — write the
 same key again to rotate it, the old value is never echoed back.
+
+Those secret-shaped values are also **encrypted at rest**: `PUT` stores them
+via `encrypt_channel_secret` (`channels/common.py`, a Fernet token keyed from
+the app's `secret_key`), and `channel_setting()` decrypts any Fernet-looking
+value on read. Plaintext rows written before this (or directly into
+`tiqora_settings`) stay readable without a migration; they are encrypted on
+the next save through the admin API. Sending an empty value or the
+`********` mask leaves the stored secret untouched, so re-saving the form
+does not wipe or re-encrypt it.
 
 ## Uncertainties / simplifications
 
