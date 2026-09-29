@@ -409,6 +409,7 @@ class CustomerUserOut(BaseModel):
     last_name: str
     title: str | None = None
     phone: str | None = None
+    mobile: str | None = None
     company_name: str | None = None
 
 

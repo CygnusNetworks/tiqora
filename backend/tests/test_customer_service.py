@@ -70,6 +70,7 @@ async def test_get_by_login_without_company(mariadb_znuny_url: str) -> None:
                     last_name="Doe",
                     title="Ms.",
                     phone="+1 555 0100",
+                    mobile="+1 555 0199",
                     valid_id=1,
                     create_time=ts,
                     create_by=1,
@@ -88,6 +89,7 @@ async def test_get_by_login_without_company(mariadb_znuny_url: str) -> None:
             assert result.last_name == "Doe"
             assert result.title == "Ms."
             assert result.phone == "+1 555 0100"
+            assert result.mobile == "+1 555 0199"
             assert result.company_name is None
     finally:
         await _cleanup(engine, logins=["jdoe"])

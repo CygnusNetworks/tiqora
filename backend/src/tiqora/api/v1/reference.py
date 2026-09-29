@@ -9,7 +9,7 @@ CRUD under ``/admin/*`` (which is AdminUser-gated), these are guarded only by
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
@@ -129,6 +129,16 @@ class CallerLookupOut(BaseModel):
 class PhoneConfigOut(BaseModel):
     #: Link scheme for click-to-call: ``tel:`` (softphone/OS handler) or ``sip:``.
     dial_scheme: Literal["tel", "sip"]
+
+
+class DynamicFieldDefOut(BaseModel):
+    name: str
+    label: str
+    field_type: str
+    #: Znuny screen config value 2 ("required").
+    required: bool
+    #: Dropdown/Multiselect options ``{key: display value}``, else ``None``.
+    possible_values: dict[str, str] | None
 
 
 class ComposeContextOut(BaseModel):
@@ -383,6 +393,82 @@ async def caller_lookup(
         ],
         open_tickets=tickets,
     )
+
+
+#: Ticket screens whose ``###DynamicField`` config the agent UI reads.
+DynamicFieldScreen = Literal[
+    "AgentTicketPhone", "AgentTicketPhoneInbound", "AgentTicketPhoneOutbound"
+]
+_EDITABLE_DF_TYPES = frozenset(
+    {"Text", "TextArea", "Dropdown", "Multiselect", "Checkbox", "Date", "DateTime"}
+)
+
+
+@router.get("/dynamic-fields", response_model=list[DynamicFieldDefOut])
+async def screen_dynamic_fields(
+    user: CurrentUser,
+    session: DbSession,
+    screen: Annotated[DynamicFieldScreen, Query(description="Znuny frontend module")],
+) -> list[DynamicFieldDefOut]:
+    """Ticket dynamic fields to show on a screen, in field order.
+
+    Reads ``Ticket::Frontend::<screen>###DynamicField`` (1 = shown, 2 =
+    required); when that config enables nothing, every valid, non-internal
+    ticket field of an editable type is offered (optional). Article-level
+    fields are not offered -- the write paths set ticket fields only.
+    """
+    _ = user
+    from tiqora.api.v1.admin.dynamic_fields import config_from_yaml
+    from tiqora.db.legacy.dynamic_field import DynamicField
+
+    raw = await SysConfig(session).get(f"Ticket::Frontend::{screen}###DynamicField", {})
+    configured: dict[str, int] = {}
+    if isinstance(raw, dict):
+        for name, value in raw.items():
+            try:
+                level = int(value)
+            except (TypeError, ValueError):
+                continue
+            if level > 0:
+                configured[str(name)] = level
+
+    rows = (
+        (
+            await session.execute(
+                select(DynamicField)
+                .where(
+                    DynamicField.valid_id == _VALID,
+                    DynamicField.object_type == "Ticket",
+                    DynamicField.internal_field == 0,
+                )
+                .order_by(DynamicField.field_order, DynamicField.name)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    out: list[DynamicFieldDefOut] = []
+    for df in rows:
+        if df.field_type not in _EDITABLE_DF_TYPES:
+            continue
+        if configured and df.name not in configured:
+            continue
+        config = config_from_yaml(df.config)
+        possible = config.get("PossibleValues")
+        out.append(
+            DynamicFieldDefOut(
+                name=df.name,
+                label=df.label or df.name,
+                field_type=df.field_type,
+                required=configured.get(df.name) == 2,
+                possible_values=(
+                    {str(k): str(v) for k, v in possible.items()}
+                    if isinstance(possible, dict)
+                    else None
+                ),
+            )
+        )
+    return out
 
 
 @router.get("/phone-config", response_model=PhoneConfigOut)

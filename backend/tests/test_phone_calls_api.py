@@ -440,3 +440,52 @@ async def test_invalid_direction_is_422(
     async with _client(factory, AGENT_RW) as client:
         resp = await client.post(URL, json=_call(direction="sideways"))
     assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.asyncio
+async def test_phone_screen_dynamic_fields_fall_back_to_all_editable_ticket_fields(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    _seed(url)
+    async with _client(factory, AGENT_RW) as client:
+        resp = await client.get(
+            "/api/v1/reference/dynamic-fields", params={"screen": "AgentTicketPhoneInbound"}
+        )
+    assert resp.status_code == 200, resp.text
+    by_name = {f["name"]: f for f in resp.json()}
+    assert by_name["PhoneCallTopic"] == {
+        "name": "PhoneCallTopic",
+        "label": "Topic",
+        "field_type": "Text",
+        "required": False,
+        "possible_values": None,
+    }
+    # Znuny's internal process-management fields are never offered.
+    assert not any(n.startswith("ProcessManagement") for n in by_name)
+
+
+@pytest.mark.asyncio
+async def test_phone_screen_dynamic_fields_follow_the_screen_config(
+    db: tuple[str, async_sessionmaker[AsyncSession]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.znuny.sysconfig import SysConfig
+
+    url, factory = db
+    _seed(url)
+    original = SysConfig.get
+
+    async def fake_get(self: SysConfig, name: str, default: Any = None) -> Any:
+        if name == "Ticket::Frontend::AgentTicketPhoneOutbound###DynamicField":
+            return {"PhoneCallTopic": "2", "Other": "0"}
+        return await original(self, name, default)
+
+    monkeypatch.setattr(SysConfig, "get", fake_get)
+    async with _client(factory, AGENT_RW) as client:
+        resp = await client.get(
+            "/api/v1/reference/dynamic-fields", params={"screen": "AgentTicketPhoneOutbound"}
+        )
+        bad = await client.get("/api/v1/reference/dynamic-fields", params={"screen": "Nope"})
+    assert resp.status_code == 200, resp.text
+    assert [(f["name"], f["required"]) for f in resp.json()] == [("PhoneCallTopic", True)]
+    assert bad.status_code == 422
