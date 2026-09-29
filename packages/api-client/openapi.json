@@ -19991,6 +19991,33 @@
             "title": "Change Time",
             "type": "string"
           },
+          "channel": {
+            "default": "email",
+            "title": "Channel",
+            "type": "string"
+          },
+          "chat_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Display Name"
+          },
+          "chat_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Username"
+          },
           "create_by": {
             "anyOf": [
               {
@@ -20328,6 +20355,30 @@
         "title": "TicketDetail",
         "type": "object"
       },
+      "TicketFacetChannels": {
+        "description": "Ticket counts per channel chip (every filter except ``channel``).",
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "integer"
+          },
+          "telegram": {
+            "title": "Telegram",
+            "type": "integer"
+          },
+          "webchat": {
+            "title": "Webchat",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "email",
+          "telegram",
+          "webchat"
+        ],
+        "title": "TicketFacetChannels",
+        "type": "object"
+      },
       "TicketFacetFlags": {
         "description": "Ticket counts per flag chip (state filter applied, other flags ignored).",
         "properties": {
@@ -20394,6 +20445,9 @@
       "TicketFacets": {
         "description": "Inbox segment and chip counts for the current ticket-list filters.",
         "properties": {
+          "channels": {
+            "$ref": "#/components/schemas/TicketFacetChannels"
+          },
           "flags": {
             "$ref": "#/components/schemas/TicketFacetFlags"
           },
@@ -20403,7 +20457,8 @@
         },
         "required": [
           "states",
-          "flags"
+          "flags",
+          "channels"
         ],
         "title": "TicketFacets",
         "type": "object"
@@ -20607,6 +20662,33 @@
             "format": "date-time",
             "title": "Change Time",
             "type": "string"
+          },
+          "channel": {
+            "default": "email",
+            "title": "Channel",
+            "type": "string"
+          },
+          "chat_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Display Name"
+          },
+          "chat_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat Username"
           },
           "create_time": {
             "format": "date-time",
@@ -54746,6 +54828,32 @@
             }
           },
           {
+            "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "email",
+                      "telegram",
+                      "webchat"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+              "title": "Channel"
+            }
+          },
+          {
             "in": "query",
             "name": "offset",
             "required": false,
@@ -55222,6 +55330,32 @@
             }
           },
           {
+            "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "email",
+                      "telegram",
+                      "webchat"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+              "title": "Channel"
+            }
+          },
+          {
             "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
             "in": "query",
             "name": "sort",
@@ -55538,6 +55672,32 @@
               ],
               "description": "Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included).",
               "title": "Escalating Within"
+            }
+          },
+          {
+            "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "email",
+                      "telegram",
+                      "webchat"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them.",
+              "title": "Channel"
             }
           },
           {

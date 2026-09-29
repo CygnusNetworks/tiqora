@@ -41,6 +41,10 @@ export default {
         amber: themeColor("--color-amber"),
         red: themeColor("--color-red"),
         purple: themeColor("--color-purple"),
+        channel: {
+          telegram: themeColor("--color-channel-telegram"),
+          webchat: themeColor("--color-channel-webchat"),
+        },
         state: {
           new: themeColor("--color-state-new"),
           open: themeColor("--color-state-open"),

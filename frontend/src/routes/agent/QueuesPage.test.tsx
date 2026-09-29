@@ -80,6 +80,7 @@ function makeTicket(overrides: Partial<TicketListItem> & { id: number }): Ticket
     escalation_solution_time: 0,
     until_time: 0,
     attachment_count: 0,
+    channel: "email",
     has_ai_summary: false,
     ai_escalated: false,
     archive_flag: 0,
@@ -587,6 +588,54 @@ describe("QueuesPage status segments and flag chips", () => {
       expect(search.unassigned).toBeUndefined();
       expect(search.escalated).toBeUndefined();
     });
+  });
+
+  it("channel chips show once a chat channel has tickets, combine, and reset with the flags", async () => {
+    ticketFacets.mockResolvedValue({ ...FACETS, channels: { email: 12, telegram: 3, webchat: 0 } });
+    const router = await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    const telegram = await screen.findByTestId("queue-channel-telegram");
+    expect(telegram).toHaveTextContent("3");
+    // Web chat has no tickets yet — no chip for it.
+    expect(screen.queryByTestId("queue-channel-webchat")).toBeNull();
+
+    fireEvent.click(telegram);
+    await waitFor(() =>
+      expect(listTickets).toHaveBeenCalledWith(expect.objectContaining({ channel: ["telegram"], offset: 0 })),
+    );
+    fireEvent.click(screen.getByTestId("queue-channel-email"));
+    await waitFor(() =>
+      expect(listTickets).toHaveBeenCalledWith(expect.objectContaining({ channel: ["telegram", "email"] })),
+    );
+
+    fireEvent.click(screen.getByTestId("queue-flag-reset"));
+    await waitFor(() => {
+      const search = router.state.location.search as Record<string, unknown>;
+      expect(search.channel).toBeUndefined();
+    });
+  });
+
+  it("shows no channel chips while every ticket is an e-mail", async () => {
+    ticketFacets.mockResolvedValue({ ...FACETS, channels: { email: 16, telegram: 0, webchat: 0 } });
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    await waitFor(() => expect(ticketFacets).toHaveBeenCalled());
+    expect(screen.queryByTestId("queue-channel-chips")).toBeNull();
+  });
+
+  it("shows a Telegram row's channel pill, chat name and edge colour", async () => {
+    serveTickets([
+      makeTicket({ id: 301, channel: "telegram", chat_display_name: "Kim", chat_username: "kim_example", customer_id: "tg-guest" }),
+      makeTicket({ id: 302 }),
+    ]);
+    await renderQueuesPage();
+    const row = await screen.findByTestId("ticket-row-301");
+    expect(screen.getByTestId("ticket-channel-301")).toHaveAttribute("data-channel", "telegram");
+    expect(screen.getByTestId("ticket-chat-identity-301")).toHaveTextContent("Kim @kim_example");
+    expect(screen.queryByTestId("ticket-customer-name-301")).toBeNull();
+    expect(row.style.getPropertyValue("--spine-color")).toBe("var(--color-channel-telegram)");
+    expect(screen.getByTestId("ticket-channel-302")).toHaveAttribute("data-channel", "email");
   });
 
   it("pins overdue / due-soon tickets above the list, nearest deadline first", async () => {

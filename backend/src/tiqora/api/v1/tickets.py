@@ -8,7 +8,7 @@ import csv
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from html import escape as html_escape
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
@@ -298,6 +298,13 @@ _ESCALATING_WITHIN_DESC = (
     "Seconds: any escalation_* epoch set and due before now + this window"
     " (already-overdue tickets included)."
 )
+ListChannel = Literal["email", "telegram", "webchat"]
+_CHANNEL_DESC = (
+    "Repeatable; any of: email (no message on a chat channel), telegram, webchat."
+    " Several values match tickets of any of them."
+)
+# Annotated form: a list default via ``= Query(...)`` trips B008.
+ChannelQuery = Annotated[list[ListChannel] | None, Query(description=_CHANNEL_DESC)]
 _SORT_DESC = (
     "age | created | changed | tn | title | priority | activity (newest article's"
     " create_time, falling back to the ticket's create_time) | deadline (nearest"
@@ -329,6 +336,7 @@ async def list_tickets(
     ),
     unassigned: bool | None = Query(None, description=_UNASSIGNED_DESC),
     escalating_within: int | None = Query(None, ge=0, description=_ESCALATING_WITHIN_DESC),
+    channel: ChannelQuery = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     sort: str = Query("age", description=_SORT_DESC),
@@ -355,6 +363,7 @@ async def list_tickets(
         ai_escalated=True if ai_escalated else None,
         unassigned=unassigned,
         escalating_within=escalating_within,
+        channel=channel,
         offset=offset,
         limit=limit,
         sort=sort,
@@ -421,11 +430,20 @@ class TicketFacetFlags(BaseModel):
     unassigned: int
 
 
+class TicketFacetChannels(BaseModel):
+    """Ticket counts per channel chip (every filter except ``channel``)."""
+
+    email: int
+    telegram: int
+    webchat: int
+
+
 class TicketFacets(BaseModel):
     """Inbox segment and chip counts for the current ticket-list filters."""
 
     states: TicketFacetStates
     flags: TicketFacetFlags
+    channels: TicketFacetChannels
 
 
 @router.get("/facets", response_model=TicketFacets)
@@ -452,6 +470,7 @@ async def ticket_facets(
     ),
     unassigned: bool | None = Query(None, description=_UNASSIGNED_DESC),
     escalating_within: int | None = Query(None, ge=0, description=_ESCALATING_WITHIN_DESC),
+    channel: ChannelQuery = None,
     include_archived: bool = Query(
         False, description="Also count archived tickets (admins only; ignored otherwise)."
     ),
@@ -482,11 +501,13 @@ async def ticket_facets(
         ai_escalated=True if ai_escalated else None,
         unassigned=unassigned,
         escalating_within=escalating_within,
+        channel=channel,
         include_archived=include_archived,
     )
     return TicketFacets(
         states=TicketFacetStates(**counts["states"]),
         flags=TicketFacetFlags(**counts["flags"]),
+        channels=TicketFacetChannels(**counts["channels"]),
     )
 
 
@@ -577,6 +598,7 @@ async def _export_tickets_csv_stream(
     ai_escalated: bool | None = None,
     unassigned: bool | None = None,
     escalating_within: int | None = None,
+    channel: list[ListChannel] | None = None,
     sort: str,
     order: str,
     include_archived: bool = False,
@@ -601,6 +623,7 @@ async def _export_tickets_csv_stream(
         ai_escalated=ai_escalated,
         unassigned=unassigned,
         escalating_within=escalating_within,
+        channel=channel,
         sort=sort,
         order=order,
         include_archived=include_archived,
@@ -625,6 +648,7 @@ async def export_tickets_csv(
     ai_escalated: bool | None = None,
     unassigned: bool | None = Query(None, description=_UNASSIGNED_DESC),
     escalating_within: int | None = Query(None, ge=0, description=_ESCALATING_WITHIN_DESC),
+    channel: ChannelQuery = None,
     sort: str = Query("age", description=_SORT_DESC),
     order: str = Query("desc"),
     include_archived: bool = Query(
@@ -659,6 +683,7 @@ async def export_tickets_csv(
             ai_escalated=True if ai_escalated else None,
             unassigned=unassigned,
             escalating_within=escalating_within,
+            channel=channel,
             sort=sort,
             order=order,
             include_archived=include_archived,

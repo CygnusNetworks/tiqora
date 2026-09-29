@@ -12980,6 +12980,15 @@ export interface components {
              * Format: date-time
              */
             change_time: string;
+            /**
+             * Channel
+             * @default email
+             */
+            channel: string;
+            /** Chat Display Name */
+            chat_display_name?: string | null;
+            /** Chat Username */
+            chat_username?: string | null;
             /** Create By */
             create_by?: number | null;
             /**
@@ -13083,6 +13092,18 @@ export interface components {
             until_time: number;
         };
         /**
+         * TicketFacetChannels
+         * @description Ticket counts per channel chip (every filter except ``channel``).
+         */
+        TicketFacetChannels: {
+            /** Email */
+            email: number;
+            /** Telegram */
+            telegram: number;
+            /** Webchat */
+            webchat: number;
+        };
+        /**
          * TicketFacetFlags
          * @description Ticket counts per flag chip (state filter applied, other flags ignored).
          */
@@ -13117,6 +13138,7 @@ export interface components {
          * @description Inbox segment and chip counts for the current ticket-list filters.
          */
         TicketFacets: {
+            channels: components["schemas"]["TicketFacetChannels"];
             flags: components["schemas"]["TicketFacetFlags"];
             states: components["schemas"]["TicketFacetStates"];
         };
@@ -13234,6 +13256,15 @@ export interface components {
              * Format: date-time
              */
             change_time: string;
+            /**
+             * Channel
+             * @default email
+             */
+            channel: string;
+            /** Chat Display Name */
+            chat_display_name?: string | null;
+            /** Chat Username */
+            chat_username?: string | null;
             /**
              * Create Time
              * Format: date-time
@@ -27953,6 +27984,8 @@ export interface operations {
                 unassigned?: boolean | null;
                 /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
                 escalating_within?: number | null;
+                /** @description Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them. */
+                channel?: ("email" | "telegram" | "webchat")[] | null;
                 offset?: number;
                 limit?: number;
                 /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
@@ -28079,6 +28112,8 @@ export interface operations {
                 unassigned?: boolean | null;
                 /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
                 escalating_within?: number | null;
+                /** @description Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them. */
+                channel?: ("email" | "telegram" | "webchat")[] | null;
                 /** @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending). */
                 sort?: string;
                 order?: string;
@@ -28137,6 +28172,8 @@ export interface operations {
                 unassigned?: boolean | null;
                 /** @description Seconds: any escalation_* epoch set and due before now + this window (already-overdue tickets included). */
                 escalating_within?: number | null;
+                /** @description Repeatable; any of: email (no message on a chat channel), telegram, webchat. Several values match tickets of any of them. */
+                channel?: ("email" | "telegram" | "webchat")[] | null;
                 /** @description Also count archived tickets (admins only; ignored otherwise). */
                 include_archived?: boolean;
             };

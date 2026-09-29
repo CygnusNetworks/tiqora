@@ -36,6 +36,7 @@ export type {
   PaginatedTickets,
   MyTicketCounts,
   TicketFacets,
+  TicketListChannel,
   DashboardSummary,
   TicketDetail,
   ArticleListItem,

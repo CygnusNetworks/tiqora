@@ -372,3 +372,23 @@ export function MoreIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Paper plane — the Telegram channel. */
+export function PaperPlaneIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M21 4 3 11l6 2 2 6 3-4 5 4 2-15Z" />
+      <path d="m9 13 8-6" />
+    </Icon>
+  );
+}
+
+/** Speech bubble with lines — a web chat. */
+export function ChatBubbleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 5h16v11H9l-5 4V5Z" />
+      <path d="M8 10h8M8 13h5" />
+    </Icon>
+  );
+}

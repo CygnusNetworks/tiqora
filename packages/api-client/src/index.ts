@@ -21,6 +21,7 @@ export {
   type PaginatedTickets,
   type MyTicketCounts,
   type TicketFacets,
+  type TicketListChannel,
   type DashboardSummary,
   type TicketDetail,
   type TicketPermissions,

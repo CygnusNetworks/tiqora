@@ -40,6 +40,10 @@
   --color-red: #d4554f;
   --color-purple: #8b6fd6;
   --color-danger: #d4554f;
+  /* Ticket channels (list pill + row edge); distinct from the state colours
+     the edge otherwise shows. */
+  --color-channel-telegram: #1d9bd1;
+  --color-channel-webchat: #c2508a;
 
   /* Aliases kept for existing component usage */
   --color-surface-elevated: var(--color-surface);
@@ -90,6 +94,8 @@
   --color-red: #f26d6d;
   --color-purple: #a78bfa;
   --color-danger: #f26d6d;
+  --color-channel-telegram: #4fb8ea;
+  --color-channel-webchat: #e07ab0;
 
   --color-surface-elevated: var(--color-surface);
   --color-border: var(--color-hairline);
