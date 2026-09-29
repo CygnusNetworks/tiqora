@@ -25,6 +25,7 @@ from dataclasses import dataclass
 
 from tiqora.config import Settings
 from tiqora.crypto import CryptoError, CryptoUnavailableError
+from tiqora.crypto.config import CryptoConfig
 from tiqora.crypto.pgp import PgpEngine
 from tiqora.crypto.smime import SmimeEngine
 
@@ -62,13 +63,13 @@ def _find_pgp_block(raw: bytes) -> tuple[bytes, bool] | None:
     return None
 
 
-def _process_pgp(raw: bytes, settings: Settings) -> tuple[str | None, CryptoInboundResult]:
+def _process_pgp(raw: bytes, config: CryptoConfig) -> tuple[str | None, CryptoInboundResult]:
     found = _find_pgp_block(raw)
     if found is None:
         return None, CryptoInboundResult("pgp", "not_present", "no PGP block found")
     block, is_encrypted = found
     try:
-        engine = PgpEngine(settings.crypto_pgp_gnupghome)
+        engine = PgpEngine.from_config(config.pgp)
     except CryptoUnavailableError as exc:
         return None, CryptoInboundResult("pgp", "unavailable", str(exc))
     try:
@@ -91,22 +92,20 @@ def _process_pgp(raw: bytes, settings: Settings) -> tuple[str | None, CryptoInbo
         return None, CryptoInboundResult("pgp", "error", str(exc))
 
 
-def _process_smime(raw: bytes, settings: Settings) -> tuple[str | None, CryptoInboundResult]:
+def _process_smime(raw: bytes, config: CryptoConfig) -> tuple[str | None, CryptoInboundResult]:
     """Verify-only: signature check on a signed S/MIME message.
 
     Simplification: encrypted (``-encrypt``) S/MIME inbound decrypt is not
     wired up at the postmaster level — it would need the *receiving* mail
     account's own private key resolved from :class:`~tiqora.crypto.keystore.
     SmimeKeyStore` by recipient address, which the pipeline does not thread
-    through to this call. :func:`tiqora.crypto.smime.SmimeEngine.decrypt` is
-    available and covered by unit tests; only the inbound wiring stops at
-    verify. See docs/crypto.md.
+    through to this call (B2 of the crypto parity work).
     """
     if not _SMIME_CONTENT_TYPE_RE.search(raw):
         return None, CryptoInboundResult("smime", "not_present", "no pkcs7-mime content-type")
-    engine = SmimeEngine(openssl_bin=settings.crypto_openssl_bin)
+    engine = SmimeEngine(openssl_bin=config.smime.openssl_bin)
     try:
-        ca_path = settings.crypto_smime_ca_path or None
+        ca_path = config.smime.ca_path or None
         verify = engine.verify(raw, ca_path=ca_path)
         # "verified" ONLY when the chain was validated against a trust root;
         # a valid-but-untrusted (self-signed) signature is "signed_untrusted"
@@ -123,7 +122,7 @@ def _process_smime(raw: bytes, settings: Settings) -> tuple[str | None, CryptoIn
 
 
 def process_inbound_crypto_sync(
-    raw: bytes, settings: Settings
+    raw: bytes, settings: Settings, config: CryptoConfig | None = None
 ) -> tuple[str | None, CryptoInboundResult | None]:
     """Synchronous core (shells out to gpg/openssl) — see :func:`process_inbound_crypto`
     for the async wrapper used by the (async) postmaster pipeline.
@@ -133,21 +132,27 @@ def process_inbound_crypto_sync(
     unchanged). ``result`` is ``None`` when both PGP and S/MIME are disabled
     or neither method was detected in the message.
     """
-    if settings.crypto_pgp_enabled:
-        body, result = _process_pgp(raw, settings)
+    cfg = config or CryptoConfig.from_settings(settings)
+    if cfg.pgp.enabled:
+        body, result = _process_pgp(raw, cfg)
         if result.status != "not_present":
             return body, result
-    if settings.crypto_smime_enabled:
-        body, result = _process_smime(raw, settings)
+    if cfg.smime.enabled:
+        body, result = _process_smime(raw, cfg)
         if result.status != "not_present":
             return body, result
     return None, None
 
 
 async def process_inbound_crypto(
-    raw: bytes, settings: Settings
+    raw: bytes, settings: Settings, config: CryptoConfig | None = None
 ) -> tuple[str | None, CryptoInboundResult | None]:
-    """Async wrapper: runs the blocking gpg/openssl subprocess calls in a thread."""
-    if not settings.crypto_pgp_enabled and not settings.crypto_smime_enabled:
+    """Async wrapper: runs the blocking gpg/openssl subprocess calls in a thread.
+
+    *config* is the SysConfig-resolved crypto config (``PGP``/``SMIME``
+    switches and paths); without it the env-only view of *settings* applies.
+    """
+    cfg = config or CryptoConfig.from_settings(settings)
+    if not cfg.pgp.enabled and not cfg.smime.enabled:
         return None, None
-    return await asyncio.to_thread(process_inbound_crypto_sync, raw, settings)
+    return await asyncio.to_thread(process_inbound_crypto_sync, raw, settings, cfg)
