@@ -33,4 +33,8 @@ export type {
   PortalTicketCreateRequest,
   PortalTicketCreateResponse,
   PortalAttachmentUploadResponse,
+  PortalPreferencesOut,
+  CustomerCryptoKeysOut,
+  PgpKeyOut,
+  SmimeCertOut,
 } from "@tiqora/api-client";
