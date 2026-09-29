@@ -2913,7 +2913,30 @@
       "name": "Name",
       "event": "Ereignis",
       "subject": "Betreff",
-      "body": "Text"
+      "body": "Text",
+      "security": {
+        "title": "E-Mail-Sicherheit",
+        "enable": "E-Mail-Sicherheit aktivieren",
+        "notEnabled": "PGP und S/MIME sind nicht aktiviert.",
+        "level": "Sicherheitsstufe",
+        "none": "Keine",
+        "levels": {
+          "PGPSign": "Nur PGP-signieren",
+          "PGPCrypt": "Nur PGP-verschlüsseln",
+          "PGPSignCrypt": "PGP signieren und verschlüsseln",
+          "SMIMESign": "Nur S/MIME-signieren",
+          "SMIMECrypt": "Nur S/MIME-verschlüsseln",
+          "SMIMESignCrypt": "S/MIME signieren und verschlüsseln"
+        },
+        "missingSign": "Wenn Signaturschlüssel/-zertifikat fehlt",
+        "missingCrypt": "Wenn Verschlüsselungsschlüssel/-zertifikat fehlt",
+        "skip": "Benachrichtigung nicht zustellen",
+        "sendUnsigned": "Unsigniert senden",
+        "sendUnencrypted": "Unverschlüsselt senden",
+        "backendOff": "{{backend}} ist deaktiviert: Diese Benachrichtigung wird gar nicht versendet, bis es wieder aktiviert ist (wie in Znuny).",
+        "hint": "Signiert mit einem Schlüssel der Absenderadresse (Kundenbenachrichtigungen bevorzugen den Standard-Signaturschlüssel der Queue), verschlüsselt mit dem ersten gültigen Schlüssel des Empfängers. Znuny liest dieselben Einstellungen.",
+        "save": "Speichern"
+      }
     },
     "tar": {
       "title": "Ticket-Attributbeziehungen",

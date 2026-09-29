@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, type NotificationEventOut } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { NotificationEmailSecurity, type EnabledBackends } from "./NotificationEmailSecurity";
+import { securityLevel } from "./notificationSecurityItems";
 
 const inputClass =
   "rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-accent";
@@ -45,6 +47,25 @@ export function NotificationEventsPage() {
   const deactivateM = useMutation({
     mutationFn: (id: number) => api.deleteNotificationEvent(id),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin", "notification-events"] }),
+  });
+
+  // Znuny offers only the levels of enabled backends.
+  const cryptoQ = useQuery({
+    queryKey: ["admin", "crypto-status"],
+    queryFn: ({ signal }) => api.adminCrypto.status(signal),
+  });
+  const backends: EnabledBackends = {
+    pgp: Boolean(cryptoQ.data?.find((s) => s.backend === "pgp")?.enabled),
+    smime: Boolean(cryptoQ.data?.find((s) => s.backend === "smime")?.enabled),
+  };
+  const [securityOpen, setSecurityOpen] = useState<number | null>(null);
+  const securityM = useMutation({
+    mutationFn: ({ id, items }: { id: number; items: Record<string, string[]> }) =>
+      api.updateNotificationEvent(id, { items }),
+    onSuccess: () => {
+      setSecurityOpen(null);
+      void qc.invalidateQueries({ queryKey: ["admin", "notification-events"] });
+    },
   });
 
   const rows: NotificationEventOut[] = listQ.data ?? [];
@@ -107,24 +128,58 @@ export function NotificationEventsPage() {
       </form>
 
       <ul className="divide-y divide-line rounded-lg border border-line">
-        {rows.map((r) => (
-          <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div>
-              <div className="font-medium text-ink">{r.name}</div>
-              <div className="text-xs text-muted">
-                {(r.items?.Events ?? []).join(", ") || "—"} · valid={r.valid_id}
+        {rows.map((r) => {
+          const level = securityLevel(r.items ?? {});
+          return (
+            <li key={r.id} className="space-y-3 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="font-medium text-ink">{r.name}</div>
+                  <div className="text-xs text-muted">
+                    {(r.items?.Events ?? []).join(", ") || "—"} · valid={r.valid_id}
+                    {level && (
+                      <>
+                        {" · "}
+                        <span data-testid="notification-security-level">
+                          {t(`admin.notificationEvents.security.levels.${level}`, {
+                            defaultValue: level,
+                          })}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-expanded={securityOpen === r.id}
+                    onClick={() => setSecurityOpen(securityOpen === r.id ? null : r.id)}
+                  >
+                    {t("admin.notificationEvents.security.title")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => deactivateM.mutate(r.id)}
+                  >
+                    {t("admin.table.deactivate")}
+                  </Button>
+                </div>
               </div>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => deactivateM.mutate(r.id)}
-            >
-              {t("admin.table.deactivate")}
-            </Button>
-          </li>
-        ))}
+              {securityOpen === r.id && (
+                <NotificationEmailSecurity
+                  items={r.items ?? {}}
+                  backends={backends}
+                  saving={securityM.isPending}
+                  onSave={(items) => securityM.mutate({ id: r.id, items })}
+                />
+              )}
+            </li>
+          );
+        })}
         {rows.length === 0 && !listQ.isLoading && (
           <li className="px-4 py-6 text-center text-sm text-muted">{t("admin.table.empty")}</li>
         )}
