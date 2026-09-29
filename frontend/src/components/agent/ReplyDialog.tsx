@@ -21,6 +21,8 @@ import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { useComposerLock } from "@/lib/composerLock";
 import { ComposerLockBanner } from "./ComposerLock";
 import { ComposerTimeChip } from "./ComposerTimeChip";
+import { EmailSecurityControl } from "./EmailSecurityControl";
+import { useEmailSecurity } from "./useEmailSecurity";
 import { MentionTextarea } from "./MentionTextarea";
 import { RefineControls } from "./RefineControls";
 import {
@@ -337,6 +339,15 @@ export function ReplyDialog({
   } = useNextStateOptions(ticketId, open);
   const nextStateId = stateIdFor(nextState);
 
+  // PGP / S/MIME for the outgoing mail (nothing shown when both are off).
+  const security = useEmailSecurity({
+    ticketId,
+    to: joinRecipients(to),
+    cc: joinRecipients(cc),
+    bcc: joinRecipients(bcc),
+    enabled: open && !isTelegram,
+  });
+
   const sendMutation = useMutation({
     mutationFn: async () => {
       await api.createArticle(ticketId, {
@@ -360,6 +371,7 @@ export function ReplyDialog({
         in_reply_to: isTelegram ? null : (draftQ.data?.in_reply_to ?? null),
         references: isTelegram ? null : (draftQ.data?.references ?? null),
         ai_draft_id: aiDraftId,
+        email_security: isTelegram ? null : security.payload,
         ...nextStatePayload(nextState, pendingDate),
       });
       // The reply is out; mentions and the booking follow and may fail on
@@ -449,7 +461,8 @@ export function ReplyDialog({
     body.trim().length > 0 &&
     (isTelegram || to.length > 0) &&
     !sendMutation.isPending &&
-    ticketLock.lockedBy === null;
+    ticketLock.lockedBy === null &&
+    (isTelegram || !security.blocked);
 
   // Wide on large viewports (~80+ mono chars in the body); full-width on mobile.
   // Dialog base is max-w-md; this className overrides via cn().
@@ -788,6 +801,7 @@ export function ReplyDialog({
               </span>
             </div>
           </div>
+          {!isTelegram && <EmailSecurityControl security={security} testId="reply-security" />}
           {sendMutation.isError && (
             <p className="text-xs text-danger" data-testid="reply-send-error">
               {sendMutation.error instanceof ApiError &&
