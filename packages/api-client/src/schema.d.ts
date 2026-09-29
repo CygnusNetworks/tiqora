@@ -4833,6 +4833,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/dynamic-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Screen Dynamic Fields
+         * @description Ticket dynamic fields to show on a screen, in field order.
+         *
+         *     Reads ``Ticket::Frontend::<screen>###DynamicField`` (1 = shown, 2 =
+         *     required); when that config enables nothing, every valid, non-internal
+         *     ticket field of an editable type is offered (optional). Article-level
+         *     fields are not offered -- the write paths set ticket fields only.
+         */
+        get: operations["screen_dynamic_fields_api_v1_reference_dynamic_fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/phone-config": {
         parameters: {
             query?: never;
@@ -9207,6 +9232,8 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /** Mobile */
+            mobile?: string | null;
             /** Phone */
             phone?: string | null;
             /** Title */
@@ -9379,6 +9406,21 @@ export interface components {
              * @default 1
              */
             valid_id: number;
+        };
+        /** DynamicFieldDefOut */
+        DynamicFieldDefOut: {
+            /** Field Type */
+            field_type: string;
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Possible Values */
+            possible_values: {
+                [key: string]: string;
+            } | null;
+            /** Required */
+            required: boolean;
         };
         /** DynamicFieldOut */
         DynamicFieldOut: {
@@ -27387,6 +27429,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screen_dynamic_fields_api_v1_reference_dynamic_fields_get: {
+        parameters: {
+            query: {
+                /** @description Znuny frontend module */
+                screen: "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DynamicFieldDefOut"][];
                 };
             };
             /** @description Validation Error */
