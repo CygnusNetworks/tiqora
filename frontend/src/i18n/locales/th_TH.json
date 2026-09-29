@@ -1004,7 +1004,8 @@
     "language": "ภาษา",
     "theme": "ธีม",
     "themeLight": "เบา",
-    "themeDark": "มืด"
+    "themeDark": "มืด",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "ใหม่",

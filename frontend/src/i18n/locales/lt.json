@@ -1004,7 +1004,8 @@
     "language": "Kalba",
     "theme": "tema",
     "themeLight": "Šviesa",
-    "themeDark": "Tamsus"
+    "themeDark": "Tamsus",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Nauja",

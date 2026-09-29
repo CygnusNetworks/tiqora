@@ -230,9 +230,10 @@ the agent can read.
   is accepted with `delivered_to: 0` and ignored. Redis unavailable → 503.
 - **Agent ↔ extension**: Znuny user preference `TiqoraPhoneExtension`,
   several extensions comma separated; one extension may belong to several
-  agents (shared phone). Agents set it under *Settings → Phone*
-  (`GET/PUT /api/v1/auth/me/phone`), admins in the user form
-  (`phone_extension`). Allowed characters: letters, digits, `* # + _ . @ / : -`.
+  agents (shared phone). Admin-managed only: *Admin → Users → edit user →
+  Telefon-Nebenstelle* (`phone_extension` on `/api/v1/admin/users/{id}`);
+  agents cannot change it themselves. Allowed characters: letters, digits,
+  `* # + _ . @ / : -`.
 - **Call state**: one Redis document per call, `tiqora:call:<call_id>`, TTL
   2 h (number, extension, direction, agents, ringing/answered/ended times).
   A ring group sends one `ringing` per extension with the same `call_id` —

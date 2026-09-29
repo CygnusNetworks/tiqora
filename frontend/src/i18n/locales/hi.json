@@ -1004,7 +1004,8 @@
     "language": "भाषा",
     "theme": "थीम",
     "themeLight": "रोशनी",
-    "themeDark": "अंधेरा"
+    "themeDark": "अंधेरा",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "नया",

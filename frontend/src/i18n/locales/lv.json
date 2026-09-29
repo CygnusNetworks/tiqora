@@ -1004,7 +1004,8 @@
     "language": "Valoda",
     "theme": "Tēma",
     "themeLight": "Gaisma",
-    "themeDark": "Tumšs"
+    "themeDark": "Tumšs",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Jauns",

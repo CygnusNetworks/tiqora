@@ -1004,7 +1004,8 @@
     "language": "език",
     "theme": "Тема",
     "themeLight": "светлина",
-    "themeDark": "Тъмно"
+    "themeDark": "Тъмно",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Нов",

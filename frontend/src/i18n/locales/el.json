@@ -1004,7 +1004,8 @@
     "language": "Γλώσσα",
     "theme": "Θέμα",
     "themeLight": "Φως",
-    "themeDark": "Σκοτεινό"
+    "themeDark": "Σκοτεινό",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Νέο",

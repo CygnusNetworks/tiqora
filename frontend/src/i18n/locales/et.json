@@ -1004,7 +1004,8 @@
     "language": "Keel",
     "theme": "Teema",
     "themeLight": "Valgus",
-    "themeDark": "Tume"
+    "themeDark": "Tume",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Uus",

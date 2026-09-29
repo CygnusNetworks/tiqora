@@ -1004,7 +1004,8 @@
     "language": "Nyelv",
     "theme": "téma",
     "themeLight": "Világos",
-    "themeDark": "Sötét"
+    "themeDark": "Sötét",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Új",

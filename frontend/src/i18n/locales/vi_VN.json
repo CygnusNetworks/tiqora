@@ -1004,7 +1004,8 @@
     "language": "Ngôn ngữ",
     "theme": "chủ đề",
     "themeLight": "Ánh sáng",
-    "themeDark": "Tối"
+    "themeDark": "Tối",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Mới",

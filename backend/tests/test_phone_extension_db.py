@@ -115,25 +115,14 @@ async def _client(sync_url: str, user_id: int) -> Any:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test"), engine
 
 
-async def test_me_phone_roundtrip(seeded: str) -> None:
+async def test_agents_cannot_set_their_own_extension(seeded: str) -> None:
+    """The extension is admin-managed (user admin); there is no self-service API."""
     client, engine = await _client(seeded, ANNA)
     try:
         async with client:
-            resp = await client.get("/api/v1/auth/me/phone")
-            assert resp.status_code == 200
-            assert resp.json() == {"extension": "100,PJSIP/anna"}
-
-            bad = await client.put("/api/v1/auth/me/phone", json={"extension": "12 3!"})
-            assert bad.status_code == 422
-
-            ok = await client.put("/api/v1/auth/me/phone", json={"extension": " 200 ; 201 "})
-            assert ok.status_code == 200
-            assert ok.json() == {"extension": "200,201"}
-            assert (await client.get("/api/v1/auth/me/phone")).json() == {"extension": "200,201"}
-
-            cleared = await client.put("/api/v1/auth/me/phone", json={"extension": ""})
-            assert cleared.json() == {"extension": None}
-            assert (await client.get("/api/v1/auth/me/phone")).json() == {"extension": None}
+            assert (await client.get("/api/v1/auth/me/phone")).status_code in (404, 405)
+            put = await client.put("/api/v1/auth/me/phone", json={"extension": "200"})
+            assert put.status_code in (404, 405)
     finally:
         await engine.dispose()
 

@@ -1004,7 +1004,8 @@
     "language": "Kieli",
     "theme": "Teema",
     "themeLight": "Kevyt",
-    "themeDark": "Tumma"
+    "themeDark": "Tumma",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Uusi",

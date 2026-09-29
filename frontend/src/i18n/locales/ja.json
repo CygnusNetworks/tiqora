@@ -1004,7 +1004,8 @@
     "language": "言語",
     "theme": "テーマ",
     "themeLight": "ライト",
-    "themeDark": "ダーク"
+    "themeDark": "ダーク",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "新規",

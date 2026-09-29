@@ -3868,27 +3868,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/auth/me/phone": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get My Phone
-         * @description The agent's extension(s) for the CTI call popup (``TiqoraPhoneExtension``).
-         */
-        get: operations["get_my_phone_api_v1_auth_me_phone_get"];
-        /** Set My Phone */
-        put: operations["set_my_phone_api_v1_auth_me_phone_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/auth/methods": {
         parameters: {
             query?: never;
@@ -12231,16 +12210,6 @@ export interface components {
              * @enum {string}
              */
             dial_scheme: "tel" | "sip";
-        };
-        /** PhoneExtensionOut */
-        PhoneExtensionOut: {
-            /** Extension */
-            extension: string | null;
-        };
-        /** PhoneExtensionUpdate */
-        PhoneExtensionUpdate: {
-            /** Extension */
-            extension?: string | null;
         };
         /** PhoneNoteRequest */
         PhoneNoteRequest: {
@@ -26422,76 +26391,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserMe"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_my_phone_api_v1_auth_me_phone_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                tiqora_session?: string | null;
-            };
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PhoneExtensionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_my_phone_api_v1_auth_me_phone_put: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: {
-                tiqora_session?: string | null;
-            };
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PhoneExtensionUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PhoneExtensionOut"];
                 };
             };
             /** @description Validation Error */

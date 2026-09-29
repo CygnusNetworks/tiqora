@@ -1004,7 +1004,8 @@
     "language": "Sprog",
     "theme": "Tema",
     "themeLight": "Lys",
-    "themeDark": "Mørk"
+    "themeDark": "Mørk",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Ny",
