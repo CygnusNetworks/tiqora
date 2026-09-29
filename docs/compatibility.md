@@ -332,6 +332,13 @@ MariaDB and validated:
 - `POST /portal/tickets/{id}/attachments` always creates a new customer
   article carrying the file (subject to the same reopen/reject rules) — Znuny
   has no "attachment without an article" concept.
+- Preferences (`/portal/preferences`) cover Znuny's default customer groups
+  Language (`UserLanguage`), Password and — while `PGP` / `SMIME` are on —
+  PGP key / S/MIME certificate upload ([crypto.md](crypto.md#customer-keys)).
+  Time zone, Google Authenticator and other `CustomerPreferencesGroups` are
+  not offered; groups deactivated in SysConfig are hidden. The new password
+  follows Tiqora's length policy, not the `Password` group's `PasswordRegExp`
+  / `PasswordMin*` options.
 
 **Knowledge base**
 
@@ -399,5 +406,5 @@ deliberate platform choices, a few are open work.
 **Open**
 
 - "Note to linked tickets" (Znuny's `AgentTicketNoteToLinkedTicket`).
-- Customer portal: print view and customer preferences page.
+- Customer portal: print view.
 - Hybrid (vector + keyword) Meilisearch retrieval for KB/RAG.
