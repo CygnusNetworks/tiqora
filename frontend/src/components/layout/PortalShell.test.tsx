@@ -19,6 +19,9 @@ vi.mock("@/auth/CustomerAuthContext", () => ({
   }),
 }));
 
+const { portalSetLanguage } = vi.hoisted(() => ({ portalSetLanguage: vi.fn() }));
+vi.mock("@/lib/portalApi", () => ({ portalApi: { portalSetLanguage } }));
+
 const { toggleTheme } = vi.hoisted(() => ({ toggleTheme: vi.fn() }));
 vi.mock("@/themes/theme", () => ({
   useTheme: () => ({ theme: "dark", toggleTheme }),
@@ -32,7 +35,13 @@ async function renderShell() {
       </PortalShell>
     ),
   });
-  const childPaths = ["/portal", "/portal/tickets/new", "/portal/kb", "/portal/login"];
+  const childPaths = [
+    "/portal",
+    "/portal/tickets/new",
+    "/portal/kb",
+    "/portal/login",
+    "/portal/preferences",
+  ];
   const childRoutes = childPaths.map((path) =>
     createRoute({ getParentRoute: () => rootRoute, path, component: () => null }),
   );
@@ -53,6 +62,7 @@ async function renderShell() {
 describe("PortalShell", () => {
   beforeEach(() => {
     logout.mockReset().mockResolvedValue(undefined);
+    portalSetLanguage.mockReset().mockResolvedValue({});
     toggleTheme.mockReset();
     void i18n.changeLanguage("en");
   });
@@ -87,6 +97,16 @@ describe("PortalShell", () => {
     fireEvent.click(screen.getByText("Deutsch"));
     await waitFor(() => expect(i18n.language).toMatch(/^de/));
     expect(localStorage.getItem("tiqora-lang")).toBe("de");
+    // Stored as the customer's UserLanguage preference (Znuny).
+    expect(portalSetLanguage).toHaveBeenCalledWith("de");
+  });
+
+  it("links to the preferences page", async () => {
+    await renderShell();
+    expect(screen.getByTestId("portal-nav-preferences")).toHaveAttribute(
+      "href",
+      "/portal/preferences",
+    );
   });
 
   it("logs out and navigates to the portal login page", async () => {
