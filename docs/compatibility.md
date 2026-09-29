@@ -400,6 +400,4 @@ deliberate platform choices, a few are open work.
 
 - "Note to linked tickets" (Znuny's `AgentTicketNoteToLinkedTicket`).
 - Customer portal: print view and customer preferences page.
-- Admin UI for the PGP/S-MIME keyring — keys are managed through
-  `/api/v1/admin/crypto-keys` only (see [crypto.md](crypto.md)).
 - Hybrid (vector + keyword) Meilisearch retrieval for KB/RAG.
