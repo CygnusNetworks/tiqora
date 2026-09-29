@@ -269,8 +269,10 @@ async def apply_call_event(
             call.state = "ended"
             call.ended_at = at
 
-    recipients = _union(call.notified_user_ids, call.user_ids)
-    call.notified_user_ids = recipients
+    call.notified_user_ids = _union(call.notified_user_ids, call.user_ids)
+    # An agent who dismissed the card (or already acted on it) is not
+    # re-notified by later events of the same call.
+    recipients = [u for u in call.notified_user_ids if u not in call.dismissed_user_ids]
     await _store(redis_client, call)
     await _publish(redis_client, recipients, body.event, call)
     return CallEventResult(recipients=recipients)
