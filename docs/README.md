@@ -51,7 +51,7 @@
 |---|---|
 | [i18n.md](i18n.md) | UI languages: **49** locales vs Znuny’s **48** `.po` files, RTL, tooling |
 | [channels.md](channels.md) | SMS, WhatsApp Business, Telegram, and Phone/CTI channel plugins |
-| [crypto.md](crypto.md) | PGP and S/MIME for email articles (verify/decrypt inbound, sign/encrypt outbound; off by default) |
+| [crypto.md](crypto.md) | PGP and S/MIME: key stores shared with Znuny, key admin, verify/decrypt inbound, sign/encrypt outbound (off by default) |
 | [gdpr.md](gdpr.md) | Customer anonymization and retention-policy tooling, ownership write-gate |
 | [process-management.md](process-management.md) | BPM ticket processes: reused `pm_*` tables, engine flow, agent + portal CustomerInterface, REST API, supported/deferred scope |
 

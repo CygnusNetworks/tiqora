@@ -60,6 +60,31 @@ _SPA_CSP = (
 )
 
 
+async def _crypto_self_check(app: FastAPI, settings: Settings) -> None:
+    """Log whether gpg / openssl are usable for every *enabled* crypto backend."""
+    try:
+        import asyncio
+
+        from tiqora.crypto.config import backend_status_sync, load_crypto_config
+
+        async with app.state.session_factory() as _crypto_session:
+            crypto_cfg = await load_crypto_config(_crypto_session, settings)
+        for st in await asyncio.to_thread(backend_status_sync, crypto_cfg):
+            if not st.enabled:
+                continue
+            if st.available:
+                logger.info(
+                    "crypto_backend_ready",
+                    backend=st.backend,
+                    binary=st.binary.path,
+                    version=st.binary.version,
+                )
+            else:
+                logger.warning("crypto_backend_unusable", backend=st.backend, problems=st.problems)
+    except Exception as _exc:  # noqa: BLE001 — never block startup on the self-check
+        logger.warning("crypto_self_check_skipped", error=str(_exc))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application startup / shutdown hooks."""
@@ -136,6 +161,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             await mount_dynamic_compat_routes(app, _compat_session)
     except Exception as _exc:  # noqa: BLE001
         logger.warning("compat_mount_skipped", error=str(_exc))
+    await _crypto_self_check(app, settings)
     yield
     redis_client = getattr(app.state, "redis", None)
     if redis_client is not None:

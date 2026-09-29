@@ -209,6 +209,55 @@ instead of `TIQORA_LDAP_*` (`ENABLED`, `HOST`, `PORT`, `USE_SSL`,
 | `TIQORA_SMTP_USER` | *(empty)* |
 | `TIQORA_SMTP_PASSWORD` | *(empty)* |
 
+### PGP / S/MIME (key stores shared with Znuny)
+
+The production image ships `gnupg`, `openssl` and the backend `crypto` extra
+(`python-gnupg`). Both backends follow Znuny's SysConfig switches (`PGP`,
+`SMIME`, default off) and read the key locations from Znuny's settings
+(`PGP::Options --homedir`, `SMIME::CertPath`, `SMIME::PrivatePath`). Inside a
+container those host paths usually do not exist, so mount the directories and
+point the env overrides at them:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TIQORA_CRYPTO_PGP_ENABLED` | *(unset → SysConfig `PGP`)* | `true`/`false` overrides the SysConfig switch. |
+| `TIQORA_CRYPTO_PGP_GNUPGHOME` | *(unset → `--homedir` of `PGP::Options`)* | gpg keyring directory. |
+| `TIQORA_CRYPTO_GPG_BIN` | *(unset → `PGP::Bin` if present, else `gpg`)* | |
+| `TIQORA_CRYPTO_SMIME_ENABLED` | *(unset → SysConfig `SMIME`)* | |
+| `TIQORA_CRYPTO_SMIME_CERT_DIR` | *(unset → `SMIME::CertPath`)* | `<hash>.<n>` certificates. |
+| `TIQORA_CRYPTO_SMIME_PRIVATE_DIR` | *(unset → `SMIME::PrivatePath`)* | `<hash>.<n>` keys + `.P` secrets. |
+| `TIQORA_CRYPTO_OPENSSL_BIN` | *(unset → `SMIME::Bin` if present, else `openssl`)* | |
+| `TIQORA_CRYPTO_SMIME_CA_PATH` | *(empty)* | Optional CA bundle for signature chain checks. |
+
+Compose wiring for `tiqora-api` **and** `tiqora-worker` (the worker runs the
+postmaster, which verifies/decrypts inbound mail):
+
+```yaml
+environment:
+  TIQORA_CRYPTO_PGP_GNUPGHOME: /var/lib/tiqora/gnupg
+  TIQORA_CRYPTO_SMIME_CERT_DIR: /var/lib/tiqora/smime/certs
+  TIQORA_CRYPTO_SMIME_PRIVATE_DIR: /var/lib/tiqora/smime/private
+volumes:
+  # Read-write: key uploads in the admin UI write here, exactly as Znuny does.
+  # During parallel operation mount Znuny's own directories (e.g.
+  # /opt/otrs/.gnupg, and the SMIME::CertPath / SMIME::PrivatePath dirs).
+  - /opt/otrs/.gnupg:/var/lib/tiqora/gnupg
+  - /etc/ssl/znuny-certs:/var/lib/tiqora/smime/certs
+  - /etc/ssl/znuny-private:/var/lib/tiqora/smime/private
+```
+
+**Permissions:** the container runs as uid `10001`. gpg needs to write its
+agent socket and lock files into the keyring directory, and the private key
+directory must stay unreadable for others (Tiqora creates keys `0600`). When
+sharing with Znuny, give both users access via a common group (and `chmod
+g+rwX`) or run Tiqora with Znuny's uid (`user: "<otrs-uid>:<gid>"`). The
+admin pages **PGP keys** / **S/MIME certificates** and **System info** show
+whether the binaries run and the directories are writable (also logged at
+startup as `crypto_backend_ready` / `crypto_backend_unusable`).
+
+The S/MIME DB index (`smime_keys`, `smime_signer_cert_relations`) lives in
+the shared Znuny database, so no extra volume is needed for it.
+
 ### Daemon takeover poll intervals
 
 | Variable | Default |
@@ -237,7 +286,10 @@ those flags.
 | `tiqora_redis` | `redis` | Redis RDB/AOF persistence. |
 | `tiqora_meili` | `meilisearch` | Search index data. |
 
-The `tiqora-api`/`tiqora-worker`/`tiqora-ai-worker`/`tiqora-mcp` containers themselves are
+| *(bind mounts)* | `tiqora-api`, `tiqora-worker` | Only when PGP/S-MIME is used: gpg keyring, S/MIME certificate and private-key directories — see [PGP / S/MIME](#pgp--smime-key-stores-shared-with-znuny). |
+
+Apart from those optional key stores, the
+`tiqora-api`/`tiqora-worker`/`tiqora-ai-worker`/`tiqora-mcp` containers are
 stateless — no application-data volume is needed for them.
 
 ## Connecting to an existing Znuny database

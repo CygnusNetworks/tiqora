@@ -31,9 +31,10 @@ import structlog
 
 from tiqora.config import Settings
 from tiqora.crypto import CryptoError, CryptoUnavailableError
-from tiqora.crypto.keystore import SmimeKeyStore
+from tiqora.crypto.config import CryptoConfig
 from tiqora.crypto.pgp import PgpEngine
 from tiqora.crypto.smime import SmimeEngine
+from tiqora.crypto.smime_store import FILENAME_RE, SmimeEntry, SmimeStore
 from tiqora.domain.ticket_write_service import ArticleIn
 
 logger = structlog.get_logger(__name__)
@@ -48,14 +49,14 @@ def _as_list(value: Any) -> list[str]:
 
 
 def _apply_pgp(
-    article: ArticleIn, sign_key: str | None, encrypt_keys: list[str], settings: Settings
+    article: ArticleIn, sign_key: str | None, encrypt_keys: list[str], config: CryptoConfig
 ) -> None:
-    if not settings.crypto_pgp_enabled:
+    if not config.pgp.enabled:
         logger.warning("email_security_pgp_disabled")
         return
     body_bytes = article.body.encode("utf-8")
     try:
-        engine = PgpEngine(settings.crypto_pgp_gnupghome)
+        engine = PgpEngine.from_config(config.pgp)
         if encrypt_keys:
             body_bytes = engine.encrypt(body_bytes, encrypt_keys, sign_key_id=sign_key)
         elif sign_key:
@@ -70,29 +71,47 @@ def _apply_pgp(
     article.content_type = "text/plain; charset=utf-8"
 
 
+def _smime_lookup(store: SmimeStore, ref: str, *, private: bool) -> SmimeEntry:
+    """Resolve a store filename (``<hash>.<n>``) or an email address to one entry."""
+    if FILENAME_RE.match(ref):
+        entry = store.entry(ref)
+        if private and not entry.has_private:
+            raise CryptoError(f"no S/MIME private key for {ref!r}")
+        return entry
+    found = store.search(ref, private=private, valid_only=True)
+    if not found:
+        raise CryptoError(f"no valid S/MIME {'key' if private else 'cert'} on file for {ref!r}")
+    return found[0]
+
+
 def _apply_smime(
-    article: ArticleIn, sign_key: str | None, encrypt_keys: list[str], settings: Settings
+    article: ArticleIn, sign_key: str | None, encrypt_keys: list[str], config: CryptoConfig
 ) -> None:
-    if not settings.crypto_smime_enabled:
+    if not config.smime.enabled:
         logger.warning("email_security_smime_disabled")
         return
     body_bytes = article.body.encode("utf-8")
-    store = SmimeKeyStore(settings.crypto_smime_cert_dir, settings.crypto_smime_private_dir)
-    engine = SmimeEngine(openssl_bin=settings.crypto_openssl_bin)
+    engine = SmimeEngine(openssl_bin=config.smime.openssl_bin)
     try:
+        store = SmimeStore.from_config(config.smime)
         if encrypt_keys:
-            cert_paths: list[str] = []
-            for recipient in encrypt_keys:
-                paths = store.lookup(recipient)
-                if paths.cert_path is None:
-                    raise CryptoError(f"no S/MIME cert on file for {recipient!r}")
-                cert_paths.append(str(paths.cert_path))
+            cert_paths = [
+                str(store.cert_dir / _smime_lookup(store, r, private=False).filename)
+                for r in encrypt_keys
+            ]
             body_bytes = engine.encrypt(body_bytes, cert_paths)
         elif sign_key:
-            paths = store.lookup(sign_key)
-            if paths.cert_path is None or paths.key_path is None:
-                raise CryptoError(f"no S/MIME cert/key on file for {sign_key!r}")
-            body_bytes = engine.sign(body_bytes, str(paths.cert_path), str(paths.key_path))
+            entry = _smime_lookup(store, sign_key, private=True)
+            paths = store.private_paths(entry.filename)
+            private = store.get_private(entry.filename)
+            if paths is None or private is None:
+                raise CryptoError(f"no S/MIME private key for {sign_key!r}")
+            body_bytes = engine.sign(
+                body_bytes,
+                str(store.cert_dir / entry.filename),
+                str(paths[0]),
+                secret=private[1],
+            )
         else:
             return
     except (CryptoError, CryptoUnavailableError):
@@ -103,24 +122,35 @@ def _apply_smime(
 
 
 def apply_email_security_sync(
-    article: ArticleIn, security: dict[str, Any], settings: Settings
+    article: ArticleIn,
+    security: dict[str, Any],
+    settings: Settings,
+    config: CryptoConfig | None = None,
 ) -> ArticleIn:
-    """Sign and/or encrypt ``article.body`` in place per an EmailSecurity dict."""
+    """Sign and/or encrypt ``article.body`` in place per an EmailSecurity dict.
+
+    *config* is the SysConfig-resolved crypto config; without it only the
+    ``TIQORA_CRYPTO_*`` env view of *settings* is used.
+    """
+    cfg = config or CryptoConfig.from_settings(settings)
     backend = (security.get("Backend") or "").strip().upper()
     sign_key = security.get("SignKey") or None
     encrypt_keys = _as_list(security.get("EncryptKeys"))
 
     if backend == "PGP":
-        _apply_pgp(article, sign_key, encrypt_keys, settings)
+        _apply_pgp(article, sign_key, encrypt_keys, cfg)
     elif backend == "SMIME":
-        _apply_smime(article, sign_key, encrypt_keys, settings)
+        _apply_smime(article, sign_key, encrypt_keys, cfg)
     else:
         logger.warning("email_security_unknown_backend", backend=backend)
     return article
 
 
 async def apply_email_security(
-    article: ArticleIn, security: dict[str, Any], settings: Settings
+    article: ArticleIn,
+    security: dict[str, Any],
+    settings: Settings,
+    config: CryptoConfig | None = None,
 ) -> ArticleIn:
     """Async wrapper: runs the blocking gpg/openssl subprocess calls in a thread."""
-    return await asyncio.to_thread(apply_email_security_sync, article, security, settings)
+    return await asyncio.to_thread(apply_email_security_sync, article, security, settings, config)

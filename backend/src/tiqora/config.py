@@ -429,19 +429,20 @@ class Settings(BaseSettings):
         default=10, validation_alias="TIQORA_AI_WORKER_INTERVAL"
     )
 
-    # PGP / S/MIME (Phase 2c). Both OFF by default and require their
-    # respective external tool (gpg / openssl) — see docs/crypto.md. When
-    # enabled, inbound postmaster mail is checked for PGP/S/MIME
-    # encryption/signatures (decrypt + verify, best-effort — a failure never
-    # blocks delivery) and the compat GenericInterface's TicketCreate
-    # EmailSecurity params are honored for outbound email articles.
-    crypto_pgp_enabled: bool = Field(default=False, validation_alias="TIQORA_CRYPTO_PGP_ENABLED")
-    crypto_pgp_gnupghome: str = Field(default="", validation_alias="TIQORA_CRYPTO_PGP_GNUPGHOME")
-    crypto_smime_enabled: bool = Field(
-        default=False, validation_alias="TIQORA_CRYPTO_SMIME_ENABLED"
+    # PGP / S/MIME. The authoritative switches and paths are Znuny's SysConfig
+    # (``PGP``, ``PGP::Options --homedir``, ``SMIME``, ``SMIME::CertPath``,
+    # ``SMIME::PrivatePath``, ``*::Bin``) so keys are shared with Znuny; these
+    # env vars override them when set (container paths). ``None``/empty =
+    # follow SysConfig. See tiqora.crypto.config and docs/crypto.md.
+    crypto_pgp_enabled: bool | None = Field(
+        default=None, validation_alias="TIQORA_CRYPTO_PGP_ENABLED"
     )
-    # Tiqora-owned simplification of Znuny's SMIME::CertPath/SMIME::PrivatePath
-    # (flat <email>.crt / <email>.key directories — see tiqora.crypto.keystore).
+    crypto_pgp_gnupghome: str = Field(default="", validation_alias="TIQORA_CRYPTO_PGP_GNUPGHOME")
+    crypto_gpg_bin: str = Field(default="", validation_alias="TIQORA_CRYPTO_GPG_BIN")
+    crypto_smime_enabled: bool | None = Field(
+        default=None, validation_alias="TIQORA_CRYPTO_SMIME_ENABLED"
+    )
+    # Znuny layout: <subject_hash>.<n> certificates / private keys (+ .P secret).
     crypto_smime_cert_dir: str = Field(default="", validation_alias="TIQORA_CRYPTO_SMIME_CERT_DIR")
     crypto_smime_private_dir: str = Field(
         default="", validation_alias="TIQORA_CRYPTO_SMIME_PRIVATE_DIR"
@@ -451,7 +452,7 @@ class Settings(BaseSettings):
     # (self-signed passes) — such messages are reported "signed_untrusted", not
     # "verified" (security review M4).
     crypto_smime_ca_path: str = Field(default="", validation_alias="TIQORA_CRYPTO_SMIME_CA_PATH")
-    crypto_openssl_bin: str = Field(default="openssl", validation_alias="TIQORA_CRYPTO_OPENSSL_BIN")
+    crypto_openssl_bin: str = Field(default="", validation_alias="TIQORA_CRYPTO_OPENSSL_BIN")
 
     @property
     def cors_origin_list(self) -> list[str]:

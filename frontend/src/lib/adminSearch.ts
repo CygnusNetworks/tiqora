@@ -308,6 +308,22 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["smtp", "mail", "versand", "absender", "outbound", "email"],
   },
   {
+    slug: "pgp",
+    route: "/admin/pgp",
+    group: "communication",
+    nameKey: "admin.nav.pgp",
+    descriptionKey: "admin.pageDescriptions.pgp",
+    keywords: ["pgp", "gpg", "gnupg", "openpgp", "schlüssel", "key", "signatur", "verschlüsselung", "encryption"],
+  },
+  {
+    slug: "smime",
+    route: "/admin/smime",
+    group: "communication",
+    nameKey: "admin.nav.smime",
+    descriptionKey: "admin.pageDescriptions.smime",
+    keywords: ["s/mime", "smime", "zertifikat", "certificate", "x509", "signatur", "verschlüsselung", "encryption"],
+  },
+  {
     slug: "mail-accounts",
     route: "/admin/mail-accounts",
     group: "communication",

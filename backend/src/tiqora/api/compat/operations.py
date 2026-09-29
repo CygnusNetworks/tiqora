@@ -1039,9 +1039,16 @@ async def op_ticket_create(
         security = art_data.get("EmailSecurity")
         if isinstance(security, dict) and security:
             from tiqora.config import get_settings
+            from tiqora.crypto.config import resolve_crypto_config
             from tiqora.crypto.outbound import apply_email_security
 
-            article_in = await apply_email_security(article_in, security, get_settings())
+            crypto_settings = settings or get_settings()
+            article_in = await apply_email_security(
+                article_in,
+                security,
+                crypto_settings,
+                await resolve_crypto_config(crypto_settings, sysconfig),
+            )
 
     ticket_in = TicketIn(
         title=title,

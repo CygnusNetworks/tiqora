@@ -72,6 +72,8 @@ COPY backend/src ./src
 COPY uv.lock /tmp/uv.lock
 # Include the optional kerberos extra (gssapi) so SPNEGO can be enabled at
 # runtime via TIQORA_SPNEGO_ENABLED + KRB5_KTNAME. Stays inert until then.
+# The crypto extra (python-gnupg) backs PGP; it only acts once PGP is enabled
+# (Znuny SysConfig "PGP" or TIQORA_CRYPTO_PGP_ENABLED).
 RUN gssapi_wheel_url=""; \
     if [ "$TARGETARCH" = "amd64" ]; then gssapi_wheel_url="$GSSAPI_AMD64_WHEEL_URL"; fi; \
     if [ -n "$gssapi_wheel_url" ]; then \
@@ -81,10 +83,10 @@ RUN gssapi_wheel_url=""; \
             echo "ERROR: GSSAPI_AMD64_WHEEL_URL points at gssapi $wheel_version but uv.lock pins $locked_version -- rebuild the wheel and update the URL in the Jenkinsfile" >&2; \
             exit 1; \
         fi; \
-        uv sync --no-dev --no-editable --extra kerberos --no-install-package gssapi \
+        uv sync --no-dev --no-editable --extra kerberos --extra crypto --no-install-package gssapi \
         && uv pip install "$gssapi_wheel_url"; \
     else \
-        uv sync --no-dev --no-editable --extra kerberos; \
+        uv sync --no-dev --no-editable --extra kerberos --extra crypto; \
     fi
 
 # ---------- Runtime ----------
@@ -96,8 +98,10 @@ RUN useradd --create-home --uid 10001 tiqora \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        gnupg \
         libgssapi-krb5-2 \
         libkrb5-3 \
+        openssl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=python-deps /app/backend/.venv /app/.venv

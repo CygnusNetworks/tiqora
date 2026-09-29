@@ -291,6 +291,15 @@ export type DynamicFieldUpdate = Schemas["DynamicFieldUpdate"];
 export type WebhookOut = Schemas["WebhookOut"];
 export type WebhookCreate = Schemas["WebhookCreate"];
 export type WebhookUpdate = Schemas["WebhookUpdate"];
+export type CryptoBackendStatusOut = Schemas["CryptoBackendStatusOut"];
+export type CryptoKeyOut = Schemas["CryptoKeyOut"];
+export type PgpKeyOut = Schemas["PgpKeyOut"];
+export type PgpUploadOut = Schemas["PgpUploadOut"];
+export type SmimeCertOut = Schemas["SmimeCertOut"];
+export type SmimePrivateKeyOut = Schemas["SmimePrivateKeyOut"];
+export type SmimeDeleteOut = Schemas["SmimeDeleteOut"];
+export type SmimeRelationOut = Schemas["SmimeRelationOut"];
+export type SignKeyOptionOut = Schemas["SignKeyOptionOut"];
 export type ApiKeyOut = Schemas["ApiKeyOut"];
 export type ApiKeyCreate = Schemas["ApiKeyCreate"];
 export type ApiKeyUpdate = Schemas["ApiKeyUpdate"];
@@ -2366,6 +2375,76 @@ export class ApiClient {
 
   get adminWebhooks() {
     return this.adminCrud<WebhookOut, WebhookCreate, WebhookUpdate>("/api/v1/admin/webhooks");
+  }
+
+  /** PGP / S-MIME key stores shared with Znuny (AdminPGP / AdminSMIME parity). */
+  get adminCrypto() {
+    const base = "/api/v1/admin/crypto-keys";
+    const enc = encodeURIComponent;
+    return {
+      status: (signal?: AbortSignal) =>
+        this.request<CryptoBackendStatusOut[]>("GET", `${base}/status`, { signal }),
+      audit: (signal?: AbortSignal) => this.request<CryptoKeyOut[]>("GET", base, { signal }),
+      pgpList: (signal?: AbortSignal) =>
+        this.request<PgpKeyOut[]>("GET", `${base}/pgp`, { signal }),
+      pgpUpload: (asciiArmor: string, signal?: AbortSignal) =>
+        this.request<PgpUploadOut>("POST", `${base}/pgp`, {
+          body: { ascii_armor: asciiArmor },
+          signal,
+        }),
+      pgpDelete: (keyId: string, secretOnly = false, signal?: AbortSignal) =>
+        this.request<void>("DELETE", `${base}/pgp/${enc(keyId)}`, {
+          query: { secret: secretOnly },
+          signal,
+        }),
+      /** Armored public key (text). */
+      pgpExport: (keyId: string, signal?: AbortSignal) =>
+        this.request<string>("GET", `${base}/pgp/${enc(keyId)}/export`, { signal }),
+      smimeList: (signal?: AbortSignal) =>
+        this.request<SmimeCertOut[]>("GET", `${base}/smime`, { signal }),
+      /** PEM text, or base64 of a DER certificate. */
+      smimeUploadCertificate: (certificate: string, signal?: AbortSignal) =>
+        this.request<SmimeCertOut>("POST", `${base}/smime/certificates`, {
+          body: { certificate },
+          signal,
+        }),
+      smimeUploadPrivateKey: (privateKey: string, secret: string, signal?: AbortSignal) =>
+        this.request<SmimePrivateKeyOut>("POST", `${base}/smime/private-keys`, {
+          body: { private_key: privateKey, secret },
+          signal,
+        }),
+      smimeDelete: (filename: string, privateOnly = false, signal?: AbortSignal) =>
+        this.request<SmimeDeleteOut>("DELETE", `${base}/smime/${enc(filename)}`, {
+          query: { private_only: privateOnly },
+          signal,
+        }),
+      /** Certificate PEM (text). */
+      smimeDownload: (filename: string, signal?: AbortSignal) =>
+        this.request<string>("GET", `${base}/smime/${enc(filename)}`, { signal }),
+      smimeRelations: (filename: string, signal?: AbortSignal) =>
+        this.request<SmimeRelationOut[]>("GET", `${base}/smime/${enc(filename)}/relations`, {
+          signal,
+        }),
+      smimeRelationAdd: (filename: string, caFilename: string, signal?: AbortSignal) =>
+        this.request<SmimeRelationOut[]>(
+          "POST",
+          `${base}/smime/${enc(filename)}/relations`,
+          { body: { ca_filename: caFilename }, signal },
+        ),
+      smimeRelationDelete: (filename: string, caFingerprint: string, signal?: AbortSignal) =>
+        this.request<void>("DELETE", `${base}/smime/${enc(filename)}/relations`, {
+          query: { ca_fingerprint: caFingerprint },
+          signal,
+        }),
+      signKeyOptions: (
+        params: { queueId?: number; email?: string } = {},
+        signal?: AbortSignal,
+      ) =>
+        this.request<SignKeyOptionOut[]>("GET", `${base}/sign-key-options`, {
+          query: { queue_id: params.queueId, email: params.email },
+          signal,
+        }),
+    };
   }
 
   /** Znuny-compatible OAuth2 mail token configs (legacy oauth2_token_config). */

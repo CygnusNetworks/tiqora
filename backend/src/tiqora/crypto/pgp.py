@@ -1,19 +1,31 @@
-"""PGP: sign/verify/encrypt/decrypt via the ``gpg`` binary (python-gnupg wrapper).
+"""PGP: key management + sign/verify/encrypt/decrypt via the ``gpg`` binary.
 
 Mirrors Znuny's ``Kernel::System::Crypt::PGP``, which shells out to
-``PGP::Bin`` (default ``/usr/bin/gpg``) — same approach here, via
-``python-gnupg`` rather than hand-rolled subprocess/regex parsing of gpg
-output. ``GNUPGHOME`` is configurable (``TIQORA_CRYPTO_GNUPG_HOME``) so the
-keyring is Tiqora-owned and does not collide with any host/system keyring.
+``PGP::Bin`` with ``PGP::Options`` — same approach here, via ``python-gnupg``
+rather than hand-rolled subprocess/regex parsing of gpg output. The keyring
+is the one from ``PGP::Options --homedir`` (or ``TIQORA_CRYPTO_PGP_GNUPGHOME``,
+see :mod:`tiqora.crypto.config`), so Tiqora and Znuny can share it.
+
+Passphrases come from Znuny's ``PGP::Key::Password`` hash (key id →
+passphrase). Znuny keys that hash by the 8-hex-digit id it shows in its UI
+(for secret keys that is the *last subkey's* short id); :meth:`PgpEngine.
+passphrase_for` therefore accepts any id of the key — fingerprint, long or
+short primary id, long or short subkey id — case-insensitively.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+import re
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from tiqora.crypto import CryptoError, CryptoUnavailableError
+from tiqora.crypto import CryptoError, CryptoNotFoundError, CryptoUnavailableError
+
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z0-9-]{2,63}")
+_HEX_RE = re.compile(r"^(?:0x)?([0-9A-Fa-f]{8,40})$")
 
 
 @dataclass(frozen=True)
@@ -22,6 +34,8 @@ class PgpVerifyStatus:
     fingerprint: str | None
     username: str | None
     status: str
+    key_id: str | None = None
+    trust_level: int | None = None
 
 
 @dataclass(frozen=True)
@@ -30,6 +44,57 @@ class PgpDecryptResult:
     plaintext: bytes
     verify: PgpVerifyStatus | None
     status: str
+
+
+@dataclass(frozen=True)
+class PgpKeyInfo:
+    """Parsed metadata of one keyring entry (primary key + its subkeys)."""
+
+    fingerprint: str
+    key_id: str  # 16-hex long id of the primary key
+    short_id: str  # last 8 hex digits of key_id
+    uids: list[str]
+    emails: list[str]
+    created: datetime | None
+    expires: datetime | None
+    status: str  # "good" | "expired" | "revoked"
+    has_secret: bool
+    bits: int | None
+    algorithm: str
+    subkey_ids: list[str] = field(default_factory=list)
+
+    @property
+    def znuny_key_id(self) -> str:
+        """The 8-hex id Znuny shows for this key (``_ParseGPGKeyList``).
+
+        For secret keys Znuny overwrites the id with every ``ssb`` line, so it
+        ends up as the last subkey's short id; public keys keep the primary id.
+        The queue ``default_sign_key`` values (``PGP::Detached::<id>``) and the
+        ``PGP::Key::Password`` keys use this id.
+        """
+        if self.has_secret and self.subkey_ids:
+            return self.subkey_ids[-1][-8:].upper()
+        return self.short_id
+
+    def all_ids(self) -> set[str]:
+        ids = {self.fingerprint.upper(), self.key_id.upper(), self.short_id.upper()}
+        for sub in self.subkey_ids:
+            ids.add(sub.upper())
+            ids.add(sub[-8:].upper())
+        return ids
+
+    def matches(self, key_ref: str) -> bool:
+        ref = normalize_key_ref(key_ref)
+        if not ref:
+            return False
+        return ref in self.all_ids() or self.fingerprint.upper().endswith(ref)
+
+
+def normalize_key_ref(key_ref: str) -> str:
+    """Strip ``0x``/spaces from a key id or fingerprint and upper-case it."""
+    compact = (key_ref or "").replace(" ", "").strip()
+    m = _HEX_RE.match(compact)
+    return m.group(1).upper() if m else compact.upper()
 
 
 def _require_gnupg() -> Any:
@@ -44,40 +109,227 @@ def _require_gnupg() -> Any:
     return gnupg
 
 
+def _epoch(value: Any) -> datetime | None:
+    try:
+        num = int(str(value))
+    except (TypeError, ValueError):
+        return None
+    if num <= 0:
+        return None
+    return datetime.fromtimestamp(num, tz=UTC)
+
+
+def _emails(uids: list[str]) -> list[str]:
+    found: list[str] = []
+    for uid in uids:
+        for m in _EMAIL_RE.findall(uid):
+            low = m.lower()
+            if low not in found:
+                found.append(low)
+    return found
+
+
+_ALGOS = {"1": "RSA", "16": "ElGamal", "17": "DSA", "18": "ECDH", "19": "ECDSA", "22": "EdDSA"}
+
+
 class PgpEngine:
     """Thin, testable wrapper around a ``python-gnupg`` GPG instance.
 
-    One instance per ``GNUPGHOME``; each call opens its own ``gnupg.GPG()``
-    (cheap — python-gnupg shells out per-call anyway) so this class holds no
-    long-lived subprocess state.
+    One instance per keyring; each call opens its own ``gnupg.GPG()`` (cheap —
+    python-gnupg shells out per call anyway) so no long-lived subprocess state.
     """
 
-    def __init__(self, gnupghome: str) -> None:
+    def __init__(
+        self,
+        gnupghome: str,
+        *,
+        gpg_bin: str = "gpg",
+        options: tuple[str, ...] | list[str] = (),
+        passwords: dict[str, str] | None = None,
+        digest: str = "",
+    ) -> None:
         if not gnupghome:
-            raise CryptoUnavailableError("PGP GNUPGHOME is not configured")
+            raise CryptoUnavailableError(
+                "PGP keyring (GNUPGHOME / PGP::Options --homedir) is not configured"
+            )
         self._gnupghome = gnupghome
+        self._gpg_bin = gpg_bin or "gpg"
+        self._options = list(options)
+        self._passwords = {normalize_key_ref(k): v for k, v in (passwords or {}).items()}
+        self._digest = digest
+
+    @classmethod
+    def from_config(cls, cfg: Any) -> PgpEngine:
+        """Build from a :class:`tiqora.crypto.config.PgpConfig`."""
+        return cls(
+            cfg.homedir,
+            gpg_bin=cfg.gpg_bin,
+            options=cfg.options,
+            passwords=cfg.passwords,
+            digest=cfg.digest,
+        )
+
+    @property
+    def gnupghome(self) -> str:
+        return self._gnupghome
 
     def _gpg(self) -> Any:
         gnupg = _require_gnupg()
-        Path(self._gnupghome).mkdir(parents=True, exist_ok=True)
-        gpg = gnupg.GPG(gnupghome=self._gnupghome)
+        home = Path(self._gnupghome)
+        if not home.exists():
+            home.mkdir(parents=True, exist_ok=True)
+            home.chmod(0o700)
+        try:
+            gpg = gnupg.GPG(
+                gpgbinary=self._gpg_bin,
+                gnupghome=self._gnupghome,
+                options=self._options or None,
+                env={**os.environ, "LC_MESSAGES": "POSIX"},
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise CryptoUnavailableError(f"gpg not usable ({self._gpg_bin!r}): {exc}") from exc
         gpg.encoding = "utf-8"
         return gpg
+
+    # ------------------------------------------------------------------ keys
 
     def import_key(self, key_data: str) -> list[str]:
         """Import an ASCII-armored public or private key. Returns fingerprints."""
         result = self._gpg().import_keys(key_data)
         if not result.fingerprints:
             raise CryptoError(f"PGP key import failed: {result.stderr}")
-        return list(result.fingerprints)
+        # A secret key import lists the fingerprint twice (pub + sec).
+        return list(dict.fromkeys(str(fp) for fp in result.fingerprints))
 
     def list_key_fingerprints(self, *, secret: bool = False) -> list[str]:
         keys = self._gpg().list_keys(secret)
         return [str(k["fingerprint"]) for k in keys]
 
-    def sign(self, data: bytes, key_id: str, *, passphrase: str | None = None) -> bytes:
-        """Detached ASCII-armored signature over *data*."""
-        signed = self._gpg().sign(data, keyid=key_id, detach=True, passphrase=passphrase)
+    def list_keys(self) -> list[PgpKeyInfo]:
+        """All keys in the keyring with parsed metadata (public + secret merged)."""
+        gpg = self._gpg()
+        secret_fps = {str(k["fingerprint"]).upper() for k in gpg.list_keys(True)}
+        now = datetime.now(UTC)
+        out: list[PgpKeyInfo] = []
+        for raw in gpg.list_keys(False):
+            uids = [str(u) for u in raw.get("uids") or []]
+            expires = _epoch(raw.get("expires"))
+            trust = str(raw.get("trust") or "")
+            if trust == "r":
+                status = "revoked"
+            elif trust == "e" or (expires is not None and expires <= now):
+                status = "expired"
+            else:
+                status = "good"
+            try:
+                bits: int | None = int(str(raw.get("length")))
+            except (TypeError, ValueError):
+                bits = None
+            key_id = str(raw.get("keyid") or "").upper()
+            fp = str(raw.get("fingerprint") or "").upper()
+            out.append(
+                PgpKeyInfo(
+                    fingerprint=fp,
+                    key_id=key_id,
+                    short_id=key_id[-8:],
+                    uids=uids,
+                    emails=_emails(uids),
+                    created=_epoch(raw.get("date")),
+                    expires=expires,
+                    status=status,
+                    has_secret=fp in secret_fps,
+                    bits=bits,
+                    algorithm=_ALGOS.get(str(raw.get("algo") or ""), str(raw.get("algo") or "")),
+                    subkey_ids=[str(s[0]).upper() for s in raw.get("subkeys") or [] if s],
+                )
+            )
+        return out
+
+    def find_key(self, key_ref: str) -> PgpKeyInfo | None:
+        for key in self.list_keys():
+            if key.matches(key_ref):
+                return key
+        return None
+
+    def search(self, email: str, *, secret: bool = False) -> list[PgpKeyInfo]:
+        """Keys whose uids contain *email* (Znuny ``PublicKeySearch``/``PrivateKeySearch``)."""
+        needle = email.strip().lower()
+        return [k for k in self.list_keys() if needle in k.emails and (k.has_secret or not secret)]
+
+    def delete_key(self, key_ref: str, *, secret_only: bool = False) -> PgpKeyInfo:
+        """Delete a key. ``secret_only`` keeps the public part (Znuny ``SecretKeyDelete``).
+
+        Deleting the whole key removes the secret part first — gpg refuses to
+        delete a public key while its secret key is still present.
+        """
+        key = self.find_key(key_ref)
+        if key is None:
+            raise CryptoNotFoundError(f"PGP key {key_ref!r} not found")
+        gpg = self._gpg()
+        if key.has_secret:
+            res = gpg.delete_keys(
+                key.fingerprint, secret=True, passphrase=self.passphrase_for(key) or ""
+            )
+            if str(res.status) != "ok":
+                raise CryptoError(f"PGP secret key delete failed: {res.status} {res.stderr[-300:]}")
+        elif secret_only:
+            raise CryptoError(f"PGP key {key_ref!r} has no secret key")
+        if not secret_only:
+            res = gpg.delete_keys(key.fingerprint)
+            if str(res.status) != "ok":
+                raise CryptoError(f"PGP key delete failed: {res.status} {res.stderr[-300:]}")
+        return key
+
+    def export_public(self, key_ref: str) -> str:
+        key = self.find_key(key_ref)
+        if key is None:
+            raise CryptoNotFoundError(f"PGP key {key_ref!r} not found")
+        armored = self._gpg().export_keys(key.fingerprint)
+        if not armored:
+            raise CryptoError(f"PGP key export failed for {key_ref!r}")
+        return str(armored)
+
+    def passphrase_for(self, key: PgpKeyInfo | str) -> str | None:
+        """Passphrase from ``PGP::Key::Password`` for any id of *key*."""
+        if not self._passwords:
+            return None
+        if isinstance(key, str):
+            ref = normalize_key_ref(key)
+            if ref in self._passwords:
+                return self._passwords[ref]
+            found = self.find_key(key)
+            if found is None:
+                return None
+            key = found
+        for ident in [key.znuny_key_id, *sorted(key.all_ids())]:
+            if ident in self._passwords:
+                return self._passwords[ident]
+        return None
+
+    # ------------------------------------------------------------- operations
+
+    def _digest_args(self) -> list[str]:
+        return ["--personal-digest-preferences", self._digest.upper()] if self._digest else []
+
+    def sign(
+        self,
+        data: bytes,
+        key_id: str,
+        *,
+        passphrase: str | None = None,
+        clearsign: bool = False,
+    ) -> bytes:
+        """Detached (default) or clear-signed ASCII-armored signature over *data*."""
+        if passphrase is None:
+            passphrase = self.passphrase_for(key_id)
+        signed = self._gpg().sign(
+            data,
+            keyid=key_id,
+            detach=not clearsign,
+            clearsign=clearsign,
+            passphrase=passphrase,
+            extra_args=self._digest_args() or None,
+        )
         if not signed:
             raise CryptoError(f"PGP sign failed: {getattr(signed, 'stderr', '')}")
         return bytes(signed.data)
@@ -91,6 +343,8 @@ class PgpEngine:
         passphrase: str | None = None,
         always_trust: bool = True,
     ) -> bytes:
+        if sign_key_id and passphrase is None:
+            passphrase = self.passphrase_for(sign_key_id)
         result = self._gpg().encrypt(
             data,
             recipients,
@@ -107,13 +361,27 @@ class PgpEngine:
     ) -> PgpDecryptResult:
         """Decrypt (and, if the payload is also signed, verify).
 
-        ``result.valid`` from python-gnupg reflects signature validity when
-        the decrypted payload was also signed; for encrypt-only payloads it
-        stays ``False`` even though decryption succeeded — callers should
-        check ``ok`` for decrypt success and ``verify`` (``None`` if
-        unsigned) separately for signature status.
+        Without an explicit passphrase, tries no passphrase first and then every
+        distinct ``PGP::Key::Password`` value (Znuny looks up the password of
+        the key the message was encrypted for; gpg ≥ 2.5 no longer reports the
+        recipients reliably in batch mode, so trying the configured ones is the
+        robust equivalent).
+
+        ``verify`` is ``None`` for unsigned payloads; ``ok`` reflects decrypt
+        success independently of signature validity.
         """
-        result = self._gpg().decrypt(data, passphrase=passphrase, always_trust=always_trust)
+        gpg = self._gpg()
+        candidates: list[str | None] = (
+            [passphrase]
+            if passphrase is not None
+            else [None, *dict.fromkeys(self._passwords.values())]
+        )
+        result: Any = None
+        for candidate in candidates:
+            result = gpg.decrypt(data, passphrase=candidate, always_trust=always_trust)
+            if result.ok:
+                break
+        assert result is not None
         verify = None
         if result.fingerprint:
             verify = PgpVerifyStatus(
@@ -121,6 +389,8 @@ class PgpEngine:
                 fingerprint=result.fingerprint,
                 username=result.username,
                 status=result.status or "",
+                key_id=getattr(result, "key_id", None),
+                trust_level=getattr(result, "trust_level", None),
             )
         return PgpDecryptResult(
             ok=bool(result.ok),
@@ -137,4 +407,6 @@ class PgpEngine:
             fingerprint=result.fingerprint,
             username=result.username,
             status=result.status or "",
+            key_id=getattr(result, "key_id", None),
+            trust_level=getattr(result, "trust_level", None),
         )

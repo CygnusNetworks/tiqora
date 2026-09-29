@@ -6,9 +6,7 @@
 from __future__ import annotations
 
 import shutil
-import subprocess
 import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -95,41 +93,28 @@ def test_pgp_sign_with_unknown_key_leaves_body_unchanged() -> None:
 
 
 @pytest.mark.skipif(shutil.which("openssl") is None, reason="openssl binary not on PATH")
-def test_smime_sign_applies_signature_via_keystore() -> None:
+@pytest.mark.parametrize("by", ["email", "filename"])
+def test_smime_sign_applies_signature_via_znuny_store(by: str) -> None:
+    from tests._smime_fixtures import make_leaf
+    from tiqora.crypto.smime_store import SmimeStore
+
     with (
         tempfile.TemporaryDirectory() as cert_dir,
         tempfile.TemporaryDirectory() as private_dir,
     ):
-        cert_path = Path(cert_dir) / "agent@example.com.crt"
-        key_path = Path(private_dir) / "agent@example.com.key"
-        subprocess.run(
-            [
-                "openssl",
-                "req",
-                "-x509",
-                "-newkey",
-                "rsa:2048",
-                "-keyout",
-                str(key_path),
-                "-out",
-                str(cert_path),
-                "-days",
-                "2",
-                "-nodes",
-                "-subj",
-                "/CN=agent@example.com",
-            ],
-            capture_output=True,
-            check=True,
-        )
+        leaf = make_leaf("agent@example.org")
+        store = SmimeStore(cert_dir, private_dir)
+        entry = store.add_certificate(leaf.cert_pem)
+        store.add_private_key(leaf.encrypted_key("geheim"), "geheim")
         article = _article()
         settings = Settings(
             TIQORA_CRYPTO_SMIME_ENABLED="1",
             TIQORA_CRYPTO_SMIME_CERT_DIR=cert_dir,
             TIQORA_CRYPTO_SMIME_PRIVATE_DIR=private_dir,
         )
+        sign_key = "agent@example.org" if by == "email" else entry.filename
         result = apply_email_security_sync(
-            article, {"Backend": "SMIME", "SignKey": "agent@example.com"}, settings
+            article, {"Backend": "SMIME", "SignKey": sign_key}, settings
         )
         assert "MIME-Version" in result.body
         assert result.content_type == "application/pkcs7-mime"
