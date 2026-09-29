@@ -2095,6 +2095,12 @@ async def ticket_forward(
             }
         except (TicketNotFound, TicketAccessDenied, InvalidInput) as e:
             return {"error": str(e)}
+        except Exception as e:  # forward is sent by SMTP now
+            from tiqora.channels.email.outbound_reply import OutboundMailError
+
+            if isinstance(e, OutboundMailError):
+                return {"error": f"Outbound email delivery failed: {e}"}
+            raise
 
 
 @mcp.tool(

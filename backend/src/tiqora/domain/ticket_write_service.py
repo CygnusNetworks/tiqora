@@ -29,7 +29,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -73,6 +73,9 @@ from tiqora.znuny.search_flag import mark_search_rebuild, message_id_md5
 from tiqora.znuny.sysconfig import SysConfig
 from tiqora.znuny.ticket_index import ticket_accelerator_add, ticket_accelerator_update
 from tiqora.znuny.ticket_number import ticket_create_number
+
+if TYPE_CHECKING:
+    from tiqora.crypto.compose import EmailSecurityIn
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -145,6 +148,9 @@ class ArticleIn:
     history_type_override: str | None = None
     # Only read by the outgoing agent Telegram path (channels.telegram.outbound).
     telegram: TelegramSendOptions | None = None
+    # Only read by the outgoing agent email path (channels.email.outbound_reply):
+    # PGP / S/MIME signing and encryption of the sent mail.
+    email_security: EmailSecurityIn | None = None
 
 
 @dataclass
@@ -2486,18 +2492,37 @@ class TicketWriteService:
         body: str,
         to_address: str,
         cc: str | None = None,
+        email_security: EmailSecurityIn | None = None,
     ) -> int:
+        """Forward by email: SMTP send-then-store like a reply (history 'Forward').
+
+        Goes through :func:`deliver_agent_email_reply`, so the forward is
+        really sent when outbound mail is enabled (Znuny AgentTicketForward)
+        and can be signed/encrypted (``email_security``).
+        """
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
-        return await forward_article(
+        from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+        return await deliver_agent_email_reply(
             self._session,
+            self._sysconfig,
+            self._resolve_mail_sender(),
             ticket_id=ticket_id,
-            subject=subject,
-            body=body,
-            to_address=to_address,
-            cc=cc,
+            queue_id=int(t["queue_id"]),
             user_id=user_id,
-            sysconfig=self._sysconfig,
+            article=ArticleIn(
+                sender_type="agent",
+                is_visible_for_customer=True,
+                subject=subject,
+                body=body,
+                content_type="text/plain; charset=utf-8",
+                to_address=to_address,
+                cc=cc,
+                channel="email",
+                history_type_override="Forward",
+                email_security=email_security,
+            ),
         )
 
     async def bounce_article(
