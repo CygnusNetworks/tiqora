@@ -14394,6 +14394,149 @@
         "title": "PgpImportOut",
         "type": "object"
       },
+      "PhoneCallRequest": {
+        "properties": {
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/ArticleAttachmentIn"
+            },
+            "maxItems": 20,
+            "title": "Attachments",
+            "type": "array"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "caller_number": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Number"
+          },
+          "content_type": {
+            "default": "text/plain",
+            "enum": [
+              "text/plain",
+              "text/html"
+            ],
+            "title": "Content Type",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "dynamic_fields": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Dynamic Fields",
+            "type": "object"
+          },
+          "is_visible_for_customer": {
+            "default": true,
+            "title": "Is Visible For Customer",
+            "type": "boolean"
+          },
+          "pending_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Time"
+          },
+          "state_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Id"
+          },
+          "subject": {
+            "maxLength": 3800,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          },
+          "time_unit": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Unit"
+          }
+        },
+        "required": [
+          "direction",
+          "subject",
+          "body"
+        ],
+        "title": "PhoneCallRequest",
+        "type": "object"
+      },
+      "PhoneCallResponse": {
+        "properties": {
+          "article_id": {
+            "title": "Article Id",
+            "type": "integer"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "time_accounting_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Accounting Id"
+          }
+        },
+        "required": [
+          "article_id",
+          "ticket_id",
+          "time_accounting_id",
+          "locked"
+        ],
+        "title": "PhoneCallResponse",
+        "type": "object"
+      },
       "PhoneNoteRequest": {
         "properties": {
           "agent_user_id": {
@@ -59471,6 +59614,94 @@
           }
         },
         "summary": "Merge Ticket",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/phone-calls": {
+      "post": {
+        "description": "Log an inbound or outbound phone call (Znuny AgentTicketPhoneInbound/\nOutbound). Requires ``rw`` on the ticket's queue.\n\nOne transaction: ``Phone`` article (sender customer/agent, history\nPhoneCallCustomer/PhoneCallAgent), time accounting bound to it, ticket\ndynamic fields, attachments and the next state. Outbound calls lock the\nticket to the agent (``AgentTicketPhoneOutbound###RequiredLock``); a lock\nheld by another agent is a 409 with ``locked_by_*`` in the detail.",
+        "operationId": "log_phone_call_endpoint_api_v1_tickets__ticket_id__phone_calls_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneCallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneCallResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "409": {
+            "description": "Outbound call on a ticket locked by another agent"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Log Phone Call Endpoint",
         "tags": [
           "tickets"
         ]

@@ -2135,7 +2135,7 @@ async def create_time_accounting(
     """Book time units on a ticket (requires ``rw``)."""
     from sqlalchemy import text
 
-    from tiqora.domain.ticket_write_service import _ticket_must_exist
+    from tiqora.domain.ticket_write_service import _ticket_must_exist, add_time_accounting
 
     if body.time_unit <= 0:
         raise HTTPException(
@@ -2147,20 +2147,12 @@ async def create_time_accounting(
         async with session.begin():
             ticket = await _ticket_must_exist(session, ticket_id)
             await svc._assert_rw(user.id, int(ticket["queue_id"]))
-            await session.execute(
-                text(
-                    "INSERT INTO time_accounting"
-                    " (ticket_id, article_id, time_unit, create_time, create_by,"
-                    "  change_time, change_by)"
-                    " VALUES (:tid, :aid, :units, current_timestamp, :uid,"
-                    "         current_timestamp, :uid)"
-                ),
-                {
-                    "tid": ticket_id,
-                    "aid": body.article_id,
-                    "units": body.time_unit,
-                    "uid": user.id,
-                },
+            entry_id = await add_time_accounting(
+                session,
+                ticket_id=ticket_id,
+                article_id=body.article_id,
+                time_unit=body.time_unit,
+                user_id=user.id,
             )
             row = (
                 (
@@ -2170,10 +2162,9 @@ async def create_time_accounting(
                             " ta.create_time, ta.create_by, u.login AS create_by_login"
                             " FROM time_accounting ta"
                             " LEFT JOIN users u ON u.id = ta.create_by"
-                            " WHERE ta.ticket_id = :tid AND ta.create_by = :uid"
-                            " ORDER BY ta.id DESC LIMIT 1"
+                            " WHERE ta.id = :eid"
                         ),
-                        {"tid": ticket_id, "uid": user.id},
+                        {"eid": entry_id},
                     )
                 )
                 .mappings()

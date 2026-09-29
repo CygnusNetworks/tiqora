@@ -852,6 +852,39 @@ async def add_article(
     return article_id
 
 
+async def add_time_accounting(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    article_id: int | None,
+    time_unit: float,
+    user_id: int,
+) -> int:
+    """Book *time_unit* on a ticket (``TicketAccountTime``); returns the row id."""
+    await session.execute(
+        text(
+            "INSERT INTO time_accounting"
+            " (ticket_id, article_id, time_unit, create_time, create_by,"
+            "  change_time, change_by)"
+            " VALUES (:tid, :aid, :units, current_timestamp, :uid,"
+            "         current_timestamp, :uid)"
+        ),
+        {"tid": ticket_id, "aid": article_id, "units": time_unit, "uid": user_id},
+    )
+    row = (
+        await session.execute(
+            text(
+                "SELECT id FROM time_accounting WHERE ticket_id = :tid AND create_by = :uid"
+                " ORDER BY id DESC LIMIT 1"
+            ),
+            {"tid": ticket_id, "uid": user_id},
+        )
+    ).first()
+    if row is None:
+        raise RuntimeError("time_accounting insert succeeded but id read-back failed")
+    return int(row[0])
+
+
 async def resume_ai_automation(
     session: AsyncSession,
     *,

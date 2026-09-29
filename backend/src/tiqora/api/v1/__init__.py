@@ -15,6 +15,7 @@ from tiqora.api.v1 import (
     events,
     kb,
     oauth2_callback,
+    phone_calls,
     process,
     queues,
     reference,
@@ -34,6 +35,7 @@ api_v1_router.include_router(calendar.router)
 api_v1_router.include_router(queues.router)
 api_v1_router.include_router(tickets.router)
 api_v1_router.include_router(tickets_telegram.router)
+api_v1_router.include_router(phone_calls.router)
 api_v1_router.include_router(ai.router)
 api_v1_router.include_router(ai.refine_router)
 api_v1_router.include_router(process.router)
