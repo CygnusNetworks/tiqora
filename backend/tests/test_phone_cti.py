@@ -231,6 +231,15 @@ async def test_dismiss_unknown_or_foreign_call() -> None:
     assert msg["user_ids"] == [7]
 
 
+async def test_dismissed_agent_is_not_renotified() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing")
+    await _event(redis, "ringing", ext="101")
+    assert await cti.dismiss_call(cast(Any, redis), "c1", 7) is True
+    result = await _event(redis, "hangup", ext=None, at=T0 + timedelta(seconds=30))
+    assert result.recipients == [8]
+
+
 # ---------------------------------------------------------------------------
 # SSE filter
 # ---------------------------------------------------------------------------
