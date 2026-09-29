@@ -126,6 +126,7 @@ function makeTicket(overrides: Partial<TicketListItem> & { id: number }): Ticket
     escalation_solution_time: 0,
     until_time: 0,
     attachment_count: 0,
+    channel: "email",
     has_ai_summary: false,
     ai_escalated: false,
     archive_flag: 0,

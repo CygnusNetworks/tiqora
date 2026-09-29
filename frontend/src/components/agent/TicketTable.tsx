@@ -19,6 +19,8 @@ import {
   stateColorVar,
   type EscalationLevel,
 } from "@/lib/status";
+import { asTicketChannel, TICKET_CHANNELS } from "@/lib/ticketChannel";
+import { ChannelPill } from "./TicketChannel";
 
 export type SortKey =
   | "activity"
@@ -431,7 +433,11 @@ function TicketRow({
     escalationEpochs(ticket),
     ESCALATION_SOON_SECONDS,
   );
-  const spineColor = escLevel === "none" ? stateColorVar(ticket.state) : undefined;
+  const channel = asTicketChannel(ticket.channel);
+  // The edge shows the chat channel (Telegram, web chat) instead of the state
+  // colour — the state is in its own column; an escalation still wins.
+  const spineColor =
+    escLevel === "none" ? (TICKET_CHANNELS[channel].spineVar ?? stateColorVar(ticket.state)) : undefined;
   const nearest = nearestEscalation(ticket);
   const isSelected = selection?.selected.has(ticket.id) ?? false;
   const attachmentCount = ticket.attachment_count ?? 0;
@@ -455,6 +461,11 @@ function TicketRow({
   // a customer_user_id-only ticket has nothing to filter on.
   const canFilterByCustomer = Boolean(onCustomerClick && customerNumber);
   const senderFallback = !customerLabel ? senderDisplayName(ticket.first_from) : null;
+  // An unlinked Telegram chat belongs to the channel's shared guest customer,
+  // which says nothing about who wrote — show the chat's name instead.
+  const chatName = ticket.chat_display_name || null;
+  const chatHandle = ticket.chat_username ? `@${ticket.chat_username}` : null;
+  const chatIdentity = chatName || chatHandle;
 
   const escalationBadge = escLevel !== "none" && nearest != null && (
     <span
@@ -650,8 +661,14 @@ function TicketRow({
         <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted">
           <span className="flex-none font-mono text-[11px] tabular-nums text-accent">{ticket.tn}</span>
           <span aria-hidden>·</span>
+          <ChannelPill channel={channel} testId={`ticket-channel-${ticket.id}`} />
           <span className="min-w-0 truncate" data-testid={`ticket-customer-cell-${ticket.id}`}>
-            {customerLabel ? (
+            {chatIdentity ? (
+              <span data-testid={`ticket-chat-identity-${ticket.id}`}>
+                {chatName ?? chatHandle}
+                {chatName && chatHandle && <span className="text-muted/70"> {chatHandle}</span>}
+              </span>
+            ) : customerLabel ? (
               <span
                 className={cn(
                   "inline",

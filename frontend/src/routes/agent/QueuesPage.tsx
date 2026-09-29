@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
-import { api, type MutationRequest, type TicketListItem } from "@/lib/api";
+import { api, type MutationRequest, type TicketListChannel, type TicketListItem } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import {
   ESCALATION_SOON_SECONDS,
@@ -16,6 +16,7 @@ import { Menu, MenuItem } from "@/components/ui/Menu";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { FlagIcon, LockIcon, MoreIcon, UserDashedIcon } from "@/components/ui/icons";
+import { TICKET_CHANNEL_KEYS, TICKET_CHANNELS } from "@/lib/ticketChannel";
 import { runConcurrent } from "@/lib/bulk";
 import { cn } from "@/lib/cn";
 
@@ -75,6 +76,8 @@ export type QueuesSearch = {
   escalated?: boolean;
   /** True = only tickets nobody owns yet. */
   unassigned?: boolean;
+  /** Only these channels (any of them); unset = all. */
+  channel?: TicketListChannel[];
   /** Optional page title override key for preset views (i18n under views.*). */
   view?: "locked" | "mine" | "responsible" | "watched" | "escalated" | "service";
   offset?: number;
@@ -109,6 +112,7 @@ type FilterParams = {
   watcher_user_id?: number;
   escalated?: boolean;
   unassigned?: boolean;
+  channel?: TicketListChannel[];
   include_archived?: boolean;
 };
 
@@ -158,6 +162,8 @@ export function QueuesPage() {
   const watcherUserId = search.watcher_user_id;
   const escalated = search.escalated;
   const unassigned = search.unassigned;
+  const channel = search.channel;
+  const channelKey = channel?.join(",") ?? "";
   const view = search.view;
   const offset = search.offset ?? 0;
   const limit = search.limit ?? 50;
@@ -181,6 +187,7 @@ export function QueuesPage() {
     locked: locked || undefined,
     escalated: escalated || undefined,
     unassigned: unassigned || undefined,
+    channel: channel?.length ? channel : undefined,
   };
   const listParams = { ...filterParams, offset, limit, sort, order };
 
@@ -238,6 +245,7 @@ export function QueuesPage() {
     watcherUserId,
     escalated,
     unassigned,
+    channelKey,
     offset,
     sort,
     order,
@@ -511,7 +519,12 @@ export function QueuesPage() {
     locked: locked === true,
     unassigned: unassigned === true,
   };
-  const anyFlag = flagValue.escalated || flagValue.locked || flagValue.unassigned;
+  const anyFlag =
+    flagValue.escalated || flagValue.locked || flagValue.unassigned || Boolean(channel?.length);
+  const toggleChannel = (key: TicketListChannel) => {
+    const next = channel?.includes(key) ? channel.filter((c) => c !== key) : [...(channel ?? []), key];
+    setSearch({ channel: next.length ? next : undefined, offset: 0 });
+  };
   const flagChips: { key: FlagKey; icon: ReactNode; label: string; tone?: "danger" }[] = [
     { key: "escalated", icon: <FlagIcon />, label: t("queue.flags.escalated"), tone: "danger" },
     { key: "locked", icon: <LockIcon />, label: t("queue.flags.locked") },
@@ -698,12 +711,23 @@ export function QueuesPage() {
               </button>
             );
           })}
+          <ChannelChips
+            active={channel ?? []}
+            counts={facets?.channels}
+            onToggle={toggleChannel}
+          />
           {anyFlag && (
             <button
               type="button"
               data-testid="queue-flag-reset"
               onClick={() =>
-                setSearch({ escalated: undefined, locked: undefined, unassigned: undefined, offset: 0 })
+                setSearch({
+                  escalated: undefined,
+                  locked: undefined,
+                  unassigned: undefined,
+                  channel: undefined,
+                  offset: 0,
+                })
               }
               className="px-1.5 text-[12px] text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
             >
@@ -966,4 +990,63 @@ function BulkMenu<T extends string | number>({
 
 function capitalize(field: BulkField): string {
   return field.charAt(0).toUpperCase() + field.slice(1);
+}
+
+/**
+ * Channel filter chips next to the "Nur" flags. Several can be active (any of
+ * them). The group only shows once a chat channel has tickets in the current
+ * scope — an e-mail-only install sees no "E-Mail 345" chip — and a chat
+ * channel without tickets (web chat before it goes live) stays hidden.
+ */
+function ChannelChips({
+  active,
+  counts,
+  onToggle,
+}: {
+  active: TicketListChannel[];
+  counts: Record<TicketListChannel, number> | undefined;
+  onToggle: (key: TicketListChannel) => void;
+}) {
+  const { t } = useTranslation();
+  const visible = TICKET_CHANNEL_KEYS.filter(
+    (key) => active.includes(key) || key === "email" || (counts?.[key] ?? 0) > 0,
+  );
+  const anyChat = TICKET_CHANNEL_KEYS.some((k) => k !== "email" && (counts?.[k] ?? 0) > 0);
+  if (!anyChat && active.length === 0) return null;
+  return (
+    <span
+      className="inline-flex flex-wrap items-center gap-1.5"
+      role="group"
+      aria-label={t("queue.channel.label")}
+      data-testid="queue-channel-chips"
+    >
+      <span aria-hidden className="mx-1 h-4 w-px bg-hairline" />
+      <span className="mr-0.5 text-[12px] text-muted">{t("queue.channel.label")}</span>
+      {visible.map((key) => {
+        const meta = TICKET_CHANNELS[key];
+        const Icon = meta.icon;
+        const on = active.includes(key);
+        const count = counts?.[key];
+        return (
+          <button
+            key={key}
+            type="button"
+            aria-pressed={on}
+            data-testid={`queue-channel-${key}`}
+            onClick={() => onToggle(key)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-[3px] text-[12px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+              on
+                ? "border-accent/50 bg-accent-dim text-accent"
+                : "border-hairline bg-surface text-muted hover:border-muted hover:text-ink",
+            )}
+          >
+            <Icon className={cn("h-3.5 w-3.5", !on && meta.iconCls)} />
+            {t(meta.labelKey)}
+            {count != null && <span className="font-mono text-[10.5px] tabular-nums">{count}</span>}
+          </button>
+        );
+      })}
+    </span>
+  );
 }

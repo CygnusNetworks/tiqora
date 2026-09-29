@@ -313,6 +313,12 @@
       "yesterday": "Gestern",
       "week": "Diese Woche",
       "older": "Älter"
+    },
+    "channel": {
+      "label": "Kanal",
+      "email": "E-Mail",
+      "telegram": "Telegram",
+      "webchat": "Webchat"
     }
   },
   "ticket": {

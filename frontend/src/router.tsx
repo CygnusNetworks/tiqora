@@ -198,6 +198,13 @@ const agentQueuesRoute = createRoute({
         : typeof s.customer_id === "number"
           ? String(s.customer_id)
           : undefined;
+    // One value comes back from the URL as a plain string, several as an array.
+    const channels = (v: unknown): QueuesSearch["channel"] => {
+      const list = (Array.isArray(v) ? v : [v]).filter(
+        (c): c is "email" | "telegram" | "webchat" => c === "email" || c === "telegram" || c === "webchat",
+      );
+      return list.length ? [...new Set(list)] : undefined;
+    };
     const bool = (v: unknown): true | undefined =>
       v === true || v === "true" || v === 1 || v === "1" ? true : undefined;
     const view =
@@ -220,6 +227,7 @@ const agentQueuesRoute = createRoute({
       watcher_user_id: num(s.watcher_user_id),
       escalated: bool(s.escalated),
       unassigned: bool(s.unassigned),
+      channel: channels(s.channel),
       view,
       offset: num(s.offset),
       limit: num(s.limit),
