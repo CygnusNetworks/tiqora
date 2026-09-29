@@ -44,7 +44,6 @@ test_channels_sms.py
 test_channels_whatsapp.py
 test_compat_operations.py
 test_compat_soap_api.py
-test_crypto_keystore.py
 test_crypto_postmaster.py
 test_dev_anonymize.py
 test_dev_seed.py

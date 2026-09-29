@@ -6587,6 +6587,34 @@
         "title": "BacklogTrendOut",
         "type": "object"
       },
+      "BinaryStatusOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "path",
+          "version"
+        ],
+        "title": "BinaryStatusOut",
+        "type": "object"
+      },
       "Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post": {
         "properties": {
           "file": {
@@ -7236,8 +7264,58 @@
         "title": "ContainersOut",
         "type": "object"
       },
-      "CryptoKeyOut": {
+      "CryptoBackendStatusOut": {
+        "description": "PGP / S-MIME self-check: SysConfig switch, gpg/openssl binary, key directories.",
         "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "binary": {
+            "$ref": "#/components/schemas/BinaryStatusOut"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "paths": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "object"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "backend",
+          "enabled",
+          "available",
+          "binary",
+          "paths",
+          "problems"
+        ],
+        "title": "CryptoBackendStatusOut",
+        "type": "object"
+      },
+      "CryptoKeyOut": {
+        "description": "One audit row (not key material).",
+        "properties": {
+          "action": {
+            "default": "import",
+            "title": "Action",
+            "type": "string"
+          },
           "created": {
             "anyOf": [
               {
@@ -7249,6 +7327,17 @@
               }
             ],
             "title": "Created"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
           },
           "email": {
             "anyOf": [
@@ -7280,6 +7369,17 @@
           "purpose": {
             "title": "Purpose",
             "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
           }
         },
         "required": [
@@ -14694,6 +14794,146 @@
         "title": "PgpImportOut",
         "type": "object"
       },
+      "PgpKeyOut": {
+        "properties": {
+          "algorithm": {
+            "title": "Algorithm",
+            "type": "string"
+          },
+          "bits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bits"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "has_secret": {
+            "title": "Has Secret",
+            "type": "boolean"
+          },
+          "key_id": {
+            "title": "Key Id",
+            "type": "string"
+          },
+          "short_id": {
+            "title": "Short Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subkey_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subkey Ids",
+            "type": "array"
+          },
+          "uids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uids",
+            "type": "array"
+          },
+          "znuny_key_id": {
+            "title": "Znuny Key Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "key_id",
+          "short_id",
+          "znuny_key_id",
+          "uids",
+          "emails",
+          "status",
+          "has_secret",
+          "algorithm",
+          "subkey_ids"
+        ],
+        "title": "PgpKeyOut",
+        "type": "object"
+      },
+      "PgpUploadIn": {
+        "properties": {
+          "ascii_armor": {
+            "minLength": 20,
+            "title": "Ascii Armor",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ascii_armor"
+        ],
+        "title": "PgpUploadIn",
+        "type": "object"
+      },
+      "PgpUploadOut": {
+        "properties": {
+          "fingerprints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fingerprints",
+            "type": "array"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/PgpKeyOut"
+            },
+            "title": "Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fingerprints",
+          "keys"
+        ],
+        "title": "PgpUploadOut",
+        "type": "object"
+      },
       "PhoneCallRequest": {
         "properties": {
           "attachments": {
@@ -17712,6 +17952,64 @@
         "title": "ServiceUpdate",
         "type": "object"
       },
+      "SignKeyOptionOut": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "backend",
+          "method",
+          "key",
+          "label",
+          "status",
+          "emails"
+        ],
+        "title": "SignKeyOptionOut",
+        "type": "object"
+      },
       "SignatureOut": {
         "properties": {
           "change_time": {
@@ -18399,6 +18697,162 @@
         "title": "SlaUpdate",
         "type": "object"
       },
+      "SmimeCertOut": {
+        "properties": {
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "has_private": {
+            "title": "Has Private",
+            "type": "boolean"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "is_ca": {
+            "title": "Is Ca",
+            "type": "boolean"
+          },
+          "issuer": {
+            "title": "Issuer",
+            "type": "string"
+          },
+          "not_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not After"
+          },
+          "not_before": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Not Before"
+          },
+          "serial": {
+            "title": "Serial",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "filename",
+          "valid",
+          "hash",
+          "subject",
+          "issuer",
+          "fingerprint",
+          "serial",
+          "emails",
+          "status",
+          "has_private",
+          "is_ca"
+        ],
+        "title": "SmimeCertOut",
+        "type": "object"
+      },
+      "SmimeCertificateIn": {
+        "properties": {
+          "certificate": {
+            "minLength": 20,
+            "title": "Certificate",
+            "type": "string"
+          }
+        },
+        "required": [
+          "certificate"
+        ],
+        "title": "SmimeCertificateIn",
+        "type": "object"
+      },
+      "SmimeDeleteOut": {
+        "properties": {
+          "renamed": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Renamed",
+            "type": "object"
+          }
+        },
+        "required": [
+          "renamed"
+        ],
+        "title": "SmimeDeleteOut",
+        "type": "object"
+      },
+      "SmimePrivateKeyIn": {
+        "properties": {
+          "private_key": {
+            "minLength": 20,
+            "title": "Private Key",
+            "type": "string"
+          },
+          "secret": {
+            "default": "",
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "private_key"
+        ],
+        "title": "SmimePrivateKeyIn",
+        "type": "object"
+      },
+      "SmimePrivateKeyOut": {
+        "properties": {
+          "certificate": {
+            "$ref": "#/components/schemas/SmimeCertOut"
+          },
+          "secret_generated": {
+            "title": "Secret Generated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "certificate",
+          "secret_generated"
+        ],
+        "title": "SmimePrivateKeyOut",
+        "type": "object"
+      },
       "SmimeRegisterIn": {
         "properties": {
           "cert_pem": {
@@ -18431,6 +18885,11 @@
             "default": "both",
             "title": "Purpose",
             "type": "string"
+          },
+          "secret": {
+            "default": "",
+            "title": "Secret",
+            "type": "string"
           }
         },
         "required": [
@@ -18444,6 +18903,17 @@
           "email": {
             "title": "Email",
             "type": "string"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
           },
           "has_cert": {
             "title": "Has Cert",
@@ -18460,6 +18930,78 @@
           "has_key"
         ],
         "title": "SmimeRegisterOut",
+        "type": "object"
+      },
+      "SmimeRelationIn": {
+        "properties": {
+          "ca_filename": {
+            "title": "Ca Filename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ca_filename"
+        ],
+        "title": "SmimeRelationIn",
+        "type": "object"
+      },
+      "SmimeRelationOut": {
+        "properties": {
+          "ca_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ca Filename"
+          },
+          "ca_fingerprint": {
+            "title": "Ca Fingerprint",
+            "type": "string"
+          },
+          "ca_not_after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ca Not After"
+          },
+          "ca_subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ca Subject"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          }
+        },
+        "required": [
+          "ca_fingerprint"
+        ],
+        "title": "SmimeRelationOut",
         "type": "object"
       },
       "SmsInboundRequest": {
@@ -19645,6 +20187,14 @@
           },
           "containers": {
             "$ref": "#/components/schemas/ContainersOut"
+          },
+          "crypto": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CryptoBackendStatusOut"
+            },
+            "title": "Crypto",
+            "type": "array"
           },
           "datastores": {
             "$ref": "#/components/schemas/DatastoresOut"
@@ -29690,7 +30240,7 @@
     },
     "/api/v1/admin/crypto-keys": {
       "get": {
-        "description": "List audit rows for imported crypto keys (not key material).",
+        "description": "Audit trail of key-store mutations (newest first; never key material).",
         "operationId": "list_crypto_keys_api_v1_admin_crypto_keys_get",
         "parameters": [
           {
@@ -29758,9 +30308,152 @@
         ]
       }
     },
+    "/api/v1/admin/crypto-keys/pgp": {
+      "get": {
+        "operationId": "list_pgp_keys_api_v1_admin_crypto_keys_pgp_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PgpKeyOut"
+                  },
+                  "title": "Response List Pgp Keys Api V1 Admin Crypto Keys Pgp Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Pgp Keys",
+        "tags": [
+          "admin:crypto"
+        ]
+      },
+      "post": {
+        "description": "Import an ASCII-armored public or secret key (Znuny AdminPGP ``AddKey``).",
+        "operationId": "upload_pgp_key_api_v1_admin_crypto_keys_pgp_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PgpUploadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgpUploadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Pgp Key",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
     "/api/v1/admin/crypto-keys/pgp-import": {
       "post": {
-        "description": "Import a PGP key into the configured keyring + write audit rows.",
+        "description": "Alias of ``POST /pgp`` (kept for existing API clients).",
         "operationId": "admin_pgp_import_api_v1_admin_crypto_keys_pgp_import_post",
         "parameters": [
           {
@@ -29834,9 +30527,334 @@
         ]
       }
     },
+    "/api/v1/admin/crypto-keys/pgp/{key_id}": {
+      "delete": {
+        "operationId": "delete_pgp_key_api_v1_admin_crypto_keys_pgp__key_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Delete only the secret key, keep the public key",
+            "in": "query",
+            "name": "secret",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Delete only the secret key, keep the public key",
+              "title": "Secret",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Pgp Key",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/pgp/{key_id}/export": {
+      "get": {
+        "description": "Armored **public** key (secret keys are never exported).",
+        "operationId": "export_pgp_key_api_v1_admin_crypto_keys_pgp__key_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pgp-keys": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Pgp Key",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/sign-key-options": {
+      "get": {
+        "description": "Values for ``queue.default_sign_key`` in Znuny format (``PGP::Detached::<id>`` \u2026).",
+        "operationId": "sign_key_options_api_v1_admin_crypto_keys_sign_key_options_get",
+        "parameters": [
+          {
+            "description": "Only keys for this queue's system address (Znuny AdminQueue)",
+            "in": "query",
+            "name": "queue_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only keys for this queue's system address (Znuny AdminQueue)",
+              "title": "Queue Id"
+            }
+          },
+          {
+            "description": "Only keys for this address",
+            "in": "query",
+            "name": "email",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only keys for this address",
+              "title": "Email"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SignKeyOptionOut"
+                  },
+                  "title": "Response Sign Key Options Api V1 Admin Crypto Keys Sign Key Options Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sign Key Options",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/smime": {
+      "get": {
+        "operationId": "list_smime_api_v1_admin_crypto_keys_smime_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SmimeCertOut"
+                  },
+                  "title": "Response List Smime Api V1 Admin Crypto Keys Smime Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Smime",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
     "/api/v1/admin/crypto-keys/smime-register": {
       "post": {
-        "description": "Write S/MIME cert/key files under configured dirs + audit row.",
+        "description": "Alias: add a certificate and/or its private key to the Znuny-layout store.\n\n``email`` is informational only \u2014 the store files certificates by subject\nhash, the addresses come from the certificate itself.",
         "operationId": "admin_smime_register_api_v1_admin_crypto_keys_smime_register_post",
         "parameters": [
           {
@@ -29905,6 +30923,623 @@
           }
         },
         "summary": "Admin Smime Register",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/smime/certificates": {
+      "post": {
+        "operationId": "upload_smime_certificate_api_v1_admin_crypto_keys_smime_certificates_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmimeCertificateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmimeCertOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Smime Certificate",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/smime/private-keys": {
+      "post": {
+        "description": "Private key + secret for an already stored certificate (Znuny ``AddPrivate``).",
+        "operationId": "upload_smime_private_key_api_v1_admin_crypto_keys_smime_private_keys_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmimePrivateKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmimePrivateKeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Smime Private Key",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/smime/{filename}": {
+      "delete": {
+        "description": "Delete a certificate (with its private key and relations) or only the private key.",
+        "operationId": "delete_smime_api_v1_admin_crypto_keys_smime__filename__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Delete only the private key + secret",
+            "in": "query",
+            "name": "private_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Delete only the private key + secret",
+              "title": "Private Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmimeDeleteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Smime",
+        "tags": [
+          "admin:crypto"
+        ]
+      },
+      "get": {
+        "description": "The certificate PEM (never the private key).",
+        "operationId": "download_smime_certificate_api_v1_admin_crypto_keys_smime__filename__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/x-pem-file": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Smime Certificate",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/smime/{filename}/relations": {
+      "delete": {
+        "operationId": "delete_smime_relation_api_v1_admin_crypto_keys_smime__filename__relations_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ca_fingerprint",
+            "required": true,
+            "schema": {
+              "minLength": 10,
+              "title": "Ca Fingerprint",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Smime Relation",
+        "tags": [
+          "admin:crypto"
+        ]
+      },
+      "get": {
+        "description": "CA certificates attached to signatures made with this certificate.",
+        "operationId": "list_smime_relations_api_v1_admin_crypto_keys_smime__filename__relations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SmimeRelationOut"
+                  },
+                  "title": "Response List Smime Relations Api V1 Admin Crypto Keys Smime  Filename  Relations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Smime Relations",
+        "tags": [
+          "admin:crypto"
+        ]
+      },
+      "post": {
+        "operationId": "add_smime_relation_api_v1_admin_crypto_keys_smime__filename__relations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmimeRelationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SmimeRelationOut"
+                  },
+                  "title": "Response Add Smime Relation Api V1 Admin Crypto Keys Smime  Filename  Relations Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Smime Relation",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-keys/status": {
+      "get": {
+        "description": "Per backend: SysConfig switch, binary self-check, key directories.",
+        "operationId": "crypto_status_api_v1_admin_crypto_keys_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CryptoBackendStatusOut"
+                  },
+                  "title": "Response Crypto Status Api V1 Admin Crypto Keys Status Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Crypto Status",
         "tags": [
           "admin:crypto"
         ]

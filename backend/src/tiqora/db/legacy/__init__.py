@@ -30,6 +30,7 @@ from tiqora.db.legacy.config import (  # noqa: F401
     SysconfigModified,
     Valid,
 )
+from tiqora.db.legacy.crypto import SmimeKey, SmimeSignerCertRelation  # noqa: F401
 from tiqora.db.legacy.customer import (  # noqa: F401
     CustomerCompany,
     CustomerPreferences,

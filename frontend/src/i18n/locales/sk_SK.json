@@ -1643,7 +1643,9 @@
       "slas": "SLA",
       "systemAddresses": "Systémové adresy",
       "notificationEvents": "Notifikačné udalosti",
-      "ticketAttributeRelations": "Vzťahy atribútov"
+      "ticketAttributeRelations": "Vzťahy atribútov",
+      "pgp": "PGP keys",
+      "smime": "S/MIME certificates"
     },
     "table": {
       "id": "ID",
@@ -1839,7 +1841,9 @@
       "calendarName": "Kalendár",
       "defaultSignKey": "Predvolený znakový kľúč",
       "yes": "áno",
-      "no": "Nie"
+      "no": "Nie",
+      "defaultSignKeyNone": "No automatic signing",
+      "defaultSignKeyUnknown": "{{value}} (not available)"
     },
     "states": {
       "title_plural": "štátov",
@@ -2288,7 +2292,8 @@
         "services": "Služby na pozadí",
         "datastores": "Dátové úložiská a vyhľadávanie",
         "containers": "Kontajnery",
-        "host": "Zaťaženie hostiteľa"
+        "host": "Zaťaženie hostiteľa",
+        "crypto": "PGP & S/MIME"
       },
       "tier": {
         "live": "Naživo",
@@ -2349,6 +2354,11 @@
         "disk": "Disk",
         "cores": "{{count}} jadier · zaťaženie {{load}}",
         "notConfiguredHint": "psutil nie je nainštalovaný — metriky hostiteľa nie sú k dispozícii."
+      },
+      "crypto": {
+        "pgp": "PGP",
+        "smime": "S/MIME",
+        "noProblems": "No problems found."
       }
     },
     "daemons": {
@@ -2790,7 +2800,9 @@
       "slas": "Spravujte dohody o úrovni služieb a lehoty.",
       "systemAddresses": "E-mailové adresy používané ako From pre fronty a auto-odpovede.",
       "notificationEvents": "Konfigurujte notifikácie agentov riadené udalosťami.",
-      "ticketAttributeRelations": "Matice závislostí kompatibilné so Znuny (služba/fronta atď.) vo formáte CSV."
+      "ticketAttributeRelations": "Matice závislostí kompatibilné so Znuny (služba/fronta atď.) vo formáte CSV.",
+      "pgp": "Import, inspect and delete the PGP keys used to sign, encrypt and decrypt mail.",
+      "smime": "Manage S/MIME certificates, private keys and signer relations."
     },
     "types": {
       "title_plural": "Typy ticketov",
@@ -2837,6 +2849,110 @@
       "new": "Nový vzťah",
       "help": "CSV s hlavičkou Attribute1;Attribute2 a pármi hodnôt (Znuny AdminTicketAttributeRelations). Obmedzuje výbery vo formulároch (napr. Služba → Fronta).",
       "confirmDelete": "Odstrániť tento vzťah?"
+    },
+    "crypto": {
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "usable": "Ready",
+      "unusable": "Not usable",
+      "disabledHint": "Keys can be managed, but Tiqora does not sign, encrypt, decrypt or verify until the backend is enabled (SysConfig “{{setting}}” or TIQORA_CRYPTO_{{setting}}_ENABLED).",
+      "path": {
+        "homedir": "Keyring (--homedir)",
+        "cert_path": "Certificates (SMIME::CertPath)",
+        "private_path": "Private keys (SMIME::PrivatePath)"
+      }
+    },
+    "pgp": {
+      "title": "PGP keys",
+      "description": "The keyring is shared with Znuny (PGP::Options --homedir). Passphrases come from the SysConfig setting PGP::Key::Password.",
+      "upload": "Import key",
+      "uploading": "Importing…",
+      "uploadTitle": "Import PGP key",
+      "uploadDescription": "ASCII-armored public or secret key. Secret keys stay in the keyring and are never shown again.",
+      "file": "Key file",
+      "armor": "Or paste the armored key",
+      "uploaded_one": "{{count}} key imported.",
+      "uploaded_other": "{{count}} keys imported.",
+      "type": "Type",
+      "typeSecret": "Secret",
+      "typePublic": "Public",
+      "keyId": "Key ID",
+      "keyIdLong": "Long key ID",
+      "identity": "Identity",
+      "created": "Created",
+      "expires": "Expires",
+      "never": "never",
+      "fingerprint": "Fingerprint",
+      "subkeys": "Subkeys",
+      "algorithm": "Algorithm",
+      "status": {
+        "good": "valid",
+        "expired": "expired",
+        "revoked": "revoked"
+      },
+      "details": "Details",
+      "detailsTitle": "PGP key {{key}}",
+      "download": "Download public key",
+      "deleteSecret": "Delete secret key",
+      "deleteSecretConfirm": "Delete the secret key of {{key}}? The public key stays; mail can no longer be signed or decrypted with it.",
+      "delete": "Delete key",
+      "deleteConfirm": "Delete key {{key}} including its secret part from the shared keyring?",
+      "deleted": "Key deleted.",
+      "empty": "No PGP keys in the keyring.",
+      "loadError": "Could not load PGP keys"
+    },
+    "smime": {
+      "title": "S/MIME certificates",
+      "description": "Certificates and private keys in Znuny's layout (<hash>.<n>, secret in .P) — shared with Znuny.",
+      "addCertificate": "Add certificate",
+      "addPrivateKey": "Add private key",
+      "certTitle": "Add S/MIME certificate",
+      "certDescription": "PEM or DER certificate. Add the certificate before its private key.",
+      "certFile": "Certificate file",
+      "certPem": "Or paste the PEM certificate",
+      "certAdded": "Certificate stored as {{filename}}.",
+      "keyTitle": "Add private key",
+      "keyDescription": "The key is assigned to the stored certificate it belongs to.",
+      "keyFile": "Private key file",
+      "keyPem": "Or paste the PEM private key",
+      "secret": "Secret (key passphrase)",
+      "secretHelp": "Leave empty for an unencrypted key — it is then stored encrypted with a generated secret, as Znuny requires one.",
+      "keyAdded": "Private key stored for {{filename}}.",
+      "keyAddedGenerated": "Private key stored for {{filename}} (protected with a generated secret).",
+      "filename": "File",
+      "subject": "Subject",
+      "issuer": "Issuer",
+      "emails": "Email addresses",
+      "expires": "Valid until",
+      "notBefore": "Valid from",
+      "fingerprint": "Fingerprint (SHA-1)",
+      "serial": "Serial number",
+      "hash": "Subject hash",
+      "ca": "CA",
+      "privateKey": "Private key",
+      "status": {
+        "valid": "valid",
+        "expired": "expired",
+        "invalid": "invalid file"
+      },
+      "details": "Details",
+      "download": "Download certificate",
+      "relations": "Signer relations",
+      "relationsTitle": "Signer relations of {{filename}}",
+      "relationsDescription": "CA certificates attached to every signature made with this certificate, so recipients can verify the chain.",
+      "relationsEmpty": "No CA certificates attached.",
+      "relationSelect": "CA certificate",
+      "relationAdd": "Attach",
+      "relationRemove": "Remove",
+      "relationMissing": "Certificate no longer in the store",
+      "deletePrivate": "Delete private key",
+      "deletePrivateConfirm": "Delete the private key and secret of {{filename}}? The certificate stays.",
+      "delete": "Delete certificate",
+      "deleteConfirm": "Delete certificate {{filename}} including its private key and signer relations?",
+      "deleted": "Deleted.",
+      "renamed": "Renumbered: {{renamed}}.",
+      "empty": "No S/MIME certificates stored.",
+      "loadError": "Could not load S/MIME certificates"
     }
   },
   "kb": {

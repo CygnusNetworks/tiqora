@@ -9,14 +9,11 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import tempfile
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
 from tiqora.crypto import CryptoError
-from tiqora.crypto.keystore import SmimeKeyStore
 from tiqora.crypto.smime import SmimeEngine
 
 pytestmark = pytest.mark.skipif(
@@ -151,46 +148,28 @@ def test_openssl_binary_not_found_raises(selfsigned_cert: tuple[Path, Path]) -> 
 
 
 # ---------------------------------------------------------------------------
-# keystore.SmimeKeyStore
+# encrypted private keys (Znuny layout: secret in <file>.P)
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def key_dirs() -> Iterator[tuple[str, str]]:
-    with (
-        tempfile.TemporaryDirectory() as cert_dir,
-        tempfile.TemporaryDirectory() as private_dir,
-    ):
-        yield cert_dir, private_dir
+def test_sign_with_encrypted_key_needs_secret(engine: SmimeEngine, tmp_path: Path) -> None:
+    from tests._smime_fixtures import make_ca, make_leaf
 
+    ca = make_ca()
+    leaf = make_leaf("signer@example.org", ca=ca)
+    cert = tmp_path / "leaf.pem"
+    key = tmp_path / "leaf.key"
+    ca_file = tmp_path / "ca.pem"
+    cert.write_bytes(leaf.cert_pem)
+    key.write_bytes(leaf.encrypted_key("geheim"))
+    ca_file.write_bytes(ca.cert_pem)
 
-def test_smime_keystore_register_and_lookup(key_dirs: tuple[str, str]) -> None:
-    cert_dir, private_dir = key_dirs
-    store = SmimeKeyStore(cert_dir, private_dir)
-
-    paths = store.register("Alice@Example.com", cert_pem=b"CERT-DATA", key_pem=b"KEY-DATA")
-    assert paths.cert_path is not None
-    assert paths.key_path is not None
-
-    looked_up = store.lookup("alice@example.com")
-    assert looked_up.cert_path == paths.cert_path
-    assert looked_up.key_path == paths.key_path
-    assert looked_up.cert_path.read_bytes() == b"CERT-DATA"
-
-
-def test_smime_keystore_lookup_missing_returns_none(key_dirs: tuple[str, str]) -> None:
-    cert_dir, private_dir = key_dirs
-    store = SmimeKeyStore(cert_dir, private_dir)
-    result = store.lookup("nobody@example.com")
-    assert result.cert_path is None
-    assert result.key_path is None
-
-
-def test_smime_keystore_email_is_path_sanitized(key_dirs: tuple[str, str]) -> None:
-    cert_dir, private_dir = key_dirs
-    store = SmimeKeyStore(cert_dir, private_dir)
-    store.register("../../etc/passwd@evil.com", cert_pem=b"X")
-    # Must not have written outside cert_dir.
-    written = list(Path(cert_dir).iterdir())
-    assert len(written) == 1
-    assert written[0].parent == Path(cert_dir)
+    with pytest.raises(CryptoError):
+        engine.sign(b"data", str(cert), str(key), secret="falsch")
+    signed = engine.sign(
+        b"data", str(cert), str(key), secret="geheim", extra_cert_paths=[str(ca_file)]
+    )
+    # With the CA attached (signer relation), the chain verifies against the CA.
+    result = engine.verify(signed, ca_path=str(ca_file))
+    assert result.valid is True
+    assert result.chain_trusted is True
