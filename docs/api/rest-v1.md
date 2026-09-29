@@ -101,7 +101,7 @@ Response shape: `{"items": [...], "total": N}`. `limit` is 1–200 (default
 | `escalated` | `true` = any SLA escalation time already passed. |
 | `escalating_within` | Seconds: an escalation time is due before now + this window (overdue included). |
 | `ai_escalated` | `true` = the AI handed the ticket to a human and nobody has taken over yet. |
-| `channel` | Repeatable: `email`, `telegram`, `webchat` (any of them matches). |
+| `channel` | Repeatable: `email`, `telegram`, `webchat`, `phone` (any of them matches; `phone` = first article is a phone call). |
 | `include_archived` | Also list archived tickets — admins only, ignored otherwise. |
 
 `sort`: `age` (default), `created`, `changed`, `tn`, `title`, `priority`,
@@ -133,6 +133,40 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets" \
 `state_id`, `priority_id`, `queue_id`, `owner_id` reference the corresponding
 admin resources (`GET /api/v1/admin/states`, `/priorities`, `/queues`,
 `/users`). `dynamic_fields` accepts `{"<FieldName>": ["value", ...]}`.
+
+**Phone ticket** (Znuny AgentTicketPhone): `phone_call` logs the call as the
+first article in the same transaction; `pending_time` is required for a
+pending `state_id` then; `send_auto_response` sends the queue's "auto reply"
+to the customer after an inbound call (SysConfig `AutoResponseForWebTickets`,
+loop protection as in the email pipeline):
+
+```sh
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "title": "Drucker streikt", "queue_id": 2, "state_id": 4, "priority_id": 3,
+    "owner_id": 5, "customer_id": "ACME", "customer_user_id": "jane.doe",
+    "phone_call": {"direction": "inbound", "body": "Papierstau im 2. OG",
+                   "time_unit": 4, "caller_number": "+49 228 5550101"},
+    "send_auto_response": true
+  }'
+```
+
+**Log a phone call on a ticket** (Znuny AgentTicketPhoneInbound/Outbound —
+article, time accounting, dynamic fields, attachments and next state in one
+transaction; needs `rw`; outbound takes the RequiredLock and answers 409 with
+`detail.locked_by_name` when another agent holds it):
+
+```sh
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/phone-calls" \
+  -H 'Content-Type: application/json' \
+  -d '{"direction": "outbound", "subject": "Anruf an Jane Doe",
+       "body": "Techniker kommt Dienstag", "time_unit": 6,
+       "state_id": 6, "pending_time": "2026-10-01T07:00:00Z"}'
+# -> {"article_id": 99, "ticket_id": 4711, "time_accounting_id": 12, "locked": true}
+```
+
+Details: [`../channels.md`](../channels.md) (Phone / CTI).
 
 **Update — one endpoint for every field mutation.** `PATCH
 /api/v1/tickets/{id}` takes a sparse body; only the keys you send are
@@ -304,7 +338,11 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/ai/refine" \
 # -> {"sections": [{"id": 1, "text": "Yes, it has been fixed since this morning."}]}
 ```
 
-`tone` is `standard` (default), `formal`, `friendly` or `concise`. Use
+`tone` is `standard` (default), `formal`, `friendly` or `concise`.
+`mode: "call_note"` (with `language`, e.g. `"de"`) turns phone-call notes
+into an internal note under *Anliegen / Vereinbart / Nächste Schritte*
+(headings in that language) instead of polishing a message; tone is ignored
+there. Use
 `queue_id` (plus optional `customer_user_id`) instead of `ticket_id` from a
 New-ticket form; that needs `create` permission on the queue, `ticket_id`
 needs `note`. Total text is capped at 60,000 characters. Refine must be
@@ -428,7 +466,20 @@ settings this requires).
 
 ```sh
 curl -b cookies.txt "$TIQORA_URL/api/v1/customers/jdoe"
+
+# Who is calling? Customers whose phone/mobile ends in the same digits and
+# their open tickets in readable queues
+curl -b cookies.txt "$TIQORA_URL/api/v1/reference/caller?number=%2B49%20228%205550101"
+
+# Click-to-call scheme for agent UIs: {"dial_scheme": "tel"|"sip"}
+curl -b cookies.txt "$TIQORA_URL/api/v1/reference/phone-config"
+
+# Ticket dynamic fields of a phone screen (### DynamicField config, 2 = required)
+curl -b cookies.txt "$TIQORA_URL/api/v1/reference/dynamic-fields?screen=AgentTicketPhoneOutbound"
 ```
+
+`/reference/customers` and `/reference/customer-search` also match phone and
+mobile numbers once the query contains five or more digits.
 
 ## Customer portal API (`/api/portal`)
 
