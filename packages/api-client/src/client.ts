@@ -27,6 +27,8 @@ export type QueueCounts = Schemas["QueueCounts"];
 export type TicketListItem = Schemas["TicketListItem"];
 export type PaginatedTickets = Schemas["PaginatedTickets"];
 export type MyTicketCounts = Schemas["MyTicketCounts"];
+/** The ticket list's channel (`TicketListItem.channel`, `channel` filter). */
+export type TicketListChannel = "email" | "telegram" | "webchat";
 export type TicketFacets = Schemas["TicketFacets"];
 // Hand-written (see the Stats block below for why we don't regenerate
 // schema.d.ts): mirrors the DashboardSummary model in tiqora/api/v1/tickets.py.
@@ -1197,6 +1199,8 @@ export class ApiClient {
       unassigned?: boolean;
       /** Seconds: any escalation_* epoch due before now + this window (overdue ones included). */
       escalating_within?: number;
+      /** Any of: email (no chat message), telegram, webchat — repeatable. */
+      channel?: TicketListChannel[];
       offset?: number;
       limit?: number;
       /** age | created | changed | tn | title | priority | activity (newest article, else creation). */
@@ -1242,6 +1246,8 @@ export class ApiClient {
       unassigned?: boolean;
       /** Seconds: any escalation_* epoch due before now + this window (overdue ones included). */
       escalating_within?: number;
+      /** Any of: email (no chat message), telegram, webchat — repeatable. */
+      channel?: TicketListChannel[];
       /** Admins only — also count archived tickets (ignored for non-admins). */
       include_archived?: boolean;
     } = {},
@@ -1578,6 +1584,8 @@ export class ApiClient {
       unassigned?: boolean;
       /** Seconds: any escalation_* epoch due before now + this window (overdue ones included). */
       escalating_within?: number;
+      /** Any of: email (no chat message), telegram, webchat — repeatable. */
+      channel?: TicketListChannel[];
       sort?: string;
       order?: string;
       /** Admins only — also export archived tickets (ignored for non-admins). */
@@ -1587,6 +1595,10 @@ export class ApiClient {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
       if (v === undefined || v === null || v === "") continue;
+      if (Array.isArray(v)) {
+        for (const item of v) qs.append(k, String(item));
+        continue;
+      }
       qs.set(k, String(v));
     }
     const suffix = qs.toString();

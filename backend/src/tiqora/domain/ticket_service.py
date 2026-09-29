@@ -46,6 +46,7 @@ from tiqora.db.legacy.ticket import (
     TicketWatcher,
 )
 from tiqora.db.legacy.user import Users
+from tiqora.db.tiqora.models import TiqoraTelegramContact, TiqoraTelegramMessage
 from tiqora.domain.article_html import RenderedArticleBody, render_article_body
 from tiqora.domain.history_render import render_history_entry
 from tiqora.domain.queue_service import OPEN_STATE_TYPES, age_seconds
@@ -98,6 +99,31 @@ VIEW_STATE_TYPES: dict[str, frozenset[str]] = {
 #: arrived tickets owned by it until an agent takes ownership, so "owned by
 #: root" is how "unassigned" is expressed.
 UNASSIGNED_OWNER_ID = 1
+
+
+#: The ticket list's "channel". Znuny has no per-ticket channel, so a ticket
+#: that has a message on one of these conversational channels is listed as
+#: that channel (its origin: a Telegram ticket may later get an e-mail reply);
+#: everything else is "email". "Chat" is Znuny's seeded chat channel, the
+#: slot a web chat uses.
+LIST_CHANNELS: dict[str, str] = {"Telegram": "telegram", "Chat": "webchat"}
+LIST_CHANNEL_KEYS: tuple[str, ...] = ("email", "telegram", "webchat")
+
+
+def _has_article_on(ticket_id_col: Any, channel_names: Sequence[str]) -> ColumnElement[bool]:
+    return (
+        select(Article.id)
+        .join(CommunicationChannel, CommunicationChannel.id == Article.communication_channel_id)
+        .where(Article.ticket_id == ticket_id_col, CommunicationChannel.name.in_(channel_names))
+        .exists()
+    )
+
+
+def _channel_condition(ticket_id_col: Any, key: str) -> ColumnElement[bool]:
+    """``key`` from :data:`LIST_CHANNEL_KEYS` as a condition on a ticket id column."""
+    if key == "email":
+        return ~_has_article_on(ticket_id_col, list(LIST_CHANNELS))
+    return _has_article_on(ticket_id_col, [n for n, k in LIST_CHANNELS.items() if k == key])
 
 
 def _escalation_due_before(deadline: int, cols: Sequence[Any] | None = None) -> ColumnElement[bool]:
@@ -254,9 +280,12 @@ class TicketService:
         ai_escalated_ticket_ids: set[int] | None = None,
         ai_reply_source_by_ticket: dict[int, str] | None = None,
         last_article_by_ticket: dict[int, tuple[datetime, str | None]] | None = None,
+        channel_by_ticket: dict[int, str] | None = None,
+        chat_contact_by_ticket: dict[int, tuple[str | None, str | None]] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         last_article = (last_article_by_ticket or {}).get(t.id)
+        chat_contact = (chat_contact_by_ticket or {}).get(t.id)
         return TicketListItem(
             id=t.id,
             tn=t.tn,
@@ -282,6 +311,9 @@ class TicketService:
                 else None
             ),
             first_from=(first_from_by_ticket or {}).get(t.id),
+            channel=(channel_by_ticket or {}).get(t.id, "email"),
+            chat_display_name=chat_contact[0] if chat_contact else None,
+            chat_username=chat_contact[1] if chat_contact else None,
             attachment_count=(attachment_count_by_ticket or {}).get(t.id, 0),
             has_ai_summary=t.id in (ai_summary_ticket_ids or set()),
             ai_escalated=t.id in (ai_escalated_ticket_ids or set()),
@@ -326,6 +358,7 @@ class TicketService:
         ai_escalated: bool | None = None,
         unassigned: bool | None = None,
         escalating_within: int | None = None,
+        channel: Sequence[str] | None = None,
         include_archived: bool = False,
     ) -> Select[tuple[Ticket]] | None:
         """Build the permission-filtered, unordered ``Ticket`` select.
@@ -431,6 +464,8 @@ class TicketService:
             if not ai_ticket_ids:
                 return None
             stmt = stmt.where(Ticket.id.in_(set(ai_ticket_ids)))
+        if channel:
+            stmt = stmt.where(or_(*(_channel_condition(Ticket.id, c) for c in channel)))
         if state_type is not None:
             type_names = VIEW_STATE_TYPES.get(state_type, {state_type})
             state_ids = (
@@ -479,6 +514,7 @@ class TicketService:
         ai_escalated: bool | None = None,
         unassigned: bool | None = None,
         escalating_within: int | None = None,
+        channel: Sequence[str] | None = None,
         offset: int = 0,
         limit: int = 50,
         sort: str = "age",
@@ -500,6 +536,7 @@ class TicketService:
             ai_escalated=ai_escalated,
             unassigned=unassigned,
             escalating_within=escalating_within,
+            channel=channel,
             include_archived=include_archived,
         )
         if stmt is None:
@@ -519,6 +556,8 @@ class TicketService:
         ai_escalated_ids = await _ai_escalated_ticket_ids(self._session, ticket_ids)
         ai_reply_source_by_ticket = await self._ai_reply_source_by_ticket(ticket_ids)
         last_article_by_ticket = await self._last_article_by_ticket(ticket_ids)
+        channel_by_ticket = await self._channel_by_ticket(ticket_ids)
+        chat_contact_by_ticket = await self._telegram_contact_by_ticket(ticket_ids)
         customer_email_by_login = await self._customer_emails_by_login(
             [t.customer_user_id for t in tickets if t.customer_user_id]
         )
@@ -533,10 +572,71 @@ class TicketService:
                 ai_escalated_ids,
                 ai_reply_source_by_ticket,
                 last_article_by_ticket,
+                channel_by_ticket,
+                chat_contact_by_ticket,
             )
             for t in tickets
         ]
         return PaginatedTickets(items=items, total=total, offset=offset, limit=limit)
+
+    async def _channel_by_ticket(self, ticket_ids: list[int]) -> dict[int, str]:
+        """List channel key per ticket (see :data:`LIST_CHANNELS`); tickets
+        without a conversational message are absent (= "email"). With messages
+        on several conversational channels, the earliest one wins."""
+        if not ticket_ids:
+            return {}
+        rows = await self._session.execute(
+            select(Article.ticket_id, CommunicationChannel.name)
+            .join(CommunicationChannel, CommunicationChannel.id == Article.communication_channel_id)
+            .where(
+                Article.ticket_id.in_(ticket_ids),
+                CommunicationChannel.name.in_(list(LIST_CHANNELS)),
+            )
+            .order_by(Article.id)
+        )
+        out: dict[int, str] = {}
+        for ticket_id, name in rows.all():
+            out.setdefault(ticket_id, LIST_CHANNELS[name])
+        return out
+
+    async def _telegram_contact_by_ticket(
+        self, ticket_ids: list[int]
+    ) -> dict[int, tuple[str | None, str | None]]:
+        """``(display_name, username)`` of the Telegram chat behind each ticket
+        (newest message's chat), for the list's sender line. Only for chats
+        not linked to a customer user: those tickets belong to the channel's
+        shared guest customer, which says nothing about who wrote; a linked
+        chat's ticket shows its real customer as usual."""
+        if not ticket_ids:
+            return {}
+        try:
+            rows = await self._session.execute(
+                select(
+                    TiqoraTelegramMessage.ticket_id,
+                    TiqoraTelegramContact.display_name,
+                    TiqoraTelegramContact.username,
+                    TiqoraTelegramContact.customer_user_login,
+                )
+                .join(
+                    TiqoraTelegramContact,
+                    TiqoraTelegramContact.chat_id == TiqoraTelegramMessage.chat_id,
+                )
+                .where(TiqoraTelegramMessage.ticket_id.in_(ticket_ids))
+                .order_by(TiqoraTelegramMessage.article_id.desc())
+            )
+        except DBAPIError:
+            logger.debug("tiqora_telegram_* query failed (table missing?)", exc_info=True)
+            await self._session.rollback()
+            return {}
+        out: dict[int, tuple[str | None, str | None]] = {}
+        seen: set[int] = set()
+        for ticket_id, display_name, username, linked_login in rows.all():
+            if ticket_id in seen:
+                continue
+            seen.add(ticket_id)
+            if not linked_login and (display_name or username):
+                out[ticket_id] = (display_name, username)
+        return out
 
     async def _first_article_from_by_ticket(self, ticket_ids: list[int]) -> dict[int, str]:
         """Raw ``From`` header of each ticket's first article, keyed by ticket id.
@@ -733,6 +833,7 @@ class TicketService:
         ai_escalated: bool | None = None,
         unassigned: bool | None = None,
         escalating_within: int | None = None,
+        channel: Sequence[str] | None = None,
         sort: str = "age",
         order: str = "desc",
         batch_size: int = 500,
@@ -758,6 +859,7 @@ class TicketService:
             ai_escalated=ai_escalated,
             unassigned=unassigned,
             escalating_within=escalating_within,
+            channel=channel,
             include_archived=include_archived,
         )
         if stmt is None:
@@ -881,9 +983,10 @@ class TicketService:
         ai_escalated: bool | None = None,
         unassigned: bool | None = None,
         escalating_within: int | None = None,
+        channel: Sequence[str] | None = None,
         include_archived: bool = False,
     ) -> dict[str, dict[str, int]]:
-        """Segment and chip counts for the inbox, in two ``COUNT`` queries.
+        """Segment and chip counts for the inbox, in three ``COUNT`` queries.
 
         - ``states``: every filter applied *except* ``state_type``/``state_id``,
           counted per view (``todo``/``new``/``open_only``/``pending`` from
@@ -895,7 +998,10 @@ class TicketService:
           ignored — each count is that base plus only its own flag, so a
           chip shows what clicking it would yield. One conditional-sum query.
 
-        Both go through :meth:`_filtered_ticket_stmt`, so the numbers agree
+        - ``channels``: every filter applied except ``channel`` — the count
+          per :data:`LIST_CHANNEL_KEYS` value.
+
+        All go through :meth:`_filtered_ticket_stmt`, so the numbers agree
         with the list the segments and chips link to.
         """
         scope: dict[str, Any] = {
@@ -911,6 +1017,37 @@ class TicketService:
         }
         states = dict.fromkeys((*self._FACET_STATE_VIEWS, "all"), 0)
         flags = {"escalated": 0, "locked": 0, "unassigned": 0}
+        channels = dict.fromkeys(LIST_CHANNEL_KEYS, 0)
+
+        # Channels first, before ``channel`` joins the scope: every filter
+        # applied except the channel filter itself, like the flag chips.
+        channel_base = await self._filtered_ticket_stmt(
+            user_id,
+            state_id=state_id,
+            state_type=state_type,
+            escalated=escalated,
+            locked=locked,
+            unassigned=unassigned,
+            **scope,
+        )
+        if channel_base is not None:
+            sub = channel_base.subquery()
+            row = (
+                await self._session.execute(
+                    # select_from: without it the EXISTS would carry ``sub`` in
+                    # its own FROM and count over the whole scope, not per row.
+                    select(
+                        *(
+                            func.coalesce(
+                                func.sum(case((_channel_condition(sub.c.id, k), 1), else_=0)), 0
+                            )
+                            for k in LIST_CHANNEL_KEYS
+                        )
+                    ).select_from(sub)
+                )
+            ).one()
+            channels = {k: int(v) for k, v in zip(LIST_CHANNEL_KEYS, row, strict=True)}
+        scope["channel"] = channel
 
         state_base = await self._filtered_ticket_stmt(
             user_id,
@@ -989,7 +1126,7 @@ class TicketService:
             ).one()
             flags = {"escalated": int(row[0]), "locked": int(row[1]), "unassigned": int(row[2])}
 
-        return {"states": states, "flags": flags}
+        return {"states": states, "flags": flags, "channels": channels}
 
     async def count_dashboard_summary(self, user_id: int) -> dict[str, int]:
         """KPI-tile counts for the agent dashboard.

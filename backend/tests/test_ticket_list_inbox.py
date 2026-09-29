@@ -365,6 +365,7 @@ async def test_facet_counts(url_fixture: str, request: pytest.FixtureRequest) ->
                 "all": 5,
             },
             "flags": {"escalated": 2, "locked": 1, "unassigned": 2},
+            "channels": {"email": 5, "telegram": 0, "webchat": 0},
         }
 
         # states ignore the state filter but apply the flag; flags apply the
@@ -381,12 +382,15 @@ async def test_facet_counts(url_fixture: str, request: pytest.FixtureRequest) ->
                 "all": 2,
             },
             "flags": {"escalated": 1, "locked": 1, "unassigned": 1},
+            # Channels apply the state filter and the flags (all but channel).
+            "channels": {"email": 1, "telegram": 0, "webchat": 0},
         }
 
         # No ro permission at all -> everything zero.
         empty = await ts.facet_counts(ROOT_ID + 999_999, queue_id=QUEUE_ID)
         assert set(empty["states"].values()) == {0}
         assert set(empty["flags"].values()) == {0}
+        assert set(empty["channels"].values()) == {0}
     await engine.dispose()
 
 
@@ -444,6 +448,7 @@ async def test_facets_and_list_routes(mariadb_znuny_url: str) -> None:
         # Only T_OPEN_LOCKED is locked.
         "states": {"todo": 1, "new": 0, "open_only": 1, "pending": 0, "closed": 0, "all": 1},
         "flags": {"escalated": 1, "locked": 1, "unassigned": 1},
+        "channels": {"email": 1, "telegram": 0, "webchat": 0},
     }
 
     assert listed.status_code == 200, listed.text
