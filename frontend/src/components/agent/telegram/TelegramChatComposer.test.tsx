@@ -212,20 +212,47 @@ describe("TelegramChatComposer: sending", () => {
     expect(screen.queryByTestId("tg-composer-error")).toBeNull();
   });
 
-  it("sends the chosen next state", async () => {
+  it("sends and closes from the send menu, for that one message only", async () => {
     const input = await mount();
-    fireEvent.click(await screen.findByTestId("tg-composer-next-closed"));
     type(input, "Erledigt");
-    fireEvent.click(screen.getByTestId("tg-composer-send"));
-    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    fireEvent.click(await screen.findByTestId("tg-composer-send-menu"));
+    fireEvent.click(screen.getByTestId("tg-composer-send-closed"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
     expect(lastPayload()).toMatchObject({ state_id: 2, pending_time: null });
+    expect(screen.queryByTestId("tg-composer-send-options")).toBeNull();
+
+    await waitFor(() => expect(input.value).toBe(""));
+    type(input, "Noch was");
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(2));
+    expect(lastPayload().state_id).toBeUndefined();
   });
 
-  it("hides the next-state segment without rw", async () => {
+  it("maps Cmd/Ctrl+Enter to close and Alt+Enter to pending", async () => {
+    const input = await mount();
+    await screen.findByTestId("tg-composer-send-menu");
+    type(input, "Zu");
+    fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
+    expect(lastPayload()).toMatchObject({ state_id: 2 });
+
+    await waitFor(() => expect(input.value).toBe(""));
+    type(input, "Warte");
+    fireEvent.keyDown(input, { key: "Enter", altKey: true });
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(2));
+    expect(lastPayload().pending_time).toEqual(expect.any(String));
+  });
+
+  it("has no send menu without rw and ignores the state shortcuts", async () => {
     getTicket.mockResolvedValue({ id: 1, permissions: perms(false) });
-    await mount();
+    const input = await mount();
     await waitFor(() => expect(getTicket).toHaveBeenCalled());
-    expect(screen.queryByTestId("tg-composer-next-closed")).toBeNull();
+    expect(screen.queryByTestId("tg-composer-send-menu")).toBeNull();
+    type(input, "Zu");
+    fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
+    expect(lastPayload().state_id).toBeUndefined();
   });
 
   it("reports composing while there is text", async () => {
@@ -239,6 +266,32 @@ describe("TelegramChatComposer: sending", () => {
 });
 
 describe("TelegramChatComposer: snippets", () => {
+  it("opens the picker from the footer button and replaces its slash on pick", async () => {
+    listTemplates.mockResolvedValue([{ id: 11, name: "Gruß", text: "Viele Grüße", content_type: "text/plain" }]);
+    const input = await mount();
+    const btn = await screen.findByTestId("tg-composer-snippets");
+    await waitFor(() => expect(btn).toHaveTextContent("1"));
+    type(input, "Danke!");
+    fireEvent.click(btn);
+    expect(input.value).toBe("Danke! /");
+    fireEvent.click(await screen.findByTestId("tg-snippet-11"));
+    expect(input.value).toBe("Danke! Viele Grüße");
+  });
+
+  it("says so when the queue has no chat snippets, but only when asked", async () => {
+    listTemplates.mockResolvedValue([]);
+    const input = await mount();
+    type(input, "/etc/hosts");
+    await waitFor(() => expect(listTemplates).toHaveBeenCalled());
+    expect(screen.queryByTestId("tg-snippet-empty")).toBeNull();
+
+    type(input, "");
+    fireEvent.click(screen.getByTestId("tg-composer-snippets"));
+    expect(await screen.findByTestId("tg-snippet-empty")).toBeInTheDocument();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByTestId("tg-snippet-empty")).toBeNull();
+  });
+
   it("inserts a Chat template picked after a slash", async () => {
     listTemplates.mockResolvedValue([
       { id: 11, name: "Gruß", text: "Viele Grüße, dein Support-Team", content_type: "text/plain" },
@@ -427,9 +480,20 @@ describe("TelegramChatComposer: quote, buttons, AI", () => {
     fireEvent.keyDown(screen.getByTestId("tg-buttons-label-0"), { key: "Backspace" });
     expect(screen.getByTestId("tg-buttons-label-0")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("tg-buttons-clear"));
+    fireEvent.click(screen.getByTestId("tg-buttons-close"));
+    expect(screen.queryByTestId("tg-button-editor")).toBeNull();
+    fireEvent.click(screen.getByTestId("tg-composer-buttons-toggle"));
     expect(screen.queryByTestId("tg-buttons-label-0")).toBeNull();
-    expect(screen.queryByTestId("tg-buttons-clear")).toBeNull();
+  });
+
+  it("offers the preset only while no resolve buttons are there", async () => {
+    await mount();
+    fireEvent.click(screen.getByTestId("tg-composer-buttons-toggle"));
+    fireEvent.click(screen.getByTestId("tg-buttons-preset"));
+    expect(screen.queryByTestId("tg-buttons-preset")).toBeNull();
+    fireEvent.click(screen.getByTestId("tg-buttons-remove-0"));
+    fireEvent.click(screen.getByTestId("tg-buttons-remove-0"));
+    expect(screen.getByTestId("tg-buttons-preset")).toBeInTheDocument();
   });
 
   it("turning the Buttons toggle off discards the buttons", async () => {

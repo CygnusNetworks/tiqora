@@ -2,9 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, type ArticleListItem } from "@/lib/api";
 import { articleSortKey } from "@/lib/article";
-import { channelNameOf } from "@/lib/articleChannel";
+import { channelNameOf, isConversationalChannel } from "@/lib/articleChannel";
 
-export type ArticleFilter = "all" | "email" | "note";
+/** "chat" = the conversational channels (Telegram, later Webchat), which
+ * "email" never covered — they only showed up under "all". */
+export type ArticleFilter = "all" | "email" | "chat" | "note";
+
+function matchesFilter(a: ArticleListItem, filter: ArticleFilter): boolean {
+  const name = channelNameOf(a);
+  if (filter === "email") return name === "Email";
+  if (filter === "chat") return isConversationalChannel(name);
+  if (filter === "note") return name === "Internal";
+  return true;
+}
 
 const SORT_STORAGE_KEY = "tiqora.articleList.sortDescending";
 const FILTER_STORAGE_KEY = "tiqora.articleList.filter";
@@ -13,7 +23,7 @@ function readStoredFilter(): ArticleFilter {
   if (typeof window === "undefined") return "all";
   try {
     const v = window.localStorage.getItem(FILTER_STORAGE_KEY);
-    return v === "email" || v === "note" ? v : "all";
+    return v === "email" || v === "chat" || v === "note" ? v : "all";
   } catch {
     return "all";
   }
@@ -80,14 +90,15 @@ export function useArticleListState({
     }
   }, [descending]);
 
-  const filtered = useMemo(
-    () =>
-      articles.filter((a) => {
-        if (filter === "email") return channelNameOf(a) === "Email";
-        if (filter === "note") return channelNameOf(a) === "Internal";
-        return true;
-      }),
-    [articles, filter],
+  const filtered = useMemo(() => articles.filter((a) => matchesFilter(a, filter)), [articles, filter]);
+  const counts = useMemo(
+    () => ({
+      all: articles.length,
+      email: articles.filter((a) => matchesFilter(a, "email")).length,
+      chat: articles.filter((a) => matchesFilter(a, "chat")).length,
+      note: articles.filter((a) => matchesFilter(a, "note")).length,
+    }),
+    [articles],
   );
 
   // Split view's order — respects `descending`.
@@ -144,6 +155,7 @@ export function useArticleListState({
     selected,
     filter,
     setFilter,
+    counts,
     descending,
     toggleDescending,
     onListKeyDown,

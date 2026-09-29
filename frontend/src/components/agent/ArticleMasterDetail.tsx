@@ -10,7 +10,7 @@ import { ArticleConversationView } from "./ArticleConversationView";
 import { ArticleComposer } from "./ArticleTimeline";
 import { useConversationViewRequests } from "./telegram/composerBus";
 import { TelegramChatComposer } from "./telegram/TelegramChatComposer";
-import { useArticleListState } from "./useArticleListState";
+import { useArticleListState, type ArticleFilter } from "./useArticleListState";
 import { useArticleView, type ArticleViewMode } from "./useArticleView";
 import type { ReactNode } from "react";
 
@@ -88,23 +88,17 @@ export function ArticleMasterDetail({
         </p>
         <div className="flex flex-wrap items-center gap-1.5">
           <div className="inline-flex overflow-hidden rounded-md border border-hairline">
-            <FilterButton testId="article-filter-all" active={state.filter === "all"} onClick={() => state.setFilter("all")}>
-              {t("ticket.filterAll")}
-            </FilterButton>
-            <FilterButton
-              testId="article-filter-email"
-              active={state.filter === "email"}
-              onClick={() => state.setFilter("email")}
-            >
-              {t("ticket.filterEmail")}
-            </FilterButton>
-            <FilterButton
-              testId="article-filter-note"
-              active={state.filter === "note"}
-              onClick={() => state.setFilter("note")}
-            >
-              {t("ticket.filterNotes")}
-            </FilterButton>
+            {FILTERS.filter((f) => f.key !== "chat" || state.counts.chat > 0 || state.filter === "chat").map((f) => (
+              <FilterButton
+                key={f.key}
+                testId={`article-filter-${f.key}`}
+                active={state.filter === f.key}
+                count={state.counts[f.key]}
+                onClick={() => state.setFilter(f.key)}
+              >
+                {t(f.label)}
+              </FilterButton>
+            ))}
           </div>
           <span title={sortLocked ? t("ticket.sortDisabledInConversation") : undefined}>
             <Button
@@ -229,15 +223,25 @@ function ViewTab({
   );
 }
 
+/** "Chats" only shows on tickets that have a chat message at all. */
+const FILTERS: { key: ArticleFilter; label: string }[] = [
+  { key: "all", label: "ticket.filterAll" },
+  { key: "email", label: "ticket.filterEmail" },
+  { key: "chat", label: "ticket.filterChats" },
+  { key: "note", label: "ticket.filterNotes" },
+];
+
 function FilterButton({
   active,
   onClick,
   testId,
+  count,
   children,
 }: {
   active: boolean;
   onClick: () => void;
   testId: string;
+  count: number;
   children: ReactNode;
 }) {
   return (
@@ -252,6 +256,9 @@ function FilterButton({
       )}
     >
       {children}
+      <span className={cn("ml-1.5 font-mono text-[10px] tabular-nums", active ? "opacity-80" : "text-muted")}>
+        {count}
+      </span>
     </button>
   );
 }
