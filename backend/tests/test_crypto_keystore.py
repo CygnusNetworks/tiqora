@@ -5,14 +5,13 @@ table).
 
 from __future__ import annotations
 
-import contextlib
 import shutil
 import tempfile
 
 import pytest
 
 pytest.importorskip("gnupg")  # PGP tests need the optional crypto extra
-from sqlalchemy import select, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.crypto.keystore import import_pgp_key
@@ -29,22 +28,13 @@ def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
 
 
-async def _seed_table(session: AsyncSession) -> None:
-    with contextlib.suppress(Exception):
-        await session.execute(
-            text(
-                "CREATE TABLE IF NOT EXISTS tiqora_crypto_key ("
-                "id INT AUTO_INCREMENT PRIMARY KEY, key_type VARCHAR(20) NOT NULL,"
-                " identifier VARCHAR(255) NOT NULL, email VARCHAR(255),"
-                " purpose VARCHAR(20) NOT NULL DEFAULT 'both',"
-                " has_private_key TINYINT(1) NOT NULL DEFAULT 0,"
-                " created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)"
-            )
-        )
-    await session.commit()
-    with contextlib.suppress(Exception):
-        await session.execute(text("DELETE FROM tiqora_crypto_key"))
-        await session.commit()
+def _recreate_table(sync_url: str) -> None:
+    """(Re)create tiqora_crypto_key in its current shape (alembic 0051 added columns)."""
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS tiqora_crypto_key"))
+        TiqoraCryptoKey.__table__.create(conn)  # type: ignore[attr-defined]
+    engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -68,8 +58,7 @@ async def test_import_pgp_key_records_audit_row(mariadb_znuny_url: str) -> None:
         with tempfile.TemporaryDirectory(dir="/tmp") as other_home:  # noqa: S108
             engine = create_async_engine(_mysql_async(mariadb_znuny_url))
             factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-            async with factory() as session:
-                await _seed_table(session)
+            _recreate_table(mariadb_znuny_url)
 
             pgp_engine = PgpEngine(other_home)
             async with factory() as session:
@@ -88,4 +77,7 @@ async def test_import_pgp_key_records_audit_row(mariadb_znuny_url: str) -> None:
                 assert row.email == "import-test@example.com"
                 assert row.purpose == "sign"
                 assert row.has_private_key is False
+                assert row.action == "import"
+                await session.execute(text("DELETE FROM tiqora_crypto_key"))
+                await session.commit()
             await engine.dispose()

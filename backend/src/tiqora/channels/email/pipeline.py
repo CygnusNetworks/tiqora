@@ -616,18 +616,20 @@ async def process_message(
 ) -> PipelineResult:
     """Process one raw email: best-effort inbound PGP/S/MIME crypto, then dispatch.
 
-    Crypto (:mod:`tiqora.crypto.inbound`) is a no-op unless
-    ``TIQORA_CRYPTO_PGP_ENABLED``/``TIQORA_CRYPTO_SMIME_ENABLED`` are set —
+    Crypto (:mod:`tiqora.crypto.inbound`) is a no-op unless PGP/S/MIME is
+    enabled (SysConfig ``PGP``/``SMIME`` or ``TIQORA_CRYPTO_*_ENABLED``) —
     the common case, so this adds no overhead by default. A decrypt/verify
     failure never blocks delivery: the article is still created, and the
     outcome (``pgp:decrypted_verified``, ``smime:verify_failed``, etc.) is
     recorded as an ``article_flag`` row once the article id is known.
     """
     from tiqora.config import get_settings
+    from tiqora.crypto.config import resolve_crypto_config
     from tiqora.crypto.inbound import process_inbound_crypto
 
     settings = get_settings()
-    body_override, crypto_result = await process_inbound_crypto(raw, settings)
+    crypto_config = await resolve_crypto_config(settings, sysconfig)
+    body_override, crypto_result = await process_inbound_crypto(raw, settings, crypto_config)
 
     # Lightweight header parse for the communication log (same raw as pipeline).
     try:

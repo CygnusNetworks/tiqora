@@ -10,9 +10,10 @@ Ports the concepts (not the implementation) of Znuny's
   ``cryptography`` package (already a Tiqora dependency) does not expose a
   public S/MIME verify/encrypt/decrypt API, only signature *building*.
 
-Both are OFF by default (``TIQORA_CRYPTO_PGP_ENABLED`` /
-``TIQORA_CRYPTO_SMIME_ENABLED``) and require their respective external
-binary to be present. See ``docs/crypto.md``.
+Both follow Znuny's SysConfig switches (``PGP`` / ``SMIME``, default off;
+``TIQORA_CRYPTO_*`` env vars override, see :mod:`tiqora.crypto.config`) and
+require their respective external binary. Key stores are shared with Znuny
+(:mod:`tiqora.crypto.smime_store`, gpg keyring). See ``docs/crypto.md``.
 """
 
 from __future__ import annotations
@@ -24,3 +25,7 @@ class CryptoError(Exception):
 
 class CryptoUnavailableError(CryptoError):
     """Raised when a required external tool (gpg/openssl) or key is missing."""
+
+
+class CryptoNotFoundError(CryptoError):
+    """The referenced key / certificate does not exist in the store."""

@@ -8,14 +8,15 @@ API for S/MIME verify/encrypt/decrypt, only signature *building*
 ``openssl`` (same tool Znuny uses) is the pragmatic choice here rather than
 hand-rolling PKCS7 parsing.
 
-Certificate/key lookup (:mod:`tiqora.crypto.keystore`) is a Tiqora-owned
-simplification of Znuny's ``SMIME::CertPath``/``SMIME::PrivatePath`` — a flat
-directory of ``<email>.crt`` / ``<email>.key`` files, not Znuny's
-hash-indexed OpenSSL certificate store layout.
+Certificates and private keys live in Znuny's ``SMIME::CertPath`` /
+``SMIME::PrivatePath`` layout (:mod:`tiqora.crypto.smime_store`); private
+keys are normally encrypted with the secret stored next to them (``.P``),
+which is passed to openssl via an environment variable (never argv).
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 
@@ -23,6 +24,7 @@ from tiqora.crypto import CryptoError, CryptoUnavailableError
 
 DEFAULT_OPENSSL_BIN = "openssl"
 _TIMEOUT_SECONDS = 30
+_SECRET_ENV = "TIQORA_SMIME_SECRET"
 
 
 @dataclass(frozen=True)
@@ -49,7 +51,13 @@ class SmimeEngine:
     def __init__(self, *, openssl_bin: str = DEFAULT_OPENSSL_BIN) -> None:
         self._openssl_bin = openssl_bin
 
-    def _run(self, args: list[str], input_bytes: bytes) -> subprocess.CompletedProcess[bytes]:
+    def _run(
+        self, args: list[str], input_bytes: bytes, *, secret: str | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        env = {**os.environ, "LC_MESSAGES": "POSIX"}
+        if secret is not None:
+            env[_SECRET_ENV] = secret
+            args = [*args, "-passin", f"env:{_SECRET_ENV}"]
         try:
             return subprocess.run(  # noqa: S603 — fixed binary name, args are our own list
                 [self._openssl_bin, *args],
@@ -57,6 +65,7 @@ class SmimeEngine:
                 capture_output=True,
                 check=False,
                 timeout=_TIMEOUT_SECONDS,
+                env=env,
             )
         except FileNotFoundError as exc:
             raise CryptoUnavailableError(
@@ -65,11 +74,25 @@ class SmimeEngine:
         except subprocess.TimeoutExpired as exc:
             raise CryptoError(f"openssl smime call timed out: {exc}") from exc
 
-    def sign(self, data: bytes, cert_path: str, key_path: str) -> bytes:
-        """Detached S/MIME signature (``multipart/signed`` MIME output)."""
-        proc = self._run(
-            ["smime", "-sign", "-signer", cert_path, "-inkey", key_path, "-text"], data
-        )
+    def sign(
+        self,
+        data: bytes,
+        cert_path: str,
+        key_path: str,
+        *,
+        secret: str | None = None,
+        extra_cert_paths: list[str] | None = None,
+    ) -> bytes:
+        """Detached S/MIME signature (``multipart/signed`` MIME output).
+
+        ``extra_cert_paths`` are the signer-relation CA certificates Znuny
+        attaches with ``-certfile`` (concatenated into one temp file by the
+        caller when there are several — openssl accepts a single file).
+        """
+        args = ["smime", "-sign", "-signer", cert_path, "-inkey", key_path, "-text"]
+        for extra in extra_cert_paths or []:
+            args += ["-certfile", extra]
+        proc = self._run(args, data, secret=secret)
         if proc.returncode != 0:
             raise CryptoError(
                 f"openssl smime -sign failed: {proc.stderr.decode('utf-8', 'replace')}"
@@ -86,8 +109,12 @@ class SmimeEngine:
             )
         return proc.stdout
 
-    def decrypt(self, data: bytes, cert_path: str, key_path: str) -> SmimeDecryptResult:
-        proc = self._run(["smime", "-decrypt", "-recip", cert_path, "-inkey", key_path], data)
+    def decrypt(
+        self, data: bytes, cert_path: str, key_path: str, *, secret: str | None = None
+    ) -> SmimeDecryptResult:
+        proc = self._run(
+            ["smime", "-decrypt", "-recip", cert_path, "-inkey", key_path], data, secret=secret
+        )
         ok = proc.returncode == 0
         return SmimeDecryptResult(
             ok=ok,
@@ -100,10 +127,8 @@ class SmimeEngine:
 
         Without ``ca_path``, ``-noverify`` is used: the signature is checked
         cryptographically but the certificate chain is NOT validated against
-        a trust root. This matches the ephemeral self-signed test certs this
-        module is tested against; production use should pass ``ca_path`` to
-        get real chain-of-trust validation (Znuny's ``SignerCertRelation``
-        table equivalent is out of scope here — see docs/crypto.md).
+        a trust root. Production use should pass ``ca_path`` to get real
+        chain-of-trust validation (B2 adds ``SMIME::CertPath`` as ``-CApath``).
         """
         args = ["smime", "-verify"]
         args += ["-CAfile", ca_path] if ca_path else ["-noverify"]
