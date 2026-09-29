@@ -414,3 +414,89 @@ async def test_security_off_sends_plain(
     sender, sent, _failed = await _run(factory, tid)
     assert sent == 1
     assert not getattr(sender.sent[0], "tiqora_raw", b"")
+
+
+@pytest.mark.asyncio
+async def test_admin_api_persists_security_items_as_znuny_rows(
+    env: tuple[str, int, async_sessionmaker[AsyncSession]],
+) -> None:
+    from fastapi import HTTPException
+
+    from tiqora.api.v1.admin import notification_events as admin_api
+    from tiqora.api.v1.admin.schemas import (
+        NotificationEventUpdate,
+        NotificationEventWrite,
+        NotificationMessageIn,
+    )
+    from tiqora.domain.auth import AuthenticatedUser
+
+    url, _tid, factory = env
+    # the admin writes signal Znuny cache invalidations; removed again below
+    [(max_signal,)] = _rows(url, "SELECT COALESCE(MAX(id), 0) FROM tiqora_cache_invalidation")
+    admin = AuthenticatedUser(
+        id=1, login="root@localhost", first_name="A", last_name="Z", auth_method="session"
+    )
+    items = {
+        "Events": ["TicketCreate"],
+        "Transports": ["Email"],
+        "EmailSecuritySettings": ["1"],
+        "EmailSigningCrypting": ["SMIMESignCrypt"],
+        "EmailMissingSigningKeys": ["Skip"],
+        "EmailMissingCryptingKeys": ["Send"],
+    }
+    async with factory() as session:
+        created = await admin_api.create_notification_event(
+            NotificationEventWrite(
+                name=NAME_PREFIX + "admin",
+                items=items,
+                messages=[NotificationMessageIn(subject="s", text="t")],
+            ),
+            admin,
+            session,
+        )
+        assert created.items["EmailSigningCrypting"] == ["SMIMESignCrypt"]
+        with pytest.raises(HTTPException) as exc:
+            await admin_api.update_notification_event(
+                created.id,
+                NotificationEventUpdate(items={**items, "EmailMissingCryptingKeys": ["Drop"]}),
+                admin,
+                session,
+            )
+        assert exc.value.status_code == 422
+        with pytest.raises(HTTPException) as exc:
+            await admin_api.create_notification_event(
+                NotificationEventWrite(
+                    name=NAME_PREFIX + "bad", items={"EmailSigningCrypting": ["PGP"]}
+                ),
+                admin,
+                session,
+            )
+        assert exc.value.status_code == 422
+        # switching security off: Znuny's form posts no security rows then
+        off = {k: v for k, v in items.items() if not k.startswith("Email")}
+        updated = await admin_api.update_notification_event(
+            created.id, NotificationEventUpdate(items=off), admin, session
+        )
+        assert "EmailSecuritySettings" not in updated.items
+        await admin_api.update_notification_event(
+            created.id, NotificationEventUpdate(items=items), admin, session
+        )
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM tiqora_cache_invalidation WHERE id > :m"), {"m": max_signal})
+    engine.dispose()
+    rows = _rows(
+        url,
+        "SELECT event_key, event_value FROM notification_event_item"
+        " WHERE notification_id = :n AND event_key LIKE 'Email%' ORDER BY event_key",
+        n=created.id,
+    )
+    assert [tuple(r) for r in rows] == [
+        ("EmailMissingCryptingKeys", "Send"),
+        ("EmailMissingSigningKeys", "Skip"),
+        ("EmailSecuritySettings", "1"),
+        ("EmailSigningCrypting", "SMIMESignCrypt"),
+    ]
+    assert (
+        _rows(url, "SELECT id FROM notification_event WHERE name = :n", n=NAME_PREFIX + "bad") == []
+    )
