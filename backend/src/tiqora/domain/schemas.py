@@ -284,6 +284,38 @@ class TicketDetail(TicketListItem):
     permissions: TicketPermissions = Field(default_factory=TicketPermissions)
 
 
+class ArticleSecurity(BaseModel):
+    """PGP / S/MIME result of an email article (``TiqoraCrypto*`` article flags).
+
+    ``status``: ``verified`` (good signature, trusted signer), ``signed_untrusted``
+    (valid signature but untrusted chain / expired or revoked key / signer
+    does not match the sender), ``unknown_key`` (signer key not available),
+    ``verify_failed`` (bad signature), ``decrypted`` (encrypted, decrypted,
+    no signature), ``decrypt_failed``, ``unavailable`` (gpg/openssl missing),
+    ``error``. For signed+encrypted mail the signature decides the status.
+    """
+
+    method: str  # "pgp" | "smime"
+    signed: bool
+    encrypted: bool
+    status: str
+    signer: str | None = None
+    key_id: str | None = None
+    detail: str | None = None
+
+    @classmethod
+    def from_result(cls, result: Any) -> ArticleSecurity:
+        return cls(
+            method=result.method,
+            signed=result.signed,
+            encrypted=result.encrypted,
+            status=result.status,
+            signer=result.signer,
+            key_id=result.key_id,
+            detail=result.detail or None,
+        )
+
+
 class ArticleListItem(BaseModel):
     id: int
     ticket_id: int
@@ -300,6 +332,7 @@ class ArticleListItem(BaseModel):
     content_type: str | None = None
     incoming_time: int | None = None
     ai_origin: bool = False
+    security: ArticleSecurity | None = None
 
 
 class ArticleBody(BaseModel):
@@ -307,6 +340,7 @@ class ArticleBody(BaseModel):
     content_type: str
     is_html: bool
     body: str
+    security: ArticleSecurity | None = None
 
 
 class AttachmentMetaOut(BaseModel):
