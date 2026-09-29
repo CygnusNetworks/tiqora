@@ -6831,77 +6831,6 @@
         "title": "CallEventAccepted",
         "type": "object"
       },
-      "CallEventIn": {
-        "description": "Webhook body of ``POST /channels/phone/events``.",
-        "properties": {
-          "call_id": {
-            "maxLength": 128,
-            "minLength": 1,
-            "title": "Call Id",
-            "type": "string"
-          },
-          "caller_number": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Caller Number"
-          },
-          "direction": {
-            "default": "inbound",
-            "enum": [
-              "inbound",
-              "outbound"
-            ],
-            "title": "Direction",
-            "type": "string"
-          },
-          "event": {
-            "enum": [
-              "ringing",
-              "answered",
-              "hangup"
-            ],
-            "title": "Event",
-            "type": "string"
-          },
-          "extension": {
-            "anyOf": [
-              {
-                "maxLength": 64,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Extension"
-          },
-          "timestamp": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timestamp"
-          }
-        },
-        "required": [
-          "event",
-          "call_id"
-        ],
-        "title": "CallEventIn",
-        "type": "object"
-      },
       "CallerCustomerOut": {
         "properties": {
           "company": {
@@ -50709,7 +50638,7 @@
     },
     "/api/v1/channels/phone/events": {
       "post": {
-        "description": "PBX call events (ringing / answered / hangup) for the agent call popup.\n\nThe extension is mapped to agents via their ``TiqoraPhoneExtension``\npreference; an event nobody is assigned to is accepted and ignored. See\n:mod:`tiqora.channels.phone.cti`.",
+        "description": "PBX call events (ringing / answered / hangup) for the agent call popup.\n\nBody as JSON or form-encoded (same fields). The extension is mapped to\nagents via their ``TiqoraPhoneExtension`` preference; an event nobody is\nassigned to is accepted and ignored. See :mod:`tiqora.channels.phone.cti`.",
         "operationId": "call_event_api_v1_channels_phone_events_post",
         "parameters": [
           {
@@ -50733,7 +50662,148 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CallEventIn"
+                "description": "Webhook body of ``POST /channels/phone/events``.",
+                "properties": {
+                  "call_id": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "title": "Call Id",
+                    "type": "string"
+                  },
+                  "caller_number": {
+                    "anyOf": [
+                      {
+                        "maxLength": 100,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Caller Number"
+                  },
+                  "direction": {
+                    "default": "inbound",
+                    "enum": [
+                      "inbound",
+                      "outbound"
+                    ],
+                    "title": "Direction",
+                    "type": "string"
+                  },
+                  "event": {
+                    "enum": [
+                      "ringing",
+                      "answered",
+                      "hangup"
+                    ],
+                    "title": "Event",
+                    "type": "string"
+                  },
+                  "extension": {
+                    "anyOf": [
+                      {
+                        "maxLength": 64,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Extension"
+                  },
+                  "timestamp": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Timestamp"
+                  }
+                },
+                "required": [
+                  "event",
+                  "call_id"
+                ],
+                "title": "CallEventIn",
+                "type": "object"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "description": "Webhook body of ``POST /channels/phone/events``.",
+                "properties": {
+                  "call_id": {
+                    "maxLength": 128,
+                    "minLength": 1,
+                    "title": "Call Id",
+                    "type": "string"
+                  },
+                  "caller_number": {
+                    "anyOf": [
+                      {
+                        "maxLength": 100,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Caller Number"
+                  },
+                  "direction": {
+                    "default": "inbound",
+                    "enum": [
+                      "inbound",
+                      "outbound"
+                    ],
+                    "title": "Direction",
+                    "type": "string"
+                  },
+                  "event": {
+                    "enum": [
+                      "ringing",
+                      "answered",
+                      "hangup"
+                    ],
+                    "title": "Event",
+                    "type": "string"
+                  },
+                  "extension": {
+                    "anyOf": [
+                      {
+                        "maxLength": 64,
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Extension"
+                  },
+                  "timestamp": {
+                    "anyOf": [
+                      {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Timestamp"
+                  }
+                },
+                "required": [
+                  "event",
+                  "call_id"
+                ],
+                "title": "CallEventIn",
+                "type": "object"
               }
             }
           },

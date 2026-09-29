@@ -329,6 +329,30 @@ async def test_webhook_accepts_and_publishes(monkeypatch: pytest.MonkeyPatch) ->
     assert msg["call"]["number"] == "+492285550101"
 
 
+async def test_webhook_accepts_form_encoded_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Asterisk's CURL() posts form data — JSON quoting inside dialplan
+    function arguments is not practical, so the endpoint takes both."""
+    from httpx import ASGITransport, AsyncClient
+
+    redis = _FakeRedis()
+    app = _app(redis, monkeypatch)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/channels/phone/events",
+            data={**RINGING, "timestamp": "1790676000"},
+            headers={"X-Tiqora-Phone-Secret": "s3cret"},
+        )
+        assert resp.status_code == 202, resp.text
+        bad = await client.post(
+            "/api/v1/channels/phone/events",
+            data={**RINGING, "event": "nope"},
+            headers={"X-Tiqora-Phone-Secret": "s3cret"},
+        )
+        assert bad.status_code == 422
+    [msg] = redis.events()
+    assert msg["call"]["ringing_at"] == "2026-09-29T10:00:00+00:00"
+
+
 async def test_webhook_unknown_extension_is_202(monkeypatch: pytest.MonkeyPatch) -> None:
     redis = _FakeRedis()
     app = _app(redis, monkeypatch)
@@ -342,6 +366,15 @@ async def test_webhook_validates_event(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _app(_FakeRedis(), monkeypatch)
     assert (await _post_event(app, {**RINGING, "event": "bogus"})).status_code == 422
     assert (await _post_event(app, {**RINGING, "call_id": ""})).status_code == 422
+    from httpx import ASGITransport, AsyncClient
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/channels/phone/events",
+            content=b"{not json",
+            headers={"X-Tiqora-Phone-Secret": "s3cret", "Content-Type": "application/json"},
+        )
+        assert resp.status_code == 422
 
 
 async def test_webhook_503_when_redis_down(monkeypatch: pytest.MonkeyPatch) -> None:

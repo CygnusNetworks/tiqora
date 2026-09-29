@@ -4329,9 +4329,9 @@ export interface paths {
          * Call Event
          * @description PBX call events (ringing / answered / hangup) for the agent call popup.
          *
-         *     The extension is mapped to agents via their ``TiqoraPhoneExtension``
-         *     preference; an event nobody is assigned to is accepted and ignored. See
-         *     :mod:`tiqora.channels.phone.cti`.
+         *     Body as JSON or form-encoded (same fields). The extension is mapped to
+         *     agents via their ``TiqoraPhoneExtension`` preference; an event nobody is
+         *     assigned to is accepted and ignored. See :mod:`tiqora.channels.phone.cti`.
          */
         post: operations["call_event_api_v1_channels_phone_events_post"];
         delete?: never;
@@ -9048,31 +9048,6 @@ export interface components {
             accepted: boolean;
             /** Delivered To */
             delivered_to: number;
-        };
-        /**
-         * CallEventIn
-         * @description Webhook body of ``POST /channels/phone/events``.
-         */
-        CallEventIn: {
-            /** Call Id */
-            call_id: string;
-            /** Caller Number */
-            caller_number?: string | null;
-            /**
-             * Direction
-             * @default inbound
-             * @enum {string}
-             */
-            direction: "inbound" | "outbound";
-            /**
-             * Event
-             * @enum {string}
-             */
-            event: "ringing" | "answered" | "hangup";
-            /** Extension */
-            extension?: string | null;
-            /** Timestamp */
-            timestamp?: string | null;
         };
         /** CallerCustomerOut */
         CallerCustomerOut: {
@@ -26963,7 +26938,48 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["CallEventIn"];
+                "application/json": {
+                    /** Call Id */
+                    call_id: string;
+                    /** Caller Number */
+                    caller_number?: string | null;
+                    /**
+                     * Direction
+                     * @default inbound
+                     * @enum {string}
+                     */
+                    direction?: "inbound" | "outbound";
+                    /**
+                     * Event
+                     * @enum {string}
+                     */
+                    event: "ringing" | "answered" | "hangup";
+                    /** Extension */
+                    extension?: string | null;
+                    /** Timestamp */
+                    timestamp?: string | null;
+                };
+                "application/x-www-form-urlencoded": {
+                    /** Call Id */
+                    call_id: string;
+                    /** Caller Number */
+                    caller_number?: string | null;
+                    /**
+                     * Direction
+                     * @default inbound
+                     * @enum {string}
+                     */
+                    direction?: "inbound" | "outbound";
+                    /**
+                     * Event
+                     * @enum {string}
+                     */
+                    event: "ringing" | "answered" | "hangup";
+                    /** Extension */
+                    extension?: string | null;
+                    /** Timestamp */
+                    timestamp?: string | null;
+                };
             };
         };
         responses: {
