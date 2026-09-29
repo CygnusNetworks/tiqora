@@ -8,12 +8,13 @@ than logged-in agents. Disabled by default — see ``channel.phone.enabled``.
 
 from __future__ import annotations
 
+import json
 from typing import Annotated
 
 import redis.asyncio as redis
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from pydantic import BaseModel, ValidationError
 
 from tiqora.api.deps import DbSession, get_redis
 from tiqora.channels.common import channel_enabled, channel_setting, verify_shared_secret
@@ -94,21 +95,59 @@ class CallEventAccepted(BaseModel):
     delivered_to: int
 
 
-@router.post("/events", response_model=CallEventAccepted, status_code=status.HTTP_202_ACCEPTED)
+_CALL_EVENT_SCHEMA = CallEventIn.model_json_schema()
+
+
+async def _parse_call_event(request: Request) -> CallEventIn:
+    """JSON or form-encoded body (Asterisk ``CURL()`` posts form data)."""
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    try:
+        if content_type in ("application/x-www-form-urlencoded", "multipart/form-data"):
+            form = await request.form()
+            data: object = {k: v for k, v in form.items() if isinstance(v, str) and v != ""}
+        else:
+            data = json.loads(await request.body() or b"null")
+        return CallEventIn.model_validate(data)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=exc.errors(include_url=False, include_context=False, include_input=False),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid request body"
+        ) from exc
+
+
+@router.post(
+    "/events",
+    response_model=CallEventAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {"schema": _CALL_EVENT_SCHEMA},
+                "application/x-www-form-urlencoded": {"schema": _CALL_EVENT_SCHEMA},
+            },
+        }
+    },
+)
 async def call_event(
-    body: CallEventIn,
+    request: Request,
     session: DbSession,
     redis_client: Annotated[redis.Redis, Depends(get_redis)],
     x_tiqora_phone_secret: str | None = Header(default=None),
 ) -> CallEventAccepted:
     """PBX call events (ringing / answered / hangup) for the agent call popup.
 
-    The extension is mapped to agents via their ``TiqoraPhoneExtension``
-    preference; an event nobody is assigned to is accepted and ignored. See
-    :mod:`tiqora.channels.phone.cti`.
+    Body as JSON or form-encoded (same fields). The extension is mapped to
+    agents via their ``TiqoraPhoneExtension`` preference; an event nobody is
+    assigned to is accepted and ignored. See :mod:`tiqora.channels.phone.cti`.
     """
     await _require_enabled(session)
     await _require_secret(session, x_tiqora_phone_secret)
+    body = await _parse_call_event(request)
 
     async def _resolve(extension: str) -> list[int]:
         return await users_for_extension(session, extension)
