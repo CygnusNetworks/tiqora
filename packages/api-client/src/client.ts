@@ -897,19 +897,11 @@ export type AgentCustomerCreateOut = {
   last_name: string;
 };
 
-// Hand-written to match tiqora/api/v1/tickets.py's TicketCreateRequest, which
-// the generated schema for this route does not yet reflect (agent create needs
-// queue/state/priority/owner, not the portal-style title/body). The initial
-// message is added as a separate article after creation. See the Stats/Ref
-// blocks above for why we hand-write instead of regenerating openapi.json.
-export type AgentTicketCreateInput = {
-  title: string;
-  queue_id: number;
-  state_id: number;
-  priority_id: number;
-  owner_id: number;
-  customer_user_id?: string | null;
-};
+/** POST /api/v1/tickets body (agent create; phone tickets add `phone_call`).
+ * The generated type marks server-defaulted fields as required. */
+type TicketCreateDefaults = "archive_flag" | "lock_id" | "send_auto_response";
+export type AgentTicketCreateInput = Omit<Schemas["TicketCreateRequest"], TicketCreateDefaults> &
+  Partial<Pick<Schemas["TicketCreateRequest"], TicketCreateDefaults>>;
 
 export class ApiError extends Error {
   readonly status: number;

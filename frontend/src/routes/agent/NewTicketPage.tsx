@@ -22,6 +22,22 @@ import {
 import { ComposerBody } from "@/components/agent/ComposerBody";
 import { ArticleBodyRenderer } from "@/components/agent/ArticleBodyRenderer";
 import { RefineControls } from "@/components/agent/RefineControls";
+import { CallerLookup } from "@/components/agent/phone/CallerLookup";
+import { PhoneTicketFields } from "@/components/agent/phone/PhoneTicketFields";
+import {
+  EMPTY_PHONE_TICKET_FIELDS,
+  bookedMinutes,
+  type PhoneTicketFieldsValue,
+} from "@/components/agent/phone/phoneTicketValue";
+import { useCallTimer } from "@/components/agent/phone/useCallTimer";
+import { useChatAttachments } from "@/components/agent/telegram/useChatAttachments";
+import { phoneApi, type CallerCustomer, type CallerTicket } from "@/lib/phoneApi";
+import {
+  missingRequired,
+  pendingIso,
+  requestPhoneCall,
+  savePhoneDraft,
+} from "@/lib/phoneCall";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
@@ -76,15 +92,25 @@ type Direction = "inbound" | "outbound";
  * records a customer/agent note with no email dispatch. The queue may be
  * pre-selected via the `queue_id` search param set by the top-bar queue picker.
  */
-export type NewTicketSearch = { queue_id?: number };
+export type NewTicketSearch = {
+  queue_id?: number;
+  /** Phone mode prefill (click-to-call from the customer page). */
+  type?: "email" | "phone";
+  direction?: "inbound" | "outbound";
+  /** Customer login to preselect. */
+  customer?: string;
+  /** Caller / dialled number. */
+  number?: string;
+};
 
 export function NewTicketPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { queue_id: queueId } = useSearch({
+  const search = useSearch({
     from: "/agent/tickets/new",
   }) as NewTicketSearch;
+  const queueId = search.queue_id;
 
   const queuesQ = useQuery({
     queryKey: ["queues"],
@@ -104,17 +130,20 @@ export function NewTicketPage() {
     [queuesQ.data],
   );
   const priorities = useMemo(() => prioritiesQ.data ?? [], [prioritiesQ.data]);
+  const [ticketType, setTicketType] = useState<TicketType>(search.type ?? "email");
   // Only offer states an agent would set on a fresh ticket (new/open), not
-  // closed/removed types.
+  // closed/removed types. A phone ticket (Znuny AgentTicketPhone) may also
+  // start pending (with a time) or be closed right away.
   const states = useMemo(
     () =>
-      (statesQ.data ?? []).filter(
-        (s) =>
-          s.type_name === "new" ||
-          s.type_name === "open" ||
-          s.type_name === "pending auto",
+      (statesQ.data ?? []).filter((s) =>
+        ticketType === "phone"
+          ? s.type_name !== "removed" && s.type_name !== "merged"
+          : s.type_name === "new" ||
+            s.type_name === "open" ||
+            s.type_name === "pending auto",
       ),
-    [statesQ.data],
+    [statesQ.data, ticketType],
   );
 
   const queueItems: SelectMenuItem<number>[] = useMemo(
@@ -130,8 +159,6 @@ export function NewTicketPage() {
     [states, t],
   );
 
-  const [ticketType, setTicketType] = useState<TicketType>("email");
-
   const [customer, setCustomer] = useState<CustomerRef | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
   const [skipCustomer, setSkipCustomer] = useState(false);
@@ -142,7 +169,25 @@ export function NewTicketPage() {
   const [priority, setPriority] = useState<number | "">("");
   const [state, setState] = useState<number | "">("");
   const [body, setBody] = useState("");
-  const [direction, setDirection] = useState<Direction>("inbound");
+  const [direction, setDirection] = useState<Direction>(search.direction ?? "inbound");
+  // Phone mode: caller number + lookup, the parity fields and the call timer
+  // (running from page open).
+  const [callerNumber, setCallerNumber] = useState(search.number ?? "");
+  const [phoneFields, setPhoneFields] = useState<PhoneTicketFieldsValue>(EMPTY_PHONE_TICKET_FIELDS);
+  const timer = useCallTimer();
+  const attachments = useChatAttachments();
+  const phoneFieldsQ = useQuery({
+    queryKey: ["reference", "dynamic-fields", "AgentTicketPhone"],
+    queryFn: () => phoneApi.screenDynamicFields("AgentTicketPhone"),
+    enabled: ticketType === "phone",
+  });
+  const phoneDfs = useMemo(() => phoneFieldsQ.data ?? [], [phoneFieldsQ.data]);
+  // Customer preselected by login (click-to-call from the customer page).
+  const presetCustomerQ = useQuery({
+    queryKey: ["customers", search.customer],
+    queryFn: () => api.getCustomer(search.customer as string),
+    enabled: Boolean(search.customer),
+  });
 
   const [to, setTo] = useState<Recipient[]>([]);
   const [cc, setCc] = useState<Recipient[]>([]);
@@ -186,6 +231,40 @@ export function NewTicketPage() {
     }
   }, [states, state]);
 
+  const presetCustomer = presetCustomerQ.data;
+  useEffect(() => {
+    if (!presetCustomer) return;
+    setCustomer((prev) =>
+      prev ?? {
+        login: presetCustomer.login,
+        email: presetCustomer.email,
+        customer_id: presetCustomer.customer_id,
+        full_name: `${presetCustomer.first_name} ${presetCustomer.last_name}`.trim(),
+      },
+    );
+  }, [presetCustomer]);
+
+  const pickCallerCustomer = (c: CallerCustomer) =>
+    selectCustomer({
+      login: c.login,
+      email: c.email,
+      customer_id: c.customer_id,
+      full_name: c.name || c.login,
+    });
+
+  /** The call is about one of the caller's open tickets: carry text and
+   * timer over and log it there instead of opening a new ticket. */
+  const logOnExistingTicket = (tk: CallerTicket) => {
+    savePhoneDraft(tk.id, {
+      direction,
+      subject: subject.trim(),
+      body,
+      elapsed: timer.elapsed,
+    });
+    requestPhoneCall(tk.id, { direction, number: callerNumber.trim() || null });
+    void navigate({ to: "/agent/tickets/$ticketId", params: { ticketId: String(tk.id) } });
+  };
+
   const selectCustomer = (c: CustomerRef) => {
     setCustomer(c);
     setCustomerQuery("");
@@ -228,6 +307,13 @@ export function NewTicketPage() {
 
   const richText = composeContextQ.data?.rich_text ?? false;
 
+  const selectedState = statesQ.data?.find((s) => s.id === state);
+  const pendingSelected = Boolean(selectedState?.type_name.startsWith("pending"));
+  const phoneReady =
+    missingRequired(phoneDfs, phoneFields.dfValues).length === 0 &&
+    !attachments.encoding &&
+    (!pendingSelected || pendingIso(phoneFields.pendingAt) !== null);
+
   const canSubmit =
     formUnlocked &&
     queue !== "" &&
@@ -236,6 +322,7 @@ export function NewTicketPage() {
     subject.trim().length > 0 &&
     body.trim().length > 0 &&
     (ticketType === "phone" || to.length > 0) &&
+    (ticketType === "email" || phoneReady) &&
     !submitting;
 
   const onSubmit = async (e: FormEvent) => {
@@ -250,6 +337,42 @@ export function NewTicketPage() {
     }
     setSubmitting(true);
     try {
+      if (ticketType === "phone") {
+        // One request: ticket + the call as first article (+ auto reply).
+        const minutes = bookedMinutes(phoneFields, timer.elapsed);
+        const { ticket_id: phoneTicketId } = await api.createTicket({
+          title: subject.trim(),
+          queue_id: queue,
+          state_id: state,
+          priority_id: priority,
+          owner_id: phoneFields.ownerId ?? user.id,
+          responsible_id: phoneFields.responsibleId,
+          type_id: phoneFields.typeId,
+          service_id: phoneFields.serviceId,
+          sla_id: phoneFields.slaId,
+          customer_id: customer?.customer_id || null,
+          customer_user_id: customer?.login ?? null,
+          dynamic_fields: Object.fromEntries(
+            Object.entries(phoneFields.dfValues).filter(([, v]) => v.length > 0),
+          ),
+          pending_time: pendingSelected ? pendingIso(phoneFields.pendingAt) : null,
+          phone_call: {
+            direction,
+            body,
+            content_type: "text/plain",
+            is_visible_for_customer: true,
+            time_unit: minutes,
+            attachments: attachments.payload,
+            caller_number: callerNumber.trim() || null,
+          },
+          send_auto_response: direction === "inbound",
+        });
+        await navigate({
+          to: "/agent/tickets/$ticketId",
+          params: { ticketId: String(phoneTicketId) },
+        });
+        return;
+      }
       const { ticket_id } = await api.createTicket({
         title: subject.trim(),
         queue_id: queue,
@@ -264,41 +387,22 @@ export function NewTicketPage() {
       // exists at that point, so surface an error with a link to it instead
       // of silently losing the agent's typed message.
       try {
-        if (ticketType === "email") {
-          await api.createArticle(ticket_id, {
-            sender_type: "agent",
-            channel: "email",
-            is_visible_for_customer: true,
-            subject: subject.trim(),
-            body,
-            content_type: richText
-              ? "text/html; charset=utf-8"
-              : "text/plain; charset=utf-8",
-            to_address: joinRecipients(to),
-            cc: joinRecipients(cc),
-            bcc: joinRecipients(bcc),
-          });
-        } else {
-          await api.createArticle(ticket_id, {
-            sender_type: direction === "inbound" ? "customer" : "agent",
-            channel: "phone",
-            is_visible_for_customer: true,
-            subject: subject.trim(),
-            body,
-            content_type: "text/plain; charset=utf-8",
-            from_address:
-              direction === "inbound" ? (customer?.email ?? null) : null,
-            to_address:
-              direction === "outbound" ? (customer?.email ?? null) : null,
-          });
-        }
+        await api.createArticle(ticket_id, {
+          sender_type: "agent",
+          channel: "email",
+          is_visible_for_customer: true,
+          subject: subject.trim(),
+          body,
+          content_type: richText
+            ? "text/html; charset=utf-8"
+            : "text/plain; charset=utf-8",
+          to_address: joinRecipients(to),
+          cc: joinRecipients(cc),
+          bcc: joinRecipients(bcc),
+        });
       } catch (articleErr) {
         if (!(articleErr instanceof ApiError)) throw articleErr;
-        setError(
-          ticketType === "email"
-            ? t("newTicket.sendError")
-            : t("newTicket.submitError"),
-        );
+        setError(t("newTicket.sendError"));
         return;
       }
       await navigate({
@@ -369,7 +473,16 @@ export function NewTicketPage() {
         </div>
       ) : (
         <form onSubmit={(e) => void onSubmit(e)} className="mt-4 space-y-4">
-          <div className="rounded-xl border border-hairline bg-surface p-4">
+          <div className="space-y-3 rounded-xl border border-hairline bg-surface p-4">
+            {ticketType === "phone" && (
+              <CallerLookup
+                number={callerNumber}
+                onNumberChange={setCallerNumber}
+                showCustomers={customer === null}
+                onPickCustomer={pickCallerCustomer}
+                onLogOnTicket={logOnExistingTicket}
+              />
+            )}
             {customer ? (
               <div
                 className="flex items-center gap-2 rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm"
@@ -544,6 +657,11 @@ export function NewTicketPage() {
                       {t("newTicket.directionOut")}
                     </button>
                   </div>
+                  {direction === "inbound" && (
+                    <p className="mt-1 text-[11px] text-muted" data-testid="new-ticket-autoreply-hint">
+                      {t("phone.autoReplyHint")}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -694,6 +812,21 @@ export function NewTicketPage() {
               </label>
             </div>
 
+            {ticketType === "phone" && (
+              <PhoneTicketFields
+                value={phoneFields}
+                onChange={setPhoneFields}
+                pendingState={pendingSelected}
+                elapsed={timer.elapsed}
+                timerRunning={timer.running}
+                onToggleTimer={timer.running ? timer.pause : timer.resume}
+                fields={phoneDfs}
+                attachments={attachments.items}
+                onAttach={attachments.add}
+                onRemoveAttachment={attachments.remove}
+              />
+            )}
+
             <label className="block">
               <span className="mb-1 block text-[12px] font-medium text-muted">
                 {ticketType === "email"
@@ -721,6 +854,7 @@ export function NewTicketPage() {
               body={body}
               onChange={setBody}
               testIdPrefix="new-ticket-refine"
+              mode={ticketType === "phone" ? "call_note" : "message"}
             />
 
             {ticketType === "email" &&

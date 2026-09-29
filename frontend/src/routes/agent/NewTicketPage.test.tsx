@@ -17,6 +17,9 @@ const {
   createArticle,
   refine,
   refineAvailability,
+  searchParams,
+  callerLookup,
+  getCustomer,
 } = vi.hoisted(() => ({
   navigate: vi.fn(),
   listQueues: vi.fn(),
@@ -28,7 +31,18 @@ const {
   createArticle: vi.fn(),
   refine: vi.fn(),
   refineAvailability: vi.fn(),
+  searchParams: { current: {} as Record<string, unknown> },
+  callerLookup: vi.fn(),
+  getCustomer: vi.fn(),
 }));
+
+vi.mock("@/lib/phoneApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/phoneApi")>("@/lib/phoneApi");
+  return {
+    ...actual,
+    phoneApi: { callerLookup, screenDynamicFields: vi.fn().mockResolvedValue([]) },
+  };
+});
 
 vi.mock("@/lib/refineApi", async () => {
   const actual =
@@ -38,7 +52,7 @@ vi.mock("@/lib/refineApi", async () => {
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
-  useSearch: () => ({}),
+  useSearch: () => searchParams.current,
   Link: ({
     children,
     to,
@@ -83,6 +97,11 @@ vi.mock("@/lib/api", async () => {
       getComposeContext,
       createTicket,
       createArticle,
+      getCustomer,
+      listReferenceAgents: vi.fn().mockResolvedValue([{ id: 5, login: "agent1", full_name: "Agent One" }]),
+      listReferenceTypes: vi.fn().mockResolvedValue([]),
+      listReferenceServices: vi.fn().mockResolvedValue([]),
+      listReferenceSlas: vi.fn().mockResolvedValue([]),
     },
   };
 });
@@ -152,6 +171,10 @@ describe("NewTicketPage", () => {
     getComposeContext.mockReset().mockResolvedValue(composeContext);
     createTicket.mockReset().mockResolvedValue({ ticket_id: 42 });
     createArticle.mockReset().mockResolvedValue({ article_id: 1 });
+    searchParams.current = {};
+    callerLookup.mockReset().mockResolvedValue({ number_normalized: "", customers: [], open_tickets: [] });
+    getCustomer.mockReset();
+    window.localStorage.clear();
   });
 
   it("defaults to email mode and seeds the To chip + customer card on selection", async () => {
@@ -216,7 +239,7 @@ describe("NewTicketPage", () => {
     );
   });
 
-  it("phone mode hides recipients/signature and submits with direction-dependent sender_type", async () => {
+  it("phone mode creates ticket + call in one request with direction, time and auto reply", async () => {
     await renderReady();
     fireEvent.click(screen.getByTestId("new-ticket-type-phone"));
     fireEvent.click(screen.getByTestId("new-ticket-skip-customer"));
@@ -227,6 +250,7 @@ describe("NewTicketPage", () => {
       "aria-pressed",
       "true",
     );
+    expect(screen.getByTestId("new-ticket-timer")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("new-ticket-direction-out"));
     fireEvent.change(screen.getByTestId("new-ticket-subject"), {
@@ -235,20 +259,120 @@ describe("NewTicketPage", () => {
     fireEvent.change(screen.getByTestId("new-ticket-body"), {
       target: { value: "Customer called back." },
     });
+    fireEvent.change(screen.getByTestId("new-ticket-time"), { target: { value: "12" } });
     await waitFor(() =>
       expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
     );
     fireEvent.click(screen.getByTestId("new-ticket-submit"));
 
-    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
-    expect(createArticle).toHaveBeenCalledWith(
-      42,
+    await waitFor(() => expect(createTicket).toHaveBeenCalledTimes(1));
+    expect(createArticle).not.toHaveBeenCalled();
+    expect(createTicket).toHaveBeenCalledWith(
       expect.objectContaining({
-        channel: "phone",
-        sender_type: "agent",
-        content_type: "text/plain; charset=utf-8",
+        title: "Called about delivery",
+        owner_id: 5,
+        send_auto_response: false,
+        phone_call: expect.objectContaining({
+          direction: "outbound",
+          body: "Customer called back.",
+          time_unit: 12,
+        }),
       }),
     );
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({
+        to: "/agent/tickets/$ticketId",
+        params: { ticketId: "42" },
+      }),
+    );
+  });
+
+  it("an inbound phone ticket asks for the auto reply; a pending state needs a time", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...states,
+      { id: 6, name: "pending reminder", type_name: "pending reminder" },
+    ]);
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-phone"));
+    fireEvent.click(screen.getByTestId("new-ticket-skip-customer"));
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), { target: { value: "Rückruf" } });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Bitte zurückrufen" } });
+
+    fireEvent.click(screen.getByTestId("new-ticket-state"));
+    fireEvent.click(await screen.findByText(/pending reminder|Warten zur Erinnerung|Erinnerung/i));
+    await screen.findByTestId("new-ticket-pending");
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("new-ticket-pending-time-preset-tomorrow9"));
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    await waitFor(() => expect(createTicket).toHaveBeenCalledTimes(1));
+    const body = createTicket.mock.calls[0][0];
+    expect(body.state_id).toBe(6);
+    expect(new Date(body.pending_time).getHours()).toBe(9);
+    expect(body.send_auto_response).toBe(true);
+    expect(body.phone_call.direction).toBe("inbound");
+  });
+
+  it("looks up the caller number, picks the customer and hands a call over to an open ticket", async () => {
+    callerLookup.mockResolvedValue({
+      number_normalized: "492285550101",
+      customers: [
+        {
+          login: "jane.doe",
+          customer_id: "CUST1",
+          name: "Jane Doe",
+          email: "jane@example.com",
+          phone: "+49 228 555-0101",
+          mobile: null,
+          company: "Acme",
+        },
+      ],
+      open_tickets: [
+        {
+          id: 77,
+          tn: "2026092900077",
+          title: "Drucker",
+          state: "open",
+          queue: "Support",
+          customer_user_id: "jane.doe",
+          changed: "2026-09-29T10:00:00Z",
+        },
+      ],
+    });
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-phone"));
+    fireEvent.change(screen.getByTestId("caller-number"), { target: { value: "+49 228 5550101" } });
+    await waitFor(() => expect(callerLookup).toHaveBeenCalledWith("+49 228 5550101", expect.anything()));
+    fireEvent.click(await screen.findByTestId("caller-pick-jane.doe"));
+    expect(await screen.findByTestId("new-ticket-customer-card")).toHaveTextContent("Jane Doe");
+    // The open tickets stay once the customer is chosen.
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "schon wieder" } });
+    fireEvent.click(screen.getByTestId("caller-log-77"));
+    expect(navigate).toHaveBeenCalledWith({
+      to: "/agent/tickets/$ticketId",
+      params: { ticketId: "77" },
+    });
+    const { loadPhoneDraft, peekPhoneCallRequest } = await import("@/lib/phoneCall");
+    expect(loadPhoneDraft(77)?.body).toBe("schon wieder");
+    expect(peekPhoneCallRequest(77)).toEqual({ direction: "inbound", number: "+49 228 5550101" });
+    expect(createTicket).not.toHaveBeenCalled();
+  });
+
+  it("prefills an outbound phone ticket from the search params (click-to-call)", async () => {
+    searchParams.current = { type: "phone", direction: "outbound", customer: "jane.doe", number: "0228 1" };
+    getCustomer.mockResolvedValue({
+      login: "jane.doe",
+      email: "jane@example.com",
+      customer_id: "CUST1",
+      first_name: "Jane",
+      last_name: "Doe",
+    });
+    wrap(<NewTicketPage />);
+    expect(await screen.findByTestId("new-ticket-customer-card")).toHaveTextContent("Jane Doe");
+    expect(screen.getByTestId("new-ticket-type-phone")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("new-ticket-direction-out")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("caller-number")).toHaveValue("0228 1");
   });
 
   it("renders a plain textarea when rich_text is false and the ComposerBody toolbar when true", async () => {
