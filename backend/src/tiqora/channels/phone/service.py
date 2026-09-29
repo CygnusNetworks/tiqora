@@ -24,8 +24,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -50,6 +51,8 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
+
+logger = structlog.get_logger(__name__)
 
 CHANNEL_NAME = "phone"
 
@@ -308,4 +311,67 @@ async def log_phone_call(
     )
     return PhoneNoteResult(
         ticket_id=target_ticket_id, article_id=result.article_id, created=created
+    )
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+async def send_phone_ticket_auto_response(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    sysconfig: SysConfig,
+    mail_sender: Any | None,
+    *,
+    ticket_id: int,
+    user_id: int,
+    subject: str,
+    body: str,
+) -> int | None:
+    """The queue's "auto reply" for a new inbound phone ticket (Znuny
+    AgentTicketPhone with ``AutoResponseForWebTickets``). Caller commits.
+
+    Same send path as the email pipeline -- template placeholders, loop
+    protection, ``SendAutoReply`` history -- addressed to the ticket's
+    customer user. Returns the auto-reply article id, or ``None`` when
+    switched off, the customer has no address, nothing is configured for the
+    queue, or no outbound relay is configured (``mail_sender`` unset).
+    """
+    from tiqora.channels.email.autoresponse import send_auto_response
+
+    if not _truthy(await sysconfig.get("AutoResponseForWebTickets", 1)):
+        return None
+    ticket = await _ticket_must_exist(session, ticket_id)
+    recipient = await customer_address(session, ticket.get("customer_user_id"))
+    if recipient is None:
+        return None
+    sender = mail_sender
+    if sender is None:
+        from tiqora.domain.mail_outbound import build_outbound_sender, resolve_outbound_smtp
+
+        if not (await resolve_outbound_smtp(session)).enabled:
+            # Same policy as agent email replies without a relay: never
+            # fall back to localhost:25 from a request.
+            logger.info("phone_auto_response_no_outbound_relay", ticket_id=ticket_id)
+            return None
+        sender = await build_outbound_sender(
+            session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
+        )
+    return await send_auto_response(
+        session,
+        session_factory,
+        sysconfig,
+        sender,
+        ticket_id=ticket_id,
+        queue_id=int(ticket["queue_id"]),
+        auto_response_type="auto reply",
+        recipient_from_header=recipient,
+        orig_subject=subject,
+        orig_body=body,
+        orig_message_id=None,
+        orig_x_otrs_loop=None,
+        user_id=user_id,
     )
