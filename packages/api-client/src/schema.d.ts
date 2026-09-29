@@ -6110,6 +6110,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/phone-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log Phone Call Endpoint
+         * @description Log an inbound or outbound phone call (Znuny AgentTicketPhoneInbound/
+         *     Outbound). Requires ``rw`` on the ticket's queue.
+         *
+         *     One transaction: ``Phone`` article (sender customer/agent, history
+         *     PhoneCallCustomer/PhoneCallAgent), time accounting bound to it, ticket
+         *     dynamic fields, attachments and the next state. Outbound calls lock the
+         *     ticket to the agent (``AgentTicketPhoneOutbound###RequiredLock``); a lock
+         *     held by another agent is a 409 with ``locked_by_*`` in the detail.
+         */
+        post: operations["log_phone_call_endpoint_api_v1_tickets__ticket_id__phone_calls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/presence": {
         parameters: {
             query?: never;
@@ -11185,6 +11212,54 @@ export interface components {
         PgpImportOut: {
             /** Fingerprints */
             fingerprints: string[];
+        };
+        /** PhoneCallRequest */
+        PhoneCallRequest: {
+            /** Attachments */
+            attachments?: components["schemas"]["ArticleAttachmentIn"][];
+            /** Body */
+            body: string;
+            /** Caller Number */
+            caller_number?: string | null;
+            /**
+             * Content Type
+             * @default text/plain
+             * @enum {string}
+             */
+            content_type: "text/plain" | "text/html";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "inbound" | "outbound";
+            /** Dynamic Fields */
+            dynamic_fields?: {
+                [key: string]: string[];
+            };
+            /**
+             * Is Visible For Customer
+             * @default true
+             */
+            is_visible_for_customer: boolean;
+            /** Pending Time */
+            pending_time?: string | null;
+            /** State Id */
+            state_id?: number | null;
+            /** Subject */
+            subject: string;
+            /** Time Unit */
+            time_unit?: number | null;
+        };
+        /** PhoneCallResponse */
+        PhoneCallResponse: {
+            /** Article Id */
+            article_id: number;
+            /** Locked */
+            locked: boolean;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Time Accounting Id */
+            time_accounting_id: number | null;
         };
         /** PhoneNoteRequest */
         PhoneNoteRequest: {
@@ -29782,6 +29857,52 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    log_phone_call_endpoint_api_v1_tickets__ticket_id__phone_calls_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCallRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneCallResponse"];
+                };
+            };
+            /** @description Outbound call on a ticket locked by another agent */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

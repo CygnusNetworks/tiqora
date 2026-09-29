@@ -64,6 +64,13 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "Ticket::Frontend::AgentTicketForward###RequiredLock": 1,
     "Ticket::Frontend::AgentTicketBounce###RequiredLock": 1,
     "Ticket::Frontend::AgentTicketClose###RequiredLock": 1,
+    # Phone call screens (AgentTicketPhoneOutbound/Inbound): outbound locks,
+    # inbound does not.
+    "Ticket::Frontend::AgentTicketPhoneOutbound###RequiredLock": 1,
+    "Ticket::Frontend::AgentTicketPhoneInbound###RequiredLock": 0,
+    # Send the queue's "auto reply" for tickets an agent opens from the phone
+    # screen (AgentTicketPhone) -- Ticket.xml default on.
+    "AutoResponseForWebTickets": 1,
 }
 
 # Composer action name (API wire value) → RequiredLock sysconfig key.
@@ -72,6 +79,8 @@ REQUIRED_LOCK_ACTIONS: Final[dict[str, str]] = {
     "forward": "Ticket::Frontend::AgentTicketForward###RequiredLock",
     "bounce": "Ticket::Frontend::AgentTicketBounce###RequiredLock",
     "close": "Ticket::Frontend::AgentTicketClose###RequiredLock",
+    "phone_outbound": "Ticket::Frontend::AgentTicketPhoneOutbound###RequiredLock",
+    "phone_inbound": "Ticket::Frontend::AgentTicketPhoneInbound###RequiredLock",
 }
 
 # Settings Tiqora currently needs typed accessors for.
