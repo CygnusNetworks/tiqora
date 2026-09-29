@@ -33,6 +33,7 @@ from tiqora.domain.settings_store import (
     KEY_PENDING_CHECK_INTERVAL_SECONDS,
     KEY_POSTMASTER_ENABLED,
     KEY_POSTMASTER_INTERVAL_SECONDS,
+    KEY_SMIME_CUSTOMER_RENEW_ENABLED,
     KEY_TELEGRAM_POLLER_ENABLED,
     KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
     KEY_UNLOCK_TIMEOUT_ENABLED,
@@ -181,6 +182,14 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="04:00",
+    ),
+    DaemonService(
+        slug="smime_customer_renew",
+        enabled_key=KEY_SMIME_CUSTOMER_RENEW_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="daily",
+        daily_at="02:02",
     ),
 )
 

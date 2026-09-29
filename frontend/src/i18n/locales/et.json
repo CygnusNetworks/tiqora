@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI auditi puhastamine",
           "description": "Kustutab kord päevas LLM-i auditilogi read, mis jäävad konfigureeritud säilitamisest mööda."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Ülevõtmine"

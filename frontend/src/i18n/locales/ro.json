@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Curățarea auditului AI",
           "description": "Șterge rândurile din jurnalul de audit LLM dincolo de păstrarea configurată o dată pe zi."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Preluare"

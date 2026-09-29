@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "تنظيف تدقيق الذكاء الاصطناعي",
           "description": "حذف صفوف سجل تدقيق LLM بعد فترة الاحتفاظ التي تم تكوينها مرة واحدة يوميًا."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "الاستيلاء"

@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI pulizia dell'audit",
           "description": "Elimina LLM righe del registro di controllo oltre il periodo di conservazione configurato una volta al giorno."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Acquisizione"

@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Εκκαθάριση ελέγχου AI",
           "description": "Διαγράφει σειρές καταγραφής ελέγχου LLM πέρα από τη διαμορφωμένη διατήρηση μία φορά την ημέρα."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Εξαγορά"

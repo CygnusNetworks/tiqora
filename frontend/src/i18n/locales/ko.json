@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI 감사 정리",
           "description": "하루에 한 번 구성된 보존 기간을 지난 LLM 감사 로그 행을 삭제합니다."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "인수"

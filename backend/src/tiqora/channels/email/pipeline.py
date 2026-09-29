@@ -597,6 +597,32 @@ async def _process_message_inner(
     )
 
 
+async def _smime_fetch_from_customer(
+    session_factory: async_sessionmaker[AsyncSession],
+    settings: Any,
+    crypto_config: Any,
+    raw: bytes,
+) -> None:
+    """Postmaster pre-filter ``000-SMIMEFetchFromCustomer`` (best effort).
+
+    Runs in its own session (it commits key-store rows) before inbound crypto,
+    so a sender certificate from the customer backend is already in
+    ``SMIME::CertPath`` when the signature is checked.
+    """
+    from email.parser import BytesHeaderParser
+
+    from tiqora.crypto import customer_fetch
+
+    try:
+        from_header = str(BytesHeaderParser().parsebytes(raw).get("From") or "")
+        async with session_factory() as fetch_session:
+            await customer_fetch.fetch_for_sender(
+                fetch_session, settings, crypto_config, from_header
+            )
+    except Exception as exc:  # noqa: BLE001 — never blocks delivery
+        logger.warning("smime_fetch_from_customer_error", error=str(exc))
+
+
 async def process_message(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
@@ -622,6 +648,8 @@ async def process_message(
 
     settings = get_settings()
     crypto_config = await resolve_crypto_config(settings, sysconfig)
+    if crypto_config.smime.enabled and crypto_config.smime.fetch_from_customer:
+        await _smime_fetch_from_customer(session_factory, settings, crypto_config, raw)
     crypto_outcome = await process_inbound_crypto(raw, settings, crypto_config)
 
     # Lightweight header parse for the communication log (same raw as pipeline).

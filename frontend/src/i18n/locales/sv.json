@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI-revisionsrensning",
           "description": "Raderar LLM-revisionsloggrader som passerat konfigurerad lagringstid en gång om dagen."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Övertagande"

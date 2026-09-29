@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Čiščenje revizije AI",
           "description": "Enkrat na dan izbriše vrstice revizijskega dnevnika LLM mimo konfiguriranega zadrževanja."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Prevzem"

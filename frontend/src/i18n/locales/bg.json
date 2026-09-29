@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Почистване на одит на AI",
           "description": "Изтрива редове от регистрационния файл за одит на LLM след конфигурираното задържане веднъж на ден."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Поглъщане"

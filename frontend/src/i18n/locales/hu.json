@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI audit tisztítás",
           "description": "Naponta egyszer törli az LLM-naplózási naplósorokat a konfigurált megőrzésen túl."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Átvétel"

@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Dọn dẹp kiểm toán AI",
           "description": "Xóa các hàng nhật ký kiểm tra LLM ngoài thời gian lưu giữ đã định cấu hình mỗi ngày một lần."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Tiếp quản"

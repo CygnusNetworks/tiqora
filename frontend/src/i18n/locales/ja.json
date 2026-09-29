@@ -2479,6 +2479,10 @@
         "ai_audit_cleanup": {
           "name": "AI監査クリーンアップ",
           "description": "設定された保持期間を過ぎたLLM監査ログ行を1日に1回削除します。"
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "乗っ取り"
