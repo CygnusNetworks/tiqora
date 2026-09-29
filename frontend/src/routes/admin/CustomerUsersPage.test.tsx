@@ -13,6 +13,7 @@ const deactivate = vi.fn();
 const bulkUpdateCustomerUsers = vi.fn();
 const companyList = vi.fn();
 const navigate = vi.fn();
+const keysList = vi.fn();
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -42,6 +43,9 @@ vi.mock("@/lib/api", () => ({
       list: (...args: unknown[]) => companyList(...args),
     },
     bulkUpdateCustomerUsers: (...args: unknown[]) => bulkUpdateCustomerUsers(...args),
+    customerCryptoKeys: {
+      list: (...args: unknown[]) => keysList(...args),
+    },
   },
 }));
 
@@ -357,5 +361,25 @@ describe("CustomerUsersPage", () => {
         expect.anything(),
       );
     });
+  });
+
+  it("opens the customer's PGP/S-MIME keys from the row menu", async () => {
+    keysList.mockResolvedValue({
+      pgp_enabled: true,
+      smime_enabled: false,
+      can_edit: true,
+      pgp_keys: [],
+      smime_certificates: [],
+      pgp_key_id: null,
+      smime_filename: null,
+      problems: [],
+    });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("admin-row-menu-trigger-42"));
+    fireEvent.click(await screen.findByTestId("admin-customer-user-keys-42"));
+    await waitFor(() => expect(keysList).toHaveBeenCalledWith("alice@example.com", expect.anything()));
+    expect(await screen.findByTestId("customer-keys-pgp")).toBeInTheDocument();
+    expect(screen.getByTestId("customer-keys-pgp-upload-file")).toBeInTheDocument();
+    expect(screen.queryByTestId("customer-keys-smime")).toBeNull();
   });
 });
