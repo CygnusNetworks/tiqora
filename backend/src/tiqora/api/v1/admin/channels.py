@@ -46,6 +46,7 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
     },
     "phone": {
         "inbound_shared_secret",
+        "dial_scheme",
         "default_customer_user",
         "queue_name",
     },

@@ -4737,6 +4737,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/caller": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Caller Lookup
+         * @description Who is calling: customer users whose phone/mobile ends in the same
+         *     digits (all matches, max 10) and their open tickets in queues the agent
+         *     may read (max 10, newest first). Fewer than five digits match nothing.
+         */
+        get: operations["caller_lookup_api_v1_reference_caller_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/compose-context": {
         parameters: {
             query?: never;
@@ -4803,6 +4825,26 @@ export interface paths {
          * @description Search valid customer users for the customer-assignment picker.
          */
         get: operations["search_customers_api_v1_reference_customers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reference/phone-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone Config
+         * @description Agent-side phone settings (admin: ``channel.phone.dial_scheme``).
+         */
+        get: operations["phone_config_api_v1_reference_phone_config_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8634,6 +8676,52 @@ export interface components {
             /** Valid */
             valid: boolean;
         };
+        /** CallerCustomerOut */
+        CallerCustomerOut: {
+            /** Company */
+            company: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** Login */
+            login: string;
+            /** Mobile */
+            mobile: string | null;
+            /** Name */
+            name: string;
+            /** Phone */
+            phone: string | null;
+        };
+        /** CallerLookupOut */
+        CallerLookupOut: {
+            /** Customers */
+            customers: components["schemas"]["CallerCustomerOut"][];
+            /** Number Normalized */
+            number_normalized: string;
+            /** Open Tickets */
+            open_tickets: components["schemas"]["CallerTicketOut"][];
+        };
+        /** CallerTicketOut */
+        CallerTicketOut: {
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /** Customer User Id */
+            customer_user_id: string | null;
+            /** Id */
+            id: number;
+            /** Queue */
+            queue: string;
+            /** State */
+            state: string;
+            /** Title */
+            title: string;
+            /** Tn */
+            tn: string;
+        };
         /** CategoryIn */
         CategoryIn: {
             /**
@@ -11260,6 +11348,14 @@ export interface components {
             ticket_id: number;
             /** Time Accounting Id */
             time_accounting_id: number | null;
+        };
+        /** PhoneConfigOut */
+        PhoneConfigOut: {
+            /**
+             * Dial Scheme
+             * @enum {string}
+             */
+            dial_scheme: "tel" | "sip";
         };
         /** PhoneNoteRequest */
         PhoneNoteRequest: {
@@ -27101,6 +27197,42 @@ export interface operations {
             };
         };
     };
+    caller_lookup_api_v1_reference_caller_get: {
+        parameters: {
+            query: {
+                /** @description Caller number in any notation */
+                number: string;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CallerLookupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     compose_context_api_v1_reference_compose_context_get: {
         parameters: {
             query: {
@@ -27177,7 +27309,7 @@ export interface operations {
     search_customers_api_v1_reference_customers_get: {
         parameters: {
             query?: {
-                /** @description Substring matched against login, email, or name */
+                /** @description Substring matched against login, email, or name; five or more digits also match phone/mobile */
                 q?: string;
                 limit?: number;
             };
@@ -27198,6 +27330,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phone_config_api_v1_reference_phone_config_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneConfigOut"];
                 };
             };
             /** @description Validation Error */
