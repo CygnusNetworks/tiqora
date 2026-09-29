@@ -28,7 +28,7 @@ export type TicketListItem = Schemas["TicketListItem"];
 export type PaginatedTickets = Schemas["PaginatedTickets"];
 export type MyTicketCounts = Schemas["MyTicketCounts"];
 /** The ticket list's channel (`TicketListItem.channel`, `channel` filter). */
-export type TicketListChannel = "email" | "telegram" | "webchat";
+export type TicketListChannel = "email" | "telegram" | "webchat" | "phone";
 export type TicketFacets = Schemas["TicketFacets"];
 // Hand-written (see the Stats block below for why we don't regenerate
 // schema.d.ts): mirrors the DashboardSummary model in tiqora/api/v1/tickets.py.

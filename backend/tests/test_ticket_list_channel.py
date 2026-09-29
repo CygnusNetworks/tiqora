@@ -29,8 +29,19 @@ TICKET_MAIL = 87310  # e-mail only
 TICKET_TG = 87311  # Telegram inbound, later an e-mail reply
 TICKET_WEBCHAT = 87312  # Znuny "Chat" channel
 TICKET_NOTE = 87313  # only an internal note — still "email"
+TICKET_PHONE = 87314  # opened by a phone call, later an e-mail reply
+TICKET_MAIL_PHONE = 87315  # e-mail first, a phone call later — still "email"
+TICKET_PHONE_TG = 87316  # phone first, then Telegram — the chat channel wins
 CHAT_ID = 873000001
-TICKETS = (TICKET_MAIL, TICKET_TG, TICKET_WEBCHAT, TICKET_NOTE)
+TICKETS = (
+    TICKET_MAIL,
+    TICKET_TG,
+    TICKET_WEBCHAT,
+    TICKET_NOTE,
+    TICKET_PHONE,
+    TICKET_MAIL_PHONE,
+    TICKET_PHONE_TG,
+)
 # article id -> (ticket id, channel name)
 ARTICLES: dict[int, tuple[int, str]] = {
     87310: (TICKET_MAIL, "Email"),
@@ -38,6 +49,12 @@ ARTICLES: dict[int, tuple[int, str]] = {
     87314: (TICKET_TG, "Email"),
     87312: (TICKET_WEBCHAT, "Chat"),
     87313: (TICKET_NOTE, "Internal"),
+    87315: (TICKET_PHONE, "Phone"),
+    87316: (TICKET_PHONE, "Email"),
+    87317: (TICKET_MAIL_PHONE, "Email"),
+    87318: (TICKET_MAIL_PHONE, "Phone"),
+    87319: (TICKET_PHONE_TG, "Phone"),
+    87320: (TICKET_PHONE_TG, "Telegram"),
 }
 
 _SEEDED: list[tuple[str, bool]] = []
@@ -213,6 +230,9 @@ async def test_list_channel_filter_and_facets(
         assert by_id[TICKET_TG].channel == "telegram"
         assert by_id[TICKET_WEBCHAT].channel == "webchat"
         assert by_id[TICKET_NOTE].channel == "email"
+        assert by_id[TICKET_PHONE].channel == "phone"
+        assert by_id[TICKET_MAIL_PHONE].channel == "email"
+        assert by_id[TICKET_PHONE_TG].channel == "telegram"
         assert (by_id[TICKET_TG].chat_display_name, by_id[TICKET_TG].chat_username) == (
             "Kim",
             "kim_example",
@@ -236,15 +256,21 @@ async def test_list_channel_filter_and_facets(
             page = await ts.list_tickets(AGENT_ID, queue_id=QUEUE_ID, channel=channel, limit=50)
             return {i.id for i in page.items}
 
-        assert await ids_for(["telegram"]) == {TICKET_TG}
-        assert await ids_for(["email"]) == {TICKET_MAIL, TICKET_NOTE}
-        assert await ids_for(["telegram", "webchat"]) == {TICKET_TG, TICKET_WEBCHAT}
+        assert await ids_for(["telegram"]) == {TICKET_TG, TICKET_PHONE_TG}
+        assert await ids_for(["email"]) == {TICKET_MAIL, TICKET_NOTE, TICKET_MAIL_PHONE}
+        assert await ids_for(["phone"]) == {TICKET_PHONE}
+        assert await ids_for(["telegram", "webchat"]) == {
+            TICKET_TG,
+            TICKET_PHONE_TG,
+            TICKET_WEBCHAT,
+        }
 
+        expected = {"email": 3, "telegram": 2, "webchat": 1, "phone": 1}
         facets = await ts.facet_counts(AGENT_ID, queue_id=QUEUE_ID)
-        assert facets["channels"] == {"email": 2, "telegram": 1, "webchat": 1}
+        assert facets["channels"] == expected
         # The channel filter narrows states/flags, but not its own chips.
         narrowed = await ts.facet_counts(AGENT_ID, queue_id=QUEUE_ID, channel=["telegram"])
-        assert narrowed["channels"] == {"email": 2, "telegram": 1, "webchat": 1}
-        assert narrowed["states"]["all"] == 1
+        assert narrowed["channels"] == expected
+        assert narrowed["states"]["all"] == 2
 
     await engine.dispose()
