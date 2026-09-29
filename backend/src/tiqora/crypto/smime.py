@@ -104,6 +104,63 @@ class SmimeEngine:
             )
         return proc.stdout
 
+    def sign_detached_der(
+        self,
+        entity: bytes,
+        cert_path: str,
+        key_path: str,
+        *,
+        secret: str | None = None,
+        extra_cert_paths: list[str] | None = None,
+        digest: str = "sha256",
+    ) -> bytes:
+        """Detached PKCS#7 signature (DER) over the exact bytes of *entity*.
+
+        ``-binary`` stops openssl from re-canonicalising: the caller passes
+        the MIME entity already in CRLF form, and that is what gets signed —
+        the same bytes that go into the first part of ``multipart/signed``.
+        """
+        args = [
+            "smime",
+            "-sign",
+            "-binary",
+            "-md",
+            digest,
+            "-outform",
+            "DER",
+            "-signer",
+            cert_path,
+            "-inkey",
+            key_path,
+        ]
+        with tempfile.TemporaryDirectory(prefix="tiqora-smime-") as tmp:
+            if extra_cert_paths:
+                chain = os.path.join(tmp, "chain.pem")
+                with open(chain, "wb") as fh:
+                    for extra in extra_cert_paths:
+                        fh.write(_read(extra).rstrip(b"\n") + b"\n")
+                args += ["-certfile", chain]
+            proc = self._run(args, entity, secret=secret)
+        if proc.returncode != 0 or not proc.stdout:
+            raise CryptoError(
+                f"openssl smime -sign failed: {proc.stderr.decode('utf-8', 'replace')[-300:]}"
+            )
+        return proc.stdout
+
+    def encrypt_der(self, entity: bytes, recipient_cert_paths: list[str]) -> bytes:
+        """``enveloped-data`` (DER, AES-256) of *entity* for every recipient certificate."""
+        if not recipient_cert_paths:
+            raise CryptoError("openssl smime -encrypt requires at least one recipient cert")
+        proc = self._run(
+            ["smime", "-encrypt", "-binary", "-aes256", "-outform", "DER", *recipient_cert_paths],
+            entity,
+        )
+        if proc.returncode != 0 or not proc.stdout:
+            raise CryptoError(
+                f"openssl smime -encrypt failed: {proc.stderr.decode('utf-8', 'replace')[-300:]}"
+            )
+        return proc.stdout
+
     def encrypt(self, data: bytes, recipient_cert_paths: list[str]) -> bytes:
         if not recipient_cert_paths:
             raise CryptoError("openssl smime -encrypt requires at least one recipient cert")

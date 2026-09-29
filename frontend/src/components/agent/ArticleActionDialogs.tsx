@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api, type CustomerRef } from "@/lib/api";
+import { api, ApiError, type CustomerRef } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { useComposerLock } from "@/lib/composerLock";
 import { ComposerLockBanner } from "./ComposerLock";
+import { EmailSecurityControl } from "./EmailSecurityControl";
+import { useEmailSecurity } from "./useEmailSecurity";
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -35,6 +37,13 @@ export function ForwardDialog({
   const ticketLock = useComposerLock(ticketId, "forward", open);
   const [to, setTo] = useState("");
   const [note, setNote] = useState("");
+  const security = useEmailSecurity({
+    ticketId,
+    to: to.trim() || null,
+    cc: null,
+    bcc: null,
+    enabled: open,
+  });
 
   const m = useMutation({
     mutationFn: () =>
@@ -42,6 +51,7 @@ export function ForwardDialog({
         to_address: to,
         note: note || null,
         body: "",
+        email_security: security.payload,
       }),
     onSuccess: () => {
       invalidate();
@@ -70,11 +80,20 @@ export function ForwardDialog({
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-        {m.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
+        <EmailSecurityControl security={security} testId="forward-security" />
+        {m.isError && (
+          <p className="text-xs text-danger" data-testid="forward-error">
+            {m.error instanceof ApiError && m.error.status === 422
+              ? m.error.message
+              : t("ticket.dialog.genericError")}
+          </p>
+        )}
         <DialogActions
           onCancel={onClose}
           onSave={() => m.mutate()}
-          disabled={!to.trim() || m.isPending || ticketLock.lockedBy !== null}
+          disabled={
+            !to.trim() || m.isPending || ticketLock.lockedBy !== null || security.blocked !== null
+          }
         />
       </div>
     </Dialog>

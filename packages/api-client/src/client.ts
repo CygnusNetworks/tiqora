@@ -77,6 +77,11 @@ export type AcquireLockResponse = Schemas["AcquireLockResponse"];
 export type TicketCreateRequest = Schemas["TicketCreateRequest"];
 export type TicketCreateResponse = Schemas["TicketCreateResponse"];
 export type ForwardRequest = Schemas["ForwardRequest"];
+export type EmailSecurityIn = Schemas["EmailSecurityIn"];
+export type CryptoOptionsOut = Schemas["CryptoOptionsOut"];
+export type CryptoComposeBackendOut = Schemas["CryptoComposeBackendOut"];
+export type CryptoComposeKeyOut = Schemas["CryptoComposeKeyOut"];
+export type CryptoComposeRecipientOut = Schemas["CryptoComposeRecipientOut"];
 export type BounceRequest = Schemas["BounceRequest"];
 export type SplitRequest = Schemas["SplitRequest"];
 export type TicketLinkTargetOut = Schemas["TicketLinkTargetOut"];
@@ -1465,6 +1470,20 @@ export class ApiClient {
       body,
       signal,
     });
+  }
+
+  /** PGP / S/MIME compose options (sign keys, recipient keys) for a reply or
+   * forward on `ticketId`; `ticketId = null` + `queue_id` for a new ticket. */
+  getCryptoOptions(
+    ticketId: number | null,
+    params: { queue_id?: number; to?: string; cc?: string; bcc?: string },
+    signal?: AbortSignal,
+  ) {
+    const path =
+      ticketId == null
+        ? "/api/v1/tickets/crypto-options"
+        : `/api/v1/tickets/${ticketId}/crypto-options`;
+    return this.request<CryptoOptionsOut>("GET", path, { query: params, signal });
   }
 
   forwardArticle(

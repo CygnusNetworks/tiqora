@@ -131,6 +131,17 @@ def _emails(uids: list[str]) -> list[str]:
     return found
 
 
+#: OpenPGP hash algorithm ids (RFC 4880 §9.4) → RFC 3156 ``micalg`` values.
+_MICALG = {
+    "1": "pgp-md5",
+    "2": "pgp-sha1",
+    "3": "pgp-ripemd160",
+    "8": "pgp-sha256",
+    "9": "pgp-sha384",
+    "10": "pgp-sha512",
+    "11": "pgp-sha224",
+}
+
 _ALGOS = {"1": "RSA", "16": "ElGamal", "17": "DSA", "18": "ECDH", "19": "ECDSA", "22": "EdDSA"}
 
 
@@ -336,6 +347,29 @@ class PgpEngine:
             raise CryptoError(f"PGP sign failed: {getattr(signed, 'stderr', '')}")
         return bytes(signed.data)
 
+    def sign_detached(self, data: bytes, key_id: str) -> tuple[bytes, str]:
+        """Armored detached signature over *data* plus its RFC 3156 ``micalg``.
+
+        The digest is whatever gpg picked (``PGP::Options::DigestPreference``,
+        key preferences); ``SIG_CREATED`` reports it, so the ``micalg``
+        parameter always matches the signature — Znuny makes a dummy
+        clear-signature just to read its ``Hash:`` line.
+        """
+        signed = self._gpg().sign(
+            data,
+            keyid=key_id,
+            detach=True,
+            clearsign=False,
+            passphrase=self.passphrase_for(key_id),
+            extra_args=self._digest_args() or None,
+        )
+        if not signed or not signed.data:
+            raise CryptoError(
+                f"PGP sign failed: {signed.status or ''} {getattr(signed, 'stderr', '')[-300:]}"
+            )
+        micalg = _MICALG.get(str(signed.hash_algo or ""), "pgp-sha256")
+        return bytes(signed.data), micalg
+
     def encrypt(
         self,
         data: bytes,
@@ -344,6 +378,7 @@ class PgpEngine:
         sign_key_id: str | None = None,
         passphrase: str | None = None,
         always_trust: bool = True,
+        armor: bool = True,
     ) -> bytes:
         if sign_key_id and passphrase is None:
             passphrase = self.passphrase_for(sign_key_id)
@@ -353,6 +388,7 @@ class PgpEngine:
             sign=sign_key_id,
             passphrase=passphrase,
             always_trust=always_trust,
+            armor=armor,
         )
         if not result.ok:
             raise CryptoError(f"PGP encrypt failed: {result.status}: {result.stderr}")

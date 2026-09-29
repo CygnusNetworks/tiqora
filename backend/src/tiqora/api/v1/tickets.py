@@ -24,6 +24,7 @@ from tiqora.channels.email.outbound_reply import OutboundMailError
 from tiqora.channels.phone.service import PhoneCallIn
 from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.channels.telegram.outbound import TelegramDeliveryError
+from tiqora.crypto.compose import EmailSecurityIn
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.customer_link import ResolvedCustomerLink, resolve_customer_link
 from tiqora.domain.schemas import (
@@ -165,6 +166,11 @@ class ArticleCreateRequest(BaseModel):
     attachments: list[ArticleAttachmentIn] = Field(default_factory=list, max_length=10)
     telegram_reply_to_article_id: int | None = None
     telegram_buttons: list[TelegramButtonIn] = Field(default_factory=list, max_length=8)
+    # Outgoing agent email only (422 on any other channel): PGP / S/MIME
+    # signing and encryption. Omitted = sent unsigned/unencrypted; the
+    # compose UI preselects the queue's default sign key via
+    # GET /tickets/{id}/crypto-options. See docs/crypto.md.
+    email_security: EmailSecurityIn | None = None
 
 
 class ArticleCreateResponse(BaseModel):
@@ -1438,6 +1444,12 @@ async def create_article(
     sending or storing anything.
     """
     attachments, telegram_options = _telegram_extras(body)
+    wants_security = body.email_security is not None and body.email_security.active
+    if wants_security and (body.channel.lower() != "email" or body.sender_type != "agent"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="email_security is only supported for outgoing agent email",
+        )
     svc = _write_service(session, settings)
     try:
         async with session.begin():
@@ -1465,6 +1477,7 @@ async def create_article(
                     channel=body.channel,
                     attachments=attachments,
                     telegram=telegram_options,
+                    email_security=body.email_security,
                 ),
             )
             if body.state_id is not None:
@@ -1652,7 +1665,11 @@ async def forward_article_endpoint(
     session: DbSession,
     settings: AppSettings,
 ) -> ArticleCreateResponse:
-    """Forward an article by email (history type 'Forward'). Requires ``rw``."""
+    """Forward an article by email (history type 'Forward'). Requires ``rw``.
+
+    Sent like a reply (send-then-store, HTTP 502 on SMTP failure); optional
+    ``email_security`` signs/encrypts it (422 on missing/unusable keys).
+    """
     svc = _write_service(session, settings)
     fwd_body = f"{body.note}\n\n{body.body}" if body.note else body.body
     subject = body.subject or "Fwd:"
@@ -1665,8 +1682,9 @@ async def forward_article_endpoint(
                 body=fwd_body,
                 to_address=body.to_address,
                 cc=body.cc,
+                email_security=body.email_security,
             )
-    except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
+    except (WriteAccessDenied, WriteNotFound, InvalidInput, OutboundMailError) as exc:
         raise _map_exc(exc) from exc
     return ArticleCreateResponse(article_id=aid)
 

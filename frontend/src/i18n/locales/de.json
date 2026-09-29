@@ -856,6 +856,36 @@
         "unavailable": "Signatur/Verschlüsselung konnte nicht geprüft werden: gpg oder openssl ist nicht verfügbar.",
         "error": "Die Prüfung von Signatur oder Verschlüsselung ist fehlgeschlagen."
       }
+    },
+    "emailSecurity": {
+      "label": "Sicherheit",
+      "backend": "Verfahren",
+      "methodLabel": "Format",
+      "signKey": "Signaturschlüssel",
+      "mode": {
+        "none": "Keine",
+        "sign": "Signieren",
+        "encrypt": "Verschlüsseln",
+        "sign_encrypt": "Signieren + verschlüsseln"
+      },
+      "method": {
+        "detached": "PGP/MIME",
+        "inline": "Inline-PGP"
+      },
+      "keyStatus": {
+        "ok": "Schlüssel vorhanden",
+        "missing": "kein Schlüssel",
+        "expired": "Schlüssel abgelaufen",
+        "revoked": "Schlüssel widerrufen",
+        "good": "gültig",
+        "valid": "gültig",
+        "invalid": "ungültig"
+      },
+      "unavailable": "Signieren/Verschlüsseln ist für dieses Verfahren nicht verfügbar.",
+      "noSignKey": "Bitte einen Signaturschlüssel wählen.",
+      "missingKeys": "Verschlüsseln nicht möglich — kein gültiger Schlüssel für: {{addresses}}",
+      "noRecipients": "Zum Verschlüsseln einen Empfänger angeben.",
+      "checking": "Schlüssel der Empfänger werden geprüft …"
     }
   },
   "search": {
