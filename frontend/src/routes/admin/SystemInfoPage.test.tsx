@@ -86,6 +86,7 @@ function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
     },
     containers: { available: false, configured: false, reason: null, items: [] },
     host: { available: false, configured: false, reason: null },
+    crypto: [],
     ...overrides,
   };
 }
@@ -209,6 +210,37 @@ describe("SystemInfoPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("system-overall")).toHaveAttribute("data-status", "red");
     });
+  });
+
+  it("shows the PGP/S-MIME self-check only when a backend is enabled", async () => {
+    const pgp = {
+      backend: "pgp",
+      enabled: true,
+      available: false,
+      binary: { available: false, path: "gpg", version: "", reason: "'gpg' not found" },
+      paths: { homedir: "/keys/gnupg" },
+      problems: ["gpg: 'gpg' not found"],
+    };
+    const smime = {
+      backend: "smime",
+      enabled: false,
+      available: true,
+      binary: { available: true, path: "/usr/bin/openssl", version: "OpenSSL 3.0.15", reason: "" },
+      paths: { cert_path: "/keys/certs", private_path: "/keys/private" },
+      problems: [],
+    };
+    getSystemInfo.mockResolvedValue(sysinfo({ crypto: [pgp, smime] }));
+    renderPage();
+    const card = await screen.findByTestId("system-crypto-pgp");
+    expect(card).toHaveTextContent("gpg: 'gpg' not found");
+    expect(screen.getByTestId("system-crypto-smime")).toHaveTextContent("OpenSSL 3.0.15");
+  });
+
+  it("hides the crypto section when both backends are off", async () => {
+    getSystemInfo.mockResolvedValue(sysinfo());
+    renderPage();
+    await screen.findByTestId("system-overall");
+    expect(screen.queryByTestId("system-crypto")).not.toBeInTheDocument();
   });
 
   it("shows an error state when the request fails", async () => {

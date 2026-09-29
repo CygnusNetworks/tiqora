@@ -13,6 +13,7 @@ const REFETCH_INTERVAL_MS = 10_000;
 type Datastores = SystemInfoOut["datastores"];
 type ContainerItem = NonNullable<SystemInfoOut["containers"]["items"]>[number];
 type Host = SystemInfoOut["host"];
+type CryptoStatus = NonNullable<SystemInfoOut["crypto"]>[number];
 
 const DOT_CLASS: Record<StatusColor, string> = {
   green: "bg-green",
@@ -160,6 +161,7 @@ export function SystemInfoPage() {
   const info = infoQ.data;
   const nowMs = Date.now();
   const { app, services, datastores, containers, host } = info;
+  const crypto = info.crypto ?? [];
   const containerItems = containers.items ?? [];
 
   const serviceColors = services.map((s) => statusColor(s, nowMs));
@@ -398,6 +400,18 @@ export function SystemInfoPage() {
         <DatastoresCards datastores={datastores} />
       </section>
 
+      {/* PGP / S-MIME — only when a backend is switched on (Znuny SysConfig / env). */}
+      {crypto.some((c) => c.enabled) ? (
+        <section data-testid="system-crypto">
+          <SectionHead title={t("admin.systemInfo.sections.crypto")} tier={tierLive} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            {crypto.map((c) => (
+              <CryptoCard key={c.backend} status={c} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {/* Containers */}
       <section>
         <SectionHead
@@ -474,6 +488,39 @@ export function SystemInfoPage() {
         )}
       </section>
     </div>
+  );
+}
+
+function CryptoCard({ status }: { status: CryptoStatus }) {
+  const { t } = useTranslation();
+  const color: StatusColor = !status.enabled ? "grey" : status.available ? "green" : "red";
+  return (
+    <Card className="flex flex-col gap-2" data-testid={`system-crypto-${status.backend}`}>
+      <div className="flex items-center gap-2">
+        <StatusDot color={color} />
+        <b className="font-semibold text-ink">{t(`admin.systemInfo.crypto.${status.backend}`)}</b>
+        <span className="ml-auto flex gap-1.5">
+          <EnabledBadge enabled={status.enabled} />
+          {status.enabled ? (
+            <Chip color={status.available ? "green" : "red"}>
+              {status.available ? t("admin.crypto.usable") : t("admin.crypto.unusable")}
+            </Chip>
+          ) : null}
+        </span>
+      </div>
+      <div className="break-all font-mono text-[11px] text-muted">
+        {status.binary.path} {status.binary.version}
+      </div>
+      {status.problems.length > 0 ? (
+        <ul className="list-inside list-disc text-xs text-danger">
+          {status.problems.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted">{t("admin.systemInfo.crypto.noProblems")}</p>
+      )}
+    </Card>
   );
 }
 
