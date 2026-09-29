@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Nettoyage des audits IA",
           "description": "Supprime les lignes du journal d'audit LLM au-delà de la rétention configurée une fois par jour."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Reprise"

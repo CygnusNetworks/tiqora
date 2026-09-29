@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "ניקוי ביקורת AI",
           "description": "מוחק שורות יומן ביקורת LLM מעבר לשמירה שהוגדרה פעם ביום."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "השתלטות"

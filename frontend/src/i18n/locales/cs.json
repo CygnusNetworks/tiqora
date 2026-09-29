@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Úklid AI auditu",
           "description": "Jednou denně maže řádky LLM audit logu po uplynutí nastavené retence."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Převzetí"

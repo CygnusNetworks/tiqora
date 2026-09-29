@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Vyčistenie auditu AI",
           "description": "Raz denne vymaže riadky denníka auditu LLM po nakonfigurovanom uchovávaní údajov."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Prevzatie"

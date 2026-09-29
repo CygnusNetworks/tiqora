@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI auditopschoning",
           "description": "Verwijdert eenmaal per dag LLM auditlogboekrijen voorbij de geconfigureerde retentie."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Overname"

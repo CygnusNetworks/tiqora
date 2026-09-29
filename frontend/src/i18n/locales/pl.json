@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI czyszczenie audytu",
           "description": "Raz dziennie usuwa LLM wierszy dziennika audytu poza skonfigurowanym przechowywaniem."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Przejęcie"

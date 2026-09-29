@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Чишћење АИ ревизије",
           "description": "Брише редове дневника ревизије ЛЛМ након конфигурисаног задржавања једном дневно."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Преузимање"

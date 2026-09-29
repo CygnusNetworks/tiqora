@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Neteja d'auditoria d'IA",
           "description": "Suprimeix les files del registre d'auditoria de LLM més enllà de la retenció configurada una vegada al dia."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Adquisició"

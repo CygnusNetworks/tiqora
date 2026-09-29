@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI audito valymas",
           "description": "Kartą per dieną ištrina LLM audito žurnalo eilutes po sukonfigūruoto saugojimo."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Perėmimas"

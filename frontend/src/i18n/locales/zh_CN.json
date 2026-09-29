@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI审计清理",
           "description": "每天删除一次超过配置保留时间的 LLM 审核日志行。"
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "接管"

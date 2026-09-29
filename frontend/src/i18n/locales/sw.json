@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Usafishaji wa ukaguzi wa AI",
           "description": "Hufuta safumlalo za kumbukumbu za ukaguzi za LLM kupita uhifadhi uliosanidiwa mara moja kwa siku."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Kuchukua"
