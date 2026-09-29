@@ -26,6 +26,7 @@ from tiqora.worker.outbox_drain import drain_outbox
 from tiqora.worker.pending_check import run_pending_check_tick
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
+from tiqora.worker.smime_customer_renew import run_smime_customer_renew_tick
 from tiqora.worker.status import record_tick_status, seconds_until_daily
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
 from tiqora.worker.unlock_timeout import run_unlock_timeout_tick
@@ -224,6 +225,7 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),
         _daily_loop("ai_audit_cleanup", run_ai_audit_cleanup_tick, "04:00", stop),
+        _daily_loop("smime_customer_renew", run_smime_customer_renew_tick, "02:02", stop),
     )
 
 
