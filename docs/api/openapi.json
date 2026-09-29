@@ -6667,6 +6667,150 @@
         "title": "CalendarOut",
         "type": "object"
       },
+      "CallerCustomerOut": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "login",
+          "customer_id",
+          "name",
+          "email",
+          "phone",
+          "mobile",
+          "company"
+        ],
+        "title": "CallerCustomerOut",
+        "type": "object"
+      },
+      "CallerLookupOut": {
+        "properties": {
+          "customers": {
+            "items": {
+              "$ref": "#/components/schemas/CallerCustomerOut"
+            },
+            "title": "Customers",
+            "type": "array"
+          },
+          "number_normalized": {
+            "title": "Number Normalized",
+            "type": "string"
+          },
+          "open_tickets": {
+            "items": {
+              "$ref": "#/components/schemas/CallerTicketOut"
+            },
+            "title": "Open Tickets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "number_normalized",
+          "customers",
+          "open_tickets"
+        ],
+        "title": "CallerLookupOut",
+        "type": "object"
+      },
+      "CallerTicketOut": {
+        "properties": {
+          "changed": {
+            "format": "date-time",
+            "title": "Changed",
+            "type": "string"
+          },
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "queue": {
+            "title": "Queue",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tn",
+          "title",
+          "state",
+          "queue",
+          "customer_user_id",
+          "changed"
+        ],
+        "title": "CallerTicketOut",
+        "type": "object"
+      },
       "CategoryIn": {
         "properties": {
           "customer_visible": {
@@ -14535,6 +14679,23 @@
           "locked"
         ],
         "title": "PhoneCallResponse",
+        "type": "object"
+      },
+      "PhoneConfigOut": {
+        "properties": {
+          "dial_scheme": {
+            "enum": [
+              "tel",
+              "sip"
+            ],
+            "title": "Dial Scheme",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dial_scheme"
+        ],
+        "title": "PhoneConfigOut",
         "type": "object"
       },
       "PhoneNoteRequest": {
@@ -51435,6 +51596,84 @@
         ]
       }
     },
+    "/api/v1/reference/caller": {
+      "get": {
+        "description": "Who is calling: customer users whose phone/mobile ends in the same\ndigits (all matches, max 10) and their open tickets in queues the agent\nmay read (max 10, newest first). Fewer than five digits match nothing.",
+        "operationId": "caller_lookup_api_v1_reference_caller_get",
+        "parameters": [
+          {
+            "description": "Caller number in any notation",
+            "in": "query",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "description": "Caller number in any notation",
+              "maxLength": 100,
+              "title": "Number",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallerLookupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Caller Lookup",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
     "/api/v1/reference/compose-context": {
       "get": {
         "description": "From-address, signature preview, and rich-text flag for a new-ticket compose form.\n\nReuses ``queue_outbound_meta``, the same queue lookup the agent-reply send\npath (``deliver_agent_email_reply``) resolves From/signature from, so the\npreview matches what an actual reply on that queue would show. Agent tags\n(``<OTRS_First_Name>`` etc.) are expanded against the current agent, same\nas ``TicketService.get_reply_draft``. A not-yet-created ticket has no\nticket/customer context, so ticket_id is omitted and OTRS_TICKET_*/\nOTRS_CUSTOMER_DATA_* tags resolve empty here \u2014 the real expansion happens\nin ``prepare_outgoing_agent_email`` at send time once the ticket exists.",
@@ -51608,13 +51847,13 @@
         "operationId": "search_customers_api_v1_reference_customers_get",
         "parameters": [
           {
-            "description": "Substring matched against login, email, or name",
+            "description": "Substring matched against login, email, or name; five or more digits also match phone/mobile",
             "in": "query",
             "name": "q",
             "required": false,
             "schema": {
               "default": "",
-              "description": "Substring matched against login, email, or name",
+              "description": "Substring matched against login, email, or name; five or more digits also match phone/mobile",
               "title": "Q",
               "type": "string"
             }
@@ -51691,6 +51930,72 @@
           }
         },
         "summary": "Search Customers",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/reference/phone-config": {
+      "get": {
+        "description": "Agent-side phone settings (admin: ``channel.phone.dial_scheme``).",
+        "operationId": "phone_config_api_v1_reference_phone_config_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Phone Config",
         "tags": [
           "reference"
         ]
