@@ -22,6 +22,8 @@ import {
 import { ComposerBody } from "@/components/agent/ComposerBody";
 import { ArticleBodyRenderer } from "@/components/agent/ArticleBodyRenderer";
 import { RefineControls } from "@/components/agent/RefineControls";
+import { EmailSecurityControl } from "@/components/agent/EmailSecurityControl";
+import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
@@ -228,7 +230,18 @@ export function NewTicketPage() {
 
   const richText = composeContextQ.data?.rich_text ?? false;
 
+  // PGP / S/MIME for the email (separate component; nothing shown when off).
+  const emailSecurity = useEmailSecurity({
+    ticketId: null,
+    queueId: queue === "" ? null : queue,
+    to: joinRecipients(to),
+    cc: joinRecipients(cc),
+    bcc: joinRecipients(bcc),
+    enabled: ticketType === "email",
+  });
+
   const canSubmit =
+    (ticketType === "phone" || emailSecurity.blocked === null) &&
     formUnlocked &&
     queue !== "" &&
     priority !== "" &&
@@ -277,6 +290,7 @@ export function NewTicketPage() {
             to_address: joinRecipients(to),
             cc: joinRecipients(cc),
             bcc: joinRecipients(bcc),
+            email_security: emailSecurity.payload,
           });
         } else {
           await api.createArticle(ticket_id, {
@@ -296,7 +310,9 @@ export function NewTicketPage() {
         if (!(articleErr instanceof ApiError)) throw articleErr;
         setError(
           ticketType === "email"
-            ? t("newTicket.sendError")
+            ? articleErr.status === 422
+              ? `${t("newTicket.sendError")} ${articleErr.message}`
+              : t("newTicket.sendError")
             : t("newTicket.submitError"),
         );
         return;
@@ -746,6 +762,13 @@ export function NewTicketPage() {
                 </div>
               )}
           </fieldset>
+
+          {ticketType === "email" && (
+            <EmailSecurityControl
+              security={emailSecurity}
+              testId="new-ticket-security"
+            />
+          )}
 
           {error && (
             <p
