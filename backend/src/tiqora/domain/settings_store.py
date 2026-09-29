@@ -122,6 +122,10 @@ KEY_AI_TRIAGE_WATERMARK = "daemon.ai_worker.triage_watermark"
 # admin-editable within [1, 365] (tiqora.ai.audit.MIN/MAX_RETENTION_DAYS).
 KEY_AI_AUDIT_RETENTION_DAYS = "ai.audit.retention_days"
 KEY_AI_AUDIT_CLEANUP_ENABLED = "daemon.ai_audit_cleanup.enabled"
+# Znuny RenewCustomerSMIMECertificates (tiqora.worker.smime_customer_renew).
+# Default ON like the Znuny cron task; the job itself only acts when SMIME and
+# SMIME::FetchFromCustomer are enabled, and is idempotent next to Znuny's.
+KEY_SMIME_CUSTOMER_RENEW_ENABLED = "daemon.smime_customer_renew.enabled"
 # Global kill-switch for auto-reply (plan #10). Independent of
 # system.operation_mode: when true, every auto-reply run is blocked even in
 # tiqora_primary. Manual assist and summaries are unaffected.

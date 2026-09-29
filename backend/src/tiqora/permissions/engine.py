@@ -140,6 +140,23 @@ class PermissionEngine:
         perms = await self.queue_permissions(user_id)
         return "rw" in perms.get(admin_group_id, set())
 
+    async def has_rw_in_any_group(self, user_id: int, group_names: tuple[str, ...]) -> bool:
+        """``rw`` in at least one of the (valid) groups named *group_names*.
+
+        Znuny's frontend-module check: a module registered with
+        ``Group => [admin, users]`` is open to ``rw`` members of either.
+        """
+        rows = await self._session.execute(
+            select(PermissionGroups.id).where(
+                PermissionGroups.name.in_(group_names), PermissionGroups.valid_id == 1
+            )
+        )
+        group_ids = set(rows.scalars().all())
+        if not group_ids:
+            return False
+        perms = await self.queue_permissions(user_id)
+        return any("rw" in perms.get(gid, set()) for gid in group_ids)
+
     async def _user_is_valid(self, user_id: int) -> bool:
         result = await self._session.execute(
             select(Users.id).where(Users.id == user_id, Users.valid_id == 1)

@@ -150,6 +150,7 @@ export type {
   CryptoKeyOut,
   PgpKeyOut,
   SmimeCertOut,
+  CustomerCryptoKeysOut,
   SmimeRelationOut,
   SignKeyOptionOut,
   EmailSecurityIn,

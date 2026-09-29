@@ -91,6 +91,35 @@
     "allTickets": "Alle Tickets →",
     "recentTickets": "Aktuelle Tickets"
   },
+  "cryptoKeys": {
+    "title": "Verschlüsselungsschlüssel",
+    "pgpTitle": "PGP-Schlüssel",
+    "smimeTitle": "S/MIME-Zertifikate",
+    "none": "Kein Schlüssel hinterlegt.",
+    "uploadPgp": "PGP-Schlüssel hochladen",
+    "uploadSmime": "S/MIME-Zertifikat hochladen",
+    "uploading": "Wird hochgeladen…",
+    "pgpHint": "Öffentlicher Schlüssel im ASCII-Format (.asc).",
+    "smimeHint": "Zertifikat als PEM, DER, PKCS#7 oder PKCS#12 ohne Passwort.",
+    "expires": "läuft ab am {{date}}",
+    "delete": "Löschen",
+    "deleteConfirmPgp": "PGP-Schlüssel {{key}} aus dem Schlüsselspeicher löschen? Verschlüsselte Mails an diesen Kunden sind damit nicht mehr möglich.",
+    "deleteConfirmSmime": "Zertifikat {{file}} aus dem Schlüsselspeicher löschen? Verschlüsselte Mails an diesen Kunden sind damit nicht mehr möglich.",
+    "uploaded": "Schlüssel gespeichert.",
+    "deleted": "Schlüssel gelöscht.",
+    "adminManaged": "enthält einen privaten Teil – Verwaltung im Admin-Bereich",
+    "readOnly": "Schlüssel ändern erfordert rw-Rechte in der Gruppe admin oder users.",
+    "disabled": "PGP und S/MIME sind ausgeschaltet.",
+    "openButton": "Schlüssel",
+    "dialogTitle": "Schlüssel von {{login}}",
+    "status": {
+      "good": "gültig",
+      "valid": "gültig",
+      "expired": "abgelaufen",
+      "revoked": "widerrufen",
+      "invalid": "ungültig"
+    }
+  },
   "timeAccounting": {
     "title": "Zeitabrechnung",
     "hint": "Gebuchte Zeiteinheiten über Tickets, auf die Sie Zugriff haben.",
@@ -1032,7 +1061,8 @@
     "nav": {
       "myTickets": "Meine Tickets",
       "newTicket": "Neues Ticket",
-      "kb": "Hilfeartikel"
+      "kb": "Hilfeartikel",
+      "preferences": "Einstellungen"
     },
     "login": {
       "subtitle": "Bei Ihrem Support-Konto anmelden",
@@ -1081,6 +1111,22 @@
       "noResultsHint": "Versuchen Sie einen anderen Suchbegriff oder eröffnen Sie ein Ticket.",
       "loadError": "Artikel konnte nicht geladen werden.",
       "backToSearch": "Zurück zur Suche"
+    },
+    "preferences": {
+      "title": "Einstellungen",
+      "language": "Sprache der Oberfläche",
+      "languageDesc": "Wählen Sie die Sprache der Oberfläche.",
+      "languageSaved": "Sprache gespeichert.",
+      "password": "Passwort ändern",
+      "passwordDesc": "Geben Sie Ihr aktuelles und ein neues Passwort ein.",
+      "currentPassword": "Aktuelles Passwort",
+      "newPassword": "Neues Passwort",
+      "repeatPassword": "Neues Passwort wiederholen",
+      "passwordMismatch": "Die neuen Passwörter stimmen nicht überein.",
+      "passwordSaved": "Passwort geändert.",
+      "save": "Speichern",
+      "keys": "Verschlüsselung",
+      "keysDesc": "Laden Sie Ihren PGP-Schlüssel oder Ihr S/MIME-Zertifikat hoch, damit wir Ihnen verschlüsselte E-Mails senden können. Er muss Ihre E-Mail-Adresse {{email}} enthalten."
     }
   },
   "admin": {
@@ -2509,6 +2555,10 @@
         "ai_audit_cleanup": {
           "name": "KI-Audit-Bereinigung",
           "description": "Löscht LLM-Audit-Log-Einträge nach Ablauf der konfigurierten Aufbewahrungsfrist täglich."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME-Kundenzertifikate erneuern",
+          "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Übernahme"

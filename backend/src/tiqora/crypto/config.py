@@ -67,6 +67,9 @@ class SmimeConfig:
     private_path: str = ""
     #: Extra CA bundle (-CAfile) for chain validation, on top of CertPath (-CApath).
     ca_path: str = ""
+    #: ``SMIME::FetchFromCustomer`` — import certificates from the customer
+    #: backend attribute ``UserSMIMECertificate`` (see ``customer_fetch``).
+    fetch_from_customer: bool = False
 
 
 @dataclass(frozen=True)
@@ -157,6 +160,7 @@ async def resolve_crypto_config(settings: Settings, sysconfig: SysConfig | None)
     smime_bin = await _get("SMIME::Bin")
     cert_path = await _get("SMIME::CertPath")
     private_path = await _get("SMIME::PrivatePath")
+    fetch_from_customer = await _get("SMIME::FetchFromCustomer")
 
     sc_homedir, options = parse_pgp_options(str(pgp_options or ""))
     pgp_enabled = (
@@ -182,8 +186,41 @@ async def resolve_crypto_config(settings: Settings, sysconfig: SysConfig | None)
             cert_path=settings.crypto_smime_cert_dir or str(cert_path or ""),
             private_path=settings.crypto_smime_private_dir or str(private_path or ""),
             ca_path=settings.crypto_smime_ca_path,
+            fetch_from_customer=_truthy(fetch_from_customer),
         ),
     )
+
+
+async def setting_is_valid(session: AsyncSession, name: str) -> bool:
+    """Whether the SysConfig setting *name* is active (``is_valid``).
+
+    Unlike :meth:`SysConfig.get` a system-wide ``sysconfig_modified`` row with
+    ``is_valid = 0`` counts: that is how Znuny's admin deactivates a module
+    registration such as ``PostMaster::PreFilterModule###000-SMIMEFetchFromCustomer``.
+    A setting missing from both tables counts as valid (Znuny's shipped default).
+    """
+    from sqlalchemy import text
+
+    try:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT is_valid FROM sysconfig_modified WHERE name = :n AND user_id IS NULL"
+                    " ORDER BY id DESC LIMIT 1"
+                ),
+                {"n": name},
+            )
+        ).first()
+        if row is None:
+            row = (
+                await session.execute(
+                    text("SELECT is_valid FROM sysconfig_default WHERE name = :n LIMIT 1"),
+                    {"n": name},
+                )
+            ).first()
+    except Exception:  # noqa: BLE001 — SysConfig tables absent (fresh test DB)
+        return True
+    return row is None or bool(row[0])
 
 
 @dataclass(frozen=True)

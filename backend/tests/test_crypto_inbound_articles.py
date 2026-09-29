@@ -381,6 +381,51 @@ async def test_plain_signed_mail_keeps_signature_status_only(
     assert flags["TiqoraCryptoLayers"] == "signed"
 
 
+@pytest.mark.asyncio
+async def test_smime_fetch_from_customer_runs_before_inbound_crypto(
+    env: tuple[str, async_sessionmaker[AsyncSession]],
+    world: CryptoWorld,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``000-SMIMEFetchFromCustomer`` pre-filter: called with ``From`` before the verify."""
+    from tiqora.channels.email import pipeline
+    from tiqora.crypto import customer_fetch
+    from tiqora.crypto import inbound as inbound_mod
+
+    _url, factory = env
+    order: list[str] = []
+
+    async def fake_fetch(_s: Any, _settings: Any, cfg: Any, from_header: str) -> Any:
+        assert cfg.smime.fetch_from_customer
+        order.append(f"fetch:{from_header}")
+        return customer_fetch.FetchReport()
+
+    real_inbound = inbound_mod.process_inbound_crypto
+
+    async def spy_inbound(*args: Any, **kwargs: Any) -> Any:
+        order.append("inbound")
+        return await real_inbound(*args, **kwargs)
+
+    monkeypatch.setattr(customer_fetch, "fetch_for_sender", fake_fetch)
+    monkeypatch.setattr(inbound_mod, "process_inbound_crypto", spy_inbound)
+
+    async def _fetch(name: str) -> Any:
+        return "1" if name == "SMIME::FetchFromCustomer" else None
+
+    raw = _routed(outlook_smime_signed(world), "crypto-inbound fetch")
+    async with factory() as session, session.begin():
+        await pipeline.process_message(
+            session, factory, SysConfig(fetch=_fetch), raw=raw, account=_account(), user_id=1
+        )
+    assert order[0].startswith("fetch:") and "customer@example.com" in order[0]
+    assert order[1] == "inbound"
+
+    # Switched off (Znuny default): no fetch.
+    order.clear()
+    await _ingest(factory, _routed(outlook_smime_signed(world), "crypto-inbound nofetch"))
+    assert order == ["inbound"]
+
+
 # ---------------------------------------------------------- decrypt on view
 
 

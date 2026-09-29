@@ -9,6 +9,17 @@ import {
 } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { portalApi, ApiError, type CustomerMe } from "@/lib/portalApi";
+import { setAppLanguage } from "@/i18n";
+
+/** Znuny applies the customer's UserLanguage at login. */
+async function applyStoredLanguage() {
+  try {
+    const prefs = await portalApi.portalPreferences();
+    if (prefs.language) await setAppLanguage(prefs.language, { persistRemote: false });
+  } catch {
+    // No preferences reachable — keep the current language.
+  }
+}
 
 type CustomerAuthContextValue = {
   customer: CustomerMe | null;
@@ -55,6 +66,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       const res = await portalApi.portalLogin({ login: loginName, password });
       queryClient.setQueryData(["portal-auth", "me"], res.customer);
       await queryClient.invalidateQueries({ queryKey: ["portal-auth", "me"] });
+      await applyStoredLanguage();
     },
     [queryClient],
   );

@@ -453,6 +453,19 @@ class Settings(BaseSettings):
     # "verified" (security review M4).
     crypto_smime_ca_path: str = Field(default="", validation_alias="TIQORA_CRYPTO_SMIME_CA_PATH")
     crypto_openssl_bin: str = Field(default="", validation_alias="TIQORA_CRYPTO_OPENSSL_BIN")
+    # SMIME::FetchFromCustomer sources for the customer backend attribute
+    # ``UserSMIMECertificate`` (Znuny maps it to an LDAP attribute or a DB
+    # column): the customer LDAP directory (TIQORA_CUSTOMER_LDAP_*; entry found
+    # by the email attribute) and/or a customer_user column.
+    customer_ldap_smime_attr: str = Field(
+        default="userSMIMECertificate", validation_alias="TIQORA_CUSTOMER_LDAP_SMIME_ATTR"
+    )
+    customer_ldap_email_attr: str = Field(
+        default="mail", validation_alias="TIQORA_CUSTOMER_LDAP_EMAIL_ATTR"
+    )
+    customer_smime_cert_column: str = Field(
+        default="", validation_alias="TIQORA_CUSTOMER_SMIME_CERT_COLUMN"
+    )
 
     @property
     def cors_origin_list(self) -> list[str]:
