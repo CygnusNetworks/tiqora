@@ -26,6 +26,7 @@ from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.ticket import Ticket
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.dev_anonymize import ValueMapper
+from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT
 from tiqora.gdpr.erasure import (
     ErasureError,
     ErasureNotFoundError,
@@ -1362,6 +1363,13 @@ async def test_delete_tickets_hard_delete_and_rollback_restores(
             await session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": tid})
         ).scalar_one()
 
+    async with factory() as session:
+        reindex_before = await _count(
+            session,
+            "SELECT COUNT(*) FROM tiqora_event_outbox WHERE ticket_id = :t AND event_type = :e",
+            {"t": tid, "e": SEARCH_REINDEX_EVENT},
+        )
+
     # Hard delete.
     result = await run_erasure(
         factory,
@@ -1375,8 +1383,15 @@ async def test_delete_tickets_hard_delete_and_rollback_restores(
     )
     assert result.job_id > 0
 
+    # The search index is told to drop the deleted ticket.
+    reindex_sql = (
+        "SELECT COUNT(*) FROM tiqora_event_outbox WHERE ticket_id = :t AND event_type = :e"
+    )
+    reindex_params = {"t": tid, "e": SEARCH_REINDEX_EVENT}
+
     # Everything gone (ticket + children + customer master).
     async with factory() as session:
+        assert await _count(session, reindex_sql, reindex_params) == reindex_before + 1
         for name, (sql, params) in child_counts_sql.items():
             assert await _count(session, sql, params) == 0, f"{name} should be deleted"
         assert (
@@ -1389,6 +1404,7 @@ async def test_delete_tickets_hard_delete_and_rollback_restores(
     assert rb["restored_rows"] >= 7  # ticket + 5 child tables + customer_user (+more)
 
     async with factory() as session:
+        assert await _count(session, reindex_sql, reindex_params) == reindex_before + 2
         for name, (sql, params) in child_counts_sql.items():
             assert await _count(session, sql, params) >= 1, f"{name} should be restored"
         restored_title = (

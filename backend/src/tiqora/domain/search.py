@@ -359,19 +359,29 @@ class SearchIndexService:
         )
 
     async def index_tickets(self, ticket_ids: list[int]) -> int:
-        """Re-index the given ticket ids. Returns number of documents sent."""
+        """Re-index the given ticket ids. Returns number of documents sent.
+
+        Ids whose ticket row no longer exists are deleted from the index, so a
+        hard-deleted ticket (GDPR erasure, Znuny-side delete) stops matching.
+        """
         if not ticket_ids:
             return 0
         await self.ensure_index()
         docs: list[dict[str, Any]] = []
+        gone: list[str] = []
         for tid in ticket_ids:
             doc = await self.build_document(tid)
             if doc is not None:
                 docs.append(doc)
-        if not docs:
-            return 0
+            else:
+                gone.append(str(tid))
         client = await self._get_client()
         index = client.index(self._settings.meili_tickets_index)
+        if gone:
+            task = await index.delete_documents(gone)
+            await client.wait_for_task(task.task_uid, timeout_in_ms=120_000)
+        if not docs:
+            return 0
         task = await index.add_documents(docs)
         await client.wait_for_task(task.task_uid, timeout_in_ms=120_000)
         return len(docs)

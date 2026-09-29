@@ -199,6 +199,13 @@ async def _emit_event(
     )
 
 
+# Internal outbox event: "re-index this ticket in search", nothing else. Used
+# where rows change (or disappear) outside the normal write paths — e.g. GDPR
+# erasure and its rollback. Not a Znuny event: no notification rule can bind
+# to it, and the outbox drain keeps it away from webhooks and SSE.
+SEARCH_REINDEX_EVENT: Final = "TiqoraSearchReindex"
+
+
 # ---------------------------------------------------------------------------
 # Legacy ``Notification*`` events
 #
