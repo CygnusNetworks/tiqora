@@ -184,3 +184,18 @@ least privilege (scope the API key, not just the prompt).
 Full guidance, plus recommended triage / draft-reply / KB-answer agent
 patterns and the webhook event schema that typically triggers an MCP-driven
 agent: [`../ai-integration.md`](../ai-integration.md).
+
+## Known limitations
+
+- No MCP tools for mentions or time accounting — use the REST endpoints
+  (`/api/v1/tickets/{id}/mentions`, `/api/v1/tickets/{id}/time-accounting`).
+- Attachments are exposed as metadata only (`list_attachments`,
+  `get_attachment_meta`); download the binary via REST.
+- `customer_lookup` requires an authenticated agent but is not scoped by
+  customer-group permissions.
+- Changes made through MCP are attributed to the key's user in ticket
+  history; which API key made the call is not recorded.
+- Tool failures are returned as `{"error": "…"}` in the result body rather
+  than as MCP protocol errors — check for the key.
+- Authentication is API-key only (by design): session tokens and OAuth
+  scopes are not accepted.
