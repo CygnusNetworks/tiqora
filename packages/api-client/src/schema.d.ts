@@ -5231,6 +5231,12 @@ export interface paths {
         /**
          * Create Ticket
          * @description Create a new ticket. Requires ``create`` permission on the queue's group.
+         *
+         *     With ``phone_call`` the call is logged as the first article in the same
+         *     transaction (Znuny AgentTicketPhone); a pending ``state_id`` then needs
+         *     ``pending_time`` (422). ``send_auto_response`` sends the queue's "auto
+         *     reply" to the customer afterwards for an inbound call -- a failure there
+         *     is logged and never fails the request.
          */
         post: operations["create_ticket_api_v1_tickets_post"];
         delete?: never;
@@ -10686,6 +10692,39 @@ export interface components {
             /** Open */
             open: number;
         };
+        /**
+         * NewTicketPhoneCallIn
+         * @description First article of a phone ticket (Znuny AgentTicketPhone).
+         */
+        NewTicketPhoneCallIn: {
+            /** Attachments */
+            attachments?: components["schemas"]["ArticleAttachmentIn"][];
+            /** Body */
+            body: string;
+            /** Caller Number */
+            caller_number?: string | null;
+            /**
+             * Content Type
+             * @default text/plain
+             * @enum {string}
+             */
+            content_type: "text/plain" | "text/html";
+            /**
+             * Direction
+             * @default inbound
+             * @enum {string}
+             */
+            direction: "inbound" | "outbound";
+            /**
+             * Is Visible For Customer
+             * @default true
+             */
+            is_visible_for_customer: boolean;
+            /** Subject */
+            subject?: string | null;
+            /** Time Unit */
+            time_unit?: number | null;
+        };
         /** NotificationEventOut */
         NotificationEventOut: {
             /** Change Time */
@@ -13096,12 +13135,20 @@ export interface components {
             lock_id: number;
             /** Owner Id */
             owner_id: number;
+            /** Pending Time */
+            pending_time?: string | null;
+            phone_call?: components["schemas"]["NewTicketPhoneCallIn"] | null;
             /** Priority Id */
             priority_id: number;
             /** Queue Id */
             queue_id: number;
             /** Responsible Id */
             responsible_id?: number | null;
+            /**
+             * Send Auto Response
+             * @default false
+             */
+            send_auto_response: boolean;
             /** Service Id */
             service_id?: number | null;
             /** Sla Id */

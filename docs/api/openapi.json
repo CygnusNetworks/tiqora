@@ -12853,6 +12853,87 @@
         "title": "MyTicketCounts",
         "type": "object"
       },
+      "NewTicketPhoneCallIn": {
+        "description": "First article of a phone ticket (Znuny AgentTicketPhone).",
+        "properties": {
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/ArticleAttachmentIn"
+            },
+            "maxItems": 20,
+            "title": "Attachments",
+            "type": "array"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "caller_number": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Number"
+          },
+          "content_type": {
+            "default": "text/plain",
+            "enum": [
+              "text/plain",
+              "text/html"
+            ],
+            "title": "Content Type",
+            "type": "string"
+          },
+          "direction": {
+            "default": "inbound",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "is_visible_for_customer": {
+            "default": true,
+            "title": "Is Visible For Customer",
+            "type": "boolean"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "maxLength": 3800,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "time_unit": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Unit"
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "title": "NewTicketPhoneCallIn",
+        "type": "object"
+      },
       "NotificationEventOut": {
         "properties": {
           "change_time": {
@@ -20151,6 +20232,28 @@
             "title": "Owner Id",
             "type": "integer"
           },
+          "pending_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Time"
+          },
+          "phone_call": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NewTicketPhoneCallIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "priority_id": {
             "title": "Priority Id",
             "type": "integer"
@@ -20169,6 +20272,11 @@
               }
             ],
             "title": "Responsible Id"
+          },
+          "send_auto_response": {
+            "default": false,
+            "title": "Send Auto Response",
+            "type": "boolean"
           },
           "service_id": {
             "anyOf": [
@@ -55419,7 +55527,7 @@
         ]
       },
       "post": {
-        "description": "Create a new ticket. Requires ``create`` permission on the queue's group.",
+        "description": "Create a new ticket. Requires ``create`` permission on the queue's group.\n\nWith ``phone_call`` the call is logged as the first article in the same\ntransaction (Znuny AgentTicketPhone); a pending ``state_id`` then needs\n``pending_time`` (422). ``send_auto_response`` sends the queue's \"auto\nreply\" to the customer afterwards for an inbound call -- a failure there\nis logged and never fails the request.",
         "operationId": "create_ticket_api_v1_tickets_post",
         "parameters": [
           {

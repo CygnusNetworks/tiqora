@@ -8,8 +8,6 @@ all logic lives in :func:`tiqora.channels.phone.service.log_phone_call_on_ticket
 
 from __future__ import annotations
 
-import base64
-import binascii
 from datetime import datetime
 from typing import Literal
 
@@ -17,8 +15,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from tiqora.api.deps import CurrentUser, DbSession
-from tiqora.api.uploads import MAX_ATTACHMENT_BYTES
-from tiqora.api.v1.tickets import ArticleAttachmentIn
+from tiqora.api.v1.tickets import ArticleAttachmentIn, decode_attachments
 from tiqora.channels.phone.service import (
     PhoneCallIn,
     PhoneCallLockedByOther,
@@ -75,28 +72,6 @@ class PhoneCallLockedDetail(BaseModel):
     message: str
     locked_by_id: int | None
     locked_by_name: str | None
-
-
-def decode_attachments(items: list[ArticleAttachmentIn]) -> list[tuple[str, str, bytes]]:
-    """Base64-decode request attachments; 422 on bad data, 413 over the limit."""
-    out: list[tuple[str, str, bytes]] = []
-    total = 0
-    for item in items:
-        try:
-            content = base64.b64decode(item.content_base64, validate=True)
-        except (binascii.Error, ValueError):
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=f"attachment {item.filename!r} is not valid base64",
-            ) from None
-        total += len(content)
-        if total > MAX_ATTACHMENT_BYTES:
-            raise HTTPException(
-                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail="attachments exceed the upload limit",
-            )
-        out.append((item.filename, item.content_type, content))
-    return out
 
 
 def phone_call_http_error(exc: Exception) -> HTTPException:

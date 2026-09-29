@@ -168,6 +168,9 @@ class TicketIn:
     dynamic_fields: dict[str, list[str]] = field(default_factory=dict)
     # Optional first article to attach inline
     article: ArticleIn | None = None
+    # Pending-type initial state only (ignored otherwise): the reminder time,
+    # set like Znuny AgentTicketPhone's TicketPendingTimeSet after create.
+    pending_time: datetime | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -493,6 +496,25 @@ async def create_ticket(
             customer_user=params.customer_user_id or "",
             user_id=user_id,
         )
+
+    if params.pending_time is not None:
+        state_type = await _state_type_name(session, params.state_id)
+        if state_type.lower().startswith("pending"):
+            pt = params.pending_time
+            await session.execute(
+                text("UPDATE ticket SET until_time = :ut WHERE id = :tid"),
+                {"ut": int(pt.timestamp()), "tid": ticket_id},
+            )
+            await add_pending_time(
+                session,
+                ticket_id=ticket_id,
+                year=pt.year,
+                month=pt.month,
+                day=pt.day,
+                hour=pt.hour,
+                minute=pt.minute,
+                user_id=user_id,
+            )
 
     # Escalation
     await escalation_index_build(session, ticket_id, user_id, sysconfig)

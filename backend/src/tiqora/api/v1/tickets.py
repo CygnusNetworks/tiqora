@@ -10,6 +10,7 @@ from datetime import datetime
 from html import escape as html_escape
 from typing import Annotated, Any, Literal
 
+import structlog
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
@@ -17,8 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.attachment_response import safe_attachment_response
 from tiqora.api.deps import AppSettings, CurrentUser, DbSession
+from tiqora.api.uploads import MAX_ATTACHMENT_BYTES
 from tiqora.api.v1.ai import AiToolTraceOut, parse_tool_trace
 from tiqora.channels.email.outbound_reply import OutboundMailError
+from tiqora.channels.phone.service import PhoneCallIn
 from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.db.engine import get_session_factory
@@ -69,6 +72,12 @@ from tiqora.znuny.sysconfig import SysConfig
 # ---------------------------------------------------------------------------
 
 
+class ArticleAttachmentIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=250)
+    content_type: str = "application/octet-stream"
+    content_base64: str
+
+
 class TicketCreateRequest(BaseModel):
     title: str
     queue_id: int
@@ -84,16 +93,34 @@ class TicketCreateRequest(BaseModel):
     customer_user_id: str | None = None
     archive_flag: int = 0
     dynamic_fields: dict[str, list[str]] = Field(default_factory=dict)
+    #: Reminder time for a pending-type ``state_id`` (required then when
+    #: ``phone_call`` is given; ignored for other states).
+    pending_time: datetime | None = None
+    #: Phone ticket: logs the call as the first article in the same
+    #: transaction (``Phone`` channel, PhoneCallCustomer/PhoneCallAgent).
+    phone_call: NewTicketPhoneCallIn | None = None
+    #: Send the queue's "auto reply" to the customer after an inbound
+    #: ``phone_call`` (Znuny AutoResponseForWebTickets). Ignored otherwise.
+    send_auto_response: bool = False
+
+
+class NewTicketPhoneCallIn(BaseModel):
+    """First article of a phone ticket (Znuny AgentTicketPhone)."""
+
+    direction: Literal["inbound", "outbound"] = "inbound"
+    #: Defaults to the ticket title.
+    subject: str | None = Field(default=None, max_length=3800)
+    body: str
+    content_type: Literal["text/plain", "text/html"] = "text/plain"
+    is_visible_for_customer: bool = True
+    #: Time units booked on this first article.
+    time_unit: float | None = Field(default=None, ge=0)
+    attachments: list[ArticleAttachmentIn] = Field(default_factory=list, max_length=20)
+    caller_number: str | None = Field(default=None, max_length=100)
 
 
 class TicketCreateResponse(BaseModel):
     ticket_id: int
-
-
-class ArticleAttachmentIn(BaseModel):
-    filename: str = Field(min_length=1, max_length=250)
-    content_type: str = "application/octet-stream"
-    content_base64: str
 
 
 class TelegramButtonIn(BaseModel):
@@ -212,6 +239,7 @@ class DraftOut(BaseModel):
 
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+logger = structlog.get_logger(__name__)
 
 
 def _map_exc(exc: Exception) -> HTTPException:
@@ -1273,10 +1301,26 @@ async def create_ticket(
     session: DbSession,
     settings: AppSettings,
 ) -> TicketCreateResponse:
-    """Create a new ticket. Requires ``create`` permission on the queue's group."""
+    """Create a new ticket. Requires ``create`` permission on the queue's group.
+
+    With ``phone_call`` the call is logged as the first article in the same
+    transaction (Znuny AgentTicketPhone); a pending ``state_id`` then needs
+    ``pending_time`` (422). ``send_auto_response`` sends the queue's "auto
+    reply" to the customer afterwards for an inbound call -- a failure there
+    is logged and never fails the request.
+    """
+    from tiqora.channels.phone.service import (
+        log_phone_call_on_ticket,
+        send_phone_ticket_auto_response,
+        validate_next_state,
+    )
+
+    call = body.phone_call
     svc = _write_service(session, settings)
     try:
         async with session.begin():
+            if call is not None:
+                await validate_next_state(session, body.state_id, body.pending_time)
             tid = await svc.create_ticket(
                 user.id,
                 TicketIn(
@@ -1294,11 +1338,70 @@ async def create_ticket(
                     customer_user_id=body.customer_user_id,
                     archive_flag=body.archive_flag,
                     dynamic_fields=body.dynamic_fields,
+                    pending_time=body.pending_time,
                 ),
             )
+            if call is not None:
+                await log_phone_call_on_ticket(
+                    session,
+                    SysConfig(session),
+                    ticket_id=tid,
+                    user_id=user.id,
+                    call=PhoneCallIn(
+                        direction=call.direction,
+                        subject=call.subject or body.title,
+                        body=call.body,
+                        content_type=f"{call.content_type}; charset=utf-8",
+                        is_visible_for_customer=call.is_visible_for_customer,
+                        time_unit=call.time_unit,
+                        attachments=decode_attachments(call.attachments),
+                        caller_number=call.caller_number,
+                    ),
+                    # ``create`` was checked above; the ticket's lock is the
+                    # form's lock_id, not the phone screens' RequiredLock.
+                    enforce_permissions=False,
+                )
     except (WriteAccessDenied, WriteNotFound, InvalidInput) as exc:
         raise _map_exc(exc) from exc
+
+    if call is not None and call.direction == "inbound" and body.send_auto_response:
+        try:
+            async with session.begin():
+                await send_phone_ticket_auto_response(
+                    session,
+                    get_session_factory(),
+                    SysConfig(session),
+                    svc._resolve_mail_sender(),
+                    ticket_id=tid,
+                    user_id=user.id,
+                    subject=call.subject or body.title,
+                    body=call.body,
+                )
+        except Exception:
+            logger.exception("phone_ticket_auto_response_failed", ticket_id=tid)
     return TicketCreateResponse(ticket_id=tid)
+
+
+def decode_attachments(items: list[ArticleAttachmentIn]) -> list[tuple[str, str, bytes]]:
+    """Base64-decode request attachments; 422 on bad data, 413 over the limit."""
+    out: list[tuple[str, str, bytes]] = []
+    total = 0
+    for item in items:
+        try:
+            content = base64.b64decode(item.content_base64, validate=True)
+        except (binascii.Error, ValueError):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"attachment {item.filename!r} is not valid base64",
+            ) from None
+        total += len(content)
+        if total > MAX_ATTACHMENT_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="attachments exceed the upload limit",
+            )
+        out.append((item.filename, item.content_type, content))
+    return out
 
 
 @router.post(
