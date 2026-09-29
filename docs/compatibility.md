@@ -375,3 +375,31 @@ MariaDB and validated:
   `group_customer` (company-level) assignment endpoints
   (`group_customer_user` is implemented), SysConfig deploy UI, GI webservice
   admin, package manager.
+
+## Znuny features not implemented
+
+Tiqora covers the agent, customer-portal and admin surface used in day-to-day
+operation. The following Znuny features are **not** implemented; most are
+deliberate platform choices, a few are open work.
+
+**Out of scope (by design)**
+
+- Process *designer*: processes are imported from Znuny and executed, the
+  admin UI is list/detail only (see [process-management.md](process-management.md)).
+- SysConfig edit/deploy UI — settings are read from the `sysconfig_*` tables;
+  change them in Znuny or via `Admin::Config::Update`.
+- Package Manager (OPM), Support Data Collector, Cloud Services, OTRSBusiness,
+  web installer.
+- Znuny Stats framework (Tiqora ships fixed reports under `/api/v1/stats`).
+- Admin screens for sessions, SelectBox SQL, performance log and system
+  maintenance windows (a user's sessions can be revoked from user admin).
+- GenericInterface requester side and GI webservice admin (see
+  [What is not emulated](#what-is-not-emulated-and-why)).
+
+**Open**
+
+- "Note to linked tickets" (Znuny's `AgentTicketNoteToLinkedTicket`).
+- Customer portal: print view and customer preferences page.
+- Admin UI for the PGP/S-MIME keyring — keys are managed through
+  `/api/v1/admin/crypto-keys` only (see [crypto.md](crypto.md)).
+- Hybrid (vector + keyword) Meilisearch retrieval for KB/RAG.
