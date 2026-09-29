@@ -15,6 +15,8 @@ import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { MenuItem } from "@/components/ui/Menu";
+import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
 import { bulkInChunks } from "@/lib/bulk";
 import { formatDateTime } from "@/lib/format";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
@@ -41,6 +43,8 @@ export function CustomerUsersPage() {
   const [pickedCustomerId, setPickedCustomerId] = useState("");
   const [companyBusy, setCompanyBusy] = useState(false);
   const [companyError, setCompanyError] = useState<string | null>(null);
+  // Znuny AdminCustomerUser shows the customer preference modules PGP/SMIME.
+  const [keysLogin, setKeysLogin] = useState<string | null>(null);
   const debouncedCompanySearch = useDebouncedValue(companySearch, 300);
 
   const companiesQ = useQuery({
@@ -256,6 +260,11 @@ export function CustomerUsersPage() {
         pageSize={100}
         allowAllPageSize
         bulkActions={bulkActions}
+        rowActions={(row) => (
+          <MenuItem testId={`admin-customer-user-keys-${row.id}`} onSelect={() => setKeysLogin(row.login)}>
+            {t("cryptoKeys.openButton")}
+          </MenuItem>
+        )}
         toFormValues={(row) =>
           row
             ? {
@@ -297,6 +306,14 @@ export function CustomerUsersPage() {
           ...(v.password ? { password: v.password as string } : {}),
         })}
       />
+
+      <Dialog
+        open={keysLogin !== null}
+        onClose={() => setKeysLogin(null)}
+        title={t("cryptoKeys.dialogTitle", { login: keysLogin ?? "" })}
+      >
+        {keysLogin && <CustomerCryptoKeys login={keysLogin} framed={false} />}
+      </Dialog>
 
       <Dialog
         open={companyDialog !== null}

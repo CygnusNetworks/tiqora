@@ -91,6 +91,35 @@
     "allTickets": "Semua tiket →",
     "recentTickets": "Tiket terbaru"
   },
+  "cryptoKeys": {
+    "title": "Encryption keys",
+    "pgpTitle": "PGP keys",
+    "smimeTitle": "S/MIME certificates",
+    "none": "No key stored.",
+    "uploadPgp": "Upload PGP key",
+    "uploadSmime": "Upload S/MIME certificate",
+    "uploading": "Uploading…",
+    "pgpHint": "ASCII-armored public key (.asc).",
+    "smimeHint": "Certificate as PEM, DER, PKCS#7 or PKCS#12 without password.",
+    "expires": "expires {{date}}",
+    "delete": "Delete",
+    "deleteConfirmPgp": "Delete PGP key {{key}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "deleteConfirmSmime": "Delete certificate {{file}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "uploaded": "Key stored.",
+    "deleted": "Key deleted.",
+    "adminManaged": "has a private part — managed in the admin area",
+    "readOnly": "Changing keys needs rw permission in the admin or users group.",
+    "disabled": "PGP and S/MIME are switched off.",
+    "openButton": "Keys",
+    "dialogTitle": "Keys of {{login}}",
+    "status": {
+      "good": "valid",
+      "valid": "valid",
+      "expired": "expired",
+      "revoked": "revoked",
+      "invalid": "invalid"
+    }
+  },
   "timeAccounting": {
     "title": "Pencatatan waktu",
     "hint": "Satuan waktu yang dibukukan pada tiket yang dapat Anda akses.",
@@ -1032,7 +1061,8 @@
     "nav": {
       "myTickets": "Tiket saya",
       "newTicket": "Tiket baru",
-      "kb": "Artikel bantuan"
+      "kb": "Artikel bantuan",
+      "preferences": "Preferences"
     },
     "login": {
       "subtitle": "Masuk ke akun dukungan Anda",
@@ -1081,6 +1111,22 @@
       "noResultsHint": "Coba istilah pencarian lain, atau buka tiket baru untuk mendapatkan bantuan.",
       "loadError": "Tidak dapat memuat artikel ini.",
       "backToSearch": "Kembali ke pencarian"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": "Interface language",
+      "languageDesc": "Select the main interface language.",
+      "languageSaved": "Language saved.",
+      "password": "Change password",
+      "passwordDesc": "Set a new password by filling in your current password and a new one.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "repeatPassword": "Repeat new password",
+      "passwordMismatch": "The new passwords do not match.",
+      "passwordSaved": "Password changed.",
+      "save": "Save",
+      "keys": "Encryption",
+      "keysDesc": "Upload your PGP key or S/MIME certificate so that we can send you encrypted email. It must contain your email address {{email}}."
     }
   },
   "admin": {
@@ -2501,6 +2547,10 @@
         "ai_audit_cleanup": {
           "name": "Pembersihan audit AI",
           "description": "Menghapus baris log audit LLM yang melewati retensi yang dikonfigurasi sekali sehari."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Pengambilalihan"

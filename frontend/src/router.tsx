@@ -54,6 +54,7 @@ import { NewTicketPage } from "@/routes/portal/NewTicketPage";
 import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
 import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
 import { KbArticlePage } from "@/routes/portal/KbArticlePage";
+import { PreferencesPage as PortalPreferencesPage } from "@/routes/portal/PreferencesPage";
 import { AdminShell } from "@/components/layout/AdminShell";
 import { RequireAdmin } from "@/auth/RequireAdmin";
 import { AdminHomePage } from "@/routes/admin/AdminHomePage";
@@ -566,6 +567,12 @@ const portalKbArticleRoute = createRoute({
   component: KbArticlePage,
 });
 
+const portalPreferencesRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/preferences",
+  component: PortalPreferencesPage,
+});
+
 // /admin: agent session (RequireAuth) + is_admin from /me (RequireAdmin)
 // gated shell with a grouped left sidebar nav (see AdminShell).
 const adminLayoutRoute = createRoute({
@@ -995,6 +1002,7 @@ const routeTree = rootRoute.addChildren([
     portalTicketRoute,
     portalKbRoute,
     portalKbArticleRoute,
+    portalPreferencesRoute,
   ]),
   adminLayoutRoute.addChildren([
     adminIndexRoute,

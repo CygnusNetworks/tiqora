@@ -14,8 +14,9 @@ Docker image).
 Status of the parity work
 ([design](superpowers/specs/2026-09-29-crypto-parity-design.md)): B1
 (foundation + key management), B2 (inbound MIME-tree handling, article
-security status, decrypt-on-view) and B3 (signed/encrypted sending) are
-done. Customer keys / notifications (B4) follow.
+security status, decrypt-on-view), B3 (signed/encrypted sending) and of B4
+the customer keys and `SMIME::FetchFromCustomer` are done.
+Signed/encrypted notifications (rest of B4) follow.
 
 ## Configuration
 
@@ -104,7 +105,9 @@ the current openssl hash (Znuny `_ReHashCertificates`) and re-syncs
 
 `tiqora_crypto_key` records one row per mutation — `action` (`import`,
 `delete`, `delete_secret`, `add_certificate`, `add_private`,
-`delete_private`, `relation_add`, `relation_delete`, `migrate`, `rehash`),
+`delete_private`, `relation_add`, `relation_delete`, `migrate`, `rehash`,
+`customer_link`; customer uploads carry `detail` = `customer <login>` and
+`user_id` NULL when the customer uploaded through the portal),
 `user_id`, `identifier` (PGP fingerprint / S/MIME file name), `email`,
 `detail`. Never key material or secrets.
 
@@ -143,6 +146,73 @@ cannot see stays selectable so editing other fields does not drop it.
 
 Errors: `503` backend not configured / binary missing, `404` unknown key,
 `422` refused (duplicate, wrong secret, no matching certificate, …).
+
+## Customer keys
+
+Port of Znuny's customer preference modules `PGP` / `SMIME`
+(`Kernel::Output::HTML::Preferences::PGP`/`::SMIME`), which Znuny shows in
+the customer interface (`CustomerPreferencesGroups###PGP`/`###SMIME`) and
+in `AdminCustomerUser` (`crypto/customer_keys.py`):
+
+- The upload goes into the **shared** store (keyring / `SMIME::CertPath`,
+  `smime_keys` row) and the customer's `customer_preferences` get the keys
+  Znuny writes: `PGPKeyID` (long key id) and `PGPFilename`
+  (`<uid>-<bits>-<key id>.pub`); `SMIMEHash`, `SMIMEFingerprint`,
+  `SMIMEFilename` (`<hash>.<n>`). Encryption looks keys up by recipient
+  address, as in Znuny; the preferences record the upload.
+- A customer's keys are the store entries carrying the customer's email
+  address, plus the one the preferences point at.
+- S/MIME uploads may be PEM, DER, PKCS#7 (`.p7b`) or PKCS#12 without
+  password (Znuny `ConvertCertFormat`); the end-entity certificate is
+  stored. A certificate that is already stored is linked instead of refused.
+- Tighter than Znuny (which takes anything): public material only (no
+  `PRIVATE KEY BLOCK`, no CA certificates); **portal** uploads must carry the
+  customer's own email address, so nobody can plant a key for someone
+  else's address. Agents may link a key for another address of the customer.
+- Delete (agents only) removes the key from the store and clears the
+  preferences; keys with a secret part / private key are refused there and
+  stay with the admin pages.
+
+Where:
+
+| Surface | Endpoint | Rights |
+|---|---|---|
+| agent customer page (card *Encryption keys*), customer-user admin (row action *Keys*) | `GET/POST/DELETE /api/v1/customers/{login}/crypto-keys[/pgp\|/smime[/{id}]]` | read: any agent; write: `rw` in `admin` or `users` (Znuny `Frontend::Module###AdminCustomerUser` groups) |
+| portal `/portal/preferences` | `GET /api/portal/preferences`, `POST …/pgp-key`, `POST …/smime-certificate` | the logged-in customer, own keys only, upload only |
+
+Both only exist while the backend is enabled (Znuny's `Param()` returns
+nothing otherwise): the agent card is hidden, uploads answer `409`, the portal
+section is hidden and its endpoints answer `404` — also when the preference
+group is deactivated in SysConfig.
+
+### SMIME::FetchFromCustomer
+
+With `SMIME` and `SMIME::FetchFromCustomer` on (default off), certificates
+come from the customer backend attribute `UserSMIMECertificate`
+(`crypto/customer_fetch.py`, Znuny `Crypt::SMIME::FetchFromCustomer`):
+
+- **Postmaster**: before inbound crypto, the `From` address of every mail is
+  looked up (only addresses of valid `customer_user` rows, Znuny's
+  `PostMasterSearch`) and new certificates are added to `SMIME::CertPath`, so
+  the signature check already sees them. Skipped when
+  `PostMaster::PreFilterModule###000-SMIMEFetchFromCustomer` is deactivated.
+  Never blocks delivery.
+- **Daily** (`smime_customer_renew` worker loop, 02:02 UTC, flag
+  `daemon.smime_customer_renew.enabled`, default on like Znuny's
+  `RenewCustomerSMIMECertificates` task): for every address of a stored
+  certificate the customer's current backend certificate is added if it is
+  not stored yet. Like Znuny, old certificates are not deleted; running next
+  to Znuny's task is harmless (duplicates are skipped).
+
+Tiqora's customer data is the `customer_user` table, so the attribute is
+read from:
+
+| Source | Settings |
+|---|---|
+| customer LDAP directory | `TIQORA_CUSTOMER_LDAP_ENABLED`/`_HOST`/`_BASE_DN`/`_BIND_*`/`_ALWAYS_FILTER`; entry found by `TIQORA_CUSTOMER_LDAP_EMAIL_ATTR` (`mail`), attribute `TIQORA_CUSTOMER_LDAP_SMIME_ATTR` (`userSMIMECertificate`, also `;binary`) |
+| a `customer_user` column (Znuny DB backend map) | `TIQORA_CUSTOMER_SMIME_CERT_COLUMN` (PEM, base64 or binary) |
+
+Values may be PEM, DER, PKCS#7 or PKCS#12 without password.
 
 ## CLI
 
@@ -420,9 +490,21 @@ limited to ~104 bytes on macOS).
   attachments, flags, raw mail kept, article API `security`; failures still
   deliver; legacy decrypt-on-view (virtual attachments, read-only, flag
   cache, inline PGP without raw mail).
+- `test_crypto_customer_cert_format.py` — ConvertCertFormat (PEM, DER,
+  PKCS#7 PEM/DER with chain, PKCS#12 with/without passphrase).
+- `test_crypto_customer_keys.py` (`db`) — customer preferences as Znuny
+  writes them, upload guards (secret keys, CA, foreign address), delete,
+  FetchFromCustomer via a `customer_user` column and a mocked LDAP
+  directory, deactivated pre-filter, renew + worker tick.
+- `test_customer_keys_api.py` (`db`) — agent API incl. rights and disabled
+  backends; portal preferences (language, keys, password change).
+- `test_crypto_inbound_articles.py` — the fetch pre-step runs before inbound
+  crypto and only when enabled.
 - Frontend: `PgpKeysPage.test.tsx`, `SmimePage.test.tsx`,
   `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`,
-  `ArticleSecurityBadge.test.tsx`, `EmailSecurityControl.test.tsx`.
+  `ArticleSecurityBadge.test.tsx`, `EmailSecurityControl.test.tsx`,
+  `CustomerDetailPage.test.tsx`, `CustomerUsersPage.test.tsx`, portal
+  `PreferencesPage.test.tsx`.
 
 Fixtures (`tests/_smime_fixtures.py`) build throwaway CA and leaf
 certificates with `cryptography`; `tests/_crypto_mail_fixtures.py` builds

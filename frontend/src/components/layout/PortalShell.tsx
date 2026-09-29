@@ -8,6 +8,15 @@ import { Button } from "@/components/ui/Button";
 import { SelectMenu } from "@/components/ui/SelectMenu";
 import { localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
 import { cn } from "@/lib/cn";
+import { portalApi } from "@/lib/portalApi";
+
+/** Header language switch: apply locally, store as the customer's UserLanguage. */
+function switchPortalLanguage(code: string) {
+  void setAppLanguage(code, { persistRemote: false });
+  void portalApi.portalSetLanguage(code).catch(() => {
+    // Preference group off or offline — the local choice still applies.
+  });
+}
 
 export function PortalShell({ children }: { children: ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -44,7 +53,7 @@ export function PortalShell({ children }: { children: ReactNode }) {
             <SelectMenu
               items={languageItems}
               value={currentLang}
-              onSelect={(code) => void setAppLanguage(code)}
+              onSelect={switchPortalLanguage}
               panelTestId="portal-lang-panel"
               align="right"
               trigger={({ open, ref, toggleProps }) => (
@@ -106,6 +115,14 @@ export function PortalShell({ children }: { children: ReactNode }) {
             activeProps={{ className: "bg-surface-subtle text-accent" }}
           >
             {t("portal.nav.kb")}
+          </Link>
+          <Link
+            to="/portal/preferences"
+            className="ml-auto rounded px-2.5 py-1.5 text-muted transition-colors duration-100 hover:bg-surface-subtle hover:text-ink"
+            activeProps={{ className: "bg-surface-subtle text-accent" }}
+            data-testid="portal-nav-preferences"
+          >
+            {t("portal.nav.preferences")}
           </Link>
         </nav>
       </header>

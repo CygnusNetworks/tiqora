@@ -91,6 +91,35 @@
     "allTickets": "すべてのチケット →",
     "recentTickets": "最近のチケット"
   },
+  "cryptoKeys": {
+    "title": "Encryption keys",
+    "pgpTitle": "PGP keys",
+    "smimeTitle": "S/MIME certificates",
+    "none": "No key stored.",
+    "uploadPgp": "Upload PGP key",
+    "uploadSmime": "Upload S/MIME certificate",
+    "uploading": "Uploading…",
+    "pgpHint": "ASCII-armored public key (.asc).",
+    "smimeHint": "Certificate as PEM, DER, PKCS#7 or PKCS#12 without password.",
+    "expires": "expires {{date}}",
+    "delete": "Delete",
+    "deleteConfirmPgp": "Delete PGP key {{key}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "deleteConfirmSmime": "Delete certificate {{file}} from the key store? Encrypted mail to this customer is no longer possible with it.",
+    "uploaded": "Key stored.",
+    "deleted": "Key deleted.",
+    "adminManaged": "has a private part — managed in the admin area",
+    "readOnly": "Changing keys needs rw permission in the admin or users group.",
+    "disabled": "PGP and S/MIME are switched off.",
+    "openButton": "Keys",
+    "dialogTitle": "Keys of {{login}}",
+    "status": {
+      "good": "valid",
+      "valid": "valid",
+      "expired": "expired",
+      "revoked": "revoked",
+      "invalid": "invalid"
+    }
+  },
   "timeAccounting": {
     "title": "工数管理",
     "hint": "アクセス可能なチケットに計上された工数です。",
@@ -1032,7 +1061,8 @@
     "nav": {
       "myTickets": "自分のチケット",
       "newTicket": "新規チケット",
-      "kb": "ヘルプ記事"
+      "kb": "ヘルプ記事",
+      "preferences": "Preferences"
     },
     "login": {
       "subtitle": "サポートアカウントにサインインしてください",
@@ -1081,6 +1111,22 @@
       "noResultsHint": "別の検索語を試すか、新しいチケットを開いてヘルプを求めてください。",
       "loadError": "この記事を読み込めませんでした。",
       "backToSearch": "検索に戻る"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "language": "Interface language",
+      "languageDesc": "Select the main interface language.",
+      "languageSaved": "Language saved.",
+      "password": "Change password",
+      "passwordDesc": "Set a new password by filling in your current password and a new one.",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "repeatPassword": "Repeat new password",
+      "passwordMismatch": "The new passwords do not match.",
+      "passwordSaved": "Password changed.",
+      "save": "Save",
+      "keys": "Encryption",
+      "keysDesc": "Upload your PGP key or S/MIME certificate so that we can send you encrypted email. It must contain your email address {{email}}."
     }
   },
   "admin": {
@@ -2509,6 +2555,10 @@
         "ai_audit_cleanup": {
           "name": "AI監査クリーンアップ",
           "description": "設定された保持期間を過ぎたLLM監査ログ行を1日に1回削除します。"
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "乗っ取り"
