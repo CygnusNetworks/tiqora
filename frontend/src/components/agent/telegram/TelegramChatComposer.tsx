@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type ArticleCreateRequest, type TelegramButtonIn, type TemplateOut } from "@/lib/api";
-import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
 import { useComposerLock } from "@/lib/composerLock";
@@ -23,6 +22,7 @@ import {
 } from "./chatComposerHelpers";
 import { AttachmentChips, QuoteChip } from "./ComposerChips";
 import { ComposerFooter } from "./ComposerFooter";
+import { SendMenuButton } from "./SendMenuButton";
 import { useComposerRequests } from "./composerBus";
 import { MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, formatBytes, useChatAttachments } from "./useChatAttachments";
 import { useChatDraftSync } from "./useChatDraftSync";
@@ -57,11 +57,13 @@ export function TelegramChatComposer({
   const [aiDraftId, setAiDraftId] = useState<number | null>(null);
   const [buttonsOn, setButtonsOn] = useState(false);
   const [buttons, setButtons] = useState<TelegramButtonIn[]>([]);
-  const [nextState, setNextState] = useState<NextState>("keep");
   const [pendingDate, setPendingDate] = useState(defaultPendingDate);
   /** Slash position the agent dismissed with Esc — typing on keeps it shut. */
   const [snippetDismissed, setSnippetDismissed] = useState<number | null>(null);
   const [snippetIndex, setSnippetIndex] = useState(0);
+  /** Slash position the "Textbausteine" button opened — the picker then also
+   * shows when the queue has no snippets, to say so. */
+  const [snippetRequested, setSnippetRequested] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
   /** Caret to restore after a programmatic edit (snippet insert). */
   const caretAfterRef = useRef<number | null>(null);
@@ -73,6 +75,7 @@ export function TelegramChatComposer({
 
   const ticketLock = useComposerLock(ticketId, "compose", hasContent);
   const next = useNextStateOptions(ticketId, true);
+  const nextOptions: NextState[] = next.canSetState ? next.options.map((o) => o.key) : ["keep"];
   const chat = useTelegramChat(ticketId, true).data ?? null;
   const aiQ = useQuery({
     queryKey: ["tickets", ticketId, "ai"],
@@ -142,7 +145,9 @@ export function TelegramChatComposer({
   const slash = findSlashQuery(body, caret);
   const templates = templatesQ.data ?? [];
   const matches = slash && slash.start !== snippetDismissed ? filterSnippets(templates, slash.query) : [];
-  const pickerOpen = matches.length > 0;
+  const noSnippets =
+    slash !== null && slash.start === snippetRequested && templatesQ.isSuccess && templates.length === 0;
+  const pickerOpen = matches.length > 0 || (noSnippets && slash.start !== snippetDismissed);
   const activeSnippet = Math.min(snippetIndex, matches.length - 1);
 
   const pickSnippet = (tpl: TemplateOut) => {
@@ -153,7 +158,31 @@ export function TelegramChatComposer({
     setCaret(pos);
     caretAfterRef.current = pos;
     setSnippetIndex(0);
+    setSnippetRequested(null);
     inputRef.current?.focus();
+  };
+
+  // The footer button: start a `/` query at the caret (or reuse the one the
+  // agent is already typing) so the picker opens and a pick replaces it.
+  const openSnippets = () => {
+    const el = inputRef.current;
+    if (slash) {
+      setSnippetDismissed(null);
+      setSnippetRequested(slash.start);
+      el?.focus();
+      return;
+    }
+    const pos = el?.selectionStart ?? body.length;
+    const before = body.slice(0, pos);
+    const insert = before === "" || /\s$/.test(before) ? "/" : " /";
+    const start = pos + insert.length - 1;
+    setBody(before + insert + body.slice(pos));
+    setCaret(start + 1);
+    caretAfterRef.current = start + 1;
+    setSnippetDismissed(null);
+    setSnippetRequested(start);
+    setSnippetIndex(0);
+    el?.focus();
   };
 
   // ── Send ──
@@ -162,8 +191,7 @@ export function TelegramChatComposer({
     hasContent &&
     !tooLong &&
     !attachments.encoding &&
-    ticketLock.lockedBy === null &&
-    !(nextState === "pending" && !pendingDate);
+    ticketLock.lockedBy === null;
 
   // What the in-flight send took, so success clears exactly that and keeps
   // anything the agent typed, attached or changed while it was on its way.
@@ -175,8 +203,8 @@ export function TelegramChatComposer({
     buttons: TelegramButtonIn[];
     nextState: NextState;
   };
-  const latest = useRef({ buttons, nextState });
-  latest.current = { buttons, nextState };
+  const latest = useRef({ buttons });
+  latest.current = { buttons };
 
   const send = useMutation({
     mutationFn: (sent: Sent) => api.createArticle(ticketId, sent.payload),
@@ -210,16 +238,16 @@ export function TelegramChatComposer({
         setButtons([]);
         setButtonsOn(false);
       }
-      if (latest.current.nextState === sent.nextState) {
-        setNextState("keep");
-        setPendingDate(defaultPendingDate());
-      }
+      if (sent.nextState === "pending") setPendingDate(defaultPendingDate());
       inputRef.current?.focus();
     },
   });
 
-  const submit = () => {
+  // "keep" for a plain send; waiting/closing come from the send menu (or its
+  // shortcuts) and apply to this one message only.
+  const submit = (nextState: NextState = "keep") => {
     if (!canSend || send.isPending) return;
+    if (nextState === "pending" && !pendingDate) return;
     const telegramButtons = buttonsOn ? cleanButtons(buttons) : [];
     send.mutate({
       payload: {
@@ -285,7 +313,11 @@ export function TelegramChatComposer({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      submit();
+      const wanted: NextState = e.metaKey || e.ctrlKey ? "closed" : e.altKey ? "pending" : "keep";
+      // A shortcut for a state the agent may not set sends nothing rather
+      // than silently sending with a different outcome.
+      if (!nextOptions.includes(wanted)) return;
+      submit(wanted);
     }
   };
 
@@ -300,6 +332,13 @@ export function TelegramChatComposer({
   };
 
   const takeSuggestion = () => (suggestion ? applyDraft(suggestion) : undefined);
+
+  const closeButtons = () => {
+    // Off = discard: hidden buttons must not come back (or be sent) the next
+    // time the editor opens.
+    setButtons([]);
+    setButtonsOn(false);
+  };
 
   const applyPreset = () => {
     setButtons(RESOLVED_PRESET_BUTTONS.map((b) => ({ ...b })));
@@ -366,7 +405,9 @@ export function TelegramChatComposer({
         </div>
       )}
 
-      {buttonsOn && <ButtonEditor buttons={buttons} onChange={setButtons} onPreset={applyPreset} />}
+      {buttonsOn && (
+        <ButtonEditor buttons={buttons} onChange={setButtons} onPreset={applyPreset} onClose={closeButtons} />
+      )}
 
       <div className="relative flex items-end gap-2">
         {pickerOpen && (
@@ -380,6 +421,24 @@ export function TelegramChatComposer({
           className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted hover:text-ink"
         >
           ⊕
+        </button>
+        <button
+          type="button"
+          data-testid="tg-composer-buttons-toggle"
+          aria-pressed={buttonsOn}
+          title={t("ticket.telegram.composer.buttonsTitle")}
+          aria-label={t("ticket.telegram.composer.buttonsTitle")}
+          onClick={() => (buttonsOn ? closeButtons() : setButtonsOn(true))}
+          className={cn(
+            "grid h-8 w-8 shrink-0 place-items-center rounded-lg border",
+            buttonsOn ? "border-accent/50 bg-accent-dim text-accent" : "border-hairline text-muted hover:text-ink",
+          )}
+        >
+          <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current stroke-[1.8]">
+            <rect x="3" y="14" width="8" height="6" rx="1.5" />
+            <rect x="13" y="14" width="8" height="6" rx="1.5" />
+            <rect x="3" y="4" width="18" height="6" rx="1.5" />
+          </svg>
         </button>
         <input
           ref={fileRef}
@@ -411,16 +470,14 @@ export function TelegramChatComposer({
           }}
           className="max-h-[8.25rem] min-h-[2rem] flex-1 resize-none overflow-y-auto rounded-lg border border-hairline bg-bg px-3 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <Button
-          variant="primary"
-          size="sm"
-          data-testid="tg-composer-send"
-          disabled={!canSend || send.isPending}
-          onClick={submit}
-          className="h-8 shrink-0"
-        >
-          {send.isPending ? t("ticket.telegram.composer.sending") : t("ticket.telegram.composer.send")}
-        </Button>
+        <SendMenuButton
+          options={nextOptions}
+          disabled={!canSend}
+          sending={send.isPending}
+          pendingDate={pendingDate}
+          onPendingDate={setPendingDate}
+          onSend={submit}
+        />
       </div>
 
       {attachments.error && (
@@ -443,7 +500,7 @@ export function TelegramChatComposer({
               type="button"
               data-testid="tg-composer-retry"
               disabled={!canSend || send.isPending}
-              onClick={submit}
+              onClick={() => submit(send.variables?.nextState ?? "keep")}
               className="font-semibold underline disabled:opacity-50"
             >
               {t("ticket.telegram.composer.retry")}
@@ -454,18 +511,8 @@ export function TelegramChatComposer({
 
       <ComposerFooter
         length={body.length}
-        buttonsOn={buttonsOn}
-        onToggleButtons={() => {
-          // Off = discard: hidden buttons must not come back (or be sent)
-          // the next time the editor opens.
-          if (buttonsOn) setButtons([]);
-          setButtonsOn(!buttonsOn);
-        }}
-        nextOptions={next.canSetState ? next.options : []}
-        nextState={nextState}
-        onNextState={setNextState}
-        pendingDate={pendingDate}
-        onPendingDate={setPendingDate}
+        snippetCount={templatesQ.isSuccess ? templates.length : null}
+        onSnippets={openSnippets}
       />
     </div>
   );

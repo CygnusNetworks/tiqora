@@ -25,6 +25,7 @@ export default tseslint.config(
           allowConstantExport: true,
           allowExportNames: [
             "useAuth",
+            "useOptionalAuth",
             "useTheme",
             "flattenQueues",
             "useCustomerAuth",
