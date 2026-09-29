@@ -12,7 +12,7 @@ built frontend static assets. Process role is selected at start:
 |---|---|
 | `api` (default) | FastAPI (uvicorn) |
 | `worker` | Background worker (Znuny-write poller, indexing, outbox/webhooks, daemon takeovers) |
-| `ai-worker` | AI subsystem loop (auto-reply + auto-summary), isolated from the main worker; inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
+| `ai-worker` | AI subsystem loop (triage, auto-reply, auto-summary), isolated from the main worker; inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
 | `mcp` | FastMCP server |
 
 Registry targets (CI):
@@ -228,7 +228,11 @@ streams (no aggressive idle kills).
 ## Observability
 
 - Scrape `GET /metrics` with Prometheus or Zabbix HTTP agent (requires
-  `TIQORA_METRICS_ENABLED=1` in production).
+  `TIQORA_METRICS_ENABLED=1` in production). It serves the API process's
+  own metrics only; `tiqora-worker` has no HTTP port, so its counters and
+  poller-lag gauges are not scrapeable. Watch the worker through the
+  per-service status keys (Admin → Dienste, `daemon.<slug>.status.*` in
+  `tiqora_settings`) and its container healthcheck (heartbeat file).
 - A Zabbix template will live under `deploy/zabbix/` (placeholder for now).
 - Ship stdout JSON logs (structlog) to your log stack.
 
@@ -237,8 +241,9 @@ streams (no aggressive idle kills).
 - Database: same RPO/RTO as Znuny today (shared DB during parallel operation).
 - Meilisearch: rebuildable from DB (prefer rebuild over fragile index backups
   until documented otherwise).
-- Redis: sessions are disposable; job queues should use durable Redis config
-  once workers are critical path.
+- Redis: holds sessions, rate-limit counters, OAuth2 state, presence and
+  pub/sub only — there is no job queue in Redis, so losing it logs users out
+  but loses no ticket data.
 
 ### Meilisearch document-schema changes
 

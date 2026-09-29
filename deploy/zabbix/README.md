@@ -10,8 +10,9 @@
 | API readiness | HTTP agent | `GET /ready` |
 | Prometheus metrics | HTTP agent / Prometheus scrape | `GET /metrics` |
 | Request latency | Metric items | `tiqora_http_request_duration_seconds` |
-| Worker queue depth | Metric items | (taskiq metrics — TBD) |
-| Poller lag | Metric items | (Znuny write poller) |
+| Worker tick health | Database item | `daemon.<slug>.status.{last_ok,last_error}` rows in `tiqora_settings` (the worker has no task queue and no `/metrics` endpoint) |
+| Outbox backlog | Database item | unprocessed rows in `tiqora_event_outbox` |
+| Poller lag | Metric items | (Znuny write poller; worker-process gauge, not exposed yet) |
 | Mail queue errors | Metric items | |
 
 ## Layout (forthcoming)

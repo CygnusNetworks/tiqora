@@ -163,12 +163,14 @@ duty before the Znuny daemon is stopped.
    flag; the flags do not control Znuny's scheduler.
 2. Confirm fresh successful `daemon.<slug>.status.last_ok` timestamps and
    inspect `last_result` for per-item errors. A completed tick may still
-   report errors. When eligible work exists, verify corresponding counters
-   and resulting ticket changes (`tiqora_postmaster_messages_fetched_total`,
+   report errors. When eligible work exists, verify the resulting ticket
+   changes and the per-tick counts in `last_result`; the matching worker
+   counters (`tiqora_postmaster_messages_fetched_total`,
    `tiqora_escalation_tickets_swept_total`,
-   `tiqora_notifications_sent_total`, `tiqora_generic_agent_jobs_run_total`).
-   A zero counter is normal when no work is due; test each duty with controlled
-   fixtures before cutover rather than generating unsolicited production mail.
+   `tiqora_notifications_sent_total`, `tiqora_generic_agent_jobs_run_total`)
+   are not scrapeable yet (see Stage 4). A zero count is normal when no
+   work is due; test each duty with controlled fixtures before cutover
+   rather than generating unsolicited production mail.
 3. Stop the Znuny daemon:
    ```sh
    su -c "bin/otrs.Daemon.pl stop" -s /bin/bash otrs
@@ -258,6 +260,13 @@ Watch for the remainder of the maintenance window (recommend >= 1 hour, or a
 full business day for a cautious rollout) before proceeding to Stage 5.
 
 ### Golden signals (Prometheus)
+
+Only the API process serves `/metrics`. The worker-side series below
+(poller lag, webhook, escalation, notification, GenericAgent and postmaster
+counters) are registered in `tiqora-worker`, which has no HTTP port, so a
+scrape of the API does not contain their live values. Until the worker
+exports them, watch those duties through `daemon.<slug>.status.*` (Admin →
+Dienste) and the worker's structured logs.
 
 | Metric | What it means | Alert on |
 |---|---|---|
