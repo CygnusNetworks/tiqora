@@ -255,6 +255,15 @@ const agentNewTicketRoute = createRoute({
         : typeof s.queue_id === "string" && s.queue_id !== ""
           ? Number(s.queue_id)
           : undefined,
+    type: s.type === "phone" || s.type === "email" ? s.type : undefined,
+    direction: s.direction === "inbound" || s.direction === "outbound" ? s.direction : undefined,
+    customer: typeof s.customer === "string" && s.customer !== "" ? s.customer : undefined,
+    number:
+      typeof s.number === "string" && s.number !== ""
+        ? s.number
+        : typeof s.number === "number"
+          ? String(s.number)
+          : undefined,
   }),
   component: AgentNewTicketPage,
 });
