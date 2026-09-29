@@ -69,6 +69,13 @@ REFINE_TONES = frozenset({TONE_STANDARD, TONE_FORMAL, TONE_FRIENDLY, TONE_CONCIS
 
 KIND_OWN = "own"
 
+#: ``message``: polish text addressed to the customer (the default).
+#: ``call_note``: turn raw notes taken during a phone call into a structured
+#: internal note (Anliegen / Vereinbart / Nächste Schritte).
+MODE_MESSAGE = "message"
+MODE_CALL_NOTE = "call_note"
+REFINE_MODES = frozenset({MODE_MESSAGE, MODE_CALL_NOTE})
+
 #: Guard against a runaway composer body; the composer is a reply box, not a
 #: document editor. Enforced by the API layer, repeated here as a hard stop.
 MAX_TOTAL_CHARS = 60_000
@@ -103,6 +110,50 @@ _RULES = (
     "- Sections marked as a quote are context only. Never reproduce, "
     "translate or rewrite them."
 )
+
+#: Call-note headings per UI language. Any other language gets the English
+#: ones plus an instruction to translate them.
+_CALL_NOTE_HEADINGS: dict[str, tuple[str, str, str]] = {
+    "de": ("Anliegen", "Vereinbart", "Nächste Schritte"),
+    "en": ("Issue", "Agreed", "Next steps"),
+}
+
+_CALL_NOTE_RULES = (
+    "You are a note-taking assistant for a customer-support agent. You are "
+    "given the agent's rough notes from a phone call with a customer. Turn "
+    "them into a clean internal call note.\n\n"
+    "Structure the note under exactly these three headings, in this order, "
+    "each on its own line followed by short bullet points:\n"
+    "{headings}\n"
+    "Put what the caller wanted under the first heading, what was agreed or "
+    "done during the call under the second and the open follow-ups under the "
+    "third. A heading with nothing to put under it gets a single '-'.\n\n"
+    "Hard rules:\n"
+    "- Do not add any information, fact, number, date, identifier, name, "
+    "promise or next step that is not already in the agent's notes.\n"
+    "- Do not remove information. Every fact in the input must still be in "
+    "your output.\n"
+    "- Keep numbers, dates, times, amounts, ticket numbers and identifiers "
+    "verbatim, character for character.\n"
+    "- Write the note in the same language as the agent's notes.\n"
+    "- This is an internal note, not a message: no greeting, no closing line, "
+    "no addressing the customer, no comments on your changes.\n"
+    "- Sections marked as a quote are context only. Never reproduce, "
+    "translate or rewrite them."
+)
+
+
+def _call_note_headings(language: str | None) -> str:
+    code = (language or "").strip().lower().replace("-", "_")
+    base = code.split("_", 1)[0]
+    headings = _CALL_NOTE_HEADINGS.get(base)
+    if headings is not None:
+        return "\n".join(headings)
+    english = "\n".join(_CALL_NOTE_HEADINGS["en"])
+    if not base:
+        return english
+    return f"{english}\n(translate these three headings into the language '{code}')"
+
 
 _OUTPUT_CONTRACT = (
     "Answer with a JSON object and nothing else, in this exact shape:\n"
@@ -214,8 +265,17 @@ def _temperature_for(tone: str) -> float:
     return _TONE_TEMPERATURES.get(tone, _TONE_TEMPERATURES[TONE_STANDARD])
 
 
-def _build_system_prompt(tone: str) -> str:
-    """Rules, then the tone block, then the output contract — in that order."""
+def _build_system_prompt(
+    tone: str, *, mode: str = MODE_MESSAGE, language: str | None = None
+) -> str:
+    """Rules, then the tone block, then the output contract — in that order.
+
+    ``call_note`` mode has its own rules and no tone (it is an internal note);
+    its headings follow *language* (the agent's UI language).
+    """
+    if mode == MODE_CALL_NOTE:
+        rules = _CALL_NOTE_RULES.format(headings=_call_note_headings(language))
+        return f"{rules}\n\n{_OUTPUT_CONTRACT}"
     tone_block = f"TONE — apply this to every section:\n{_tone_instruction(tone)}"
     return f"{_RULES}\n\n{tone_block}\n\n{_OUTPUT_CONTRACT}"
 
@@ -391,6 +451,8 @@ async def refine_text(
     customer_user_id: str | None = None,
     settings: Settings | None = None,
     run_id: str | None = None,
+    mode: str = MODE_MESSAGE,
+    language: str | None = None,
 ) -> RefineResult:
     """Rewrite the agent's own sections of *segments*; quotes are context only.
 
@@ -450,8 +512,9 @@ async def refine_text(
         pii_mapper=pii,
     )
 
-    system_prompt = _build_system_prompt(tone)
-    temperature = _temperature_for(tone)
+    system_prompt = _build_system_prompt(tone, mode=mode, language=language)
+    # A call note is restructured, not re-toned: stay at the low default.
+    temperature = _temperature_for(TONE_STANDARD if mode == MODE_CALL_NOTE else tone)
     prompt_tokens = 0
     completion_tokens = 0
     model_served: str | None = None

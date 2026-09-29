@@ -7498,6 +7498,14 @@ export interface components {
         AiRefineIn: {
             /** Customer User Id */
             customer_user_id?: string | null;
+            /** Language */
+            language?: string | null;
+            /**
+             * Mode
+             * @default message
+             * @enum {string}
+             */
+            mode: "message" | "call_note";
             /** Queue Id */
             queue_id?: number | null;
             /** Segments */

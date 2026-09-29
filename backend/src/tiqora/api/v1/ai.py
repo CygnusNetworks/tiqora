@@ -218,6 +218,11 @@ class AiRefineIn(BaseModel):
     #: itself — see ``tiqora.ai.refine._name_masking_inputs``.
     customer_user_id: str | None = None
     tone: str = TONE_STANDARD
+    #: ``message`` (default) polishes a reply; ``call_note`` structures phone
+    #: call notes into Anliegen / Vereinbart / Nächste Schritte.
+    mode: Literal["message", "call_note"] = "message"
+    #: UI language of the agent (e.g. ``de``) -- the call-note headings.
+    language: str | None = Field(default=None, max_length=16)
     segments: list[AiRefineSegmentIn] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -1162,6 +1167,8 @@ async def request_refine(
             ticket_id=body.ticket_id,
             customer_user_id=body.customer_user_id,
             settings=settings,
+            mode=body.mode,
+            language=body.language,
         )
     except RefineError as exc:
         raise _map_refine_error(exc) from exc
