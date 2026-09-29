@@ -37,6 +37,7 @@ import {
   pendingIso,
   requestPhoneCall,
   savePhoneDraft,
+  timerFromCall,
 } from "@/lib/phoneCall";
 
 const FIELD_CLASS =
@@ -101,6 +102,9 @@ export type NewTicketSearch = {
   customer?: string;
   /** Caller / dialled number. */
   number?: string;
+  /** CTI popup: epoch ms the call was answered / ended — seeds the timer. */
+  call_started?: number;
+  call_ended?: number;
 };
 
 export function NewTicketPage() {
@@ -174,7 +178,8 @@ export function NewTicketPage() {
   // (running from page open).
   const [callerNumber, setCallerNumber] = useState(search.number ?? "");
   const [phoneFields, setPhoneFields] = useState<PhoneTicketFieldsValue>(EMPTY_PHONE_TICKET_FIELDS);
-  const timer = useCallTimer();
+  const [callTimer] = useState(() => timerFromCall(search.call_started, search.call_ended));
+  const timer = useCallTimer(callTimer ?? undefined);
   const attachments = useChatAttachments();
   const phoneFieldsQ = useQuery({
     queryKey: ["reference", "dynamic-fields", "AgentTicketPhone"],

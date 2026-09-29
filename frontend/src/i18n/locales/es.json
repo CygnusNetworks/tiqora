@@ -24,7 +24,12 @@
     "themeDark": "Oscuro",
     "security": "Seguridad",
     "securityHint": "Administre la autenticación de dos factores de su cuenta.",
-    "securityLink": "Abrir configuración de seguridad"
+    "securityLink": "Abrir configuración de seguridad",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "Inicio",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Marque la cuenta como «No válida» para que tickets, artículos e historial sigan siendo atribuibles.",
       "resendSetupLink": "Reenviar enlace de configuración",
       "setupLinkSent": "Enlace de configuración enviado.",
-      "setupLinkFailed": "No se pudo enviar el enlace de configuración."
+      "setupLinkFailed": "No se pudo enviar el enlace de configuración.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "Grupos",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

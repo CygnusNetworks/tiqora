@@ -131,14 +131,25 @@ export function clearPhoneDraft(ticketId: number): void {
 }
 
 /** "Open the phone dialog on ticket N" — set before navigating to a ticket
- * (New-ticket caller lookup, click-to-call), read by the ticket header once
- * it mounts. In memory only: a reload simply opens the ticket. */
-export type PhoneCallRequestIntent = { direction: PhoneDirection; number?: string | null };
+ * (New-ticket caller lookup, click-to-call, the CTI call popup), read by the
+ * ticket header once it mounts — or right away when that ticket is already
+ * open (see `subscribePhoneCallRequests`). In memory only: a reload simply
+ * opens the ticket. */
+export type PhoneCallRequestIntent = {
+  direction: PhoneDirection;
+  number?: string | null;
+  /** Epoch ms the call was answered (CTI popup) — the timer counts from here. */
+  startedAt?: number | null;
+  /** Epoch ms the call ended — the timer shows the fixed duration. */
+  endedAt?: number | null;
+};
 
 const pendingIntents = new Map<number, PhoneCallRequestIntent>();
+const requestListeners = new Set<(ticketId: number) => void>();
 
 export function requestPhoneCall(ticketId: number, intent: PhoneCallRequestIntent): void {
   pendingIntents.set(ticketId, intent);
+  for (const listener of requestListeners) listener(ticketId);
 }
 
 export function peekPhoneCallRequest(ticketId: number): PhoneCallRequestIntent | null {
@@ -147,6 +158,32 @@ export function peekPhoneCallRequest(ticketId: number): PhoneCallRequestIntent |
 
 export function consumePhoneCallRequest(ticketId: number): void {
   pendingIntents.delete(ticketId);
+}
+
+/** Notified with the ticket id on every `requestPhoneCall`. */
+export function subscribePhoneCallRequests(listener: (ticketId: number) => void): () => void {
+  requestListeners.add(listener);
+  return () => {
+    requestListeners.delete(listener);
+  };
+}
+
+/**
+ * Call-timer seed for a call that started (and maybe ended) elsewhere — the
+ * CTI popup's answered/hangup times: seconds already elapsed, and whether the
+ * timer keeps running. `null` without a start time.
+ */
+export function timerFromCall(
+  startedAt: number | null | undefined,
+  endedAt: number | null | undefined,
+  now: number = Date.now(),
+): { initialSeconds: number; autoStart: boolean } | null {
+  if (!startedAt || !Number.isFinite(startedAt)) return null;
+  const end = endedAt && Number.isFinite(endedAt) ? endedAt : now;
+  return {
+    initialSeconds: Math.max(0, Math.floor((end - startedAt) / 1000)),
+    autoStart: !endedAt,
+  };
 }
 
 /** `datetime-local` value → ISO string for the API (`null` when blank). */

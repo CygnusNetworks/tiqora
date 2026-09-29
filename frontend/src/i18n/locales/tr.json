@@ -24,7 +24,12 @@
     "themeDark": "Koyu",
     "security": "Güvenlik",
     "securityHint": "Hesabınız için iki adımlı doğrulamayı yönetin.",
-    "securityLink": "Güvenlik ayarlarını aç"
+    "securityLink": "Güvenlik ayarlarını aç",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "Ana sayfa",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Hesabı “Geçersiz” yapın; böylece biletler, makaleler ve geçmiş atanabilir kalır.",
       "resendSetupLink": "Kurulum bağlantısını yeniden gönder",
       "setupLinkSent": "Kurulum bağlantısı gönderildi.",
-      "setupLinkFailed": "Kurulum bağlantısı gönderilemedi."
+      "setupLinkFailed": "Kurulum bağlantısı gönderilemedi.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "Gruplar",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

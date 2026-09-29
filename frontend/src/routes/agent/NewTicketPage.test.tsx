@@ -375,6 +375,13 @@ describe("NewTicketPage", () => {
     expect(screen.getByTestId("caller-number")).toHaveValue("0228 1");
   });
 
+  it("seeds the call timer from the CTI popup's call times", async () => {
+    const start = Date.now() - 120_000;
+    searchParams.current = { type: "phone", number: "0228 1", call_started: start, call_ended: start + 75_000 };
+    wrap(<NewTicketPage />);
+    expect(await screen.findByTestId("new-ticket-timer")).toHaveTextContent("01:15");
+  });
+
   it("renders a plain textarea when rich_text is false and the ComposerBody toolbar when true", async () => {
     getComposeContext.mockResolvedValue({ ...composeContext, rich_text: true });
     await renderReady();

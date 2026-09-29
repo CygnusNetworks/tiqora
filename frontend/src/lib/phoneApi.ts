@@ -16,6 +16,8 @@ export type CallerTicket = Schemas["CallerTicketOut"];
 export type PhoneConfig = Schemas["PhoneConfigOut"];
 export type DialScheme = PhoneConfig["dial_scheme"];
 export type DynamicFieldDef = Schemas["DynamicFieldDefOut"];
+export type ActiveCall = Schemas["ActiveCall"];
+export type PhoneExtension = Schemas["PhoneExtensionOut"];
 export type PhoneScreen = "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound";
 
 /** 409 detail of an outbound call on a ticket another agent holds. */
@@ -40,6 +42,19 @@ export const phoneApi = {
   },
   phoneConfig(signal?: AbortSignal) {
     return api.request<PhoneConfig>("GET", "/api/v1/reference/phone-config", { signal });
+  },
+  /** CTI popup: running calls + those ended ≤ 15 min ago (reload restore). */
+  activeCalls(signal?: AbortSignal) {
+    return api.request<ActiveCall[]>("GET", "/api/v1/phone/calls/active", { signal });
+  },
+  dismissCall(callId: string) {
+    return api.request<void>("POST", `/api/v1/phone/calls/${encodeURIComponent(callId)}/dismiss`);
+  },
+  myExtension(signal?: AbortSignal) {
+    return api.request<PhoneExtension>("GET", "/api/v1/auth/me/phone", { signal });
+  },
+  setMyExtension(extension: string | null) {
+    return api.request<PhoneExtension>("PUT", "/api/v1/auth/me/phone", { body: { extension } });
   },
   screenDynamicFields(screen: PhoneScreen, signal?: AbortSignal) {
     return api.request<DynamicFieldDef[]>("GET", "/api/v1/reference/dynamic-fields", {

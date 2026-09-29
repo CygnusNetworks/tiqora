@@ -65,3 +65,26 @@ describe("phoneCall helpers", () => {
     expect(loadPhoneDraft(7)).toBeNull();
   });
 });
+
+describe("CTI handover", () => {
+  it("timerFromCall counts from the answered time or freezes at hangup", async () => {
+    const { timerFromCall } = await import("./phoneCall");
+    expect(timerFromCall(null, null)).toBeNull();
+    expect(timerFromCall(1_000, null, 91_500)).toEqual({ initialSeconds: 90, autoStart: true });
+    expect(timerFromCall(1_000, 61_000, 999_000)).toEqual({ initialSeconds: 60, autoStart: false });
+  });
+
+  it("notifies subscribers of a phone-call request", async () => {
+    const { consumePhoneCallRequest, peekPhoneCallRequest, requestPhoneCall, subscribePhoneCallRequests } =
+      await import("./phoneCall");
+    const seen: number[] = [];
+    const off = subscribePhoneCallRequests((id) => seen.push(id));
+    requestPhoneCall(42, { direction: "inbound", startedAt: 5 });
+    off();
+    requestPhoneCall(43, { direction: "inbound" });
+    expect(seen).toEqual([42]);
+    expect(peekPhoneCallRequest(42)?.startedAt).toBe(5);
+    consumePhoneCallRequest(42);
+    consumePhoneCallRequest(43);
+  });
+});

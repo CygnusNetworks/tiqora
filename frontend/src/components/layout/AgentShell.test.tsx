@@ -17,6 +17,9 @@ import { AgentShell } from "./AgentShell";
 vi.mock("@/lib/useSSE", () => ({
   SSEProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+vi.mock("@/components/agent/phone/CallPopup", () => ({
+  CallPopup: () => null,
+}));
 vi.mock("@/components/agent/NotificationBell", () => ({
   NotificationBell: () => <div data-testid="notification-bell-stub" />,
   NotificationToaster: () => null,

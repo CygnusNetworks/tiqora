@@ -184,6 +184,32 @@ describe("PhoneCallDialog", () => {
     expect(screen.getByTestId("phone-timer")).toHaveTextContent("02:05");
   });
 
+  it("counts from the answered time of a CTI call and wins over a draft", () => {
+    savePhoneDraft(7, { direction: "inbound", subject: "", body: "x", elapsed: 5 });
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(new Date("2026-09-29T10:02:00Z"));
+    renderDialog({ startedAt: Date.parse("2026-09-29T10:00:30Z") });
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("01:30");
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("01:40");
+  });
+
+  it("shows the fixed duration of an ended CTI call", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(new Date("2026-09-29T10:10:00Z"));
+    renderDialog({
+      startedAt: Date.parse("2026-09-29T10:00:00Z"),
+      endedAt: Date.parse("2026-09-29T10:03:20Z"),
+    });
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("03:20");
+    act(() => {
+      vi.advanceTimersByTime(5_000);
+    });
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("03:20");
+  });
+
   it("names the agent holding the lock on a 409", async () => {
     logPhoneCall.mockRejectedValue(
       new ApiError(409, { detail: { message: "locked", locked_by_id: 3, locked_by_name: "Otto Other" } }, "/x"),

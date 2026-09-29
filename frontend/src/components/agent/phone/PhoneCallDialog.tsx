@@ -19,6 +19,7 @@ import {
   missingRequired,
   pendingIso,
   savePhoneDraft,
+  timerFromCall,
   type PhoneNextState,
 } from "@/lib/phoneCall";
 import { ComposerBody } from "../ComposerBody";
@@ -61,12 +62,19 @@ export function PhoneCallDialog({
   ticket,
   initialDirection,
   callerNumber,
+  startedAt,
+  endedAt,
   onClose,
 }: {
   ticket: TicketDetail;
   initialDirection: PhoneDirection;
   /** Number that was dialled (click-to-call) — logged with the call. */
   callerNumber?: string | null;
+  /** CTI popup: epoch ms the call was answered — the timer counts from here
+   * (wins over a draft's elapsed time). */
+  startedAt?: number | null;
+  /** CTI popup: epoch ms the call ended — the timer shows the fixed duration. */
+  endedAt?: number | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -81,7 +89,8 @@ export function PhoneCallDialog({
   const [subject, setSubject] = useState(() => draft?.subject || autoSubject(t, ticket, draft?.direction ?? initialDirection));
   const [subjectTouched, setSubjectTouched] = useState(Boolean(draft?.subject));
   const [body, setBody] = useState(draft?.body ?? "");
-  const timer = useCallTimer({ initialSeconds: draft?.elapsed ?? 0 });
+  const [callTimer] = useState(() => timerFromCall(startedAt, endedAt));
+  const timer = useCallTimer(callTimer ?? { initialSeconds: draft?.elapsed ?? 0 });
   const [timeUnits, setTimeUnits] = useState("");
   const [timeTouched, setTimeTouched] = useState(false);
   const [nextState, setNextState] = useState<PhoneNextState>(perms.rw ? "default" : "keep");

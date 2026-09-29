@@ -24,7 +24,12 @@
     "themeDark": "Giza",
     "security": "Usalama",
     "securityHint": "Dhibiti uthibitishaji wa vipengele viwili kwa akaunti yako.",
-    "securityLink": "Fungua mipangilio ya usalama"
+    "securityLink": "Fungua mipangilio ya usalama",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "Nyumbani",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Weka akaunti kuwa “Batili” ili tiketi, makala na historia zibaki zinazoweza kuhusishwa.",
       "resendSetupLink": "Tuma tena kiungo cha usanidi",
       "setupLinkSent": "Kiungo cha usanidi kimetumwa.",
-      "setupLinkFailed": "Imeshindikana kutuma kiungo cha usanidi."
+      "setupLinkFailed": "Imeshindikana kutuma kiungo cha usanidi.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "Vikundi",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

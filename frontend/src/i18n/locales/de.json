@@ -24,7 +24,12 @@
     "themeDark": "Dunkel",
     "security": "Sicherheit",
     "securityHint": "Zwei-Faktor-Authentifizierung für Ihr Konto verwalten.",
-    "securityLink": "Sicherheitseinstellungen öffnen"
+    "securityLink": "Sicherheitseinstellungen öffnen",
+    "phoneExtension": "Telefon",
+    "phoneExtensionHint": "Ihre Nebenstelle an der Telefonanlage – eingehende Anrufe darauf öffnen das Anruf-Popup. Mehrere Nebenstellen durch Komma trennen.",
+    "phoneExtensionInvalid": "Ungültige Nebenstelle – nur Ziffern, Buchstaben und * # + _ . @ / : - erlaubt.",
+    "phoneExtensionError": "Nebenstelle konnte nicht gespeichert werden.",
+    "phoneExtensionSaved": "Gespeichert"
   },
   "nav": {
     "home": "Start",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Setze das Konto stattdessen auf „Ungültig“. So bleiben Tickets, Artikel und Historie zuordenbar.",
       "resendSetupLink": "Setup-Link erneut senden",
       "setupLinkSent": "Setup-Link wurde gesendet.",
-      "setupLinkFailed": "Setup-Link konnte nicht gesendet werden."
+      "setupLinkFailed": "Setup-Link konnte nicht gesendet werden.",
+      "phoneExtension": "Telefon-Nebenstelle",
+      "phoneExtensionHelp": "Nebenstelle(n) für das Anruf-Popup, durch Komma getrennt."
     },
     "groups": {
       "title_plural": "Gruppen",
@@ -3280,5 +3287,19 @@
     "pendingUntil": "Wartend bis",
     "autoReplyHint": "Die Auto-Antwort der Queue geht an den Kunden (eingehende Anrufe).",
     "noCustomerNumber": "Keine Nummer"
+  },
+  "callPopup": {
+    "region": "Anrufe",
+    "ringing": "Eingehender Anruf",
+    "outgoing": "Ausgehender Anruf",
+    "answered": "Im Gespräch",
+    "ended": "Anruf beendet – erfassen?",
+    "missed": "Verpasster Anruf",
+    "severalCustomers": "{{count}} passende Kunden",
+    "unknownNumber": "Unbekannte Nummer",
+    "logOnTicket": "Zu Ticket erfassen",
+    "newTicket": "Neues Telefon-Ticket",
+    "ignore": "Ignorieren",
+    "close": "Schließen"
   }
 }

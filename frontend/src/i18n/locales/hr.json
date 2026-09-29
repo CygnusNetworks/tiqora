@@ -24,7 +24,12 @@
     "themeDark": "tamno",
     "security": "Sigurnost",
     "securityHint": "Upravljajte dvofaktorskom autentifikacijom za svoj račun.",
-    "securityLink": "Otvorite sigurnosne postavke"
+    "securityLink": "Otvorite sigurnosne postavke",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "Dom",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Postavite račun na «Nevažeći» da tiketi, članci i povijest ostanu pripisivi.",
       "resendSetupLink": "Ponovno pošalji poveznicu za postavljanje",
       "setupLinkSent": "Poveznica za postavljanje je poslana.",
-      "setupLinkFailed": "Poveznicu za postavljanje nije moguće poslati."
+      "setupLinkFailed": "Poveznicu za postavljanje nije moguće poslati.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "grupe",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

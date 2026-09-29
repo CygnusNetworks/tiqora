@@ -24,7 +24,12 @@
     "themeDark": "Sötét",
     "security": "Biztonság",
     "securityHint": "Kezelje fiókja kéttényezős hitelesítését.",
-    "securityLink": "Nyissa meg a biztonsági beállításokat"
+    "securityLink": "Nyissa meg a biztonsági beállításokat",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "Otthon",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Állítsa a fiókot „Érvénytelen” értékre, hogy a jegyek, cikkek és az előzmények hozzárendelhetők maradjanak.",
       "resendSetupLink": "Beállító hivatkozás újraküldése",
       "setupLinkSent": "Beállító hivatkozás elküldve.",
-      "setupLinkFailed": "A beállító hivatkozást nem sikerült elküldeni."
+      "setupLinkFailed": "A beállító hivatkozást nem sikerült elküldeni.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "Csoportok",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

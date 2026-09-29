@@ -8,6 +8,7 @@ import {
   useConnectionStatus,
 } from "./useSSE";
 import { clearNotifications, useNotifications } from "./notificationStore";
+import { getCalls, resetCalls } from "./callPopup";
 
 describe("handleSSEMessage", () => {
   it("invalidates the tickets cache prefix for ticket_changed", () => {
@@ -32,6 +33,29 @@ describe("handleSSEMessage", () => {
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy).toHaveBeenCalledWith({ queryKey: presenceQueryKey(7) });
+  });
+
+  it("feeds call_event into the call popup store without touching the cache", () => {
+    resetCalls();
+    const queryClient = new QueryClient();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const call = {
+      call_id: "c1",
+      state: "ringing",
+      number: "+4930",
+      extension: "100",
+      direction: "inbound",
+      user_ids: [7],
+      ringing_at: "2026-09-29T10:00:00+00:00",
+      answered_at: null,
+      ended_at: null,
+    };
+    handleSSEMessage(queryClient, JSON.stringify({ type: "call_event", user_ids: [7], event: "ringing", call }));
+    expect(getCalls().map((c) => c.call_id)).toEqual(["c1"]);
+    handleSSEMessage(queryClient, JSON.stringify({ type: "call_event", user_ids: [7], event: "ringing" }));
+    expect(getCalls()).toHaveLength(1);
+    expect(spy).not.toHaveBeenCalled();
+    resetCalls();
   });
 
   it("ignores malformed payloads without throwing", () => {
