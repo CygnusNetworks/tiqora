@@ -2955,7 +2955,30 @@
       "name": "Nom",
       "event": "Esdeveniment",
       "subject": "Assumpte",
-      "body": "Cos"
+      "body": "Cos",
+      "security": {
+        "title": "Email security",
+        "enable": "Enable email security",
+        "notEnabled": "PGP and S/MIME are not enabled.",
+        "level": "Email security level",
+        "none": "None",
+        "levels": {
+          "PGPSign": "PGP sign only",
+          "PGPCrypt": "PGP encrypt only",
+          "PGPSignCrypt": "PGP sign and encrypt",
+          "SMIMESign": "S/MIME sign only",
+          "SMIMECrypt": "S/MIME encrypt only",
+          "SMIMESignCrypt": "S/MIME sign and encrypt"
+        },
+        "missingSign": "If signing key/certificate is missing",
+        "missingCrypt": "If encryption key/certificate is missing",
+        "skip": "Skip notification delivery",
+        "sendUnsigned": "Send unsigned notification",
+        "sendUnencrypted": "Send unencrypted notification",
+        "backendOff": "{{backend}} is disabled: this notification is not sent at all until it is enabled again (as in Znuny).",
+        "hint": "Signed with a key of the sender address (customer notifications prefer the queue's default sign key), encrypted with the recipient's first valid key. Znuny reads the same settings.",
+        "save": "Save"
+      }
     },
     "tar": {
       "title": "Relacions d'atributs de tiquet",
