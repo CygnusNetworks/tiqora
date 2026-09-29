@@ -42,6 +42,7 @@ export type {
   ArticleListItem,
   ArticleBody,
   AiOriginOut,
+  ArticleSecurity,
   AttachmentMetaOut,
   HistoryEntry,
   PresenceIn,

@@ -14,6 +14,7 @@ import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { AttachmentLightbox } from "./AttachmentLightbox";
 import { ComposerTimeChip } from "./ComposerTimeChip";
 import { AiOriginMarker } from "./AiOriginBadge";
+import { ArticleSecurityMarker } from "./ArticleSecurityBadge";
 import { MentionTextarea } from "./MentionTextarea";
 import { ReplyDialog } from "./ReplyDialog";
 import {
@@ -145,6 +146,12 @@ export function ArticleTimeline({
                               : t("ticket.internal")}
                           </Badge>
                           {article.ai_origin && <AiOriginMarker articleId={article.id} />}
+                          {article.security && (
+                            <ArticleSecurityMarker
+                              articleId={article.id}
+                              security={article.security}
+                            />
+                          )}
                           <span className="font-mono text-xs tabular-nums text-muted">
                             {formatDateTime(article.create_time, locale)}
                           </span>

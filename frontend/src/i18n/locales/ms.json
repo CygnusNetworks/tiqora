@@ -820,6 +820,36 @@
         "snippetsEmptyBody": "Snippets are response templates of type “Chat” assigned to the ticket's queue.",
         "snippetsEmptyLink": "Manage templates"
       }
+    },
+    "security": {
+      "title": "Signature and encryption",
+      "method": "Method",
+      "layers": "Protection",
+      "signed": "signed",
+      "encrypted": "encrypted",
+      "signer": "Signer",
+      "keyId": "Key ID",
+      "detail": "Detail",
+      "short": {
+        "verified": "Signed",
+        "decrypted": "Encrypted",
+        "signed_untrusted": "Untrusted",
+        "unknown_key": "Unknown key",
+        "verify_failed": "Signature invalid",
+        "decrypt_failed": "Not decrypted",
+        "unavailable": "Not checked",
+        "error": "Crypto error"
+      },
+      "status": {
+        "verified": "Signature verified — the signer is trusted.",
+        "decrypted": "The message was encrypted and has been decrypted.",
+        "signed_untrusted": "The signature is valid, but the signer is not trusted (unknown CA, expired or revoked key, or signer and sender differ).",
+        "unknown_key": "Signed with a key that is not in the key store — the signature could not be checked.",
+        "verify_failed": "The signature does not match the message — it may have been altered.",
+        "decrypt_failed": "The message is encrypted but could not be decrypted (no matching private key).",
+        "unavailable": "Signature/encryption could not be checked: gpg or openssl is not available.",
+        "error": "Checking the signature or encryption failed."
+      }
     }
   },
   "search": {
