@@ -13,9 +13,9 @@ Docker image).
 
 Status of the parity work
 ([design](superpowers/specs/2026-09-29-crypto-parity-design.md)): B1
-(foundation + key management) is done. Inbound MIME-tree handling (B2),
-signed/encrypted SMTP sending (B3) and customer keys / notifications (B4)
-follow.
+(foundation + key management) and B2 (inbound MIME-tree handling, article
+security status, decrypt-on-view) are done. Signed/encrypted SMTP sending
+(B3) and customer keys / notifications (B4) follow.
 
 ## Configuration
 
@@ -35,7 +35,7 @@ Tiqora reads Znuny's SysConfig (DB-backed, `sysconfig_modified` over
 | `SMIME::CertPath` | certificate directory | `TIQORA_CRYPTO_SMIME_CERT_DIR` |
 | `SMIME::PrivatePath` | private key directory | `TIQORA_CRYPTO_SMIME_PRIVATE_DIR` |
 | `SMIME::CacheTTL` | ignored (Tiqora reads the files directly) | — |
-| — | CA bundle for inbound signature chain checks; without it a valid signature is `signed_untrusted` | `TIQORA_CRYPTO_SMIME_CA_PATH` |
+| — | extra CA bundle (`-CAfile`) for inbound signature chain checks, on top of `SMIME::CertPath` | `TIQORA_CRYPTO_SMIME_CA_PATH` |
 
 Znuny ships `SMIME::CertPath`/`SMIME::PrivatePath` as *invalid* (inactive)
 settings; they only count once enabled in Znuny's SysConfig — or set the env
@@ -175,25 +175,97 @@ secret; pass `--secret` for encrypted ones), indexes both in `smime_keys`
 and deletes the flat files once both parts are stored (`--keep` keeps them).
 Certificates already present are skipped, so it is safe to re-run.
 
-## Inbound: postmaster wiring
+## Inbound: reading signed and encrypted mail
+
+### At ingest
 
 `tiqora.channels.email.pipeline.process_message()` resolves the crypto
-config (SysConfig + env) and:
+config and runs `tiqora.crypto.inbound.process_inbound_crypto()` — a no-op
+unless PGP or S/MIME is enabled. It hands the raw mail to
+`tiqora.crypto.mime_walk.walk_message()`, which walks the MIME tree on the
+**raw bytes** (CRLF canonical, never re-serialised before a signature check):
 
-1. Runs `tiqora.crypto.inbound.process_inbound_crypto(raw, settings,
-   config)` — a no-op unless PGP or S/MIME is enabled.
-2. If a PGP-encrypted inline block (`-----BEGIN PGP MESSAGE-----...`) is
-   found and decrypts successfully (passphrases from
-   `PGP::Key::Password`), the plaintext replaces the article body.
-3. Records the outcome as an `article_flag` row `TiqoraCryptoVerify =
-   "<method>:<status>"` (e.g. `pgp:decrypted_verified`, `pgp:verify_failed`,
-   `smime:verified`, `smime:signed_untrusted`).
-4. A decrypt/verify failure **never blocks delivery** (like Znuny's
-   `ArticleCheck::PGP`/`::SMIME`).
+| Shape | Handling |
+|---|---|
+| PGP/MIME `multipart/encrypted` (RFC 3156) | second part decrypted; the inner entity replaces the node and is walked again, so body **and attachments** survive; a Thunderbird `protected-headers` subject replaces a placeholder outer subject (`...`) |
+| PGP/MIME `multipart/signed` | detached signature checked over the exact bytes of the first part; the signature part is dropped |
+| inline PGP | `BEGIN PGP MESSAGE` in a text part decrypted, `BEGIN PGP SIGNED MESSAGE` verified and shown without armor; `*.pgp`/`*.gpg` (and armored `*.asc`) attachments decrypted and renamed (`report.pdf.pgp` → `report.pdf`, as Znuny does) |
+| S/MIME `multipart/signed` (`application/(x-)pkcs7-signature`) | `openssl smime -verify` on the entity; the `smime.p7s` part is dropped |
+| S/MIME opaque `application/(x-)pkcs7-mime; smime-type=signed-data` | verified, the signed content extracted and walked |
+| S/MIME `enveloped-data` (or `pkcs7-mime` without `smime-type`) | decrypted with every private key whose certificate carries a recipient address (`Resent-To`, `Envelope-To`, `To`, `Cc`, `Delivered-To`, `X-Original-To`) until one works — Znuny's `PrivateSearch` loop; the decrypted entity is walked again (signed inside encrypted) |
 
-**Until B2**: only inline PGP and whole-message S/MIME verification;
-PGP/MIME, S/MIME decryption and attachment-preserving MIME-tree handling
-follow in B2.
+The rewritten content replaces body and attachments before the article is
+written, so the article holds the mail **in clear** (Znuny's ArticleCheck
+does the same with `ArticleUpdate` when an agent first opens it); the
+original mail is kept in `article_data_mime_plain`. Nothing ever blocks
+delivery: a layer that cannot be processed stays as it is (e.g. the
+`smime.p7m` attachment) and is reported in the status.
+
+### Trust
+
+- **S/MIME**: `SMIME::CertPath` is the trust store (`-CApath`; its
+  `<subject_hash>.<n>` names are exactly what `-CApath` looks up), plus
+  `TIQORA_CRYPTO_SMIME_CA_PATH` and openssl's default store, like Znuny's
+  call. CAs linked through signer relations are in CertPath, so they are
+  trust anchors automatically; a customer's self-signed certificate
+  uploaded to CertPath is trusted too. A signature that is cryptographically
+  valid but whose chain does not validate is `signed_untrusted` — Znuny's
+  `SMIME::NoVerify` retry, but never shown as verified (Tiqora always
+  retries; the setting itself is not read).
+- **PGP**: a good signature from a key in the keyring is `verified`
+  (Znuny's `GOODSIG` rule, regardless of ownertrust); an expired/revoked key
+  or ownertrust *never* gives `signed_untrusted`, a signer missing from the
+  keyring `unknown_key`.
+- **Sender check** (RFC 3850 §3, Znuny bug#5098): a verified signature whose
+  signer addresses do not include the `From`/`Sender` address becomes
+  `signed_untrusted`, for both backends.
+
+### Status model
+
+The article API returns `security` on `GET /tickets/{id}/articles` and
+`GET /tickets/{id}/articles/{article_id}/body`:
+
+```json
+{"method": "pgp", "signed": true, "encrypted": true, "status": "verified",
+ "signer": "Carla Customer <customer@example.com>",
+ "key_id": "3F2A…", "detail": "good signature"}
+```
+
+`status` is the worst layer: `decrypt_failed` > `verify_failed` > `error`
+> `unavailable` > `unknown_key` > `signed_untrusted` > `verified` >
+`decrypted` (so a signed+encrypted mail reports its signature). `key_id` is
+the PGP fingerprint, the S/MIME signer's SHA-1 fingerprint, or — for
+encrypted-only S/MIME — the key file used to decrypt.
+
+Stored in Znuny's `article_flag` (values are `VARCHAR(50)`, so split):
+`TiqoraCryptoVerify` = `<method>:<status>` (pre-B2 format, older
+`decrypted_verified`/`decrypted_unverified` values are still read),
+`TiqoraCryptoLayers` (`signed`, `encrypted`, `signed,encrypted`),
+`TiqoraCryptoSigner`, `TiqoraCryptoKeyID`, `TiqoraCryptoDetail` (truncated).
+GDPR anonymisation removes `TiqoraCryptoSigner`.
+
+### Legacy Znuny articles: decrypt on view
+
+Znuny decrypts only when an agent opens an article, so a migrated database
+holds never-opened articles that are still encrypted (inline PGP body,
+`smime.p7m`, `encrypted.asc`). For those the read endpoints (`/body`,
+`/attachments`, attachment download incl. `cid:` lookups) show the
+decrypted content **read-only** — the stored article is not changed, so
+Znuny keeps reading it as before. Source is the raw mail in
+`article_data_mime_plain` (or the inline-PGP body when there is none);
+decrypted attachments get virtual negative ids (`-1` = first). The security
+result is cached in the flags (from then on the article list shows it), the
+decrypted content in-process for 10 minutes (also failures, so newly
+uploaded keys take effect after that). Legacy articles that are only
+*signed* get their flags computed once the same way.
+
+### Ticket view
+
+The article header shows a badge — 🔒 encrypted, ✓ signature verified,
+⚠ untrusted / unknown key / invalid / not decrypted — with a popover
+(method, protection, signer, key id, detail): full badge in the reader
+(split view), glyph in the conversation bubble header, a non-interactive
+marker in the timeline's collapsible header.
 
 ## Outbound: GenericInterface `EmailSecurity`
 
@@ -239,8 +311,27 @@ limited to ~104 bytes on macOS).
   validation, legacy alias, flat-store migration.
 - `test_crypto_outbound.py`, `test_crypto_keystore.py`,
   `test_crypto_postmaster.py` — EmailSecurity, audit row, postmaster flag.
+- `test_crypto_mime_walk.py` — every inbound shape built by real gpg/openssl
+  and read back: PGP/MIME signed (incl. LF-only mail, tampered, unknown key,
+  sender mismatch), encrypted with attachments, sign+encrypt, signed inside
+  encrypted, wrong recipient; inline PGP (encrypted, clear-signed, tampered,
+  encrypted attachment); S/MIME detached (trusted via CertPath, untrusted,
+  tampered), opaque, enveloped (To / Delivered-To / no key), signed inside
+  encrypted; plus the committed sample mails.
+- `test_crypto_inbound_articles.py` (`db`) — postmaster → article in clear,
+  attachments, flags, raw mail kept, article API `security`; failures still
+  deliver; legacy decrypt-on-view (virtual attachments, read-only, flag
+  cache, inline PGP without raw mail).
 - Frontend: `PgpKeysPage.test.tsx`, `SmimePage.test.tsx`,
-  `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`.
+  `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`,
+  `ArticleSecurityBadge.test.tsx`.
 
 Fixtures (`tests/_smime_fixtures.py`) build throwaway CA and leaf
-certificates with `cryptography`.
+certificates with `cryptography`; `tests/_crypto_mail_fixtures.py` builds
+the mails (a customer and the support mailbox with PGP keys, S/MIME CA and
+leaf certificates, a Znuny-layout store). `tests/fixtures/crypto/` holds
+realistic samples — Thunderbird PGP/MIME (sign+encrypt, protected subject,
+PDF attachment), Outlook S/MIME detached-signed and encrypted — with the
+throwaway keys to read them (certificates valid 30 years); regenerate with
+`cd backend && uv run python -m tests._crypto_mail_fixtures`. gitleaks
+allowlists that directory.

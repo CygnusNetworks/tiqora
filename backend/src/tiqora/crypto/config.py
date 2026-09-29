@@ -65,7 +65,7 @@ class SmimeConfig:
     openssl_bin: str = "openssl"
     cert_path: str = ""
     private_path: str = ""
-    #: Explicit CA bundle for chain validation (Tiqora-only; B2 adds CertPath as CApath).
+    #: Extra CA bundle (-CAfile) for chain validation, on top of CertPath (-CApath).
     ca_path: str = ""
 
 
