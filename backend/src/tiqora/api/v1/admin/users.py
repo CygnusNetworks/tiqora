@@ -41,6 +41,7 @@ from tiqora.api.v1.admin.schemas import (
     UserReference,
     UserUpdate,
 )
+from tiqora.channels.phone.cti import PHONE_EXTENSION_PREF
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.user import GroupRole, GroupUser, PermissionGroups, Roles, RoleUser, Users
 from tiqora.domain.auth import SessionStore, normalize_language_code
@@ -92,10 +93,12 @@ def _with_preferences(
     *,
     invite: InviteStatus | None = None,
     last_login: datetime | None = None,
+    phone_extension: str | None = None,
 ) -> UserOut:
     out = UserOut.model_validate(user)
     out.email = email
     out.mobile = mobile
+    out.phone_extension = phone_extension
     if invite is not None:
         out.invited_at = invite.invited_at
         out.invite_expires = invite.expires
@@ -113,10 +116,12 @@ async def list_users(admin: AdminUser, session: DbSession, params: ListParamsDep
     emails = await bulk_get_preferences(session, ids, "UserEmail")
     mobiles = await bulk_get_preferences(session, ids, "UserMobile")
     last_logins = await bulk_get_preferences(session, ids, "UserLastLogin")
+    extensions = await bulk_get_preferences(session, ids, PHONE_EXTENSION_PREF)
     invites = await bulk_latest_invite(session, ids)
     for u in page.items:
         u.email = emails.get(u.id)
         u.mobile = mobiles.get(u.id)
+        u.phone_extension = extensions.get(u.id)
         u.last_login = _parse_last_login(last_logins.get(u.id))
         invite = invites.get(u.id)
         if invite is not None:
@@ -155,8 +160,11 @@ async def get_user(user_id: int, admin: AdminUser, session: DbSession) -> UserOu
     email = await get_preference(session, user_id, "UserEmail")
     mobile = await get_preference(session, user_id, "UserMobile")
     last_login = _parse_last_login(await get_preference(session, user_id, "UserLastLogin"))
+    extension = await get_preference(session, user_id, PHONE_EXTENSION_PREF)
     invite = (await bulk_latest_invite(session, [user_id])).get(user_id)
-    return _with_preferences(user, email, mobile, invite=invite, last_login=last_login)
+    return _with_preferences(
+        user, email, mobile, invite=invite, last_login=last_login, phone_extension=extension
+    )
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -187,6 +195,8 @@ async def create_user(
         await set_preference(session, user.id, "UserEmail", body.email)
     if body.mobile:
         await set_preference(session, user.id, "UserMobile", body.mobile)
+    if body.phone_extension:
+        await set_preference(session, user.id, PHONE_EXTENSION_PREF, body.phone_extension)
 
     await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
@@ -227,7 +237,9 @@ async def create_user(
             ) from exc
         await session.commit()
 
-    return _with_preferences(user, body.email or None, body.mobile or None)
+    return _with_preferences(
+        user, body.email or None, body.mobile or None, phone_extension=body.phone_extension
+    )
 
 
 @router.patch("/{user_id}", response_model=UserOut)
@@ -247,6 +259,8 @@ async def update_user(
     email = data.pop("email", None)
     mobile_set = "mobile" in data
     mobile = data.pop("mobile", None)
+    extension_set = "phone_extension" in data
+    extension = data.pop("phone_extension", None)
     password_changed = False
     if "password" in data:
         password = data.pop("password")
@@ -262,6 +276,8 @@ async def update_user(
         await set_preference(session, user_id, "UserEmail", email)
     if mobile_set:
         await set_preference(session, user_id, "UserMobile", mobile)
+    if extension_set:
+        await set_preference(session, user_id, PHONE_EXTENSION_PREF, extension)
 
     await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
@@ -291,7 +307,10 @@ async def update_user(
     out_mobile = (
         (mobile or None) if mobile_set else await get_preference(session, user_id, "UserMobile")
     )
-    return _with_preferences(user, out_email, out_mobile)
+    out_extension = (
+        extension if extension_set else await get_preference(session, user_id, PHONE_EXTENSION_PREF)
+    )
+    return _with_preferences(user, out_email, out_mobile, phone_extension=out_extension)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -23,6 +23,8 @@ Design notes
   closed before the streaming generator runs) and drops notifications for
   queues the agent can't read. ``ticket_changed`` / ``presence_changed``
   pass through unfiltered as before.
+* ``call_event`` messages (CTI popup) carry ``user_ids`` and reach only the
+  connections of those agents.
 
 v1 limitations (documented intentionally)
 -----------------------------------------
@@ -78,7 +80,13 @@ def _presence_key(ticket_id: int, user_id: int) -> str:
 _QUEUE_SCOPED_EVENT_TYPES = frozenset({"ticket_new_in_queue", "ticket_changed"})
 
 
-def _should_forward(raw: str, allowed_queue_ids: set[int]) -> bool:
+# Message types addressed to explicit agents (``user_ids``): the CTI popup's
+# ``call_event`` names the caller's number, so it must only reach the agents
+# whose extension rang.
+_USER_SCOPED_EVENT_TYPES = frozenset({"call_event"})
+
+
+def _should_forward(raw: str, allowed_queue_ids: set[int], *, user_id: int | None = None) -> bool:
     """Whether one raw pub/sub payload should reach *this* connection.
 
     Queue-scoped message types are dropped unless their ``queue_id`` is one the
@@ -94,18 +102,29 @@ def _should_forward(raw: str, allowed_queue_ids: set[int]) -> bool:
     filter miss never silently swallows unrelated events. Extracted as a pure
     function so the per-queue gate is unit-testable without a live SSE
     connection.
+
+    User-scoped types (``call_event``) are forwarded only when *user_id* is in
+    the message's ``user_ids`` list; anything malformed is dropped.
     """
     try:
         payload = json.loads(raw)
     except (ValueError, TypeError):
         return True
-    if not isinstance(payload, dict) or payload.get("type") not in _QUEUE_SCOPED_EVENT_TYPES:
+    if not isinstance(payload, dict):
+        return True
+    if payload.get("type") in _USER_SCOPED_EVENT_TYPES:
+        targets = payload.get("user_ids")
+        return user_id is not None and isinstance(targets, list) and user_id in targets
+    if payload.get("type") not in _QUEUE_SCOPED_EVENT_TYPES:
         return True
     return payload.get("queue_id") in allowed_queue_ids
 
 
 async def _event_stream(
-    request: Request, redis_client: redis.Redis, allowed_queue_ids: set[int]
+    request: Request,
+    redis_client: redis.Redis,
+    allowed_queue_ids: set[int],
+    user_id: int | None = None,
 ) -> AsyncGenerator[bytes, None]:
     pubsub = redis_client.pubsub()
     await pubsub.subscribe(TIQORA_EVENTS_CHANNEL)
@@ -127,7 +146,7 @@ async def _event_stream(
                 continue
             if isinstance(data, bytes):
                 data = data.decode("utf-8")
-            if not _should_forward(data, allowed_queue_ids):
+            if not _should_forward(data, allowed_queue_ids, user_id=user_id):
                 continue
             yield f"data: {data}\n\n".encode()
     except asyncio.CancelledError:
@@ -164,7 +183,7 @@ async def stream_events(
     """
     allowed_queue_ids = await QueueService(session).allowed_queue_ids(user.id, "ro")
     return StreamingResponse(
-        _event_stream(request, redis_client, allowed_queue_ids),
+        _event_stream(request, redis_client, allowed_queue_ids, user.id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -26,6 +26,11 @@ of two shapes:
   toast without an extra fetch. Unlike ``ticket_changed`` this is filtered
   per-connection by the SSE endpoint to the agent's readable queues (see
   :mod:`tiqora.api.v1.events`).
+* ``{"type": "call_event", "user_ids": [<int>], "event":
+  "ringing"|"answered"|"hangup"|"dismissed", "call": {...}}`` — CTI call
+  popup update (see :mod:`tiqora.channels.phone.cti`). Addressed: the SSE
+  endpoint forwards it only to the listed agents; ``call`` is the
+  ``ActiveCall`` document (id, state, number, owners, timestamps).
 
 Publishing is always best-effort: this module never raises out of its
 publish functions, so callers (outbox drain, poller, presence writes) don't
@@ -142,6 +147,25 @@ async def publish_new_ticket_in_queue(
         "title": title,
         "queue_id": queue_id,
         "queue_name": queue_name,
+    }
+    await _publish(redis_client, payload)
+
+
+async def publish_call_event(
+    redis_client: redis.Redis,
+    *,
+    user_ids: list[int],
+    event: str,
+    call: dict[str, Any],
+) -> None:
+    """Publish a ``call_event`` to *user_ids* only. Best-effort — never raises."""
+    if not user_ids:
+        return
+    payload: dict[str, Any] = {
+        "type": "call_event",
+        "user_ids": [int(u) for u in user_ids],
+        "event": event,
+        "call": call,
     }
     await _publish(redis_client, payload)
 

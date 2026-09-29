@@ -336,6 +336,103 @@
         "title": "AcquireLockResponse",
         "type": "object"
       },
+      "ActiveCall": {
+        "description": "One call as the popup sees it.",
+        "properties": {
+          "answered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "call_id": {
+            "title": "Call Id",
+            "type": "string"
+          },
+          "direction": {
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extension"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          },
+          "ringing_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ringing At"
+          },
+          "state": {
+            "enum": [
+              "ringing",
+              "answered",
+              "ended"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "user_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "call_id",
+          "state",
+          "number",
+          "extension",
+          "direction",
+          "user_ids",
+          "ringing_at",
+          "answered_at",
+          "ended_at"
+        ],
+        "title": "ActiveCall",
+        "type": "object"
+      },
       "ActivityDialogDetailOut": {
         "description": "Full field definitions for one activity dialog.",
         "properties": {
@@ -6714,6 +6811,95 @@
           "valid"
         ],
         "title": "CalendarOut",
+        "type": "object"
+      },
+      "CallEventAccepted": {
+        "properties": {
+          "accepted": {
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "delivered_to": {
+            "title": "Delivered To",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accepted",
+          "delivered_to"
+        ],
+        "title": "CallEventAccepted",
+        "type": "object"
+      },
+      "CallEventIn": {
+        "description": "Webhook body of ``POST /channels/phone/events``.",
+        "properties": {
+          "call_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Call Id",
+            "type": "string"
+          },
+          "caller_number": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Caller Number"
+          },
+          "direction": {
+            "default": "inbound",
+            "enum": [
+              "inbound",
+              "outbound"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "event": {
+            "enum": [
+              "ringing",
+              "answered",
+              "hangup"
+            ],
+            "title": "Event",
+            "type": "string"
+          },
+          "extension": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extension"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          }
+        },
+        "required": [
+          "event",
+          "call_id"
+        ],
+        "title": "CallEventIn",
         "type": "object"
       },
       "CallerCustomerOut": {
@@ -15094,6 +15280,43 @@
         "title": "PhoneConfigOut",
         "type": "object"
       },
+      "PhoneExtensionOut": {
+        "properties": {
+          "extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extension"
+          }
+        },
+        "required": [
+          "extension"
+        ],
+        "title": "PhoneExtensionOut",
+        "type": "object"
+      },
+      "PhoneExtensionUpdate": {
+        "properties": {
+          "extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extension"
+          }
+        },
+        "title": "PhoneExtensionUpdate",
+        "type": "object"
+      },
       "PhoneNoteRequest": {
         "properties": {
           "agent_user_id": {
@@ -22511,6 +22734,17 @@
             ],
             "title": "Password"
           },
+          "phone_extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Extension"
+          },
           "title": {
             "anyOf": [
               {
@@ -22779,6 +23013,17 @@
             ],
             "title": "Mobile"
           },
+          "phone_extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Extension"
+          },
           "title": {
             "anyOf": [
               {
@@ -22895,6 +23140,17 @@
               }
             ],
             "title": "Password"
+          },
+          "phone_extension": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone Extension"
           },
           "title": {
             "anyOf": [
@@ -48379,6 +48635,145 @@
         ]
       }
     },
+    "/api/v1/auth/me/phone": {
+      "get": {
+        "description": "The agent's extension(s) for the CTI call popup (``TiqoraPhoneExtension``).",
+        "operationId": "get_my_phone_api_v1_auth_me_phone_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneExtensionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get My Phone",
+        "tags": [
+          "auth"
+        ]
+      },
+      "put": {
+        "operationId": "set_my_phone_api_v1_auth_me_phone_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhoneExtensionUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneExtensionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set My Phone",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/methods": {
       "get": {
         "description": "Discovery endpoint the login page uses to decide which buttons to show.",
@@ -50309,6 +50704,66 @@
         "summary": "Calendar Feed",
         "tags": [
           "calendar"
+        ]
+      }
+    },
+    "/api/v1/channels/phone/events": {
+      "post": {
+        "description": "PBX call events (ringing / answered / hangup) for the agent call popup.\n\nThe extension is mapped to agents via their ``TiqoraPhoneExtension``\npreference; an event nobody is assigned to is accepted and ignored. See\n:mod:`tiqora.channels.phone.cti`.",
+        "operationId": "call_event_api_v1_channels_phone_events_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-tiqora-phone-secret",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tiqora-Phone-Secret"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallEventAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Call Event",
+        "tags": [
+          "channels:phone"
         ]
       }
     },
@@ -52816,6 +53271,143 @@
         "summary": "Oauth2 Authorization Callback",
         "tags": [
           "oauth2"
+        ]
+      }
+    },
+    "/api/v1/phone/calls/active": {
+      "get": {
+        "description": "The agent's ringing/answered calls and those ended \u2264 15 min ago.",
+        "operationId": "active_calls_api_v1_phone_calls_active_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ActiveCall"
+                  },
+                  "title": "Response Active Calls Api V1 Phone Calls Active Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Active Calls",
+        "tags": [
+          "phone"
+        ]
+      }
+    },
+    "/api/v1/phone/calls/{call_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_api_v1_phone_calls__call_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "title": "Call Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss",
+        "tags": [
+          "phone"
         ]
       }
     },

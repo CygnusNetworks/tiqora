@@ -63,6 +63,7 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/process", "process"),
     ("/api/v1/channels", "channels"),
     ("/api/v1/events", "events"),
+    ("/api/v1/phone", "events"),
     ("/api/v1/agents", "agents"),
     ("/api/v1/sse", "events"),
     ("/znuny-compat", "compat"),
