@@ -24,7 +24,12 @@
     "themeDark": "黑暗",
     "security": "安全性",
     "securityHint": "管理您帳戶的雙重認證。",
-    "securityLink": "開啟安全設定"
+    "securityLink": "開啟安全設定",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "首頁",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "請改為將帳戶設為「無效」，以便工單、文章與歷史仍可歸屬。",
       "resendSetupLink": "重新傳送設定連結",
       "setupLinkSent": "設定連結已傳送。",
-      "setupLinkFailed": "無法傳送設定連結。"
+      "setupLinkFailed": "無法傳送設定連結。",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "團體",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

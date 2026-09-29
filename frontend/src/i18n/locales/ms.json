@@ -24,7 +24,12 @@
     "themeDark": "Gelap",
     "security": "Keselamatan",
     "securityHint": "Urus pengesahan dua faktor untuk akaun anda.",
-    "securityLink": "Buka tetapan keselamatan"
+    "securityLink": "Buka tetapan keselamatan",
+    "phoneExtension": "Phone",
+    "phoneExtensionHint": "Your PBX extension — incoming calls on it open the call popup. Several extensions separated by commas.",
+    "phoneExtensionInvalid": "Invalid extension — use digits, letters and * # + _ . @ / : - only.",
+    "phoneExtensionError": "Could not save the extension.",
+    "phoneExtensionSaved": "Saved"
   },
   "nav": {
     "home": "Rumah",
@@ -1801,7 +1806,9 @@
       "deleteBlockedHint": "Tetapkan akaun kepada “Tidak sah” supaya tiket, artikel dan sejarah kekal boleh dikaitkan.",
       "resendSetupLink": "Hantar semula pautan persediaan",
       "setupLinkSent": "Pautan persediaan dihantar.",
-      "setupLinkFailed": "Tidak dapat menghantar pautan persediaan."
+      "setupLinkFailed": "Tidak dapat menghantar pautan persediaan.",
+      "phoneExtension": "Phone extension",
+      "phoneExtensionHelp": "PBX extension(s) for the incoming-call popup, comma separated."
     },
     "groups": {
       "title_plural": "Kumpulan",
@@ -3272,5 +3279,19 @@
     "pendingUntil": "Pending until",
     "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
+  },
+  "callPopup": {
+    "region": "Calls",
+    "ringing": "Incoming call",
+    "outgoing": "Outgoing call",
+    "answered": "On the phone",
+    "ended": "Call ended – log it?",
+    "missed": "Missed call",
+    "severalCustomers": "{{count}} matching customers",
+    "unknownNumber": "Unknown number",
+    "logOnTicket": "Log on ticket",
+    "newTicket": "New phone ticket",
+    "ignore": "Ignore",
+    "close": "Dismiss"
   }
 }

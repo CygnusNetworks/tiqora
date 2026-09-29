@@ -34,6 +34,7 @@ import {
   consumePhoneCallRequest,
   dialHref,
   peekPhoneCallRequest,
+  subscribePhoneCallRequests,
   type PhoneCallRequestIntent,
 } from "@/lib/phoneCall";
 
@@ -198,6 +199,16 @@ export function TicketHeaderActions({
     peekPhoneCallRequest(ticketId),
   );
   useEffect(() => consumePhoneCallRequest(ticketId), [ticketId]);
+  // A request for this very ticket while it is open (CTI popup action).
+  useEffect(
+    () =>
+      subscribePhoneCallRequests((id) => {
+        if (id !== ticketId) return;
+        setPhoneCall(peekPhoneCallRequest(id));
+        consumePhoneCallRequest(id);
+      }),
+    [ticketId],
+  );
   const customerQ = useQuery({
     queryKey: ["customers", ticket.customer_user_id],
     queryFn: () => api.getCustomer(ticket.customer_user_id as string),
@@ -659,9 +670,12 @@ export function TicketHeaderActions({
       )}
       {phoneCall && (
         <PhoneCallDialog
+          key={`${phoneCall.direction}-${phoneCall.startedAt ?? ""}-${phoneCall.endedAt ?? ""}`}
           ticket={ticket}
           initialDirection={phoneCall.direction}
           callerNumber={phoneCall.number}
+          startedAt={phoneCall.startedAt}
+          endedAt={phoneCall.endedAt}
           onClose={() => setPhoneCall(null)}
         />
       )}

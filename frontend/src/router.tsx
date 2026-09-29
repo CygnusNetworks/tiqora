@@ -245,6 +245,12 @@ const agentQueuesRoute = createRoute({
   component: QueuesPage,
 });
 
+/** Epoch-ms search param (CTI popup call times) — positive number or absent. */
+function epochMs(v: unknown): number | undefined {
+  const n = typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 // NB: register the literal "/tickets/new" route before the "$ticketId" param
 // route so "new" isn't captured as a ticket id.
 const agentNewTicketRoute = createRoute({
@@ -266,6 +272,8 @@ const agentNewTicketRoute = createRoute({
         : typeof s.number === "number"
           ? String(s.number)
           : undefined,
+    call_started: epochMs(s.call_started),
+    call_ended: epochMs(s.call_ended),
   }),
   component: AgentNewTicketPage,
 });
