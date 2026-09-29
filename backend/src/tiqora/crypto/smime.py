@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 from dataclasses import dataclass
 
 from tiqora.crypto import CryptoError, CryptoUnavailableError
@@ -36,6 +37,10 @@ class SmimeVerifyResult:
     # cryptographically valid but the SIGNER IS UNTRUSTED — a self-signed cert
     # bearing the victim's address also passes (security review M4).
     chain_trusted: bool = False
+    #: The signed content (``openssl smime -verify -out``), empty on failure.
+    content: bytes = b""
+    #: Signer certificate(s) as PEM (``-signer``), when openssl found them.
+    signer_pem: bytes = b""
 
 
 @dataclass(frozen=True)
@@ -122,19 +127,56 @@ class SmimeEngine:
             detail=proc.stderr.decode("utf-8", "replace"),
         )
 
-    def verify(self, data: bytes, *, ca_path: str | None = None) -> SmimeVerifyResult:
-        """Verify a detached S/MIME signature.
+    def verify(
+        self,
+        data: bytes,
+        *,
+        ca_path: str | None = None,
+        ca_dir: str | None = None,
+        no_verify: bool = False,
+    ) -> SmimeVerifyResult:
+        """Verify a signed S/MIME entity (``multipart/signed`` or opaque signed-data).
 
-        Without ``ca_path``, ``-noverify`` is used: the signature is checked
-        cryptographically but the certificate chain is NOT validated against
-        a trust root. Production use should pass ``ca_path`` to get real
-        chain-of-trust validation (B2 adds ``SMIME::CertPath`` as ``-CApath``).
+        Trust anchors: ``ca_dir`` is used as ``-CApath`` (Znuny passes
+        ``SMIME::CertPath``, whose ``<subject_hash>.<n>`` names are exactly the
+        ``-CApath`` lookup names), ``ca_path`` as ``-CAfile``; openssl adds its
+        default store as Znuny's call does. Without either, or with
+        ``no_verify``, ``-noverify`` is used: the signature is checked
+        cryptographically but the chain is NOT validated — a self-signed cert
+        bearing the victim's address also passes (security review M4), so
+        ``chain_trusted`` stays False.
+
+        The result carries the signed content (``-out``) and the signer
+        certificate (``-signer``, PEM) when openssl could extract them.
         """
-        args = ["smime", "-verify"]
-        args += ["-CAfile", ca_path] if ca_path else ["-noverify"]
-        proc = self._run(args, data)
+        noverify = no_verify or not (ca_path or ca_dir)
+        with tempfile.TemporaryDirectory(prefix="tiqora-smime-") as tmp:
+            signer_file = os.path.join(tmp, "signer.pem")
+            out_file = os.path.join(tmp, "content")
+            args = ["smime", "-verify", "-signer", signer_file, "-out", out_file]
+            if noverify:
+                args.append("-noverify")
+            else:
+                if ca_dir:
+                    args += ["-CApath", ca_dir]
+                if ca_path:
+                    args += ["-CAfile", ca_path]
+            proc = self._run(args, data)
+            content = _read(out_file)
+            signer = _read(signer_file)
+        ok = proc.returncode == 0
         return SmimeVerifyResult(
-            valid=proc.returncode == 0,
+            valid=ok,
             detail=proc.stderr.decode("utf-8", "replace"),
-            chain_trusted=bool(ca_path) and proc.returncode == 0,
+            chain_trusted=ok and not noverify,
+            content=content if ok else b"",
+            signer_pem=signer,
         )
+
+
+def _read(path: str) -> bytes:
+    try:
+        with open(path, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return b""

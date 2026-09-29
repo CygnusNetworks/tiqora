@@ -1,0 +1,76 @@
+From: Carla Customer <customer@example.com>
+To: Tiqora Support <support@tiqora.test>
+Subject: VPN token reset
+Date: Tue, 29 Sep 2026 10:00:00 +0200
+Message-ID: <1948616831914728951@example.com>
+MIME-Version: 1.0
+X-Mailer: Microsoft Outlook 16.0
+Thread-Index: AdsSampleThreadIndex==
+Content-Type: multipart/signed;
+	protocol="application/x-pkcs7-signature";
+	micalg=SHA256;
+	boundary="----=_NextPart_000_0012_01DB1234.56789ABC"
+
+This is a multipart message in MIME format.
+
+------=_NextPart_000_0012_01DB1234.56789ABC
+Content-Type: multipart/alternative;
+ boundary="----=_NextPart_001_0013_01DB1234.56789ABC"
+
+------=_NextPart_001_0013_01DB1234.56789ABC
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Hello team,
+
+please reset my VPN token.
+
+Regards
+Carla
+
+------=_NextPart_001_0013_01DB1234.56789ABC
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+
+<html><body><p>Hello team,</p><p>please reset my VPN token.</p><p>Regards<br>=
+Carla</p></body></html>
+
+------=_NextPart_001_0013_01DB1234.56789ABC--
+
+------=_NextPart_000_0012_01DB1234.56789ABC
+Content-Type: application/x-pkcs7-signature;
+	name="smime.p7s"
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment;
+	filename="smime.p7s"
+
+MIIFjwYJKoZIhvcNAQcCoIIFgDCCBXwCAQExDzANBglghkgBZQMEAgEFADALBgkqhkiG9w0BBwGg
+ggMPMIIDCzCCAfOgAwIBAgIUeb6OyMKo17sSRAjseHgEUWDun98wDQYJKoZIhvcNAQELBQAwGjEY
+MBYGA1UEAwwPRXhhbXBsZSBNYWlsIENBMCAXDTI2MDkyODEzMjI0NFoYDzIwNTYwOTIxMTMyMjQ0
+WjA+MRcwFQYDVQQDDA5DYXJsYSBDdXN0b21lcjEjMCEGCSqGSIb3DQEJARYUY3VzdG9tZXJAZXhh
+bXBsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCUk+wL29/ZRcb9dTjdDUik
+DWn2Ujk9kwt2jiEPZJ9VQHSS26pq4EvmjA9ufKGSxMp28PDWHZbL5tleja7yfVTQqsD30arX+LSS
+E8r0m3h78oCih92qm9sMl9PVqL1chSCFfAAk7SZbIbJebIacC0oE6hjpvkYwUK5mfRQs/a4YMSDk
+yARoU8LxErN2pAb2juDZPH3a9pR+h11vGIOFkG4wiIcILcqp1zco5hMwu+s0BzgqYqg8dvuL5Nl9
+s8Oynbhq8ZsAv9caa95NulZBW9tGW9gpGKl7m0ySdNNw7Ac6pYP90B0JGFU/R12Lltjr8owxhhD+
+YvN+gWzYzxfLnQuLAgMBAAGjIzAhMB8GA1UdEQQYMBaBFGN1c3RvbWVyQGV4YW1wbGUuY29tMA0G
+CSqGSIb3DQEBCwUAA4IBAQCnO4Hh0RYLVc9cU0HsS5ZYcBpcIc2NCgTiBaPH4M/q0Y5+wzjaWlhY
+m8Eo+3hAx/VlOjOXvPTNlAwwh30D8eizK5yzZobTI/zDi9n5OMxnCtpQsbdjU37GhZyjvYbLbo0M
+m1Avgx/Jv8N5Mn4XAzxRnjo/MLzEsKeCF4ih3iQaG9EAys1AF8DQEKmYCGovisvflEquUfzmE/k1
+cFUl+oHA5zdt9eQwl5SU2XnUM6Ka4LB/9QPdNQC9cSVpb1edYD8QBmEfwnnXB7qvVhr+8P+Xz/hR
+0nZo+62YCihHMN6bYwFO4PKp91DZ8YvNnLDO7PxXWOsAP8DVQQMdHsnMFkwfMYICRDCCAkACAQEw
+MjAaMRgwFgYDVQQDDA9FeGFtcGxlIE1haWwgQ0ECFHm+jsjCqNe7EkQI7Hh4BFFg7p/fMA0GCWCG
+SAFlAwQCAQUAoIHkMBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2
+MDkyOTEzMjI0NVowLwYJKoZIhvcNAQkEMSIEINWsX1XVPuCrb1EGcvn30HnNE1CFF+73I/6Ywuvt
+Uy0HMHkGCSqGSIb3DQEJDzFsMGowCwYJYIZIAWUDBAEqMAsGCWCGSAFlAwQBFjALBglghkgBZQME
+AQIwCgYIKoZIhvcNAwcwDgYIKoZIhvcNAwICAgCAMA0GCCqGSIb3DQMCAgFAMAcGBSsOAwIHMA0G
+CCqGSIb3DQMCAgEoMA0GCSqGSIb3DQEBAQUABIIBAEnTttQ+lH0PGfnuXesl9K/anCdoKJsSofPs
+3hHKRbAeEy0cGU0s6N2p8yurY4lZU066yVw3eXsfK/xRYs0cfEM9iKjAIPGR8zbj9w/a8SOH1TXW
+Egu2lwCYUTxBWzNi61bbAiKgeXSoA2Wygru6/RzFeM/besQTfN0YLz0pZCGRWLy/OflcjGZbQHyM
+jnLgN0o55NX5iNtfRC6vGKVyySQdaQ8LcuBe9TwEYPlbsQqd2WDq8nbUe9bo2kD2M1Beko5gWuzN
+c7/No4ytIth2pgjYg2LW0PGmxg25qBU2dGkhcUQM6781LKqHzCzlJ+BuhKeChkFRRXr5hVoJbF6C
+i/0=
+
+------=_NextPart_000_0012_01DB1234.56789ABC--
+
