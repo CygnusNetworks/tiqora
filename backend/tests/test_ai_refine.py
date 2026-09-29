@@ -21,6 +21,8 @@ from tiqora.ai import providers as ai_providers
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.refine import (
+    MODE_CALL_NOTE,
+    MODE_MESSAGE,
     TONE_CONCISE,
     TONE_FORMAL,
     TONE_FRIENDLY,
@@ -59,6 +61,33 @@ def test_system_prompt_forbids_inventing_or_dropping_content() -> None:
     assert "signature" in prompt
     # Output contract that _parse_sections depends on.
     assert "JSON" in prompt
+
+
+def test_call_note_prompt_structures_without_adding_facts() -> None:
+    prompt = _build_system_prompt(TONE_STANDARD, mode=MODE_CALL_NOTE, language="de")
+    assert "phone call" in prompt
+    for heading in ("Anliegen", "Vereinbart", "Nächste Schritte"):
+        assert heading in prompt
+    assert "Do not add" in prompt
+    assert "verbatim" in prompt
+    # The output contract _parse_sections depends on stays.
+    assert '{"sections"' in prompt
+    # Not the message rules: a note is not addressed to the customer.
+    assert "signature" not in prompt
+
+
+def test_call_note_headings_follow_the_ui_language() -> None:
+    english = _build_system_prompt(TONE_STANDARD, mode=MODE_CALL_NOTE, language="en")
+    assert "Issue" in english and "Agreed" in english and "Next steps" in english
+    other = _build_system_prompt(TONE_STANDARD, mode=MODE_CALL_NOTE, language="fr")
+    # Unknown language: the English headings, translated by the model.
+    assert "Issue" in other and "fr" in other
+
+
+def test_message_mode_is_the_default_prompt() -> None:
+    assert _build_system_prompt(TONE_STANDARD) == _build_system_prompt(
+        TONE_STANDARD, mode=MODE_MESSAGE
+    )
 
 
 def test_tone_block_comes_before_the_output_contract() -> None:
@@ -203,6 +232,7 @@ class ScriptedLlm:
         self._contents = list(contents)
         self.calls = 0
         self.user_messages: list[str] = []
+        self.system_messages: list[str] = []
 
     async def chat(
         self,
@@ -217,6 +247,7 @@ class ScriptedLlm:
         self.user_messages.append(
             next((m.content for m in reversed(messages) if m.role == "user"), "")
         )
+        self.system_messages.append(next((m.content for m in messages if m.role == "system"), ""))
         return LlmResponse(
             content=self._contents.pop(0),
             usage=LlmUsage(prompt_tokens=11, completion_tokens=7),
@@ -446,6 +477,34 @@ async def test_refine_returns_refined_sections_and_leaves_quotes_out_of_the_resu
         assert [(r[0], r[1], r[2], r[3], bool(r[4])) for r in rows] == [
             ("refine", seed["agent_id"], 11, 7, True)
         ]
+    finally:
+        await engine.dispose()
+
+
+async def test_refine_call_note_mode_uses_the_call_note_prompt(
+    mariadb_znuny_url: str,
+) -> None:
+    seed = _seed(mariadb_znuny_url, ns=1)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+        note = "Anliegen: Drucker\nVereinbart: Techniker Di 10:00\nNächste Schritte: -"
+        llm = ScriptedLlm([json.dumps({"sections": [{"id": 0, "text": note}]})])
+        async with factory() as session:
+            result = await refine_text(
+                session,
+                llm=llm,
+                queue_id=seed["queue_id"],
+                segments=[Segment(kind="own", text="drucker kaputt, techniker di 10 uhr")],
+                tone=TONE_STANDARD,
+                acting_user_id=seed["agent_id"],
+                mode=MODE_CALL_NOTE,
+                language="de",
+            )
+        assert result.sections == {0: note}
+        assert "Nächste Schritte" in llm.system_messages[0]
     finally:
         await engine.dispose()
 

@@ -2907,6 +2907,27 @@
             ],
             "title": "Customer User Id"
           },
+          "language": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "mode": {
+            "default": "message",
+            "enum": [
+              "message",
+              "call_note"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
           "queue_id": {
             "anyOf": [
               {
