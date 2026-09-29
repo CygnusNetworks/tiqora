@@ -262,11 +262,16 @@ Each of the following moves to Tiqora independently:
 | Escalation sweep | RebuildEscalationIndexOnline | escalation job |
 | Notifications | NotificationEvent | notification engine |
 | GenericAgent | GenericAgent | GA executor |
-| Automatic unlock | TicketUnlockTimeout | unlock-timeout worker |
-| Pending states and reminders | TicketPendingCheck | pending-check worker |
-| Auto-responses | AutoResponse | auto-response job |
+| Automatic unlock | TicketUnlockTimeout | unlock-timeout worker (`unlock_timeout`) |
+| Pending states and reminders | TicketPendingCheck | pending-check worker (`pending_check`) |
 | AI auto-reply / auto-summary | *(n/a — new capability)* | `ai-worker` |
 | Telegram polling | *(n/a — no Znuny counterpart)* | `telegram_poller` |
+
+Auto-responses (`auto reply`, `auto reject`, `auto follow up`, …) are not a
+separate takeover: they are sent by the postmaster pipeline
+(`channels/email/autoresponse.py`) for the mail it processes, so they move
+with `daemon.postmaster.enabled` and there is no auto-response flag of their
+own.
 
 Flags must be **mutually exclusive** with the Znuny side for each function to
 avoid double-send or double-escalation. `telegram_poller` (slug
@@ -335,11 +340,19 @@ POP3/IMAP delete-after-fetch semantics, race to delete) messages.
 ### Enabling the takeover
 
 1. Disable Znuny's own scheduler task so it stops fetching mail. Either:
-   - Console: `bin/otrs.Console.pl Admin::Config::Update --setting-name "Daemon::SchedulerCronTaskManager::Task###MailAccountFetch" --value '{}'`
-     (or set it invalid via SysConfig UI → *Daemon → SchedulerCronTaskManager*
-     → `MailAccountFetch`), or
+   - Invalidate the cron task: `bin/otrs.Console.pl Admin::Config::Update
+     --setting-name "Daemon::SchedulerCronTaskManager::Task###MailAccountFetch"
+     --valid 0` (or untick it in SysConfig UI → *Daemon →
+     SchedulerCronTaskManager* → `MailAccountFetch`), then deploy. Stock
+     cron tasks are not *required* settings and invalidate normally, but do
+     not trust the console's `Done.` — for a required setting it prints the
+     same line and writes nothing (see [cutover.md](cutover.md) §0, "A
+     configuration tool reporting success is not proof of a change").
+     Confirm the entry is gone from the deployed
+     `Kernel/Config/Files/ZZZAAuto.pm` and from `Maint::Daemon::Summary`, or
    - Stop/disable the Znuny daemon process entirely if nothing else on it is
-     needed yet.
+     needed yet — the fallback for any duty that cannot be disabled
+     individually.
 2. Set the Tiqora feature flag: Admin → Dienste → toggle *postmaster* (or, as
    a fallback, a `tiqora_settings` row — not an env var, toggle at runtime
    without restarting the worker):
@@ -659,6 +672,10 @@ action (double note, double state-flap history, etc.).
    `SchedulerGenericAgentTaskManager`. Check `Maint::Daemon::Summary` for
    both recurrent cron tasks and recurrent GenericAgent jobs. Disabling the
    GenericAgent event handler does not stop these scheduled executions.
+   `DaemonModules###SchedulerGenericAgentTaskManager` is usually a *required*
+   setting and cannot be invalidated (the console reports success anyway) —
+   see [cutover.md](cutover.md) §0 for sequencing this handover with stopping
+   the Znuny daemon.
 2. Admin → Dienste → toggle *generic_agent* (or set
    `daemon.generic_agent.enabled = 1` in `tiqora_settings` directly).
 3. The worker polls this flag every tick (default 60s,
@@ -683,6 +700,111 @@ action (double note, double state-flap history, etc.).
 - `daemon.generic_agent.allow_delete` (`tiqora_settings`, default unset =
   OFF) — required in addition to the takeover flag before any job's
   `NewDelete` action actually deletes a ticket.
+
+## Taking over automatic unlock
+
+Tiqora's unlock-timeout loop (`tiqora.worker.unlock_timeout`) is a
+behavioural port of `Kernel::System::Console::Command::Maint::Ticket::UnlockTimeout`
+(scheduled via `Daemon::SchedulerCronTaskManager::Task###TicketUnlockTimeout`):
+it selects locked tickets in a queue with a non-zero `unlock_timeout` whose
+state type is listed in `Ticket::UnlockStateType` (default `new`, `open`),
+computes the due time from `ticket.timeout` plus the queue's timeout in
+**working** minutes (calendar from the ticket's SLA, else its queue), and
+unlocks due tickets through `domain.ticket_write_service.unlock_ticket` as the
+postmaster user — history row, `NotificationLockTimeout` outbox event and
+cache invalidation included.
+
+**It is OFF by default** and **mutually exclusive** with Znuny's own
+unlock-timeout cron task. Unlocking an already-unlocked ticket is a no-op
+on both sides, so an overlap mostly races on the same rows — but whichever
+side gets there first does the work, so the takeover cannot be verified
+until Znuny's task is really off.
+
+### Enabling the takeover
+
+1. Invalidate Znuny's `Daemon::SchedulerCronTaskManager::Task###TicketUnlockTimeout`
+   (SysConfig UI, or `Admin::Config::Update --valid 0`) and confirm it is gone
+   from the deployed configuration and `Maint::Daemon::Summary` — see the
+   verification note in "Taking over mail processing" step 1.
+2. Admin → Dienste → toggle *unlock_timeout* (or set
+   `daemon.unlock_timeout.enabled = 1` in `tiqora_settings` directly).
+3. The worker polls this flag every tick (default 300s,
+   `TIQORA_UNLOCK_TIMEOUT_INTERVAL`; admin override
+   `daemon.unlock_timeout.interval_seconds`).
+4. Verify: `daemon.unlock_timeout.status.last_ok` is fresh and `last_result`
+   (`checked`/`unlocked`/`errors`) shows no errors; a test ticket locked in a
+   queue with a short unlock timeout unlocks exactly once after the working
+   time has elapsed. The worker also counts unlocks and failures in
+   `tiqora_unlock_timeout_tickets_total` / `tiqora_unlock_timeout_errors_total`,
+   but these live in the `tiqora-worker` process, which has no `/metrics`
+   endpoint (the API's `/metrics` serves only its own process) — the status
+   keys are the verification that is actually visible.
+
+### Rollback
+
+1. Set `daemon.unlock_timeout.enabled` back to `0`.
+2. Re-enable Znuny's `TicketUnlockTimeout` cron task. The loop keeps no
+   state of its own, so either side can resume at any point.
+
+### Safety flags
+
+- `daemon.unlock_timeout.enabled` (`tiqora_settings`, default unset = OFF).
+
+## Taking over pending checks
+
+Tiqora's pending-check loop (`tiqora.worker.pending_check`) is a behavioural
+port of `Kernel::System::Console::Command::Maint::Ticket::PendingCheck`
+(scheduled via `Daemon::SchedulerCronTaskManager::Task###TicketPendingCheck`).
+Each tick makes two passes over tickets whose pending time has passed:
+
+- **Pending auto**: tickets whose state type is listed in
+  `Ticket::PendingAutoStateType` move to the state configured for their
+  current state in `Ticket::StateAfterPending`; when the target's state type
+  is `closed` the ticket is also unlocked.
+- **Pending reminder**: tickets in a `pending reminder` state get a
+  `NotificationPendingReminder` outbox event, but only when the preceding ten
+  minutes contained working time for the ticket's calendar (upstream's
+  working-time guard).
+
+**It is OFF by default** and **mutually exclusive** with Znuny's own
+pending-check cron task — both sides would perform the same transition and
+send reminders independently. Reminders are only *emitted* here; they reach
+anyone only when the notification engine (`daemon.notifications.enabled`) is
+on and a valid rule is bound to `NotificationPendingReminder` (see "Check
+which events your rules are actually bound to" above).
+
+### Enabling the takeover
+
+1. Invalidate Znuny's `Daemon::SchedulerCronTaskManager::Task###TicketPendingCheck`
+   and confirm it is gone from the deployed configuration and
+   `Maint::Daemon::Summary` (same verification as for `MailAccountFetch`).
+2. Admin → Dienste → toggle *pending_check* (or set
+   `daemon.pending_check.enabled = 1` in `tiqora_settings` directly).
+3. The worker polls this flag every tick (default 600s,
+   `TIQORA_PENDING_CHECK_INTERVAL`; admin override
+   `daemon.pending_check.interval_seconds`).
+4. Verify: `daemon.pending_check.status.last_ok` is fresh and `last_result`
+   (`checked`/`transitioned`/`reminded`/`errors`) shows no errors; a test
+   ticket in `pending auto close+` past its pending time transitions once, and
+   a `pending reminder` ticket produces one reminder per cadence, not one from
+   each side. The worker-process counters `tiqora_pending_transitions_total`,
+   `tiqora_pending_reminders_total` and `tiqora_pending_check_errors_total`
+   are not scrapeable (see the note under automatic unlock); use the status
+   keys.
+
+### Rollback
+
+1. Set `daemon.pending_check.enabled` back to `0`.
+2. Re-enable Znuny's `TicketPendingCheck` cron task. Due transitions that
+   neither side has made yet are picked up on its next run.
+
+### Safety flags
+
+- `daemon.pending_check.enabled` (`tiqora_settings`, default unset = OFF).
+- `daemon.pending_check.reminder_interval_seconds` (`tiqora_settings`,
+  default 7200, minimum 60) — reminder cadence per pending deadline. Znuny
+  re-fires a reminder on every run of its task; Tiqora de-duplicates per
+  deadline instead, so the cadence no longer depends on the tick interval.
 
 ## Uncertainties (escalation, notifications, GenericAgent)
 
