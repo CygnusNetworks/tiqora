@@ -185,7 +185,8 @@ async def test_pgp_upload_guards(session: AsyncSession, config: CryptoConfig) ->
             user_id=None,
             require_own_email=False,
         )
-    other = _gen_pgp("someone.else@example.com")
+    # Another address that merely contains the customer's one is foreign, too.
+    other = _gen_pgp("x" + EMAIL)
     with pytest.raises(ck.CustomerKeyError, match="email"):
         await ck.add_customer_pgp_key(
             session,
