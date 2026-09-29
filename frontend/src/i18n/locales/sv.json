@@ -1004,7 +1004,8 @@
     "language": "Språk",
     "theme": "Tema",
     "themeLight": "Ljus",
-    "themeDark": "Mörkt"
+    "themeDark": "Mörkt",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Nytt",

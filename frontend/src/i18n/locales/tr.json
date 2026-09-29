@@ -1004,7 +1004,8 @@
     "language": "Dil",
     "theme": "Tema",
     "themeLight": "Açık",
-    "themeDark": "Koyu"
+    "themeDark": "Koyu",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Yeni",

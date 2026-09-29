@@ -24,7 +24,7 @@ vi.mock("@/lib/portalApi", () => ({ portalApi: { portalSetLanguage } }));
 
 const { toggleTheme } = vi.hoisted(() => ({ toggleTheme: vi.fn() }));
 vi.mock("@/themes/theme", () => ({
-  useTheme: () => ({ theme: "dark", toggleTheme }),
+  useTheme: () => ({ theme: "dark", resolvedTheme: "dark", toggleTheme }),
 }));
 
 async function renderShell() {

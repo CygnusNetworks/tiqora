@@ -25,11 +25,6 @@ from tiqora.api.deps import (
     get_auth_service,
     get_redis,
 )
-from tiqora.channels.phone.cti import (
-    PHONE_EXTENSION_PREF,
-    normalize_extensions,
-    parse_extensions,
-)
 from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import (
     AuthenticatedUser,
@@ -70,7 +65,6 @@ from tiqora.domain.spnego import (
 from tiqora.domain.template_permission import TemplatePermissionService
 from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
-from tiqora.domain.user_preferences import get_preference, set_preference
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 
@@ -433,38 +427,6 @@ async def set_my_language(
         )
     await auth.set_user_language(user.id, code)
     return await _user_me(session, user)
-
-
-class PhoneExtensionOut(BaseModel):
-    #: PBX extension(s) that ring for this agent, comma separated (``None`` = none).
-    extension: str | None
-
-
-class PhoneExtensionUpdate(BaseModel):
-    #: One or more extensions (comma separated); empty clears.
-    extension: str | None = None
-
-
-@router.get("/me/phone", response_model=PhoneExtensionOut)
-async def get_my_phone(user: CurrentUser, session: DbSession) -> PhoneExtensionOut:
-    """The agent's extension(s) for the CTI call popup (``TiqoraPhoneExtension``)."""
-    raw = await get_preference(session, user.id, PHONE_EXTENSION_PREF)
-    return PhoneExtensionOut(extension=",".join(parse_extensions(raw)) or None)
-
-
-@router.put("/me/phone", response_model=PhoneExtensionOut)
-async def set_my_phone(
-    body: PhoneExtensionUpdate, user: CurrentUser, session: DbSession
-) -> PhoneExtensionOut:
-    try:
-        value = normalize_extensions(body.extension)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
-        ) from exc
-    await set_preference(session, user.id, PHONE_EXTENSION_PREF, value)
-    await session.commit()
-    return PhoneExtensionOut(extension=value)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

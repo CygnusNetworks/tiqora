@@ -1004,7 +1004,8 @@
     "language": "Sprache",
     "theme": "Design",
     "themeLight": "Hell",
-    "themeDark": "Dunkel"
+    "themeDark": "Dunkel",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Neu",

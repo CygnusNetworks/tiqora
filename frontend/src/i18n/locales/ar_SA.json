@@ -1004,7 +1004,8 @@
     "language": "اللغة",
     "theme": "الموضوع",
     "themeLight": "ضوء",
-    "themeDark": "الظلام"
+    "themeDark": "الظلام",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "جديد",

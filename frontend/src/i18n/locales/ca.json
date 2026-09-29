@@ -1004,7 +1004,8 @@
     "language": "Llengua",
     "theme": "Tema",
     "themeLight": "Llum",
-    "themeDark": "Fosc"
+    "themeDark": "Fosc",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Nou",

@@ -1004,7 +1004,8 @@
     "language": "語言",
     "theme": "主題",
     "themeLight": "光",
-    "themeDark": "黑暗"
+    "themeDark": "黑暗",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "新",

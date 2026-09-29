@@ -1004,7 +1004,8 @@
     "language": "שפה",
     "theme": "נושא",
     "themeLight": "אור",
-    "themeDark": "כהה"
+    "themeDark": "כהה",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "חדש",

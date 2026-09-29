@@ -186,12 +186,10 @@ curl -b cookies.txt "$TIQORA_URL/api/v1/phone/calls/active"
 
 # Hide a card in all of the agent's tabs
 curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/phone/calls/1727600000.42/dismiss"   # 204
-
-# Own extension(s), comma separated (admins: phone_extension on /admin/users/{id})
-curl -b cookies.txt "$TIQORA_URL/api/v1/auth/me/phone"          # {"extension": "100,101"}
-curl -b cookies.txt -X PUT "$TIQORA_URL/api/v1/auth/me/phone" \
-  -H 'Content-Type: application/json' -d '{"extension": "100, 101"}'
 ```
+
+The agent ↔ extension mapping is admin-managed: `phone_extension`
+(comma separated) on `GET/PATCH /api/v1/admin/users/{id}`.
 
 API keys reach `/api/v1/phone/*` with the `events` scope.
 

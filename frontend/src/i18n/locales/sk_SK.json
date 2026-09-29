@@ -1004,7 +1004,8 @@
     "language": "Jazyk",
     "theme": "Téma",
     "themeLight": "Svetlo",
-    "themeDark": "Tmavý"
+    "themeDark": "Tmavý",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "Nové",

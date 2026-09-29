@@ -1004,7 +1004,8 @@
     "language": "언어",
     "theme": "테마",
     "themeLight": "빛",
-    "themeDark": "어둠"
+    "themeDark": "어둠",
+    "themeSystem": "System"
   },
   "newTicket": {
     "new": "새로운",
