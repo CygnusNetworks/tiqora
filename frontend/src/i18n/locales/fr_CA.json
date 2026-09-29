@@ -850,6 +850,36 @@
         "unavailable": "Signature/encryption could not be checked: gpg or openssl is not available.",
         "error": "Checking the signature or encryption failed."
       }
+    },
+    "emailSecurity": {
+      "label": "Security",
+      "backend": "Method",
+      "methodLabel": "Format",
+      "signKey": "Signing key",
+      "mode": {
+        "none": "None",
+        "sign": "Sign",
+        "encrypt": "Encrypt",
+        "sign_encrypt": "Sign + encrypt"
+      },
+      "method": {
+        "detached": "PGP/MIME",
+        "inline": "Inline PGP"
+      },
+      "keyStatus": {
+        "ok": "key available",
+        "missing": "no key",
+        "expired": "key expired",
+        "revoked": "key revoked",
+        "good": "valid",
+        "valid": "valid",
+        "invalid": "invalid"
+      },
+      "unavailable": "Signing/encryption is not available for this method.",
+      "noSignKey": "Choose a signing key.",
+      "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
+      "noRecipients": "Add a recipient to encrypt.",
+      "checking": "Checking recipient keys…"
     }
   },
   "search": {
