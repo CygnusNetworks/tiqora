@@ -18,6 +18,7 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.channels.email.outbound_reply import OutboundMailError as _OutboundMailError
 from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.article import Article, ArticleDataMimeAttachment
 from tiqora.db.legacy.article import ArticleDataMime as ArticleDataMimeModel
@@ -706,6 +707,71 @@ def _build_article_in(art_data: dict[str, Any], user_type: str) -> ArticleIn:
     )
 
 
+def _wants_article_send(art_data: dict[str, Any], user_type: str) -> bool:
+    """Znuny ``Article->ArticleSend``: send the article by email (agents only)."""
+    flag = art_data.get("ArticleSend")
+    return user_type == _AGENT_USER_TYPE and str(flag or "").strip() not in ("", "0")
+
+
+def _as_send_article(article_in: ArticleIn, art_data: dict[str, Any]) -> ArticleIn:
+    """The article as an outgoing agent email (ArticleSend forces channel Email)."""
+    from dataclasses import replace
+
+    from tiqora.crypto.outbound import email_security_from_znuny
+
+    return replace(
+        article_in,
+        channel="email",
+        sender_type="agent",
+        is_visible_for_customer=True,
+        email_security=email_security_from_znuny(art_data.get("EmailSecurity")),
+    )
+
+
+async def _deliver_article(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    ticket_id: int,
+    queue_id: int,
+    user_id: int,
+    article: ArticleIn,
+) -> int:
+    from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+
+    return await deliver_agent_email_reply(
+        session,
+        sysconfig,
+        None,
+        ticket_id=ticket_id,
+        queue_id=queue_id,
+        user_id=user_id,
+        article=article,
+    )
+
+
+async def _apply_stored_email_security(
+    article_in: ArticleIn,
+    art_data: dict[str, Any],
+    sysconfig: SysConfig,
+    settings: Settings | None,
+) -> ArticleIn:
+    """No ArticleSend: EmailSecurity rewrites the stored body (best effort)."""
+    security = art_data.get("EmailSecurity")
+    if not (isinstance(security, dict) and security):
+        return article_in
+    from tiqora.config import get_settings
+    from tiqora.crypto.config import resolve_crypto_config
+    from tiqora.crypto.outbound import apply_email_security
+
+    crypto_settings = settings or get_settings()
+    return await apply_email_security(
+        article_in,
+        security,
+        crypto_settings,
+        await resolve_crypto_config(crypto_settings, sysconfig),
+    )
+
+
 # ---------------------------------------------------------------------------
 # SessionCreate
 # ---------------------------------------------------------------------------
@@ -1020,6 +1086,7 @@ async def op_ticket_create(
 
     # Build optional article (single dict or first of list)
     article_in: ArticleIn | None = None
+    send_article: ArticleIn | None = None
     art_data = data.get("Article")
     if isinstance(art_data, list) and art_data:
         art_data = art_data[0]
@@ -1036,18 +1103,20 @@ async def op_ticket_create(
         if isinstance(att, dict):
             art_data = {**art_data, "Attachment": [att]}
         article_in = _build_article_in(art_data, user_type)
-        security = art_data.get("EmailSecurity")
-        if isinstance(security, dict) and security:
-            from tiqora.config import get_settings
-            from tiqora.crypto.config import resolve_crypto_config
-            from tiqora.crypto.outbound import apply_email_security
-
-            crypto_settings = settings or get_settings()
-            article_in = await apply_email_security(
-                article_in,
-                security,
-                crypto_settings,
-                await resolve_crypto_config(crypto_settings, sysconfig),
+        if _wants_article_send(art_data, user_type):
+            # Znuny ArticleSend: sent by SMTP (EmailSecurity applied on the
+            # wire) right after the ticket exists — see below.
+            send_article = _as_send_article(article_in, art_data)
+            if not (send_article.to_address or "").strip():
+                return _err(
+                    f"{op}.InvalidParameter",
+                    f"{op}: Article->To parameter must be a valid email address"
+                    " when Article->ArticleSend is set!",
+                )
+            article_in = None
+        else:
+            article_in = await _apply_stored_email_security(
+                article_in, art_data, sysconfig, settings
             )
 
     ticket_in = TicketIn(
@@ -1082,6 +1151,10 @@ async def op_ticket_create(
                     sysconfig=sysconfig,
                     pending_time=pending_time,
                 )
+            if send_article is not None:
+                await _deliver_article(
+                    session, sysconfig, ticket_id, queue_id, write_user_id, send_article
+                )
         await session.commit()
     except TicketAccessDenied:
         await session.rollback()
@@ -1089,6 +1162,9 @@ async def op_ticket_create(
     except InvalidInput as e:
         await session.rollback()
         return _err(f"{op}.InvalidParameter", str(e))
+    except _OutboundMailError as e:
+        await session.rollback()
+        return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
     return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
 
@@ -1446,13 +1522,38 @@ async def op_ticket_update(
                 if isinstance(att, dict):
                     art_data = {**art_data, "Attachment": [att]}
                 article_in = _build_article_in(art_data, user_type)
-                await add_article(
-                    session,
-                    ticket_id=ticket_id,
-                    article=article_in,
-                    user_id=user_id,
-                    sysconfig=sysconfig,
-                )
+                if _wants_article_send(art_data, user_type):
+                    send_article = _as_send_article(article_in, art_data)
+                    if not (send_article.to_address or "").strip():
+                        raise InvalidInput(
+                            f"{op}: Article->To parameter must be a valid email address"
+                            " when Article->ArticleSend is set!"
+                        )
+                    queue_row = (
+                        await session.execute(
+                            text("SELECT queue_id FROM ticket WHERE id = :tid"),
+                            {"tid": ticket_id},
+                        )
+                    ).first()
+                    await _deliver_article(
+                        session,
+                        sysconfig,
+                        ticket_id,
+                        int(queue_row[0]) if queue_row else 0,
+                        user_id,
+                        send_article,
+                    )
+                else:
+                    article_in = await _apply_stored_email_security(
+                        article_in, art_data, sysconfig, settings
+                    )
+                    await add_article(
+                        session,
+                        ticket_id=ticket_id,
+                        article=article_in,
+                        user_id=user_id,
+                        sysconfig=sysconfig,
+                    )
 
         await session.commit()
     except TicketNotFound:
@@ -1464,6 +1565,9 @@ async def op_ticket_update(
     except InvalidInput as e:
         await session.rollback()
         return _err(f"{op}.InvalidParameter", str(e))
+    except _OutboundMailError as e:
+        await session.rollback()
+        return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
     return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
 
