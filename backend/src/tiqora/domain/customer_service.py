@@ -8,6 +8,7 @@ from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
+from tiqora.domain.phone_match import phone_condition
 from tiqora.domain.schemas import CustomerUserOut
 
 # Znuny's "valid" list id — 1 == valid, everything else is invalid/temporary.
@@ -102,6 +103,10 @@ class CustomerService:
                     CustomerUser.last_name.ilike(f"%{last}%"),
                 )
             )
+        # Five or more digits: also a phone/mobile number search.
+        by_phone = phone_condition(term, contains=True)
+        if by_phone is not None:
+            conditions.append(by_phone)
         contact_stmt = (
             select(CustomerUser)
             .where(CustomerUser.valid_id == _VALID)

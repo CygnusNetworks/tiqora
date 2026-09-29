@@ -9,20 +9,23 @@ CRUD under ``/admin/*`` (which is AdminUser-gated), these are guarded only by
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import bindparam, select, text
 
 from tiqora.api.deps import CurrentUser, DbSession
+from tiqora.channels.common import channel_setting
 from tiqora.channels.email.outbound_reply import queue_outbound_meta
 from tiqora.channels.email.placeholder import expand_placeholders
-from tiqora.db.legacy.customer import CustomerUser
+from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.queue import Queue, Service, ServiceSla, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType, TicketType
 from tiqora.db.legacy.user import Users
 from tiqora.domain.customer_service import CustomerService
+from tiqora.domain.phone_match import find_customers_by_phone, phone_condition, phone_digits
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
@@ -95,6 +98,37 @@ class CustomerContactRefOut(BaseModel):
 class CustomerSearchOut(BaseModel):
     companies: list[CustomerCompanyRefOut]
     contacts: list[CustomerContactRefOut]
+
+
+class CallerCustomerOut(BaseModel):
+    login: str
+    customer_id: str
+    name: str
+    email: str
+    phone: str | None
+    mobile: str | None
+    company: str | None
+
+
+class CallerTicketOut(BaseModel):
+    id: int
+    tn: str
+    title: str
+    state: str
+    queue: str
+    customer_user_id: str | None
+    changed: UtcDateTime
+
+
+class CallerLookupOut(BaseModel):
+    number_normalized: str
+    customers: list[CallerCustomerOut]
+    open_tickets: list[CallerTicketOut]
+
+
+class PhoneConfigOut(BaseModel):
+    #: Link scheme for click-to-call: ``tel:`` (softphone/OS handler) or ``sip:``.
+    dial_scheme: Literal["tel", "sip"]
 
 
 class ComposeContextOut(BaseModel):
@@ -206,7 +240,11 @@ async def list_agents(user: CurrentUser, session: DbSession) -> list[AgentRefOut
 async def search_customers(
     user: CurrentUser,
     session: DbSession,
-    q: str = Query("", description="Substring matched against login, email, or name"),
+    q: str = Query(
+        "",
+        description="Substring matched against login, email, or name; five or more"
+        " digits also match phone/mobile",
+    ),
     limit: int = Query(20, ge=1, le=100),
 ) -> list[CustomerRefOut]:
     """Search valid customer users for the customer-assignment picker."""
@@ -215,12 +253,15 @@ async def search_customers(
     term = q.strip()
     if term:
         like = f"%{term}%"
-        stmt = stmt.where(
+        match = (
             CustomerUser.login.ilike(like)
             | CustomerUser.email.ilike(like)
             | CustomerUser.first_name.ilike(like)
             | CustomerUser.last_name.ilike(like)
         )
+        # Five or more digits: also a phone/mobile number search.
+        by_phone = phone_condition(term, contains=True)
+        stmt = stmt.where(match if by_phone is None else match | by_phone)
     stmt = stmt.order_by(CustomerUser.login).limit(limit)
     rows = (await session.execute(stmt)).scalars()
     return [
@@ -268,6 +309,88 @@ async def customer_search(
             for c in contacts
         ],
     )
+
+
+_OPEN_TICKETS_FOR_CUSTOMERS = text(
+    "SELECT t.id, t.tn, t.title, ts.name AS state, q.name AS queue,"
+    " t.customer_user_id, t.change_time"
+    " FROM ticket t"
+    " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+    " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+    " JOIN queue q ON q.id = t.queue_id"
+    " WHERE t.customer_user_id IN :logins"
+    " AND q.group_id IN :groups"
+    " AND tst.name NOT IN ('closed', 'removed', 'merged')"
+    " ORDER BY t.change_time DESC, t.id DESC"
+    " LIMIT 10"
+).bindparams(bindparam("logins", expanding=True), bindparam("groups", expanding=True))
+
+
+@router.get("/caller", response_model=CallerLookupOut)
+async def caller_lookup(
+    user: CurrentUser,
+    session: DbSession,
+    number: str = Query(..., max_length=100, description="Caller number in any notation"),
+) -> CallerLookupOut:
+    """Who is calling: customer users whose phone/mobile ends in the same
+    digits (all matches, max 10) and their open tickets in queues the agent
+    may read (max 10, newest first). Fewer than five digits match nothing.
+    """
+    customers = await find_customers_by_phone(session, number, limit=10)
+    company_names: dict[str, str] = {}
+    customer_ids = {c.customer_id for c in customers if c.customer_id}
+    if customer_ids:
+        rows = await session.execute(
+            select(CustomerCompany.customer_id, CustomerCompany.name).where(
+                CustomerCompany.customer_id.in_(customer_ids)
+            )
+        )
+        company_names = {r.customer_id: r.name for r in rows.all()}
+
+    tickets: list[CallerTicketOut] = []
+    groups = await PermissionEngine(session).groups_for_permission(user.id, "ro")
+    if customers and groups:
+        rows = await session.execute(
+            _OPEN_TICKETS_FOR_CUSTOMERS,
+            {"logins": [c.login for c in customers], "groups": sorted(groups)},
+        )
+        tickets = [
+            CallerTicketOut(
+                id=int(r.id),
+                tn=str(r.tn),
+                title=str(r.title or ""),
+                state=str(r.state),
+                queue=str(r.queue),
+                customer_user_id=r.customer_user_id,
+                changed=r.change_time,
+            )
+            for r in rows.all()
+        ]
+
+    return CallerLookupOut(
+        number_normalized=phone_digits(number),
+        customers=[
+            CallerCustomerOut(
+                login=c.login,
+                customer_id=c.customer_id,
+                name=f"{c.first_name} {c.last_name}".strip(),
+                email=c.email,
+                phone=c.phone,
+                mobile=c.mobile,
+                company=company_names.get(c.customer_id),
+            )
+            for c in customers
+        ],
+        open_tickets=tickets,
+    )
+
+
+@router.get("/phone-config", response_model=PhoneConfigOut)
+async def phone_config(user: CurrentUser, session: DbSession) -> PhoneConfigOut:
+    """Agent-side phone settings (admin: ``channel.phone.dial_scheme``)."""
+    _ = user
+    scheme = (await channel_setting(session, "phone", "dial_scheme") or "tel").strip().lower()
+    return PhoneConfigOut(dial_scheme="sip" if scheme == "sip" else "tel")
 
 
 @router.get("/queues", response_model=list[QueueRefOut])
