@@ -2479,6 +2479,10 @@
         "ai_audit_cleanup": {
           "name": "KI-Audit-Bereinigung",
           "description": "Löscht LLM-Audit-Log-Einträge nach Ablauf der konfigurierten Aufbewahrungsfrist täglich."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME-Kundenzertifikate erneuern",
+          "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Übernahme"

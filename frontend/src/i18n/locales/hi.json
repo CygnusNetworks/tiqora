@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "एआई ऑडिट क्लीनअप",
           "description": "दिन में एक बार कॉन्फ़िगर किए गए रिटेंशन से पहले एलएलएम ऑडिट लॉग पंक्तियों को हटा देता है।"
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "अधिग्रहण"

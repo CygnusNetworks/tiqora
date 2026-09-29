@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "Pembersihan audit AI",
           "description": "Memadamkan baris log audit LLM melepasi pengekalan yang dikonfigurasikan sekali sehari."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Pengambilalihan"

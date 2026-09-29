@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "AI denetim temizliği",
           "description": "Günde bir kez, yapılandırılmış saklamayı aşan LLM denetim günlüğü satırlarını siler."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Devralma"

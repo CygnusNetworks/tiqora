@@ -2479,6 +2479,10 @@
         "ai_audit_cleanup": {
           "name": "AI audit cleanup",
           "description": "Deletes LLM audit log rows past the configured retention once a day."
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "Takeover"

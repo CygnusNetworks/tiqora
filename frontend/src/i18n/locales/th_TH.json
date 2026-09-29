@@ -2471,6 +2471,10 @@
         "ai_audit_cleanup": {
           "name": "การล้างการตรวจสอบ AI",
           "description": "ลบแถวบันทึกการตรวจสอบ LLM เลยการเก็บรักษาที่กำหนดค่าไว้วันละครั้ง"
+        },
+        "smime_customer_renew": {
+          "name": "S/MIME customer certificate renewal",
+          "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."
         }
       },
       "takeoverBadge": "เทคโอเวอร์"
