@@ -256,6 +256,47 @@ async def test_backfill_search_and_permission_filter(
 
 
 @pytest.mark.asyncio
+async def test_index_tickets_removes_deleted_ticket(
+    postgres_znuny_url: str,
+    meili_url: str,
+) -> None:
+    """Re-indexing an id whose ticket row is gone deletes its document — a
+    hard-deleted ticket (e.g. GDPR erasure) must not stay searchable."""
+    from meilisearch_python_sdk.errors import MeilisearchApiError
+
+    ids = _seed_search(postgres_znuny_url)
+    async_url = _to_async_url(postgres_znuny_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    settings = Settings(
+        meili_url=meili_url,
+        meili_master_key="test-master-key",
+        meili_tickets_index="tickets_test_delete",
+        database_url=async_url,
+    )
+    tid = ids["archived_ticket"]
+
+    async with factory() as session:
+        svc = SearchIndexService(session, settings)
+        try:
+            assert await svc.index_tickets([tid]) == 1
+            client = await svc._get_client()
+            index = client.index(settings.meili_tickets_index)
+            assert (await index.get_document(str(tid)))["id"] == tid
+
+            await session.execute(text("DELETE FROM ticket WHERE id = :t"), {"t": tid})
+            await session.commit()
+
+            await svc.index_tickets([tid])
+            with pytest.raises(MeilisearchApiError):
+                await index.get_document(str(tid))
+        finally:
+            await svc.close()
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_exact_ticket_number_does_not_match_near_numbers(
     postgres_znuny_url: str,
     meili_url: str,

@@ -244,12 +244,17 @@ Each apply, rollback and manual purge writes a `tiqora_gdpr_audit` row
   selector as entered (e.g. login lists or regexes) after purge; for delete
   jobs `resolved_logins` holds the original logins, for anonymize jobs the
   new ones.
-- **Meilisearch is not updated.** The engine does not touch the Meilisearch
-  ticket index, and it creates no ticket history or articles, so the search
-  poller does not pick up the change. Indexed documents (title, customer ids,
-  latest article excerpt, dynamic fields) keep pre-erasure content until the
-  tickets are re-indexed (`tiqora index rebuild`); `rebuild` only upserts, so
-  documents of hard-deleted tickets remain until removed from the index.
+- **Search index follows via the outbox.** Apply and rollback write one
+  internal `TiqoraSearchReindex` outbox event per affected ticket in the same
+  transaction; the outbox drain (`tiqora-worker`) then re-indexes the ticket,
+  or deletes its document when the ticket was hard-deleted. The event is not
+  forwarded to webhooks or SSE. Until the drain runs (every 60 s by default,
+  `TIQORA_OUTBOX_DRAIN_INTERVAL`; if Meilisearch is down the rows stay
+  unprocessed and are retried) search can still show pre-erasure content.
+  Jobs applied before this change are not covered: run
+  `tiqora index rebuild` for them, and note that `rebuild` only upserts, so
+  documents of tickets hard-deleted by such an old job must be removed from
+  the index by hand.
 - **Scope is by ticket customer.** Only tickets whose `customer_user_id` is
   one of the selected logins are touched. The customer's address or name in
   other customers' tickets is not scrubbed, and Tiqora-owned tables other

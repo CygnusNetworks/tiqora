@@ -40,6 +40,7 @@ from tiqora.db.legacy.user import GroupCustomerUser
 from tiqora.db.tiqora.models import TiqoraGdprBackup, TiqoraGdprJob
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.domain.settings_store import get_setting
+from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT, _emit_event
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
@@ -1895,6 +1896,9 @@ async def run_erasure(
             await invalidate_cache_type(session, ctype)
         for tid in ticket_ids:
             await invalidate_ticket_cache(session, tid)
+            # Search holds title, customer ids and an article excerpt — re-index
+            # (or, for hard-deleted tickets, drop) via the durable outbox.
+            await _emit_event(session, SEARCH_REINDEX_EVENT, tid)
 
         job.counts = _json_dump(counts)
         job.resolved_logins = _json_dump(
@@ -2067,6 +2071,7 @@ async def rollback_job(
             await invalidate_cache_type(session, ctype)
         for tid in set(ticket_ids):
             await invalidate_ticket_cache(session, tid)
+            await _emit_event(session, SEARCH_REINDEX_EVENT, tid)
 
     async with session_factory() as session:
         await record_audit(

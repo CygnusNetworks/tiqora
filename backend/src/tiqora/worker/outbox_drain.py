@@ -17,7 +17,7 @@ from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.search import SearchIndexService
 from tiqora.domain.settings_store import KEY_OUTBOX_ENABLED, get_setting_bool
-from tiqora.domain.ticket_write_service import LEGACY_NOTIFICATION_EVENTS
+from tiqora.domain.ticket_write_service import LEGACY_NOTIFICATION_EVENTS, SEARCH_REINDEX_EVENT
 from tiqora.events.pubsub import (
     get_pubsub_redis,
     publish_ticket_event,
@@ -69,7 +69,12 @@ async def drain_outbox(
     # The legacy ``Notification*`` events exist only to drive the notification
     # engine; they duplicate a ``Ticket*``/``Article*`` event that is already in
     # this same batch, so they must not fan out again to webhooks or SSE.
-    external_rows = [r for r in rows if str(r[1]) not in LEGACY_NOTIFICATION_EVENTS]
+    # ``SEARCH_REINDEX_EVENT`` is internal (index only) and stays out as well.
+    external_rows = [
+        r
+        for r in rows
+        if str(r[1]) not in LEGACY_NOTIFICATION_EVENTS and str(r[1]) != SEARCH_REINDEX_EVENT
+    ]
     webhook_rows = [(str(r[1]), int(r[2]), r[3]) for r in external_rows]
 
     # Re-index in Meilisearch

@@ -268,3 +268,35 @@ async def test_drain_pubsub_failure_does_not_abort_or_block_processed_mark(
         assert remaining == 0, "pubsub failure must not prevent marking rows processed"
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_drain_search_reindex_event_is_internal(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """``SEARCH_REINDEX_EVENT`` rows re-index the ticket but never reach
+    webhook subscribers or SSE (they carry no user-visible change event)."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    _reset(sync_url)
+    _insert_outbox_row(sync_url, event_type=outbox_drain.SEARCH_REINDEX_EVENT, ticket_id=201)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    mock_index = AsyncMock(return_value=0)
+    with (
+        patch.object(outbox_drain, "SearchIndexService") as mock_svc_cls,
+        patch.object(outbox_drain, "dispatch_webhooks", new=AsyncMock()) as mock_wh,
+        patch.object(outbox_drain, "publish_ticket_event", new=AsyncMock()) as mock_pub,
+    ):
+        mock_svc_cls.return_value.index_tickets = mock_index
+        mock_svc_cls.return_value.close = AsyncMock()
+        result = await outbox_drain.drain_outbox(settings=get_settings(), session_factory=factory)
+
+    assert result == {"processed": 1, "ticket_ids": 1}
+    (indexed_ids,), _ = mock_index.call_args
+    assert indexed_ids == [201]
+    (webhook_rows,), _ = mock_wh.call_args
+    assert webhook_rows == []
+    mock_pub.assert_not_awaited()
+    await engine.dispose()
