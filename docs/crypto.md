@@ -13,9 +13,9 @@ Docker image).
 
 Status of the parity work
 ([design](superpowers/specs/2026-09-29-crypto-parity-design.md)): B1
-(foundation + key management) and B2 (inbound MIME-tree handling, article
-security status, decrypt-on-view) are done. Signed/encrypted SMTP sending
-(B3) and customer keys / notifications (B4) follow.
+(foundation + key management), B2 (inbound MIME-tree handling, article
+security status, decrypt-on-view) and B3 (signed/encrypted sending) are
+done. Customer keys / notifications (B4) follow.
 
 ## Configuration
 
@@ -267,29 +267,114 @@ The article header shows a badge — 🔒 encrypted, ✓ signature verified,
 (split view), glyph in the conversation bubble header, a non-interactive
 marker in the timeline's collapsible header.
 
-## Outbound: GenericInterface `EmailSecurity`
+## Outbound: signed and encrypted sending
 
-Mirrors Znuny's `EmailSecurity` block on `TicketCreate` articles:
+### What is sent
+
+`tiqora.crypto.mime_build` (port of the `EmailSecurity` block of Znuny's
+`Kernel::System::Email::Send`) takes the normal outgoing message — built by
+`smtp.build_message` with all headers, body and attachments — and wraps its
+content:
+
+| Backend / method | Shape |
+|---|---|
+| PGP detached (default) | sign: `multipart/signed; micalg=pgp-<hash>; protocol="application/pgp-signature"` (RFC 3156 §5), `micalg` taken from the digest gpg actually used; encrypt: `multipart/encrypted; protocol="application/pgp-encrypted"` with the `Version: 1` part and `encrypted.asc`; sign + encrypt: the signed entity inside the encrypted one (RFC 3156 §6.1, as Znuny) |
+| PGP inline (`PGP::Inline::<id>`) | clear-signed text body, or an armored encrypted (and signed) body; on encryption every attachment becomes `<name>.pgp`. HTML bodies are sent as plain text (inline PGP is a text format; Znuny only offers it without rich text) |
+| S/MIME (always detached) | sign: `multipart/signed; protocol="application/pkcs7-signature"; micalg=sha-256` with `smime.p7s` (signer-relation CAs included, Znuny `-certfile`); encrypt: `application/pkcs7-mime; smime-type=enveloped-data` (AES-256) `smime.p7m`; sign + encrypt: signed entity inside the envelope |
+
+Only the content moves into the signed/encrypted entity; `From`, `To`,
+`Subject`, `Message-ID`, threading headers etc. stay outside. The signed part
+is canonical CRLF and 7-bit clean (text quoted-printable, which also protects
+trailing whitespace like the `-- ` signature delimiter; binaries base64), and
+the message is sent **as those exact bytes** (`SmtpMailSender` sends the raw
+form; `Bcc` is only in the envelope) — re-serialising could re-fold a header
+and break the signature. Encryption is only for the recipients' keys
+(To/Cc/Bcc), not for the sender, like Znuny.
+
+### Where
+
+Every agent email goes through `channels.email.outbound_reply.
+deliver_agent_email_reply`: **reply**, **forward** and the email of a **new
+email ticket** (`POST /tickets` + `POST /tickets/{id}/articles`), plus
+GenericInterface `ArticleSend` (below). Bounce is excluded (it resends a
+mail verbatim). Forward now really sends (send-then-store like a reply,
+502 on SMTP failure) — before B3 it was only stored.
+
+- keys are resolved and the message built **before** anything is sent or
+  stored, so a key problem fails the request without side effects;
+- the stored article keeps the **clear** content; the sent raw mail is kept
+  in `article_data_mime_plain` (Znuny does the same) and the article gets
+  `TiqoraCrypto*` flags (`verified` for a signature by our key, `decrypted`
+  = "encrypted" for encryption only; detail `sent: …`), so the ticket view
+  shows the badge on sent articles too;
+- with outbound SMTP disabled the article is stored the same way (queued).
+
+### API
+
+`POST /tickets/{id}/articles` (agent email only; 422 on other channels) and
+`POST /tickets/{id}/articles/{article_id}/forward` take
 
 ```json
-{
-  "Article": {
-    "EmailSecurity": {
-      "Backend": "PGP",
-      "SignKey": "81877F5E",
-      "EncryptKeys": ["81877F5E", "3b630c80"]
-    }
-  }
-}
+"email_security": {"backend": "pgp", "method": "detached",
+                   "sign_key": "81877F5E", "encrypt": true,
+                   "encrypt_keys": null}
 ```
 
-`op_ticket_create` calls `tiqora.crypto.outbound.apply_email_security()`,
-which signs and/or encrypts the stored article body (`EncryptKeys` wins over
-`SignKey`). For S/MIME, `SignKey`/`EncryptKeys` are store file names
-(`<hash>.<n>`) or email addresses (first valid certificate/key for that
-address); the private key's `.P` secret is passed to openssl via the
-environment, never argv. Disabled backends or crypto failures leave the body
-untouched (logged). Real signed/encrypted SMTP sending follows in B3.
+- `sign_key` — PGP key id/fingerprint (Znuny id as in the queue default) or
+  S/MIME `<hash>.<n>` (also an email address); the Znuny form
+  `PGP::Inline::<id>` is accepted and sets the method. The key needs its
+  secret part and must be valid (not expired/revoked).
+- `encrypt_keys` — optional explicit selection (PGP fingerprints/ids,
+  S/MIME file names). Omitted: the first usable key of every To/Cc/Bcc
+  recipient (Znuny's preselection). An explicit selection must cover every
+  recipient (Znuny `_CheckRecipient`).
+- Omitted/`null` `email_security` = plain mail. The server does **not**
+  apply the queue default on its own (API clients, AI replies and process
+  automation keep sending as before); the compose UI preselects it.
+
+Errors: **422** `email_security: no usable PGP encryption key: a@x
+(missing), b@y (expired)` — reasons `missing`, `expired`, `revoked`,
+`no_selected_key`, `unknown_key`; also for a sign key without secret, a
+disabled backend or encryption without recipients. **502** when gpg/openssl
+fail while building. Never a silent unencrypted send.
+
+`GET /tickets/{id}/crypto-options?to=&cc=&bcc=` (reply/forward, `ro` on the
+ticket) and `GET /tickets/crypto-options?queue_id=&to=…` (new ticket,
+`create` on the queue) return per enabled backend the sign keys for the
+sender (the queue's system address; the queue default key is always listed),
+the methods, each recipient's keys with status (`ok`, `missing`, `expired`,
+`revoked`) and the preselected key, `can_encrypt`, and top-level `default`
+(the queue's `default_sign_key` as an `email_security` object, or `null`) and
+`warnings` (default key missing/expired, backend disabled). With both
+backends off: `{"enabled": false}`.
+
+### Compose UI
+
+Reply, Forward and New ticket (email) show a **Sicherheit** row
+(`EmailSecurityControl` + `useEmailSecurity`, a self-contained component):
+*Keine / Signieren / Verschlüsseln / Signieren + verschlüsseln*, PGP or
+S/MIME, PGP/MIME or inline PGP, the sign key; when encrypting each recipient
+is shown with its key status. Default: sign with the queue default sign key
+if configured, otherwise none. Sending is blocked with a message naming the
+recipients without a usable key. Nothing is shown when PGP and S/MIME are
+both disabled.
+
+### GenericInterface `EmailSecurity`
+
+```json
+{"Article": {"ArticleSend": 1, "CommunicationChannel": "Email", "To": "…",
+  "EmailSecurity": {"Backend": "PGP", "Method": "Detached",
+                    "SignKey": "81877F5E", "EncryptKeys": ["81877F5E"]}}}
+```
+
+- `ArticleSend: 1` (TicketCreate **and** TicketUpdate, agents): the article is
+  sent through the same path (`crypto.outbound.email_security_from_znuny`
+  maps the hash); `To` is required; key problems → `…InvalidParameter`, send
+  failures → `…OperationFailed`, nothing stored.
+- Without `ArticleSend` (Znuny ignores `EmailSecurity` then) Tiqora keeps
+  rewriting the **stored** body with the same builder: PGP as inline PGP
+  (clear-signed / armored), S/MIME as the signed/encrypted MIME entity.
+  Best effort — a disabled backend or failure leaves the body as it is.
 
 ## Tests
 
@@ -310,7 +395,20 @@ limited to ~104 bytes on macOS).
   relation rows as Znuny writes them, audit rows, sign-key options, queue
   validation, legacy alias, flat-store migration.
 - `test_crypto_outbound.py`, `test_crypto_keystore.py`,
-  `test_crypto_postmaster.py` — EmailSecurity, audit row, postmaster flag.
+  `test_crypto_postmaster.py` — stored-body EmailSecurity, GI mapping, audit
+  row, postmaster flag.
+- `test_crypto_mime_build.py` — every outbound shape built with the support
+  keys and read back with the customer's (inbound walk: verify/decrypt, body
+  and attachments), plus the raw tools: `gpg --verify` on the extracted
+  signed part (and `micalg` = the digest gpg reports), `openssl smime -verify`
+  / `-decrypt` on the raw mail, `protocol`/`micalg` parameters, CRLF-only
+  and 7-bit output, LF-converted-in-transit, tampering, Bcc not on the wire.
+- `test_crypto_compose.py` — key choice: defaults per recipient, explicit
+  selection coverage, missing/expired/unknown keys, sign key without secret,
+  compose options with queue-default preselection and warnings.
+- `test_crypto_outbound_send.py` (`db`) — through the API with a recording
+  SMTP: reply PGP sign+encrypt, forward S/MIME sign+encrypt, GI
+  `ArticleSend`, 422 without keys (nothing sent/stored), crypto-options.
 - `test_crypto_mime_walk.py` — every inbound shape built by real gpg/openssl
   and read back: PGP/MIME signed (incl. LF-only mail, tampered, unknown key,
   sender mismatch), encrypted with attachments, sign+encrypt, signed inside
@@ -324,7 +422,7 @@ limited to ~104 bytes on macOS).
   cache, inline PGP without raw mail).
 - Frontend: `PgpKeysPage.test.tsx`, `SmimePage.test.tsx`,
   `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`,
-  `ArticleSecurityBadge.test.tsx`.
+  `ArticleSecurityBadge.test.tsx`, `EmailSecurityControl.test.tsx`.
 
 Fixtures (`tests/_smime_fixtures.py`) build throwaway CA and leaf
 certificates with `cryptography`; `tests/_crypto_mail_fixtures.py` builds
