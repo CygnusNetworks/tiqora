@@ -1296,7 +1296,7 @@
       },
       "queues": {
         "title": "Queue AI policies",
-        "description": "Configure AI behavior per queue: features, autonomy, provider, limits and escalation.",
+        "description": "Configure AI behavior per queue: features, autonomy, which model profiles handle each task, limits and escalation.",
         "new": "New policy",
         "queue": "Queue",
         "features": "Features",

@@ -1296,7 +1296,7 @@
       },
       "queues": {
         "title": "Queue-KI-Policies",
-        "description": "KI-Verhalten je Queue konfigurieren: Funktionen, Autonomie, Provider, Limits und Eskalation.",
+        "description": "KI-Verhalten je Queue konfigurieren: Funktionen, Autonomie, welche Modellprofile die Aufgaben übernehmen, Limits und Eskalation.",
         "new": "Neue Policy",
         "queue": "Queue",
         "features": "Funktionen",

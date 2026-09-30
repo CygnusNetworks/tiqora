@@ -255,18 +255,77 @@ indexing.
 
 Two admin-managed building blocks sit under the per-queue policies:
 
-- **LLM providers** (`tiqora_llm_provider`, `/admin/ai/providers`) — one row per
-  usable model: kind (`openai_compat` or `anthropic`), base URL, model, an
-  encrypted API key (`TIQORA_SECRET_KEY`), capability flags (tools/streaming/
-  vision/EU-hosted), optional pricing, an optional cost budget and an optional
-  tool-round override (both below). A queue policy references a provider by
-  id; a separate `vision_provider_id` can point at a vision-capable model for the
-  attachment pre-pass.
+- **LLM providers** (`tiqora_llm_provider`, `/admin/ai/providers`) — the
+  *access* to one OpenAI-compatible endpoint: base URL, an encrypted API key
+  (`TIQORA_SECRET_KEY`), `eu_hosted`, the price currency and an optional cost
+  budget (below). Only `openai_compat` can be created; a provider holds no
+  model, capability or price data any more.
+- **Models, profiles and tasks** (`/admin/ai/models`) — see "Model routing"
+  below. Queue policies no longer point at a provider; they point at profiles
+  per task.
 - **MCP clients** (`/admin/ai/mcp-clients`) — external MCP servers registered as
   tool sources the built-in agent may call, subject to the same ACLs. Each
   discovered tool is listed per client with its own `enabled` and `mutating`
   switches, so a read-only subset of a server can be exposed without
   registering a second endpoint.
+
+### Model routing (provider → model → profile → task)
+
+Four levels, configured under Admin › KI › Modelle:
+
+1. **Provider** — access (URL, key, currency, budget). Test = lists the
+   remote models (auth + URL check); `GET /providers/{id}/remote-models`
+   feeds the model form's suggestions.
+2. **Model** (`tiqora_llm_model`) — exactly one model at one provider
+   (*model@provider*): the exact API model id (it may be named differently
+   at each provider), display name, capabilities (`supports_tools`,
+   `supports_vision`), context size, `max_tool_rounds`, and the prices per
+   1M tokens (currency comes from the provider). `POST /models/{id}/test`
+   runs the tool probe for that model.
+3. **Profile** (`tiqora_llm_profile`) — an ordered fallback chain of models
+   plus an optional timeout (default `llm_timeout_seconds`). The first
+   usable model answers; the rest are the fallback
+   (`FallbackLlmClient`, sticky, 5-minute cooldown keyed **per model**).
+   An entry is skipped when its model or provider is disabled, the provider
+   budget is exceeded, or (vision) the model cannot see images; skips are
+   logged (`ai_llm_chain_entry_skipped`).
+4. **Task assignment** — a profile per task, as a global default (Admin ›
+   KI › Modelle › Aufgaben, `GET/PUT /task-defaults`) with an optional
+   per-queue override in the queue editor's "Modelle" table
+   (`task_profiles` on the queue policy; a task absent inherits the global
+   default; an explicit "Kein eigenes Profil" means the task's fallback).
+
+| Task (key) | UI name | Needs | Without a profile |
+|---|---|---|---|
+| `agent` | Recherche und Werkzeuge | tools | AI unavailable for the queue (HTTP 409 "no provider") |
+| `final_answer` | Antwort formulieren | tools | no hand-over; the agent chain answers |
+| `triage` | Triage | tools | uses the `agent` chain |
+| `summary` | Zusammenfassen | — | uses the `agent` chain |
+| `refine` | Text verfeinern | — | uses the `agent` chain |
+| `vision` | Bilder beschreiben | vision | images are ignored |
+
+"Needs" is enforced on every model of a profile when it is assigned or edited
+(422 listing the tasks). Deleting a model that is in a profile, or a profile
+that is assigned, returns 409 with the names. If every entry of a resolved
+profile is skipped, `agent` answers 409, `final_answer` falls back to the
+agent, `vision` is unused.
+
+Admin walk-through: create the provider → create models (or load the
+provider's model list and pick) → build profiles (order = fallback order) →
+assign profiles to the six tasks globally → override single tasks per queue
+where needed.
+
+**Migration (0053)**: every existing queue policy was converted 1:1, so
+behaviour is unchanged on day one: each provider's `default_model` and every
+model referenced by a policy became a model row; identical chains share one
+profile (named `<model> @ <provider>`, ` +N` for fallbacks); the most
+frequent value per task became the global default and differing queues got
+override rows. Fixed on the way: triage with a different provider but no
+model no longer receives the queue's `model_override`; final answer and
+vision now have fallback chains; a budget-exceeded primary falls back
+instead of returning 409; disabled providers/models are skipped; prices are
+per model; `anthropic` providers can no longer be created (the runtime only
+speaks the OpenAI-compatible protocol).
 
 **Cost budget per provider** (`budget_cost_day` / `_week` / `_month`): an
 optional spend cap in the provider's own currency, summed from the
@@ -279,36 +338,30 @@ window is over budget, the auto-reply worker skips the run
 (`provider_budget_<window>`, silent, retried on the next event) and the
 manual-assist and summary paths refuse with `409 LLM provider budget
 exceeded (<window>)`; the vision pre-pass simply goes unused, so images are
-ignored rather than the run failing. Note this is a *provider*-wide cap
+ignored rather than the run failing; a budget-exceeded provider is skipped
+in profile chains, so the next model answers. Note this is a *provider*-wide cap
 shared by every queue pointing at that provider, unlike the per-queue
 `budget_tokens_day`.
 
 **Tool-round budget** (`max_tool_rounds`): how many research steps the agent
-gets before it has to answer. The built-in default is
-`tiqora.ai.runtime.DEFAULT_MAX_TOOL_ROUNDS` (**12**), and a provider row may
-override it — the round count is a property of the model, the same kind of
-fact `supports_tools` and `supports_vision` record. `NULL` (and any stored
-value below 1) means the default; `0` is what the admin UI's emptied number
-input sends, and is treated as "back to the default" rather than "no rounds
-at all", which would leave the terminal-force as the only call the agent
-ever makes. Resolved **once**, from the queue policy's configured provider,
-before the loop starts — not from whichever provider a mid-run fallback ends
-up on, because the budget shapes the whole run and has to be known up front.
-Raising it costs more than proportionally: every round re-sends the whole
+gets before it has to answer.
+The built-in default is `tiqora.ai.runtime.DEFAULT_MAX_TOOL_ROUNDS` (**12**),
+and a model row may override it (`max_tool_rounds`) — the round count is a
+property of the model, like its capabilities. `NULL` (and any stored value
+below 1) means the default; `0` is what the admin UI's emptied number input
+sends and is treated as "back to the default". Resolved **once**, from the
+first model of the queue's `agent` chain, before the loop starts — not from
+whichever model a mid-run fallback ends up on. Raising it costs more than proportionally: every round re-sends the whole
 conversation.
 
-**LLM provider fallback** (`tiqora.ai.llm_fallback.FallbackLlmClient`): a
-queue policy's `llm_fallback_json` is an optional priority-ordered list of
-additional `{provider_id, model}` entries tried, in order, when the primary
-provider raises an `LlmError` (timeout, non-2xx, malformed response). Two
-pieces of state make repeated failures cheap: **stickiness** — the client
-remembers which entry last succeeded and starts there on the next call
-within the same run, instead of re-trying a provider that just failed — and
-a module-global **5-minute per-provider cooldown**, shared across
-runs/requests in the process, so a newly built client for a *different* run
-also skips a provider that failed recently (unless every entry is in
-cooldown, in which case the full list is tried anyway rather than failing
-outright).
+**Fallback** (`tiqora.ai.llm_fallback.FallbackLlmClient`): the models of a
+profile after the first are tried, in order, when the previous one raises an
+`LlmError` (timeout, non-2xx, malformed response). **Stickiness** — the
+client remembers which entry last succeeded and starts there on the next
+call within the same run — and a module-global **5-minute per-model
+cooldown**, shared across runs in the process, make repeated failures cheap
+(a failing model does not cool down other models of the same provider; if
+every entry is cooling down, the full list is tried anyway).
 
 **PII masking** is a pipeline step, not an afterthought: when a queue policy has
 `pii_masking` on (the default), the text sent to the LLM is run through a
@@ -668,7 +721,7 @@ editor):
 | `triage_samples` | 3 | 1–5; every sample is one LLM call per new ticket. |
 | `triage_customer_fix_enabled` / `triage_customer_fix_auto_threshold` | off / 100 | With the fix disabled no customer proposal is shown or accepted. |
 | `triage_delay_reply` | off | Read on the **destination** queue. |
-| `triage_llm_provider_id` / `triage_model_override` | — | Optional cheaper model; falls back to `llm_provider_id` / `model_override` (and `llm_fallback_json`). |
+| task `triage` (`task_profiles`) | — | Optional cheaper profile; without one the `agent` chain is used. |
 
 **In the ticket UI**, an `open` row appears as the "AI triage suggestion"
 banner in the AI panel (`GET /api/v1/tickets/{id}/ai` → `triage`, only the
@@ -768,10 +821,10 @@ reads and writes nothing; the response is `{"valid", "error", "hit"}`, with
 Every summary, auto-reply, manual-assist, refine and triage run is
 recorded in `tiqora_ai_usage` (queue, ticket, user, provider, model,
 prompt/completion tokens, success/error). `cost_hint` is computed at record
-time from the provider's `price_input_per_1m` / `price_output_per_1m`
+time from the model's `price_input_per_1m` / `price_output_per_1m`
 (`tokens × price / 1e6` per side; a missing side counts as 0 only if the
 other is set, both unset = `null`, "no pricing configured", not "free"), in
-the provider's `price_currency`. Changing a price therefore does not
+the provider's `price_currency` (no matching model row = `null`). Changing a price therefore does not
 re-price past rows. The same `cost_hint` sums drive the provider cost budget
 (see "Cost budget per provider"). `GET /api/v1/admin/ai/usage` lists rows
 with `queue_id`, `feature`, `from`, `to`, `page`, `page_size` (≤ 500)
@@ -795,10 +848,9 @@ and fail silently (structlog warning + skip):
   rather than silently dropped. Extracted text passes through the same PII
   masking as the article body it's attached to.
 - **Image attachments** (png/jpeg/gif/webp) are **never** shown to the main
-  model. Instead, a dedicated vision-capable provider
-  (`tiqora_llm_provider.supports_vision`, selected per queue via
-  `tiqora_ai_queue_policy.vision_provider_id` — `NULL` means images are
-  ignored) is called once per image with a neutral description prompt
+  model. Instead, the profile of the `vision` task
+  (vision-capable models only, `tiqora_llm_model.supports_vision`; no profile
+  means images are ignored) is called once per image with a neutral description prompt
   (`tiqora.ai.vision`). The plain-text description it returns is what gets
   embedded into the main model's context
   (`[Bild-Anhang: foto.png — Beschreibung durch Vision-Modell]\n<text>`) —
@@ -809,7 +861,7 @@ and fail silently (structlog warning + skip):
   treated as a tracking pixel / mini icon and skipped before spending a
   vision call. Because images cannot be masked for PII the way text can,
   the only control is *which* provider is allowed to see them — prefer an
-  `eu_hosted` provider and treat enabling `vision_provider_id` per queue as
+  `eu_hosted` provider and treat assigning a `vision` profile per queue as
   a deliberate decision, not a default.
 - Two canonical `article_data_mime_attachment` marker categories are
   excluded from both paths entirely (same predicates as the ticket-zoom
