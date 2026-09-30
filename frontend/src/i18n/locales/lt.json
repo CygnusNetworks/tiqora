@@ -1080,6 +1080,7 @@
       "toggleOut": "I called",
       "autoReplyYes": "· customer gets the acknowledgement",
       "autoReplyNo": "· no acknowledgement",
+      "autoReplyNoCustomer": "· no acknowledgement (no customer)",
       "answeredAt": "answered {{time}}",
       "endedAt": "ended {{time}}"
     }
