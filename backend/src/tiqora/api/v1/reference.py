@@ -413,9 +413,11 @@ async def screen_dynamic_fields(
     """Ticket dynamic fields to show on a screen, in field order.
 
     Reads ``Ticket::Frontend::<screen>###DynamicField`` (1 = shown, 2 =
-    required); when that config enables nothing, every valid, non-internal
-    ticket field of an editable type is offered (optional). Article-level
-    fields are not offered -- the write paths set ticket fields only.
+    required); only valid, non-internal ticket fields of an editable type that
+    config enables are offered. Nothing enabled → empty list (no "all fields"
+    fallback: stock Znuny enables none on the phone screens, and offering every
+    field there filled the form with unrelated ones). Article-level fields are
+    not offered -- the write paths set ticket fields only.
     """
     _ = user
     from tiqora.api.v1.admin.dynamic_fields import config_from_yaml
@@ -432,11 +434,14 @@ async def screen_dynamic_fields(
             if level > 0:
                 configured[str(name)] = level
 
+    if not configured:
+        return []
     rows = (
         (
             await session.execute(
                 select(DynamicField)
                 .where(
+                    DynamicField.name.in_(list(configured)),
                     DynamicField.valid_id == _VALID,
                     DynamicField.object_type == "Ticket",
                     DynamicField.internal_field == 0,
@@ -450,8 +455,6 @@ async def screen_dynamic_fields(
     out: list[DynamicFieldDefOut] = []
     for df in rows:
         if df.field_type not in _EDITABLE_DF_TYPES:
-            continue
-        if configured and df.name not in configured:
             continue
         config = config_from_yaml(df.config)
         possible = config.get("PossibleValues")

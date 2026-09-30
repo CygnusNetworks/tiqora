@@ -351,6 +351,17 @@
             ],
             "title": "Answered At"
           },
+          "answered_by_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered By User Id"
+          },
           "call_id": {
             "title": "Call Id",
             "type": "string"
@@ -17384,6 +17395,45 @@
           "name"
         ],
         "title": "QueueRefOut",
+        "type": "object"
+      },
+      "QueueSuggestion": {
+        "description": "Queue a new ticket starts in and which rule picked it (both null: none).",
+        "properties": {
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "customer",
+                  "company",
+                  "default",
+                  "fallback"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "queue_id",
+          "source"
+        ],
+        "title": "QueueSuggestion",
         "type": "object"
       },
       "QueueTemplateAssignment": {
@@ -53696,6 +53746,97 @@
         ]
       }
     },
+    "/api/v1/customers/{login}/suggested-queue": {
+      "get": {
+        "description": "Queue for a new ticket of this customer user, for the current agent.\n\nNewest ticket of the customer user (``source=customer``) \u2192 newest ticket of\ntheir company (``company``) \u2192 the screen's ``QueueDefault`` sysconfig\n(``default``) \u2192 first queue that is not Junk/Raw/Postmaster (``fallback``).\nOnly queues the agent may create tickets in; tickets in Junk/Raw/Postmaster\nnever count. Unknown logins just skip the history steps. Both fields are\nnull when the agent may create tickets nowhere.",
+        "operationId": "suggested_queue_api_v1_customers__login__suggested_queue_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "description": "New-ticket form variant",
+            "in": "query",
+            "name": "screen",
+            "required": false,
+            "schema": {
+              "default": "phone",
+              "description": "New-ticket form variant",
+              "enum": [
+                "phone",
+                "email"
+              ],
+              "title": "Screen",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSuggestion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suggested Queue",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
     "/api/v1/events/stream": {
       "get": {
         "description": "Server-sent event stream of ``tiqora:events`` pub/sub messages.\n\nRequires an authenticated agent (same session/API-key auth as the rest\nof ``/api/v1``). Each message forwarded is the raw JSON payload\npublished to Redis \u2014 see :mod:`tiqora.events.pubsub` for the message\nshapes (``ticket_changed`` / ``presence_changed`` /\n``ticket_new_in_queue``).\n\n``ticket_new_in_queue`` notifications are filtered to the agent's\nreadable queues. ``allowed_queue_ids`` is resolved **here**, before the\n``StreamingResponse`` is returned, because the DB session dependency's\ncontext manager closes once this function returns \u2014 the streaming\ngenerator must not touch it. This snapshots the permission set for the\nlife of the connection (see the module docstring's v1 limitations).",
@@ -56468,7 +56609,7 @@
     },
     "/api/v1/reference/dynamic-fields": {
       "get": {
-        "description": "Ticket dynamic fields to show on a screen, in field order.\n\nReads ``Ticket::Frontend::<screen>###DynamicField`` (1 = shown, 2 =\nrequired); when that config enables nothing, every valid, non-internal\nticket field of an editable type is offered (optional). Article-level\nfields are not offered -- the write paths set ticket fields only.",
+        "description": "Ticket dynamic fields to show on a screen, in field order.\n\nReads ``Ticket::Frontend::<screen>###DynamicField`` (1 = shown, 2 =\nrequired); only valid, non-internal ticket fields of an editable type that\nconfig enables are offered. Nothing enabled \u2192 empty list (no \"all fields\"\nfallback: stock Znuny enables none on the phone screens, and offering every\nfield there filled the form with unrelated ones). Article-level fields are\nnot offered -- the write paths set ticket fields only.",
         "operationId": "screen_dynamic_fields_api_v1_reference_dynamic_fields_get",
         "parameters": [
           {
@@ -61025,6 +61166,88 @@
           }
         },
         "summary": "My Ticket Counts",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/new/default-queue": {
+      "get": {
+        "description": "Queue a new ticket starts in before (or without) a customer.\n\nThe screen's ``QueueDefault`` sysconfig (``source=default``), else the first\nqueue that is not Junk/Raw/Postmaster (``fallback``), else the first queue;\nonly queues the agent may create tickets in. With a customer use\n``GET /customers/{login}/suggested-queue``.",
+        "operationId": "new_ticket_default_queue_api_v1_tickets_new_default_queue_get",
+        "parameters": [
+          {
+            "description": "New-ticket form variant",
+            "in": "query",
+            "name": "screen",
+            "required": false,
+            "schema": {
+              "default": "phone",
+              "description": "New-ticket form variant",
+              "enum": [
+                "phone",
+                "email"
+              ],
+              "title": "Screen",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSuggestion"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "New Ticket Default Queue",
         "tags": [
           "tickets"
         ]

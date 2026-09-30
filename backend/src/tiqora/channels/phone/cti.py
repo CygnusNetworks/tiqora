@@ -21,6 +21,8 @@ State machine per call:
   one ``ringing`` per extension with the same ``call_id``; the audience grows).
 * ``answered`` — the answering extension's agents become the call's owners;
   everybody notified before still receives this event so their card can go.
+  When that extension maps to exactly one agent, they are recorded as
+  ``answered_by_user_id`` (owner prefill of the phone-ticket form).
 * ``hangup`` — the call is ``ended``; the popup keeps offering "log this call"
   for :data:`RECENT_AFTER_HANGUP_SECONDS`.
 * ``handled`` — the PBX took the call over itself (secretary, IVR, voicemail):
@@ -157,6 +159,10 @@ class ActiveCall(BaseModel):
     direction: CallDirection
     #: Agents currently handling the call (after ``answered``: the answering ones).
     user_ids: list[int]
+    #: The agent who took the call: set on ``answered`` when the answering
+    #: extension maps to exactly one agent (a shared desk phone names nobody).
+    #: The new-ticket form preselects them as owner.
+    answered_by_user_id: int | None = None
     ringing_at: UtcDateTime | None
     answered_at: UtcDateTime | None
     ended_at: UtcDateTime | None
@@ -272,6 +278,7 @@ async def apply_call_event(
             if users:
                 call.user_ids = users
                 call.extension = body.extension
+                call.answered_by_user_id = users[0] if len(users) == 1 else None
     elif body.event == "handled":
         if call.state != "ended":
             call.state = "ended"

@@ -27,6 +27,11 @@ from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.crypto.compose import EmailSecurityIn
 from tiqora.db.engine import get_session_factory
 from tiqora.domain.customer_link import ResolvedCustomerLink, resolve_customer_link
+from tiqora.domain.new_ticket_queue import (
+    NewTicketScreen,
+    QueueSuggestion,
+    default_new_ticket_queue,
+)
 from tiqora.domain.schemas import (
     ArticleBody,
     ArticleListItem,
@@ -424,6 +429,22 @@ async def my_ticket_counts(user: CurrentUser, session: DbSession) -> MyTicketCou
     """
     counts = await TicketService(session).count_owned(user.id)
     return MyTicketCounts(open=counts["open"], new=counts["new"])
+
+
+@router.get("/new/default-queue", response_model=QueueSuggestion)
+async def new_ticket_default_queue(
+    user: CurrentUser,
+    session: DbSession,
+    screen: Annotated[NewTicketScreen, Query(description="New-ticket form variant")] = "phone",
+) -> QueueSuggestion:
+    """Queue a new ticket starts in before (or without) a customer.
+
+    The screen's ``QueueDefault`` sysconfig (``source=default``), else the first
+    queue that is not Junk/Raw/Postmaster (``fallback``), else the first queue;
+    only queues the agent may create tickets in. With a customer use
+    ``GET /customers/{login}/suggested-queue``.
+    """
+    return await default_new_ticket_queue(session, user.id, screen)
 
 
 class DashboardSummary(BaseModel):
