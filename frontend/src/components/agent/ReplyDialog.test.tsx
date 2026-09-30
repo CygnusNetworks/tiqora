@@ -977,6 +977,15 @@ describe("ReplyDialog refine", () => {
     expect(sent).toBe(`eins zwei DREI\n\n${baseDraft.body}`);
   });
 
+  it("picking a template closes an open review", async () => {
+    listTemplates.mockResolvedValue([{ id: 5, name: "Gruss", text: "Hallo" }]);
+    await openWithRefine("EINS zwei DREI");
+    fireEvent.click(await screen.findByTestId("reply-template-select"));
+    fireEvent.click(await screen.findByText("Gruss"));
+    await waitFor(() => expect(screen.queryByTestId("refine-review")).toBeNull());
+    expect((screen.getByTestId("reply-body") as HTMLTextAreaElement).value.startsWith("Hallo\n")).toBe(true);
+  });
+
   it("discarding the review keeps the original text", async () => {
     await openWithRefine("EINS zwei DREI");
     fireEvent.click(screen.getByTestId("refine-review-discard"));

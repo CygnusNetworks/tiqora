@@ -463,4 +463,22 @@ describe("NewTicketPage refine", () => {
     // composer names the customer it was opened for.
     expect(refine.mock.calls[0][0].customer_user_id).toBe(customer.login);
   });
+
+  it("submitting while the review is open sends the accepted selection", async () => {
+    createArticle.mockClear();
+    refine.mockResolvedValue({ sections: [{ id: 0, text: "EINS zwei DREI" }] });
+    await renderReady();
+    await pickCustomer();
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), { target: { value: "Frage" } });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "eins zwei drei" } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-refine-button")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("new-ticket-refine-button"));
+    await screen.findByTestId("refine-review");
+    // Turn the first change off.
+    fireEvent.click(screen.getAllByTestId("refine-review-change")[0]);
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
+    expect(createArticle.mock.calls[0][1].body).toBe("eins zwei DREI");
+  });
 });
