@@ -328,13 +328,27 @@ def _unserved_message(features: Sequence[str]) -> str:
 
 
 async def check_policy_llm_requirements(
-    session: AsyncSession, *, flags: Mapping[str, Any], overrides: Mapping[str, int | None]
+    session: AsyncSession,
+    *,
+    flags: Mapping[str, Any],
+    overrides: Mapping[str, int | None],
+    previous_flags: Mapping[str, Any] | None = None,
+    previous_overrides: Mapping[str, int | None] | None = None,
 ) -> None:
-    """422 when an enabled feature of a queue (with these *overrides*) would
-    have no profile to run on — the equivalent of the old "auto-reply needs
-    a provider" check. Triage/summary/refine without their own profile use
-    the agent's, so an agent profile always satisfies every feature."""
-    unserved = _unserved_features(flags, overrides, await _routing_state(session))
+    """422 when a create/update would newly leave an enabled feature of a
+    queue without a profile to run on — the equivalent of the old
+    "auto-reply needs a provider" check. *previous_** describe the stored
+    policy (omit on create); a feature that was already enabled and unserved
+    before does not block an unrelated edit. Triage/summary/refine without
+    their own profile use the agent's, so an agent profile always satisfies
+    every feature."""
+    state = await _routing_state(session)
+    already = (
+        set(_unserved_features(previous_flags, previous_overrides or {}, state))
+        if previous_flags is not None
+        else set()
+    )
+    unserved = [f for f in _unserved_features(flags, overrides, state) if f not in already]
     if unserved:
         raise CatalogValidationError(_unserved_message(unserved))
 
@@ -343,16 +357,17 @@ async def newly_unserved_queues(
     session: AsyncSession,
     *,
     defaults: Mapping[str, int | None] | None = None,
-    usable: frozenset[int] | None = None,
+    disabled_profile_id: int | None = None,
 ) -> list[str]:
     """Queues (valid policies) that have a profile for every enabled feature
     today but would lose one if the global defaults became *defaults* and/or
-    the enabled profiles became *usable*. Queues already missing one are not
-    reported — a global edit must not be blocked by an unrelated queue."""
+    the profile *disabled_profile_id* were disabled. Queues already missing
+    one are not reported — a global edit must not be blocked by an unrelated
+    queue."""
     before = await _routing_state(session)
     after = _RoutingState(
         dict(defaults) if defaults is not None else before.defaults,
-        usable if usable is not None else before.usable,
+        before.usable - {disabled_profile_id} if disabled_profile_id is not None else before.usable,
     )
     feature_filter = [
         getattr(TiqoraAiQueuePolicy, flag).is_(True) for flag, _, _ in POLICY_FEATURE_TASKS
@@ -693,6 +708,9 @@ async def probe_model_connection(
             return ModelProbeResult(ok=False, model=None, tool_calling_ok=False, error=error)
         data = response.json()
         response_json = json.dumps(data)
+        if not isinstance(data, dict):
+            error = f"Unerwartete Antwort (kein JSON-Objekt): {response.text[:200]}"
+            return ModelProbeResult(ok=False, model=None, tool_calling_ok=False, error=error)
         served_model = data.get("model")
         choices = data.get("choices") or []
         tool_calling_ok = False
@@ -885,8 +903,7 @@ async def update_profile(
             "Das Profil ist Aufgaben zugewiesen, die das brauchen: " + "; ".join(lines) + "."
         )
     if clean.valid_id != 1 and row.valid_id == 1:
-        state = await _routing_state(session)
-        lost = await newly_unserved_queues(session, usable=state.usable - {row.id})
+        lost = await newly_unserved_queues(session, disabled_profile_id=row.id)
         if lost:
             raise CatalogValidationError(
                 "Ohne dieses Profil hätten diese Queues kein Modell mehr für: "

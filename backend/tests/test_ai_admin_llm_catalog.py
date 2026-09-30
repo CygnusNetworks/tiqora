@@ -65,10 +65,22 @@ def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
 
 
+_OWN_PROFILES = "SELECT id FROM tiqora_llm_profile WHERE name LIKE :p"
+_OWN_PROVIDERS = "SELECT id FROM tiqora_llm_provider WHERE name LIKE :p"
+
+
 def _cleanup(sync_url: str) -> None:
+    """Deletes only what this module created (prefixed names, 97xx queues)."""
+    own = {"p": f"{_PREFIX}%"}
     engine = create_engine(sync_url)
     with engine.begin() as conn:
-        conn.execute(text("DELETE FROM tiqora_ai_task_default"))
+        conn.execute(
+            text(
+                "DELETE FROM tiqora_ai_task_default"
+                f" WHERE profile_id IN (SELECT id FROM ({_OWN_PROFILES}) AS x)"
+            ),
+            own,
+        )
         conn.execute(
             text(
                 "DELETE FROM tiqora_ai_queue_policy"
@@ -76,13 +88,15 @@ def _cleanup(sync_url: str) -> None:
             ),
             {"a": _QUEUE_BASE, "b": _QUEUE_BASE + 99, "s": _SEEDED_QUEUE},
         )
+        conn.execute(text("DELETE FROM tiqora_llm_profile WHERE name LIKE :p"), own)
         conn.execute(
-            text("DELETE FROM tiqora_llm_profile WHERE name LIKE :p"), {"p": f"{_PREFIX}%"}
+            text(
+                "DELETE FROM tiqora_ai_audit_log WHERE feature = 'test'"
+                f" AND provider_id IN (SELECT id FROM ({_OWN_PROVIDERS}) AS x)"
+            ),
+            own,
         )
-        conn.execute(
-            text("DELETE FROM tiqora_llm_provider WHERE name LIKE :p"), {"p": f"{_PREFIX}%"}
-        )
-        conn.execute(text("DELETE FROM tiqora_ai_audit_log WHERE feature = 'test'"))
+        conn.execute(text("DELETE FROM tiqora_llm_provider WHERE name LIKE :p"), own)
     engine.dispose()
 
 
@@ -420,6 +434,13 @@ async def test_model_test_probes_chat_with_tools_and_audits(
     _mock_http(monkeypatch, lambda _r: httpx.Response(404, text="model not found"))
     failed = await ai_models.test_llm_model(model.id, _admin(), session)
     assert failed.ok is False and "404" in (failed.error or "")
+
+    # A JSON body that is not an object is a failed probe, not a 500.
+    for body in ([{"model": "x"}], "pong"):
+        _mock_http(monkeypatch, lambda _r, body=body: httpx.Response(200, json=body))
+        odd = await ai_models.test_llm_model(model.id, _admin(), session)
+        assert (odd.ok, odd.tool_calling_ok) == (False, False)
+        assert "kein JSON-Objekt" in (odd.error or "")
 
 
 # ---------------------------------------------------------------------------
@@ -829,3 +850,34 @@ async def test_provider_row_kind_is_left_alone(session: AsyncSession) -> None:
         provider_id, LlmProviderUpdate(eu_hosted=True), _admin(), session
     )
     assert (updated.kind, updated.eu_hosted) == ("anthropic", True)
+
+
+async def test_queue_already_without_profile_still_accepts_unrelated_edits(
+    session: AsyncSession,
+) -> None:
+    """Only a *new* gap is rejected: a queue that already had manual assist
+    on without any profile (e.g. its profile was deleted via the DB) can be
+    edited, but enabling another feature without a profile is still 422."""
+    created = await admin_ai.create_queue_policy_route(
+        AiQueuePolicyCreate(queue_id=_QUEUE_BASE + 30), _admin(), session
+    )
+    row = await session.get(TiqoraAiQueuePolicy, created.id)
+    assert row is not None
+    row.enabled_manual_assist = True
+    await session.commit()
+
+    edited = await admin_ai.update_queue_policy_route(
+        created.id, AiQueuePolicyUpdate(system_prompt="Neu"), _admin(), session
+    )
+    assert (edited.system_prompt, edited.enabled_manual_assist) == ("Neu", True)
+
+    detail = await _expect(
+        422,
+        admin_ai.update_queue_policy_route(
+            created.id,
+            AiQueuePolicyUpdate(enabled_auto_reply=True, service_user_id=1),
+            _admin(),
+            session,
+        ),
+    )
+    assert detail.startswith("Kein Modellprofil für: Automatische Antworten.")
