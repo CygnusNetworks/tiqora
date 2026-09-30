@@ -44,7 +44,7 @@ import {
  *   1. back breadcrumb to the list the ticket was opened from, ‹ › within it
  *   2. title with the AI summary as subtitle; Antworten (+ AI drafts),
  *      Notiz and one ⋯ menu on the right
- *   3. AI banners that need a decision (hand-over, triage) — only if present
+ *   3. AI banners that need attention (paused, hand-over, triage) — only if present
  *   4. status bar (Neu · Offen · Wartend ⌄ · Geschlossen ⌄); priority,
  *      type/service/SLA pickers and the SLA chip on the right
  *   5. queue, people, customer and similar tickets; counters + timestamp right
