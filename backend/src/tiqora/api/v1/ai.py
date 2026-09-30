@@ -1096,7 +1096,7 @@ async def resume_ai_route(ticket_id: int, user: CurrentUser, session: DbSession)
     await session.commit()
 
 
-async def _ticket_for_pause(session: DbSession, user: CurrentUser, ticket_id: int) -> None:
+async def _require_note_access(session: DbSession, user: CurrentUser, ticket_id: int) -> None:
     """Same access rule as resume: ticket visible and note permission on its queue."""
     try:
         ticket = await TicketService(session).get_ticket(user.id, ticket_id)
@@ -1114,7 +1114,7 @@ async def pause_ai_route(ticket_id: int, user: CurrentUser, session: DbSession) 
     Idempotent. Manual Assist stays available. See
     :func:`tiqora.domain.ticket_write_service.pause_ai_automation`.
     """
-    await _ticket_for_pause(session, user, ticket_id)
+    await _require_note_access(session, user, ticket_id)
     await _pause_ai_automation(
         session, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
     )
@@ -1124,7 +1124,7 @@ async def pause_ai_route(ticket_id: int, user: CurrentUser, session: DbSession) 
 @router.post("/unpause", status_code=status.HTTP_204_NO_CONTENT)
 async def unpause_ai_route(ticket_id: int, user: CurrentUser, session: DbSession) -> None:
     """Lift the per-ticket AI pause. Idempotent."""
-    await _ticket_for_pause(session, user, ticket_id)
+    await _require_note_access(session, user, ticket_id)
     await _unpause_ai_automation(
         session, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
     )
