@@ -17,6 +17,7 @@ function renderStrip(props: Partial<React.ComponentProps<typeof PhoneCallStrip>>
         elapsed={75}
         running
         onToggleTimer={onToggleTimer}
+        hasCustomer
         {...props}
       />
     </I18nextProvider>,
@@ -47,6 +48,13 @@ describe("PhoneCallStrip", () => {
     expect(screen.queryByTestId("phone-call-strip-meta")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("new-ticket-direction-out"));
     expect(onDirectionChange).toHaveBeenCalledWith("outbound");
+  });
+
+  it("an inbound call without a customer sends no acknowledgement", () => {
+    renderStrip({ hasCustomer: false });
+    expect(screen.getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
+      "no acknowledgement (no customer)",
+    );
   });
 
   it("carries the number and the call timer with pause", () => {

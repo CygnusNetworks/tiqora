@@ -544,6 +544,25 @@ describe("NewTicketPage property bar and queue default", () => {
     expect(queueValue()).toHaveTextContent("Hotline");
   });
 
+  it("a queue_id param the agent cannot see is dropped for the suggestion", async () => {
+    searchParams.current = { queue_id: 99 };
+    await renderReady();
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Hotline"));
+    expect(defaultQueue).toHaveBeenCalledWith("email", expect.anything());
+  });
+
+  it("the inbound hint names the acknowledgement only once a customer is set", async () => {
+    searchParams.current = { type: "phone" };
+    await renderReady();
+    expect(screen.getByTestId("new-ticket-autoreply-hint")).toHaveTextContent("(no customer)");
+    await pick("jane.doe");
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
+        "customer gets the acknowledgement",
+      ),
+    );
+  });
+
   it("the queue_id param wins over every suggestion", async () => {
     searchParams.current = { queue_id: 1 };
     await renderReady();
@@ -696,8 +715,9 @@ describe("NewTicketPage compact phone ticket", () => {
     const strip = await screen.findByTestId("phone-call-strip");
     expect(within(strip).getByTestId("new-ticket-direction-badge")).toHaveTextContent("Incoming call");
     expect(screen.queryByTestId("new-ticket-direction-in")).not.toBeInTheDocument();
+    // No customer in the URL: nobody to acknowledge.
     expect(within(strip).getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
-      "customer gets the acknowledgement",
+      "no acknowledgement (no customer)",
     );
     expect(within(strip).getByTestId("new-ticket-timer")).toHaveTextContent("03:12");
     expect(within(strip).getByTestId("phone-call-strip-number")).toHaveTextContent("+49 228 1234");

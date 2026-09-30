@@ -44,6 +44,17 @@ const owner = (over: Partial<NonNullable<TicketPropsBarProps["owner"]>> = {}) =>
 });
 
 describe("TicketPropsBar", () => {
+  it("queue not chosen yet: a neutral placeholder, 'no queue' only without queues", () => {
+    const { unmount } = renderBar({ queueId: null });
+    expect(screen.getByTestId("new-ticket-queue-value")).toHaveTextContent(
+      i18n.t("admin.form.selectPlaceholder"),
+    );
+    expect(screen.getByTestId("new-ticket-queue-value")).not.toHaveTextContent(i18n.t("newTicket.noQueues"));
+    unmount();
+    renderBar({ queues: [], queueId: null });
+    expect(screen.getByTestId("new-ticket-queue-value")).toHaveTextContent(i18n.t("newTicket.noQueues"));
+  });
+
   it("e-mail variant: three cells with their values", () => {
     renderBar();
     const bar = screen.getByTestId("ticket-props-bar");
