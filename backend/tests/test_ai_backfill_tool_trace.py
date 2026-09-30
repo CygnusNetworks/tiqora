@@ -23,6 +23,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import routing_cleanup_statements
 from tests.test_ai_runtime import (
     ScriptedLlm,
     _mysql_async,
@@ -72,6 +73,7 @@ def _cleanup_ticket(
             ("DELETE FROM ticket WHERE id = :tid", {"tid": ticket_id}),
             ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :qid", {"qid": queue_id}),
             ("DELETE FROM tiqora_ai_acl WHERE subject_id = :uid", {"uid": agent_id}),
+            *routing_cleanup_statements(f"fake-provider-{queue_id}"),
             (
                 "DELETE FROM tiqora_llm_provider WHERE name = :n",
                 {"n": f"fake-provider-{queue_id}"},

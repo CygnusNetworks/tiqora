@@ -47,8 +47,13 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import is_tiqora_primary
-from tiqora.ai.kb_wiring import build_llm_client
 from tiqora.ai.listfields import parse_str_list
+from tiqora.ai.llm_routing import (
+    TASK_TRIAGE,
+    NoUsableModel,
+    build_task_llm,
+    resolve_task_profile_id,
+)
 from tiqora.ai.models import (
     FEATURE_TRIAGE,
     TRIAGE_STATUS_APPLIED,
@@ -203,14 +208,17 @@ async def _skip_reason(
     return None
 
 
-def _policy_skip_reason(policy: TiqoraAiQueuePolicy | None) -> str | None:
+async def _policy_skip_reason(
+    session: AsyncSession, policy: TiqoraAiQueuePolicy | None
+) -> str | None:
     if policy is None or policy.valid_id != 1:
         return "no_policy"
     if not policy.enabled_triage:
         return "triage_disabled"
     if policy.service_user_id is None:
         return "no_service_user"
-    if policy.triage_llm_provider_id is None and policy.llm_provider_id is None:
+    # Triage without an own profile runs on the agent's.
+    if await resolve_task_profile_id(session, policy, TASK_TRIAGE) is None:
         return "no_provider"
     return None
 
@@ -252,7 +260,7 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
         return "ticket_gone"
 
     policy = await get_queue_policy_by_queue(session, ticket.queue_id)
-    policy_reason = _policy_skip_reason(policy)
+    policy_reason = await _policy_skip_reason(session, policy)
     if policy_reason is not None:
         return policy_reason
     assert policy is not None  # narrowed by _policy_skip_reason
@@ -278,28 +286,24 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
         logger.info("ai_triage_sender_skip", ticket_id=ticket_id)
         return "ignored_sender"
 
-    # _policy_skip_reason already rejected "neither provider set"; this
-    # re-states it for the type checker and guards against the row changing
-    # between the two reads.
-    effective_provider_id = policy.triage_llm_provider_id or policy.llm_provider_id
-    if effective_provider_id is None:
+    # Resolving the chain skips disabled and over-budget entries; when
+    # nothing is left the run is skipped. _policy_skip_reason already
+    # rejected "no profile at all"; None here guards against the rows
+    # changing between the two reads.
+    try:
+        task_llm = await build_task_llm(session, settings, policy, TASK_TRIAGE)
+    except NoUsableModel as exc:
+        logger.info("ai_triage_llm_unavailable", ticket_id=ticket_id, reasons=exc.reasons)
+        return "llm_unavailable"
+    if task_llm is None:
         return "no_provider"
-    window = await usage_service.provider_budget_exceeded(session, effective_provider_id)
-    if window is not None:
-        return f"provider_budget_{window}"
 
     candidates = await triage_service.load_candidates(session, policy)
     if not candidates:
         return "no_candidates"
 
     run_id = uuid.uuid4().hex
-    raw_llm = await build_llm_client(
-        session,
-        settings,
-        effective_provider_id,
-        policy.triage_model_override or policy.model_override,
-        policy.llm_fallback_json,
-    )
+    raw_llm = task_llm.client
     pii = await _build_pii_mapper(session, policy, ticket)
     llm = AuditingLlmClient(
         raw_llm,
@@ -310,6 +314,8 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
             ticket_id=ticket_id,
             queue_id=ticket.queue_id,
             trigger="auto",
+            provider_id=task_llm.models[0].provider_id,
+            model=task_llm.models[0].model,
         ),
         session=session,
         pii_mapper=pii,
@@ -341,8 +347,8 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
         queue_id=ticket.queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_TRIAGE,
-        provider_id=decision.provider_id or effective_provider_id,
-        model=decision.model,
+        provider_id=decision.provider_id or task_llm.models[0].provider_id,
+        model=decision.model or task_llm.models[0].model,
         prompt_tokens=decision.prompt_tokens,
         completion_tokens=decision.completion_tokens,
         success=decision.error is None,

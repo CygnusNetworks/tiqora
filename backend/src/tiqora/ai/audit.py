@@ -3,12 +3,12 @@
 :class:`AuditingLlmClient` wraps a production :class:`~tiqora.ai.llm.LlmClient`
 (or vision-pre-pass client) and writes an audit row after every call,
 success or failure. It is deliberately **not** wired into
-:func:`tiqora.ai.kb_wiring.build_llm_client` itself: the :class:`PiiMapper`
+:func:`tiqora.ai.llm_routing.build_task_llm` itself: the :class:`PiiMapper`
 used to mask a run's messages is created *after* the client is built (inside
 :func:`tiqora.ai.runtime.run_ticket_agent` / :func:`tiqora.ai.summary.summarize_ticket`),
 so those two call sites wrap the injected ``llm`` client themselves once the
 mapper exists — see their module docstrings. The vision pre-pass client
-*is* wrapped centrally in :func:`tiqora.ai.kb_wiring.build_vision_llm_factory`
+*is* wrapped centrally in :func:`tiqora.ai.llm_routing.build_vision_llm_factory`
 (no PII masking applies to image requests, only the data-URL redaction
 below).
 
@@ -36,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.ai.llm import LlmClient, LlmHttpError, LlmMessage, LlmResponse
 from tiqora.ai.models import TiqoraAiAuditLog, TiqoraLlmProvider
 from tiqora.ai.pii import PiiMapper
+from tiqora.ai.usage import load_model_prices, match_model_price, price_cost
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 
@@ -350,49 +351,76 @@ async def list_audit_log(
     return AuditLogPage(items=list(rows), total=int(total))
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderPrices:
+    """One provider's currency plus its model price rows
+    ``(model_id, price_input_per_1m, price_output_per_1m)``."""
+
+    currency: str | None
+    models: list[tuple[str, float | None, float | None]]
+
+
 async def load_provider_prices(
     session: AsyncSession, provider_ids: Iterable[int | None]
-) -> dict[int, tuple[float | None, float | None, str | None]]:
-    """Bulk-load ``(price_input_per_1m, price_output_per_1m, price_currency)``
-    for a set of provider ids — one query for a whole page/result set, never
-    one query per row."""
+) -> dict[int, ProviderPrices]:
+    """Bulk-load the per-model prices (``tiqora_llm_model``) and the currency
+    (provider) for a set of provider ids — two queries for a whole page/result
+    set, never one per row."""
     ids = {i for i in provider_ids if i is not None}
     if not ids:
         return {}
-    rows = (
-        await session.execute(
-            select(
-                TiqoraLlmProvider.id,
-                TiqoraLlmProvider.price_input_per_1m,
-                TiqoraLlmProvider.price_output_per_1m,
-                TiqoraLlmProvider.price_currency,
-            ).where(TiqoraLlmProvider.id.in_(ids))
-        )
-    ).all()
-    return {r[0]: (r[1], r[2], r[3]) for r in rows}
+    currencies = {
+        r[0]: r[1]
+        for r in (
+            await session.execute(
+                select(TiqoraLlmProvider.id, TiqoraLlmProvider.price_currency).where(
+                    TiqoraLlmProvider.id.in_(ids)
+                )
+            )
+        ).all()
+    }
+    models = await load_model_prices(session, ids)
+    return {
+        pid: ProviderPrices(currency=currency, models=models.get(pid, []))
+        for pid, currency in currencies.items()
+    }
+
+
+def _cost_for(
+    prices: dict[int, ProviderPrices],
+    provider_id: int | None,
+    model: str | None,
+    *,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> tuple[float | None, str | None]:
+    if provider_id is None:
+        return None, None
+    provider = prices.get(provider_id)
+    if provider is None:
+        return None, None
+    cost = price_cost(
+        match_model_price(provider.models, model),
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+    return (None, None) if cost is None else (cost, provider.currency)
 
 
 def compute_entry_cost(
-    entry: TiqoraAiAuditLog,
-    prices: dict[int, tuple[float | None, float | None, str | None]],
+    entry: TiqoraAiAuditLog, prices: dict[int, ProviderPrices]
 ) -> tuple[float | None, str | None]:
     """``(cost, currency)`` for one audit row given a bulk-loaded price map
-    (see :func:`load_provider_prices`). ``(None, None)`` when the row has no
-    provider, the provider is unknown, or neither price component is set."""
-    if entry.provider_id is None:
-        return None, None
-    price = prices.get(entry.provider_id)
-    if price is None:
-        return None, None
-    price_input, price_output, currency = price
-    if price_input is None and price_output is None:
-        return None, None
-    cost = 0.0
-    if price_input is not None:
-        cost += (entry.prompt_tokens or 0) * price_input / 1_000_000
-    if price_output is not None:
-        cost += (entry.completion_tokens or 0) * price_output / 1_000_000
-    return cost, currency
+    (see :func:`load_provider_prices`), priced by the row's provider *and*
+    model. ``(None, None)`` when the row has no provider, no model row of
+    that provider matches, or neither price component is set."""
+    return _cost_for(
+        prices,
+        entry.provider_id,
+        entry.model,
+        prompt_tokens=entry.prompt_tokens or 0,
+        completion_tokens=entry.completion_tokens or 0,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -484,42 +512,40 @@ async def _audit_log_cost_totals(
     session: AsyncSession, *, filters: list[Any]
 ) -> tuple[float | None, str | None]:
     """Total cost across all rows matching ``filters`` (not just one page),
-    grouped by provider so each provider's tokens are priced with its own
-    rates. ``total_cost`` is only ever a number when every provider that
-    contributed tokens has pricing configured *and* they all share the same
-    currency — otherwise ``(None, None)``, since summing mismatched
-    currencies (or partially-unpriced usage) would silently misrepresent the
-    total."""
-    per_provider = (
+    grouped by provider and model so each model's tokens are priced with its
+    own rates. ``total_cost`` is only ever a number when every group that
+    contributed tokens and has pricing shares the same currency — otherwise
+    ``(None, None)``, since summing mismatched currencies would silently
+    misrepresent the total."""
+    groups = (
         await session.execute(
             select(
                 TiqoraAiAuditLog.provider_id,
+                TiqoraAiAuditLog.model,
                 func.coalesce(func.sum(TiqoraAiAuditLog.prompt_tokens), 0),
                 func.coalesce(func.sum(TiqoraAiAuditLog.completion_tokens), 0),
             )
             .where(*filters, TiqoraAiAuditLog.provider_id.is_not(None))
-            .group_by(TiqoraAiAuditLog.provider_id)
+            .group_by(TiqoraAiAuditLog.provider_id, TiqoraAiAuditLog.model)
         )
     ).all()
-    if not per_provider:
+    if not groups:
         return None, None
 
-    prices = await load_provider_prices(session, [r[0] for r in per_provider])
+    prices = await load_provider_prices(session, [r[0] for r in groups])
     total = 0.0
     currencies: set[str | None] = set()
     priced_any = False
-    for provider_id, prompt_sum, completion_sum in per_provider:
-        price = prices.get(provider_id)
-        if price is None:
+    for provider_id, model, prompt_sum, completion_sum in groups:
+        cost, currency = _cost_for(
+            prices,
+            provider_id,
+            model,
+            prompt_tokens=int(prompt_sum),
+            completion_tokens=int(completion_sum),
+        )
+        if cost is None:
             continue
-        price_input, price_output, currency = price
-        if price_input is None and price_output is None:
-            continue
-        cost = 0.0
-        if price_input is not None:
-            cost += int(prompt_sum) * price_input / 1_000_000
-        if price_output is not None:
-            cost += int(completion_sum) * price_output / 1_000_000
         total += cost
         currencies.add(currency)
         priced_any = True
@@ -611,6 +637,7 @@ __all__ = [
     "compute_entry_cost",
     "get_audit_log_entry",
     "list_audit_log",
+    "ProviderPrices",
     "load_provider_prices",
     "reveal_pii",
     "write_audit_log",

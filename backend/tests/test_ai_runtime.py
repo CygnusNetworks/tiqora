@@ -16,6 +16,13 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import (
+    assign_task,
+    make_model,
+    make_profile,
+    routing_cleanup_statements,
+    setup_agent_llm,
+)
 from tiqora.ai import policies as ai_policies
 from tiqora.ai.acl import create_acl
 from tiqora.ai.context import ArticleSnapshot, TicketSnapshot
@@ -559,6 +566,7 @@ def _seed_ticket(sync_url: str, *, ns: int, ticket_state_id: int = STATE_OPEN_ID
             ),
             ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :id", {"id": queue_id}),
             ("DELETE FROM tiqora_ai_acl WHERE subject_id = :id", {"id": agent_id}),
+            *routing_cleanup_statements(f"fake-provider-{queue_id}"),
             (
                 "DELETE FROM tiqora_llm_provider WHERE name = :n",
                 {"n": f"fake-provider-{queue_id}"},
@@ -701,7 +709,7 @@ async def _setup_policy(
     allowed_state_types: str | None = None,
 ) -> None:
     await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
-    provider_id = None
+    provider = None
     if enabled_auto_reply:
         from tiqora.ai import providers as ai_providers
 
@@ -712,15 +720,11 @@ async def _setup_policy(
             name=f"fake-provider-{seed['queue_id']}",
             kind="openai_compat",
             base_url="https://llm.example/v1",
-            default_model="fake-model",
             api_key=None,
             extra_json=None,
-            supports_tools=True,
-            supports_streaming=False,
             eu_hosted=True,
         )
-        provider_id = provider.id
-    await ai_policies.create_queue_policy(
+    policy = await ai_policies.create_queue_policy(
         session,
         change_by=1,
         queue_id=seed["queue_id"],
@@ -729,10 +733,11 @@ async def _setup_policy(
         system_prompt="You are a helpful support agent.",
         autonomy=autonomy,
         service_user_id=seed["agent_id"] if enabled_auto_reply else None,
-        llm_provider_id=provider_id,
         pii_masking=False,
         allowed_state_types=allowed_state_types,
     )
+    if provider is not None:
+        await setup_agent_llm(session, policy, provider)
 
 
 async def test_manual_assist_creates_draft_even_at_full_autonomy(mariadb_znuny_url: str) -> None:
@@ -1266,19 +1271,15 @@ async def test_image_attachment_described_via_vision_provider(mariadb_znuny_url:
                 name=f"fake-vision-provider-{seed['queue_id']}",
                 kind="openai_compat",
                 base_url="https://vision.example/v1",
-                default_model="fake-vision-model",
                 api_key=None,
                 extra_json=None,
-                supports_tools=False,
-                supports_streaming=False,
                 eu_hosted=True,
-                supports_vision=True,
             )
+            await make_model(session, vision_provider, "fake-vision-model", supports_vision=True)
             policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
             assert policy is not None
-            await ai_policies.update_queue_policy(
-                session, policy, change_by=1, vision_provider_id=vision_provider.id
-            )
+            vision_profile = await make_profile(session, vision_provider, ["fake-vision-model"])
+            await assign_task(session, policy, "vision", vision_profile)
 
         llm = ScriptedLlm([_propose_response("reply", "Answer")])
         async with factory() as session:
@@ -1366,19 +1367,15 @@ async def test_inline_signature_image_skipped_regardless_of_size(mariadb_znuny_u
                 name=f"fake-vision-provider-inline-{seed['queue_id']}",
                 kind="openai_compat",
                 base_url="https://vision.example/v1",
-                default_model="fake-vision-model",
                 api_key=None,
                 extra_json=None,
-                supports_tools=False,
-                supports_streaming=False,
                 eu_hosted=True,
-                supports_vision=True,
             )
+            await make_model(session, vision_provider, "fake-vision-model", supports_vision=True)
             policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
             assert policy is not None
-            await ai_policies.update_queue_policy(
-                session, policy, change_by=1, vision_provider_id=vision_provider.id
-            )
+            vision_profile = await make_profile(session, vision_provider, ["fake-vision-model"])
+            await assign_task(session, policy, "vision", vision_profile)
 
         class FakeVisionLlm:
             async def chat(self, **kwargs: Any) -> LlmResponse:
@@ -1432,19 +1429,15 @@ async def test_small_real_image_skipped_as_tracking_pixel(mariadb_znuny_url: str
                 name=f"fake-vision-provider-pixel-{seed['queue_id']}",
                 kind="openai_compat",
                 base_url="https://vision.example/v1",
-                default_model="fake-vision-model",
                 api_key=None,
                 extra_json=None,
-                supports_tools=False,
-                supports_streaming=False,
                 eu_hosted=True,
-                supports_vision=True,
             )
+            await make_model(session, vision_provider, "fake-vision-model", supports_vision=True)
             policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
             assert policy is not None
-            await ai_policies.update_queue_policy(
-                session, policy, change_by=1, vision_provider_id=vision_provider.id
-            )
+            vision_profile = await make_profile(session, vision_provider, ["fake-vision-model"])
+            await assign_task(session, policy, "vision", vision_profile)
 
         class FakeVisionLlm:
             async def chat(self, **kwargs: Any) -> LlmResponse:
@@ -2182,14 +2175,12 @@ async def _setup_identity_policy(
         name=f"fake-provider-{seed['queue_id']}",
         kind="openai_compat",
         base_url="https://llm.example/v1",
-        default_model="fake-model",
         api_key=None,
         extra_json=None,
-        supports_tools=True,
-        supports_streaming=False,
         eu_hosted=True,
     )
-    await ai_policies.create_queue_policy(
+    await make_model(session, provider, "fake-model")
+    _policy = await ai_policies.create_queue_policy(
         session,
         change_by=1,
         queue_id=seed["queue_id"],
@@ -2198,11 +2189,11 @@ async def _setup_identity_policy(
         system_prompt="You are a helpful support agent.",
         autonomy=autonomy,
         service_user_id=seed["agent_id"],
-        llm_provider_id=provider.id,
         pii_masking=False,
         identity_mode=identity_mode,
         clarify_schema_json=clarify_schema_json,
     )
+    await setup_agent_llm(session, _policy, provider)
 
 
 async def _seed_telegram_article(session: AsyncSession, *, article_id: int, chat_id: int) -> None:
@@ -3535,7 +3526,7 @@ async def test_usage_records_the_model_the_provider_actually_served(
     mariadb_znuny_url: str,
 ) -> None:
     """``tiqora_ai_usage.model`` must name the model that answered, not the
-    policy's ``model_override`` — see the sibling test in
+    configured model id — see the sibling test in
     ``test_ai_summary.py``. With no override configured the column was NULL.
     """
     seed = _seed_ticket(mariadb_znuny_url, ns=42)
@@ -3718,8 +3709,9 @@ async def test_terminal_force_uses_the_final_answer_model(
 async def test_final_answer_tokens_are_booked_on_the_final_provider(
     mariadb_znuny_url: str,
 ) -> None:
-    """Prices and budgets are per provider: the final model's tokens get their
-    own usage row priced by its provider, the primary keeps the rest."""
+    """Budgets are per provider and prices per model: the final model's tokens
+    get their own usage row on its provider, priced by its model row; the
+    primary keeps the rest."""
     from tiqora.ai import providers as ai_providers
 
     seed = _seed_ticket(mariadb_znuny_url, ns=76)
@@ -3729,6 +3721,8 @@ async def test_final_answer_tokens_are_booked_on_the_final_provider(
     final_name = f"fake-final-provider-{seed['queue_id']}"
     try:
         async with factory() as session:
+            for stmt, params in routing_cleanup_statements(final_name):
+                await session.execute(text(stmt), params)
             await session.execute(
                 text("DELETE FROM tiqora_llm_provider WHERE name = :n"), {"n": final_name}
             )
@@ -3741,20 +3735,21 @@ async def test_final_answer_tokens_are_booked_on_the_final_provider(
                 name=final_name,
                 kind="openai_compat",
                 base_url="https://llm.example/v1",
-                default_model="strong-model",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=False,
                 eu_hosted=True,
+            )
+            await make_model(
+                session,
+                final_provider,
+                "strong-model",
                 price_input_per_1m=1_000_000.0,
                 price_output_per_1m=2_000_000.0,
             )
             policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
             assert policy is not None
-            await ai_policies.update_queue_policy(
-                session, policy, change_by=1, final_answer_llm_provider_id=final_provider.id
-            )
+            final_profile = await make_profile(session, final_provider, ["strong-model"])
+            await assign_task(session, policy, "final_answer", final_profile)
 
         primary = ScriptedLlm([_propose_response("reply", "cheap answer")])
         final = ScriptedLlm([_propose_response("reply", "strong answer", model="strong-model")])
@@ -3797,8 +3792,25 @@ async def test_final_answer_tokens_are_booked_on_the_final_provider(
                 text("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :q"),
                 {"q": seed["queue_id"]},
             )
+            for stmt, params in routing_cleanup_statements(final_name):
+                await session.execute(text(stmt), params)
             await session.execute(
                 text("DELETE FROM tiqora_llm_provider WHERE name = :n"), {"n": final_name}
             )
             await session.commit()
         await engine.dispose()
+
+
+def test_tool_round_budget_comes_from_the_first_agent_model() -> None:
+    """``tiqora_llm_model.max_tool_rounds`` of the agent profile's first usable
+    model; unset, non-positive or no model at all → the default."""
+    from tiqora.ai.llm_routing import ChainModel
+    from tiqora.ai.runtime import _tool_rounds_for
+
+    def _model(rounds: int | None) -> ChainModel:
+        return ChainModel(llm_model_id=1, provider_id=1, model="m", max_tool_rounds=rounds)
+
+    assert _tool_rounds_for(_model(20), default=12) == 20
+    assert _tool_rounds_for(_model(None), default=12) == 12
+    assert _tool_rounds_for(_model(0), default=12) == 12
+    assert _tool_rounds_for(None, default=12) == 12

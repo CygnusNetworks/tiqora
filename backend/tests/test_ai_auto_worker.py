@@ -4,7 +4,7 @@ Seed ids use the 98xx range (unique per test, ``ns`` offset) — disjoint from
 the 96xx (``test_ai_runtime.py``) and 97xx (``test_ai_summary.py``) ranges —
 so the session-scoped testcontainer DB is shared safely.
 
-``build_llm_client``/``kb_bundle``/``kb_search_fn``/``kb_get_article_fn`` are
+``llm_routing.make_llm_client``/``kb_bundle``/``kb_search_fn``/``kb_get_article_fn`` are
 monkeypatched at the ``tiqora.ai.auto_worker`` module level (where they are
 imported) so no real HTTP call is ever made.
 """
@@ -18,6 +18,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import make_model, routing_cleanup_statements, setup_agent_llm
 from tests.test_ai_runtime import ScriptedLlm, _propose_response
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -79,6 +80,7 @@ def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
             ),
             ("DELETE FROM tiqora_ai_usage WHERE queue_id = :id", {"id": queue_id}),
             ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :id", {"id": queue_id}),
+            *routing_cleanup_statements(f"fake-auto-provider-{queue_id}"),
             (
                 "DELETE FROM tiqora_llm_provider WHERE name = :n",
                 {"n": f"fake-auto-provider-{queue_id}"},
@@ -241,38 +243,35 @@ async def _setup_policy(
         name=f"fake-auto-provider-{seed['queue_id']}",
         kind="openai_compat",
         base_url="https://llm.example/v1",
-        default_model="fake-model",
         api_key=None,
         extra_json=None,
-        supports_tools=True,
-        supports_streaming=False,
         eu_hosted=True,
         budget_cost_day=budget_cost_day,
         budget_cost_week=budget_cost_week,
         budget_cost_month=budget_cost_month,
     )
-    await ai_policies.create_queue_policy(
+    await make_model(session, provider, "fake-model")
+    _policy = await ai_policies.create_queue_policy(
         session,
         change_by=1,
         queue_id=seed["queue_id"],
         enabled_auto_reply=True,
         autonomy=autonomy,
         service_user_id=seed["agent_id"],
-        llm_provider_id=provider.id,
         pii_masking=False,
         max_auto_replies=max_auto_replies,
         max_clarifications=max_clarifications,
         max_replies_per_hour=max_replies_per_hour,
         budget_tokens_day=budget_tokens_day,
     )
+    await setup_agent_llm(session, _policy, provider)
     return provider
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch, llm: LlmClient) -> None:
-    async def _fake_build_llm_client(*_args: Any, **_kwargs: Any) -> LlmClient:
-        return llm
-
-    monkeypatch.setattr("tiqora.ai.auto_worker.build_llm_client", _fake_build_llm_client)
+    # The real routing runs (profile, skips, provider budget); only the
+    # client it would construct is replaced.
+    monkeypatch.setattr("tiqora.ai.llm_routing.make_llm_client", lambda **_kwargs: llm)
 
 
 async def test_watermark_advances_even_for_irrelevant_events(
@@ -634,13 +633,13 @@ async def test_error_in_one_event_does_not_abort_batch(
 
         calls = {"n": 0}
 
-        async def _fake_build_llm_client(*_args: Any, **_kwargs: Any) -> LlmClient:
+        def _fake_make_llm_client(**_kwargs: Any) -> LlmClient:
             calls["n"] += 1
             if calls["n"] == 1:
                 raise RuntimeError("boom")
             return ScriptedLlm([_propose_response("reply", "Second ticket answer.")])
 
-        monkeypatch.setattr("tiqora.ai.auto_worker.build_llm_client", _fake_build_llm_client)
+        monkeypatch.setattr("tiqora.ai.llm_routing.make_llm_client", _fake_make_llm_client)
 
         totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
         assert totals["events"] == 2
@@ -913,14 +912,12 @@ async def test_provider_budget_on_other_provider_does_not_block_run(
                 name=f"other-provider-{seed['queue_id']}",
                 kind="openai_compat",
                 base_url="https://llm.example/v1",
-                default_model="fake-model",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=False,
                 eu_hosted=True,
                 budget_cost_day=1.0,
             )
+            await make_model(session, other, "fake-model")
             await usage_service.record_usage(
                 session,
                 queue_id=seed["queue_id"],

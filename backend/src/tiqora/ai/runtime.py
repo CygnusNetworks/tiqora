@@ -19,7 +19,6 @@ from email.utils import parseaddr
 from typing import Any
 
 import structlog
-from fastapi import HTTPException
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,7 +56,6 @@ from tiqora.ai.identity import (
     record_identity_attempt,
     verify_identity_claim,
 )
-from tiqora.ai.kb_wiring import build_llm_client, build_vision_llm_factory
 from tiqora.ai.listfields import parse_int_list
 from tiqora.ai.llm import (
     LlmClient,
@@ -66,6 +64,17 @@ from tiqora.ai.llm import (
     LlmMessage,
     LlmResponse,
     LlmUsage,
+)
+from tiqora.ai.llm_routing import (
+    TASK_AGENT,
+    TASK_FINAL_ANSWER,
+    TASK_VISION,
+    ChainModel,
+    NoUsableModel,
+    build_task_llm,
+    build_vision_llm_factory,
+    resolve_task_models,
+    resolve_task_profile_id,
 )
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
@@ -95,7 +104,6 @@ from tiqora.ai.output_guards import (
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
 from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SYSTEM_BLOCK
-from tiqora.ai.providers import resolve_max_tool_rounds
 from tiqora.ai.reply_language import (
     LANGUAGE_PROFILES,
     detect_reply_language,
@@ -146,7 +154,8 @@ conversation, so the run above billed 68k input tokens for a conversation whose
 final context was 13.9k. Prompt caching would blunt that, but Nebius does not
 offer it yet, so the budget is the only lever.
 
-Per-provider overrides live in ``tiqora_llm_provider.max_tool_rounds``."""
+Per-model overrides live in ``tiqora_llm_model.max_tool_rounds`` (the first
+usable model of the queue's agent profile decides)."""
 # Fallback for KEY_AI_LLM_MAX_COMPLETION_TOKENS when the setting row is
 # unset. Reasoning models need real headroom beyond the OpenAI wire default
 # of 1024 — see settings_store.KEY_AI_LLM_MAX_COMPLETION_TOKENS.
@@ -1138,6 +1147,28 @@ async def _hand_off_unidentified(
     )
 
 
+def _tool_rounds_for(model: ChainModel | None, *, default: int) -> int:
+    """Tool-round budget of the agent profile's first usable model.
+
+    Taken from the first model, not from whichever model a mid-run fallback
+    ends up on: the budget shapes the whole run and has to be known before
+    the first call. A non-positive stored value is treated as unset rather
+    than as "no rounds at all", which would leave the terminal-force as the
+    only call the agent ever makes.
+    """
+    if model is None or model.max_tool_rounds is None or model.max_tool_rounds < 1:
+        return default
+    return model.max_tool_rounds
+
+
+@dataclass(frozen=True, slots=True)
+class _FinalAnswerLlm:
+    llm: LlmClient  # audited
+    raw: LlmClient  # for active_provider_id/active_model after a fallback
+    provider_id: int | None
+    model: str | None
+
+
 async def _resolve_final_answer_llm(
     session: AsyncSession,
     settings: Settings,
@@ -1146,39 +1177,39 @@ async def _resolve_final_answer_llm(
     *,
     audit_context: AuditContext,
     pii: PiiMapper,
-) -> LlmClient | None:
+) -> _FinalAnswerLlm | None:
     """The audited final-answer client for this run, or ``None`` when the
-    queue has none configured or it is unusable right now (provider gone,
-    budget exceeded) — the primary model then answers, as before."""
+    queue has no final-answer profile or nothing in it is usable right now
+    (model/provider disabled, budget exceeded) — the primary model then
+    answers, as before."""
     if injected is None:
-        if policy.final_answer_llm_provider_id is None:
-            return None
         try:
-            injected = await build_llm_client(
-                session,
-                settings,
-                policy.final_answer_llm_provider_id,
-                policy.final_answer_model_override,
-            )
-        except HTTPException as exc:
+            task_llm = await build_task_llm(session, settings, policy, TASK_FINAL_ANSWER)
+        except NoUsableModel as exc:
             logger.warning(
                 "ai_final_answer_model_unavailable",
                 queue_id=policy.queue_id,
-                provider_id=policy.final_answer_llm_provider_id,
-                reason=exc.detail,
+                profile=exc.profile_name,
+                reasons=exc.reasons,
             )
             return None
-    return AuditingLlmClient(
+        if task_llm is None:
+            return None
+        injected = task_llm.client
+        first: ChainModel | None = task_llm.models[0]
+    else:
+        models = await resolve_task_models(session, policy, TASK_FINAL_ANSWER)
+        first = models[0] if models else None
+    provider_id = first.provider_id if first is not None else None
+    model = first.model if first is not None else None
+    audited = AuditingLlmClient(
         injected,
         settings=settings,
-        context=replace(
-            audit_context,
-            provider_id=policy.final_answer_llm_provider_id,
-            model=policy.final_answer_model_override,
-        ),
+        context=replace(audit_context, provider_id=provider_id, model=model),
         session=session,
         pii_mapper=pii,
     )
+    return _FinalAnswerLlm(llm=audited, raw=injected, provider_id=provider_id, model=model)
 
 
 async def run_ticket_agent(
@@ -1208,8 +1239,8 @@ async def run_ticket_agent(
     ``mcp_caller``/``kb_search_fn``/``kb_get_article_fn`` are injectable seams
     for tests; production omits them (real fastmcp/KB calls). ``vision_llm_factory``
     (a sync ``() -> LlmClient``) is an injectable seam for the attachment
-    vision pre-pass — production omits it and the queue policy's
-    ``vision_provider_id`` is resolved automatically; tests inject a fake to
+    vision pre-pass — production omits it and the queue's vision profile
+    is resolved automatically; tests inject a fake to
     assert on the vision prompt without a real endpoint. ``source_channel``
     is the triggering article's channel (from the outbox event payload,
     auto-worker only) — passed through to the gate re-check below so a
@@ -1218,8 +1249,8 @@ async def run_ticket_agent(
     typing-indicator task (tests); production omits it and a gateway is
     built lazily from the channel config only when actually needed.
     ``final_llm`` is an injectable seam for the final-answer model (tests);
-    production omits it and the policy's ``final_answer_llm_provider_id`` is
-    resolved instead.
+    production omits it and the queue's final-answer profile is resolved
+    instead.
     """
     # 1. Readiness gate — auto-reply only (plan §3.0 v1.1 relaxation, Phase
     # E). Manual Assist always runs regardless of operation_mode: it only
@@ -1308,6 +1339,11 @@ async def run_ticket_agent(
         audit_feature = (
             AUDIT_FEATURE_DRAFT if trigger == TRIGGER_MANUAL else AUDIT_FEATURE_AUTO_REPLY
         )
+        # The agent profile's first usable model: default provider/model for
+        # audit and usage (a fallback that actually served overrides it) and
+        # the source of the tool-round budget.
+        agent_models = await resolve_task_models(session, policy, TASK_AGENT)
+        primary_model = agent_models[0] if agent_models else None
         audit_context = AuditContext(
             feature=audit_feature,
             run_id=run_id,
@@ -1315,8 +1351,8 @@ async def run_ticket_agent(
             queue_id=ticket.queue_id,
             acting_user_id=actor_user_id,
             trigger=trigger,
-            provider_id=policy.llm_provider_id,
-            model=policy.model_override,
+            provider_id=primary_model.provider_id if primary_model else None,
+            model=primary_model.model if primary_model else None,
         )
 
         # Identity check (Task 6, plan: identity verification) — wired ONLY
@@ -1357,15 +1393,16 @@ async def run_ticket_agent(
         # 5. AI-content filter is applied when rendering (labels own AI output,
         # see _build_user_message) — nothing is physically removed.
 
+        vision_enabled = await resolve_task_profile_id(session, policy, TASK_VISION) is not None
         effective_vision_factory = vision_llm_factory
-        if effective_vision_factory is None and policy.vision_provider_id is not None:
+        if effective_vision_factory is None and vision_enabled:
             effective_vision_factory = await build_vision_llm_factory(
-                session, settings, policy.vision_provider_id, audit=audit_context
+                session, settings, policy, audit=audit_context
             )
         attachment_context = await build_attachment_context(
             session,
             articles,
-            vision_enabled=policy.vision_provider_id is not None,
+            vision_enabled=vision_enabled,
             vision_llm_factory=effective_vision_factory,
         )
 
@@ -1385,7 +1422,7 @@ async def run_ticket_agent(
         llm = AuditingLlmClient(
             llm, settings=settings, context=audit_context, session=session, pii_mapper=pii
         )
-        final_llm = await _resolve_final_answer_llm(
+        final_answer = await _resolve_final_answer_llm(
             session, settings, policy, final_llm, audit_context=audit_context, pii=pii
         )
         reply_language_line = _resolve_reply_language_line(policy, ticket, customer_articles)
@@ -1475,9 +1512,7 @@ async def run_ticket_agent(
         rounds = (
             max_tool_rounds
             if max_tool_rounds is not None
-            else await resolve_max_tool_rounds(
-                session, policy.llm_provider_id, default=DEFAULT_MAX_TOOL_ROUNDS
-            )
+            else _tool_rounds_for(primary_model, default=DEFAULT_MAX_TOOL_ROUNDS)
         )
         nudges_left = _MAX_PLAIN_TEXT_NUDGES
         # Final-answer handover: the primary model does the research; the
@@ -1522,12 +1557,12 @@ async def run_ticket_agent(
                 break
 
             if (
-                final_llm is not None
+                final_answer is not None
                 and not handed_over
                 and any(tc.name == TOOL_PROPOSE_CUSTOMER_MESSAGE for tc in response.tool_calls)
             ):
                 handed_over = True
-                active_llm = final_llm
+                active_llm = final_answer.llm
                 logger.info("ai_final_answer_handover", ticket_id=ticket_id, round=_round)
                 continue
 
@@ -1588,9 +1623,9 @@ async def run_ticket_agent(
             logger.info("ai_terminal_force", ticket_id=ticket_id, trigger=trigger, rounds=rounds)
             # The forced call writes the answer, so it is the final-answer
             # model's job whenever one is configured.
-            if final_llm is not None:
+            if final_answer is not None:
                 handed_over = True
-                active_llm = final_llm
+                active_llm = final_answer.llm
             response = await _chat_with_budget_retry(
                 active_llm, messages=messages, tools=terminal_schemas, max_tokens=completion_budget
             )
@@ -1645,15 +1680,22 @@ async def run_ticket_agent(
                 trigger=trigger,
             )
 
-        if handed_over:
+        if handed_over and final_answer is not None:
             await usage_service.record_usage(
                 session,
                 user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
                 queue_id=ticket.queue_id,
                 ticket_id=ticket_id,
                 feature=feature,
-                provider_id=policy.final_answer_llm_provider_id,
-                model=final_served_model or policy.final_answer_model_override,
+                provider_id=(
+                    getattr(final_answer.raw, "active_provider_id", None)
+                    or final_answer.provider_id
+                ),
+                model=(
+                    final_served_model
+                    or getattr(final_answer.raw, "active_model", None)
+                    or final_answer.model
+                ),
                 prompt_tokens=final_prompt_tokens,
                 completion_tokens=final_completion_tokens,
                 success=True,
@@ -1665,8 +1707,15 @@ async def run_ticket_agent(
             queue_id=ticket.queue_id,
             ticket_id=ticket_id,
             feature=feature,
-            provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
-            model=served_model or getattr(raw_llm, "active_model", None) or policy.model_override,
+            provider_id=(
+                getattr(raw_llm, "active_provider_id", None)
+                or (primary_model.provider_id if primary_model else None)
+            ),
+            model=(
+                served_model
+                or getattr(raw_llm, "active_model", None)
+                or (primary_model.model if primary_model else None)
+            ),
             prompt_tokens=prompt_tokens - final_prompt_tokens,
             completion_tokens=completion_tokens - final_completion_tokens,
             success=True,

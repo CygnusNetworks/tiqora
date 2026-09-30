@@ -39,13 +39,12 @@ from tiqora.ai.models import (
     SUMMARY_DETAIL_MODES,
     TiqoraAiPromptPart,
     TiqoraAiQueuePolicy,
-    TiqoraLlmProvider,
 )
 
 
 class QueuePolicyValidationError(ValueError):
     """Raised for 422-shaped input errors (bad autonomy value, missing
-    service_user_id/provider on auto-reply enable, etc.)."""
+    service_user_id on auto-reply enable, etc.)."""
 
 
 async def list_queue_policies(session: AsyncSession) -> list[TiqoraAiQueuePolicy]:
@@ -222,7 +221,6 @@ def _validate_fields(
     identity_mode: str | None,
     enabled_auto_reply: bool | None,
     service_user_id: int | None,
-    llm_provider_id: int | None,
     reply_language_mode: str | None,
     reply_language_fixed: str | None,
     reply_language_default: str | None,
@@ -236,15 +234,10 @@ def _validate_fields(
         raise QueuePolicyValidationError(
             f"Invalid identity_mode: {identity_mode!r} (expected one of {sorted(IDENTITY_MODES)})"
         )
-    if enabled_auto_reply:
-        if service_user_id is None:
-            raise QueuePolicyValidationError(
-                "enabled_auto_reply=true requires service_user_id to be set"
-            )
-        if llm_provider_id is None:
-            raise QueuePolicyValidationError(
-                "enabled_auto_reply=true requires llm_provider_id to be set"
-            )
+    if enabled_auto_reply and service_user_id is None:
+        raise QueuePolicyValidationError(
+            "enabled_auto_reply=true requires service_user_id to be set"
+        )
     if reply_language_mode is not None and reply_language_mode not in REPLY_LANGUAGE_MODES:
         raise QueuePolicyValidationError(
             f"Invalid reply_language_mode: {reply_language_mode!r} "
@@ -269,8 +262,6 @@ def _validate_triage_fields(
     *,
     enabled_triage: bool | None,
     service_user_id: int | None,
-    llm_provider_id: int | None,
-    triage_llm_provider_id: int | None,
     triage_target_queue_ids: str | None,
     triage_auto_threshold: int | None,
     triage_suggest_threshold: int | None,
@@ -303,10 +294,6 @@ def _validate_triage_fields(
         if service_user_id is None:
             raise QueuePolicyValidationError(
                 "enabled_triage=true requires service_user_id to be set"
-            )
-        if triage_llm_provider_id is None and llm_provider_id is None:
-            raise QueuePolicyValidationError(
-                "enabled_triage=true requires triage_llm_provider_id or llm_provider_id to be set"
             )
         if not parse_int_list(triage_target_queue_ids):
             raise QueuePolicyValidationError(
@@ -389,56 +376,6 @@ async def _validate_clarify_schema_json(session: AsyncSession, raw: str | None) 
             )
 
 
-async def _validate_llm_fallback_json(session: AsyncSession, raw: str | None) -> None:
-    """``llm_fallback_json``, when set, must be a JSON array of
-    ``{"provider_id": int > 0, "model": str|null}`` entries whose
-    ``provider_id`` refers to an existing :class:`TiqoraLlmProvider` — same
-    error class/422 shape as the other queue-policy validations. Actual
-    fallback resolution/skip-on-missing happens at run time in
-    :func:`tiqora.ai.kb_wiring.build_llm_client`; this only rejects obviously
-    invalid input at write time."""
-    if raw is None or raw == "":
-        return
-    import json
-
-    try:
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, TypeError) as exc:
-        raise QueuePolicyValidationError(f"llm_fallback_json is not valid JSON: {exc}") from exc
-    if not isinstance(parsed, list):
-        raise QueuePolicyValidationError("llm_fallback_json must be a JSON array")
-    for item in parsed:
-        if not isinstance(item, dict) or "provider_id" not in item:
-            raise QueuePolicyValidationError(
-                'llm_fallback_json entries must be {"provider_id": int, "model": str|null}'
-            )
-        provider_id = item["provider_id"]
-        if not isinstance(provider_id, int) or isinstance(provider_id, bool) or provider_id <= 0:
-            raise QueuePolicyValidationError(
-                f"llm_fallback_json provider_id {provider_id!r} must be a positive integer"
-            )
-        model = item.get("model")
-        if model is not None and not isinstance(model, str):
-            raise QueuePolicyValidationError("llm_fallback_json model must be a string or null")
-        provider = await session.get(TiqoraLlmProvider, provider_id)
-        if provider is None:
-            raise QueuePolicyValidationError(
-                f"llm_fallback_json provider_id {provider_id} does not exist"
-            )
-
-
-async def _validate_vision_provider(session: AsyncSession, vision_provider_id: int | None) -> None:
-    if vision_provider_id is None:
-        return
-    provider = await session.get(TiqoraLlmProvider, vision_provider_id)
-    if provider is None:
-        raise QueuePolicyValidationError(f"vision_provider_id {vision_provider_id} does not exist")
-    if not provider.supports_vision:
-        raise QueuePolicyValidationError(
-            f"Provider {vision_provider_id!r} does not have supports_vision enabled"
-        )
-
-
 async def _enforce_gate_on_enable(
     session: AsyncSession,
     *,
@@ -495,10 +432,6 @@ async def create_queue_policy(
     system_prompt: str = "",
     autonomy: str = "off",
     service_user_id: int | None = None,
-    llm_provider_id: int | None = None,
-    model_override: str | None = None,
-    llm_fallback_json: str | None = None,
-    vision_provider_id: int | None = None,
     kb_tags: str | None = None,
     kb_category_ids: str | None = None,
     mcp_client_ids: str | None = None,
@@ -535,17 +468,12 @@ async def create_queue_policy(
     triage_customer_fix_enabled: bool = False,
     triage_customer_fix_auto_threshold: int = 100,
     triage_delay_reply: bool = False,
-    triage_llm_provider_id: int | None = None,
-    triage_model_override: str | None = None,
-    final_answer_llm_provider_id: int | None = None,
-    final_answer_model_override: str | None = None,
 ) -> TiqoraAiQueuePolicy:
     _validate_fields(
         autonomy=autonomy,
         identity_mode=identity_mode,
         enabled_auto_reply=enabled_auto_reply,
         service_user_id=service_user_id,
-        llm_provider_id=llm_provider_id,
         reply_language_mode=reply_language_mode,
         reply_language_fixed=reply_language_fixed,
         reply_language_default=reply_language_default,
@@ -554,8 +482,6 @@ async def create_queue_policy(
     _validate_triage_fields(
         enabled_triage=enabled_triage,
         service_user_id=service_user_id,
-        llm_provider_id=llm_provider_id,
-        triage_llm_provider_id=triage_llm_provider_id,
         triage_target_queue_ids=triage_target_queue_ids,
         triage_auto_threshold=triage_auto_threshold,
         triage_suggest_threshold=triage_suggest_threshold,
@@ -564,8 +490,6 @@ async def create_queue_policy(
     )
     _validate_escalation_rules_json(escalation_rules)
     await _validate_clarify_schema_json(session, clarify_schema_json)
-    await _validate_llm_fallback_json(session, llm_fallback_json)
-    await _validate_vision_provider(session, vision_provider_id)
     await _validate_triage_targets(session, triage_target_queue_ids, queue_id=queue_id)
     await _enforce_gate_on_enable(
         session,
@@ -586,10 +510,6 @@ async def create_queue_policy(
         system_prompt=system_prompt,
         autonomy=autonomy,
         service_user_id=service_user_id,
-        llm_provider_id=llm_provider_id,
-        model_override=model_override,
-        llm_fallback_json=llm_fallback_json,
-        vision_provider_id=vision_provider_id,
         kb_tags=kb_tags,
         kb_category_ids=kb_category_ids,
         mcp_client_ids=mcp_client_ids,
@@ -626,10 +546,6 @@ async def create_queue_policy(
         triage_customer_fix_enabled=triage_customer_fix_enabled,
         triage_customer_fix_auto_threshold=triage_customer_fix_auto_threshold,
         triage_delay_reply=triage_delay_reply,
-        triage_llm_provider_id=triage_llm_provider_id,
-        triage_model_override=triage_model_override,
-        final_answer_llm_provider_id=final_answer_llm_provider_id,
-        final_answer_model_override=final_answer_model_override,
         create_by=change_by,
         change_by=change_by,
     )
@@ -652,7 +568,6 @@ async def update_queue_policy(
     effective_identity_mode = fields.get("identity_mode", row.identity_mode)
     effective_enabled_auto_reply = fields.get("enabled_auto_reply", row.enabled_auto_reply)
     effective_service_user_id = fields.get("service_user_id", row.service_user_id)
-    effective_llm_provider_id = fields.get("llm_provider_id", row.llm_provider_id)
     effective_reply_language_mode = fields.get("reply_language_mode", row.reply_language_mode)
     effective_reply_language_fixed = fields.get("reply_language_fixed", row.reply_language_fixed)
     effective_reply_language_default = fields.get(
@@ -660,14 +575,13 @@ async def update_queue_policy(
     )
     effective_summary_detail = fields.get("summary_detail", row.summary_detail)
     # Triage validation has to see the *merged* row, not just the patch: a
-    # PATCH that only flips enabled_triage still needs the stored targets and
-    # provider checked, and one that only lowers triage_auto_threshold must
+    # PATCH that only flips enabled_triage still needs the stored targets
+    # checked, and one that only lowers triage_auto_threshold must
     # be compared against the stored suggest threshold.
     effective_triage = {
         name: fields.get(name, getattr(row, name))
         for name in (
             "enabled_triage",
-            "triage_llm_provider_id",
             "triage_target_queue_ids",
             "triage_auto_threshold",
             "triage_suggest_threshold",
@@ -681,7 +595,6 @@ async def update_queue_policy(
         identity_mode=effective_identity_mode,
         enabled_auto_reply=effective_enabled_auto_reply,
         service_user_id=effective_service_user_id,
-        llm_provider_id=effective_llm_provider_id,
         reply_language_mode=effective_reply_language_mode,
         reply_language_fixed=effective_reply_language_fixed,
         reply_language_default=effective_reply_language_default,
@@ -689,7 +602,6 @@ async def update_queue_policy(
     )
     _validate_triage_fields(
         service_user_id=effective_service_user_id,
-        llm_provider_id=effective_llm_provider_id,
         **effective_triage,
     )
     if "triage_target_queue_ids" in fields:
@@ -700,10 +612,6 @@ async def update_queue_policy(
         _validate_escalation_rules_json(fields.get("escalation_rules"))
     if "clarify_schema_json" in fields:
         await _validate_clarify_schema_json(session, fields.get("clarify_schema_json"))
-    if "llm_fallback_json" in fields:
-        await _validate_llm_fallback_json(session, fields.get("llm_fallback_json"))
-    if "vision_provider_id" in fields:
-        await _validate_vision_provider(session, fields.get("vision_provider_id"))
     await _enforce_gate_on_enable(
         session,
         previous=row,

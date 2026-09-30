@@ -16,6 +16,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import make_model, routing_cleanup_statements, setup_agent_llm
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmUsage
@@ -290,6 +291,7 @@ def _seed_statements(*, ns: int) -> tuple[tuple[str, dict[str, Any]], ...]:
         ("DELETE FROM tiqora_ai_acl WHERE subject_id = :id", {"id": agent_id}),
         ("DELETE FROM tiqora_ai_usage WHERE queue_id = :id", {"id": queue_id}),
         ("DELETE FROM tiqora_ai_audit_log WHERE queue_id = :id", {"id": queue_id}),
+        *routing_cleanup_statements(f"fake-refine-provider-{queue_id}"),
         (
             "DELETE FROM tiqora_llm_provider WHERE name = :n",
             {"n": f"fake-refine-provider-{queue_id}"},
@@ -412,21 +414,19 @@ async def _setup_policy(
         name=f"fake-refine-provider-{seed['queue_id']}",
         kind="openai_compat",
         base_url="https://llm.example/v1",
-        default_model="fake-model",
         api_key=None,
         extra_json=None,
-        supports_tools=True,
-        supports_streaming=False,
         eu_hosted=True,
     )
-    await ai_policies.create_queue_policy(
+    await make_model(session, provider, "fake-model")
+    _policy = await ai_policies.create_queue_policy(
         session,
         change_by=1,
         queue_id=seed["queue_id"],
         enabled_refine=enabled_refine,
-        llm_provider_id=provider.id,
         pii_masking=pii_masking,
     )
+    await setup_agent_llm(session, _policy, provider)
 
 
 pytestmark = pytest.mark.db
