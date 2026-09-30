@@ -135,4 +135,15 @@ describe("RefineDiffView", () => {
     ).filter((m) => m.textContent?.includes("> Zitat"));
     expect(muted).toHaveLength(2);
   });
+
+  it("reports the current selection on mount and after every toggle", () => {
+    const onGroupsChange = vi.fn();
+    setup({ onGroupsChange });
+    expect(onGroupsChange).toHaveBeenLastCalledWith(AFTER, { total: 3, on: 3 });
+    fireEvent.click(screen.getAllByTestId("refine-review-change")[0]);
+    expect(onGroupsChange).toHaveBeenLastCalledWith("eins zwei DREI vier FÜNF", {
+      total: 3,
+      on: 2,
+    });
+  });
 });

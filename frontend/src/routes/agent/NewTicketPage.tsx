@@ -22,6 +22,9 @@ import {
 import { ComposerBody } from "@/components/agent/ComposerBody";
 import { ArticleBodyRenderer } from "@/components/agent/ArticleBodyRenderer";
 import { RefineControls } from "@/components/agent/RefineControls";
+import { toneLabelKey } from "@/lib/refineTone";
+import { RefineDiffView } from "@/components/agent/RefineDiffView";
+import { useRefineReview } from "@/components/agent/useRefineReview";
 import { CallerLookup } from "@/components/agent/phone/CallerLookup";
 import { PhoneTicketFields } from "@/components/agent/phone/PhoneTicketFields";
 import {
@@ -175,6 +178,7 @@ export function NewTicketPage() {
   const [priority, setPriority] = useState<number | "">("");
   const [state, setState] = useState<number | "">("");
   const [body, setBody] = useState("");
+  const refineReview = useRefineReview(setBody);
   const [direction, setDirection] = useState<Direction>(search.direction ?? "inbound");
   // Phone mode: caller number + lookup, the parity fields and the call timer
   // (running from page open).
@@ -850,19 +854,38 @@ export function NewTicketPage() {
               />
             )}
 
-            <label className="block">
-              <span className="mb-1 block text-[12px] font-medium text-muted">
-                {ticketType === "email"
-                  ? t("newTicket.message")
-                  : t("newTicket.note")}
-              </span>
-              <ComposerBody
-                richText={ticketType === "email" && richText}
-                value={body}
-                onChange={setBody}
-                testId="new-ticket-body"
-              />
-            </label>
+            {refineReview.review ? (
+              <div className="block">
+                <span className="mb-1 block text-[12px] font-medium text-muted">
+                  {ticketType === "email"
+                    ? t("newTicket.message")
+                    : t("newTicket.note")}
+                </span>
+                <RefineDiffView
+                  key={refineReview.reviewKey}
+                  before={refineReview.review.before}
+                  after={refineReview.review.after}
+                  toneLabel={t(toneLabelKey(refineReview.review.tone))}
+                  onAccept={refineReview.accept}
+                  onDiscard={refineReview.discard}
+                  className="min-h-[15rem] rounded-md border border-hairline"
+                />
+              </div>
+            ) : (
+              <label className="block">
+                <span className="mb-1 block text-[12px] font-medium text-muted">
+                  {ticketType === "email"
+                    ? t("newTicket.message")
+                    : t("newTicket.note")}
+                </span>
+                <ComposerBody
+                  richText={ticketType === "email" && richText}
+                  value={body}
+                  onChange={refineReview.onEdit}
+                  testId="new-ticket-body"
+                />
+              </label>
+            )}
 
             {/* No quote here, so the whole body is the agent's own text. */}
             <RefineControls
@@ -875,8 +898,15 @@ export function NewTicketPage() {
                     }
               }
               body={body}
-              onChange={setBody}
+              onChange={refineReview.onEdit}
               testIdPrefix="new-ticket-refine"
+              // A rich-text body is HTML: a word diff of markup is unreadable,
+              // so that case applies the refined text directly as before.
+              onRefined={
+                ticketType === "email" && richText ? undefined : refineReview.onRefined
+              }
+              appliedStats={refineReview.applied?.stats ?? null}
+              onShowChanges={refineReview.showChanges}
               mode={ticketType === "phone" ? "call_note" : "message"}
             />
 

@@ -5,7 +5,9 @@ import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
-import { RefineControls } from "./RefineControls";
+import { RefineControls, type RefineResult } from "./RefineControls";
+import { RefineDiffView } from "./RefineDiffView";
+import { useRefineReview } from "./useRefineReview";
 
 const { refine, refineAvailability } = vi.hoisted(() => ({
   refine: vi.fn(),
@@ -313,5 +315,145 @@ describe("RefineControls call-note mode", () => {
     expect(sent.mode).toBe("call_note");
     expect(sent.language).toBe(i18n.language);
     expect(sent.ticket_id).toBe(42);
+  });
+});
+
+/** Composer wiring with the review, exactly as the three composers do it. */
+function ReviewHarness({
+  initial,
+  onRefinedSpy,
+}: {
+  initial: string;
+  onRefinedSpy?: (r: RefineResult) => void;
+}) {
+  const [text, setText] = useState(initial);
+  const rr = useRefineReview(setText);
+  return (
+    <>
+      {rr.review ? (
+        <RefineDiffView
+          key={rr.reviewKey}
+          before={rr.review.before}
+          after={rr.review.after}
+          toneLabel="t"
+          onAccept={rr.accept}
+          onDiscard={rr.discard}
+        />
+      ) : (
+        <textarea
+          data-testid="body"
+          value={text}
+          onChange={(e) => rr.onEdit(e.target.value)}
+        />
+      )}
+      <RefineControls
+        target={{ ticket_id: 42 }}
+        body={text}
+        onChange={rr.onEdit}
+        onRefined={(r) => {
+          onRefinedSpy?.(r);
+          rr.onRefined(r);
+        }}
+        appliedStats={rr.applied?.stats ?? null}
+        onShowChanges={rr.showChanges}
+      />
+    </>
+  );
+}
+
+function renderReview(initial: string, spy?: (r: RefineResult) => void) {
+  return render(
+    <QueryClientProvider client={qc}>
+      <I18nextProvider i18n={i18n}>
+        <ReviewHarness initial={initial} onRefinedSpy={spy} />
+      </I18nextProvider>
+    </QueryClientProvider>,
+  );
+}
+
+async function pressRefine() {
+  await waitFor(() => expect(screen.getByTestId("refine-button")).toBeEnabled());
+  fireEvent.click(screen.getByTestId("refine-button"));
+}
+
+describe("RefineControls with review (onRefined)", () => {
+  it("hands the result to the parent instead of changing the body", async () => {
+    refine.mockResolvedValue({ sections: [{ id: 0, text: "Poliert." }] });
+    const onRefined = vi.fn();
+    const onChange = vi.fn();
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <RefineControls
+            target={{ ticket_id: 42 }}
+            body="roh getippt"
+            onChange={onChange}
+            onRefined={onRefined}
+          />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    await pressRefine();
+    await waitFor(() => expect(onRefined).toHaveBeenCalledTimes(1));
+    expect(onRefined).toHaveBeenCalledWith({
+      before: "roh getippt",
+      after: "Poliert.",
+      tone: "standard",
+    });
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("opens no review and says so when nothing changed", async () => {
+    refine.mockResolvedValue({ sections: [{ id: 0, text: "schon gut" }] });
+    const spy = vi.fn();
+    renderReview("schon gut", spy);
+    await pressRefine();
+    expect(
+      await screen.findByText(i18n.t("ticket.refine.review.noChanges")),
+    ).toBeTruthy();
+    expect(spy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("refine-review")).toBeNull();
+    expect(body()).toBe("schon gut");
+  });
+
+  it("shows the applied summary, re-opens the changes and undoes to the pre-refine text", async () => {
+    refine.mockResolvedValue({ sections: [{ id: 0, text: "Poliert." }] });
+    renderReview("roh getippt");
+    await pressRefine();
+    await screen.findByTestId("refine-review");
+    expect(screen.queryByTestId("refine-undo")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("refine-review-accept"));
+    expect(body()).toBe("Poliert.");
+    expect(screen.getByTestId("refine-applied").textContent).toContain(
+      i18n.t("ticket.refine.review.applied", { tone: "Standard", on: 1, total: 1 }),
+    );
+
+    fireEvent.click(screen.getByTestId("refine-show-changes"));
+    expect(screen.getByTestId("refine-review")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("refine-review-discard"));
+    expect(body()).toBe("Poliert.");
+
+    fireEvent.click(screen.getByTestId("refine-undo"));
+    expect(body()).toBe("roh getippt");
+  });
+
+  it("compares a second refine against the text right before it", async () => {
+    refine.mockResolvedValueOnce({ sections: [{ id: 0, text: "Eins zwei." }] });
+    const spy = vi.fn();
+    renderReview("eins zwei", spy);
+    await pressRefine();
+    fireEvent.click(await screen.findByTestId("refine-review-accept"));
+    expect(body()).toBe("Eins zwei.");
+
+    refine.mockResolvedValueOnce({ sections: [{ id: 0, text: "Eins zwei drei." }] });
+    await pressRefine();
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+    expect(spy.mock.calls[1][0].before).toBe("Eins zwei.");
+    fireEvent.click(await screen.findByTestId("refine-review-accept"));
+    expect(body()).toBe("Eins zwei drei.");
+
+    fireEvent.click(screen.getByTestId("refine-undo"));
+    expect(body()).toBe("Eins zwei.");
   });
 });

@@ -453,6 +453,7 @@ describe("NewTicketPage refine", () => {
     );
     fireEvent.click(screen.getByTestId("new-ticket-refine-button"));
 
+    fireEvent.click(await screen.findByTestId("refine-review-accept"));
     await waitFor(() =>
       expect(body().value).toBe("Der Kunde meldet eine Stoerung."),
     );

@@ -14,7 +14,16 @@ import {
   type RefineTarget,
   type RefineTone,
 } from "@/lib/refineApi";
-import { loadRefineTone, saveRefineTone } from "@/lib/refineTone";
+import { loadRefineTone, saveRefineTone, toneLabelKey } from "@/lib/refineTone";
+
+/** A finished refine handed to the parent for review (`onRefined`). */
+export interface RefineResult {
+  /** The body at the moment "Verfeinern" was pressed. */
+  before: string;
+  /** The re-assembled body the model produced (quotes untouched). */
+  after: string;
+  tone: RefineTone;
+}
 
 /**
  * "Text verfeinern" for a composer body: one split button — press the left
@@ -47,6 +56,9 @@ export function RefineControls({
   testIdPrefix = "refine",
   variant = "split",
   mode = "message",
+  onRefined,
+  appliedStats,
+  onShowChanges,
 }: {
   /** `{ticket_id}` when replying inside a ticket (the server reads its queue),
    * `{queue_id}` for the New-ticket form, `null` while no queue is picked
@@ -60,11 +72,24 @@ export function RefineControls({
   /** `call_note`: one "Notiz aufbereiten" button, no tones — structures
    * phone-call notes instead of polishing a message. */
   mode?: RefineMode;
+  /** When given, a refine does NOT call `onChange`: the parent opens a review
+   * (`RefineDiffView`) and applies the accepted text itself. Omitted = the
+   * refined text replaces the body directly. */
+  onRefined?: (result: RefineResult) => void;
+  /** Set by the parent once the user accepted; turns the undo row into
+   * "Verfeinert (Tonfall) · k von N Änderungen übernommen". */
+  appliedStats?: { total: number; on: number } | null;
+  /** Renders "Änderungen anzeigen" in the undo row. */
+  onShowChanges?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const [tone, setTone] = useState<RefineTone>(loadRefineTone);
   /** The body as the agent last typed it, kept so one refine can be undone. */
   const [beforeRefine, setBeforeRefine] = useState<string | null>(null);
+  /** Tone of the last refine, for the "Verfeinert (Tonfall)" summary. */
+  const [lastTone, setLastTone] = useState<RefineTone>("standard");
+  /** The last refine came back identical to the input. */
+  const [noChanges, setNoChanges] = useState(false);
 
   const availabilityQ = useQuery({
     queryKey: ["ai-refine-availability", target],
@@ -77,8 +102,9 @@ export function RefineControls({
   const sections = ownSections(segments);
 
   const refineMutation = useMutation({
-    mutationFn: () =>
-      refineApi.refine(
+    mutationFn: () => {
+      setNoChanges(false);
+      return refineApi.refine(
         mode === "call_note"
           ? {
               ...(target as RefineTarget),
@@ -88,11 +114,24 @@ export function RefineControls({
               language: i18n.language,
             }
           : { ...(target as RefineTarget), tone, segments },
-      ),
+      );
+    },
     onSuccess: (response) => {
       const refined = new Map(response.sections.map((s) => [s.id, s.text]));
+      const after = applyRefined(segments, refined);
+      const usedTone: RefineTone = mode === "call_note" ? "standard" : tone;
+      if (!onRefined) {
+        setBeforeRefine(body);
+        onChange(after);
+        return;
+      }
+      if (after === body) {
+        setNoChanges(true);
+        return;
+      }
+      setLastTone(usedTone);
       setBeforeRefine(body);
-      onChange(applyRefined(segments, refined));
+      onRefined({ before: body, after, tone: usedTone });
     },
   });
 
@@ -111,19 +150,53 @@ export function RefineControls({
     if (beforeRefine === null) return;
     onChange(beforeRefine);
     setBeforeRefine(null);
+    setNoChanges(false);
     refineMutation.reset();
   };
 
-  const undoButton = beforeRefine !== null && (
-    <button
-      type="button"
-      data-testid={`${testIdPrefix}-undo`}
-      disabled={busy}
-      onClick={undo}
-      className="rounded px-1.5 py-1 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-    >
-      ↩ {t("ticket.refine.undo")}
-    </button>
+  const linkBtn =
+    "rounded px-1.5 py-1 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
+  // With a review the undo row only exists once the user accepted something.
+  const showUndo = beforeRefine !== null && (!onRefined || appliedStats != null);
+  const undoButton = (
+    <>
+      {noChanges && (
+        <span className="text-muted" data-testid={`${testIdPrefix}-no-changes`}>
+          {t("ticket.refine.review.noChanges")}
+        </span>
+      )}
+      {showUndo && appliedStats && (
+        <span className="text-muted" data-testid={`${testIdPrefix}-applied`}>
+          {t("ticket.refine.review.applied", {
+            tone: t(toneLabelKey(lastTone)),
+            on: appliedStats.on,
+            total: appliedStats.total,
+          })}
+        </span>
+      )}
+      {showUndo && appliedStats && onShowChanges && (
+        <button
+          type="button"
+          data-testid={`${testIdPrefix}-show-changes`}
+          disabled={busy}
+          onClick={onShowChanges}
+          className={linkBtn}
+        >
+          {t("ticket.refine.review.show")}
+        </button>
+      )}
+      {showUndo && (
+        <button
+          type="button"
+          data-testid={`${testIdPrefix}-undo`}
+          disabled={busy}
+          onClick={undo}
+          className={linkBtn}
+        >
+          ↩ {t("ticket.refine.undo")}
+        </button>
+      )}
+    </>
   );
   const errorText = refineMutation.isError && (
     <span className="text-danger" data-testid={`${testIdPrefix}-error`}>
@@ -269,10 +342,6 @@ export function RefineControls({
       {errorText}
     </div>
   );
-}
-
-function toneLabelKey(tone: RefineTone): string {
-  return `ticket.refine.tone${tone[0].toUpperCase()}${tone.slice(1)}`;
 }
 
 /** Maps the structured `"<code>: <message>"` detail the API returns onto a

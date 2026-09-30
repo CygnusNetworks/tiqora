@@ -942,13 +942,46 @@ describe("ReplyDialog refine", () => {
     );
     fireEvent.click(screen.getByTestId("reply-refine-button"));
 
+    // The result is reviewed first: the textarea is swapped for the diff.
+    await screen.findByTestId("refine-review");
+    expect(screen.queryByTestId("reply-body")).toBeNull();
+    fireEvent.click(screen.getByTestId("refine-review-accept"));
     await waitFor(() =>
       expect(body().value).toBe(
         `Guten Tag, der Anschluss wurde neu geschaltet.\n\n${baseDraft.body}`,
       ),
     );
+    expect(screen.queryByTestId("refine-review")).toBeNull();
     // Addressed by ticket — the server derives the queue from it.
     expect(refine.mock.calls[0][0].ticket_id).toBe(1);
+  });
+
+  async function openWithRefine(refined: string) {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
+    refine.mockResolvedValue({ sections: [{ id: 0, text: refined }] });
+    wrap(<ReplyDialog ticketId={1} articleId={2} replyAll={false} open onClose={vi.fn()} />);
+    const ta = (await screen.findByTestId("reply-body")) as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: `eins zwei drei\n\n${baseDraft.body}` } });
+    await waitFor(() => expect(screen.getByTestId("reply-refine-button")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("reply-refine-button"));
+    await screen.findByTestId("refine-review");
+  }
+
+  it("sends the accepted selection when Send is pressed while the review is open", async () => {
+    await openWithRefine("EINS zwei DREI");
+    // Turn the first change off, leave the second on.
+    fireEvent.click(screen.getAllByTestId("refine-review-change")[0]);
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
+    const sent = createArticle.mock.calls[0][1].body as string;
+    expect(sent).toBe(`eins zwei DREI\n\n${baseDraft.body}`);
+  });
+
+  it("discarding the review keeps the original text", async () => {
+    await openWithRefine("EINS zwei DREI");
+    fireEvent.click(screen.getByTestId("refine-review-discard"));
+    const ta = (await screen.findByTestId("reply-body")) as HTMLTextAreaElement;
+    expect(ta.value).toBe(`eins zwei drei\n\n${baseDraft.body}`);
   });
 });
 

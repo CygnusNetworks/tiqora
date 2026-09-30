@@ -16,6 +16,9 @@ export interface RefineDiffViewProps {
   toneLabel: string;
   onAccept: (text: string, stats: { total: number; on: number }) => void;
   onDiscard: () => void;
+  /** Fires on mount and after every toggle with the text the current on/off
+   * selection would produce, so a parent can send it without accepting. */
+  onGroupsChange?: (text: string, stats: { total: number; on: number }) => void;
   /** Sizing from the parent (min-height of the editor). */
   className?: string;
 }
@@ -61,6 +64,7 @@ export function RefineDiffView({
   toneLabel,
   onAccept,
   onDiscard,
+  onGroupsChange,
   className,
 }: RefineDiffViewProps) {
   const { t } = useTranslation();
@@ -87,6 +91,11 @@ export function RefineDiffView({
   }, [cur, view]);
 
   const stats = useMemo(() => countChanges(groups), [groups]);
+  const onGroupsChangeRef = useRef(onGroupsChange);
+  onGroupsChangeRef.current = onGroupsChange;
+  useEffect(() => {
+    onGroupsChangeRef.current?.(applyRefineDiff(groups), stats);
+  }, [groups, stats]);
   // group index of each change, so a change's ordinal maps to its slot
   const changeSlots = useMemo(
     () => groups.flatMap((g, i) => (g.kind === "change" ? [i] : [])),

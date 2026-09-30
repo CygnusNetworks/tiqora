@@ -25,6 +25,9 @@ import {
 import { ComposerBody } from "../ComposerBody";
 import { ComposerTimeChip } from "../ComposerTimeChip";
 import { RefineControls } from "../RefineControls";
+import { toneLabelKey } from "@/lib/refineTone";
+import { RefineDiffView } from "../RefineDiffView";
+import { useRefineReview } from "../useRefineReview";
 import { AttachmentChips } from "../telegram/ComposerChips";
 import { useChatAttachments } from "../telegram/useChatAttachments";
 import { DynamicFieldInputs, type DynamicFieldValues } from "./DynamicFieldInputs";
@@ -89,6 +92,7 @@ export function PhoneCallDialog({
   const [subject, setSubject] = useState(() => draft?.subject || autoSubject(t, ticket, draft?.direction ?? initialDirection));
   const [subjectTouched, setSubjectTouched] = useState(Boolean(draft?.subject));
   const [body, setBody] = useState(draft?.body ?? "");
+  const refineReview = useRefineReview(setBody);
   const [callTimer] = useState(() => timerFromCall(startedAt, endedAt));
   const timer = useCallTimer(callTimer ?? { initialSeconds: draft?.elapsed ?? 0 });
   const [timeUnits, setTimeUnits] = useState("");
@@ -349,13 +353,33 @@ export function PhoneCallDialog({
         <div className="overflow-hidden rounded-lg border border-hairline bg-surface-subtle/40 focus-within:border-accent/60">
           <div className="p-2">
             <span className="mb-1 block text-xs text-muted">{t("phone.notes")}</span>
-            <ComposerBody richText={false} value={body} onChange={setBody} testId="phone-body" />
+            {refineReview.review ? (
+              <RefineDiffView
+                key={refineReview.reviewKey}
+                before={refineReview.review.before}
+                after={refineReview.review.after}
+                toneLabel={t(toneLabelKey(refineReview.review.tone))}
+                onAccept={refineReview.accept}
+                onDiscard={refineReview.discard}
+                className="min-h-[12rem] rounded-md border border-hairline"
+              />
+            ) : (
+              <ComposerBody
+                richText={false}
+                value={body}
+                onChange={refineReview.onEdit}
+                testId="phone-body"
+              />
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t border-hairline bg-surface px-2 py-1.5">
             <RefineControls
               target={{ ticket_id: ticketId }}
               body={body}
-              onChange={setBody}
+              onChange={refineReview.onEdit}
+              onRefined={refineReview.onRefined}
+              appliedStats={refineReview.applied?.stats ?? null}
+              onShowChanges={refineReview.showChanges}
               testIdPrefix="phone-refine"
               variant="toolbar"
               mode="call_note"
