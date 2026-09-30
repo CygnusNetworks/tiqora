@@ -1,4 +1,8 @@
-"""LLM provider CRUD + connection/tool-calling test (plan §3.2).
+"""LLM provider CRUD + the provider's remote model list (plan §3.2).
+
+The per-model connection/tool-calling probe lives in
+:mod:`tiqora.ai.llm_catalog` (models belong to providers since the LLM
+routing rework).
 
 Follows the Fernet-at-rest pattern from ``tiqora.domain.mail_outbound``: the
 admin API never returns the decrypted API key, only ``has_api_key``.
@@ -6,26 +10,34 @@ admin API never returns the decrypted API key, only ``has_api_key``.
 
 from __future__ import annotations
 
-import json
-import time
-from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.ai.audit import FEATURE_TEST as AUDIT_FEATURE_TEST
-from tiqora.ai.audit import AuditContext, write_audit_log
-from tiqora.ai.models import TiqoraLlmProvider
+from tiqora.ai.models import PROVIDER_KIND_OPENAI_COMPAT, TiqoraLlmProvider
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 
-_TEST_TIMEOUT_SECONDS = 20.0
+REMOTE_MODELS_TIMEOUT_SECONDS = 10.0
+ERROR_TEXT_LIMIT = 300
+KIND_NOT_SUPPORTED = "Nur OpenAI-kompatible Provider werden unterstützt."
 
 
 class ProviderValidationError(Exception):
-    """Raised for invalid provider pricing fields (translated to 422)."""
+    """Raised for invalid provider fields (translated to 422)."""
+
+
+class RemoteModelsError(Exception):
+    """The provider's model list could not be read (translated to 502)."""
+
+
+def _validate_kind(kind: str | None) -> None:
+    # The runtime only has the OpenAI-compatible client; any other kind would
+    # silently be spoken to as OpenAI. Existing rows are left alone.
+    if kind is not None and kind != PROVIDER_KIND_OPENAI_COMPAT:
+        raise ProviderValidationError(KIND_NOT_SUPPORTED)
 
 
 def _validate_pricing(*, price_currency: str | None) -> None:
@@ -50,31 +62,6 @@ def _validate_budget(
     ):
         if value is not None and value < 0:
             raise ProviderValidationError(f"{label} must be >= 0")
-
-
-# Minimal tool schema used to probe tool-calling support on /chat/completions.
-_TEST_TOOL_SCHEMA = [
-    {
-        "type": "function",
-        "function": {
-            "name": "ping",
-            "description": "Respond with pong.",
-            "parameters": {
-                "type": "object",
-                "properties": {"echo": {"type": "string"}},
-                "required": [],
-            },
-        },
-    }
-]
-
-
-@dataclass(frozen=True, slots=True)
-class ProviderTestResult:
-    ok: bool
-    model: str | None
-    tool_calling_ok: bool
-    error: str | None
 
 
 async def list_providers(session: AsyncSession) -> list[TiqoraLlmProvider]:
@@ -106,6 +93,7 @@ async def create_provider(
     budget_cost_week: float | None = None,
     budget_cost_month: float | None = None,
 ) -> TiqoraLlmProvider:
+    _validate_kind(kind)
     _validate_pricing(price_currency=price_currency)
     _validate_budget(
         budget_cost_day=budget_cost_day,
@@ -153,6 +141,7 @@ async def update_provider(
     budget_cost_month: float | None = None,
     valid_id: int | None = None,
 ) -> TiqoraLlmProvider:
+    _validate_kind(kind)
     _validate_pricing(price_currency=price_currency)
     _validate_budget(
         budget_cost_day=budget_cost_day,
@@ -253,110 +242,86 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
     }
 
 
-async def test_provider_connection(
+def http_client(timeout_seconds: float) -> httpx.AsyncClient:
+    """The one place an outbound HTTP client for provider calls is built
+    (admin probes only; tests replace it with a ``MockTransport`` client).
+    Redirects are never followed — see :mod:`tiqora.security.outbound`."""
+    return httpx.AsyncClient(timeout=timeout_seconds, follow_redirects=False)
+
+
+def shorten(text: str, limit: int = ERROR_TEXT_LIMIT) -> str:
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+async def list_remote_models(
     row: TiqoraLlmProvider,
     *,
-    model: str,
-    supports_tools: bool = True,
     settings: Settings,
     client: httpx.AsyncClient | None = None,
-    session: AsyncSession | None = None,
-) -> ProviderTestResult:
-    """Call ``POST {base_url}/chat/completions`` for *model* with a mini
-    prompt (+ a mini tool schema when *supports_tools*) to verify both
-    connectivity/auth and tool-calling support.
+) -> list[str]:
+    """``GET {base_url}/models`` with the provider's key → the sorted,
+    de-duplicated ``data[].id`` values (OpenAI list shape).
 
-    ``client`` is injectable (``httpx.AsyncClient(transport=httpx.MockTransport(...))``)
-    so tests never hit the network; production callers omit it and a
-    short-lived client is created for the single request. When ``session``
-    is given, the call (request/response, redacted of nothing — this probe
-    never carries PII) is written to ``tiqora_ai_audit_log`` with
-    ``feature="test"`` (see :mod:`tiqora.ai.audit`).
+    Raises :class:`RemoteModelsError` with a short, human-readable reason for
+    anything that is not a usable list: blocked URL, network error, HTTP
+    error status (with the provider's own error text), unexpected body.
     """
-    api_key = decrypt_secret(settings.secret_key, row.api_key_enc) if row.api_key_enc else None
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    payload: dict[str, object] = {
-        "model": model,
-        "messages": [{"role": "user", "content": "Reply with the single word: pong"}],
-        "max_tokens": 16,
-    }
-    if supports_tools:
-        payload["tools"] = _TEST_TOOL_SCHEMA
-
-    url = row.base_url.rstrip("/") + "/chat/completions"
     from tiqora.security.outbound import OutboundURLError, pin_outbound_url
 
+    api_key = decrypt_secret(settings.secret_key, row.api_key_enc) if row.api_key_enc else None
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    url = row.base_url.rstrip("/") + "/models"
     try:
         pinned = pin_outbound_url(url, allow_private_networks=True)
     except OutboundURLError as exc:
-        return ProviderTestResult(
-            ok=False, model=None, tool_calling_ok=False, error=f"outbound URL rejected: {exc}"
-        )
-    headers = pinned.request_headers(headers)
-    extensions = pinned.request_extensions()
+        raise RemoteModelsError(f"URL abgelehnt: {exc}") from exc
     owns_client = client is None
-    http_client = client or httpx.AsyncClient(timeout=_TEST_TIMEOUT_SECONDS, follow_redirects=False)
-    start = time.monotonic()
-    status_code: int | None = None
-    error: str | None = None
-    response_json: str | None = None
-    served_model: str | None = None
+    http = client or http_client(REMOTE_MODELS_TIMEOUT_SECONDS)
     try:
-        response = await http_client.post(
-            pinned.request_url, headers=headers, json=payload, extensions=extensions
-        )
-        status_code = response.status_code
-        if response.status_code >= 400:
-            error = f"HTTP {response.status_code}: {response.text[:500]}"
-            return ProviderTestResult(ok=False, model=None, tool_calling_ok=False, error=error)
-        data = response.json()
-        response_json = json.dumps(data)
-        served_model = data.get("model")
-        choices = data.get("choices") or []
-        tool_calling_ok = False
-        if choices:
-            message = choices[0].get("message") or {}
-            tool_calling_ok = bool(message.get("tool_calls"))
-        return ProviderTestResult(
-            ok=True, model=served_model, tool_calling_ok=tool_calling_ok, error=None
+        response = await http.get(
+            pinned.request_url,
+            headers=pinned.request_headers(headers),
+            extensions=pinned.request_extensions(),
         )
     except httpx.HTTPError as exc:
-        error = str(exc)
-        return ProviderTestResult(ok=False, model=None, tool_calling_ok=False, error=error)
+        raise RemoteModelsError(str(exc) or type(exc).__name__) from exc
     finally:
         if owns_client:
-            await http_client.aclose()
-        if session is not None:
-            await write_audit_log(
-                session,
-                settings=settings,
-                context=AuditContext(
-                    feature=AUDIT_FEATURE_TEST,
-                    provider_id=row.id,
-                    model=served_model or model,
-                ),
-                request_json=json.dumps(payload),
-                response_json=response_json,
-                status_code=status_code,
-                error=error,
-                duration_ms=int((time.monotonic() - start) * 1000),
-                prompt_tokens=None,
-                completion_tokens=None,
-            )
+            await http.aclose()
+    if response.status_code >= 400:
+        raise RemoteModelsError(f"HTTP {response.status_code}: {response.text}")
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise RemoteModelsError("Antwort ist kein JSON") from exc
+    items = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise RemoteModelsError("Antwort enthält keine Modellliste (data[])")
+    ids = {
+        item["id"].strip()
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip()
+    }
+    return sorted(ids)
 
 
 __all__ = [
-    "ProviderTestResult",
+    "ERROR_TEXT_LIMIT",
+    "KIND_NOT_SUPPORTED",
+    "REMOTE_MODELS_TIMEOUT_SECONDS",
     "ProviderValidationError",
+    "RemoteModelsError",
     "create_provider",
     "delete_provider",
     "duplicate_provider",
     "get_provider",
+    "http_client",
     "list_providers",
+    "list_remote_models",
     "provider_to_public_dict",
-    "test_provider_connection",
+    "shorten",
     "update_provider",
 ]

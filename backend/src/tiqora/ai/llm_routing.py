@@ -79,7 +79,7 @@ TASK_NEEDS: dict[str, frozenset[str]] = {
 }
 
 # Tasks that use the agent's profile when they resolve to none of their own.
-_FALLS_BACK_TO_AGENT = frozenset({TASK_TRIAGE, TASK_SUMMARY, TASK_REFINE})
+TASKS_FALLING_BACK_TO_AGENT = frozenset({TASK_TRIAGE, TASK_SUMMARY, TASK_REFINE})
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,7 +169,7 @@ async def resolve_task_profile_id(
     if task not in ALL_TASKS:
         raise ValueError(f"Unknown AI task: {task!r}")
     profile_id = await _own_profile_id(session, policy, task)
-    if profile_id is None and task in _FALLS_BACK_TO_AGENT:
+    if profile_id is None and task in TASKS_FALLING_BACK_TO_AGENT:
         profile_id = await _own_profile_id(session, policy, TASK_AGENT)
     return profile_id
 
@@ -461,6 +461,7 @@ __all__ = [
     "TASK_REFINE",
     "TASK_SUMMARY",
     "TASK_TRIAGE",
+    "TASKS_FALLING_BACK_TO_AGENT",
     "TASK_VISION",
     "ChainModel",
     "NoUsableModel",
