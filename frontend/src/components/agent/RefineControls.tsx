@@ -59,6 +59,7 @@ export function RefineControls({
   onRefined,
   appliedStats,
   onShowChanges,
+  reviewOpen = false,
 }: {
   /** `{ticket_id}` when replying inside a ticket (the server reads its queue),
    * `{queue_id}` for the New-ticket form, `null` while no queue is picked
@@ -81,6 +82,8 @@ export function RefineControls({
   appliedStats?: { total: number; on: number } | null;
   /** Renders "Änderungen anzeigen" in the undo row. */
   onShowChanges?: () => void;
+  /** A review is open: the undo row is hidden (the review has its own Verwerfen). */
+  reviewOpen?: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const [tone, setTone] = useState<RefineTone>(loadRefineTone);
@@ -162,7 +165,8 @@ export function RefineControls({
   const linkBtn =
     "rounded px-1.5 py-1 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
   // With a review the undo row only exists once the user accepted something.
-  const showUndo = beforeRefine !== null && (!onRefined || appliedStats != null);
+  const showUndo =
+    !reviewOpen && beforeRefine !== null && (!onRefined || appliedStats != null);
   const undoButton = (
     <>
       {noChanges && (

@@ -106,6 +106,7 @@ export function ReplyDialog({
   const [body, setBody] = useState("");
   const refineReview = useRefineReview(setBody);
   const clearReview = refineReview.clear;
+  const { review: reviewOpen, currentReviewText } = refineReview;
   const [templateId, setTemplateId] = useState("");
   // Collected while writing, recorded after the article is created.
   const [mentions, setMentions] = useState<PickedMention[]>([]);
@@ -262,10 +263,12 @@ export function ReplyDialog({
       if (sendEpochRef.current !== epoch) return;
       const baseline = baselineRef.current;
       if (!baseline) return;
+      // While a refine review is open the text to keep is its current selection.
+      const text = reviewOpen ? currentReviewText() : body;
       const toStr = joinRecipients(to) ?? "";
       const ccStr = joinRecipients(cc) ?? "";
       const dirty =
-        body.trim() !== baseline.body.trim() ||
+        text.trim() !== baseline.body.trim() ||
         subject !== baseline.subject ||
         toStr !== baseline.to ||
         ccStr !== baseline.cc ||
@@ -277,7 +280,7 @@ export function ReplyDialog({
           articleId,
           replyAll,
           subject,
-          body,
+          body: text,
           to: toStr,
           cc: ccStr,
           bcc: joinRecipients(bcc) ?? "",
@@ -296,6 +299,8 @@ export function ReplyDialog({
     replyAll,
     subject,
     body,
+    reviewOpen,
+    currentReviewText,
     to,
     cc,
     bcc,
@@ -827,6 +832,7 @@ export function ReplyDialog({
                   onRefined={refineReview.onRefined}
                   appliedStats={refineReview.applied?.stats ?? null}
                   onShowChanges={refineReview.showChanges}
+                  reviewOpen={refineReview.review !== null}
                 />
               )}
               <span className="ml-auto">

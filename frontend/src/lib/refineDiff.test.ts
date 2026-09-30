@@ -44,3 +44,18 @@ describe("refineDiff", () => {
     expect(countChanges(off)).toEqual({ total: 2, on: 1 });
   });
 });
+
+describe("buildRefineDiff on a full rewrite of long text", () => {
+  test("finishes quickly and still round-trips", () => {
+    const words = (p: string) =>
+      Array.from({ length: 4000 }, (_, i) => `${p}${i}`).join(" ");
+    const before = `Hallo\n\n${words("alt")}\n\nGruss`;
+    const after = `Hallo\n\n${words("neu")}\n\nGruss`;
+    const t0 = Date.now();
+    const groups = buildRefineDiff(before, after);
+    expect(Date.now() - t0).toBeLessThan(1500);
+    expect(applyRefineDiff(groups)).toBe(after);
+    expect(applyRefineDiff(groups.map((g) => (g.kind === "change" ? { ...g, on: false } : g)))).toBe(before);
+    expect(countChanges(groups).total).toBeGreaterThan(0);
+  });
+});
