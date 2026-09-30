@@ -1065,7 +1065,11 @@
     "submitSend": "Vytvořit a odeslat",
     "sendError": "E-mail se nepodařilo odeslat. Tiket už byl vytvořen — zkuste odeslat odpověď z něj.",
     "goToTicket": "Přejít na tiket",
-    "note": "Poznámka k hovoru"
+    "note": "Poznámka k hovoru",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Připojeno živě",

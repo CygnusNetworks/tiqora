@@ -1065,7 +1065,11 @@
     "submitSend": "Oluştur ve gönder",
     "sendError": "E-posta gönderilemedi. Bilet zaten oluşturuldu; lütfen yanıtı oradan göndermeyi yeniden deneyin.",
     "goToTicket": "Bilete git",
-    "note": "Çağrı notu"
+    "note": "Çağrı notu",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Canlı bağlanıldı",

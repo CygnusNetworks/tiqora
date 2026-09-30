@@ -64,8 +64,8 @@ function Picker<T extends number>({
 }
 
 /**
- * The AgentTicketPhone parity fields of the New-ticket page's phone mode:
- * owner, responsible, type, service, SLA, the pending time of a pending
+ * The AgentTicketPhone parity fields of the New-ticket page's phone mode
+ * (the owner sits in `TicketPropsBar`): responsible, type, service, SLA, the pending time of a pending
  * initial state, the booked time (timer from page open), dynamic fields and
  * attachments. Controlled — the page owns the value and submits it.
  */
@@ -120,7 +120,6 @@ export function PhoneTicketFields({
   return (
     <div className="space-y-4" data-testid="phone-ticket-fields">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Picker label={t("ticket.owner")} items={agentItems} value={value.ownerId} onSelect={(v) => set({ ownerId: v })} testId="new-ticket-owner" noneLabel={none} />
         <Picker
           label={t("ticket.toolbar.responsible")}
           items={agentItems}

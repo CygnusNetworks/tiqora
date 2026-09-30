@@ -1065,7 +1065,11 @@
     "submitSend": "Crear y enviar",
     "sendError": "No se pudo enviar el correo electrónico. El ticket ya se creó; vuelva a intentar enviar la respuesta desde allí.",
     "goToTicket": "Ir al billete",
-    "note": "nota de llamada"
+    "note": "nota de llamada",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Conectado en vivo",

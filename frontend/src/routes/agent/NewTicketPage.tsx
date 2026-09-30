@@ -8,10 +8,12 @@ import { flattenQueues } from "@/components/agent/QueueTree";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
-import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
-import { ChevronDownIcon } from "@/components/ui/icons";
-import { stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
+import { TicketPropsBar } from "@/components/agent/TicketPropsBar";
+import {
+  newTicketApi,
+  type QueueSuggestionSource,
+} from "@/lib/newTicketApi";
 import {
   RecipientsField,
   joinRecipients,
@@ -47,9 +49,6 @@ import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
-
-const SELECT_TRIGGER_CLASS =
-  "flex w-full items-center justify-between gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-left text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
 
 const toggleCls =
   "inline-flex items-center gap-1 rounded border border-hairline px-2 py-0.5 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -155,18 +154,11 @@ export function NewTicketPage() {
     [statesQ.data, ticketType],
   );
 
-  const queueItems: SelectMenuItem<number>[] = useMemo(
-    () => queues.map((q) => ({ value: q.id, label: q.name })),
-    [queues],
-  );
-  const priorityItems: SelectMenuItem<number>[] = useMemo(
-    () => priorities.map((p) => ({ value: p.id, label: p.name })),
-    [priorities],
-  );
-  const stateItems: SelectMenuItem<number>[] = useMemo(
-    () => states.map((s) => ({ value: s.id, label: stateLabel(t, s.name) })),
-    [states, t],
-  );
+  const agentsQ = useQuery({
+    queryKey: ["reference", "agents"],
+    queryFn: () => api.listReferenceAgents(),
+    enabled: ticketType === "phone",
+  });
 
   const [customer, setCustomer] = useState<CustomerRef | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -174,6 +166,9 @@ export function NewTicketPage() {
   const debouncedCustomerQuery = useDebouncedValue(customerQuery, 250);
 
   const [queue, setQueue] = useState<number | "">(queueId ?? "");
+  // A queue the agent picked by hand (or the `?queue_id=` param) is never
+  // replaced by a suggestion; otherwise the queue follows the customer.
+  const [queuePinned, setQueuePinned] = useState(queueId !== undefined);
   const [subject, setSubject] = useState("");
   const [priority, setPriority] = useState<number | "">("");
   const [state, setState] = useState<number | "">("");
@@ -226,11 +221,52 @@ export function NewTicketPage() {
     enabled: queue !== "",
   });
 
-  // Seed the selects with sensible defaults once their options load, without
-  // clobbering a value the user (or the queue picker) already chose.
+  // Queue default (Decision 1): the customer's last ticket, the company's,
+  // the configured default, else the first non-intake queue — the backend
+  // picks; before a customer is known (or "Ohne Kunde") the default applies.
+  const suggestLogin = customer?.login ?? null;
+  const suggestionQ = useQuery({
+    queryKey: ["new-ticket", "queue-suggestion", ticketType, suggestLogin],
+    queryFn: ({ signal }) =>
+      suggestLogin
+        ? newTicketApi.suggestedQueue(suggestLogin, ticketType, signal)
+        : newTicketApi.defaultQueue(ticketType, signal),
+    enabled: !queuePinned,
+  });
+  const suggestion = suggestionQ.data;
   useEffect(() => {
-    if (queue === "" && queues.length > 0) setQueue(queueId ?? queues[0].id);
-  }, [queues, queueId, queue]);
+    if (queuePinned || !suggestion || suggestion.queue_id === null) return;
+    if (!queues.some((q) => q.id === suggestion.queue_id)) return;
+    setQueue(suggestion.queue_id);
+  }, [suggestion, queuePinned, queues]);
+  // Endpoint down or no usable answer: still offer a queue, but never an
+  // intake one (Junk etc.).
+  const suggestionFailed =
+    suggestionQ.isError ||
+    (suggestion !== undefined && !queues.some((q) => q.id === suggestion.queue_id));
+  useEffect(() => {
+    if (queue !== "" || !suggestionFailed || queues.length === 0) return;
+    const intake = /^(junk|raw|postmaster)$/i;
+    const pick = queues.find((q) => !intake.test(q.name.split("::")[0].trim())) ?? queues[0];
+    setQueue(pick.id);
+  }, [queue, suggestionFailed, queues]);
+
+  const pickQueue = (id: number) => {
+    setQueue(id);
+    setQueuePinned(true);
+  };
+  // Only while the queue still is the suggestion for the current customer.
+  const queueSource: QueueSuggestionSource | null =
+    !queuePinned && suggestion && suggestion.queue_id === queue ? suggestion.source : null;
+  const queueSourceText =
+    queueSource === "customer" && customer
+      ? t("newTicket.queueSourceCustomer", { name: customer.full_name || customer.login })
+      : queueSource === "company" && customer
+        ? t("newTicket.queueSourceCompany")
+        : null;
+
+  // Seed the selects with sensible defaults once their options load, without
+  // clobbering a value the user already chose.
   useEffect(() => {
     if (priority === "" && priorities.length > 0) {
       setPriority(defaultId(priorities, ["normal", "3"]) ?? priorities[0].id);
@@ -325,6 +361,8 @@ export function NewTicketPage() {
 
   const selectedState = statesQ.data?.find((s) => s.id === state);
   const pendingSelected = Boolean(selectedState?.type_name.startsWith("pending"));
+  // Decision 4: a phone ticket logged as already done says so on the button.
+  const closedSelected = Boolean(selectedState?.type_name.startsWith("closed"));
   const phoneReady =
     missingRequired(phoneDfs, phoneFields.dfValues).length === 0 &&
     !attachments.encoding &&
@@ -612,93 +650,58 @@ export function NewTicketPage() {
               !formUnlocked && "pointer-events-none opacity-50",
             )}
           >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
+            {ticketType === "email" ? (
+              <div className="block">
                 <span className="mb-1 block text-[12px] font-medium text-muted">
-                  {t("newTicket.queue")}
+                  {t("newTicket.from")}
                 </span>
-                <SelectMenu
-                  items={queueItems}
-                  value={typeof queue === "number" ? queue : undefined}
-                  onSelect={setQueue}
-                  placeholder={t("newTicket.noQueues")}
-                  panelTestId="new-ticket-queue-panel"
-                  trigger={({ open, ref, toggleProps }) => (
-                    <button
-                      ref={ref}
-                      type="button"
-                      data-testid="new-ticket-queue"
-                      {...toggleProps}
-                      className={SELECT_TRIGGER_CLASS}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {queueItems.find((i) => i.value === queue)?.label ??
-                          t("newTicket.noQueues")}
-                      </span>
-                      <ChevronDownIcon
-                        className={cn(
-                          "shrink-0 text-muted transition-transform duration-150",
-                          open && "rotate-180",
-                        )}
-                      />
-                    </button>
-                  )}
-                />
-              </label>
-
-              {ticketType === "email" ? (
-                <div className="block">
-                  <span className="mb-1 block text-[12px] font-medium text-muted">
-                    {t("newTicket.from")}
-                  </span>
-                  <p
-                    className="rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-muted"
-                    data-testid="new-ticket-from"
+                <p
+                  className="rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-muted"
+                  data-testid="new-ticket-from"
+                >
+                  {composeContextQ.isLoading
+                    ? "…"
+                    : (composeContextQ.data?.from_address ?? "—")}
+                </p>
+              </div>
+            ) : (
+              <div className="block">
+                <span className="mb-1 block text-[12px] font-medium text-muted">
+                  {t("newTicket.directionLabel")}
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    data-testid="new-ticket-direction-in"
+                    aria-pressed={direction === "inbound"}
+                    onClick={() => setDirection("inbound")}
+                    className={cn(
+                      toggleCls,
+                      direction === "inbound" && toggleActiveCls,
+                    )}
                   >
-                    {composeContextQ.isLoading
-                      ? "…"
-                      : (composeContextQ.data?.from_address ?? "—")}
+                    {t("newTicket.directionIn")}
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="new-ticket-direction-out"
+                    aria-pressed={direction === "outbound"}
+                    onClick={() => setDirection("outbound")}
+                    className={cn(
+                      toggleCls,
+                      direction === "outbound" && toggleActiveCls,
+                    )}
+                  >
+                    {t("newTicket.directionOut")}
+                  </button>
+                </div>
+                {direction === "inbound" && (
+                  <p className="mt-1 text-[11px] text-muted" data-testid="new-ticket-autoreply-hint">
+                    {t("phone.autoReplyHint")}
                   </p>
-                </div>
-              ) : (
-                <div className="block">
-                  <span className="mb-1 block text-[12px] font-medium text-muted">
-                    {t("newTicket.directionLabel")}
-                  </span>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      data-testid="new-ticket-direction-in"
-                      aria-pressed={direction === "inbound"}
-                      onClick={() => setDirection("inbound")}
-                      className={cn(
-                        toggleCls,
-                        direction === "inbound" && toggleActiveCls,
-                      )}
-                    >
-                      {t("newTicket.directionIn")}
-                    </button>
-                    <button
-                      type="button"
-                      data-testid="new-ticket-direction-out"
-                      aria-pressed={direction === "outbound"}
-                      onClick={() => setDirection("outbound")}
-                      className={cn(
-                        toggleCls,
-                        direction === "outbound" && toggleActiveCls,
-                      )}
-                    >
-                      {t("newTicket.directionOut")}
-                    </button>
-                  </div>
-                  {direction === "inbound" && (
-                    <p className="mt-1 text-[11px] text-muted" data-testid="new-ticket-autoreply-hint">
-                      {t("phone.autoReplyHint")}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {ticketType === "email" && (
               <div className="space-y-2">
@@ -778,73 +781,27 @@ export function NewTicketPage() {
               />
             </label>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-muted">
-                  {t("newTicket.priority")}
-                </span>
-                <SelectMenu
-                  items={priorityItems}
-                  value={typeof priority === "number" ? priority : undefined}
-                  onSelect={setPriority}
-                  placeholder={t("admin.form.selectPlaceholder")}
-                  panelTestId="new-ticket-priority-panel"
-                  trigger={({ open, ref, toggleProps }) => (
-                    <button
-                      ref={ref}
-                      type="button"
-                      data-testid="new-ticket-priority"
-                      {...toggleProps}
-                      className={SELECT_TRIGGER_CLASS}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {priorityItems.find((i) => i.value === priority)
-                          ?.label ?? t("admin.form.selectPlaceholder")}
-                      </span>
-                      <ChevronDownIcon
-                        className={cn(
-                          "shrink-0 text-muted transition-transform duration-150",
-                          open && "rotate-180",
-                        )}
-                      />
-                    </button>
-                  )}
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-muted">
-                  {t("newTicket.state")}
-                </span>
-                <SelectMenu
-                  items={stateItems}
-                  value={typeof state === "number" ? state : undefined}
-                  onSelect={setState}
-                  placeholder={t("admin.form.selectPlaceholder")}
-                  panelTestId="new-ticket-state-panel"
-                  trigger={({ open, ref, toggleProps }) => (
-                    <button
-                      ref={ref}
-                      type="button"
-                      data-testid="new-ticket-state"
-                      {...toggleProps}
-                      className={SELECT_TRIGGER_CLASS}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {stateItems.find((i) => i.value === state)?.label ??
-                          t("admin.form.selectPlaceholder")}
-                      </span>
-                      <ChevronDownIcon
-                        className={cn(
-                          "shrink-0 text-muted transition-transform duration-150",
-                          open && "rotate-180",
-                        )}
-                      />
-                    </button>
-                  )}
-                />
-              </label>
-            </div>
+            <TicketPropsBar
+              queues={queues}
+              queueId={queue === "" ? null : queue}
+              onQueueChange={pickQueue}
+              queueSource={queueSourceText}
+              owner={
+                ticketType === "phone"
+                  ? {
+                      agents: agentsQ.data ?? [],
+                      value: phoneFields.ownerId ?? user?.id ?? null,
+                      onChange: (id) => setPhoneFields((f) => ({ ...f, ownerId: id })),
+                    }
+                  : undefined
+              }
+              priorities={priorities}
+              priorityId={priority === "" ? null : priority}
+              onPriorityChange={setPriority}
+              states={states}
+              stateId={state === "" ? null : state}
+              onStateChange={setState}
+            />
 
             {ticketType === "phone" && (
               <PhoneTicketFields
@@ -991,6 +948,8 @@ export function NewTicketPage() {
                 <Spinner />
               ) : ticketType === "email" ? (
                 t("newTicket.submitSend")
+              ) : closedSelected ? (
+                t("newTicket.submitClose")
               ) : (
                 t("newTicket.submit")
               )}

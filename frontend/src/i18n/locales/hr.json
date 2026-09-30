@@ -1065,7 +1065,11 @@
     "submitSend": "Izradi i pošalji",
     "sendError": "Nije moguće poslati e-poštu. Title je već kreiran — pokušajte ponovno poslati odgovor od tamo.",
     "goToTicket": "Idi na kartu",
-    "note": "Bilješka o pozivu"
+    "note": "Bilješka o pozivu",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Povezan uživo",

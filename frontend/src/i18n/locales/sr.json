@@ -1065,7 +1065,11 @@
     "submitSend": "Креирај и пошаљи",
     "sendError": "Порука е-поште није могла бити послата. Карта је већ креирана — покушајте поново да пошаљете одговор одатле.",
     "goToTicket": "Иди на карту",
-    "note": "Напомена о позиву"
+    "note": "Напомена о позиву",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Повезано уживо",

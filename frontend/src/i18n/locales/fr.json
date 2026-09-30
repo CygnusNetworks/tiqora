@@ -1065,7 +1065,11 @@
     "submitSend": "Créer et envoyer",
     "sendError": "L'e-mail n'a pas pu être envoyé. Le ticket a déjà été créé. Veuillez réessayer d'envoyer la réponse à partir de là.",
     "goToTicket": "Aller au ticket",
-    "note": "Note d'appel"
+    "note": "Note d'appel",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Connecté en direct",

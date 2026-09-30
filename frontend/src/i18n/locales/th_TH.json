@@ -1065,7 +1065,11 @@
     "submitSend": "สร้างและส่ง",
     "sendError": "ไม่สามารถส่งอีเมลได้ สร้างตั๋วแล้ว โปรดลองส่งคำตอบอีกครั้งจากที่นั่น",
     "goToTicket": "ไปที่ตั๋ว",
-    "note": "บันทึกการโทร"
+    "note": "บันทึกการโทร",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "เชื่อมต่อสดแล้ว",

@@ -1065,7 +1065,11 @@
     "submitSend": "Crea e invia",
     "sendError": "Impossibile inviare l'email. Il ticket è già stato creato — riprovare l'invio della risposta da lì.",
     "goToTicket": "Vai al ticket",
-    "note": "Nota chiamata"
+    "note": "Nota chiamata",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Connesso in tempo reale",

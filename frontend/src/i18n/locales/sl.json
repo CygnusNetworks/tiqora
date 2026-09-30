@@ -1065,7 +1065,11 @@
     "submitSend": "Ustvari in pošlji",
     "sendError": "E-pošte ni bilo mogoče poslati. Vstopnica je že ustvarjena — poskusite ponovno poslati odgovor od tam.",
     "goToTicket": "Pojdi na vstopnico",
-    "note": "Opomba za klic"
+    "note": "Opomba za klic",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Povezan v živo",

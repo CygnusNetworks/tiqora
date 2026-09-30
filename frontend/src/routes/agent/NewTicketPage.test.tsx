@@ -20,6 +20,8 @@ const {
   searchParams,
   callerLookup,
   getCustomer,
+  suggestedQueue,
+  defaultQueue,
 } = vi.hoisted(() => ({
   navigate: vi.fn(),
   listQueues: vi.fn(),
@@ -34,6 +36,12 @@ const {
   searchParams: { current: {} as Record<string, unknown> },
   callerLookup: vi.fn(),
   getCustomer: vi.fn(),
+  suggestedQueue: vi.fn(),
+  defaultQueue: vi.fn(),
+}));
+
+vi.mock("@/lib/newTicketApi", () => ({
+  newTicketApi: { suggestedQueue, defaultQueue },
 }));
 
 vi.mock("@/lib/phoneApi", async () => {
@@ -174,6 +182,8 @@ describe("NewTicketPage", () => {
     searchParams.current = {};
     callerLookup.mockReset().mockResolvedValue({ number_normalized: "", customers: [], open_tickets: [] });
     getCustomer.mockReset();
+    defaultQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "fallback" });
+    suggestedQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "default" });
     window.localStorage.clear();
   });
 
@@ -424,6 +434,158 @@ describe("NewTicketPage", () => {
   });
 });
 
+describe("NewTicketPage property bar and queue default", () => {
+  const junk = { id: 9, name: "Junk", group_id: 1, valid: true };
+  const hotline = { id: 2, name: "Level1::Hotline", group_id: 1, valid: true };
+  const technik = { id: 3, name: "Level1::Technik", group_id: 1, valid: true };
+  const other = {
+    login: "max.muster",
+    email: "max@example.com",
+    customer_id: "CUST2",
+    full_name: "Max Muster",
+  };
+
+  beforeEach(() => {
+    navigate.mockReset();
+    listQueues.mockReset().mockResolvedValue([junk, queue, hotline, technik]);
+    listReferencePriorities.mockReset().mockResolvedValue(priorities);
+    listReferenceStates.mockReset().mockResolvedValue(states);
+    searchReferenceCustomers.mockReset().mockResolvedValue([customer, other]);
+    getComposeContext.mockReset().mockResolvedValue(composeContext);
+    createTicket.mockReset().mockResolvedValue({ ticket_id: 42 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 1 });
+    searchParams.current = {};
+    callerLookup.mockReset().mockResolvedValue({ number_normalized: "", customers: [], open_tickets: [] });
+    getCustomer.mockReset();
+    defaultQueue.mockReset().mockResolvedValue({ queue_id: 2, source: "default" });
+    suggestedQueue.mockReset().mockImplementation((login: string) =>
+      Promise.resolve(
+        login === "jane.doe"
+          ? { queue_id: 3, source: "customer" }
+          : { queue_id: 1, source: "company" },
+      ),
+    );
+  });
+
+  const queueValue = () => screen.getByTestId("new-ticket-queue-value");
+
+  async function pick(login: string) {
+    fireEvent.change(screen.getByTestId("new-ticket-customer-search"), {
+      target: { value: login.slice(0, 3) },
+    });
+    fireEvent.click(await screen.findByTestId(`new-ticket-customer-result-${login}`));
+  }
+
+  it("starts in the configured default queue, not the first (Junk) one, and shows no source", async () => {
+    await renderReady();
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Hotline"));
+    expect(defaultQueue).toHaveBeenCalledWith("email", expect.anything());
+    expect(screen.queryByTestId("new-ticket-queue-source")).not.toBeInTheDocument();
+    expect(queueValue()).not.toHaveTextContent("Junk");
+  });
+
+  it("never falls back to Junk when the suggestion endpoint fails", async () => {
+    defaultQueue.mockRejectedValue(new ApiError(500, "boom", "/x"));
+    await renderReady();
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Support"));
+  });
+
+  it("never falls back to Junk when no queue is suggested", async () => {
+    defaultQueue.mockResolvedValue({ queue_id: null, source: null });
+    await renderReady();
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Support"));
+  });
+
+  it("takes the customer's queue once a customer is set and says why", async () => {
+    await renderReady();
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Hotline"));
+    await pick("jane.doe");
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Technik"));
+    expect(suggestedQueue).toHaveBeenCalledWith("jane.doe", "email", expect.anything());
+    expect(screen.getByTestId("new-ticket-queue-source")).toHaveTextContent(
+      "like Jane Doe's last ticket",
+    );
+  });
+
+  it("names the company as source when the queue comes from the company's last ticket", async () => {
+    await renderReady();
+    await pick("max.muster");
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-queue-source")).toHaveTextContent(
+        "like the company's last ticket",
+      ),
+    );
+    expect(queueValue()).toHaveTextContent("Support");
+  });
+
+  it("keeps a queue the agent picked by hand when the customer changes", async () => {
+    await renderReady();
+    await pick("jane.doe");
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Technik"));
+
+    fireEvent.click(screen.getByTestId("new-ticket-queue"));
+    fireEvent.click(await screen.findByTestId("new-ticket-queue-panel-option-2"));
+    expect(queueValue()).toHaveTextContent("Hotline");
+    expect(screen.queryByTestId("new-ticket-queue-source")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("new-ticket-customer-clear"));
+    await pick("max.muster");
+    expect(await screen.findByTestId("new-ticket-customer-card")).toHaveTextContent("Max Muster");
+    // Give a (wrong) re-suggestion the chance to land.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(suggestedQueue).not.toHaveBeenCalledWith("max.muster", expect.anything(), expect.anything());
+    expect(queueValue()).toHaveTextContent("Hotline");
+  });
+
+  it("the queue_id param wins over every suggestion", async () => {
+    searchParams.current = { queue_id: 1 };
+    await renderReady();
+    await pick("jane.doe");
+    expect(await screen.findByTestId("new-ticket-customer-card")).toBeInTheDocument();
+    expect(queueValue()).toHaveTextContent("Support");
+    expect(defaultQueue).not.toHaveBeenCalled();
+    expect(suggestedQueue).not.toHaveBeenCalled();
+  });
+
+  it("phone mode asks the phone screen and shows Queue, Owner, Priority, State; e-mail shows three", async () => {
+    await renderReady();
+    await pick("jane.doe");
+    expect(screen.getByTestId("new-ticket-queue")).toBeInTheDocument();
+    expect(screen.queryByTestId("new-ticket-owner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-priority-value")).toHaveTextContent("normal");
+    expect(screen.getByTestId("new-ticket-priority-value")).not.toHaveTextContent("3");
+
+    fireEvent.click(screen.getByTestId("new-ticket-type-phone"));
+    await waitFor(() =>
+      expect(suggestedQueue).toHaveBeenCalledWith("jane.doe", "phone", expect.anything()),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-owner-value")).toHaveTextContent("Agent One"),
+    );
+    // The owner lives in the bar only.
+    expect(screen.getAllByTestId("new-ticket-owner")).toHaveLength(1);
+  });
+
+  it("the submit button says 'Log and close' for a closed state on a phone ticket", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...states,
+      { id: 2, name: "closed successful", type_name: "closed" },
+    ]);
+    await renderReady();
+    fireEvent.click(screen.getByTestId("new-ticket-type-phone"));
+    fireEvent.click(screen.getByTestId("new-ticket-skip-customer"));
+    expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Create ticket");
+
+    fireEvent.click(screen.getByTestId("new-ticket-state"));
+    fireEvent.click(await screen.findByTestId("new-ticket-state-panel-option-2"));
+    expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Log and close");
+
+    fireEvent.click(screen.getByTestId("new-ticket-state"));
+    fireEvent.click(await screen.findByTestId("new-ticket-state-panel-option-4"));
+    expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Create ticket");
+  });
+});
+
 describe("NewTicketPage refine", () => {
   beforeEach(() => {
     navigate.mockReset();
@@ -432,6 +594,8 @@ describe("NewTicketPage refine", () => {
     listReferenceStates.mockReset().mockResolvedValue(states);
     searchReferenceCustomers.mockReset().mockResolvedValue([customer]);
     getComposeContext.mockReset().mockResolvedValue(composeContext);
+    defaultQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "fallback" });
+    suggestedQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "default" });
     refine.mockReset();
     refineAvailability.mockReset().mockResolvedValue({ available: true });
   });

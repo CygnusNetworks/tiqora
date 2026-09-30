@@ -1065,7 +1065,11 @@
     "submitSend": "बनाएं और भेजें",
     "sendError": "ईमेल नहीं भेजा जा सका. टिकट पहले ही बन चुका था - कृपया वहां से उत्तर भेजने का पुनः प्रयास करें।",
     "goToTicket": "टिकट पर जाएँ",
-    "note": "कॉल नोट"
+    "note": "कॉल नोट",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "लाइव जुड़े",

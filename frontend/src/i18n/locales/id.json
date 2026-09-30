@@ -1065,7 +1065,11 @@
     "submitSend": "Buat & kirim",
     "sendError": "Email tidak dapat dikirim. Tiket sudah dibuat — silakan coba lagi mengirimkan balasan dari sana.",
     "goToTicket": "Pergi ke tiket",
-    "note": "Catatan panggilan"
+    "note": "Catatan panggilan",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Terhubung langsung",

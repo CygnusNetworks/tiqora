@@ -1065,7 +1065,11 @@
     "submitSend": "创建并发送",
     "sendError": "电子邮件无法发送。工单已创建 - 请重试从那里发送回复。",
     "goToTicket": "前往购工单处",
-    "note": "通话记录"
+    "note": "通话记录",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "已连接直播",

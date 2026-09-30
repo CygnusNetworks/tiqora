@@ -1065,7 +1065,11 @@
     "submitSend": "Създаване и изпращане",
     "sendError": "Имейлът не можа да бъде изпратен. Билетът вече е създаден — моля, опитайте отново да изпратите отговора оттам.",
     "goToTicket": "Отидете на билет",
-    "note": "Бележка за обаждане"
+    "note": "Бележка за обаждане",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Свързан на живо",

@@ -1065,7 +1065,11 @@
     "submitSend": "創建並發送",
     "sendError": "電子郵件無法傳送。票證已建立 - 請重試從那裡發送回覆。",
     "goToTicket": "前往購票處",
-    "note": "通話記錄"
+    "note": "通話記錄",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "已連線直播",

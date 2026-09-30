@@ -1065,7 +1065,11 @@
     "submitSend": "Create & send",
     "sendError": "The email could not be sent. The ticket was already created — please retry sending the reply from there.",
     "goToTicket": "Go to ticket",
-    "note": "Call note"
+    "note": "Call note",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Connected live",

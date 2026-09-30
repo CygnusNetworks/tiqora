@@ -1065,7 +1065,11 @@
     "submitSend": "Creați și trimiteți",
     "sendError": "E-mailul nu a putut fi trimis. Biletul a fost deja creat - vă rugăm să reîncercați să trimiteți răspunsul de acolo.",
     "goToTicket": "Du-te la bilet",
-    "note": "Notă de apel"
+    "note": "Notă de apel",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Conectat în direct",
