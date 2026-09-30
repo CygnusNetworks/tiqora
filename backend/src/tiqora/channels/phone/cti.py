@@ -23,6 +23,10 @@ State machine per call:
   everybody notified before still receives this event so their card can go.
 * ``hangup`` — the call is ``ended``; the popup keeps offering "log this call"
   for :data:`RECENT_AFTER_HANGUP_SECONDS`.
+* ``handled`` — the PBX took the call over itself (secretary, IVR, voicemail):
+  the call is ``ended`` and dismissed for everybody notified, so it is neither
+  shown as missed nor offered for logging. Ignored for unknown calls and for
+  calls an agent already answered.
 
 Events are applied read-modify-write without a Redis transaction: a PBX
 reports one call's events in order (the dialplan ``CURL()`` calls are
@@ -57,7 +61,7 @@ RECENT_AFTER_HANGUP_SECONDS = 15 * 60
 _EXTENSION_RE = re.compile(r"^[A-Za-z0-9*#+_.@/:-]{1,64}$")
 _SPLIT_RE = re.compile(r"[,;\s]+")
 
-CallEventType = Literal["ringing", "answered", "hangup"]
+CallEventType = Literal["ringing", "answered", "hangup", "handled"]
 CallStateName = Literal["ringing", "answered", "ended"]
 CallDirection = Literal["inbound", "outbound"]
 
@@ -230,6 +234,10 @@ async def apply_call_event(
     users = await resolve_users(body.extension) if body.extension else []
     call = await _load(redis_client, body.call_id)
 
+    if body.event == "handled" and (call is None or call.state == "answered"):
+        logger.debug("cti.event_ignored", call_id=body.call_id, call_event=body.event)
+        return CallEventResult(recipients=[])
+
     if call is None:
         if not users:
             logger.debug(
@@ -264,6 +272,16 @@ async def apply_call_event(
             if users:
                 call.user_ids = users
                 call.extension = body.extension
+    elif body.event == "handled":
+        if call.state != "ended":
+            call.state = "ended"
+            call.ended_at = at
+        everybody = _union(call.notified_user_ids, call.user_ids)
+        pending = [u for u in everybody if u not in call.dismissed_user_ids]
+        call.dismissed_user_ids = everybody
+        await _store(redis_client, call)
+        await _publish(redis_client, pending, "dismissed", call)
+        return CallEventResult(recipients=pending)
     else:  # hangup
         if call.state != "ended":
             call.state = "ended"
