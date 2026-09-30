@@ -1324,17 +1324,21 @@
           "identity": "Identität",
           "language": "Sprache"
         },
-        "modelOverride": "Modell-Override",
-        "llmFallback": "Fallback-Provider",
-        "fallbackAdd": "Fallback hinzufügen",
-        "fallbackEmpty": "Keine Fallback-Provider — es wird ausschließlich der oben gewählte Haupt-Provider verwendet.",
-        "fallbackMoveUp": "Nach oben",
-        "fallbackMoveDown": "Nach unten",
-        "fallbackRemove": "Entfernen",
+        "models": {
+          "title": "Modelle",
+          "intro": "Welches Modellprofil jede Aufgabe in dieser Queue nutzt. Ohne eigene Auswahl gilt die globale Zuordnung unter KI → Modelle → Aufgaben.",
+          "manage": "Modelle und Profile verwalten",
+          "colTask": "Aufgabe",
+          "colProfile": "Profil in dieser Queue",
+          "colEffective": "Antwortet gerade",
+          "inheritProfile": "Global: {{name}}",
+          "inheritNone": "Global: kein eigenes Profil ({{fallback}})",
+          "inherited": "geerbt",
+          "overridden": "überschrieben",
+          "viaAgent": "wie {{task}}"
+        },
         "clarifySchemaJson": "Clarify-Schema-Felder (JSON)",
         "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}",
-        "visionProvider": "Vision-Modell (Bilder)",
-        "visionProviderNone": "— keins — Bilder werden ignoriert",
         "serviceUser": "Service-Agent",
         "kbTags": "KB-Tags",
         "kbTagsPlaceholder": "tag1, tag2, …",
@@ -1370,7 +1374,9 @@
         },
         "list": {
           "tabPolicies": "Richtlinien",
-          "tabUsage": "Nutzung"
+          "tabUsage": "Nutzung",
+          "agentProfile": "Profil: {{name}}",
+          "noAgentProfile": "Kein Modellprofil ({{fallback}})"
         },
         "tab": {
           "basics": "Basis",
@@ -1423,13 +1429,7 @@
         "triageThresholdExplainer": "Ab {{auto}} → automatisch verschieben · {{suggestLow}}–{{suggestHigh}} → vorschlagen · unter {{suggestLow}} → nichts tun",
         "triageDelayReply": "Nach einem Move in diese Queue erst auf die nächste Kundennachricht antworten",
         "triageCustomerFix": "Kunden bei weitergeleiteten Mails korrigieren",
-        "triageCustomerFixThreshold": "Kunden korrigieren ab",
-        "triageProvider": "Triage-Provider",
-        "triageProviderInherit": "Provider der Queue übernehmen",
-        "triageModelOverride": "Triage-Modell",
-        "finalAnswerProvider": "Provider für die finale Antwort",
-        "finalAnswerProviderNone": "Keiner (Modell der Queue antwortet)",
-        "finalAnswerModelOverride": "Modell für die finale Antwort"
+        "triageCustomerFixThreshold": "Kunden korrigieren ab"
       },
       "usage": {
         "title": "Nutzung",
@@ -1598,7 +1598,7 @@
         "supportsTools": "Kann Werkzeuge nutzen",
         "supportsVision": "Kann Bilder lesen",
         "active": "Aktiv",
-        "disableWarning": "Das Modell steckt in Profil {{profiles}}. Deaktiviert wird es dort übersprungen; bleibt in einem Profil kein Modell übrig, hat die zugehörige Aufgabe kein Modell mehr.",
+        "disableWarning": "Das Modell steckt in Profil(en) {{profiles}}. Deaktiviert wird es dort übersprungen; bleibt in einem Profil kein Modell übrig, hat die zugehörige Aufgabe kein Modell mehr.",
         "priceInput": "Preis Eingabe je 1 Mio. Token",
         "priceOutput": "Preis Ausgabe je 1 Mio. Token",
         "priceHelp": "In {{currency}}, der Währung des Providers. Grundlage für die Kosten im LLM-Audit und für die Kostenlimits.",
@@ -1607,6 +1607,7 @@
         "contextTokensHelp": "Nur zur Information. Leer = unbekannt.",
         "maxToolRounds": "Max. Tool-Runden",
         "maxToolRoundsHelp": "Wie viele Rechercheschritte dieses Modell bekommt, bevor es antworten muss. Jeder Schritt schickt das gesamte Gespräch erneut, Erhöhen kostet also überproportional. Leer = eingebauter Standard.",
+        "wholeNumberRequired": "{{field}}: bitte eine ganze Zahl eingeben.",
         "testAction": "Testen",
         "testOk": "OK",
         "testFail": "Fehlgeschlagen",
@@ -1651,7 +1652,6 @@
         "colProfile": "Profil",
         "needsNothing": "nichts Besonderes",
         "noProfile": "Kein eigenes Profil ({{fallback}})",
-        "cannot": "kann nicht: {{needs}}",
         "profileInactive": "deaktiviert",
         "selectedInactive": "Das Profil ist deaktiviert und zählt wie „Kein eigenes Profil“ ({{fallback}}).",
         "saved": "Gespeichert.",
@@ -1689,10 +1689,6 @@
       "aiQueue": {
         "queue": "Die Queue, für die diese Policy gilt. Jede Queue kann höchstens eine Policy haben; Policies werden nicht auf Subqueues vererbt.",
         "systemPrompt": "Zusätzlicher Prompt-Text, der vor jeder Modellanfrage vorangestellt wird (z. B. Ton, Fachkontext der Queue) — kombiniert mit dem Autonomie-Template und optionalen Identitätsregeln.",
-        "llmProvider": "Sprachmodell-Provider für diese Queue. Muss Tool-Aufrufe unterstützen, sobald MCP-Tools oder Autonomie genutzt werden.",
-        "modelOverride": "Überschreibt nur für diese Queue das Standardmodell des gewählten Providers.",
-        "llmFallback": "Provider, die nach dem oben gewählten Haupt-Provider der Reihe nach versucht werden, wenn eine Anfrage fehlschlägt (Rate-Limit, Timeout, Fehler). Jeder Eintrag hat einen eigenen optionalen Modell-Override. Priorität 1 ist immer der Haupt-Provider/das Hauptmodell; die Einträge hier sind Priorität 2, 3, ….",
-        "visionProvider": "Bild-Anhänge werden nie an das Hauptmodell gezeigt — nur an dieses dedizierte Vision-Modell, das sie in Textform beschreibt. Diese Beschreibung (nicht das Bild) sieht das Hauptmodell. Leer lassen, um Bild-Anhänge komplett zu ignorieren. Da Bilder nicht auf PII maskiert werden können, empfiehlt sich hier ein EU-gehosteter Provider — und eine bewusste Aktivierung.",
         "enabledManualAssist": "Blendet den „KI-Entwurf“-Button im Ticket Zoom ein. Entwürfe sind eigene Datensätze, kein Artikel — ein Agent muss jeden Entwurf explizit übernehmen und senden. Nicht vom Betriebsmodus-Gate betroffen.",
         "kbTags": "Kommagetrennte Tags, deren Wissensdatenbank-Artikel dem Modell als Kontext mitgegeben werden.",
         "kbCategoryIds": "Kommagetrennte Kategorie-IDs der Wissensdatenbank, zusätzlich zu den Tags eingebunden.",
@@ -1732,11 +1728,7 @@
         "triageSamples": "Wie oft das Modell pro Ticket gefragt wird. Die Übereinstimmung der Stichproben ist das wichtigste Konfidenzsignal, 1 schaltet es also ab. Jede Stichprobe ist ein eigener LLM-Aufruf pro neuem Ticket.",
         "triageDelayReply": "Wird auf der ZIEL-Queue gesetzt. Verhindert, dass ein Routing-Fehler zu einer falschen Antwort wird — dafür bekommt der Kunde auf seine erste Mail keine KI-Antwort.",
         "triageCustomerFix": "Bei einer weitergeleiteten Mail den ursprünglichen Absender als Ticket-Kunden setzen. Wird nur angewendet, wenn die Adresse wörtlich im Text steht und genau einen Kundendatensatz trifft.",
-        "triageCustomerFixThreshold": "100 heißt: nur vorschlagen. Eine mehrfach weitergeleitete Mail bekommt 70, weil der ursprüngliche Absender dort unsicherer ist.",
-        "triageProvider": "Triage ist eine Klassifikationsaufgabe und läuft mehrfach pro Ticket — ein kleineres, günstigeres Modell ist hier meist die richtige Wahl.",
-        "triageModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden.",
-        "finalAnswerProvider": "Optionales stärkeres Modell, das die Kundennachricht schreibt. Das Modell der Queue recherchiert (Diagnose, Wissensdatenbank); sobald es antworten will, übernimmt dieses Modell den Verlauf und schreibt die Antwort. Kostet ein bis zwei zusätzliche Aufrufe pro beantwortetem Ticket. Seine Tokens werden über den hier gewählten Provider abgerechnet und auf dessen Budget angerechnet — Preise gelten pro Provider, für ein Modell mit anderen Preisen also einen eigenen Provider-Eintrag anlegen.",
-        "finalAnswerModelOverride": "Leer lassen, um das Standardmodell des Providers zu verwenden."
+        "triageCustomerFixThreshold": "100 heißt: nur vorschlagen. Eine mehrfach weitergeleitete Mail bekommt 70, weil der ursprüngliche Absender dort unsicherer ist."
       },
       "common": {
         "validId": "Gültig/Ungültig ist ein weicher Löschstatus: „Ungültig“ blendet den Eintrag aus Auswahllisten für neue Datensätze aus, ohne bestehende Verknüpfungen (z. B. Tickets, Zuordnungen) zu löschen. Ein echtes Löschen ist nicht vorgesehen."

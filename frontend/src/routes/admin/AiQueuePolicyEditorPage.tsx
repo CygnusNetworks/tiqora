@@ -20,6 +20,19 @@ import {
   type IdentityMode,
   type ReplyLanguageMode,
 } from "@/lib/aiApi";
+import { AI_TASKS, missingNeeds, taskProfileMap } from "@/lib/aiTasks";
+import {
+  QueueTaskProfilesTable,
+  type QueueTaskOverrides,
+} from "@/components/admin/QueueTaskProfilesTable";
+import {
+  POLICIES_KEY,
+  PROFILES_KEY,
+  QUEUES_KEY,
+  SETTINGS_KEY,
+  TASK_DEFAULTS_KEY,
+  invalidateCatalog,
+} from "@/components/admin/ai-models/shared";
 import { PickerField } from "@/components/admin/PickerField";
 import { PromptPartsSection } from "@/components/admin/PromptPartsSection";
 import { EscalationRuleTester } from "@/components/admin/EscalationRuleTester";
@@ -36,12 +49,8 @@ const NONE = 0;
 const MAX_PROMPT_FILE_BYTES = 2 * 1024 * 1024;
 const PROMPT_WARN_CHARS = 100_000;
 
-const POLICIES_KEY = ["admin", "ai", "queue-policies"] as const;
-const QUEUES_KEY = ["admin", "ai", "reference-queues"] as const;
-const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
 const MCP_KEY = ["admin", "ai", "mcp-clients"] as const;
 const AGENTS_KEY = ["admin", "ai", "reference-agents"] as const;
-const SETTINGS_KEY = ["admin", "ai", "settings"] as const;
 
 const AUTONOMY_VALUES: Autonomy[] = ["off", "clarify_only", "full"];
 const IDENTITY_MODES: IdentityMode[] = [
@@ -61,11 +70,6 @@ type TabId =
   | "triage"
   | "safety";
 
-/** One fallback-provider entry in the priority list (below the primary
- * `llm_provider_id`/`model_override`). `model` empty string means "use the
- * provider's default model", mirroring `model_override`'s own convention. */
-type FallbackEntry = { provider_id: number; model: string };
-
 type FormState = {
   queue_id: number;
   enabled_auto_reply: boolean;
@@ -81,16 +85,10 @@ type FormState = {
   triage_customer_fix_enabled: boolean;
   triage_customer_fix_auto_threshold: string;
   triage_delay_reply: boolean;
-  triage_llm_provider_id: number;
-  triage_model_override: string;
-  final_answer_llm_provider_id: number;
-  final_answer_model_override: string;
+  /** Overrides only — a task not in the map inherits the global default. */
+  task_profiles: QueueTaskOverrides;
   autonomy: Autonomy;
   system_prompt: string;
-  llm_provider_id: number;
-  model_override: string;
-  llm_fallback: FallbackEntry[];
-  vision_provider_id: number;
   service_user_id: number;
   kb_tags: string;
   kb_category_ids: string;
@@ -142,16 +140,9 @@ function emptyForm(queueId: number): FormState {
     triage_customer_fix_enabled: false,
     triage_customer_fix_auto_threshold: "100",
     triage_delay_reply: false,
-    triage_llm_provider_id: NONE,
-    triage_model_override: "",
-    final_answer_llm_provider_id: NONE,
-    final_answer_model_override: "",
+    task_profiles: new Map(),
     autonomy: "off",
     system_prompt: "",
-    llm_provider_id: NONE,
-    model_override: "",
-    llm_fallback: [],
-    vision_provider_id: NONE,
     service_user_id: NONE,
     kb_tags: "",
     kb_category_ids: "",
@@ -213,40 +204,6 @@ function linesToSendersRaw(text: string): string | null {
   return items.length > 0 ? items.join(",") : null;
 }
 
-/** Defensive parse of `llm_fallback_json` — malformed/unexpected stored JSON
- * must never crash the editor; it just falls back to an empty list (the
- * operator can re-add entries) with a console warning for diagnosis. */
-function parseFallbackJson(raw: string | null): FallbackEntry[] {
-  if (!raw || !raw.trim()) return [];
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) throw new Error("not an array");
-    return parsed
-      .filter(
-        (e): e is { provider_id: unknown; model?: unknown } =>
-          typeof e === "object" && e !== null && "provider_id" in e,
-      )
-      .map((e) => ({
-        provider_id: Number(e.provider_id),
-        model: typeof e.model === "string" ? e.model : "",
-      }))
-      .filter((e) => Number.isFinite(e.provider_id));
-  } catch (err) {
-    console.warn("Invalid llm_fallback_json, resetting to empty list:", err);
-    return [];
-  }
-}
-
-function fallbackToJson(entries: FallbackEntry[]): string | null {
-  if (entries.length === 0) return null;
-  return JSON.stringify(
-    entries.map((e) => ({
-      provider_id: e.provider_id,
-      model: e.model.trim() || null,
-    })),
-  );
-}
-
 /**
  * Tolerant id-list parse for the Text columns that hold a JSON array but,
  * historically, sometimes a CSV instead (mirrors the backend's
@@ -289,16 +246,9 @@ function toForm(row: AiQueuePolicyOut): FormState {
       row.triage_customer_fix_auto_threshold,
     ),
     triage_delay_reply: row.triage_delay_reply,
-    triage_llm_provider_id: row.triage_llm_provider_id ?? NONE,
-    triage_model_override: row.triage_model_override ?? "",
-    final_answer_llm_provider_id: row.final_answer_llm_provider_id ?? NONE,
-    final_answer_model_override: row.final_answer_model_override ?? "",
+    task_profiles: taskProfileMap(row.task_profiles),
     autonomy: row.autonomy,
     system_prompt: row.system_prompt,
-    llm_provider_id: row.llm_provider_id ?? NONE,
-    model_override: row.model_override ?? "",
-    llm_fallback: parseFallbackJson(row.llm_fallback_json),
-    vision_provider_id: row.vision_provider_id ?? NONE,
     service_user_id: row.service_user_id ?? NONE,
     kb_tags: row.kb_tags ?? "",
     kb_category_ids: row.kb_category_ids ?? "",
@@ -434,7 +384,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     clarify?: string;
   }>({});
   const [promptFileError, setPromptFileError] = useState<string | null>(null);
-  const autoProviderApplied = useRef(false);
+  const autoProfileApplied = useRef(false);
   const promptFileInputRef = useRef<HTMLInputElement>(null);
 
   const policiesQ = useQuery({
@@ -445,10 +395,18 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     queryKey: QUEUES_KEY,
     queryFn: ({ signal }) => api.listReferenceQueues({}, signal),
   });
-  const providersQ = useQuery({
-    queryKey: PROVIDERS_KEY,
-    queryFn: ({ signal }) => aiApi.listProviders(signal),
+  const profilesQ = useQuery({
+    queryKey: PROFILES_KEY,
+    queryFn: ({ signal }) => aiApi.listProfiles(signal),
   });
+  const taskDefaultsQ = useQuery({
+    queryKey: TASK_DEFAULTS_KEY,
+    queryFn: ({ signal }) => aiApi.getTaskDefaults(signal),
+  });
+  const globalDefaults = useMemo(
+    () => taskProfileMap(taskDefaultsQ.data),
+    [taskDefaultsQ.data],
+  );
   const mcpQ = useQuery({
     queryKey: MCP_KEY,
     queryFn: ({ signal }) => aiApi.listMcpClients(signal),
@@ -538,57 +496,28 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     setForm(toForm(editingRow));
   }, [isEdit, editingRow]);
 
-  // Create only, once: auto-pick the sole configured provider (never override
-  // a value the operator already touched or that came from a stored policy).
+  // Create only, once: with exactly one profile and no global default for
+  // "Recherche und Werkzeuge", preselect that profile for the task — the
+  // successor of "auto-pick the sole provider". Never overrides a choice the
+  // operator already made.
   useEffect(() => {
-    if (isEdit || autoProviderApplied.current || !form || !providersQ.data)
+    if (isEdit || autoProfileApplied.current || !form) return;
+    if (!profilesQ.data || !taskDefaultsQ.data) return;
+    autoProfileApplied.current = true;
+    if (form.task_profiles.has("agent") || globalDefaults.get("agent") != null)
       return;
-    if (form.llm_provider_id !== NONE) return;
-    if (providersQ.data.items.length === 1) {
-      autoProviderApplied.current = true;
-      const providerId = providersQ.data.items[0].id;
-      setForm((f) => (f ? { ...f, llm_provider_id: providerId } : f));
-    }
-  }, [isEdit, form, providersQ.data]);
+    const only = profilesQ.data.length === 1 ? profilesQ.data[0] : null;
+    if (!only || only.valid_id !== 1) return;
+    if (missingNeeds("agent", only.entries).length > 0) return;
+    setForm((f) =>
+      f
+        ? { ...f, task_profiles: new Map(f.task_profiles).set("agent", only.id) }
+        : f,
+    );
+  }, [isEdit, form, profilesQ.data, taskDefaultsQ.data, globalDefaults]);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => (f ? { ...f, [key]: value } : f));
-
-  const addFallback = () => {
-    setForm((f) =>
-      f
-        ? {
-            ...f,
-            llm_fallback: [...f.llm_fallback, { provider_id: NONE, model: "" }],
-          }
-        : f,
-    );
-  };
-  const removeFallback = (index: number) => {
-    setForm((f) =>
-      f
-        ? { ...f, llm_fallback: f.llm_fallback.filter((_, i) => i !== index) }
-        : f,
-    );
-  };
-  const moveFallback = (index: number, dir: -1 | 1) => {
-    setForm((f) => {
-      if (!f) return f;
-      const target = index + dir;
-      if (target < 0 || target >= f.llm_fallback.length) return f;
-      const next = [...f.llm_fallback];
-      [next[index], next[target]] = [next[target], next[index]];
-      return { ...f, llm_fallback: next };
-    });
-  };
-  const updateFallback = (index: number, patch: Partial<FallbackEntry>) => {
-    setForm((f) => {
-      if (!f) return f;
-      const next = [...f.llm_fallback];
-      next[index] = { ...next[index], ...patch };
-      return { ...f, llm_fallback: next };
-    });
-  };
 
   const toggleMcpClient = (id: number) => {
     setForm((f) => {
@@ -657,7 +586,12 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     applyPromptFileContent(text);
   };
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: POLICIES_KEY });
+  // Profiles list their queue uses (`used_by`), so refresh the catalog too.
+  const invalidate = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: POLICIES_KEY }),
+      invalidateCatalog(qc),
+    ]);
 
   const createM = useMutation({
     mutationFn: (body: AiQueuePolicyCreate) => aiApi.createQueuePolicy(body),
@@ -675,9 +609,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     },
   });
 
-  const buildBody = (
-    f: FormState,
-  ): AiQueuePolicyCreate | AiQueuePolicyUpdate => ({
+  const buildBody = (f: FormState): Omit<AiQueuePolicyCreate, "queue_id"> => ({
     enabled_auto_reply: f.enabled_auto_reply,
     enabled_summary: f.enabled_summary,
     enabled_manual_assist: f.enabled_manual_assist,
@@ -695,21 +627,12 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     triage_customer_fix_auto_threshold:
       numOrNull(f.triage_customer_fix_auto_threshold) ?? 100,
     triage_delay_reply: f.triage_delay_reply,
-    triage_llm_provider_id:
-      f.triage_llm_provider_id !== NONE ? f.triage_llm_provider_id : null,
-    triage_model_override: f.triage_model_override.trim() || null,
-    final_answer_llm_provider_id:
-      f.final_answer_llm_provider_id !== NONE
-        ? f.final_answer_llm_provider_id
-        : null,
-    final_answer_model_override: f.final_answer_model_override.trim() || null,
+    // The whole override set (PUT replaces it); inherited tasks are omitted.
+    task_profiles: AI_TASKS.filter((task) => f.task_profiles.has(task)).map(
+      (task) => ({ task, profile_id: f.task_profiles.get(task) ?? null }),
+    ),
     autonomy: f.autonomy,
     system_prompt: f.system_prompt,
-    llm_provider_id: f.llm_provider_id !== NONE ? f.llm_provider_id : null,
-    model_override: f.model_override.trim() || null,
-    llm_fallback_json: fallbackToJson(f.llm_fallback),
-    vision_provider_id:
-      f.vision_provider_id !== NONE ? f.vision_provider_id : null,
     service_user_id: f.service_user_id !== NONE ? f.service_user_id : null,
     kb_tags: f.kb_tags.trim() || null,
     kb_category_ids: f.kb_category_ids.trim() || null,
@@ -1095,211 +1018,14 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
               <PromptPartsSection policyId={policyId} />
             )}
 
-            <label className="block text-sm">
-              <FieldLabel
-                text={t("admin.ai.providers.title")}
-                help={t("admin.help.aiQueue.llmProvider")}
-                testId="admin-ai-queue-help-llm_provider_id"
+            <div className="sm:col-span-2">
+              <QueueTaskProfilesTable
+                value={form.task_profiles}
+                onChange={(next) => setField("task_profiles", next)}
+                profiles={profilesQ.data ?? []}
+                globalDefaults={globalDefaults}
               />
-              <PickerField
-                testId="admin-ai-queue-form-llm_provider_id"
-                value={form.llm_provider_id}
-                items={[
-                  { value: NONE, label: t("admin.form.selectPlaceholder") },
-                  ...(providersQ.data?.items ?? []).map((p) => ({
-                    value: p.id,
-                    label: p.name,
-                  })),
-                ]}
-                placeholder={t("admin.form.selectPlaceholder")}
-                loading={providersQ.isLoading}
-                onSelect={(v) => setField("llm_provider_id", v)}
-              />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel
-                text={t("admin.ai.queues.modelOverride")}
-                help={t("admin.help.aiQueue.modelOverride")}
-                testId="admin-ai-queue-help-model_override"
-              />
-              <input
-                data-testid="admin-ai-queue-form-model_override"
-                value={form.model_override}
-                onChange={(e) => setField("model_override", e.target.value)}
-                className={inputClass}
-              />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel
-                text={t("admin.ai.queues.finalAnswerProvider")}
-                help={t("admin.help.aiQueue.finalAnswerProvider")}
-                testId="admin-ai-queue-help-final_answer_llm_provider_id"
-              />
-              <PickerField
-                testId="admin-ai-queue-form-final_answer_llm_provider_id"
-                value={form.final_answer_llm_provider_id}
-                items={[
-                  {
-                    value: NONE,
-                    label: t("admin.ai.queues.finalAnswerProviderNone"),
-                  },
-                  ...(providersQ.data?.items ?? []).map((p) => ({
-                    value: p.id,
-                    label: p.name,
-                  })),
-                ]}
-                placeholder={t("admin.form.selectPlaceholder")}
-                loading={providersQ.isLoading}
-                onSelect={(v) => setField("final_answer_llm_provider_id", v)}
-              />
-            </label>
-            <label className="block text-sm">
-              <FieldLabel
-                text={t("admin.ai.queues.finalAnswerModelOverride")}
-                help={t("admin.help.aiQueue.finalAnswerModelOverride")}
-                testId="admin-ai-queue-help-final_answer_model_override"
-              />
-              <input
-                data-testid="admin-ai-queue-form-final_answer_model_override"
-                value={form.final_answer_model_override}
-                onChange={(e) =>
-                  setField("final_answer_model_override", e.target.value)
-                }
-                className={inputClass}
-              />
-            </label>
-            <div
-              className="block text-sm sm:col-span-2"
-              data-testid="admin-ai-queue-fallback-section"
-            >
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <FieldLabel
-                  text={t("admin.ai.queues.llmFallback")}
-                  help={t("admin.help.aiQueue.llmFallback")}
-                  testId="admin-ai-queue-help-llm_fallback"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  data-testid="admin-ai-queue-fallback-add"
-                  onClick={addFallback}
-                >
-                  {t("admin.ai.queues.fallbackAdd")}
-                </Button>
-              </div>
-              {form.llm_fallback.length === 0 ? (
-                <p className="text-xs text-muted">
-                  {t("admin.ai.queues.fallbackEmpty")}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {form.llm_fallback.map((entry, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2"
-                      data-testid={`admin-ai-queue-fallback-row-${index}`}
-                    >
-                      <span className="w-5 shrink-0 text-xs text-muted">
-                        {index + 2}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <PickerField
-                          testId={`admin-ai-queue-fallback-provider-${index}`}
-                          value={entry.provider_id}
-                          items={[
-                            {
-                              value: NONE,
-                              label: t("admin.form.selectPlaceholder"),
-                            },
-                            ...(providersQ.data?.items ?? []).map((p) => ({
-                              value: p.id,
-                              label: p.name,
-                            })),
-                          ]}
-                          placeholder={t("admin.form.selectPlaceholder")}
-                          loading={providersQ.isLoading}
-                          onSelect={(v) =>
-                            updateFallback(index, { provider_id: v })
-                          }
-                        />
-                      </div>
-                      <input
-                        data-testid={`admin-ai-queue-fallback-model-${index}`}
-                        value={entry.model}
-                        onChange={(e) =>
-                          updateFallback(index, { model: e.target.value })
-                        }
-                        placeholder={t("admin.ai.queues.modelOverride")}
-                        className={cn(inputClass, "min-w-0 flex-1")}
-                      />
-                      <div className="flex shrink-0 items-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={t("admin.ai.queues.fallbackMoveUp")}
-                          data-testid={`admin-ai-queue-fallback-up-${index}`}
-                          disabled={index === 0}
-                          onClick={() => moveFallback(index, -1)}
-                        >
-                          ▲
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={t("admin.ai.queues.fallbackMoveDown")}
-                          data-testid={`admin-ai-queue-fallback-down-${index}`}
-                          disabled={index === form.llm_fallback.length - 1}
-                          onClick={() => moveFallback(index, 1)}
-                        >
-                          ▼
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          aria-label={t("admin.ai.queues.fallbackRemove")}
-                          data-testid={`admin-ai-queue-fallback-remove-${index}`}
-                          onClick={() => removeFallback(index)}
-                        >
-                          ✕
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-
-            <label className="block text-sm sm:col-span-2">
-              <FieldLabel
-                text={t("admin.ai.queues.visionProvider")}
-                help={t("admin.help.aiQueue.visionProvider")}
-                defaultHint={t("admin.ai.queues.visionProviderNone")}
-                testId="admin-ai-queue-help-vision_provider_id"
-              />
-              <PickerField
-                testId="admin-ai-queue-form-vision_provider_id"
-                value={form.vision_provider_id}
-                items={[
-                  {
-                    value: NONE,
-                    label: t("admin.ai.queues.visionProviderNone"),
-                  },
-                  // Vision capability moved to the model (Task 5 replaces
-                  // this field with the per-queue task table).
-                  ...(providersQ.data?.items ?? []).map((p) => ({
-                    value: p.id,
-                    label: p.name,
-                  })),
-                ]}
-                placeholder={t("admin.form.selectPlaceholder")}
-                loading={providersQ.isLoading}
-                onSelect={(v) => setField("vision_provider_id", v)}
-              />
-            </label>
           </div>
         )}
 
@@ -2038,46 +1764,6 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                         "triage_customer_fix_auto_threshold",
                         e.target.value,
                       )
-                    }
-                    className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
-                <label className="block text-sm">
-                  <FieldLabel
-                    text={t("admin.ai.queues.triageProvider")}
-                    help={t("admin.help.aiQueue.triageProvider")}
-                    testId="admin-ai-queue-help-triage_llm_provider_id"
-                  />
-                  <PickerField
-                    testId="admin-ai-queue-form-triage_llm_provider_id"
-                    value={form.triage_llm_provider_id}
-                    items={[
-                      {
-                        value: NONE,
-                        label: t("admin.ai.queues.triageProviderInherit"),
-                      },
-                      ...(providersQ.data?.items ?? []).map((p) => ({
-                        value: p.id,
-                        label: p.name,
-                      })),
-                    ]}
-                    placeholder={t("admin.form.selectPlaceholder")}
-                    loading={providersQ.isLoading}
-                    onSelect={(v) => setField("triage_llm_provider_id", v)}
-                  />
-                </label>
-                <label className="block text-sm">
-                  <FieldLabel
-                    text={t("admin.ai.queues.triageModelOverride")}
-                    help={t("admin.help.aiQueue.triageModelOverride")}
-                    testId="admin-ai-queue-help-triage_model_override"
-                  />
-                  <input
-                    type="text"
-                    data-testid="admin-ai-queue-form-triage_model_override"
-                    value={form.triage_model_override}
-                    onChange={(e) =>
-                      setField("triage_model_override", e.target.value)
                     }
                     className="mt-1 w-full rounded-md border border-hairline bg-surface px-2 py-1.5 text-sm text-ink"
                   />

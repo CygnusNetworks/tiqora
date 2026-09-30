@@ -256,6 +256,52 @@ describe("AiModelsPage", () => {
     );
   });
 
+  it("forgets the loaded model list when the drawer closes", async () => {
+    listProviderRemoteModels.mockResolvedValue({ models: ["meta/llama-3.3-70b"] });
+    renderPage();
+    await openNewModel();
+    fireEvent.click(screen.getByTestId("admin-ai-model-load-remote"));
+    await screen.findByTestId("admin-ai-model-remote-status");
+
+    fireEvent.click(screen.getByRole("button", { name: i18n.t("admin.form.cancel") }));
+    await openNewModel();
+    expect(screen.queryByTestId("admin-ai-model-remote-status")).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId("admin-ai-model-remote-list").querySelectorAll("option"),
+    ).toHaveLength(0);
+  });
+
+  it("rejects non-whole context tokens and tool rounds before saving", async () => {
+    renderPage();
+    await openNewModel();
+    fireEvent.change(screen.getByTestId("admin-ai-model-form-model_id"), {
+      target: { value: "meta/llama-3.3-70b" },
+    });
+    fireEvent.change(screen.getByTestId("admin-ai-model-form-context_tokens"), {
+      target: { value: "1.5" },
+    });
+    fireEvent.click(screen.getByTestId("admin-ai-model-form-submit"));
+    expect(await screen.findByTestId("admin-ai-model-form-error")).toHaveTextContent(
+      i18n.t("admin.ai.models.wholeNumberRequired", {
+        field: i18n.t("admin.ai.models.contextTokens"),
+      }),
+    );
+
+    fireEvent.change(screen.getByTestId("admin-ai-model-form-context_tokens"), {
+      target: { value: "128000" },
+    });
+    fireEvent.change(screen.getByTestId("admin-ai-model-form-max_tool_rounds"), {
+      target: { value: "-2" },
+    });
+    fireEvent.click(screen.getByTestId("admin-ai-model-form-submit"));
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-model-form-error")).toHaveTextContent(
+        i18n.t("admin.ai.models.maxToolRounds"),
+      ),
+    );
+    expect(createModel).not.toHaveBeenCalled();
+  });
+
   it("shows the provider's error when the model list cannot be loaded", async () => {
     const { ApiError } = await import("@/lib/api");
     listProviderRemoteModels.mockRejectedValue(new ApiError(502, "HTTP 401: invalid key", "/x"));
@@ -313,12 +359,21 @@ describe("AiModelsPage", () => {
   });
 
   it("lists a queue's inherited use when its agent override points at the profile", async () => {
+    // A realistic agent override: a second tools-capable profile.
+    const fastProfile = {
+      ...agentProfile,
+      id: 12,
+      name: "Schnell",
+      entries: [entry(oss)],
+      used_by: [{ task: "agent", queue_policy_id: 7, queue_name: "Billing" }],
+    };
+    listProfiles.mockResolvedValue([agentProfile, visionProfile, fastProfile]);
     listQueuePolicies.mockResolvedValue({
       items: [
         {
           id: 7,
           queue_id: 5,
-          task_profiles: [{ task: "agent", profile_id: 11 }],
+          task_profiles: [{ task: "agent", profile_id: 12 }],
         },
       ],
       total: 1,
@@ -328,7 +383,7 @@ describe("AiModelsPage", () => {
     renderPage();
     await screen.findByTestId("admin-ai-model-row-1");
     openTab(i18n.t("admin.ai.models.tabs.profiles"));
-    const used = await screen.findByTestId("admin-ai-profile-used-11");
+    const used = await screen.findByTestId("admin-ai-profile-used-12");
     await waitFor(() =>
       expect(used.textContent).toContain(
         `${i18n.t("admin.ai.tasks.name.summary")} (Billing)`,
@@ -415,7 +470,7 @@ describe("AiModelsPage", () => {
     const bilder = await screen.findByTestId("admin-ai-task-profile-agent-menu-option-11");
     expect(bilder).toBeDisabled();
     expect(bilder.textContent).toContain(
-      i18n.t("admin.ai.tasks.cannot", { needs: i18n.t("admin.ai.models.cap.tools") }),
+      i18n.t("admin.ai.tasks.missing.tools"),
     );
     fireEvent.click(bilder);
     expect(putTaskDefaults).not.toHaveBeenCalled();

@@ -752,7 +752,11 @@ const aiProfiles = [
     create_time: t0, change_time: t0 },
   { id: 3, name: "Schnell", description: "Günstig, für Zusammenfassungen", timeout_seconds: null,
     valid_id: 1, entries: [profileEntry(3)],
-    used_by: [{ task: "summary", queue_policy_id: null, queue_name: null }],
+    used_by: [
+      { task: "summary", queue_policy_id: null, queue_name: null },
+      { task: "agent", queue_policy_id: 3, queue_name: "Billing" },
+      { task: "refine", queue_policy_id: 2, queue_name: "Incidents" },
+    ],
     create_time: t0, change_time: t0 },
 ];
 const aiTaskDefaults = [
@@ -790,9 +794,7 @@ function queuePolicy(over: Record<string, unknown>) {
   return {
     id: 1, queue_id: 2, enabled_auto_reply: false, enabled_summary: true, enabled_manual_assist: true, enabled_refine: true, enabled_triage: false,
     system_prompt: "You are a support assistant for an IT service desk. Answer factually, in the customer's language, and never invent account details.",
-    autonomy: "off", service_user_id: 1, llm_provider_id: 1, model_override: null,
-    llm_fallback_json: JSON.stringify([{ provider_id: 2, model: null }]),
-    vision_provider_id: 3, kb_tags: null, kb_category_ids: null,
+    autonomy: "off", service_user_id: 1, kb_tags: null, kb_category_ids: null,
     mcp_client_ids: null, mcp_tool_overrides: null,
     summary_article_threshold: 4, summary_char_threshold: 6000,
     summary_incremental_min_articles: 1, summary_incremental_min_chars: 400,
@@ -807,8 +809,8 @@ function queuePolicy(over: Record<string, unknown>) {
     routing_description: null, triage_target_queue_ids: null,
     triage_auto_threshold: 100, triage_suggest_threshold: 50, triage_samples: 3,
     triage_customer_fix_enabled: false, triage_customer_fix_auto_threshold: 100,
-    triage_delay_reply: false, triage_llm_provider_id: null, triage_model_override: null,
-    final_answer_llm_provider_id: null, final_answer_model_override: null,
+    triage_delay_reply: false,
+    // Overrides only; a task not listed inherits the global default.
     task_profiles: [],
     valid_id: 1, create_time: t0, change_time: t0,
     ...over,
@@ -818,12 +820,14 @@ const aiQueuePolicies = [
   queuePolicy({ id: 1, queue_id: 2, autonomy: "clarify_only", enabled_auto_reply: true }),
   queuePolicy({
     id: 2, queue_id: 4, autonomy: "off", enabled_auto_reply: false,
-    llm_provider_id: 2, max_replies_per_hour: 10, budget_tokens_day: 200000,
+    task_profiles: [{ task: "refine", profile_id: 3 }],
+    max_replies_per_hour: 10, budget_tokens_day: 200000,
     escalation_rules: JSON.stringify([{ tool: "monitoring.list_active_alerts", field: "severity", match: "critical" }]),
   }),
   queuePolicy({
     id: 3, queue_id: 6, autonomy: "full", enabled_auto_reply: true,
-    llm_provider_id: 3, summary_detail: "detailed", max_auto_replies: 2,
+    task_profiles: [{ task: "agent", profile_id: 3 }, { task: "vision", profile_id: null }],
+    summary_detail: "detailed", max_auto_replies: 2,
     escalation_rules: JSON.stringify([{ tool: "billing.get_invoice", field: "status", match: "disputed" }]),
   }),
 ];

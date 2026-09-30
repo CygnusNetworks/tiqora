@@ -43,7 +43,8 @@ vi.mock("@/lib/api", () => ({
 const listQueuePolicies = vi.fn();
 const createQueuePolicy = vi.fn();
 const updateQueuePolicy = vi.fn();
-const listProviders = vi.fn();
+const listProfiles = vi.fn();
+const getTaskDefaults = vi.fn();
 const listMcpClients = vi.fn();
 const getSettings = vi.fn();
 
@@ -52,7 +53,8 @@ vi.mock("@/lib/aiApi", () => ({
     listQueuePolicies: (...args: unknown[]) => listQueuePolicies(...args),
     createQueuePolicy: (...args: unknown[]) => createQueuePolicy(...args),
     updateQueuePolicy: (...args: unknown[]) => updateQueuePolicy(...args),
-    listProviders: (...args: unknown[]) => listProviders(...args),
+    listProfiles: (...args: unknown[]) => listProfiles(...args),
+    getTaskDefaults: (...args: unknown[]) => getTaskDefaults(...args),
     listMcpClients: (...args: unknown[]) => listMcpClients(...args),
     getSettings: (...args: unknown[]) => getSettings(...args),
   },
@@ -67,8 +69,6 @@ const samplePolicy = {
   system_prompt: "Be helpful.",
   autonomy: "clarify_only",
   service_user_id: null,
-  llm_provider_id: null,
-  model_override: null,
   kb_tags: null,
   kb_category_ids: null,
   mcp_client_ids: null,
@@ -106,14 +106,55 @@ const samplePolicy = {
   triage_customer_fix_enabled: false,
   triage_customer_fix_auto_threshold: 100,
   triage_delay_reply: false,
-  triage_llm_provider_id: null,
-  triage_model_override: null,
-  final_answer_llm_provider_id: null,
-  final_answer_model_override: null,
+  task_profiles: [] as { task: string; profile_id: number | null }[],
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
 };
+
+const t0 = "2026-09-30T00:00:00Z";
+
+function entry(id: number, label: string, tools: boolean, vision: boolean) {
+  return {
+    llm_model_id: id,
+    model_id: label.toLowerCase(),
+    model_label: label,
+    provider_id: 1,
+    provider_name: "Nebius",
+    supports_tools: tools,
+    supports_vision: vision,
+    valid_id: 1,
+  };
+}
+
+function profile(id: number, name: string, entries: ReturnType<typeof entry>[]) {
+  return {
+    id,
+    name,
+    description: null,
+    timeout_seconds: null,
+    valid_id: 1,
+    entries,
+    used_by: [],
+    create_time: t0,
+    change_time: t0,
+  };
+}
+
+const agentProfile = profile(10, "Agent", [entry(1, "Qwen3 235B", true, false)]);
+const fastProfile = profile(12, "Schnell", [entry(2, "gpt-oss 120B", true, false)]);
+const visionProfile = profile(11, "Bilder", [entry(3, "Qwen2.5-VL", false, true)]);
+
+const globalDefaults = [
+  { task: "agent", profile_id: 10 },
+  { task: "final_answer", profile_id: null },
+  { task: "triage", profile_id: null },
+  { task: "summary", profile_id: null },
+  { task: "refine", profile_id: null },
+  { task: "vision", profile_id: 11 },
+];
+
+const TASKS = ["agent", "final_answer", "triage", "summary", "refine", "vision"];
 
 function renderEdit() {
   const qc = new QueryClient({
@@ -150,7 +191,8 @@ describe("AiQueuePolicyEditorPage", () => {
     listQueuePolicies.mockReset();
     createQueuePolicy.mockReset();
     updateQueuePolicy.mockReset();
-    listProviders.mockReset();
+    listProfiles.mockReset();
+    getTaskDefaults.mockReset();
     listMcpClients.mockReset();
     getSettings.mockReset();
 
@@ -160,7 +202,8 @@ describe("AiQueuePolicyEditorPage", () => {
     ]);
     listReferenceAgents.mockResolvedValue([{ id: 1, login: "agent1", full_name: "Agent One" }]);
     listQueuePolicies.mockResolvedValue({ items: [samplePolicy], total: 1, page: 1, page_size: 1 });
-    listProviders.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 });
+    listProfiles.mockResolvedValue([agentProfile, visionProfile, fastProfile]);
+    getTaskDefaults.mockResolvedValue(globalDefaults);
     listMcpClients.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 });
     getSettings.mockResolvedValue({
       operation_mode: "tiqora_primary",
@@ -204,14 +247,11 @@ describe("AiQueuePolicyEditorPage", () => {
     expect(screen.getByTestId("admin-ai-queue-form-kb_tags-input")).toBeDisabled();
   });
 
-  it("opens the create page pre-filled with defaults, incl. the sole provider", async () => {
+  it("opens the create page pre-filled with defaults, incl. the sole profile for the agent", async () => {
     currentPolicyId = "";
-    listProviders.mockResolvedValue({
-      items: [{ id: 7, name: "Nebius" }],
-      total: 1,
-      page: 1,
-      page_size: 1,
-    });
+    // One profile and no global agent default → preselected for the agent.
+    listProfiles.mockResolvedValue([fastProfile]);
+    getTaskDefaults.mockResolvedValue(TASKS.map((task) => ({ task, profile_id: null })));
     renderNew();
 
     await waitFor(() =>
@@ -226,7 +266,29 @@ describe("AiQueuePolicyEditorPage", () => {
 
     fireEvent.click(screen.getByText("Basics"));
     await waitFor(() =>
-      expect(screen.getByTestId("admin-ai-queue-form-llm_provider_id")).toHaveTextContent("Nebius"),
+      expect(screen.getByTestId("admin-ai-queue-task-profile-agent")).toHaveTextContent("Schnell"),
+    );
+    expect(screen.getByTestId("admin-ai-queue-task-state-agent")).toHaveTextContent(
+      i18n.t("admin.ai.queues.models.overridden"),
+    );
+  });
+
+  it("does not preselect a profile when a global agent default exists", async () => {
+    currentPolicyId = "";
+    listProfiles.mockResolvedValue([agentProfile]);
+    createQueuePolicy.mockResolvedValue({ ...samplePolicy, id: 2, queue_id: 11 });
+    renderNew();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-task-profile-agent")).toHaveTextContent(
+        i18n.t("admin.ai.queues.models.inheritProfile", { name: "Agent" }),
+      ),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
+    await waitFor(() =>
+      expect(createQueuePolicy).toHaveBeenCalledWith(
+        expect.objectContaining({ queue_id: 11, task_profiles: [] }),
+      ),
     );
   });
 
@@ -325,7 +387,7 @@ describe("AiQueuePolicyEditorPage", () => {
     });
     renderEdit();
     await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("Triage"));
+    fireEvent.click(screen.getByRole("tab", { name: "Triage" }));
 
     expect(screen.getByTestId("admin-ai-queue-triage-gate-warning")).toBeInTheDocument();
     expect(screen.getByTestId("admin-ai-queue-form-enabled_triage")).toBeDisabled();
@@ -334,7 +396,7 @@ describe("AiQueuePolicyEditorPage", () => {
   it("renders the triage tab and saves routing_description", async () => {
     renderEdit();
     await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
-    fireEvent.click(screen.getByText("Triage"));
+    fireEvent.click(screen.getByRole("tab", { name: "Triage" }));
 
     expect(screen.getByTestId("admin-ai-queue-form-enabled_triage")).not.toBeChecked();
     fireEvent.change(screen.getByTestId("admin-ai-queue-form-routing_description"), {
@@ -418,65 +480,105 @@ describe("AiQueuePolicyEditorPage", () => {
     });
   });
 
-  it("adds a fallback provider entry and saves it as llm_fallback_json", async () => {
-    listProviders.mockResolvedValue({
-      items: [
-        { id: 7, name: "Nebius" },
-        { id: 8, name: "OpenAI" },
-      ],
-      total: 2,
-      page: 1,
-      page_size: 2,
-    });
+  it("shows the six tasks, inherited by default, with the global profile named", async () => {
+    renderEdit();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-models-table")).toBeInTheDocument(),
+    );
+    for (const task of TASKS) {
+      expect(screen.getByTestId(`admin-ai-queue-task-row-${task}`)).toHaveTextContent(
+        i18n.t(`admin.ai.tasks.name.${task}`),
+      );
+      expect(screen.getByTestId(`admin-ai-queue-task-state-${task}`)).toHaveTextContent(
+        i18n.t("admin.ai.queues.models.inherited"),
+      );
+    }
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-task-profile-agent")).toHaveTextContent(
+        i18n.t("admin.ai.queues.models.inheritProfile", { name: "Agent" }),
+      ),
+    );
+    expect(screen.getByTestId("admin-ai-queue-task-profile-final_answer")).toHaveTextContent(
+      i18n.t("admin.ai.queues.models.inheritNone", {
+        fallback: i18n.t("admin.ai.tasks.fallback.final_answer"),
+      }),
+    );
+    // Triage has no profile of its own and runs on the agent's.
+    expect(screen.getByTestId("admin-ai-queue-task-effective-triage")).toHaveTextContent("Agent");
+    expect(screen.getByTestId("admin-ai-queue-task-effective-triage")).toHaveTextContent(
+      "Qwen3 235B @ Nebius",
+    );
+  });
+
+  it("the old provider/model fields are gone", async () => {
+    renderEdit();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-models-table")).toBeInTheDocument(),
+    );
+    for (const id of [
+      "llm_provider_id",
+      "model_override",
+      "final_answer_llm_provider_id",
+      "final_answer_model_override",
+      "vision_provider_id",
+    ]) {
+      expect(screen.queryByTestId(`admin-ai-queue-form-${id}`)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("admin-ai-queue-fallback-section")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Triage" }));
+    expect(
+      screen.queryByTestId("admin-ai-queue-form-triage_llm_provider_id"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("admin-ai-queue-form-triage_model_override"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("choosing a profile sends it as the task's override", async () => {
     updateQueuePolicy.mockResolvedValue(samplePolicy);
     renderEdit();
-    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
-
-    expect(screen.getByTestId("admin-ai-queue-fallback-section")).toHaveTextContent(
-      "No fallback providers",
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-models-table")).toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-add"));
-
-    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-provider-0"));
+    fireEvent.click(screen.getByTestId("admin-ai-queue-task-profile-summary"));
     fireEvent.click(
-      await screen.findByTestId("admin-ai-queue-fallback-provider-0-panel-option-8"),
+      await screen.findByTestId("admin-ai-queue-task-profile-summary-menu-option-12"),
     );
-    fireEvent.change(screen.getByTestId("admin-ai-queue-fallback-model-0"), {
-      target: { value: "gpt-4o-mini" },
-    });
-
+    expect(screen.getByTestId("admin-ai-queue-task-state-summary")).toHaveTextContent(
+      i18n.t("admin.ai.queues.models.overridden"),
+    );
     fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(updateQueuePolicy).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({
-          llm_fallback_json: JSON.stringify([
-            { provider_id: 8, model: "gpt-4o-mini" },
-          ]),
-        }),
-      );
-    });
+        expect.objectContaining({ task_profiles: [{ task: "summary", profile_id: 12 }] }),
+      ),
+    );
+    const body = updateQueuePolicy.mock.calls[0][1] as Record<string, unknown>;
+    for (const old of [
+      "llm_provider_id",
+      "model_override",
+      "llm_fallback_json",
+      "vision_provider_id",
+      "final_answer_llm_provider_id",
+      "final_answer_model_override",
+      "triage_llm_provider_id",
+      "triage_model_override",
+    ]) {
+      expect(body).not.toHaveProperty(old);
+    }
   });
 
-  it("reorders fallback entries with the move-down button", async () => {
-    listProviders.mockResolvedValue({
-      items: [
-        { id: 7, name: "Nebius" },
-        { id: 8, name: "OpenAI" },
-      ],
-      total: 2,
-      page: 1,
-      page_size: 2,
-    });
+  it("choosing “Global: …” removes the override from the payload", async () => {
     listQueuePolicies.mockResolvedValue({
       items: [
         {
           ...samplePolicy,
-          llm_fallback_json: JSON.stringify([
-            { provider_id: 7, model: null },
-            { provider_id: 8, model: "gpt-4o-mini" },
-          ]),
+          task_profiles: [
+            { task: "agent", profile_id: 12 },
+            { task: "vision", profile_id: null },
+          ],
         },
       ],
       total: 1,
@@ -486,96 +588,89 @@ describe("AiQueuePolicyEditorPage", () => {
     updateQueuePolicy.mockResolvedValue(samplePolicy);
     renderEdit();
     await waitFor(() =>
-      expect(screen.getByTestId("admin-ai-queue-fallback-row-0")).toBeInTheDocument(),
+      expect(screen.getByTestId("admin-ai-queue-task-profile-agent")).toHaveTextContent("Schnell"),
     );
-    expect(screen.getByTestId("admin-ai-queue-fallback-provider-0")).toHaveTextContent(
-      "Nebius",
-    );
-    expect(screen.getByTestId("admin-ai-queue-fallback-provider-1")).toHaveTextContent(
-      "OpenAI",
+    expect(screen.getByTestId("admin-ai-queue-task-state-agent")).toHaveTextContent(
+      i18n.t("admin.ai.queues.models.overridden"),
     );
 
-    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-down-0"));
-
-    expect(screen.getByTestId("admin-ai-queue-fallback-provider-0")).toHaveTextContent(
-      "OpenAI",
+    fireEvent.click(screen.getByTestId("admin-ai-queue-task-profile-agent"));
+    fireEvent.click(
+      await screen.findByTestId("admin-ai-queue-task-profile-agent-menu-option-inherit"),
     );
-    expect(screen.getByTestId("admin-ai-queue-fallback-provider-1")).toHaveTextContent(
-      "Nebius",
+    expect(screen.getByTestId("admin-ai-queue-task-state-agent")).toHaveTextContent(
+      i18n.t("admin.ai.queues.models.inherited"),
     );
-
     fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(updateQueuePolicy).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({
-          llm_fallback_json: JSON.stringify([
-            { provider_id: 8, model: "gpt-4o-mini" },
-            { provider_id: 7, model: null },
-          ]),
-        }),
-      );
-    });
+        expect.objectContaining({ task_profiles: [{ task: "vision", profile_id: null }] }),
+      ),
+    );
   });
 
-  it("removes the last fallback entry, saving llm_fallback_json as null", async () => {
-    listProviders.mockResolvedValue({
-      items: [{ id: 7, name: "Nebius" }],
-      total: 1,
-      page: 1,
-      page_size: 1,
-    });
-    listQueuePolicies.mockResolvedValue({
-      items: [
-        {
-          ...samplePolicy,
-          llm_fallback_json: JSON.stringify([{ provider_id: 7, model: null }]),
-        },
-      ],
-      total: 1,
-      page: 1,
-      page_size: 1,
-    });
+  it("“Kein eigenes Profil” sends profile_id null and shows the fallback", async () => {
     updateQueuePolicy.mockResolvedValue(samplePolicy);
     renderEdit();
     await waitFor(() =>
-      expect(screen.getByTestId("admin-ai-queue-fallback-row-0")).toBeInTheDocument(),
+      expect(screen.getByTestId("admin-ai-queue-models-table")).toBeInTheDocument(),
     );
-
-    fireEvent.click(screen.getByTestId("admin-ai-queue-fallback-remove-0"));
-    expect(screen.getByTestId("admin-ai-queue-fallback-section")).toHaveTextContent(
-      "No fallback providers",
+    fireEvent.click(screen.getByTestId("admin-ai-queue-task-profile-vision"));
+    fireEvent.click(
+      await screen.findByTestId("admin-ai-queue-task-profile-vision-menu-option-none"),
     );
-
+    expect(screen.getByTestId("admin-ai-queue-task-effective-vision")).toHaveTextContent(
+      i18n.t("admin.ai.tasks.fallback.vision"),
+    );
     fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(updateQueuePolicy).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ llm_fallback_json: null }),
-      );
-    });
+        expect.objectContaining({ task_profiles: [{ task: "vision", profile_id: null }] }),
+      ),
+    );
   });
 
-  it("resets to an empty fallback list and warns instead of crashing on malformed stored llm_fallback_json", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    listQueuePolicies.mockResolvedValue({
-      items: [{ ...samplePolicy, llm_fallback_json: "{not valid json" }],
-      total: 1,
-      page: 1,
-      page_size: 1,
-    });
+  it("disables profiles whose models lack what the task needs, saying why", async () => {
     renderEdit();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-models-table")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-queue-task-profile-agent"));
+    const bilder = await screen.findByTestId(
+      "admin-ai-queue-task-profile-agent-menu-option-11",
+    );
+    expect(bilder).toBeDisabled();
+    expect(bilder).toHaveTextContent(i18n.t("admin.ai.tasks.missing.tools"));
+
+    fireEvent.click(screen.getByTestId("admin-ai-queue-task-profile-vision"));
+    const agent = await screen.findByTestId(
+      "admin-ai-queue-task-profile-vision-menu-option-10",
+    );
+    expect(agent).toBeDisabled();
+    expect(agent).toHaveTextContent(i18n.t("admin.ai.tasks.missing.vision"));
+  });
+
+  it("shows the backend's 422 detail when a feature would have no profile", async () => {
+    const detail =
+      "Kein Modellprofil für: KI-Entwurf. Bitte der Aufgabe „Recherche und Werkzeuge“ ein Profil zuweisen – in dieser Queue oder global unter KI → Modelle → Aufgaben.";
+    updateQueuePolicy.mockRejectedValue(new ApiError(422, detail, "/admin/ai/queue-policies/1"));
+    renderEdit();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-models-table")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-queue-task-profile-agent"));
+    fireEvent.click(
+      await screen.findByTestId("admin-ai-queue-task-profile-agent-menu-option-none"),
+    );
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
 
     await waitFor(() =>
-      expect(screen.getByTestId("admin-ai-queue-fallback-section")).toBeInTheDocument(),
+      expect(screen.getByTestId("admin-ai-queue-editor-error").textContent).toBe(detail),
     );
-    expect(screen.getByTestId("admin-ai-queue-fallback-section")).toHaveTextContent(
-      "No fallback providers",
-    );
-    expect(warnSpy).toHaveBeenCalled();
-    warnSpy.mockRestore();
   });
 
   it("shows clarify_schema_json only when identity_mode is clarify_schema", async () => {
