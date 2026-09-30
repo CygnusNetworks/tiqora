@@ -1200,3 +1200,41 @@ async def test_auto_tick_never_overtakes_the_triage_watermark(
     finally:
         _delete_triage(mariadb_znuny_url, seed["ticket_id"])
         await engine.dispose()
+
+
+async def test_agent_models_tool_rounds_reach_the_run(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End to end: the worker resolves the agent chain and the run uses the
+    first model's ``max_tool_rounds`` (1 → the second call is already the
+    forced terminal call; with the default budget it would offer all tools)."""
+    from tests.test_ai_runtime import _note_tool_response
+
+    seed = _seed_ticket(mariadb_znuny_url, ns=47)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="Help!"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            await make_model(session, provider, "fake-model", max_tool_rounds=1)
+
+        llm = ScriptedLlm(
+            [_note_tool_response("recherche"), _propose_response("reply", "Antwort.")]
+        )
+        _patch_llm(monkeypatch, llm)
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 1
+        assert llm.calls == 2
+        forced = {t["function"]["name"] for t in (llm.tools_seen[-1] or [])}
+        assert forced == {"propose_customer_message", "escalate_to_human", "no_reply_needed"}
+    finally:
+        await engine.dispose()

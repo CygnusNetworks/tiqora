@@ -405,3 +405,37 @@ async def test_fallback_serves_when_first_model_errors(
     assert isinstance(task_llm.client, FallbackLlmClient)
     assert task_llm.client.active_model == "steady"
     assert task_llm.client.active_llm_model_id == task_llm.models[1].llm_model_id
+
+
+async def test_disabled_profile_behaves_like_no_profile(
+    session: AsyncSession, built: list[_RecordedClient]
+) -> None:
+    """valid_id != 1 on a profile = "no profile" for the task: triage falls
+    back to the agent chain, final answer hands over to nothing, vision is
+    off, and an agent without a usable profile is 409."""
+    provider = await _provider(session, "disabled")
+    agent = await make_profile(session, provider, ["agent-model"])
+    triage = await make_profile(session, provider, ["triage-model"])
+    final = await make_profile(session, provider, ["final-model"])
+    vision = await make_profile(session, provider, ["eye"], supports_vision=True)
+    policy = await _policy(session, 15)
+    await assign_task(session, policy, TASK_AGENT, agent)
+    await assign_task(session, policy, TASK_TRIAGE, triage)
+    await assign_task(session, None, TASK_FINAL_ANSWER, final)
+    await assign_task(session, policy, TASK_VISION, vision)
+    for profile in (triage, final, vision):
+        profile.valid_id = 2
+    await session.commit()
+
+    triage_llm = await build_task_llm(session, get_settings(), policy, TASK_TRIAGE)
+    assert triage_llm is not None and triage_llm.profile_id == agent.id
+    assert await build_task_llm(session, get_settings(), policy, TASK_FINAL_ANSWER) is None
+    setup = await llm_routing.resolve_vision(session, get_settings(), policy)
+    assert (setup.enabled, setup.factory) == (False, None)
+
+    agent.valid_id = 2
+    await session.commit()
+    with pytest.raises(HTTPException) as excinfo:
+        await build_agent_llm(session, get_settings(), policy)
+    assert excinfo.value.status_code == 409
+    assert await resolve_task_profile_id(session, policy, TASK_SUMMARY) is None

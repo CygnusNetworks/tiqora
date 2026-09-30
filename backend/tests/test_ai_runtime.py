@@ -37,6 +37,7 @@ from tiqora.ai.identity import (
     MAX_IDENTITY_ATTEMPTS,
 )
 from tiqora.ai.llm import LlmEmptyOutputError, LlmMessage, LlmResponse, LlmUsage, ToolCall
+from tiqora.ai.llm_routing import TaskLlm
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
     AUTONOMY_FULL,
@@ -3605,7 +3606,7 @@ async def test_final_answer_model_writes_the_customer_message(
                 session,
                 settings=settings,
                 llm=primary,
-                final_llm=final,
+                final_llm=_final_task_llm(final),
                 ticket_id=seed["ticket_id"],
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
@@ -3659,7 +3660,7 @@ async def test_final_answer_model_may_research_before_answering(
                 session,
                 settings=settings,
                 llm=primary,
-                final_llm=final,
+                final_llm=_final_task_llm(final),
                 ticket_id=seed["ticket_id"],
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
@@ -3691,7 +3692,7 @@ async def test_terminal_force_uses_the_final_answer_model(
                 session,
                 settings=settings,
                 llm=primary,
-                final_llm=final,
+                final_llm=_final_task_llm(final),
                 ticket_id=seed["ticket_id"],
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
@@ -3706,28 +3707,55 @@ async def test_terminal_force_uses_the_final_answer_model(
         await engine.dispose()
 
 
-async def test_final_answer_tokens_are_booked_on_the_final_provider(
-    mariadb_znuny_url: str,
+async def test_final_answer_tokens_are_booked_on_the_model_that_served(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Budgets are per provider and prices per model: the final model's tokens
-    get their own usage row on its provider, priced by its model row; the
-    primary keeps the rest."""
+    """Budgets are per provider and prices per model: after the final-answer
+    chain fell back from a failing model to one at another provider, the
+    final model's tokens are booked on the provider and model row that
+    actually served (priced from that row even though the echoed name
+    matches no configured id); the primary keeps the rest."""
     from tiqora.ai import providers as ai_providers
+    from tiqora.ai.llm import LlmHttpError
+    from tiqora.ai.llm_fallback import reset_cooldowns
 
     seed = _seed_ticket(mariadb_znuny_url, ns=76)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     settings = get_settings()
     final_name = f"fake-final-provider-{seed['queue_id']}"
-    try:
-        async with factory() as session:
-            for stmt, params in routing_cleanup_statements(final_name):
+    flaky_name = f"{final_name}-flaky"
+
+    async def _cleanup(session: AsyncSession) -> None:
+        for name in (final_name, flaky_name):
+            for stmt, params in routing_cleanup_statements(name):
                 await session.execute(text(stmt), params)
             await session.execute(
-                text("DELETE FROM tiqora_llm_provider WHERE name = :n"), {"n": final_name}
+                text("DELETE FROM tiqora_llm_provider WHERE name = :n"), {"n": name}
             )
-            await session.commit()
+        await session.commit()
+
+    class _Failing:
+        async def chat(self, **_kwargs: Any) -> LlmResponse:
+            raise LlmHttpError(503, "overloaded")
+
+    final = ScriptedLlm([_propose_response("reply", "strong answer", model="vendor/strong")])
+    clients = {"flaky-model": _Failing(), "strong-model": final}
+    monkeypatch.setattr("tiqora.ai.llm_routing.make_llm_client", lambda **kw: clients[kw["model"]])
+    reset_cooldowns()
+    try:
+        async with factory() as session:
+            await _cleanup(session)
             await _setup_policy(session, seed=seed, autonomy=AUTONOMY_FULL)
+            flaky_provider = await ai_providers.create_provider(
+                session,
+                settings=settings,
+                change_by=1,
+                name=flaky_name,
+                kind="openai_compat",
+                base_url="https://flaky.example/v1",
+                api_key=None,
+            )
             final_provider = await ai_providers.create_provider(
                 session,
                 settings=settings,
@@ -3736,10 +3764,8 @@ async def test_final_answer_tokens_are_booked_on_the_final_provider(
                 kind="openai_compat",
                 base_url="https://llm.example/v1",
                 api_key=None,
-                extra_json=None,
-                eu_hosted=True,
             )
-            await make_model(
+            strong = await make_model(
                 session,
                 final_provider,
                 "strong-model",
@@ -3748,17 +3774,17 @@ async def test_final_answer_tokens_are_booked_on_the_final_provider(
             )
             policy = await ai_policies.get_queue_policy_by_queue(session, seed["queue_id"])
             assert policy is not None
-            final_profile = await make_profile(session, final_provider, ["strong-model"])
+            final_profile = await make_profile(
+                session, flaky_provider, ["flaky-model", (final_provider, "strong-model")]
+            )
             await assign_task(session, policy, "final_answer", final_profile)
 
         primary = ScriptedLlm([_propose_response("reply", "cheap answer")])
-        final = ScriptedLlm([_propose_response("reply", "strong answer", model="strong-model")])
         async with factory() as session:
             result = await run_ticket_agent(
                 session,
                 settings=settings,
                 llm=primary,
-                final_llm=final,
                 ticket_id=seed["ticket_id"],
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
@@ -3771,18 +3797,31 @@ async def test_final_answer_tokens_are_booked_on_the_final_provider(
             rows = (
                 await session.execute(
                     text(
-                        "SELECT provider_id, model, prompt_tokens, completion_tokens, cost_hint"
-                        " FROM tiqora_ai_usage WHERE ticket_id = :tid ORDER BY id"
+                        "SELECT provider_id, model, prompt_tokens, completion_tokens, cost_hint,"
+                        " llm_model_id FROM tiqora_ai_usage WHERE ticket_id = :tid ORDER BY id"
                     ),
                     {"tid": seed["ticket_id"]},
                 )
             ).all()
+            audit_final = (
+                await session.execute(
+                    text(
+                        "SELECT provider_id, llm_model_id FROM tiqora_ai_audit_log"
+                        " WHERE ticket_id = :tid AND model = 'vendor/strong'"
+                    ),
+                    {"tid": seed["ticket_id"]},
+                )
+            ).one()
         final_row = next(r for r in rows if r[0] == final_provider.id)
-        assert (final_row[1], final_row[2], final_row[3]) == ("strong-model", 10, 5)
+        assert (final_row[1], final_row[2], final_row[3]) == ("vendor/strong", 10, 5)
+        assert final_row[5] == strong.id
         assert final_row[4] == pytest.approx(10 * 1.0 + 5 * 2.0)
+        assert tuple(audit_final) == (final_provider.id, strong.id)
+        assert not any(r[0] == flaky_provider.id for r in rows)
         primary_rows = [r for r in rows if r[0] != final_provider.id]
         assert [(r[2], r[3]) for r in primary_rows] == [(10, 5)]
     finally:
+        reset_cooldowns()
         async with factory() as session:
             await session.execute(
                 text("DELETE FROM tiqora_ai_usage WHERE ticket_id = :tid"),
@@ -3792,12 +3831,7 @@ async def test_final_answer_tokens_are_booked_on_the_final_provider(
                 text("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :q"),
                 {"q": seed["queue_id"]},
             )
-            for stmt, params in routing_cleanup_statements(final_name):
-                await session.execute(text(stmt), params)
-            await session.execute(
-                text("DELETE FROM tiqora_llm_provider WHERE name = :n"), {"n": final_name}
-            )
-            await session.commit()
+            await _cleanup(session)
         await engine.dispose()
 
 
@@ -3814,3 +3848,8 @@ def test_tool_round_budget_comes_from_the_first_agent_model() -> None:
     assert _tool_rounds_for(_model(None), default=12) == 12
     assert _tool_rounds_for(_model(0), default=12) == 12
     assert _tool_rounds_for(None, default=12) == 12
+
+
+def _final_task_llm(client: Any) -> TaskLlm:
+    """An injected final-answer chain without model rows (no provider)."""
+    return TaskLlm(client=client, models=[], profile_id=0, profile_name="final")

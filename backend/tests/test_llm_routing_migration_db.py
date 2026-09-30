@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 from alembic import command
@@ -29,7 +30,8 @@ from tiqora.ai.llm_routing import (
     TASK_SUMMARY,
     TASK_TRIAGE,
     TASK_VISION,
-    resolve_task_models,
+    NoUsableModel,
+    build_task_llm,
 )
 from tiqora.ai.models import TiqoraAiQueuePolicy
 from tiqora.cli.migrate import build_alembic_config
@@ -171,6 +173,14 @@ def _seed_old_schema(sync_url: str) -> dict[str, int]:
     return ids
 
 
+async def _models(session: Any, policy: TiqoraAiQueuePolicy | None, task: str) -> list[Any]:
+    try:
+        task_llm = await build_task_llm(session, get_settings(), policy, task)
+    except NoUsableModel:
+        return []
+    return [] if task_llm is None else task_llm.models
+
+
 async def _resolved(
     sync_url: str, ids: dict[str, int]
 ) -> dict[str, dict[str, list[tuple[int, str]]]]:
@@ -182,10 +192,7 @@ async def _resolved(
             for key in ("q1", "q2", "q3"):
                 policy = await session.get(TiqoraAiQueuePolicy, ids[key])
                 out[key] = {
-                    task: [
-                        (m.provider_id, m.model)
-                        for m in await resolve_task_models(session, policy, task)
-                    ]
+                    task: [(m.provider_id, m.model) for m in await _models(session, policy, task)]
                     for task in (
                         TASK_AGENT,
                         TASK_FINAL_ANSWER,
@@ -262,12 +269,15 @@ def test_upgrade_resolves_like_before_and_downgrade_restores(alembic_env: str) -
             policy_columns = {
                 c["name"] for c in inspect(conn).get_columns("tiqora_ai_queue_policy")
             }
+            usage_columns = {c["name"] for c in inspect(conn).get_columns("tiqora_ai_usage")}
+            audit_columns = {c["name"] for c in inspect(conn).get_columns("tiqora_ai_audit_log")}
         engine.dispose()
         assert names[defaults["agent"]] == "main-model @ Main +1"
         assert tuple(model) == (6, 2.0)
         assert "default_model" not in provider_columns
         assert "llm_provider_id" not in policy_columns
         assert "llm_fallback_json" not in policy_columns
+        assert "llm_model_id" in usage_columns and "llm_model_id" in audit_columns
 
         _migrate(_PREVIOUS, down=True)
         engine = create_engine(sync_url)
@@ -286,9 +296,11 @@ def test_upgrade_resolves_like_before_and_downgrade_restores(alembic_env: str) -
                 conn.execute(text("SELECT id, default_model FROM tiqora_llm_provider")).all()
             )
             tables = set(inspect(conn).get_table_names())
+            usage_after = {c["name"] for c in inspect(conn).get_columns("tiqora_ai_usage")}
         engine.dispose()
         assert providers == {p1: "main-model", p2: "eye-model"}
         assert "tiqora_llm_model" not in tables
+        assert "llm_model_id" not in usage_after
         q1 = rows[9901]
         assert (q1.llm_provider_id, q1.model_override) == (p1, "main-model")
         assert json.loads(q1.llm_fallback_json) == [{"provider_id": p2, "model": "eye-model"}]

@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -58,12 +59,12 @@ from tiqora.ai.context import (
 )
 from tiqora.ai.llm import LlmClient, LlmMessage
 from tiqora.ai.llm_routing import (
-    TASK_SUMMARY,
     TASK_VISION,
     ChainModel,
-    build_vision_llm_factory,
-    resolve_task_models,
+    primary_of,
     resolve_task_profile_id,
+    resolve_vision,
+    served_identity,
 )
 from tiqora.ai.models import (
     DETAIL_DETAILED,
@@ -404,20 +405,6 @@ class _PreparedRun:
     primary_model: ChainModel | None
 
 
-def _served_provider_id(raw_llm: LlmClient, primary: ChainModel | None) -> int | None:
-    """The provider a fallback client actually used, else the profile's first."""
-    active = getattr(raw_llm, "active_provider_id", None)
-    return active if active is not None else (primary.provider_id if primary else None)
-
-
-def _served_model(echoed: str | None, raw_llm: LlmClient, primary: ChainModel | None) -> str | None:
-    return (
-        echoed
-        or getattr(raw_llm, "active_model", None)
-        or (primary.model if primary is not None else None)
-    )
-
-
 async def _prepare_run(
     session: AsyncSession,
     *,
@@ -430,13 +417,14 @@ async def _prepare_run(
     run_id: str | None,
     settings: Settings | None,
     vision_llm_factory: Any,
+    llm_models: Sequence[ChainModel],
 ) -> _PreparedRun:
     """Attachment extraction, PII mapper and audit wrapping shared by the
     stored and the custom summary."""
-    # The summary profile's first usable model: default provider/model for
-    # audit and usage (a fallback that actually served overrides it).
-    summary_models = await resolve_task_models(session, policy, TASK_SUMMARY)
-    primary_model = summary_models[0] if summary_models else None
+    # The summary chain's first usable model (resolved by the caller):
+    # default provider/model for audit and usage (a fallback that actually
+    # served overrides it).
+    primary_model = primary_of(llm_models)
     audit_context = AuditContext(
         feature=AUDIT_FEATURE_SUMMARY,
         run_id=run_id or uuid.uuid4().hex,
@@ -446,15 +434,17 @@ async def _prepare_run(
         trigger=trigger,
         provider_id=primary_model.provider_id if primary_model else None,
         model=primary_model.model if primary_model else None,
+        llm_model_id=primary_model.llm_model_id if primary_model else None,
     )
 
-    vision_enabled = await resolve_task_profile_id(session, policy, TASK_VISION) is not None
-    effective_vision_factory = vision_llm_factory
-    if effective_vision_factory is None and vision_enabled:
-        effective_settings = settings or get_settings()
-        effective_vision_factory = await build_vision_llm_factory(
-            session, effective_settings, policy, audit=audit_context
+    if vision_llm_factory is not None:
+        vision_enabled = await resolve_task_profile_id(session, policy, TASK_VISION) is not None
+        effective_vision_factory = vision_llm_factory
+    else:
+        vision = await resolve_vision(
+            session, settings or get_settings(), policy, audit=audit_context
         )
+        vision_enabled, effective_vision_factory = vision.enabled, vision.factory
     attachment_context = await build_attachment_context(
         session,
         articles,
@@ -505,11 +495,16 @@ async def summarize_ticket(
     vision_llm_factory: Any = None,
     run_id: str | None = None,
     detail: str | None = None,
+    llm_models: Sequence[ChainModel] = (),
 ) -> SummaryResult:
     """Run the summary service once for one ticket (plan §3.5).
 
     ``detail`` (``"standard"``/``"detailed"``) overrides the queue policy's
     ``summary_detail`` for this run — the agent picks the scope per ticket.
+
+    ``llm_models`` are the usable models behind ``llm`` (the caller's
+    ``TaskLlm.models``); the first supplies the default provider/model for
+    audit and usage.
 
     ``acting_user_id`` is required for ``trigger="manual"`` (ACL check);
     ``None`` for ``trigger="auto"`` (queue-driven, no per-user ACL — mirrors
@@ -566,6 +561,7 @@ async def summarize_ticket(
         run_id=run_id,
         settings=settings,
         vision_llm_factory=vision_llm_factory,
+        llm_models=llm_models,
     )
     llm, raw_llm, pii = run.llm, run.raw_llm, run.pii
     attachment_context = run.attachment_context
@@ -616,16 +612,18 @@ async def summarize_ticket(
         attachment_context.vision_usage.completion_tokens + response.usage.completion_tokens
     )
 
+    served = served_identity(raw_llm, run.primary_model)
     await usage_service.record_usage(
         session,
         user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
         queue_id=ticket.queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_SUMMARY,
-        provider_id=_served_provider_id(raw_llm, run.primary_model),
+        provider_id=served[0],
         # The provider echoes back what it actually served — preferred over
         # the configured model id.
-        model=_served_model(response.model, raw_llm, run.primary_model),
+        model=response.model or served[1],
+        llm_model_id=served[2],
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool(response.content),
@@ -671,6 +669,7 @@ async def custom_summarize_ticket(
     settings: Settings | None = None,
     vision_llm_factory: Any = None,
     run_id: str | None = None,
+    llm_models: Sequence[ChainModel] = (),
 ) -> SummaryResult:
     """Summarize the whole ticket along the agent's own ``instruction``.
 
@@ -706,6 +705,7 @@ async def custom_summarize_ticket(
         run_id=run_id,
         settings=settings,
         vision_llm_factory=vision_llm_factory,
+        llm_models=llm_models,
     )
     attachment_blocks = run.attachment_context.blocks
 
@@ -734,14 +734,16 @@ async def custom_summarize_ticket(
     completion_tokens = (
         run.attachment_context.vision_usage.completion_tokens + response.usage.completion_tokens
     )
+    served = served_identity(run.raw_llm, run.primary_model)
     await usage_service.record_usage(
         session,
         user_id=acting_user_id,
         queue_id=ticket.queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_SUMMARY,
-        provider_id=_served_provider_id(run.raw_llm, run.primary_model),
-        model=_served_model(response.model, run.raw_llm, run.primary_model),
+        provider_id=served[0],
+        model=response.model or served[1],
+        llm_model_id=served[2],
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool((response.content or "").strip()),

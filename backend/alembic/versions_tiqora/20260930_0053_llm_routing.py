@@ -20,8 +20,15 @@ tool rounds, prices) with four levels:
 Every existing queue policy is converted 1:1, so each queue resolves exactly
 the models it used before (see :func:`_plan_conversion`, a pure function so
 it can be unit-tested without a database). One deliberate difference: a
-triage provider without a triage model now uses *that* provider's default
-model, not the queue's ``model_override`` meant for another provider.
+triage provider *other than the agent's* without a triage model now uses
+that provider's default model, not the queue's ``model_override`` meant for
+the agent's provider.
+
+``tiqora_ai_usage`` / ``tiqora_ai_audit_log`` get a nullable ``llm_model_id``
+(the model row that served the call) so cost is priced from that row
+directly; rows without it fall back to matching the model name. Plain
+integer without FK: the audit table can be large, and a deleted model just
+makes old rows fall back to the name match.
 """
 
 # No ``from __future__ import annotations``: Alembic executes this file
@@ -200,9 +207,14 @@ def _policy_chains(
 
     if policy.triage_llm_provider_id is not None or policy.triage_model_override:
         triage_provider = policy.triage_llm_provider_id or policy.llm_provider_id
-        # The triage provider's own default model — never the queue's
-        # model_override, which names a model at a (possibly) other provider.
-        triage = _key(providers, triage_provider, policy.triage_model_override)
+        triage_model = policy.triage_model_override
+        if not triage_model and triage_provider == policy.llm_provider_id:
+            # Same provider as the agent: the agent's model (old behaviour).
+            triage_model = policy.model_override
+        # A different provider without a triage model gets its own default
+        # model — never the agent's model_override, which names a model at
+        # the agent's provider (the old bug).
+        triage = _key(providers, triage_provider, triage_model)
         if triage is not None:
             chains["triage"] = _dedupe([triage, *fallback])
 
@@ -583,6 +595,9 @@ def upgrade() -> None:
     ]
     _write_plan(bind, _plan_conversion(providers, policies))
 
+    for table in ("tiqora_ai_usage", "tiqora_ai_audit_log"):
+        op.add_column(table, sa.Column("llm_model_id", sa.Integer(), nullable=True))
+
     _drop_fks_on("tiqora_ai_queue_policy", _POLICY_DROPPED)
     for column in _POLICY_DROPPED:
         op.drop_column("tiqora_ai_queue_policy", column)
@@ -611,7 +626,21 @@ def _load_chains(bind: sa.Connection) -> dict[int, list[tuple[int, str]]]:
 
 
 def downgrade() -> None:
+    """Lossy by nature. Restored: each queue's first model per task (agent
+    fallbacks back into ``llm_fallback_json``) and each provider's first model
+    row's flags/prices as the provider settings. Lost: summary/refine
+    profiles, triage/final-answer/vision fallbacks, profile timeouts, models
+    beyond the first per provider. Vision in particular: the old schema only
+    knew ``vision_provider_id`` and always used that provider's
+    ``default_model`` — which is restored from the provider's *first* model
+    row, so if the vision model was not that row, the vision queue silently
+    switches to the provider's other model (and ``supports_vision`` comes
+    from the first row too, possibly turning vision off).
+    """
     bind = op.get_bind()
+
+    for table in ("tiqora_ai_usage", "tiqora_ai_audit_log"):
+        op.drop_column(table, "llm_model_id")
 
     op.add_column("tiqora_llm_provider", sa.Column("default_model", sa.String(200), nullable=True))
     op.add_column(

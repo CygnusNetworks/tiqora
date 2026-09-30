@@ -118,6 +118,54 @@ async def test_cost_hint_is_priced_per_model(mariadb_znuny_url: str) -> None:
         get_settings.cache_clear()
 
 
+async def test_cost_hint_uses_the_serving_model_row_when_known(mariadb_znuny_url: str) -> None:
+    """With the serving model row known (llm_model_id), its price applies even
+    when the echoed name matches nothing; the name match is only the
+    fallback for rows without it."""
+    _ensure_tables(mariadb_znuny_url)
+    get_settings.cache_clear()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            provider = await ai_providers.create_provider(
+                session,
+                settings=get_settings(),
+                change_by=1,
+                name="by-id-89516",
+                kind="openai_compat",
+                base_url="https://api.example/v1",
+                api_key=None,
+                price_currency="EUR",
+            )
+            cheap = await make_model(session, provider, "cheap", price_input_per_1m=1.0)
+            await make_model(session, provider, "dear", price_input_per_1m=50.0)
+
+            async def _cost(model: str | None, llm_model_id: int | None) -> float | None:
+                row = await ai_usage.record_usage(
+                    session,
+                    queue_id=89516,
+                    feature="manual_assist",
+                    provider_id=provider.id,
+                    model=model,
+                    llm_model_id=llm_model_id,
+                    prompt_tokens=1_000_000,
+                )
+                assert row.llm_model_id == llm_model_id
+                return row.cost_hint
+
+            # Echoed name unrelated to any configured id: priced by the row.
+            assert await _cost("vendor/renamed", cheap.id) == pytest.approx(1.0)
+            # The row wins over a name that would match another model.
+            assert await _cost("dear", cheap.id) == pytest.approx(1.0)
+            # Unknown row id (deleted model) → name match fallback.
+            assert await _cost("dear", 999_999) == pytest.approx(50.0)
+            assert await _cost("vendor/renamed", None) is None
+    finally:
+        await engine.dispose()
+        get_settings.cache_clear()
+
+
 async def test_record_usage_computes_cost_hint_with_one_price_set(mariadb_znuny_url: str) -> None:
     _ensure_tables(mariadb_znuny_url)
     get_settings.cache_clear()
