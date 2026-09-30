@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select, update
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.models import TiqoraAiTicketState
@@ -70,45 +70,67 @@ async def clear_ai_escalated(session: AsyncSession, ticket_id: int) -> None:
         )
 
 
+async def _pause_row_exists(session: AsyncSession, ticket_id: int) -> bool:
+    return (
+        await session.execute(
+            select(TiqoraAiTicketState.ticket_id).where(TiqoraAiTicketState.ticket_id == ticket_id)
+        )
+    ).first() is not None
+
+
+async def _apply_pause(session: AsyncSession, ticket_id: int, user_id: int) -> int:
+    """Set the pause on an existing, not-yet-paused row; returns rows changed."""
+    result = await session.execute(
+        update(TiqoraAiTicketState)
+        .where(
+            TiqoraAiTicketState.ticket_id == ticket_id,
+            TiqoraAiTicketState.ai_paused_at.is_(None),
+        )
+        .values(ai_paused_at=datetime.now(UTC).replace(tzinfo=None), ai_paused_by=user_id)
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]
+
+
 async def set_ai_paused(session: AsyncSession, ticket_id: int, user_id: int) -> None:
     """Pause all automatic AI actions on a ticket. Does not commit.
 
-    Upserts the per-ticket state row like :func:`mark_ai_escalated`. A ticket
-    that is already paused keeps its original ``ai_paused_at``/``ai_paused_by``.
-    Unlike the escalation flag this is never cleared by an agent reply or a
-    state change, only by :func:`clear_ai_paused`.
+    User-initiated, so errors propagate (a swallowed failure would report a
+    pause that never happened). Race-safe against the auto worker creating the
+    state row concurrently: update first, insert only when no row exists, and
+    if that insert loses the race, update again. An already paused ticket keeps
+    its original ``ai_paused_at``/``ai_paused_by``. Unlike the escalation flag
+    this is never cleared by an agent reply or a state change, only by
+    :func:`clear_ai_paused`.
     """
+    if await _apply_pause(session, ticket_id, user_id):
+        return
+    if await _pause_row_exists(session, ticket_id):
+        return  # already paused
     try:
         async with session.begin_nested():
-            state = await session.get(TiqoraAiTicketState, ticket_id)
-            if state is None:
-                state = TiqoraAiTicketState(ticket_id=ticket_id)
-                session.add(state)
-                await session.flush()
-            if state.ai_paused_at is None:
-                state.ai_paused_at = datetime.now(UTC).replace(tzinfo=None)
-                state.ai_paused_by = user_id
-    except DBAPIError:
-        logger.debug(
-            "tiqora_ai_ticket_state write failed (table missing?) - skipping AI pause",
-            exc_info=True,
-        )
+            session.add(
+                TiqoraAiTicketState(
+                    ticket_id=ticket_id,
+                    ai_paused_at=datetime.now(UTC).replace(tzinfo=None),
+                    ai_paused_by=user_id,
+                )
+            )
+            await session.flush()
+    except IntegrityError:
+        # The row appeared between our check and the insert.
+        await _apply_pause(session, ticket_id, user_id)
 
 
 async def clear_ai_paused(session: AsyncSession, ticket_id: int) -> None:
-    """Lift the per-ticket AI pause. No-op when the row is missing. Does not commit."""
-    try:
-        async with session.begin_nested():
-            await session.execute(
-                update(TiqoraAiTicketState)
-                .where(TiqoraAiTicketState.ticket_id == ticket_id)
-                .values(ai_paused_at=None, ai_paused_by=None)
-            )
-    except DBAPIError:
-        logger.debug(
-            "tiqora_ai_ticket_state write failed (table missing?) - skipping AI unpause",
-            exc_info=True,
-        )
+    """Lift the per-ticket AI pause. No-op when the row is missing. Does not
+    commit. User-initiated, so errors propagate."""
+    await session.execute(
+        update(TiqoraAiTicketState)
+        .where(TiqoraAiTicketState.ticket_id == ticket_id)
+        .values(ai_paused_at=None, ai_paused_by=None)
+        .execution_options(synchronize_session=False)
+    )
 
 
 async def ai_escalated_ticket_ids(session: AsyncSession, ticket_ids: list[int]) -> set[int]:

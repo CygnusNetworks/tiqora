@@ -966,6 +966,8 @@ async def pause_ai_automation(
     state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
     if state is not None and state.ai_paused_at is not None:
         return
+    # State first: if it fails, no orphan note is left behind.
+    await set_ai_paused(session, ticket_id, user_id)
     await add_article(
         session,
         ticket_id=ticket_id,
@@ -982,7 +984,6 @@ async def pause_ai_automation(
         user_id=user_id,
         sysconfig=sysconfig,
     )
-    await set_ai_paused(session, ticket_id, user_id)
 
 
 async def unpause_ai_automation(
@@ -1000,6 +1001,8 @@ async def unpause_ai_automation(
     state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
     if state is None or state.ai_paused_at is None:
         return
+    # State first: if it fails, no orphan note is left behind.
+    await clear_ai_paused(session, ticket_id)
     await add_article(
         session,
         ticket_id=ticket_id,
@@ -1017,7 +1020,6 @@ async def unpause_ai_automation(
         user_id=user_id,
         sysconfig=sysconfig,
     )
-    await clear_ai_paused(session, ticket_id)
 
 
 # ---------------------------------------------------------------------------
