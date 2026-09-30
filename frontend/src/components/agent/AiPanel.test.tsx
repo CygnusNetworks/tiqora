@@ -14,6 +14,8 @@ const {
   customSummary,
   discardDraft,
   resume,
+  pause,
+  unpause,
   acceptTriage,
   rejectTriage,
   adminDeleteDraft,
@@ -29,6 +31,8 @@ const {
   customSummary: vi.fn(),
   discardDraft: vi.fn(),
   resume: vi.fn(),
+  pause: vi.fn(),
+  unpause: vi.fn(),
   acceptTriage: vi.fn(),
   rejectTriage: vi.fn(),
   adminDeleteDraft: vi.fn(),
@@ -53,6 +57,8 @@ vi.mock("@/lib/ticketAiApi", async () => {
       customSummary,
       discardDraft,
       resume,
+      pause,
+      unpause,
       acceptTriage,
       rejectTriage,
     },
@@ -148,6 +154,8 @@ describe("AiPanel", () => {
     window.localStorage.clear();
     discardDraft.mockReset();
     resume.mockReset();
+    pause.mockReset();
+    unpause.mockReset();
     listArticles.mockReset().mockResolvedValue([]);
     createArticle.mockReset().mockResolvedValue({ id: 1 });
     getReplyDraft.mockReset().mockResolvedValue({
@@ -197,6 +205,76 @@ describe("AiPanel", () => {
         screen.queryByTestId("ai-panel-escalated-banner"),
       ).not.toBeInTheDocument(),
     );
+  });
+
+  it("pauses AI automation and refreshes state", async () => {
+    getState
+      .mockResolvedValueOnce({ ...baseState, summary_available: true })
+      .mockResolvedValueOnce({
+        ...baseState,
+        summary_available: true,
+        ai_paused_at: "2026-09-30T08:00:00",
+        ai_paused_by_name: "Erika",
+      });
+    pause.mockResolvedValue(undefined);
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    fireEvent.click(await screen.findByTestId("ai-panel-pause-button"));
+
+    await waitFor(() => expect(pause).toHaveBeenCalledWith(1));
+    const banner = await screen.findByTestId("ai-panel-paused-banner");
+    expect(banner.textContent).toContain("Erika");
+    expect(screen.queryByTestId("ai-panel-pause-button")).not.toBeInTheDocument();
+  });
+
+  it("shows the paused banner, keeps manual AI enabled, and unpauses", async () => {
+    getState
+      .mockResolvedValueOnce({
+        ...baseState,
+        summary_available: true,
+        can_summarize: true,
+        manual_assist_available: true,
+        ai_paused_at: "2026-09-30T08:00:00",
+        ai_paused_by_name: "Erika",
+      })
+      .mockResolvedValueOnce({
+        ...baseState,
+        summary_available: true,
+        can_summarize: true,
+        manual_assist_available: true,
+      });
+    unpause.mockResolvedValue(undefined);
+
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    const banner = await screen.findByTestId("ai-panel-paused-banner");
+    expect(banner.textContent).toContain("AI automation paused by Erika");
+    expect(banner.textContent).toContain("Manual AI features keep working");
+
+    await openCards();
+    expect(await screen.findByTestId("ai-panel-summarize-button")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("ai-panel-unpause-button"));
+    await waitFor(() => expect(unpause).toHaveBeenCalledWith(1));
+    await waitFor(() =>
+      expect(screen.queryByTestId("ai-panel-paused-banner")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("ai-panel-pause-button")).toBeInTheDocument();
+  });
+
+  it("shows an error when pausing fails", async () => {
+    getState.mockResolvedValue({ ...baseState, summary_available: true });
+    pause.mockRejectedValue(new Error("boom"));
+    wrap(<AiPanel ticketId={1} canNote />);
+    fireEvent.click(await screen.findByTestId("ai-panel-pause-button"));
+    expect(await screen.findByTestId("ai-panel-pause-error")).toBeInTheDocument();
+  });
+
+  it("disables the pause button without note permission", async () => {
+    getState.mockResolvedValue({ ...baseState, summary_available: true });
+    wrap(<AiPanel ticketId={1} canNote={false} />);
+    expect(await screen.findByTestId("ai-panel-pause-button")).toBeDisabled();
   });
 
   it("disables the resume button without note permission", async () => {
