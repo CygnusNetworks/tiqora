@@ -13,6 +13,7 @@ from tiqora.api.v1.admin import (
     acl,
     ai,
     ai_audit,
+    ai_models,
     api_keys,
     attachments,
     auth_config,
@@ -89,6 +90,7 @@ admin_router.include_router(placeholder_variables.queue_variables_router)
 admin_router.include_router(placeholder_variables.customer_fields_router)
 admin_router.include_router(customer_links.router)
 admin_router.include_router(ai.router)
+admin_router.include_router(ai_models.router)
 admin_router.include_router(ai_audit.router)
 
 __all__ = ["admin_router"]

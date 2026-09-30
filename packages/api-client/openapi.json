@@ -1734,6 +1734,13 @@
             "title": "System Prompt",
             "type": "string"
           },
+          "task_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/AiTaskProfileItem"
+            },
+            "title": "Task Profiles",
+            "type": "array"
+          },
           "triage_auto_threshold": {
             "default": 100,
             "title": "Triage Auto Threshold",
@@ -2105,6 +2112,13 @@
             "title": "System Prompt",
             "type": "string"
           },
+          "task_profiles": {
+            "items": {
+              "$ref": "#/components/schemas/AiTaskProfileItem"
+            },
+            "title": "Task Profiles",
+            "type": "array"
+          },
           "triage_auto_threshold": {
             "title": "Triage Auto Threshold",
             "type": "integer"
@@ -2190,6 +2204,7 @@
           "triage_customer_fix_enabled",
           "triage_customer_fix_auto_threshold",
           "triage_delay_reply",
+          "task_profiles",
           "valid_id",
           "create_time",
           "change_time"
@@ -2613,6 +2628,20 @@
               }
             ],
             "title": "System Prompt"
+          },
+          "task_profiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AiTaskProfileItem"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Profiles"
           },
           "triage_auto_threshold": {
             "anyOf": [
@@ -3188,6 +3217,32 @@
           "status"
         ],
         "title": "AiSummarizeOut",
+        "type": "object"
+      },
+      "AiTaskProfileItem": {
+        "description": "One task \u2192 profile assignment. ``profile_id`` null = \"no own\nprofile\" (the task's fallback).",
+        "properties": {
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "profile_id"
+        ],
+        "title": "AiTaskProfileItem",
         "type": "object"
       },
       "AiToolTraceOut": {
@@ -11311,6 +11366,493 @@
         "title": "LegacySchemaOut",
         "type": "object"
       },
+      "LlmModelIn": {
+        "description": "POST and PUT (full replace).",
+        "properties": {
+          "context_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
+          "model_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "integer"
+          },
+          "supports_tools": {
+            "default": true,
+            "title": "Supports Tools",
+            "type": "boolean"
+          },
+          "supports_vision": {
+            "default": false,
+            "title": "Supports Vision",
+            "type": "boolean"
+          },
+          "valid_id": {
+            "default": 1,
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model_id"
+        ],
+        "title": "LlmModelIn",
+        "type": "object"
+      },
+      "LlmModelOut": {
+        "properties": {
+          "change_time": {
+            "format": "date-time",
+            "title": "Change Time",
+            "type": "string"
+          },
+          "context_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Tokens"
+          },
+          "create_time": {
+            "format": "date-time",
+            "title": "Create Time",
+            "type": "string"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "max_tool_rounds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tool Rounds"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "price_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Currency"
+          },
+          "price_input_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Input Per 1M"
+          },
+          "price_output_per_1m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Output Per 1M"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "integer"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "supports_tools": {
+            "title": "Supports Tools",
+            "type": "boolean"
+          },
+          "supports_vision": {
+            "title": "Supports Vision",
+            "type": "boolean"
+          },
+          "used_in_profiles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Used In Profiles",
+            "type": "array"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "provider_id",
+          "provider_name",
+          "price_currency",
+          "model_id",
+          "display_name",
+          "label",
+          "supports_tools",
+          "supports_vision",
+          "context_tokens",
+          "max_tool_rounds",
+          "price_input_per_1m",
+          "price_output_per_1m",
+          "valid_id",
+          "used_in_profiles",
+          "create_time",
+          "change_time"
+        ],
+        "title": "LlmModelOut",
+        "type": "object"
+      },
+      "LlmModelTestOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "tool_calling_ok": {
+            "title": "Tool Calling Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "model",
+          "tool_calling_ok",
+          "error"
+        ],
+        "title": "LlmModelTestOut",
+        "type": "object"
+      },
+      "LlmProfileEntryOut": {
+        "properties": {
+          "llm_model_id": {
+            "title": "Llm Model Id",
+            "type": "integer"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_label": {
+            "title": "Model Label",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "integer"
+          },
+          "provider_name": {
+            "title": "Provider Name",
+            "type": "string"
+          },
+          "supports_tools": {
+            "title": "Supports Tools",
+            "type": "boolean"
+          },
+          "supports_vision": {
+            "title": "Supports Vision",
+            "type": "boolean"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "llm_model_id",
+          "model_id",
+          "model_label",
+          "provider_id",
+          "provider_name",
+          "supports_tools",
+          "supports_vision",
+          "valid_id"
+        ],
+        "title": "LlmProfileEntryOut",
+        "type": "object"
+      },
+      "LlmProfileIn": {
+        "description": "POST and PUT (full replace; ``llm_model_ids`` in fallback order).",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "llm_model_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "minItems": 1,
+            "title": "Llm Model Ids",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
+          },
+          "valid_id": {
+            "default": 1,
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "llm_model_ids"
+        ],
+        "title": "LlmProfileIn",
+        "type": "object"
+      },
+      "LlmProfileOut": {
+        "properties": {
+          "change_time": {
+            "format": "date-time",
+            "title": "Change Time",
+            "type": "string"
+          },
+          "create_time": {
+            "format": "date-time",
+            "title": "Create Time",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LlmProfileEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
+          },
+          "used_by": {
+            "items": {
+              "$ref": "#/components/schemas/LlmProfileUseOut"
+            },
+            "title": "Used By",
+            "type": "array"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "timeout_seconds",
+          "valid_id",
+          "entries",
+          "used_by",
+          "create_time",
+          "change_time"
+        ],
+        "title": "LlmProfileOut",
+        "type": "object"
+      },
+      "LlmProfileUseOut": {
+        "description": "A direct assignment: global default (queue fields null) or queue override.",
+        "properties": {
+          "queue_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Name"
+          },
+          "queue_policy_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Policy Id"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "queue_policy_id",
+          "queue_name"
+        ],
+        "title": "LlmProfileUseOut",
+        "type": "object"
+      },
       "LlmProviderCreate": {
         "properties": {
           "api_key": {
@@ -11529,8 +12071,9 @@
         "type": "object"
       },
       "LlmProviderTestOut": {
+        "description": "Result of reading the provider's model list (URL + key check).",
         "properties": {
-          "error": {
+          "detail": {
             "anyOf": [
               {
                 "type": "string"
@@ -11539,33 +12082,28 @@
                 "type": "null"
               }
             ],
-            "title": "Error"
+            "title": "Detail"
           },
-          "model": {
+          "model_count": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Model"
+            "title": "Model Count"
           },
           "ok": {
             "title": "Ok",
-            "type": "boolean"
-          },
-          "tool_calling_ok": {
-            "title": "Tool Calling Ok",
             "type": "boolean"
           }
         },
         "required": [
           "ok",
-          "model",
-          "tool_calling_ok",
-          "error"
+          "detail",
+          "model_count"
         ],
         "title": "LlmProviderTestOut",
         "type": "object"
@@ -17293,6 +17831,22 @@
           "connected"
         ],
         "title": "RedisStatusOut",
+        "type": "object"
+      },
+      "RemoteModelsOut": {
+        "properties": {
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          }
+        },
+        "required": [
+          "models"
+        ],
+        "title": "RemoteModelsOut",
         "type": "object"
       },
       "ReplyDraftOut": {
@@ -26824,6 +27378,663 @@
         ]
       }
     },
+    "/api/v1/admin/ai/models": {
+      "get": {
+        "operationId": "list_llm_models_api_v1_admin_ai_models_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LlmModelOut"
+                  },
+                  "title": "Response List Llm Models Api V1 Admin Ai Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Llm Models",
+        "tags": [
+          "admin:ai"
+        ]
+      },
+      "post": {
+        "operationId": "create_llm_model_api_v1_admin_ai_models_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmModelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Llm Model",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/models/{model_id}": {
+      "delete": {
+        "operationId": "delete_llm_model_api_v1_admin_ai_models__model_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Llm Model",
+        "tags": [
+          "admin:ai"
+        ]
+      },
+      "put": {
+        "operationId": "update_llm_model_api_v1_admin_ai_models__model_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmModelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Llm Model",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/models/{model_id}/test": {
+      "post": {
+        "description": "Chat call with a tool schema (when the model supports tools) against\nthe model's provider: checks key, model id and tool calling.",
+        "operationId": "test_llm_model_api_v1_admin_ai_models__model_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmModelTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Llm Model",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/profiles": {
+      "get": {
+        "operationId": "list_llm_profiles_api_v1_admin_ai_profiles_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LlmProfileOut"
+                  },
+                  "title": "Response List Llm Profiles Api V1 Admin Ai Profiles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Llm Profiles",
+        "tags": [
+          "admin:ai"
+        ]
+      },
+      "post": {
+        "operationId": "create_llm_profile_api_v1_admin_ai_profiles_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmProfileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Llm Profile",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/profiles/{profile_id}": {
+      "delete": {
+        "operationId": "delete_llm_profile_api_v1_admin_ai_profiles__profile_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Llm Profile",
+        "tags": [
+          "admin:ai"
+        ]
+      },
+      "put": {
+        "operationId": "update_llm_profile_api_v1_admin_ai_profiles__profile_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "profile_id",
+            "required": true,
+            "schema": {
+              "title": "Profile Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmProfileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmProfileOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Llm Profile",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
     "/api/v1/admin/ai/providers": {
       "get": {
         "operationId": "list_llm_providers_api_v1_admin_ai_providers_get",
@@ -27189,8 +28400,84 @@
         ]
       }
     },
+    "/api/v1/admin/ai/providers/{provider_id}/remote-models": {
+      "get": {
+        "description": "The model ids the provider offers (``GET {base_url}/models``), for the\nmodel form's suggestions. Provider errors \u2192 502 with their text.",
+        "operationId": "list_llm_provider_remote_models_api_v1_admin_ai_providers__provider_id__remote_models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoteModelsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Llm Provider Remote Models",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
     "/api/v1/admin/ai/providers/{provider_id}/test": {
       "post": {
+        "description": "Access check: can the provider's model list be read with this URL and\nkey? (Per-model chat/tool probes: ``POST /models/{id}/test``.)",
         "operationId": "test_llm_provider_api_v1_admin_ai_providers__provider_id__test_post",
         "parameters": [
           {
@@ -28170,6 +29457,158 @@
           }
         },
         "summary": "Delete Ai Summary",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/task-defaults": {
+      "get": {
+        "description": "All six tasks; ``profile_id`` null = no global profile.",
+        "operationId": "get_ai_task_defaults_api_v1_admin_ai_task_defaults_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiTaskProfileItem"
+                  },
+                  "title": "Response Get Ai Task Defaults Api V1 Admin Ai Task Defaults Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ai Task Defaults",
+        "tags": [
+          "admin:ai"
+        ]
+      },
+      "put": {
+        "description": "Replaces all global defaults (a task not listed \u2192 no profile).",
+        "operationId": "put_ai_task_defaults_api_v1_admin_ai_task_defaults_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "items": {
+                  "$ref": "#/components/schemas/AiTaskProfileItem"
+                },
+                "title": "Body",
+                "type": "array"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AiTaskProfileItem"
+                  },
+                  "title": "Response Put Ai Task Defaults Api V1 Admin Ai Task Defaults Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Ai Task Defaults",
         "tags": [
           "admin:ai"
         ]
@@ -50833,7 +52272,7 @@
     },
     "/api/v1/channels/phone/events": {
       "post": {
-        "description": "PBX call events (ringing / answered / hangup) for the agent call popup.\n\nBody as JSON or form-encoded (same fields). The extension is mapped to\nagents via their ``TiqoraPhoneExtension`` preference; an event nobody is\nassigned to is accepted and ignored. See :mod:`tiqora.channels.phone.cti`.",
+        "description": "PBX call events (ringing / answered / hangup / handled) for the agent call popup.\n\nBody as JSON or form-encoded (same fields). The extension is mapped to\nagents via their ``TiqoraPhoneExtension`` preference; an event nobody is\nassigned to is accepted and ignored. See :mod:`tiqora.channels.phone.cti`.",
         "operationId": "call_event_api_v1_channels_phone_events_post",
         "parameters": [
           {
@@ -50890,7 +52329,8 @@
                     "enum": [
                       "ringing",
                       "answered",
-                      "hangup"
+                      "hangup",
+                      "handled"
                     ],
                     "title": "Event",
                     "type": "string"
@@ -50963,7 +52403,8 @@
                     "enum": [
                       "ringing",
                       "answered",
-                      "hangup"
+                      "hangup",
+                      "handled"
                     ],
                     "title": "Event",
                     "type": "string"
