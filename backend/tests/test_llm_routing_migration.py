@@ -278,3 +278,100 @@ def test_triage_on_the_agent_provider_without_any_override_uses_default() -> Non
         [_policy(10, llm_provider_id=1, triage_llm_provider_id=1)],
     )
     assert _resolve(plan, 10, "triage") == ((1, "a-default"),)
+
+
+def test_models_in_tool_tasks_get_supports_tools() -> None:
+    """The old runtime never read the provider's supports_tools; copying a
+    False onto models serving agent/final answer/triage would leave profiles
+    that violate "needs tools" (every later admin save would 422)."""
+    plan = mig._plan_conversion(
+        [
+            _provider(1, "NoTools", "agent-m", supports_tools=False),
+            _provider(2, "Other", "unused", supports_tools=False),
+            _provider(3, "V", "eye", supports_tools=False, supports_vision=True),
+        ],
+        [
+            _policy(
+                10,
+                llm_provider_id=1,
+                final_answer_llm_provider_id=1,
+                final_answer_model_override="final-m",
+                triage_llm_provider_id=1,
+                triage_model_override="triage-m",
+                vision_provider_id=3,
+            )
+        ],
+    )
+    flags = {m.key: (m.supports_tools, m.supports_vision) for m in plan.models}
+    assert flags[(1, "agent-m")] == (True, False)
+    assert flags[(1, "final-m")] == (True, False)
+    assert flags[(1, "triage-m")] == (True, False)
+    # Not in any tools chain: the provider's flag is kept.
+    assert flags[(2, "unused")] == (False, False)
+    # Vision chain models are vision-capable (only kept for such providers).
+    assert flags[(3, "eye")] == (False, True)
+
+
+def test_vision_provider_without_supports_vision_gets_no_vision_chain() -> None:
+    """The old runtime ignored images for such a provider — same after."""
+    plan = mig._plan_conversion(
+        [_provider(1, "A", "a"), _provider(2, "Blind", "b", supports_vision=False)],
+        [_policy(10, llm_provider_id=1, vision_provider_id=2)],
+    )
+    assert _resolve(plan, 10, "vision") is None
+    assert "vision" not in plan.task_defaults
+
+
+def test_model_names_differing_in_case_or_spaces_are_one_model() -> None:
+    """MariaDB *_ci collation + PAD SPACE: 'GPT-4o', 'gpt-4o' and 'gpt-4o '
+    collide in the unique index — one row, first spelling wins."""
+    plan = mig._plan_conversion(
+        [_provider(1, "OpenAI", "GPT-4o")],
+        [
+            _policy(
+                10,
+                llm_provider_id=1,
+                model_override="gpt-4o ",
+                llm_fallback_json=json.dumps([{"provider_id": 1, "model": " gpt-4o-mini"}]),
+            ),
+            _policy(11, llm_provider_id=1, model_override="GPT-4O-MINI"),
+            _policy(12, llm_provider_id=1, model_override="   "),
+        ],
+    )
+    keys = [(m.provider_id, m.model_id) for m in plan.models]
+    assert keys == [(1, "GPT-4o"), (1, "gpt-4o-mini")]
+    assert len({k[1].casefold() for k in keys}) == len(keys)
+    # Primary and fallback that collapse to the same model are deduped.
+    assert _resolve(plan, 10, "agent") == ((1, "GPT-4o"), (1, "gpt-4o-mini"))
+    assert _resolve(plan, 11, "agent") == ((1, "gpt-4o-mini"),)
+    # Whitespace-only override = no override → the provider's default.
+    assert _resolve(plan, 12, "agent") == ((1, "GPT-4o"),)
+
+
+def test_trailing_space_twins_share_one_row() -> None:
+    plan = mig._plan_conversion(
+        [_provider(1, "A", "base")],
+        [
+            _policy(10, llm_provider_id=1, model_override="big"),
+            _policy(11, llm_provider_id=1, model_override="big  "),
+        ],
+    )
+    assert [m.model_id for m in plan.models] == ["base", "big"]
+    assert len(plan.profiles) == 1
+
+
+def test_only_valid_policies_pick_the_global_default() -> None:
+    """Invalid policies do not vote; they still resolve as before via their
+    own queue rows."""
+    plan = mig._plan_conversion(
+        [_provider(1, "A", "a"), _provider(2, "B", "b")],
+        [
+            _policy(10, llm_provider_id=1),
+            _policy(11, llm_provider_id=2, valid_id=2),
+            _policy(12, llm_provider_id=2, valid_id=2),
+        ],
+    )
+    assert plan.profiles[plan.task_defaults["agent"]].models == ((1, "a"),)
+    assert _resolve(plan, 10, "agent") == ((1, "a"),)
+    assert _resolve(plan, 11, "agent") == ((2, "b"),)
+    assert _resolve(plan, 12, "agent") == ((2, "b"),)
