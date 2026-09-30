@@ -1080,6 +1080,7 @@
       "toggleOut": "Ich habe angerufen",
       "autoReplyYes": "· Kunde bekommt die Eingangsbestätigung",
       "autoReplyNo": "· keine Eingangsbestätigung",
+      "autoReplyNoCustomer": "· keine Eingangsbestätigung (kein Kunde)",
       "answeredAt": "{{time}} angenommen",
       "endedAt": "beendet {{time}}"
     }

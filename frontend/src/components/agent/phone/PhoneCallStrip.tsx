@@ -42,6 +42,7 @@ export function PhoneCallStrip({
   elapsed,
   running,
   onToggleTimer,
+  hasCustomer,
 }: {
   direction: CallDirection;
   onDirectionChange: (d: CallDirection) => void;
@@ -54,6 +55,8 @@ export function PhoneCallStrip({
   elapsed: number;
   running: boolean;
   onToggleTimer: () => void;
+  /** Without a customer nobody gets the acknowledgement, whatever the direction. */
+  hasCustomer: boolean;
 }) {
   const { t } = useTranslation();
   const inbound = direction === "inbound";
@@ -112,7 +115,11 @@ export function PhoneCallStrip({
         </span>
       )}
       <span className="text-[12px] text-muted" data-testid="new-ticket-autoreply-hint">
-        {inbound ? t("newTicket.call.autoReplyYes") : t("newTicket.call.autoReplyNo")}
+        {!inbound
+          ? t("newTicket.call.autoReplyNo")
+          : hasCustomer
+            ? t("newTicket.call.autoReplyYes")
+            : t("newTicket.call.autoReplyNoCustomer")}
       </span>
       {number.trim() !== "" && (
         <span className="font-mono text-[13px] text-ink" data-testid="phone-call-strip-number">

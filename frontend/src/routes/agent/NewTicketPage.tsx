@@ -280,6 +280,14 @@ export function NewTicketPage() {
     setQueue(pick.id);
   }, [queue, suggestionFailed, queues]);
 
+  // A `?queue_id=` the agent cannot see (gone, no permission) is dropped:
+  // the queue then follows the suggestion like on a plain "New ticket".
+  useEffect(() => {
+    if (queues.length === 0 || queue === "" || queues.some((q) => q.id === queue)) return;
+    setQueue("");
+    setQueuePinned(false);
+  }, [queues, queue]);
+
   const pickQueue = (id: number) => {
     setQueue(id);
     setQueuePinned(true);
@@ -618,6 +626,7 @@ export function NewTicketPage() {
                 elapsed={timer.elapsed}
                 running={timer.running}
                 onToggleTimer={timer.running ? timer.pause : timer.resume}
+                hasCustomer={customer !== null}
               />
             )}
             {ticketType === "phone" && (

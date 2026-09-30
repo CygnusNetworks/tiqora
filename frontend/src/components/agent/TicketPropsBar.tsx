@@ -190,10 +190,19 @@ export function TicketPropsBar({
         items={queueItems}
         value={queueId}
         onSelect={onQueueChange}
-        display={queue ? <QueueName name={queue.name} /> : t("newTicket.noQueues")}
+        display={
+          queue ? (
+            <QueueName name={queue.name} />
+          ) : queues.length === 0 ? (
+            t("newTicket.noQueues")
+          ) : (
+            // Still waiting for the suggestion/default: nothing chosen yet.
+            none
+          )
+        }
         source={queueSource}
         testId="new-ticket-queue"
-        placeholder={t("newTicket.noQueues")}
+        placeholder={queues.length === 0 ? t("newTicket.noQueues") : none}
       />
       {owner && (
         <PropCell
