@@ -5,6 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import {
   AdminResourcePage,
+  type AdminCrudApi,
   type AdminResourcePageProps,
 } from "./AdminResourcePage";
 import type { AdminListParams, AdminPage } from "@/lib/api";
@@ -12,10 +13,11 @@ import type { AdminListParams, AdminPage } from "@/lib/api";
 type Row = { id: number; name: string; valid_id: number };
 type Create = { name: string };
 type Update = { name?: string };
+type Api = AdminCrudApi<Row, Create, Update>;
 
 /** Build a paginated list mock that slices a synthetic table of `total` rows. */
 function makeChunkedListMock(total: number) {
-  return vi.fn().mockImplementation(
+  return vi.fn<Api["list"]>().mockImplementation(
     async (params?: AdminListParams): Promise<AdminPage<Row>> => {
       const page = params?.page ?? 1;
       const pageSize = params?.pageSize ?? 25;
@@ -32,11 +34,11 @@ function makeChunkedListMock(total: number) {
 
 function renderPage(
   props: Partial<AdminResourcePageProps<Row, Create, Update>> = {},
-  listImpl?: ReturnType<typeof vi.fn>,
+  listImpl?: ReturnType<typeof vi.fn<Api["list"]>>,
 ) {
   const list =
     listImpl ??
-    vi.fn().mockResolvedValue({
+    vi.fn<Api["list"]>().mockResolvedValue({
       items: [
         { id: 1, name: "Alpha", valid_id: 1 },
         { id: 2, name: "Beta", valid_id: 1 },
@@ -45,9 +47,9 @@ function renderPage(
       page: 1,
       page_size: 25,
     });
-  const create = vi.fn();
-  const update = vi.fn();
-  const deactivate = vi.fn();
+  const create = vi.fn<Api["create"]>();
+  const update = vi.fn<Api["update"]>();
+  const deactivate = vi.fn<Api["deactivate"]>();
 
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -369,7 +371,7 @@ describe("AdminResourcePage", () => {
         expect(call[0]).toEqual(
           expect.objectContaining({ pageSize: 500 }),
         );
-        expect(call[0].pageSize).not.toBe(100_000);
+        expect(call[0]?.pageSize).not.toBe(100_000);
       }
       expect(list).toHaveBeenNthCalledWith(
         1,
@@ -432,7 +434,7 @@ describe("AdminResourcePage", () => {
         );
       });
       expect(list).toHaveBeenCalledTimes(1);
-      expect(list.mock.calls[0][0].pageSize).toBe(50);
+      expect(list.mock.calls[0][0]?.pageSize).toBe(50);
 
       list.mockClear();
       fireEvent.click(screen.getByTestId("admin-test-resource-page-size"));
