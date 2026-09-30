@@ -160,13 +160,22 @@ export function SelectMenu<T extends string | number>({
     close();
   };
 
+  // Next selectable index from *from* in direction *dir*; disabled items are
+  // skipped, and the highlight stays put when nothing selectable is left.
+  const step = (from: number, dir: 1 | -1) => {
+    for (let i = from + dir; i >= 0 && i < filtered.length; i += dir) {
+      if (!filtered[i].disabled) return i;
+    }
+    return from;
+  };
+
   const onPanelKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+      setHighlight((h) => step(h, 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlight((h) => Math.max(h - 1, 0));
+      setHighlight((h) => step(h, -1));
     } else if (e.key === "Enter") {
       e.preventDefault();
       const item = filtered[highlight];

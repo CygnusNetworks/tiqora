@@ -22,10 +22,14 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { aiTaskFallbackKey, resolveTaskProfile, taskProfileMap } from "@/lib/aiTasks";
+import {
+  POLICIES_KEY,
+  PROFILES_KEY,
+  QUEUES_KEY,
+  TASK_DEFAULTS_KEY,
+} from "@/components/admin/ai-models/shared";
 
-const POLICIES_KEY = ["admin", "ai", "queue-policies"] as const;
-const QUEUES_KEY = ["admin", "ai", "reference-queues"] as const;
-const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
 const USAGE_KEY = ["admin", "ai", "usage"] as const;
 
 const NONE = 0;
@@ -60,9 +64,13 @@ export function AiQueuePoliciesPage() {
     queryKey: QUEUES_KEY,
     queryFn: ({ signal }) => api.listReferenceQueues({}, signal),
   });
-  const providersQ = useQuery({
-    queryKey: PROVIDERS_KEY,
-    queryFn: ({ signal }) => aiApi.listProviders(signal),
+  const profilesQ = useQuery({
+    queryKey: PROFILES_KEY,
+    queryFn: ({ signal }) => aiApi.listProfiles(signal),
+  });
+  const taskDefaultsQ = useQuery({
+    queryKey: TASK_DEFAULTS_KEY,
+    queryFn: ({ signal }) => aiApi.getTaskDefaults(signal),
   });
 
   const usageQ = useQuery({
@@ -96,9 +104,27 @@ export function AiQueuePoliciesPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: POLICIES_KEY }),
   });
 
-  const providerName = (id: number | null) => {
-    if (id == null) return "—";
-    return providersQ.data?.items.find((p) => p.id === id)?.name ?? `#${id}`;
+  const globalDefaults = useMemo(
+    () => taskProfileMap(taskDefaultsQ.data),
+    [taskDefaultsQ.data],
+  );
+  /** Profile "Recherche und Werkzeuge" runs on in this queue (own override,
+   * else global default; a disabled profile counts as none). */
+  const agentProfileLabel = (row: AiQueuePolicyOut) => {
+    if (!profilesQ.data || !taskDefaultsQ.data) return "";
+    const byId = new Map(profilesQ.data.map((p) => [p.id, p]));
+    const id = resolveTaskProfile(
+      "agent",
+      globalDefaults,
+      taskProfileMap(row.task_profiles),
+      (pid) => byId.get(pid)?.valid_id === 1,
+    );
+    const profile = id != null ? byId.get(id) : undefined;
+    return profile
+      ? t("admin.ai.queues.list.agentProfile", { name: profile.name })
+      : t("admin.ai.queues.list.noAgentProfile", {
+          fallback: t(aiTaskFallbackKey("agent")),
+        });
   };
 
   const goToEditor = (row: AiQueuePolicyOut) =>
@@ -117,7 +143,8 @@ export function AiQueuePoliciesPage() {
   };
 
   // Two-line row matching the provider list: status dot + queue + autonomy on
-  // top, provider (mono) below, feature chips right, actions in the ⋯-menu.
+  // top, the agent's model profile below, feature chips right, actions in the
+  // ⋯-menu.
   const renderPolicyRow = (r: AiQueuePolicyOut) => {
     const hasFeature =
       r.enabled_manual_assist ||
@@ -161,8 +188,11 @@ export function AiQueuePoliciesPage() {
             </span>
           </div>
           <div className="col-start-1 row-start-2 flex min-w-0 items-baseline gap-3 pl-4">
-            <span className="truncate font-mono text-xs text-muted">
-              {providerName(r.llm_provider_id)}
+            <span
+              className="truncate text-xs text-muted"
+              data-testid={`admin-ai-queue-agent-profile-${r.id}`}
+            >
+              {agentProfileLabel(r)}
             </span>
           </div>
           <div className="row-span-2 hidden flex-wrap items-center justify-end gap-1 md:flex">

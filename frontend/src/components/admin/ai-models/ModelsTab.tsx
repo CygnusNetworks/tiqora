@@ -80,6 +80,12 @@ export function ModelsTab() {
   const [testingId, setTestingId] = useState<number | null>(null);
   const [remote, setRemote] = useState<RemoteState | null>(null);
 
+  // A loaded remote-model list belongs to one editing session only.
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setRemote(null);
+  };
+
   const modelsQ = useQuery({
     queryKey: MODELS_KEY,
     queryFn: ({ signal }) => aiApi.listModels(signal),
@@ -99,7 +105,7 @@ export function ModelsTab() {
     mutationFn: ({ id, body }: { id: number | null; body: LlmModelIn }) =>
       id == null ? aiApi.createModel(body) : aiApi.updateModel(id, body),
     onSuccess: async () => {
-      setDrawerOpen(false);
+      closeDrawer();
       await invalidateCatalog(qc);
     },
   });
@@ -156,6 +162,23 @@ export function ModelsTab() {
 
   const handleSubmit = async (values: FieldValues) => {
     setFormError(null);
+    // Token count and tool rounds are whole numbers; the backend would 422
+    // with a pydantic field list, so say it here in plain words.
+    const notWhole = (
+      [
+        ["context_tokens", "admin.ai.models.contextTokens"],
+        ["max_tool_rounds", "admin.ai.models.maxToolRounds"],
+      ] as const
+    ).find(([name]) => {
+      const raw = String(values[name] ?? "").trim();
+      return raw !== "" && !/^\d+$/.test(raw);
+    });
+    if (notWhole) {
+      setFormError(
+        t("admin.ai.models.wholeNumberRequired", { field: t(notWhole[1]) }),
+      );
+      return;
+    }
     const body: LlmModelIn = {
       provider_id: Number(values.provider_id),
       model_id: String(values.model_id ?? "").trim(),
@@ -493,7 +516,7 @@ export function ModelsTab() {
 
       <CrudDrawer
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onClose={closeDrawer}
         title={
           editing
             ? t("admin.form.editTitle", { title: editing.label })

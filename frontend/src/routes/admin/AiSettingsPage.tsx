@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
 
-const SETTINGS_KEY = ["admin", "ai", "settings"] as const;
-const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
-const MODELS_KEY = ["admin", "ai", "models"] as const;
+import {
+  MODELS_KEY,
+  POLICIES_KEY,
+  PROVIDERS_KEY,
+  SETTINGS_KEY,
+} from "@/components/admin/ai-models/shared";
+
 const MCP_KEY = ["admin", "ai", "mcp-clients"] as const;
-const POLICIES_KEY = ["admin", "ai", "queue-policies"] as const;
 
 export function AiSettingsPage() {
   const { t } = useTranslation();

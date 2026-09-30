@@ -1324,17 +1324,21 @@
           "identity": "Identitat",
           "language": "Llengua"
         },
-        "modelOverride": "Anul·lació del model",
-        "llmFallback": "Fallback providers",
-        "fallbackAdd": "Add fallback",
-        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
-        "fallbackMoveUp": "Move up",
-        "fallbackMoveDown": "Move down",
-        "fallbackRemove": "Remove",
+        "models": {
+          "title": "Models",
+          "intro": "Which model profile each task uses in this queue. Without a choice of its own, the global assignment under AI → Models → Tasks applies.",
+          "manage": "Manage models and profiles",
+          "colTask": "Task",
+          "colProfile": "Profile in this queue",
+          "colEffective": "Currently answering",
+          "inheritProfile": "Global: {{name}}",
+          "inheritNone": "Global: no own profile ({{fallback}})",
+          "inherited": "inherited",
+          "overridden": "overridden",
+          "viaAgent": "like {{task}}"
+        },
         "clarifySchemaJson": "Clarify schema fields (JSON)",
         "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}",
-        "visionProvider": "Model de visió (imatges)",
-        "visionProviderNone": "— cap — les imatges s'ignoren",
         "serviceUser": "Agent del servei",
         "kbTags": "Etiquetes KB",
         "kbTagsPlaceholder": "etiqueta 1, etiqueta 2,...",
@@ -1370,7 +1374,9 @@
         },
         "list": {
           "tabPolicies": "Polítiques",
-          "tabUsage": "Ús"
+          "tabUsage": "Ús",
+          "agentProfile": "Profile: {{name}}",
+          "noAgentProfile": "No model profile ({{fallback}})"
         },
         "tab": {
           "basics": "Conceptes bàsics",
@@ -1423,13 +1429,7 @@
         "triageThresholdExplainer": "{{auto}} and above → move automatically · {{suggestLow}}–{{suggestHigh}} → propose · below {{suggestLow}} → do nothing",
         "triageDelayReply": "After a move into this queue, wait for the customer's next message before replying",
         "triageCustomerFix": "Correct the customer on forwarded mail",
-        "triageCustomerFixThreshold": "Correct customer from",
-        "triageProvider": "Triage provider",
-        "triageProviderInherit": "Inherit from the queue's provider",
-        "triageModelOverride": "Triage model",
-        "finalAnswerProvider": "Final-answer provider",
-        "finalAnswerProviderNone": "None (the queue's model answers)",
-        "finalAnswerModelOverride": "Final-answer model"
+        "triageCustomerFixThreshold": "Correct customer from"
       },
       "usage": {
         "title": "Ús",
@@ -1598,7 +1598,7 @@
         "supportsTools": "Can use tools",
         "supportsVision": "Can read images",
         "active": "Active",
-        "disableWarning": "This model is in profile {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
+        "disableWarning": "This model is in profile(s) {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
         "priceInput": "Input price per 1M tokens",
         "priceOutput": "Output price per 1M tokens",
         "priceHelp": "In {{currency}}, the provider's currency. Basis for the costs in the LLM audit and for the cost limits.",
@@ -1607,6 +1607,7 @@
         "contextTokensHelp": "For information only. Empty = unknown.",
         "maxToolRounds": "Max. tool rounds",
         "maxToolRoundsHelp": "How many research steps this model gets before it must answer. Every step resends the whole conversation, so raising it costs disproportionately more. Empty = built-in default.",
+        "wholeNumberRequired": "{{field}}: please enter a whole number.",
         "testAction": "Test",
         "testOk": "OK",
         "testFail": "Failed",
@@ -1651,7 +1652,6 @@
         "colProfile": "Profile",
         "needsNothing": "nothing special",
         "noProfile": "No own profile ({{fallback}})",
-        "cannot": "cannot: {{needs}}",
         "profileInactive": "disabled",
         "selectedInactive": "The profile is disabled and counts as \"No own profile\" ({{fallback}}).",
         "saved": "Saved.",
@@ -1689,10 +1689,6 @@
       "aiQueue": {
         "queue": "La cua a la qual s'aplica aquesta política. Cada cua pot tenir com a màxim una política; les polítiques no són heretades per subcues.",
         "systemPrompt": "Text de sol·licitud addicional que s'adjunta a cada sol·licitud de model (per exemple, to, context específic de la cua), combinat amb la plantilla d'autonomia i qualsevol regla d'identitat.",
-        "llmProvider": "El proveïdor de model d'idioma per a aquesta cua. Ha de donar suport a les trucades d'eines un cop s'utilitzen les eines MCP o l'autonomia.",
-        "modelOverride": "Substitueix el model predeterminat del proveïdor seleccionat només per a aquesta cua.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
-        "visionProvider": "Els fitxers adjunts d'imatge mai es mostren al model principal, només a aquest model de visió dedicat, que els descriu en text sense format. Aquesta descripció (no la imatge) és la que veu el model principal. Deixeu sense definir per ignorar completament els fitxers adjunts d'imatge. Com que les imatges no es poden emmascarar per a la PII, preferiu un proveïdor allotjat a la UE aquí i activeu-lo deliberadament.",
         "enabledManualAssist": "Mostra el botó \"Esborrany d'IA\" al zoom del bitllet. Els esborranys són el seu propi registre, mai un article: un agent ha d'acceptar i enviar-los explícitament. No està afectat per la porta del mode d'operació.",
         "kbTags": "Etiquetes separades per comes els articles de la base de coneixement de les quals es donen al model com a context.",
         "kbCategoryIds": "Identificadors de categoria de base de coneixement separats per comes, inclosos a més de les etiquetes.",
@@ -1732,11 +1728,7 @@
         "triageSamples": "How often the model is asked per ticket. Agreement between samples is the main confidence signal, so 1 disables it. Each sample is a separate LLM call on every new ticket.",
         "triageDelayReply": "Set on the DESTINATION queue. Protects against a routing mistake turning into a wrong answer, at the cost of the customer getting no AI reply to their first mail.",
         "triageCustomerFix": "When a mail was forwarded, use the original sender as the ticket customer. Only applied when the address appears verbatim in the message and matches exactly one customer record.",
-        "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain.",
-        "triageProvider": "Triage is a classification task and runs several times per ticket, so a smaller, cheaper model is usually the right choice here.",
-        "triageModelOverride": "Leave empty to use the provider's default model.",
-        "finalAnswerProvider": "Optional stronger model that writes the customer message. The queue's model does the research (diagnosis, knowledge base); as soon as it wants to answer, the conversation is handed over to this model, which writes the reply. Costs one or two extra calls per answered ticket. Its tokens are billed and budgeted on the provider selected here — prices are per provider, so use a separate provider entry for a model with different prices.",
-        "finalAnswerModelOverride": "Leave empty to use the provider's default model."
+        "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain."
       },
       "common": {
         "validId": "Vàlid/no vàlid és una marca d'eliminació suau: marcar una entrada com a vàlida l'amaga als seleccionadors de registres nous sense esborrar les referències existents (per exemple, bitllets, tasques). No hi ha una eliminació difícil."

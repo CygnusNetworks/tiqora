@@ -1324,17 +1324,21 @@
           "identity": "Identita",
           "language": "Jazyk"
         },
-        "modelOverride": "Přepsání modelu",
-        "llmFallback": "Fallback providers",
-        "fallbackAdd": "Add fallback",
-        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
-        "fallbackMoveUp": "Move up",
-        "fallbackMoveDown": "Move down",
-        "fallbackRemove": "Remove",
+        "models": {
+          "title": "Models",
+          "intro": "Which model profile each task uses in this queue. Without a choice of its own, the global assignment under AI → Models → Tasks applies.",
+          "manage": "Manage models and profiles",
+          "colTask": "Task",
+          "colProfile": "Profile in this queue",
+          "colEffective": "Currently answering",
+          "inheritProfile": "Global: {{name}}",
+          "inheritNone": "Global: no own profile ({{fallback}})",
+          "inherited": "inherited",
+          "overridden": "overridden",
+          "viaAgent": "like {{task}}"
+        },
         "clarifySchemaJson": "Clarify schema fields (JSON)",
         "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}",
-        "visionProvider": "Vision model (obrázky)",
-        "visionProviderNone": "— žádný — obrázky se ignorují",
         "serviceUser": "Servisní agent",
         "kbTags": "KB tagy",
         "kbTagsPlaceholder": "tag1, tag2, …",
@@ -1370,7 +1374,9 @@
         },
         "list": {
           "tabPolicies": "Politiky",
-          "tabUsage": "Využití"
+          "tabUsage": "Využití",
+          "agentProfile": "Profile: {{name}}",
+          "noAgentProfile": "No model profile ({{fallback}})"
         },
         "tab": {
           "basics": "Základy",
@@ -1423,13 +1429,7 @@
         "triageThresholdExplainer": "{{auto}} and above → move automatically · {{suggestLow}}–{{suggestHigh}} → propose · below {{suggestLow}} → do nothing",
         "triageDelayReply": "After a move into this queue, wait for the customer's next message before replying",
         "triageCustomerFix": "Correct the customer on forwarded mail",
-        "triageCustomerFixThreshold": "Correct customer from",
-        "triageProvider": "Triage provider",
-        "triageProviderInherit": "Inherit from the queue's provider",
-        "triageModelOverride": "Triage model",
-        "finalAnswerProvider": "Final-answer provider",
-        "finalAnswerProviderNone": "None (the queue's model answers)",
-        "finalAnswerModelOverride": "Final-answer model"
+        "triageCustomerFixThreshold": "Correct customer from"
       },
       "usage": {
         "title": "Využití",
@@ -1598,7 +1598,7 @@
         "supportsTools": "Can use tools",
         "supportsVision": "Can read images",
         "active": "Active",
-        "disableWarning": "This model is in profile {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
+        "disableWarning": "This model is in profile(s) {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
         "priceInput": "Input price per 1M tokens",
         "priceOutput": "Output price per 1M tokens",
         "priceHelp": "In {{currency}}, the provider's currency. Basis for the costs in the LLM audit and for the cost limits.",
@@ -1607,6 +1607,7 @@
         "contextTokensHelp": "For information only. Empty = unknown.",
         "maxToolRounds": "Max. tool rounds",
         "maxToolRoundsHelp": "How many research steps this model gets before it must answer. Every step resends the whole conversation, so raising it costs disproportionately more. Empty = built-in default.",
+        "wholeNumberRequired": "{{field}}: please enter a whole number.",
         "testAction": "Test",
         "testOk": "OK",
         "testFail": "Failed",
@@ -1651,7 +1652,6 @@
         "colProfile": "Profile",
         "needsNothing": "nothing special",
         "noProfile": "No own profile ({{fallback}})",
-        "cannot": "cannot: {{needs}}",
         "profileInactive": "disabled",
         "selectedInactive": "The profile is disabled and counts as \"No own profile\" ({{fallback}}).",
         "saved": "Saved.",
@@ -1689,10 +1689,6 @@
       "aiQueue": {
         "queue": "Fronta, na kterou se tato politika vztahuje. Každá fronta může mít nejvýše jednu politiku; politiky se nezdědí na podfronty.",
         "systemPrompt": "Další text promptu předřazený každému požadavku na model (např. tón, kontext fronty) — kombinovaný s šablonou autonomie a případnými pravidly identity.",
-        "llmProvider": "Poskytovatel jazykového modelu pro tuto frontu. Musí podporovat volání nástrojů, jakmile se používají MCP nástroje nebo autonomie.",
-        "modelOverride": "Přepisuje výchozí model vybraného poskytovatele pouze pro tuto frontu.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
-        "visionProvider": "Obrázkové přílohy se nikdy neposílají hlavnímu modelu — pouze tomuto specializovanému vision modelu, který je popíše prostým textem. Hlavní model vidí právě tento popis (ne obrázek). Nechte prázdné pro úplné ignorování obrázkových příloh. Protože obrázky nelze maskovat pro PII, preferujte zde poskytovatele hostovaného v EU a zapínejte jej vědomě.",
         "enabledManualAssist": "Zobrazí tlačítko „AI koncept“ v detailu tiketu. Koncepty jsou samostatný záznam, nikdy článek — agent musí každý výslovně přijmout a odeslat. Není ovlivněno bránou provozního režimu.",
         "kbTags": "Tagy oddělené čárkou, jejichž články znalostní báze se předají modelu jako kontext.",
         "kbCategoryIds": "ID kategorií znalostní báze oddělená čárkou, navíc k tagům.",
@@ -1732,11 +1728,7 @@
         "triageSamples": "How often the model is asked per ticket. Agreement between samples is the main confidence signal, so 1 disables it. Each sample is a separate LLM call on every new ticket.",
         "triageDelayReply": "Set on the DESTINATION queue. Protects against a routing mistake turning into a wrong answer, at the cost of the customer getting no AI reply to their first mail.",
         "triageCustomerFix": "When a mail was forwarded, use the original sender as the ticket customer. Only applied when the address appears verbatim in the message and matches exactly one customer record.",
-        "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain.",
-        "triageProvider": "Triage is a classification task and runs several times per ticket, so a smaller, cheaper model is usually the right choice here.",
-        "triageModelOverride": "Leave empty to use the provider's default model.",
-        "finalAnswerProvider": "Optional stronger model that writes the customer message. The queue's model does the research (diagnosis, knowledge base); as soon as it wants to answer, the conversation is handed over to this model, which writes the reply. Costs one or two extra calls per answered ticket. Its tokens are billed and budgeted on the provider selected here — prices are per provider, so use a separate provider entry for a model with different prices.",
-        "finalAnswerModelOverride": "Leave empty to use the provider's default model."
+        "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain."
       },
       "common": {
         "validId": "Platný/neplatný je příznak soft-delete: označení záznamu jako neplatného jej skryje ve výběrech pro nové záznamy, aniž by smazalo existující reference (např. tikety, přiřazení). Hard delete neexistuje."

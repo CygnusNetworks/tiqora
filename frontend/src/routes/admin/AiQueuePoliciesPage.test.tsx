@@ -23,7 +23,8 @@ vi.mock("@/lib/api", () => ({
 
 const listQueuePolicies = vi.fn();
 const deleteQueuePolicy = vi.fn();
-const listProviders = vi.fn();
+const listProfiles = vi.fn();
+const getTaskDefaults = vi.fn();
 const listMcpClients = vi.fn();
 const listUsage = vi.fn();
 
@@ -31,7 +32,8 @@ vi.mock("@/lib/aiApi", () => ({
   aiApi: {
     listQueuePolicies: (...args: unknown[]) => listQueuePolicies(...args),
     deleteQueuePolicy: (...args: unknown[]) => deleteQueuePolicy(...args),
-    listProviders: (...args: unknown[]) => listProviders(...args),
+    listProfiles: (...args: unknown[]) => listProfiles(...args),
+    getTaskDefaults: (...args: unknown[]) => getTaskDefaults(...args),
     listMcpClients: (...args: unknown[]) => listMcpClients(...args),
     listUsage: (...args: unknown[]) => listUsage(...args),
   },
@@ -46,8 +48,6 @@ const samplePolicy = {
   system_prompt: "Be helpful.",
   autonomy: "clarify_only",
   service_user_id: null,
-  llm_provider_id: null,
-  model_override: null,
   kb_tags: null,
   kb_category_ids: null,
   mcp_client_ids: null,
@@ -68,6 +68,7 @@ const samplePolicy = {
   clarify_schema_json: null,
   enabled_refine: false,
   enabled_triage: false,
+  task_profiles: [] as { task: string; profile_id: number | null }[],
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
@@ -93,7 +94,8 @@ describe("AiQueuePoliciesPage", () => {
     listReferenceAgents.mockReset();
     listQueuePolicies.mockReset();
     deleteQueuePolicy.mockReset();
-    listProviders.mockReset();
+    listProfiles.mockReset();
+    getTaskDefaults.mockReset();
     listMcpClients.mockReset();
     listUsage.mockReset();
 
@@ -103,7 +105,19 @@ describe("AiQueuePoliciesPage", () => {
     ]);
     listReferenceAgents.mockResolvedValue([{ id: 1, login: "agent1", full_name: "Agent One" }]);
     listQueuePolicies.mockResolvedValue({ items: [samplePolicy], total: 1, page: 1, page_size: 1 });
-    listProviders.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 });
+    listProfiles.mockResolvedValue([
+      { id: 10, name: "Agent", valid_id: 1, entries: [] },
+      { id: 12, name: "Schnell", valid_id: 1, entries: [] },
+      { id: 13, name: "Alt", valid_id: 2, entries: [] },
+    ]);
+    getTaskDefaults.mockResolvedValue([
+      { task: "agent", profile_id: 10 },
+      { task: "final_answer", profile_id: null },
+      { task: "triage", profile_id: null },
+      { task: "summary", profile_id: null },
+      { task: "refine", profile_id: null },
+      { task: "vision", profile_id: null },
+    ]);
     listMcpClients.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 0 });
     listUsage.mockResolvedValue({
       items: [],
@@ -120,6 +134,35 @@ describe("AiQueuePoliciesPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("admin-ai-queues-table")).toHaveTextContent("Support");
     });
+  });
+
+  it("shows the profile “Recherche und Werkzeuge” runs on in each queue", async () => {
+    listQueuePolicies.mockResolvedValue({
+      items: [
+        samplePolicy,
+        { ...samplePolicy, id: 2, queue_id: 11, task_profiles: [{ task: "agent", profile_id: 12 }] },
+        { ...samplePolicy, id: 3, queue_id: 12, task_profiles: [{ task: "agent", profile_id: null }] },
+        // A disabled profile counts as none.
+        { ...samplePolicy, id: 4, queue_id: 13, task_profiles: [{ task: "agent", profile_id: 13 }] },
+      ],
+      total: 4,
+      page: 1,
+      page_size: 4,
+    });
+    renderPage();
+    const none = i18n.t("admin.ai.queues.list.noAgentProfile", {
+      fallback: i18n.t("admin.ai.tasks.fallback.agent"),
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-agent-profile-1")).toHaveTextContent(
+        i18n.t("admin.ai.queues.list.agentProfile", { name: "Agent" }),
+      ),
+    );
+    expect(screen.getByTestId("admin-ai-queue-agent-profile-2")).toHaveTextContent(
+      i18n.t("admin.ai.queues.list.agentProfile", { name: "Schnell" }),
+    );
+    expect(screen.getByTestId("admin-ai-queue-agent-profile-3")).toHaveTextContent(none);
+    expect(screen.getByTestId("admin-ai-queue-agent-profile-4")).toHaveTextContent(none);
   });
 
   it("navigates to the editor from the row's ⋯ edit action", async () => {

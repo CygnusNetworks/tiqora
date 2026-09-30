@@ -79,6 +79,36 @@ describe("SelectMenu", () => {
     expect(screen.queryByTestId("sm")).toBeNull();
   });
 
+  it("skips disabled items with the arrow keys", () => {
+    const { onSelect } = renderSelectMenu([
+      { value: 1, label: "Alpha" },
+      { value: 2, label: "Beta", disabled: true },
+      { value: 3, label: "Gamma" },
+      { value: 4, label: "Delta", disabled: true },
+    ]);
+    fireEvent.click(screen.getByTestId("trigger"));
+    const panel = screen.getByTestId("sm");
+    fireEvent.keyDown(panel, { key: "ArrowDown" }); // Beta skipped → Gamma
+    fireEvent.keyDown(panel, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledWith(3);
+
+    fireEvent.click(screen.getByTestId("trigger"));
+    const again = screen.getByTestId("sm");
+    fireEvent.keyDown(again, { key: "ArrowDown" }); // → Gamma
+    fireEvent.keyDown(again, { key: "ArrowDown" }); // only Delta left → stays
+    fireEvent.keyDown(again, { key: "ArrowDown" });
+    fireEvent.keyDown(again, { key: "Enter" });
+    expect(onSelect).toHaveBeenCalledTimes(2);
+    expect(onSelect).toHaveBeenLastCalledWith(3);
+
+    fireEvent.click(screen.getByTestId("trigger"));
+    const third = screen.getByTestId("sm");
+    fireEvent.keyDown(third, { key: "ArrowDown" }); // → Gamma
+    fireEvent.keyDown(third, { key: "ArrowUp" }); // Beta skipped → Alpha
+    fireEvent.keyDown(third, { key: "Enter" });
+    expect(onSelect).toHaveBeenLastCalledWith(1);
+  });
+
   it("calls onSelect and closes on item click", () => {
     const { onSelect } = renderSelectMenu(FEW_ITEMS);
     fireEvent.click(screen.getByTestId("trigger"));

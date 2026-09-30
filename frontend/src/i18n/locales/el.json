@@ -1324,17 +1324,21 @@
           "identity": "Ταυτότητα",
           "language": "Γλώσσα"
         },
-        "modelOverride": "Παράκαμψη μοντέλου",
-        "llmFallback": "Fallback providers",
-        "fallbackAdd": "Add fallback",
-        "fallbackEmpty": "No fallback providers — the primary provider above is used exclusively.",
-        "fallbackMoveUp": "Move up",
-        "fallbackMoveDown": "Move down",
-        "fallbackRemove": "Remove",
+        "models": {
+          "title": "Models",
+          "intro": "Which model profile each task uses in this queue. Without a choice of its own, the global assignment under AI → Models → Tasks applies.",
+          "manage": "Manage models and profiles",
+          "colTask": "Task",
+          "colProfile": "Profile in this queue",
+          "colEffective": "Currently answering",
+          "inheritProfile": "Global: {{name}}",
+          "inheritNone": "Global: no own profile ({{fallback}})",
+          "inherited": "inherited",
+          "overridden": "overridden",
+          "viaAgent": "like {{task}}"
+        },
         "clarifySchemaJson": "Clarify schema fields (JSON)",
         "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}",
-        "visionProvider": "Μοντέλο όρασης (εικόνες)",
-        "visionProviderNone": "— καμία — οι εικόνες αγνοούνται",
         "serviceUser": "Πράκτορας σέρβις",
         "kbTags": "Ετικέτες KB",
         "kbTagsPlaceholder": "tag1, tag2,…",
@@ -1370,7 +1374,9 @@
         },
         "list": {
           "tabPolicies": "πολιτικών",
-          "tabUsage": "Χρήση"
+          "tabUsage": "Χρήση",
+          "agentProfile": "Profile: {{name}}",
+          "noAgentProfile": "No model profile ({{fallback}})"
         },
         "tab": {
           "basics": "Βασικά",
@@ -1423,13 +1429,7 @@
         "triageThresholdExplainer": "{{auto}} and above → move automatically · {{suggestLow}}–{{suggestHigh}} → propose · below {{suggestLow}} → do nothing",
         "triageDelayReply": "After a move into this queue, wait for the customer's next message before replying",
         "triageCustomerFix": "Correct the customer on forwarded mail",
-        "triageCustomerFixThreshold": "Correct customer from",
-        "triageProvider": "Triage provider",
-        "triageProviderInherit": "Inherit from the queue's provider",
-        "triageModelOverride": "Triage model",
-        "finalAnswerProvider": "Final-answer provider",
-        "finalAnswerProviderNone": "None (the queue's model answers)",
-        "finalAnswerModelOverride": "Final-answer model"
+        "triageCustomerFixThreshold": "Correct customer from"
       },
       "usage": {
         "title": "Χρήση",
@@ -1598,7 +1598,7 @@
         "supportsTools": "Can use tools",
         "supportsVision": "Can read images",
         "active": "Active",
-        "disableWarning": "This model is in profile {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
+        "disableWarning": "This model is in profile(s) {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
         "priceInput": "Input price per 1M tokens",
         "priceOutput": "Output price per 1M tokens",
         "priceHelp": "In {{currency}}, the provider's currency. Basis for the costs in the LLM audit and for the cost limits.",
@@ -1607,6 +1607,7 @@
         "contextTokensHelp": "For information only. Empty = unknown.",
         "maxToolRounds": "Max. tool rounds",
         "maxToolRoundsHelp": "How many research steps this model gets before it must answer. Every step resends the whole conversation, so raising it costs disproportionately more. Empty = built-in default.",
+        "wholeNumberRequired": "{{field}}: please enter a whole number.",
         "testAction": "Test",
         "testOk": "OK",
         "testFail": "Failed",
@@ -1651,7 +1652,6 @@
         "colProfile": "Profile",
         "needsNothing": "nothing special",
         "noProfile": "No own profile ({{fallback}})",
-        "cannot": "cannot: {{needs}}",
         "profileInactive": "disabled",
         "selectedInactive": "The profile is disabled and counts as \"No own profile\" ({{fallback}}).",
         "saved": "Saved.",
@@ -1689,10 +1689,6 @@
       "aiQueue": {
         "queue": "Η ουρά στην οποία ισχύει αυτή η πολιτική. Κάθε ουρά μπορεί να έχει το πολύ μία πολιτική. οι πολιτικές δεν κληρονομούνται από υποουρές.",
         "systemPrompt": "Επιπλέον κείμενο προτροπής επισυνάπτεται σε κάθε αίτημα μοντέλου (π.χ. τόνος, συγκεκριμένο πλαίσιο ουράς) — σε συνδυασμό με το πρότυπο αυτονομίας και τυχόν κανόνες ταυτότητας.",
-        "llmProvider": "Ο πάροχος μοντέλου γλώσσας για αυτήν την ουρά. Πρέπει να υποστηρίζει την κλήση εργαλείου μόλις χρησιμοποιηθούν εργαλεία MCP ή αυτονομία.",
-        "modelOverride": "Αντικαθιστά το προεπιλεγμένο μοντέλο του επιλεγμένου παρόχου μόνο για αυτήν την ουρά.",
-        "llmFallback": "Providers tried in order, after the primary provider above, when a request fails (rate limit, timeout, error). Each entry has its own optional model override. Priority 1 is always the primary provider/model; entries here are priority 2, 3, ….",
-        "visionProvider": "Τα συνημμένα εικόνας δεν εμφανίζονται ποτέ στο κύριο μοντέλο — μόνο σε αυτό το αποκλειστικό μοντέλο όρασης, το οποίο τα περιγράφει σε απλό κείμενο. Αυτή η περιγραφή (όχι η εικόνα) είναι αυτό που βλέπει το κύριο μοντέλο. Αφήστε χωρίς ρύθμιση για να αγνοηθούν εντελώς τα συνημμένα εικόνας. Επειδή οι εικόνες δεν μπορούν να καλυφθούν για PII, προτιμήστε έναν πάροχο που φιλοξενείται στην ΕΕ εδώ και ενεργοποιήστε τον σκόπιμα.",
         "enabledManualAssist": "Εμφανίζει το κουμπί \"AI draft\" στο ζουμ του εισιτηρίου. Τα προσχέδια είναι το δικό τους αρχείο, ποτέ ένα άρθρο — ένας πράκτορας πρέπει ρητά να αποδεχτεί και να στείλει το καθένα. Δεν επηρεάζεται από την πύλη λειτουργίας.",
         "kbTags": "Ετικέτες διαχωρισμένες με κόμματα των οποίων τα άρθρα βάσης γνώσεων δίνονται στο μοντέλο ως πλαίσιο.",
         "kbCategoryIds": "Αναγνωριστικά κατηγοριών γνωσιακής βάσης διαχωρισμένα με κόμματα, που περιλαμβάνονται εκτός από τις ετικέτες.",
@@ -1732,11 +1728,7 @@
         "triageSamples": "How often the model is asked per ticket. Agreement between samples is the main confidence signal, so 1 disables it. Each sample is a separate LLM call on every new ticket.",
         "triageDelayReply": "Set on the DESTINATION queue. Protects against a routing mistake turning into a wrong answer, at the cost of the customer getting no AI reply to their first mail.",
         "triageCustomerFix": "When a mail was forwarded, use the original sender as the ticket customer. Only applied when the address appears verbatim in the message and matches exactly one customer record.",
-        "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain.",
-        "triageProvider": "Triage is a classification task and runs several times per ticket, so a smaller, cheaper model is usually the right choice here.",
-        "triageModelOverride": "Leave empty to use the provider's default model.",
-        "finalAnswerProvider": "Optional stronger model that writes the customer message. The queue's model does the research (diagnosis, knowledge base); as soon as it wants to answer, the conversation is handed over to this model, which writes the reply. Costs one or two extra calls per answered ticket. Its tokens are billed and budgeted on the provider selected here — prices are per provider, so use a separate provider entry for a model with different prices.",
-        "finalAnswerModelOverride": "Leave empty to use the provider's default model."
+        "triageCustomerFixThreshold": "100 means propose only. A mail forwarded more than once scores 70, since the original sender is less certain."
       },
       "common": {
         "validId": "Valid/invalid είναι μια σημαία απαλής διαγραφής: η επισήμανση μιας καταχώρισης ως μη έγκυρης την αποκρύπτει από τους επιλογείς για νέες εγγραφές χωρίς να διαγράφει υπάρχουσες αναφορές (π.χ. εισιτήρια, εργασίες). Δεν υπάρχει σκληρή διαγραφή."

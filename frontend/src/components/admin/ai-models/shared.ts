@@ -1,5 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
 import { ApiError } from "@/lib/api";
+import type { LlmProfileOut } from "@/lib/aiApi";
+import { aiNeedMissingKey, missingNeeds, type AiTask } from "@/lib/aiTasks";
+import type { SelectMenuItem } from "@/components/ui/SelectMenu";
 
 export const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
 export const MODELS_KEY = ["admin", "ai", "models"] as const;
@@ -45,4 +49,29 @@ export function formatPrice(
 ): string | null {
   if (input == null && output == null) return null;
   return `${input ?? "–"} / ${output ?? "–"} ${currency ?? ""}`.trim();
+}
+
+/** One select option per profile for *task* — shared by the global task
+ * table and the queue editor. A profile with a model that lacks one of the
+ * task's needs is shown but disabled (the backend would reject it), with the
+ * reason as hint; a disabled profile is marked as such. */
+export function taskProfileItems(
+  task: AiTask,
+  profiles: LlmProfileOut[],
+  t: TFunction,
+): SelectMenuItem<string>[] {
+  return profiles.map((p) => {
+    const missing = missingNeeds(task, p.entries);
+    return {
+      value: String(p.id),
+      label: p.name,
+      disabled: missing.length > 0,
+      hint:
+        missing.length > 0
+          ? missing.map((n) => t(aiNeedMissingKey(n))).join(", ")
+          : p.valid_id !== 1
+            ? t("admin.ai.tasks.profileInactive")
+            : undefined,
+    };
+  });
 }
