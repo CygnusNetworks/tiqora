@@ -523,7 +523,7 @@ async def test_pause_and_escalation_are_independent(
             )
         engine.dispose()
 
-        # unpause (a no-op pause-wise) leaves the escalation alone
+        # pause then unpause leaves the escalation alone
         assert (await client.post(f"/api/v1/tickets/{tid}/ai/pause")).status_code == 204
         assert (await client.post(f"/api/v1/tickets/{tid}/ai/unpause")).status_code == 204
         row = _state_row(mariadb_znuny_url, tid)
@@ -550,10 +550,33 @@ async def test_pause_routes_forbidden_without_note_permission(
         mariadb_znuny_url, ns=85, monkeypatch=monkeypatch
     )
     try:
+        # A user who can see the ticket (ro on its group) but has no note permission.
+        reader_id = 9500 + 85
+        engine = create_engine(mariadb_znuny_url)
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": reader_id})
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, login, pw, first_name, last_name, valid_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, 'agent.aipause.reader', 'x', 'Read', 'Only', 1,"
+                    " current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"id": reader_id},
+            )
+            conn.execute(
+                text(
+                    "INSERT INTO group_user (user_id, group_id, permission_key,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:uid, :gid, 'ro', current_timestamp, 1, current_timestamp, 1)"
+                ),
+                {"uid": reader_id, "gid": _group_id(seed)},
+            )
+        engine.dispose()
         outsider, outsider_engine = await _client_for(
             mariadb_znuny_url,
-            user_id=999999,
-            login="agent.aipause.outsider",
+            user_id=reader_id,
+            login="agent.aipause.reader",
             monkeypatch=monkeypatch,
         )
         try:
@@ -567,3 +590,67 @@ async def test_pause_routes_forbidden_without_note_permission(
         await client.aclose()
         await client_engine.dispose()
         _cleanup_ticket(mariadb_znuny_url, **_teardown_args(seed))
+        engine = create_engine(mariadb_znuny_url)
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": 9500 + 85})
+        engine.dispose()
+
+
+async def test_set_ai_paused_survives_state_row_created_concurrently(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The auto worker creates the state row between our existence check and
+    our insert: the pause must still apply (and errors must not be swallowed)."""
+    ns = 95
+    seed = aw._seed_ticket(mariadb_znuny_url, ns=ns)
+    tid = seed["ticket_id"]
+    engine = create_async_engine(aw._mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    real_exists = handoff._pause_row_exists
+
+    async def racing_exists(session: Any, ticket_id: int) -> bool:
+        assert await real_exists(session, ticket_id) is False
+        # Same connection: a second connection would just block on the
+        # update's gap lock. The row is "the worker's", the PK clash is real.
+        await session.execute(
+            text("INSERT INTO tiqora_ai_ticket_state (ticket_id) VALUES (:tid)"),
+            {"tid": ticket_id},
+        )
+        return False
+
+    monkeypatch.setattr(handoff, "_pause_row_exists", racing_exists)
+    try:
+        async with factory() as session:
+            await handoff.set_ai_paused(session, tid, seed["agent_id"])
+            await session.commit()
+        row = _state_row(mariadb_znuny_url, tid)
+        assert row is not None
+        assert row[0] is not None
+        assert row[1] == seed["agent_id"]
+    finally:
+        await engine.dispose()
+        _cleanup_aw(mariadb_znuny_url, seed, ns)
+
+
+async def test_set_and_clear_ai_paused_are_idempotent_and_keep_original(
+    mariadb_znuny_url: str,
+) -> None:
+    ns = 96
+    seed = aw._seed_ticket(mariadb_znuny_url, ns=ns)
+    tid = seed["ticket_id"]
+    engine = create_async_engine(aw._mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await handoff.clear_ai_paused(session, tid)  # no row: no-op
+            await handoff.set_ai_paused(session, tid, 11)
+            await session.commit()
+        first = _state_row(mariadb_znuny_url, tid)
+        async with factory() as session:
+            await handoff.set_ai_paused(session, tid, 22)
+            await session.commit()
+        assert _state_row(mariadb_znuny_url, tid)[:2] == first[:2]
+        assert first[1] == 11
+    finally:
+        await engine.dispose()
+        _cleanup_aw(mariadb_znuny_url, seed, ns)
