@@ -567,6 +567,7 @@
         "pause": "Pause AI for this ticket",
         "unpause": "Resume",
         "banner": "AI automation paused by {{name}} on {{date}}",
+        "bannerNoName": "AI automation paused since {{date}}",
         "hint": "Auto-reply, triage and automatic summaries are off for this ticket. Manual AI features keep working.",
         "error": "Could not change the AI pause. Please try again."
       },

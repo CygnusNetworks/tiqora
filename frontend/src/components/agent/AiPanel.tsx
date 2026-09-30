@@ -41,8 +41,9 @@ import { CustomSummaryPanel } from "./CustomSummaryPanel";
  * B/C). Fetches `GET /tickets/{id}/ai` and produces the pieces the header
  * places where each belongs (see `TicketAiSlots`): the summary as a one-line
  * subtitle under the title that expands into the full summary controls, the
- * drafts trigger next to "Antworten", and the triage / hand-over banners
- * that need a decision. Without a `children` render function the pieces are
+ * drafts trigger next to "Antworten", and the pause / triage / hand-over
+ * banners that need attention (the pause switch itself is in the summary
+ * line's ⋯ menu). Without a `children` render function the pieces are
  * stacked in a compact default layout. Agents without ACL access get empty
  * slots (only the `trailing` chips in the default layout).
  */
@@ -55,7 +56,7 @@ export type TicketAiSlots = {
   summaryPanel: ReactNode | null;
   /** Drafts trigger styled to attach to the right edge of the primary reply button. */
   draftsButton: ReactNode | null;
-  /** Hand-over and triage banners — shown only when they apply. */
+  /** Pause, hand-over and triage banners — shown only when they apply. */
   banners: ReactNode | null;
   /** Dialogs opened from inside the slots (reply from draft, confirmations). */
   overlays: ReactNode | null;
@@ -407,10 +408,12 @@ export function AiPanel({
   if (
     !state.manual_assist_available &&
     !state.summary_available &&
-    !state.triage
+    !state.triage &&
+    !state.ai_paused_at
   )
     // A triage-only queue enables neither of the two, but still has a
-    // proposal worth showing.
+    // proposal worth showing; an active pause must stay visible (and
+    // liftable) for every viewer with note permission.
     return renderSlots(EMPTY_SLOTS);
 
   // Only this panel instance's OWN triggered run ever renders a
@@ -1089,6 +1092,14 @@ export function AiPanel({
         <MenuItem testId="ai-summary-line-pin" onSelect={() => setPinned(!pinned)}>
           {pinned ? t("ticket.ai.unpin") : t("ticket.ai.pinOpen")}
         </MenuItem>
+        {!state.ai_paused_at && canNote && (
+          <MenuItem
+            testId="ai-panel-pause-button"
+            onSelect={() => pauseMutation.mutate(true)}
+          >
+            {t("ticket.ai.pause.pause")}
+          </MenuItem>
+        )}
         {hasSummary && (
           <MenuItem
             testId="ai-summary-line-copy"
@@ -1173,7 +1184,31 @@ export function AiPanel({
       </HoverCard>
     ) : null;
 
-  const banners = (
+  // The pause control lives in the summary line's ⋯ menu. Only viewers
+  // without a summary line (manual assist only) get a standalone link.
+  const pauseLink =
+    !state.ai_paused_at && !state.summary_available ? (
+      <div className="flex justify-end">
+        <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
+          <button
+            type="button"
+            className="text-[11px] text-muted underline-offset-2 transition-colors hover:text-ink hover:underline disabled:opacity-60"
+            data-testid="ai-panel-pause-button"
+            disabled={!canNote || pauseMutation.isPending}
+            onClick={() => pauseMutation.mutate(true)}
+          >
+            {t("ticket.ai.pause.pause")}
+          </button>
+        </span>
+      </div>
+    ) : null;
+
+  const banners =
+    state.ai_paused_at ||
+    state.ai_escalated_at ||
+    state.triage ||
+    pauseLink ||
+    pauseMutation.isError ? (
       <div className="space-y-2" data-testid="ai-banners">
         {state.ai_paused_at ? (
           <div
@@ -1183,10 +1218,15 @@ export function AiPanel({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="font-semibold">⏸</span>
               <span className="min-w-0 flex-1">
-                {t("ticket.ai.pause.banner", {
-                  name: state.ai_paused_by_name ?? "?",
-                  date: formatDateTime(state.ai_paused_at, locale),
-                })}
+                {t(
+                  state.ai_paused_by_name
+                    ? "ticket.ai.pause.banner"
+                    : "ticket.ai.pause.bannerNoName",
+                  {
+                    name: state.ai_paused_by_name,
+                    date: formatDateTime(state.ai_paused_at, locale),
+                  },
+                )}
               </span>
               <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
                 <Button
@@ -1207,19 +1247,7 @@ export function AiPanel({
             <p>{t("ticket.ai.pause.hint")}</p>
           </div>
         ) : (
-          <div className="flex justify-end">
-            <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
-              <button
-                type="button"
-                className="text-[11px] text-muted underline-offset-2 transition-colors hover:text-ink hover:underline disabled:opacity-60"
-                data-testid="ai-panel-pause-button"
-                disabled={!canNote || pauseMutation.isPending}
-                onClick={() => pauseMutation.mutate(true)}
-              >
-                {t("ticket.ai.pause.pause")}
-              </button>
-            </span>
-          </div>
+          pauseLink
         )}
         {pauseMutation.isError && (
           <p className="text-xs text-danger" role="alert" data-testid="ai-panel-pause-error">
@@ -1336,7 +1364,7 @@ export function AiPanel({
           </div>
         )}
       </div>
-  );
+    ) : null;
 
   const overlays = (
     <>

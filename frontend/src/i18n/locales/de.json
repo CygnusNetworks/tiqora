@@ -567,6 +567,7 @@
         "pause": "KI für dieses Ticket pausieren",
         "unpause": "Fortsetzen",
         "banner": "KI-Automatik pausiert von {{name}} am {{date}}",
+        "bannerNoName": "KI-Automatik pausiert seit {{date}}",
         "hint": "Auto-Antwort, Triage und automatische Zusammenfassung sind für dieses Ticket aus. Manuelle KI-Funktionen gehen weiter.",
         "error": "Die KI-Pause konnte nicht geändert werden. Bitte erneut versuchen."
       },
