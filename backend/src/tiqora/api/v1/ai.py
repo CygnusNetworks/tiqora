@@ -1069,14 +1069,7 @@ async def resume_ai_route(ticket_id: int, user: CurrentUser, session: DbSession)
     hand back without writing a customer-visible reply, e.g. after fixing
     the underlying issue that caused a bad escalation.
     """
-    try:
-        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
-    except (TicketNotFound, TicketAccessDenied) as exc:
-        if isinstance(exc, TicketNotFound):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
-
-    await _assert_note_permission(session, user.id, ticket.queue_id)
+    await _require_note_access(session, user, ticket_id)
 
     await _resume_ai_automation(
         session,

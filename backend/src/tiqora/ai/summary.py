@@ -769,7 +769,7 @@ async def auto_summary_due(session: AsyncSession, ticket_id: int) -> bool:
     "NULL = kein Auto-Summary")."""
     # An agent paused all automatic AI actions on this ticket. Checked first
     # and read-only (no get_or_create): a ticket without a state row is not paused.
-    paused_state = await session.get(TiqoraAiTicketState, ticket_id)
+    paused_state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
     if paused_state is not None and paused_state.ai_paused_at is not None:
         return False
     try:

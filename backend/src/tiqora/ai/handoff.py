@@ -15,7 +15,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.ai.models import TiqoraAiTicketState
+from tiqora.ai.models import TiqoraAiTicketState, TiqoraAiTriage
 
 logger = structlog.get_logger(__name__)
 
@@ -92,45 +92,62 @@ async def _apply_pause(session: AsyncSession, ticket_id: int, user_id: int) -> i
     return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
 
-async def set_ai_paused(session: AsyncSession, ticket_id: int, user_id: int) -> None:
+async def set_ai_paused(session: AsyncSession, ticket_id: int, user_id: int) -> bool:
     """Pause all automatic AI actions on a ticket. Does not commit.
 
-    User-initiated, so errors propagate (a swallowed failure would report a
-    pause that never happened). Race-safe against the auto worker creating the
-    state row concurrently: update first, insert only when no row exists, and
-    if that insert loses the race, update again. An already paused ticket keeps
-    its original ``ai_paused_at``/``ai_paused_by``. Unlike the escalation flag
-    this is never cleared by an agent reply or a state change, only by
-    :func:`clear_ai_paused`.
+    Returns True only when THIS call changed the state (so two concurrent
+    requests write one audit note, not two). User-initiated, so errors
+    propagate (a swallowed failure would report a pause that never happened).
+    Race-safe against the auto worker creating the state row concurrently:
+    update first, insert only when no row exists, and if that insert loses the
+    race, update again. An already paused ticket keeps its original
+    ``ai_paused_at``/``ai_paused_by``. Unlike the escalation flag this is never
+    cleared by an agent reply or a state change, only by :func:`clear_ai_paused`.
+
+    Also drops the ticket's parked triage reply (``reply_deferred_article_id``):
+    it is an article that arrived before the pause and must not be answered
+    after a later unpause (see ``auto_worker._replay_deferred_replies``).
     """
-    if await _apply_pause(session, ticket_id, user_id):
-        return
-    if await _pause_row_exists(session, ticket_id):
-        return  # already paused
-    try:
-        async with session.begin_nested():
-            session.add(
-                TiqoraAiTicketState(
-                    ticket_id=ticket_id,
-                    ai_paused_at=datetime.now(UTC).replace(tzinfo=None),
-                    ai_paused_by=user_id,
+    changed = await _apply_pause(session, ticket_id, user_id) > 0
+    if not changed and not await _pause_row_exists(session, ticket_id):
+        try:
+            async with session.begin_nested():
+                session.add(
+                    TiqoraAiTicketState(
+                        ticket_id=ticket_id,
+                        ai_paused_at=datetime.now(UTC).replace(tzinfo=None),
+                        ai_paused_by=user_id,
+                    )
                 )
-            )
-            await session.flush()
-    except IntegrityError:
-        # The row appeared between our check and the insert.
-        await _apply_pause(session, ticket_id, user_id)
+                await session.flush()
+            changed = True
+        except IntegrityError:
+            # The row appeared between our check and the insert.
+            changed = await _apply_pause(session, ticket_id, user_id) > 0
+    if changed:
+        await session.execute(
+            update(TiqoraAiTriage)
+            .where(TiqoraAiTriage.ticket_id == ticket_id)
+            .values(reply_deferred_article_id=None)
+            .execution_options(synchronize_session=False)
+        )
+    return changed
 
 
-async def clear_ai_paused(session: AsyncSession, ticket_id: int) -> None:
-    """Lift the per-ticket AI pause. No-op when the row is missing. Does not
-    commit. User-initiated, so errors propagate."""
-    await session.execute(
+async def clear_ai_paused(session: AsyncSession, ticket_id: int) -> bool:
+    """Lift the per-ticket AI pause. Returns True only when this call lifted
+    it (False: row missing or not paused). Does not commit. User-initiated,
+    so errors propagate."""
+    result = await session.execute(
         update(TiqoraAiTicketState)
-        .where(TiqoraAiTicketState.ticket_id == ticket_id)
+        .where(
+            TiqoraAiTicketState.ticket_id == ticket_id,
+            TiqoraAiTicketState.ai_paused_at.is_not(None),
+        )
         .values(ai_paused_at=None, ai_paused_by=None)
         .execution_options(synchronize_session=False)
     )
+    return int(result.rowcount or 0) > 0  # type: ignore[attr-defined]
 
 
 async def ai_escalated_ticket_ids(session: AsyncSession, ticket_ids: list[int]) -> set[int]:

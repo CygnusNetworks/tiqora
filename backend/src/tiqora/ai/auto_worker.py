@@ -66,6 +66,7 @@ from tiqora.ai.models import (
     FEATURE_TRIAGE,
     TRIAGE_STATUS_OPEN,
     TiqoraAiQueuePolicy,
+    TiqoraAiTicketState,
     TiqoraAiTriage,
     TiqoraAiUsage,
 )
@@ -210,6 +211,12 @@ async def _defer_for_open_triage(session: AsyncSession, ticket_id: int, article_
     article is remembered on the triage row (``reply_deferred_article_id``)
     and :func:`_replay_deferred_replies` answers it once the row is decided.
     """
+    # A paused ticket never parks an article for later: unpausing must not
+    # answer what arrived during the pause. Falling through lets _cap_reason
+    # skip the event with "ai_paused".
+    paused = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
+    if paused is not None and paused.ai_paused_at is not None:
+        return False
     row = (
         await session.execute(
             select(TiqoraAiTriage)
