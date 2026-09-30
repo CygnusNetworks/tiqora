@@ -1065,7 +1065,11 @@
     "submitSend": "Unda na utume",
     "sendError": "Barua pepe haikuweza kutumwa. Tikiti ilikuwa tayari imeundwa - tafadhali jaribu tena kutuma jibu kutoka hapo.",
     "goToTicket": "Nenda kwa tikiti",
-    "note": "Ujumbe wa simu"
+    "note": "Ujumbe wa simu",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Imeunganishwa moja kwa moja",

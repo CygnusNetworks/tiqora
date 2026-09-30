@@ -1065,7 +1065,11 @@
     "submitSend": "Luo ja lähetä",
     "sendError": "Sähköpostia ei voitu lähettää. Lippu on jo luotu – yritä lähettää vastaus uudelleen sieltä.",
     "goToTicket": "Siirry lippuun",
-    "note": "Soita muistiinpano"
+    "note": "Soita muistiinpano",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Yhdistetty livenä",

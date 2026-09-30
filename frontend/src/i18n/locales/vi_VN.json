@@ -1065,7 +1065,11 @@
     "submitSend": "Tạo và gửi",
     "sendError": "Không thể gửi email. Phiếu đã được tạo — vui lòng thử gửi lại thư trả lời từ đó.",
     "goToTicket": "Đi đến vé",
-    "note": "Ghi chú cuộc gọi"
+    "note": "Ghi chú cuộc gọi",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Đã kết nối trực tiếp",

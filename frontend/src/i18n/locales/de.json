@@ -1065,7 +1065,11 @@
     "submitSend": "Erstellen & senden",
     "sendError": "E-Mail konnte nicht versendet werden. Das Ticket wurde bereits angelegt — bitte die Antwort von dort erneut senden.",
     "goToTicket": "Zum Ticket",
-    "note": "Gesprächsnotiz"
+    "note": "Gesprächsnotiz",
+    "propsLabel": "Ticketdaten",
+    "queueSourceCustomer": "wie letztes Ticket von {{name}}",
+    "queueSourceCompany": "wie letztes Ticket der Firma",
+    "submitClose": "Erfassen und schließen"
   },
   "connection": {
     "live": "Live verbunden",

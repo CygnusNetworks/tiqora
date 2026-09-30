@@ -1065,7 +1065,11 @@
     "submitSend": "إنشاء وإرسال",
     "sendError": "لا يمكن إرسال البريد الإلكتروني. The ticket was already created — please retry sending the reply from there.",
     "goToTicket": "اذهب إلى التذكرة",
-    "note": "ملاحظة الاتصال"
+    "note": "ملاحظة الاتصال",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "متصلة مباشرة",

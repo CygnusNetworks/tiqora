@@ -1065,7 +1065,11 @@
     "submitSend": "צור ושלח",
     "sendError": "לא ניתן היה לשלוח את המייל. הכרטיס כבר נוצר - אנא נסה שוב לשלוח את התשובה משם.",
     "goToTicket": "לך לכרטיס",
-    "note": "פתק שיחה"
+    "note": "פתק שיחה",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "מחובר בשידור חי",

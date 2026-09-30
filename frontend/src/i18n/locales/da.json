@@ -1065,7 +1065,11 @@
     "submitSend": "Opret og send",
     "sendError": "E-mailen kunne ikke sendes. Billetten er allerede oprettet - prøv venligst at sende svaret derfra igen.",
     "goToTicket": "Gå til billet",
-    "note": "Opkaldsnote"
+    "note": "Opkaldsnote",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Tilsluttet live",

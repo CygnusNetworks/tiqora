@@ -1065,7 +1065,11 @@
     "submitSend": "作成して送信",
     "sendError": "メールを送信できませんでした。チケットはすでに作成されています。そこから返信を再送信してください。",
     "goToTicket": "チケットへ行く",
-    "note": "通話メモ"
+    "note": "通話メモ",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "ライブ接続",

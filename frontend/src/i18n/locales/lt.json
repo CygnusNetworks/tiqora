@@ -1065,7 +1065,11 @@
     "submitSend": "Sukurti ir siųsti",
     "sendError": "El. laiško išsiųsti nepavyko. Bilietas jau sukurtas – pabandykite dar kartą išsiųsti atsakymą iš ten.",
     "goToTicket": "Eiti į bilietą",
-    "note": "Skambučio pastaba"
+    "note": "Skambučio pastaba",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Prisijungta gyvai",

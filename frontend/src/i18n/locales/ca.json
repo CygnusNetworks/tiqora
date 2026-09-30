@@ -1065,7 +1065,11 @@
     "submitSend": "Crear i enviar",
     "sendError": "No s'ha pogut enviar el correu electrònic. El bitllet ja s'ha creat. Torneu a enviar la resposta des d'allà.",
     "goToTicket": "Anar al tiquet",
-    "note": "Nota de trucada"
+    "note": "Nota de trucada",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Connectat en directe",

@@ -1065,7 +1065,11 @@
     "submitSend": "Létrehozás és küldés",
     "sendError": "Az e-mailt nem sikerült elküldeni. A jegy már létrejött – kérjük, próbálja meg újra elküldeni a választ onnan.",
     "goToTicket": "Tovább a jegyhez",
-    "note": "Hívásjegyzet"
+    "note": "Hívásjegyzet",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Élőben kapcsolva",
