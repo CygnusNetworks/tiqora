@@ -1202,7 +1202,8 @@
         "disclosure": "공개 및 글로벌 기본값",
         "disclosureText": "전역 기본 공개 텍스트",
         "globalCap": "전역 자동 회신 하드 캡(시간당)",
-        "globalCapPlaceholder": "비어 있음 = 꺼짐"
+        "globalCapPlaceholder": "비어 있음 = 꺼짐",
+        "statModels": "Models"
       },
       "acl": {
         "title": "액세스 제어(ACL)",
@@ -1247,35 +1248,29 @@
           "anthropic": "인류학"
         },
         "baseUrl": "기본 URL",
-        "defaultModel": "기본 모델",
         "flags": "플래그",
-        "flagTools": "도구 호출",
-        "flagStreaming": "스트리밍",
         "flagEu": "EU 호스팅",
-        "flagVision": "비전",
-        "flagVisionHelp": "이 공급자는 이미지를 설명할 수 있습니다(티켓 텍스트에는 사용되지 않고 첨부 비전 사전 패스에만 사용됨).",
         "hasKey": "API 키 세트",
         "test": "테스트",
         "testAction": "연결 테스트",
-        "testOk": "알았어",
         "testFail": "실패",
         "duplicateAction": "중복",
         "apiKey": "API 키",
         "apiKeySetHelp": "API 키가 저장됩니다. 보관하려면 비워 두세요.",
         "apiKeyHelp": "암호화되어 저장되며 다시는 표시되지 않습니다.",
-        "deleteConfirm": "'{{name}}' 제공업체를 삭제하시겠습니까?",
-        "price": "가격(100만 토큰)",
-        "priceInput": "100만개 토큰당 가격 입력",
-        "priceOutput": "100만 토큰당 가격 출력",
         "priceCurrency": "통화",
-        "priceHelp": "해당 통화의 100만 개 토큰(입력/출력)당 비용 — LLM 감사에서 비용 계산에 사용됩니다.",
         "priceCurrencyNone": "— 없음 —",
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "maxToolRounds": "최대 도구 라운드",
-        "maxToolRoundsHelp": "이 모델이 답변하기 전에 사용할 수 있는 조사 단계 수입니다. 각 단계는 전체 대화를 다시 보내므로 늘리면 비례 이상으로 비용이 듭니다. 비워 두면 기본값이 적용됩니다.",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "modelCount_one": "{{count}} model",
+        "modelCount_other": "{{count}} models",
+        "testOkModels_one": "OK – the provider offers {{count}} model",
+        "testOkModels_other": "OK – the provider offers {{count}} models",
+        "priceCurrencyHelp": "Applies to the prices of all models of this provider and to the cost limits.",
+        "kindLegacyHelp": "Anthropic providers are no longer supported. New providers are always OpenAI-compatible.",
+        "deleteConfirmWithModels": "Really delete provider \"{{name}}\"? Its models are deleted with it."
       },
       "mcp": {
         "title": "MCP 클라이언트",
@@ -1570,6 +1565,124 @@
         "noHit": "히트 없음",
         "hitDetail": "규칙 #{{index}} · 필드: {{field}} · 값: {{value}}",
         "requestError": "테스트에 실패했습니다. 다시 시도해 주세요."
+      },
+      "models": {
+        "title": "Models",
+        "tabs": {
+          "models": "Models",
+          "profiles": "Profiles",
+          "tasks": "Tasks"
+        },
+        "intro": "An entry is always one model at exactly one provider. The model ID is exactly the name this provider expects in its API – best picked from the provider's model list rather than typed. The display name is for humans only. The same model at two providers means two entries.",
+        "new": "New model",
+        "empty": "No models yet. Create a provider first, then add its models here.",
+        "colName": "Display name",
+        "colProvider": "Provider",
+        "colModelId": "Model ID at the provider",
+        "colCaps": "Can",
+        "colPrice": "Price in / out",
+        "cap": {
+          "tools": "Tools",
+          "vision": "Images"
+        },
+        "inactive": "disabled",
+        "provider": "Provider",
+        "modelId": "Model ID at the provider",
+        "modelIdHelp": "Exactly as the provider names the model in its API.",
+        "loadRemote": "Load models from provider",
+        "loadRemoteDone_one": "{{count}} model loaded – pick it in the field.",
+        "loadRemoteDone_other": "{{count}} models loaded – pick one in the field.",
+        "loadRemoteFail": "Model list not loaded",
+        "displayName": "Display name",
+        "displayNameHelp": "For humans only. Leave empty to show the model ID.",
+        "supportsTools": "Can use tools",
+        "supportsVision": "Can read images",
+        "active": "Active",
+        "disableWarning": "This model is in profile {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
+        "priceInput": "Input price per 1M tokens",
+        "priceOutput": "Output price per 1M tokens",
+        "priceHelp": "In {{currency}}, the provider's currency. Basis for the costs in the LLM audit and for the cost limits.",
+        "priceHelpNoCurrency": "The provider has no currency set; costs are shown without a currency.",
+        "contextTokens": "Context length (tokens)",
+        "contextTokensHelp": "For information only. Empty = unknown.",
+        "maxToolRounds": "Max. tool rounds",
+        "maxToolRoundsHelp": "How many research steps this model gets before it must answer. Every step resends the whole conversation, so raising it costs disproportionately more. Empty = built-in default.",
+        "testAction": "Test",
+        "testOk": "OK",
+        "testFail": "Failed",
+        "testToolsOk": "tool call OK",
+        "testToolsFail": "tool call failed",
+        "deleteConfirm": "Really delete model \"{{name}}\"?"
+      },
+      "profiles": {
+        "title": "Profiles",
+        "intro": "A profile is an ordered list of models. If the first one fails, the next one takes over (fallback model). Every task requires certain capabilities, and every model in the profile must have them.",
+        "new": "New profile",
+        "empty": "No profiles yet.",
+        "name": "Name",
+        "descriptionField": "Description",
+        "models": "Models",
+        "modelsHelp": "Order = fallback order: the first model answers, the others step in when it fails.",
+        "noModelsYet": "No model in the profile yet.",
+        "addModel": "Add model …",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "needOneModel": "A profile needs at least one model.",
+        "timeout": "Timeout (seconds)",
+        "timeoutHelp": "Empty = global timeout.",
+        "timeoutValue": "Timeout {{seconds}} s",
+        "timeoutGlobal": "Timeout: global",
+        "active": "Active",
+        "inactive": "disabled",
+        "modelCount_one": "{{count}} model",
+        "modelCount_other": "{{count}} models",
+        "modelSkipped": "Disabled model – skipped",
+        "usedBy": "Used for",
+        "usedByNone": "no task",
+        "scopeGlobal": "global",
+        "inheritedVia": "inherited via {{task}}",
+        "deleteConfirm": "Really delete profile \"{{name}}\"?"
+      },
+      "tasks": {
+        "intro": "Global assignment. Queues inherit it and can override single tasks. Every task requires certain capabilities, and every model in the profile must have them.",
+        "colTask": "Task",
+        "colNeeds": "Needs",
+        "colProfile": "Profile",
+        "needsNothing": "nothing special",
+        "noProfile": "No own profile ({{fallback}})",
+        "cannot": "cannot: {{needs}}",
+        "profileInactive": "disabled",
+        "selectedInactive": "The profile is disabled and counts as \"No own profile\" ({{fallback}}).",
+        "saved": "Saved.",
+        "name": {
+          "agent": "Research and tools",
+          "final_answer": "Write the answer",
+          "triage": "Triage",
+          "summary": "Summarize",
+          "refine": "Refine text",
+          "vision": "Describe images"
+        },
+        "description": {
+          "agent": "Reads ticket and knowledge base, calls tools",
+          "final_answer": "Writes the customer text from the research result",
+          "triage": "Queue, customer and internal note for new tickets",
+          "summary": "Automatic and manual summaries",
+          "refine": "Reworks the draft in the reply editor",
+          "vision": "Describes image attachments before the other tasks"
+        },
+        "fallback": {
+          "agent": "no AI",
+          "final_answer": "research model answers itself",
+          "triage": "like research and tools",
+          "summary": "like research and tools",
+          "refine": "like research and tools",
+          "vision": "images are ignored"
+        },
+        "missing": {
+          "tools": "cannot use tools",
+          "vision": "cannot read images"
+        }
       }
     },
     "help": {
@@ -1783,7 +1896,8 @@
       "notificationEvents": "알림 이벤트",
       "ticketAttributeRelations": "속성 관계",
       "pgp": "PGP keys",
-      "smime": "S/MIME certificates"
+      "smime": "S/MIME certificates",
+      "aiModels": "Models"
     },
     "table": {
       "id": "ID",
@@ -2946,7 +3060,8 @@
       "notificationEvents": "이벤트 기반 상담원 알림을 구성합니다.",
       "ticketAttributeRelations": "Znuny 호환 의존성 행렬(서비스→대기열 등)을 CSV로 관리합니다.",
       "pgp": "Import, inspect and delete the PGP keys used to sign, encrypt and decrypt mail.",
-      "smime": "Manage S/MIME certificates, private keys and signer relations."
+      "smime": "Manage S/MIME certificates, private keys and signer relations.",
+      "aiModels": "Models at the providers, profiles with fallback models, and which profile handles which task."
     },
     "types": {
       "title_plural": "티켓 유형",

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
 import {
@@ -24,7 +25,10 @@ import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 
 const QUERY_KEY = ["admin", "ai", "providers"] as const;
-const PROVIDER_KINDS: ProviderKind[] = ["openai_compat", "anthropic"];
+const MODELS_KEY = ["admin", "ai", "models"] as const;
+/** Only OpenAI-compatible providers can be created; a legacy Anthropic row
+ * keeps its kind (the select offers it only while editing that row). */
+const CREATABLE_KIND: ProviderKind = "openai_compat";
 
 function toFormValues(row: LlmProviderOut | null): FieldValues {
   return row
@@ -32,37 +36,23 @@ function toFormValues(row: LlmProviderOut | null): FieldValues {
         name: row.name,
         kind: row.kind,
         base_url: row.base_url,
-        default_model: row.default_model,
         api_key: "",
-        supports_tools: row.supports_tools,
-        supports_streaming: row.supports_streaming,
         eu_hosted: row.eu_hosted,
-        supports_vision: row.supports_vision,
-        price_input_per_1m: row.price_input_per_1m ?? "",
-        price_output_per_1m: row.price_output_per_1m ?? "",
         price_currency: row.price_currency ?? "",
         budget_cost_day: row.budget_cost_day ?? "",
         budget_cost_week: row.budget_cost_week ?? "",
         budget_cost_month: row.budget_cost_month ?? "",
-        max_tool_rounds: row.max_tool_rounds ?? "",
       }
     : {
         name: "",
-        kind: "openai_compat",
+        kind: CREATABLE_KIND,
         base_url: "",
-        default_model: "",
         api_key: "",
-        supports_tools: true,
-        supports_streaming: true,
         eu_hosted: false,
-        supports_vision: false,
-        price_input_per_1m: "",
-        price_output_per_1m: "",
         price_currency: "",
         budget_cost_day: "",
         budget_cost_week: "",
         budget_cost_month: "",
-        max_tool_rounds: "",
       };
 }
 
@@ -79,21 +69,32 @@ export function AiProvidersPage() {
   >({});
   const [testingId, setTestingId] = useState<number | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<number | null>(null);
-  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const listQ = useQuery({
     queryKey: QUERY_KEY,
     queryFn: ({ signal }) => aiApi.listProviders(signal),
   });
 
-  // Only for the tool-rounds placeholder: showing the actual default beats a
-  // help text naming a number that would go stale across 48 locale files.
-  const settingsQ = useQuery({
-    queryKey: ["admin", "ai", "settings"],
-    queryFn: ({ signal }) => aiApi.getSettings(signal),
+  // Models live on their own page; here only "N Modelle" per provider.
+  const modelsQ = useQuery({
+    queryKey: MODELS_KEY,
+    queryFn: ({ signal }) => aiApi.listModels(signal),
   });
+  const modelCount = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const m of modelsQ.data ?? []) {
+      counts.set(m.provider_id, (counts.get(m.provider_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [modelsQ.data]);
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: QUERY_KEY });
+  const invalidate = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: QUERY_KEY }),
+      // Deleting a provider deletes its models; names show on the models page.
+      qc.invalidateQueries({ queryKey: MODELS_KEY }),
+    ]);
 
   const createM = useMutation({
     mutationFn: (body: LlmProviderCreate) => aiApi.createProvider(body),
@@ -114,7 +115,11 @@ export function AiProvidersPage() {
 
   const deleteM = useMutation({
     mutationFn: (id: number) => aiApi.deleteProvider(id),
+    onMutate: () => setActionError(null),
     onSuccess: () => invalidate(),
+    // 409 when its models are still in profiles — the detail names them.
+    onError: (err) =>
+      setActionError(err instanceof ApiError ? err.message : String(err)),
   });
 
   const testM = useMutation({
@@ -126,9 +131,8 @@ export function AiProvidersPage() {
         ...r,
         [id]: {
           ok: false,
-          model: null,
-          tool_calling_ok: false,
-          error: err instanceof ApiError ? err.message : String(err),
+          detail: err instanceof ApiError ? err.message : String(err),
+          model_count: null,
         },
       })),
     onSettled: () => setTestingId(null),
@@ -137,17 +141,17 @@ export function AiProvidersPage() {
   const duplicateM = useMutation({
     mutationFn: (id: number) => aiApi.duplicateProvider(id),
     onMutate: (id) => {
-      setDuplicateError(null);
+      setActionError(null);
       setDuplicatingId(id);
     },
     onSuccess: async (copy) => {
       await invalidate();
-      // Open the copy's edit dialog directly so the operator can rename the
-      // model right away (typical case: several models, same provider/key).
+      // Open the copy's edit dialog directly so the operator can rename it
+      // and change what differs (typically the key or the budget).
       openEdit(copy);
     },
     onError: (err) =>
-      setDuplicateError(err instanceof ApiError ? err.message : String(err)),
+      setActionError(err instanceof ApiError ? err.message : String(err)),
     onSettled: () => setDuplicatingId(null),
   });
 
@@ -171,17 +175,11 @@ export function AiProvidersPage() {
 
   const handleSubmit = async (values: FieldValues) => {
     setFormError(null);
-    const base: LlmProviderCreate = {
+    const kind = values.kind as ProviderKind;
+    const base = {
       name: String(values.name ?? ""),
-      kind: values.kind as ProviderKind,
       base_url: String(values.base_url ?? ""),
-      default_model: String(values.default_model ?? ""),
-      supports_tools: Boolean(values.supports_tools),
-      supports_streaming: Boolean(values.supports_streaming),
       eu_hosted: Boolean(values.eu_hosted),
-      supports_vision: Boolean(values.supports_vision),
-      price_input_per_1m: priceOrNull(values.price_input_per_1m),
-      price_output_per_1m: priceOrNull(values.price_output_per_1m),
       price_currency:
         String(values.price_currency ?? "")
           .trim()
@@ -189,19 +187,24 @@ export function AiProvidersPage() {
       budget_cost_day: priceOrNull(values.budget_cost_day),
       budget_cost_week: priceOrNull(values.budget_cost_week),
       budget_cost_month: priceOrNull(values.budget_cost_month),
-      // 0 rather than null on an empty field: the backend reads null as "field
-      // not supplied" and would keep the old override instead of clearing it.
-      max_tool_rounds: priceOrNull(values.max_tool_rounds) ?? 0,
     };
     const apiKey =
       typeof values.api_key === "string" ? values.api_key.trim() : "";
     try {
       if (editing) {
         const body: LlmProviderUpdate = { ...base };
+        // Sending an unchanged legacy "anthropic" kind would be rejected;
+        // the backend keeps the stored kind when the field is omitted.
+        if (kind !== editing.kind) body.kind = kind;
         if (apiKey) body.api_key = apiKey;
         await updateM.mutateAsync({ id: editing.id, body });
       } else {
-        await createM.mutateAsync({ ...base, api_key: apiKey || null });
+        const body: LlmProviderCreate = {
+          ...base,
+          kind: CREATABLE_KIND,
+          api_key: apiKey || null,
+        };
+        await createM.mutateAsync(body);
       }
     } catch (err) {
       setFormError(
@@ -214,26 +217,19 @@ export function AiProvidersPage() {
   const handleDelete = async (row: LlmProviderOut) => {
     const ok = await confirm({
       title: t("admin.ai.providers.title"),
-      message: t("admin.ai.providers.deleteConfirm", { name: row.name }),
+      message: t("admin.ai.providers.deleteConfirmWithModels", {
+        name: row.name,
+      }),
       variant: "danger",
     });
     if (ok) deleteM.mutate(row.id);
   };
 
-  const renderPrice = (r: LlmProviderOut): string | null => {
-    if (r.price_input_per_1m == null && r.price_output_per_1m == null)
-      return null;
-    const cur = r.price_currency ?? "";
-    return `${r.price_input_per_1m ?? 0} / ${r.price_output_per_1m ?? 0} ${cur}`.trim();
-  };
-
   // Two-line row instead of a wide table: name/kind + status dot on top,
-  // model + price below; feature chips right; every action in the ⋯-menu
-  // (row click = edit). The base URL lives only in the edit drawer — with
-  // several models of the same vendor it is identical anyway.
+  // "N Modelle" (link to the models page) + currency below; chips right;
+  // every action in the ⋯-menu (row click = edit).
   const renderRow = (r: LlmProviderOut) => {
     const result = testResults[r.id];
-    const price = renderPrice(r);
     return (
       <div key={r.id} className="border-t border-hairline first:border-t-0">
         <div
@@ -269,25 +265,26 @@ export function AiProvidersPage() {
             </span>
           </div>
           <div className="col-start-1 row-start-2 flex min-w-0 items-baseline gap-3 pl-4">
-            <span className="truncate font-mono text-xs text-muted">
-              {r.default_model}
-            </span>
-            {price && (
+            <Link
+              to="/admin/ai/models"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs text-accent hover:underline"
+              data-testid={`admin-ai-provider-models-${r.id}`}
+            >
+              {t("admin.ai.providers.modelCount", {
+                count: modelCount.get(r.id) ?? 0,
+              })}
+            </Link>
+            {r.price_currency && (
               <span
                 className="shrink-0 font-mono text-[11px] text-muted"
-                title={t("admin.ai.providers.price")}
+                title={t("admin.ai.providers.priceCurrency")}
               >
-                {price}
+                {r.price_currency}
               </span>
             )}
           </div>
           <div className="row-span-2 hidden flex-wrap items-center justify-end gap-1 md:flex">
-            {r.supports_tools && (
-              <Badge tone="accent">{t("admin.ai.providers.flagTools")}</Badge>
-            )}
-            {r.supports_vision && (
-              <Badge tone="accent">{t("admin.ai.providers.flagVision")}</Badge>
-            )}
             {r.eu_hosted && (
               <Badge tone="success">{t("admin.ai.providers.flagEu")}</Badge>
             )}
@@ -354,8 +351,10 @@ export function AiProvidersPage() {
                 data-testid={`admin-ai-provider-test-result-${r.id}`}
               >
                 {result.ok
-                  ? `${t("admin.ai.providers.testOk")} (${result.model ?? "?"})`
-                  : `${t("admin.ai.providers.testFail")}: ${result.error ?? ""}`}
+                  ? t("admin.ai.providers.testOkModels", {
+                      count: result.model_count ?? 0,
+                    })
+                  : `${t("admin.ai.providers.testFail")}: ${result.detail ?? ""}`}
               </span>
             ) : null}
           </div>
@@ -376,20 +375,21 @@ export function AiProvidersPage() {
       label: t("admin.ai.providers.kind"),
       type: "select",
       required: true,
-      options: PROVIDER_KINDS.map((k) => ({
+      options: [
+        CREATABLE_KIND,
+        ...(editing && editing.kind !== CREATABLE_KIND ? [editing.kind] : []),
+      ].map((k) => ({
         value: k,
         label: t(`admin.ai.providers.kindLabel.${k}`),
       })),
+      helpText: (v) =>
+        v.kind !== CREATABLE_KIND
+          ? t("admin.ai.providers.kindLegacyHelp")
+          : undefined,
     },
     {
       name: "base_url",
       label: t("admin.ai.providers.baseUrl"),
-      type: "text",
-      required: true,
-    },
-    {
-      name: "default_model",
-      label: t("admin.ai.providers.defaultModel"),
       type: "text",
       required: true,
     },
@@ -402,19 +402,9 @@ export function AiProvidersPage() {
         : t("admin.ai.providers.apiKeyHelp"),
     },
     {
-      name: "price_input_per_1m",
-      label: t("admin.ai.providers.priceInput"),
-      type: "number",
-      helpText: t("admin.ai.providers.priceHelp"),
-    },
-    {
-      name: "price_output_per_1m",
-      label: t("admin.ai.providers.priceOutput"),
-      type: "number",
-    },
-    {
       name: "price_currency",
       label: t("admin.ai.providers.priceCurrency"),
+      helpText: t("admin.ai.providers.priceCurrencyHelp"),
       type: "select",
       options: [
         { value: "", label: t("admin.ai.providers.priceCurrencyNone") },
@@ -439,34 +429,9 @@ export function AiProvidersPage() {
       type: "number",
     },
     {
-      name: "max_tool_rounds",
-      label: t("admin.ai.providers.maxToolRounds"),
-      type: "number",
-      placeholder: settingsQ.data
-        ? String(settingsQ.data.default_max_tool_rounds)
-        : undefined,
-      helpText: t("admin.ai.providers.maxToolRoundsHelp"),
-    },
-    {
-      name: "supports_tools",
-      label: t("admin.ai.providers.flagTools"),
-      type: "checkbox",
-    },
-    {
-      name: "supports_streaming",
-      label: t("admin.ai.providers.flagStreaming"),
-      type: "checkbox",
-    },
-    {
       name: "eu_hosted",
       label: t("admin.ai.providers.flagEu"),
       type: "checkbox",
-    },
-    {
-      name: "supports_vision",
-      label: t("admin.ai.providers.flagVision"),
-      type: "checkbox",
-      helpText: t("admin.ai.providers.flagVisionHelp"),
     },
   ];
 
@@ -491,12 +456,12 @@ export function AiProvidersPage() {
       <p className="text-xs text-muted">
         {t("admin.ai.providers.description")}
       </p>
-      {duplicateError && (
+      {actionError && (
         <p
           className="text-sm text-danger"
-          data-testid="admin-ai-providers-duplicate-error"
+          data-testid="admin-ai-providers-action-error"
         >
-          {duplicateError}
+          {actionError}
         </p>
       )}
 

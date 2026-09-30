@@ -688,35 +688,77 @@ const aiSettings = {
 };
 const aiProviders = [
   {
-    id: 1, name: "OpenAI (GPT-4o)", kind: "openai_compat", base_url: "https://api.openai.com/v1",
-    default_model: "gpt-4o", has_api_key: true, extra_json: null, supports_tools: true,
-    supports_streaming: true, eu_hosted: false, supports_vision: true,
-    price_input_per_1m: 2.5, price_output_per_1m: 10, price_currency: "USD",
+    id: 1, name: "OpenAI", kind: "openai_compat", base_url: "https://api.openai.com/v1",
+    has_api_key: true, extra_json: null, eu_hosted: false, price_currency: "USD",
     budget_cost_day: 25, budget_cost_week: 120, budget_cost_month: 400,
-    max_tool_rounds: null,
     valid_id: 1, create_time: t0, change_time: t0,
   },
   {
-    id: 2, name: "Anthropic (Claude Sonnet)", kind: "anthropic", base_url: "https://api.anthropic.com",
-    default_model: "claude-sonnet-4", has_api_key: true, extra_json: null, supports_tools: true,
-    supports_streaming: true, eu_hosted: false, supports_vision: true,
-    price_input_per_1m: 3, price_output_per_1m: 15, price_currency: "USD",
+    // A legacy row: Anthropic can no longer be created, existing rows still show.
+    id: 2, name: "Anthropic", kind: "anthropic", base_url: "https://api.anthropic.com",
+    has_api_key: true, extra_json: null, eu_hosted: false, price_currency: "USD",
     budget_cost_day: 30, budget_cost_week: 150, budget_cost_month: 500,
-    max_tool_rounds: 16,
     valid_id: 1, create_time: t0, change_time: t0,
   },
   {
-    // EU-hosted, self-hostable — the provider the vision pre-pass is pointed
-    // at, since images cannot be PII-masked the way text can.
-    id: 3, name: "Nebius (Qwen2.5-VL, EU)", kind: "openai_compat",
+    // EU-hosted — the vision profile points here, since images cannot be
+    // PII-masked the way text can.
+    id: 3, name: "Nebius (EU)", kind: "openai_compat",
     base_url: "https://api.studio.nebius.com/v1",
-    default_model: "Qwen/Qwen2.5-VL-72B-Instruct", has_api_key: true, extra_json: null,
-    supports_tools: true, supports_streaming: true, eu_hosted: true, supports_vision: true,
-    price_input_per_1m: 0.25, price_output_per_1m: 0.75, price_currency: "EUR",
+    has_api_key: true, extra_json: null, eu_hosted: true, price_currency: "EUR",
     budget_cost_day: 10, budget_cost_week: 50, budget_cost_month: 150,
-    max_tool_rounds: 8,
     valid_id: 1, create_time: t0, change_time: t0,
   },
+];
+
+// Models: one model at one provider, with the provider's exact API id.
+function llmModel(
+  id: number, providerId: number, modelId: string, displayName: string | null,
+  tools: boolean, vision: boolean, priceIn: number | null, priceOut: number | null,
+  usedIn: string[],
+) {
+  const provider = aiProviders[providerId - 1];
+  return {
+    id, provider_id: providerId, provider_name: provider.name,
+    price_currency: provider.price_currency, model_id: modelId, display_name: displayName,
+    label: displayName ?? modelId, supports_tools: tools, supports_vision: vision,
+    context_tokens: null, max_tool_rounds: null,
+    price_input_per_1m: priceIn, price_output_per_1m: priceOut,
+    valid_id: 1, used_in_profiles: usedIn, create_time: t0, change_time: t0,
+  };
+}
+const aiModels = [
+  llmModel(1, 1, "gpt-4o", "GPT-4o", true, true, 2.5, 10, ["Agent"]),
+  llmModel(2, 2, "claude-sonnet-4", "Claude Sonnet 4", true, true, 3, 15, ["Agent"]),
+  llmModel(3, 3, "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen3 235B", true, false, 0.2, 0.6, ["Schnell"]),
+  llmModel(4, 3, "Qwen/Qwen2.5-VL-72B-Instruct", "Qwen2.5-VL 72B", false, true, 0.25, 0.75, ["Bilder"]),
+];
+function profileEntry(modelId: number) {
+  const m = aiModels[modelId - 1];
+  return {
+    llm_model_id: m.id, model_id: m.model_id, model_label: m.label,
+    provider_id: m.provider_id, provider_name: m.provider_name,
+    supports_tools: m.supports_tools, supports_vision: m.supports_vision, valid_id: m.valid_id,
+  };
+}
+const aiProfiles = [
+  { id: 1, name: "Agent", description: "Hauptmodell mit Ausweichmodell bei Ausfall",
+    timeout_seconds: 60, valid_id: 1, entries: [profileEntry(1), profileEntry(2)],
+    used_by: [{ task: "agent", queue_policy_id: null, queue_name: null }],
+    create_time: t0, change_time: t0 },
+  { id: 2, name: "Bilder", description: null, timeout_seconds: 45, valid_id: 1,
+    entries: [profileEntry(4)],
+    used_by: [{ task: "vision", queue_policy_id: null, queue_name: null }],
+    create_time: t0, change_time: t0 },
+  { id: 3, name: "Schnell", description: "Günstig, für Zusammenfassungen", timeout_seconds: null,
+    valid_id: 1, entries: [profileEntry(3)],
+    used_by: [{ task: "summary", queue_policy_id: null, queue_name: null }],
+    create_time: t0, change_time: t0 },
+];
+const aiTaskDefaults = [
+  { task: "agent", profile_id: 1 }, { task: "final_answer", profile_id: null },
+  { task: "triage", profile_id: null }, { task: "summary", profile_id: 3 },
+  { task: "refine", profile_id: null }, { task: "vision", profile_id: 2 },
 ];
 
 // MCP servers the built-in agent may call as tool sources.
@@ -767,6 +809,7 @@ function queuePolicy(over: Record<string, unknown>) {
     triage_customer_fix_enabled: false, triage_customer_fix_auto_threshold: 100,
     triage_delay_reply: false, triage_llm_provider_id: null, triage_model_override: null,
     final_answer_llm_provider_id: null, final_answer_model_override: null,
+    task_profiles: [],
     valid_id: 1, create_time: t0, change_time: t0,
     ...over,
   };
@@ -1121,10 +1164,17 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/admin/customer-users")) return page(adminCustomerUsers);
   if (p.endsWith("/admin/customer-companies")) return page(adminCustomerCompanies);
   if (p.endsWith("/admin/gdpr/jobs")) return page([]);
-  // Admin — AI subsystem (settings object + provider list); other AI lists
-  // (queue policies, MCP clients) fall through to the empty-array default.
+  // Admin — AI subsystem (settings, providers, models, profiles, task
+  // assignments, MCP clients, queue policies, audit, usage).
   if (p.endsWith("/admin/ai/settings")) return aiSettings;
   if (p.endsWith("/admin/ai/providers") && method === "GET") return aiProviders;
+  if (p.match(/\/admin\/ai\/providers\/\d+\/remote-models$/) && method === "GET") {
+    const id = Number(p.split("/").slice(-2)[0]);
+    return { models: aiModels.filter((m) => m.provider_id === id).map((m) => m.model_id) };
+  }
+  if (p.endsWith("/admin/ai/models") && method === "GET") return aiModels;
+  if (p.endsWith("/admin/ai/profiles") && method === "GET") return aiProfiles;
+  if (p.endsWith("/admin/ai/task-defaults") && method === "GET") return aiTaskDefaults;
   if (p.match(/\/admin\/ai\/mcp-clients\/\d+\/tools$/) && method === "GET") {
     const id = Number(p.split("/").slice(-2)[0]);
     return aiMcpToolPolicies[id] ?? [];

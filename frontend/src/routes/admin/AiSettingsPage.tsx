@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 
 const SETTINGS_KEY = ["admin", "ai", "settings"] as const;
 const PROVIDERS_KEY = ["admin", "ai", "providers"] as const;
+const MODELS_KEY = ["admin", "ai", "models"] as const;
 const MCP_KEY = ["admin", "ai", "mcp-clients"] as const;
 const POLICIES_KEY = ["admin", "ai", "queue-policies"] as const;
 
@@ -28,6 +29,10 @@ export function AiSettingsPage() {
   const providersQ = useQuery({
     queryKey: PROVIDERS_KEY,
     queryFn: ({ signal }) => aiApi.listProviders(signal),
+  });
+  const modelsQ = useQuery({
+    queryKey: MODELS_KEY,
+    queryFn: ({ signal }) => aiApi.listModels(signal),
   });
   const mcpQ = useQuery({
     queryKey: MCP_KEY,
@@ -131,13 +136,21 @@ export function AiSettingsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="rounded-lg border border-hairline bg-surface p-3">
           <p className="text-xs uppercase tracking-wide text-muted">
             {t("admin.ai.settings.statProviders")}
           </p>
           <p className="mt-1 font-mono text-2xl text-ink" data-testid="admin-ai-stat-providers">
             {providersQ.data?.total ?? "—"}
+          </p>
+        </div>
+        <div className="rounded-lg border border-hairline bg-surface p-3">
+          <p className="text-xs uppercase tracking-wide text-muted">
+            {t("admin.ai.settings.statModels")}
+          </p>
+          <p className="mt-1 font-mono text-2xl text-ink" data-testid="admin-ai-stat-models">
+            {modelsQ.data?.length ?? "—"}
           </p>
         </div>
         <div className="rounded-lg border border-hairline bg-surface p-3">

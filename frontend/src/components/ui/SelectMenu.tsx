@@ -19,6 +19,8 @@ export type SelectMenuItem<T extends string | number> = {
   value: T;
   label: string;
   hint?: string;
+  /** Shown but not selectable (say why in `hint`). */
+  disabled?: boolean;
 };
 
 type TriggerArgs = {
@@ -153,6 +155,7 @@ export function SelectMenu<T extends string | number>({
   }, [open, close]);
 
   const select = (item: SelectMenuItem<T>) => {
+    if (item.disabled) return;
     onSelect(item.value);
     close();
   };
@@ -240,13 +243,16 @@ export function SelectMenu<T extends string | number>({
                   type="button"
                   role="option"
                   aria-selected={item.value === value}
+                  aria-disabled={item.disabled || undefined}
+                  disabled={item.disabled}
                   tabIndex={-1}
                   data-testid={panelTestId ? `${panelTestId}-option-${item.value}` : undefined}
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => select(item)}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink/90 transition-colors duration-100 focus:outline-none",
-                    i === highlight && "bg-surface-subtle",
+                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors duration-100 focus:outline-none",
+                    item.disabled ? "cursor-not-allowed text-muted" : "text-ink/90",
+                    i === highlight && !item.disabled && "bg-surface-subtle",
                   )}
                 >
                   <span className="min-w-0 flex-1 truncate">
