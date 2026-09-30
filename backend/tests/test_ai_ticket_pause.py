@@ -46,7 +46,12 @@ from tiqora.domain.settings_store import (
     KEY_AI_TRIAGE_WATERMARK,
     KEY_OPERATION_MODE,
 )
-from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.domain.ticket_write_service import (
+    ArticleIn,
+    add_article,
+    pause_ai_automation,
+    unpause_ai_automation,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
@@ -656,4 +661,100 @@ async def test_set_and_clear_ai_paused_are_idempotent_and_keep_original(
         assert first[1] == 11
     finally:
         await engine.dispose()
+        _cleanup_aw(mariadb_znuny_url, seed, ns)
+
+
+async def test_concurrent_pause_and_unpause_write_one_note_each(
+    mariadb_znuny_url: str,
+) -> None:
+    import asyncio
+
+    ns = 97
+    seed = aw._seed_ticket(mariadb_znuny_url, ns=ns)
+    tid = seed["ticket_id"]
+    engine = create_async_engine(aw._mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def run(fn: Any) -> None:
+        async with factory() as session:
+            await fn(
+                session,
+                ticket_id=tid,
+                user_id=seed["agent_id"],
+                sysconfig=SysConfig(session),
+            )
+            await session.commit()
+
+    try:
+        async with factory() as session:  # the worker already created the row
+            session.add(TiqoraAiTicketState(ticket_id=tid))
+            await session.commit()
+        await asyncio.gather(run(pause_ai_automation), run(pause_ai_automation))
+        notes = _notes(mariadb_znuny_url, tid)
+        assert len([n for n in notes if n[0] == PAUSE_SUBJECT]) == 1
+        await asyncio.gather(run(unpause_ai_automation), run(unpause_ai_automation))
+        notes = _notes(mariadb_znuny_url, tid)
+        assert len([n for n in notes if n[0] == UNPAUSE_SUBJECT]) == 1
+        assert _state_row(mariadb_znuny_url, tid)[0] is None
+    finally:
+        await engine.dispose()
+        _cleanup_aw(mariadb_znuny_url, seed, ns)
+
+
+def _deferred(sync_url: str, ticket_id: int) -> int | None:
+    engine = create_engine(sync_url)
+    with engine.connect() as conn:
+        v = conn.execute(
+            text("SELECT reply_deferred_article_id FROM tiqora_ai_triage WHERE ticket_id = :t"),
+            {"t": ticket_id},
+        ).scalar()
+    engine.dispose()
+    return None if v is None else int(v)
+
+
+async def test_pause_drops_parked_triage_reply_and_paused_ticket_parks_none(
+    mariadb_znuny_url: str,
+) -> None:
+    """Unpause must never answer an article that arrived before/during the pause
+    via the triage deferred-reply replay."""
+    from tiqora.ai.auto_worker import _defer_for_open_triage
+
+    ns = 98
+    seed = aw._seed_ticket(mariadb_znuny_url, ns=ns)
+    tid = seed["ticket_id"]
+    article_id = aw._add_article(
+        mariadb_znuny_url, ticket_id=tid, sender_type="customer", body="Hallo?"
+    )
+    aw._insert_open_triage(
+        mariadb_znuny_url, ticket_id=tid, queue_id=seed["queue_id"], article_id=article_id
+    )
+    engine = create_async_engine(aw._mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        # A reply parked before the pause is dropped by pausing.
+        async with factory() as session:
+            assert await _defer_for_open_triage(session, tid, article_id) is True
+        assert _deferred(mariadb_znuny_url, tid) == article_id
+        async with factory() as session:
+            assert await handoff.set_ai_paused(session, tid, seed["agent_id"]) is True
+            await session.commit()
+        assert _deferred(mariadb_znuny_url, tid) is None
+
+        # While paused, nothing new is parked.
+        async with factory() as session:
+            assert await _defer_for_open_triage(session, tid, article_id + 1) is False
+        assert _deferred(mariadb_znuny_url, tid) is None
+
+        # Return values report whether state changed.
+        async with factory() as session:
+            assert await handoff.set_ai_paused(session, tid, seed["agent_id"]) is False
+            assert await handoff.clear_ai_paused(session, tid) is True
+            assert await handoff.clear_ai_paused(session, tid) is False
+            await session.commit()
+    finally:
+        await engine.dispose()
+        e = create_engine(mariadb_znuny_url)
+        with e.begin() as conn:
+            conn.execute(text("DELETE FROM tiqora_ai_triage WHERE ticket_id = :t"), {"t": tid})
+        e.dispose()
         _cleanup_aw(mariadb_znuny_url, seed, ns)

@@ -35,7 +35,6 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai.handoff import clear_ai_escalated, clear_ai_paused, set_ai_paused
-from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.permissions.engine import PermissionEngine
@@ -963,11 +962,11 @@ async def pause_ai_automation(
     Writes an *internal* note for the audit trail. Already paused: no-op
     (no second note).
     """
-    state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
-    if state is not None and state.ai_paused_at is not None:
+    # State first: if it fails, no orphan note is left behind. The note is
+    # written only when this call really changed the state, so two concurrent
+    # requests produce one note.
+    if not await set_ai_paused(session, ticket_id, user_id):
         return
-    # State first: if it fails, no orphan note is left behind.
-    await set_ai_paused(session, ticket_id, user_id)
     await add_article(
         session,
         ticket_id=ticket_id,
@@ -998,11 +997,9 @@ async def unpause_ai_automation(
     Customer messages that arrived during the pause are not processed
     retroactively (their outbox events were consumed); the note says so.
     """
-    state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
-    if state is None or state.ai_paused_at is None:
+    # State first (see pause_ai_automation); note only if this call lifted it.
+    if not await clear_ai_paused(session, ticket_id):
         return
-    # State first: if it fails, no orphan note is left behind.
-    await clear_ai_paused(session, ticket_id)
     await add_article(
         session,
         ticket_id=ticket_id,
