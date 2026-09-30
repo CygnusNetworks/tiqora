@@ -1065,7 +1065,11 @@
     "submitSend": "Δημιουργία & αποστολή",
     "sendError": "Δεν ήταν δυνατή η αποστολή του email. Το εισιτήριο έχει ήδη δημιουργηθεί — δοκιμάστε ξανά να στείλετε την απάντηση από εκεί.",
     "goToTicket": "Πήγαινε στο εισιτήριο",
-    "note": "Σημείωμα κλήσης"
+    "note": "Σημείωμα κλήσης",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Συνδέθηκε ζωντανά",

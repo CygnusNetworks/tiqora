@@ -1065,7 +1065,11 @@
     "submitSend": "Utwórz i wyślij",
     "sendError": "Nie udało się wysłać e-maila. Ticket został już utworzony — spróbuj ponownie wysłać odpowiedź stamtąd.",
     "goToTicket": "Przejdź do ticketu",
-    "note": "Notatka z rozmowy"
+    "note": "Notatka z rozmowy",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Połączono na żywo",

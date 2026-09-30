@@ -1065,7 +1065,11 @@
     "submitSend": "Создать и отправить",
     "sendError": "Не удалось отправить электронное письмо. Заявка уже создана — попробуйте отправить ответ оттуда еще раз.",
     "goToTicket": "Перейти к тикету",
-    "note": "Примечание о вызове"
+    "note": "Примечание о вызове",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Подключено в прямом эфире",

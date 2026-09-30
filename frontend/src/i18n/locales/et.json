@@ -1065,7 +1065,11 @@
     "submitSend": "Loo ja saada",
     "sendError": "Meili ei saanud saata. Pilet on juba loodud – proovige sealt vastus uuesti saata.",
     "goToTicket": "Mine pileti juurde",
-    "note": "Kõnemärkus"
+    "note": "Kõnemärkus",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Ühendatud otse",

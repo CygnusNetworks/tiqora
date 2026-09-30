@@ -1065,7 +1065,11 @@
     "submitSend": "Aanmaken en verzenden",
     "sendError": "De e-mail kon niet worden verzonden. Het ticket is al aangemaakt. Probeer het antwoord vanaf daar opnieuw.",
     "goToTicket": "Ga naar ticket",
-    "note": "Gespreksnotitie"
+    "note": "Gespreksnotitie",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Live verbonden",

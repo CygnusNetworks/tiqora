@@ -1065,7 +1065,11 @@
     "submitSend": "Створити та відправити",
     "sendError": "Не вдалося надіслати електронний лист. Квиток уже створено — повторіть спробу надіслати відповідь звідти.",
     "goToTicket": "Перейти до квитка",
-    "note": "Записка про виклик"
+    "note": "Записка про виклик",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Підключено наживо",

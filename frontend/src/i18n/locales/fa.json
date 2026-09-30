@@ -1065,7 +1065,11 @@
     "submitSend": "ایجاد و ارسال کنید",
     "sendError": "ایمیل ارسال نشد. بلیط قبلاً ایجاد شده است - لطفاً دوباره سعی کنید پاسخ را از آنجا ارسال کنید.",
     "goToTicket": "برو به بلیط",
-    "note": "یادداشت تماس"
+    "note": "یادداشت تماس",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "به صورت زنده متصل شد",

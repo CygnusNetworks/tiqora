@@ -1065,7 +1065,11 @@
     "submitSend": "작성 및 보내기",
     "sendError": "이메일을 보낼 수 없습니다. 티켓이 이미 생성되었습니다. 거기에서 답장을 다시 보내보세요.",
     "goToTicket": "티켓으로 이동",
-    "note": "통화 메모"
+    "note": "통화 메모",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "라이브로 연결됨",

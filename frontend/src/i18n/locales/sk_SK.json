@@ -1065,7 +1065,11 @@
     "submitSend": "Vytvoriť a odoslať",
     "sendError": "E-mail sa nepodarilo odoslať. Lístok už bol vytvorený – skúste odtiaľ odoslať odpoveď znova.",
     "goToTicket": "Prejsť na lístok",
-    "note": "Poznámka k hovoru"
+    "note": "Poznámka k hovoru",
+    "propsLabel": "Ticket details",
+    "queueSourceCustomer": "like {{name}}'s last ticket",
+    "queueSourceCompany": "like the company's last ticket",
+    "submitClose": "Log and close"
   },
   "connection": {
     "live": "Pripojené naživo",
