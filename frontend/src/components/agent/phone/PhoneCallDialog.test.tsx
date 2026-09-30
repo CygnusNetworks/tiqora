@@ -7,12 +7,13 @@ import { ApiError, type TicketDetail } from "@/lib/api";
 import { loadPhoneDraft, savePhoneDraft } from "@/lib/phoneCall";
 import { PhoneCallDialog } from "./PhoneCallDialog";
 
-const { listReferenceStates, logPhoneCall, screenDynamicFields, refineAvailability } = vi.hoisted(
+const { listReferenceStates, logPhoneCall, screenDynamicFields, refineAvailability, refine } = vi.hoisted(
   () => ({
     listReferenceStates: vi.fn(),
     logPhoneCall: vi.fn(),
     screenDynamicFields: vi.fn(),
     refineAvailability: vi.fn(),
+    refine: vi.fn(),
   }),
 );
 
@@ -28,7 +29,7 @@ vi.mock("@/lib/phoneApi", async () => {
 
 vi.mock("@/lib/refineApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/refineApi")>("@/lib/refineApi");
-  return { ...actual, refineApi: { refine: vi.fn(), refineAvailability } };
+  return { ...actual, refineApi: { refine, refineAvailability } };
 });
 
 const STATES = [
@@ -235,5 +236,41 @@ describe("PhoneCallDialog", () => {
     fireEvent.click(screen.getByTestId("phone-save"));
     await waitFor(() => expect(logPhoneCall).toHaveBeenCalled());
     expect(logPhoneCall.mock.calls[0][1].dynamic_fields).toEqual({ Area: ["tv"] });
+  });
+
+  async function openReview() {
+    refine.mockReset().mockResolvedValue({ sections: [{ id: 0, text: "EINS zwei DREI" }] });
+    renderDialog();
+    fireEvent.change(screen.getByTestId("phone-body"), { target: { value: "eins zwei drei" } });
+    await waitFor(() => expect(screen.getByTestId("phone-refine-button")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("phone-refine-button"));
+    await screen.findByTestId("refine-review");
+    fireEvent.click(screen.getAllByTestId("refine-review-change")[0]);
+  }
+
+  it("saving while the review is open sends the accepted selection", async () => {
+    await openReview();
+    fireEvent.click(screen.getByTestId("phone-save"));
+    await waitFor(() => expect(logPhoneCall).toHaveBeenCalled());
+    expect(logPhoneCall.mock.calls[0][1].body).toBe("eins zwei DREI");
+  });
+
+  it("the draft keeps the selection while the review is open", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+    refine.mockReset().mockResolvedValue({ sections: [{ id: 0, text: "EINS zwei DREI" }] });
+    renderDialog();
+    fireEvent.change(screen.getByTestId("phone-body"), { target: { value: "eins zwei drei" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.click(screen.getByTestId("phone-refine-button"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    fireEvent.click(screen.getAllByTestId("refine-review-change")[0]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(loadPhoneDraft(7)?.body).toBe("eins zwei DREI");
   });
 });
