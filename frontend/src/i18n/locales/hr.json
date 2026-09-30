@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Nema kupaca.",
     "from": "Od",
     "directionLabel": "Smjer",
-    "directionIn": "Dolazni",
-    "directionOut": "Odlazni",
     "submitSend": "Izradi i pošalji",
     "sendError": "Nije moguće poslati e-poštu. Title je već kreiran — pokušajte ponovno poslati odgovor od tamo.",
     "goToTicket": "Idi na kartu",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

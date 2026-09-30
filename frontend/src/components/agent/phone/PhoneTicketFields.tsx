@@ -112,7 +112,7 @@ export function PhoneTicketFields({
       <button
         type="button"
         aria-expanded={open}
-        aria-controls="new-ticket-more-fields"
+        aria-controls={open ? "new-ticket-more-fields" : undefined}
         data-testid="new-ticket-more-toggle"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 rounded py-1 text-left text-[12.5px] text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"

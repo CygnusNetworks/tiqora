@@ -1060,8 +1060,6 @@
     "noCustomerResults": "顧客が見つかりませんでした。",
     "from": "から",
     "directionLabel": "方向",
-    "directionIn": "インバウンド",
-    "directionOut": "アウトバウンド",
     "submitSend": "作成して送信",
     "sendError": "メールを送信できませんでした。チケットはすでに作成されています。そこから返信を再送信してください。",
     "goToTicket": "チケットへ行く",
@@ -3572,7 +3570,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

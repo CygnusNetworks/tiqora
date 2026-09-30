@@ -125,6 +125,8 @@ export type NewTicketSearch = {
   call_ended?: number;
   /** CTI popup: the agent who answered the call — the default owner. */
   owner_id?: number;
+  /** Set by the CTI popup: the direction is a fact of the call (badge). */
+  from_call?: boolean;
 };
 
 export function NewTicketPage() {
@@ -198,8 +200,10 @@ export function NewTicketPage() {
     ...EMPTY_PHONE_TICKET_FIELDS,
     ownerId: search.owner_id ?? null,
   }));
-  // Opened from the call popup: the call's direction is a fact, not a choice.
-  const fromCall = search.call_started !== undefined || search.call_ended !== undefined;
+  // Opened from the call popup (even while still ringing): the call's
+  // direction is a fact, not a choice. `direction` alone is ambiguous —
+  // click-to-call from the customer page sets it too.
+  const fromCall = search.from_call === true;
   const [callTimer] = useState(() => timerFromCall(search.call_started, search.call_ended));
   const timer = useCallTimer(callTimer ?? undefined);
   const attachments = useChatAttachments();
@@ -299,13 +303,14 @@ export function NewTicketPage() {
   }, [priorities, priority]);
   // Also re-seeds when the ticket type changes and the chosen state is not
   // offered for the other type (e.g. "closed" is phone-only).
-  const callEnded = search.call_ended !== undefined;
+  // Answered and hung up; a missed call (ended, never answered) keeps open.
+  const callDone = search.call_started !== undefined && search.call_ended !== undefined;
   useEffect(() => {
     if (states.length === 0) return;
     if (state !== "" && states.some((s) => s.id === state)) return;
-    const closed = ticketType === "phone" && callEnded ? closedSuccessfulId(states) : undefined;
+    const closed = ticketType === "phone" && callDone ? closedSuccessfulId(states) : undefined;
     setState(closed ?? defaultId(states, ["open", "new"]) ?? states[0].id);
-  }, [states, state, ticketType, callEnded]);
+  }, [states, state, ticketType, callDone]);
 
   const presetCustomer = presetCustomerQ.data;
   useEffect(() => {
@@ -606,7 +611,7 @@ export function NewTicketPage() {
               <PhoneCallStrip
                 direction={direction}
                 onDirectionChange={setDirection}
-                fixed={fromCall && search.direction !== undefined}
+                fixed={fromCall}
                 number={callerNumber}
                 answeredAt={search.call_started}
                 endedAt={search.call_ended}
@@ -868,7 +873,8 @@ export function NewTicketPage() {
             {ticketType === "phone" ? (
               <div className="block">
                 <label
-                  htmlFor="new-ticket-note"
+                  // Only while the textarea exists (not during a review).
+                  htmlFor={refineReview.review ? undefined : "new-ticket-note"}
                   className="mb-1 block text-[12px] font-medium text-muted"
                 >
                   {t("newTicket.note")}

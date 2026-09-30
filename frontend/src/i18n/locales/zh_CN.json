@@ -1060,8 +1060,6 @@
     "noCustomerResults": "没有找到客户。",
     "from": "来自",
     "directionLabel": "方向",
-    "directionIn": "入境",
-    "directionOut": "出境",
     "submitSend": "创建并发送",
     "sendError": "电子邮件无法发送。工单已创建 - 请重试从那里发送回复。",
     "goToTicket": "前往购工单处",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

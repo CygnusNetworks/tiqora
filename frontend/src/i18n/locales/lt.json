@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Klientų nerasta.",
     "from": "Iš",
     "directionLabel": "Kryptis",
-    "directionIn": "Įeinantis",
-    "directionOut": "Išeinantis",
     "submitSend": "Sukurti ir siųsti",
     "sendError": "El. laiško išsiųsti nepavyko. Bilietas jau sukurtas – pabandykite dar kartą išsiųsti atsakymą iš ten.",
     "goToTicket": "Eiti į bilietą",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

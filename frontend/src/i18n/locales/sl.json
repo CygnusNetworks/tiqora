@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Ni strank.",
     "from": "Od",
     "directionLabel": "Smer",
-    "directionIn": "Dohodni",
-    "directionOut": "Odhodni",
     "submitSend": "Ustvari in pošlji",
     "sendError": "E-pošte ni bilo mogoče poslati. Vstopnica je že ustvarjena — poskusite ponovno poslati odgovor od tam.",
     "goToTicket": "Pojdi na vstopnico",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

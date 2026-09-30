@@ -1060,8 +1060,6 @@
     "noCustomerResults": "לא נמצאו לקוחות.",
     "from": "מ",
     "directionLabel": "כיוון",
-    "directionIn": "נכנסת",
-    "directionOut": "יוצא",
     "submitSend": "צור ושלח",
     "sendError": "לא ניתן היה לשלוח את המייל. הכרטיס כבר נוצר - אנא נסה שוב לשלוח את התשובה משם.",
     "goToTicket": "לך לכרטיס",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

@@ -83,6 +83,7 @@ function CallCard({ call, now }: { call: ActiveCall; now: number }) {
       to: "/agent/tickets/new",
       search: {
         type: "phone",
+        from_call: true,
         direction: call.direction,
         number: number || undefined,
         customer: single?.login,

@@ -1060,8 +1060,6 @@
     "noCustomerResults": "مشتری پیدا نشد",
     "from": "از",
     "directionLabel": "جهت",
-    "directionIn": "ورودی",
-    "directionOut": "خروجی",
     "submitSend": "ایجاد و ارسال کنید",
     "sendError": "ایمیل ارسال نشد. بلیط قبلاً ایجاد شده است - لطفاً دوباره سعی کنید پاسخ را از آنجا ارسال کنید.",
     "goToTicket": "برو به بلیط",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

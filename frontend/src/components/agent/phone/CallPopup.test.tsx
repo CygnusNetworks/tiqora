@@ -145,6 +145,7 @@ describe("CallPopup", () => {
       to: "/agent/tickets/new",
       search: {
         type: "phone",
+        from_call: true,
         direction: "inbound",
         number: "+492285550101",
         customer: "bob",
@@ -159,7 +160,7 @@ describe("CallPopup", () => {
     renderPopup();
     push("answered", call({ state: "answered", answered_at: iso(Date.now()), answered_by_user_id: null }));
     fireEvent.click(await screen.findByTestId("call-card-new-ticket"));
-    expect(navigate.mock.calls.at(-1)?.[0].search).not.toHaveProperty("owner_id", expect.anything());
+    expect(navigate.mock.calls.at(-1)?.[0].search.owner_id).toBeUndefined();
   });
 
   it("restores active calls after a reload", async () => {
