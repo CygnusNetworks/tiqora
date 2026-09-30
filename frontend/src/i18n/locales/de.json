@@ -1069,7 +1069,22 @@
     "propsLabel": "Ticketdaten",
     "queueSourceCustomer": "wie letztes Ticket von {{name}}",
     "queueSourceCompany": "wie letztes Ticket der Firma",
-    "submitClose": "Erfassen und schließen"
+    "submitClose": "Erfassen und schließen",
+    "ownerSourceCall": "hat angenommen",
+    "moreFields": "Weitere Felder",
+    "moreFieldsCount_one": "{{count}} Zusatzfeld",
+    "moreFieldsCount_other": "{{count}} Zusatzfelder",
+    "attachFile": "Datei",
+    "call": {
+      "badgeIn": "Eingehender Anruf",
+      "badgeOut": "Ausgehender Anruf",
+      "toggleIn": "Anruf kam rein",
+      "toggleOut": "Ich habe angerufen",
+      "autoReplyYes": "· Kunde bekommt die Eingangsbestätigung",
+      "autoReplyNo": "· keine Eingangsbestätigung",
+      "answeredAt": "{{time}} angenommen",
+      "endedAt": "beendet {{time}}"
+    }
   },
   "connection": {
     "live": "Live verbunden",
@@ -1380,7 +1395,8 @@
           "tabPolicies": "Richtlinien",
           "tabUsage": "Nutzung",
           "agentProfile": "Profil: {{name}}",
-          "noAgentProfile": "Kein Modellprofil ({{fallback}})"
+          "noAgentProfile": "Kein Modellprofil ({{fallback}})",
+          "agentProfileError": "Modellprofile konnten nicht geladen werden"
         },
         "tab": {
           "basics": "Basis",
