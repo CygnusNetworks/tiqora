@@ -759,7 +759,25 @@
       "error": "Refining failed. Your text is unchanged.",
       "nothingToRefineShort": "nothing of your own",
       "toneMenuLabel": "Choose tone",
-      "buttonShort": "Refine"
+      "buttonShort": "Refine",
+      "review": {
+        "title": "✦ Refined · {{tone}}",
+        "count_one": "{{count}} change",
+        "count_other": "{{count}} changes",
+        "countPartial": "{{on}} of {{total}} changes active",
+        "inline": "Inline",
+        "side": "Side by side",
+        "before": "Before",
+        "after": "After",
+        "prev": "Previous change",
+        "next": "Next change",
+        "discard": "Discard",
+        "accept": "Apply",
+        "toggleHint": "Click to undo or restore this change",
+        "noChanges": "No changes suggested",
+        "applied": "Refined ({{tone}}) · {{on}} of {{total}} changes applied",
+        "show": "Show changes"
+      }
     },
     "nav": {
       "label": "Origin",
