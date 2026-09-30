@@ -51,6 +51,7 @@ vi.mock("@/lib/aiApi", () => ({
     getSettings: (...args: unknown[]) => getSettings(...args),
     putSettings: (...args: unknown[]) => putSettings(...args),
     listProviders: (...args: unknown[]) => listProviders(...args),
+    listModels: () => Promise.resolve([{ id: 1 }, { id: 2 }]),
     listMcpClients: (...args: unknown[]) => listMcpClients(...args),
     listQueuePolicies: (...args: unknown[]) => listQueuePolicies(...args),
     listAcl: (...args: unknown[]) => listAcl(...args),
@@ -119,6 +120,9 @@ describe("AiSettingsPage", () => {
     expect(screen.queryByTestId("admin-ai-parallel-banner")).not.toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByTestId("admin-ai-stat-providers").textContent).toBe("1");
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("admin-ai-stat-models").textContent).toBe("2");
     });
     expect(screen.getByTestId("admin-ai-stat-policies").textContent).toBe("1");
   });

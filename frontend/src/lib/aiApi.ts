@@ -11,10 +11,10 @@
  * back to `api.adminAi*` without changing call sites here.
  */
 import { api } from "./api";
-import type { AdminPage } from "@tiqora/api-client";
+import type { AdminPage, Schemas } from "@tiqora/api-client";
 
 export type OperationMode = "parallel" | "tiqora_primary";
-export type ProviderKind = "openai_compat" | "anthropic";
+export type ProviderKind = Schemas["LlmProviderOut"]["kind"];
 export type McpTransport = "streamable_http";
 export type Autonomy = "off" | "clarify_only" | "full";
 export type IdentityMode = "ticket_customer_id" | "clarify_schema" | "off";
@@ -39,62 +39,29 @@ export type AiSettingsUpdate = Partial<
   Omit<AiSettingsOut, "default_max_tool_rounds">
 >;
 
-export type LlmProviderOut = {
-  id: number;
-  name: string;
-  kind: ProviderKind;
-  base_url: string;
-  default_model: string;
-  has_api_key: boolean;
-  extra_json: string | null;
-  supports_tools: boolean;
-  supports_streaming: boolean;
-  eu_hosted: boolean;
-  supports_vision: boolean;
-  price_input_per_1m: number | null;
-  price_output_per_1m: number | null;
-  price_currency: string | null;
-  budget_cost_day: number | null;
-  budget_cost_week: number | null;
-  budget_cost_month: number | null;
-  /** null = the built-in default applies. */
-  max_tool_rounds: number | null;
-  valid_id: number;
-  create_time: string;
-  change_time: string;
-};
+// Provider, model, profile and task-assignment shapes come straight from the
+// generated OpenAPI schema (packages/api-client), so a backend change shows up
+// as a type error here instead of a silent mismatch.
+export type LlmProviderOut = Schemas["LlmProviderOut"];
+export type LlmProviderCreate = Schemas["LlmProviderCreate"];
+export type LlmProviderUpdate = Schemas["LlmProviderUpdate"];
+/** Connection test of a provider: lists its models (`model_count`); `detail`
+ * carries the shortened error when `ok` is false. */
+export type LlmProviderTestOut = Schemas["LlmProviderTestOut"];
+export type RemoteModelsOut = Schemas["RemoteModelsOut"];
 
-export type LlmProviderCreate = {
-  name: string;
-  kind?: ProviderKind;
-  base_url: string;
-  default_model: string;
-  api_key?: string | null;
-  extra_json?: string | null;
-  supports_tools?: boolean;
-  supports_streaming?: boolean;
-  eu_hosted?: boolean;
-  supports_vision?: boolean;
-  price_input_per_1m?: number | null;
-  price_output_per_1m?: number | null;
-  price_currency?: string | null;
-  budget_cost_day?: number | null;
-  budget_cost_week?: number | null;
-  budget_cost_month?: number | null;
-  /** Tool rounds for this model; 0 or omitted means the built-in default. */
-  max_tool_rounds?: number | null;
-};
+export type LlmModelOut = Schemas["LlmModelOut"];
+export type LlmModelIn = Schemas["LlmModelIn"];
+export type LlmModelTestOut = Schemas["LlmModelTestOut"];
 
-export type LlmProviderUpdate = Partial<LlmProviderCreate> & {
-  valid_id?: number;
-};
-
-export type LlmProviderTestOut = {
-  ok: boolean;
-  model: string | null;
-  tool_calling_ok: boolean;
-  error: string | null;
-};
+export type LlmProfileOut = Schemas["LlmProfileOut"];
+export type LlmProfileIn = Schemas["LlmProfileIn"];
+export type LlmProfileEntryOut = Schemas["LlmProfileEntryOut"];
+/** A direct assignment of a profile: global default when `queue_policy_id` is
+ * null, else a queue override. Inherited uses are not listed. */
+export type LlmProfileUseOut = Schemas["LlmProfileUseOut"];
+/** `profile_id: null` = "Kein eigenes Profil" (the task's fallback). */
+export type AiTaskProfileItem = Schemas["AiTaskProfileItem"];
 
 export type McpClientOut = {
   id: number;
@@ -201,6 +168,9 @@ export type AiQueuePolicyOut = {
   triage_model_override: string | null;
   final_answer_llm_provider_id: number | null;
   final_answer_model_override: string | null;
+  /** This queue's own task assignments only; a task not listed inherits the
+   * global default. */
+  task_profiles: AiTaskProfileItem[];
   valid_id: number;
   create_time: string;
   change_time: string;
@@ -502,6 +472,83 @@ export const aiApi = {
       {
         signal,
       },
+    );
+  },
+
+  listProviderRemoteModels(id: number | string, signal?: AbortSignal) {
+    return api.request<RemoteModelsOut>(
+      "GET",
+      `/api/v1/admin/ai/providers/${id}/remote-models`,
+      { signal },
+    );
+  },
+
+  listModels(signal?: AbortSignal) {
+    return api.request<LlmModelOut[]>("GET", "/api/v1/admin/ai/models", {
+      signal,
+    });
+  },
+  createModel(body: LlmModelIn, signal?: AbortSignal) {
+    return api.request<LlmModelOut>("POST", "/api/v1/admin/ai/models", {
+      body,
+      signal,
+    });
+  },
+  updateModel(id: number, body: LlmModelIn, signal?: AbortSignal) {
+    return api.request<LlmModelOut>("PUT", `/api/v1/admin/ai/models/${id}`, {
+      body,
+      signal,
+    });
+  },
+  deleteModel(id: number, signal?: AbortSignal) {
+    return api.request<void>("DELETE", `/api/v1/admin/ai/models/${id}`, {
+      signal,
+    });
+  },
+  testModel(id: number, signal?: AbortSignal) {
+    return api.request<LlmModelTestOut>(
+      "POST",
+      `/api/v1/admin/ai/models/${id}/test`,
+      { signal },
+    );
+  },
+
+  listProfiles(signal?: AbortSignal) {
+    return api.request<LlmProfileOut[]>("GET", "/api/v1/admin/ai/profiles", {
+      signal,
+    });
+  },
+  createProfile(body: LlmProfileIn, signal?: AbortSignal) {
+    return api.request<LlmProfileOut>("POST", "/api/v1/admin/ai/profiles", {
+      body,
+      signal,
+    });
+  },
+  updateProfile(id: number, body: LlmProfileIn, signal?: AbortSignal) {
+    return api.request<LlmProfileOut>(
+      "PUT",
+      `/api/v1/admin/ai/profiles/${id}`,
+      { body, signal },
+    );
+  },
+  deleteProfile(id: number, signal?: AbortSignal) {
+    return api.request<void>("DELETE", `/api/v1/admin/ai/profiles/${id}`, {
+      signal,
+    });
+  },
+
+  getTaskDefaults(signal?: AbortSignal) {
+    return api.request<AiTaskProfileItem[]>(
+      "GET",
+      "/api/v1/admin/ai/task-defaults",
+      { signal },
+    );
+  },
+  putTaskDefaults(body: AiTaskProfileItem[], signal?: AbortSignal) {
+    return api.request<AiTaskProfileItem[]>(
+      "PUT",
+      "/api/v1/admin/ai/task-defaults",
+      { body, signal },
     );
   },
 

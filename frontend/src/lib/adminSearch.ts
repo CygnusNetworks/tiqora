@@ -428,7 +428,15 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     group: "ai",
     nameKey: "admin.nav.aiProviders",
     descriptionKey: "admin.pageDescriptions.aiProviders",
-    keywords: ["ki", "llm", "provider", "openai", "anthropic", "modell"],
+    keywords: ["ki", "llm", "provider", "openai", "zugang", "api-key", "budget"],
+  },
+  {
+    slug: "ai-models",
+    route: "/admin/ai/models",
+    group: "ai",
+    nameKey: "admin.nav.aiModels",
+    descriptionKey: "admin.pageDescriptions.aiModels",
+    keywords: ["ki", "llm", "modell", "profil", "aufgabe", "fallback", "ausweichmodell", "vision"],
   },
   {
     slug: "ai-mcp",
