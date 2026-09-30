@@ -94,7 +94,6 @@ async def test_provider_crud_never_exposes_api_key(mariadb_znuny_url: str) -> No
                     name="nebius",
                     kind="openai_compat",
                     base_url="https://api.studio.nebius.ai/v1",
-                    default_model="meta-llama/Llama-3.3-70B",
                     api_key="sk-super-secret",
                     eu_hosted=True,
                 ),
@@ -119,9 +118,12 @@ async def test_provider_crud_never_exposes_api_key(mariadb_znuny_url: str) -> No
             assert listed[0].name == "nebius"
 
             updated = await admin_ai.update_llm_provider(
-                created.id, LlmProviderUpdate(default_model="new-model"), _root_user(), session
+                created.id,
+                LlmProviderUpdate(base_url="https://api.example.org/v1"),
+                _root_user(),
+                session,
             )
-            assert updated.default_model == "new-model"
+            assert updated.base_url == "https://api.example.org/v1"
             assert updated.has_api_key is True  # unchanged, key preserved
 
             await admin_ai.delete_llm_provider(created.id, _root_user(), session)
@@ -129,7 +131,7 @@ async def test_provider_crud_never_exposes_api_key(mariadb_znuny_url: str) -> No
 
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.update_llm_provider(
-                    999_999, LlmProviderUpdate(default_model="x"), _root_user(), session
+                    999_999, LlmProviderUpdate(name="x"), _root_user(), session
                 )
             assert exc_info.value.status_code == 404
     finally:
@@ -152,10 +154,8 @@ async def test_provider_duplicate_copies_api_key_and_suffixes_name(
                     name="nebius",
                     kind="openai_compat",
                     base_url="https://api.studio.nebius.ai/v1",
-                    default_model="meta-llama/Llama-3.3-70B",
                     api_key="sk-super-secret",
                     eu_hosted=True,
-                    supports_vision=True,
                 ),
                 _root_user(),
                 session,
@@ -166,9 +166,7 @@ async def test_provider_duplicate_copies_api_key_and_suffixes_name(
             assert copy1.name == "nebius (Kopie)"
             assert copy1.has_api_key is True
             assert copy1.base_url == original.base_url
-            assert copy1.default_model == original.default_model
             assert copy1.eu_hosted is True
-            assert copy1.supports_vision is True
 
             # Ciphertext is byte-for-byte the same row (never re-entered/re-encrypted
             # from plaintext) but decrypts to the same secret.
@@ -214,11 +212,8 @@ async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: s
                 name="p1",
                 kind="openai_compat",
                 base_url="https://example.com/v1",
-                default_model="test-model",
                 api_key="secret",
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
                 eu_hosted=False,
             )
 
@@ -236,7 +231,7 @@ async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: s
 
             client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
             result = await ai_providers.test_provider_connection(
-                row, settings=settings, client=client
+                row, model="test-model", settings=settings, client=client
             )
             await client.aclose()
             assert result.ok is True
@@ -248,7 +243,7 @@ async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: s
 
             client2 = httpx.AsyncClient(transport=httpx.MockTransport(error_handler))
             result2 = await ai_providers.test_provider_connection(
-                row, settings=settings, client=client2
+                row, model="test-model", settings=settings, client=client2
             )
             await client2.aclose()
             assert result2.ok is False
@@ -270,26 +265,19 @@ async def test_provider_price_fields_roundtrip_and_validation(mariadb_znuny_url:
                     name="priced-89501",
                     kind="openai_compat",
                     base_url="https://api.example/v1",
-                    default_model="model-a",
-                    price_input_per_1m=1.5,
-                    price_output_per_1m=6.0,
                     price_currency="USD",
                 ),
                 _root_user(),
                 session,
             )
-            assert created.price_input_per_1m == 1.5
-            assert created.price_output_per_1m == 6.0
             assert created.price_currency == "USD"
 
             updated = await admin_ai.update_llm_provider(
                 created.id,
-                LlmProviderUpdate(price_input_per_1m=2.0, price_currency="EUR"),
+                LlmProviderUpdate(price_currency="EUR"),
                 _root_user(),
                 session,
             )
-            assert updated.price_input_per_1m == 2.0
-            assert updated.price_output_per_1m == 6.0  # untouched
             assert updated.price_currency == "EUR"
 
             # A provider without any pricing configured still round-trips as None.
@@ -298,13 +286,10 @@ async def test_provider_price_fields_roundtrip_and_validation(mariadb_znuny_url:
                     name="unpriced-89502",
                     kind="openai_compat",
                     base_url="https://api.example/v1",
-                    default_model="model-b",
                 ),
                 _root_user(),
                 session,
             )
-            assert bare.price_input_per_1m is None
-            assert bare.price_output_per_1m is None
             assert bare.price_currency is None
 
             with pytest.raises(HTTPException) as exc_info:
@@ -313,22 +298,7 @@ async def test_provider_price_fields_roundtrip_and_validation(mariadb_znuny_url:
                         name="bad-currency-89503",
                         kind="openai_compat",
                         base_url="https://api.example/v1",
-                        default_model="model-c",
                         price_currency="usd",
-                    ),
-                    _root_user(),
-                    session,
-                )
-            assert exc_info.value.status_code == 422
-
-            with pytest.raises(HTTPException) as exc_info:
-                await admin_ai.create_llm_provider(
-                    LlmProviderCreate(
-                        name="negative-price-89504",
-                        kind="openai_compat",
-                        base_url="https://api.example/v1",
-                        default_model="model-d",
-                        price_input_per_1m=-1.0,
                     ),
                     _root_user(),
                     session,
@@ -359,7 +329,6 @@ async def test_provider_budget_fields_roundtrip_and_validation(mariadb_znuny_url
                     name="budgeted-89601",
                     kind="openai_compat",
                     base_url="https://api.example/v1",
-                    default_model="model-a",
                     budget_cost_day=5.0,
                     budget_cost_week=25.0,
                     budget_cost_month=90.0,
@@ -387,7 +356,6 @@ async def test_provider_budget_fields_roundtrip_and_validation(mariadb_znuny_url
                     name="unbudgeted-89602",
                     kind="openai_compat",
                     base_url="https://api.example/v1",
-                    default_model="model-b",
                 ),
                 _root_user(),
                 session,
@@ -402,7 +370,6 @@ async def test_provider_budget_fields_roundtrip_and_validation(mariadb_znuny_url
                         name="negative-budget-89603",
                         kind="openai_compat",
                         base_url="https://api.example/v1",
-                        default_model="model-c",
                         budget_cost_day=-1.0,
                     ),
                     _root_user(),
@@ -601,26 +568,11 @@ async def test_queue_policy_gate_enforcement_409_then_ok_then_regression(
 ) -> None:
     _ensure_tiqora_tables(mariadb_znuny_url)
     get_settings.cache_clear()
-    settings = get_settings()
+    get_settings()
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as session:
-            provider = await ai_providers.create_provider(
-                session,
-                settings=settings,
-                change_by=1,
-                name="p",
-                kind="openai_compat",
-                base_url="https://example.com/v1",
-                default_model="m",
-                api_key=None,
-                extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
-                eu_hosted=False,
-            )
-
             # operation_mode defaults to "parallel" -> enabling auto_reply is 409.
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.create_queue_policy_route(
@@ -628,7 +580,6 @@ async def test_queue_policy_gate_enforcement_409_then_ok_then_regression(
                         queue_id=1,
                         enabled_auto_reply=True,
                         service_user_id=42,
-                        llm_provider_id=provider.id,
                     ),
                     _root_user(),
                     session,
@@ -645,9 +596,7 @@ async def test_queue_policy_gate_enforcement_409_then_ok_then_regression(
             await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
             enabled = await admin_ai.update_queue_policy_route(
                 created.id,
-                AiQueuePolicyUpdate(
-                    enabled_auto_reply=True, service_user_id=42, llm_provider_id=provider.id
-                ),
+                AiQueuePolicyUpdate(enabled_auto_reply=True, service_user_id=42),
                 _root_user(),
                 session,
             )
@@ -680,32 +629,17 @@ async def test_queue_policy_triage_enable_requires_tiqora_primary(
     """``enabled_triage`` is gated the same way as ``enabled_auto_reply``."""
     _ensure_tiqora_tables(mariadb_znuny_url)
     get_settings.cache_clear()
-    settings = get_settings()
+    get_settings()
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as session:
-            provider = await ai_providers.create_provider(
-                session,
-                settings=settings,
-                change_by=1,
-                name="p-triage-gate",
-                kind="openai_compat",
-                base_url="https://example.com/v1",
-                default_model="m",
-                api_key=None,
-                extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
-                eu_hosted=False,
-            )
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.create_queue_policy_route(
                     AiQueuePolicyCreate(
                         queue_id=1,
                         enabled_triage=True,
                         service_user_id=42,
-                        llm_provider_id=provider.id,
                         triage_target_queue_ids="[2]",
                     ),
                     _root_user(),
@@ -726,26 +660,11 @@ async def test_queue_policy_manual_assist_and_summary_enable_in_parallel_operati
     unchanged here)."""
     _ensure_tiqora_tables(mariadb_znuny_url)
     get_settings.cache_clear()
-    settings = get_settings()
+    get_settings()
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as session:
-            provider = await ai_providers.create_provider(
-                session,
-                settings=settings,
-                change_by=1,
-                name="p-parallel",
-                kind="openai_compat",
-                base_url="https://example.com/v1",
-                default_model="m",
-                api_key=None,
-                extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
-                eu_hosted=False,
-            )
-
             created = await admin_ai.create_queue_policy_route(
                 AiQueuePolicyCreate(queue_id=1, enabled_manual_assist=True, enabled_summary=True),
                 _root_user(),
@@ -755,7 +674,7 @@ async def test_queue_policy_manual_assist_and_summary_enable_in_parallel_operati
             assert created.enabled_summary is True
 
             # Still 409 for auto_reply in the same (parallel) operation_mode —
-            # service_user_id/llm_provider_id are set so the gate is the only
+            # service_user_id is set so the gate is the only
             # thing blocking this, isolating it from the 422 validation path.
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.update_queue_policy_route(
@@ -763,7 +682,6 @@ async def test_queue_policy_manual_assist_and_summary_enable_in_parallel_operati
                     AiQueuePolicyUpdate(
                         enabled_auto_reply=True,
                         service_user_id=42,
-                        llm_provider_id=provider.id,
                     ),
                     _root_user(),
                     session,
@@ -1048,68 +966,5 @@ async def test_admin_delete_summary_clears_state_and_404s(mariadb_znuny_url: str
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.delete_ai_summary(999_999, _root_user(), session)
             assert exc_info.value.status_code == 404
-    finally:
-        await engine.dispose()
-
-
-async def test_provider_max_tool_rounds_override_and_reset(mariadb_znuny_url: str) -> None:
-    """The per-provider tool-round budget, and how it is cleared again.
-
-    ``None`` on the column means "use DEFAULT_MAX_TOOL_ROUNDS". Since the update
-    path reads ``None`` as "field not supplied", 0 is what expresses "back to
-    the default" — an emptied number input in the admin UI sends exactly that.
-    """
-    _ensure_tiqora_tables(mariadb_znuny_url)
-    get_settings.cache_clear()
-    settings = get_settings()
-    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with factory() as session:
-            provider = await ai_providers.create_provider(
-                session,
-                settings=settings,
-                change_by=1,
-                name="rounds-provider",
-                kind="openai_compat",
-                base_url="https://example.com/v1",
-                default_model="m",
-                api_key=None,
-                extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
-                eu_hosted=False,
-            )
-            # Not configured -> the caller's default applies.
-            assert provider.max_tool_rounds is None
-            assert (
-                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
-            )
-
-            await ai_providers.update_provider(
-                session, provider, settings=settings, change_by=1, max_tool_rounds=20
-            )
-            assert (
-                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 20
-            )
-
-            # 0 clears the override rather than starving the loop of every round.
-            await ai_providers.update_provider(
-                session, provider, settings=settings, change_by=1, max_tool_rounds=0
-            )
-            assert provider.max_tool_rounds is None
-            assert (
-                await ai_providers.resolve_max_tool_rounds(session, provider.id, default=12) == 12
-            )
-
-            # An unknown or unset provider falls back rather than raising: the
-            # budget must never be the reason a run cannot start.
-            assert await ai_providers.resolve_max_tool_rounds(session, 999_999, default=12) == 12
-            assert await ai_providers.resolve_max_tool_rounds(session, None, default=12) == 12
-
-            await session.execute(
-                text("DELETE FROM tiqora_llm_provider WHERE id = :pid"), {"pid": provider.id}
-            )
-            await session.commit()
     finally:
         await engine.dispose()

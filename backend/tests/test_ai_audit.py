@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import make_model, setup_agent_llm
 from tests.test_ai_runtime import ScriptedLlm, _mysql_async, _propose_response, _seed_ticket
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -309,23 +310,21 @@ async def test_manual_assist_run_writes_masked_audit_row(mariadb_znuny_url: str)
                 name=f"fake-audit-provider-{seed['queue_id']}",
                 kind="openai_compat",
                 base_url="https://llm.example/v1",
-                default_model="fake-model",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=False,
                 eu_hosted=True,
             )
-            await ai_policies.create_queue_policy(
+            await make_model(session, provider, "fake-model")
+            _policy = await ai_policies.create_queue_policy(
                 session,
                 change_by=1,
                 queue_id=seed["queue_id"],
                 enabled_manual_assist=True,
                 system_prompt="You are a helpful support agent.",
                 autonomy="full",
-                llm_provider_id=provider.id,
                 pii_masking=True,
             )
+            await setup_agent_llm(session, _policy, provider)
 
         llm = ScriptedLlm([_propose_response("reply", "Here is the answer.")])
         async with factory() as session:
@@ -371,6 +370,7 @@ async def _write_row(
     ts_override: datetime | None = None,
     pii_mapping: dict[str, str] | None = None,
     provider_id: int | None = None,
+    model: str | None = None,
     prompt_tokens: int = 1,
     completion_tokens: int = 1,
 ) -> None:
@@ -378,7 +378,11 @@ async def _write_row(
         session,
         settings=settings,
         context=AuditContext(
-            feature=feature, run_id=run_id, ticket_id=ticket_id, provider_id=provider_id
+            feature=feature,
+            run_id=run_id,
+            ticket_id=ticket_id,
+            provider_id=provider_id,
+            model=model,
         ),
         request_json='{"messages": []}',
         response_json=None if error else '{"content": "ok"}',
@@ -569,15 +573,13 @@ async def test_list_cost_uses_bulk_loaded_provider_prices(mariadb_znuny_url: str
                 name=f"{run_prefix}-priced",
                 kind="openai_compat",
                 base_url="https://api.example/v1",
-                default_model="model-a",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
                 eu_hosted=False,
-                price_input_per_1m=2.0,
-                price_output_per_1m=4.0,
                 price_currency="USD",
+            )
+            await make_model(
+                session, priced, "model-a", price_input_per_1m=2.0, price_output_per_1m=4.0
             )
             unpriced = await ai_providers.create_provider(
                 session,
@@ -586,19 +588,18 @@ async def test_list_cost_uses_bulk_loaded_provider_prices(mariadb_znuny_url: str
                 name=f"{run_prefix}-unpriced",
                 kind="openai_compat",
                 base_url="https://api.example/v1",
-                default_model="model-b",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
                 eu_hosted=False,
             )
+            await make_model(session, unpriced, "model-b")
             await _write_row(
                 session,
                 settings=settings,
                 run_id=f"{run_prefix}-priced",
                 feature=f"{run_prefix}-feature",
                 provider_id=priced.id,
+                model="model-a",
                 prompt_tokens=1_000_000,
                 completion_tokens=500_000,
             )
@@ -608,6 +609,7 @@ async def test_list_cost_uses_bulk_loaded_provider_prices(mariadb_znuny_url: str
                 run_id=f"{run_prefix}-unpriced",
                 feature=f"{run_prefix}-feature",
                 provider_id=unpriced.id,
+                model="model-b",
                 prompt_tokens=1_000_000,
                 completion_tokens=500_000,
             )
@@ -647,15 +649,13 @@ async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str)
                 name=f"{run_prefix}-usd-a",
                 kind="openai_compat",
                 base_url="https://api.example/v1",
-                default_model="model-a",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
                 eu_hosted=False,
-                price_input_per_1m=1.0,
-                price_output_per_1m=1.0,
                 price_currency="USD",
+            )
+            await make_model(
+                session, usd_a, "model-a", price_input_per_1m=1.0, price_output_per_1m=1.0
             )
             usd_b = await ai_providers.create_provider(
                 session,
@@ -664,15 +664,13 @@ async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str)
                 name=f"{run_prefix}-usd-b",
                 kind="openai_compat",
                 base_url="https://api.example/v1",
-                default_model="model-b",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
                 eu_hosted=False,
-                price_input_per_1m=1.0,
-                price_output_per_1m=1.0,
                 price_currency="USD",
+            )
+            await make_model(
+                session, usd_b, "model-b", price_input_per_1m=1.0, price_output_per_1m=1.0
             )
             await _write_row(
                 session,
@@ -680,6 +678,7 @@ async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str)
                 run_id=f"{run_prefix}-a1",
                 feature=f"{run_prefix}-feature",
                 provider_id=usd_a.id,
+                model="model-a",
                 prompt_tokens=1_000_000,
                 completion_tokens=0,
             )
@@ -689,6 +688,7 @@ async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str)
                 run_id=f"{run_prefix}-b1",
                 feature=f"{run_prefix}-feature",
                 provider_id=usd_b.id,
+                model="model-b",
                 prompt_tokens=1_000_000,
                 completion_tokens=0,
             )
@@ -705,15 +705,13 @@ async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str)
                 name=f"{run_prefix}-eur",
                 kind="openai_compat",
                 base_url="https://api.example/v1",
-                default_model="model-c",
                 api_key=None,
                 extra_json=None,
-                supports_tools=True,
-                supports_streaming=True,
                 eu_hosted=True,
-                price_input_per_1m=1.0,
-                price_output_per_1m=1.0,
                 price_currency="EUR",
+            )
+            await make_model(
+                session, eur, "model-c", price_input_per_1m=1.0, price_output_per_1m=1.0
             )
             await _write_row(
                 session,
@@ -721,6 +719,7 @@ async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str)
                 run_id=f"{run_prefix}-c1",
                 feature=f"{run_prefix}-feature",
                 provider_id=eur.id,
+                model="model-c",
                 prompt_tokens=1_000_000,
                 completion_tokens=0,
             )

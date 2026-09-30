@@ -19,6 +19,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import make_model, routing_cleanup_statements, setup_agent_llm
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
 from tiqora.ai.gate import (
@@ -203,6 +204,7 @@ def _cleanup(sync_url: str, ns: int) -> None:
                 "DELETE FROM customer_user WHERE login = :login",
                 {"login": f"s00mmust86{ns}@uni.example.org"},
             ),
+            *routing_cleanup_statements(f"fake-triage-provider-{i['source_queue_id']}"),
             (
                 "DELETE FROM tiqora_llm_provider WHERE name = :n",
                 {"n": f"fake-triage-provider-{i['source_queue_id']}"},
@@ -377,13 +379,11 @@ async def _setup_policies(
         name=f"fake-triage-provider-{ids['source_queue_id']}",
         kind="openai_compat",
         base_url="https://llm.example/v1",
-        default_model="fake-model",
         api_key=None,
         extra_json=None,
-        supports_tools=True,
-        supports_streaming=False,
         eu_hosted=True,
     )
+    await make_model(session, provider, "fake-model")
     # Destination queue first: the source policy's target validation needs it
     # to exist, and triage_delay_reply is read off the destination.
     await ai_policies.create_queue_policy(
@@ -393,13 +393,12 @@ async def _setup_policies(
         routing_description=target_description,
         triage_delay_reply=delay_reply,
     )
-    await ai_policies.create_queue_policy(
+    _policy = await ai_policies.create_queue_policy(
         session,
         change_by=1,
         queue_id=ids["source_queue_id"],
         enabled_triage=True,
         service_user_id=ids["agent_id"],
-        llm_provider_id=provider.id,
         pii_masking=False,
         routing_description=source_description,
         triage_target_queue_ids=json.dumps([ids["target_queue_id"]]),
@@ -409,13 +408,13 @@ async def _setup_policies(
         triage_customer_fix_enabled=customer_fix,
         triage_customer_fix_auto_threshold=customer_fix_threshold,
     )
+    await setup_agent_llm(session, _policy, provider)
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch, llm: LlmClient) -> None:
-    async def _fake(*_args: Any, **_kwargs: Any) -> LlmClient:
-        return llm
-
-    monkeypatch.setattr("tiqora.ai.triage_worker.build_llm_client", _fake)
+    # The real routing runs (profile, skips, provider budget); only the
+    # client it would construct is replaced.
+    monkeypatch.setattr("tiqora.ai.llm_routing.make_llm_client", lambda **_kwargs: llm)
 
 
 async def _reset_watermark(factory: Any, sync_url: str) -> None:

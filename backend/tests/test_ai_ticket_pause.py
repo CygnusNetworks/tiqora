@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tests import test_ai_auto_worker as aw
 from tests import test_ai_triage_worker as tw
+from tests._llm_routing_helpers import routing_cleanup_statements
 from tests.test_ai_manual_draft_async import (
     _cleanup_ticket,
     _client_for,
@@ -93,6 +94,8 @@ def _now() -> datetime:
 def _drop_aw_provider(sync_url: str, queue_id: int) -> None:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
+        for stmt, params in routing_cleanup_statements(f"fake-auto-provider-{queue_id}"):
+            conn.execute(text(stmt), params)
         conn.execute(
             text("DELETE FROM tiqora_llm_provider WHERE name = :n"),
             {"n": f"fake-auto-provider-{queue_id}"},

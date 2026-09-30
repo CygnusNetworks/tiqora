@@ -53,6 +53,7 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.llm import LlmClient, LlmMessage
+from tiqora.ai.llm_routing import TASK_REFINE, resolve_task_models
 from tiqora.ai.models import FEATURE_REFINE
 from tiqora.ai.ner import extract_person_names
 from tiqora.ai.pii import PiiMapper
@@ -493,6 +494,10 @@ async def refine_text(
     )
     pii = PiiMapper(known_names=known_names or None, never_mask=never_mask or None)
 
+    # The refine profile's first usable model: default provider/model for
+    # audit and usage (a fallback that actually served overrides it).
+    refine_models = await resolve_task_models(session, policy, TASK_REFINE)
+    primary_model = refine_models[0] if refine_models else None
     audit_context = AuditContext(
         feature=AUDIT_FEATURE_REFINE,
         run_id=run_id or uuid.uuid4().hex,
@@ -500,8 +505,8 @@ async def refine_text(
         queue_id=queue_id,
         acting_user_id=acting_user_id,
         trigger="manual",
-        provider_id=policy.llm_provider_id,
-        model=policy.model_override,
+        provider_id=primary_model.provider_id if primary_model else None,
+        model=primary_model.model if primary_model else None,
     )
     raw_llm = llm
     audited = AuditingLlmClient(
@@ -566,8 +571,15 @@ async def refine_text(
         queue_id=queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_REFINE,
-        provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
-        model=model_served or getattr(raw_llm, "active_model", None) or policy.model_override,
+        provider_id=(
+            getattr(raw_llm, "active_provider_id", None)
+            or (primary_model.provider_id if primary_model else None)
+        ),
+        model=(
+            model_served
+            or getattr(raw_llm, "active_model", None)
+            or (primary_model.model if primary_model else None)
+        ),
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool(sections),

@@ -39,10 +39,15 @@ from tests.test_ai_runtime import (
     _setup_policy,
 )
 from tiqora.ai.llm import LlmMessage, LlmResponse, LlmTimeoutError
+from tiqora.ai.llm_routing import TaskLlm
 from tiqora.ai.models import AUTONOMY_FULL
 from tiqora.domain.settings_store import KEY_OPERATION_MODE
 
 pytestmark = pytest.mark.db
+
+
+def _task_llm(client: Any) -> TaskLlm:
+    return TaskLlm(client=client, models=[], profile_id=0, profile_name="fake")
 
 
 def _to_async_url(sync_url: str) -> str:
@@ -214,13 +219,13 @@ async def test_post_draft_returns_started_and_marks_running(
 
     import tiqora.api.v1.ai as ai_module
 
-    async def _fake_build_llm_client(*a: Any, **kw: Any) -> ScriptedLlm:
-        return ScriptedLlm([_propose_response("reply", "Async draft body.")])
+    async def _fake_build_agent_llm(*a: Any, **kw: Any) -> TaskLlm:
+        return _task_llm(ScriptedLlm([_propose_response("reply", "Async draft body.")]))
 
     async def _fake_kb_bundle(*a: Any, **kw: Any) -> None:
         return None
 
-    monkeypatch.setattr(ai_module, "build_llm_client", _fake_build_llm_client)
+    monkeypatch.setattr(ai_module, "build_agent_llm", _fake_build_agent_llm)
     monkeypatch.setattr(ai_module, "kb_bundle", _fake_kb_bundle)
 
     try:
@@ -277,13 +282,13 @@ async def test_background_run_llm_timeout_sets_error_status(
 
     import tiqora.api.v1.ai as ai_module
 
-    async def _fake_build_llm_client(*a: Any, **kw: Any) -> _RaisingLlm:
-        return _RaisingLlm(LlmTimeoutError("provider timed out"))
+    async def _fake_build_agent_llm(*a: Any, **kw: Any) -> TaskLlm:
+        return _task_llm(_RaisingLlm(LlmTimeoutError("provider timed out")))
 
     async def _fake_kb_bundle(*a: Any, **kw: Any) -> None:
         return None
 
-    monkeypatch.setattr(ai_module, "build_llm_client", _fake_build_llm_client)
+    monkeypatch.setattr(ai_module, "build_agent_llm", _fake_build_agent_llm)
     monkeypatch.setattr(ai_module, "kb_bundle", _fake_kb_bundle)
 
     try:

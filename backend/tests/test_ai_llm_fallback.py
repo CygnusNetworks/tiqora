@@ -1,23 +1,15 @@
-"""Unit tests for tiqora.ai.llm_fallback (FallbackLlmClient) and its wiring
-into tiqora.ai.kb_wiring.build_llm_client / tiqora.ai.policies validation.
-
-No real DB/network: providers are resolved through a minimal fake session
-(``.get(Model, id) -> obj|None``) — build_llm_client and the policy
-validators only ever call ``session.get(TiqoraLlmProvider, id)``.
+"""Unit tests for tiqora.ai.llm_fallback (FallbackLlmClient). The chain
+building on top of it lives in tiqora.ai.llm_routing (test_llm_routing.py).
 """
 
 from __future__ import annotations
 
-import json
-from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
-from tiqora.ai import kb_wiring, policies
 from tiqora.ai.llm import LlmError, LlmHttpError, LlmMessage, LlmResponse, LlmTimeoutError, LlmUsage
 from tiqora.ai.llm_fallback import FallbackEntry, FallbackLlmClient, reset_cooldowns
-from tiqora.ai.policies import QueuePolicyValidationError
 
 pytestmark = pytest.mark.asyncio
 
@@ -56,8 +48,15 @@ def _response(content: str) -> LlmResponse:
     return LlmResponse(content=content, usage=LlmUsage(prompt_tokens=1, completion_tokens=1))
 
 
-def _entry(provider_id: int, model: str, client: _FakeClient) -> FallbackEntry:
-    return FallbackEntry(provider_id=provider_id, model=model, factory=lambda: client)
+def _entry(
+    provider_id: int, model: str, client: _FakeClient, *, llm_model_id: int | None = None
+) -> FallbackEntry:
+    return FallbackEntry(
+        llm_model_id=provider_id if llm_model_id is None else llm_model_id,
+        provider_id=provider_id,
+        model=model,
+        factory=lambda: client,
+    )
 
 
 async def test_timeout_fails_over_to_second_entry() -> None:
@@ -177,81 +176,47 @@ async def test_all_entries_in_cooldown_still_attempted_in_order() -> None:
     assert first_retry.calls == 1
 
 
-# ---------------------------------------------------------------------------
-# build_llm_client wiring
-# ---------------------------------------------------------------------------
+async def test_cooldown_is_per_model_not_per_provider() -> None:
+    """One model of a provider failing must not cool down its other models."""
+    clock = {"t": 0.0}
 
+    def fake_clock() -> float:
+        return clock["t"]
 
-def _provider(id_: int, *, model: str = "gpt-x") -> SimpleNamespace:
-    return SimpleNamespace(
-        id=id_,
-        base_url="https://example.invalid",
-        api_key_enc=None,
-        default_model=model,
-        budget_cost_day=None,
-        budget_cost_week=None,
-        budget_cost_month=None,
+    failing = _FakeClient([LlmTimeoutError("slow")])
+    sibling = _FakeClient([_response("sibling")])
+    fb1 = FallbackLlmClient(
+        [_entry(1, "big", failing, llm_model_id=10), _entry(1, "small", sibling, llm_model_id=11)],
+        cooldown_seconds=300.0,
+        clock=fake_clock,
     )
+    assert (await fb1.chat(messages=[LlmMessage(role="user", content="hi")])).content == "sibling"
+    assert fb1.active_llm_model_id == 11
 
+    # New run: the sibling (same provider, other model) is tried first, the
+    # other provider's model is not needed.
+    clock["t"] = 10.0
+    sibling_again = _FakeClient([_response("sibling-again")])
+    other = _FakeClient([])
+    fb2 = FallbackLlmClient(
+        [
+            _entry(1, "small", sibling_again, llm_model_id=11),
+            _entry(2, "elsewhere", other, llm_model_id=20),
+        ],
+        cooldown_seconds=300.0,
+        clock=fake_clock,
+    )
+    response = await fb2.chat(messages=[LlmMessage(role="user", content="hi")])
+    assert response.content == "sibling-again"
+    assert other.calls == 0
 
-class _FakeSession:
-    def __init__(self, providers: dict[int, Any]) -> None:
-        self._providers = providers
-
-    async def get(self, _model: Any, id_: int) -> Any:
-        return self._providers.get(id_)
-
-
-def _settings() -> SimpleNamespace:
-    return SimpleNamespace(secret_key="test-secret", llm_timeout_seconds=30.0)
-
-
-async def test_build_llm_client_single_provider_returns_plain_client() -> None:
-    session = _FakeSession({1: _provider(1)})
-    client = await kb_wiring.build_llm_client(session, _settings(), 1, None, None)
-    from tiqora.ai.llm import OpenAiCompatLlmClient
-
-    assert isinstance(client, OpenAiCompatLlmClient)
-
-
-async def test_build_llm_client_with_fallback_returns_fallback_client() -> None:
-    session = _FakeSession({1: _provider(1), 2: _provider(2)})
-    fallback_json = json.dumps([{"provider_id": 2, "model": None}])
-    client = await kb_wiring.build_llm_client(session, _settings(), 1, None, fallback_json)
-
-    assert isinstance(client, FallbackLlmClient)
-    assert [e.provider_id for e in client._entries] == [1, 2]  # noqa: SLF001
-
-
-async def test_build_llm_client_skips_missing_fallback_provider() -> None:
-    session = _FakeSession({1: _provider(1)})  # provider 2 does not exist
-    fallback_json = json.dumps([{"provider_id": 2, "model": None}])
-    client = await kb_wiring.build_llm_client(session, _settings(), 1, None, fallback_json)
-
-    from tiqora.ai.llm import OpenAiCompatLlmClient
-
-    assert isinstance(client, OpenAiCompatLlmClient)
-
-
-# ---------------------------------------------------------------------------
-# Policy validation
-# ---------------------------------------------------------------------------
-
-
-async def test_validate_llm_fallback_json_rejects_invalid_json() -> None:
-    session = _FakeSession({})
-    with pytest.raises(QueuePolicyValidationError):
-        await policies._validate_llm_fallback_json(session, "{not json")  # noqa: SLF001
-
-
-async def test_validate_llm_fallback_json_rejects_unknown_provider() -> None:
-    session = _FakeSession({1: _provider(1)})
-    raw = json.dumps([{"provider_id": 999, "model": None}])
-    with pytest.raises(QueuePolicyValidationError):
-        await policies._validate_llm_fallback_json(session, raw)  # noqa: SLF001
-
-
-async def test_validate_llm_fallback_json_accepts_valid_entries() -> None:
-    session = _FakeSession({1: _provider(1), 2: _provider(2)})
-    raw = json.dumps([{"provider_id": 2, "model": "gpt-y"}])
-    await policies._validate_llm_fallback_json(session, raw)  # noqa: SLF001 — must not raise
+    # The failed model itself is still in cooldown.
+    failing_again = _FakeClient([])
+    third = _FakeClient([_response("third")])
+    fb3 = FallbackLlmClient(
+        [_entry(1, "big", failing_again, llm_model_id=10), _entry(2, "x", third, llm_model_id=20)],
+        cooldown_seconds=300.0,
+        clock=fake_clock,
+    )
+    assert (await fb3.chat(messages=[LlmMessage(role="user", content="hi")])).content == "third"
+    assert failing_again.calls == 0
