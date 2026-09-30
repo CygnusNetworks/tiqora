@@ -30,6 +30,8 @@ const INS = "rounded-sm bg-green/15 px-px text-green no-underline";
 const DEL = "rounded-sm bg-red/15 px-px text-red line-through";
 const OFF_DEL = "rounded-sm px-px text-ink outline-dashed outline-1 outline-muted";
 const OFF_INS_SIDE = "rounded-sm px-px text-muted line-through";
+// A turned-off pure insertion: keep the added text visible (struck through) so it can be restored.
+const OFF_PLACEHOLDER = `${OFF_INS_SIDE} outline-dashed outline-1 outline-muted`;
 const SEG_BTN =
   "px-2.5 py-1 text-xs transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
 const GHOST_BTN =
@@ -116,6 +118,7 @@ export function RefineDiffView({
         <>
           {g.removed && <del className={g.on ? DEL : OFF_DEL}>{g.removed}</del>}
           {g.on && g.added && <ins className={INS}>{g.added}</ins>}
+          {!g.on && !g.removed && g.added && <span className={OFF_PLACEHOLDER}>{g.added}</span>}
         </>
       );
     } else if (col === "old") {
@@ -123,7 +126,11 @@ export function RefineDiffView({
     } else if (g.on) {
       content = g.added ? <ins className={INS}>{g.added}</ins> : null;
     } else {
-      content = g.removed ? <span className={OFF_INS_SIDE}>{g.removed}</span> : null;
+      content = g.removed ? (
+        <span className={OFF_INS_SIDE}>{g.removed}</span>
+      ) : g.added ? (
+        <span className={OFF_PLACEHOLDER}>{g.added}</span>
+      ) : null;
     }
     // Keyboard/ARIA only on one instance per change (inline, or the left column).
     const interactive = col !== "new";
@@ -156,7 +163,7 @@ export function RefineDiffView({
         return <SameText key={i} text={g.text} atLineStart={atLineStart} />;
       }
       slot += 1;
-      prevText = g.on ? g.added : g.removed;
+      prevText = col === "old" ? g.removed : col === "new" ? (g.on ? g.added : g.removed) : g.on ? g.added : g.removed;
       return renderChange(g, slot, col, i);
     });
   };
