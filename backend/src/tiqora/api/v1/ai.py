@@ -97,7 +97,13 @@ from tiqora.domain.ticket_write_service import (
     TicketWriteService,
 )
 from tiqora.domain.ticket_write_service import (
+    pause_ai_automation as _pause_ai_automation,
+)
+from tiqora.domain.ticket_write_service import (
     resume_ai_automation as _resume_ai_automation,
+)
+from tiqora.domain.ticket_write_service import (
+    unpause_ai_automation as _unpause_ai_automation,
 )
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
@@ -189,6 +195,8 @@ class AiStateOut(BaseModel):
     manual_run_error_code: str | None = None
     manual_run_started_at: UtcDateTime | None = None
     ai_escalated_at: UtcDateTime | None = None
+    ai_paused_at: UtcDateTime | None = None
+    ai_paused_by_name: str | None = None
     triage: AiTriageOut | None = None
 
 
@@ -518,6 +526,26 @@ async def _open_triage_out(session: DbSession, ticket_id: int) -> AiTriageOut | 
     )
 
 
+async def _paused_by_name(session: AsyncSession, state: TiqoraAiTicketState | None) -> str | None:
+    """Full name of the agent who paused the ticket, ``None`` if unknown."""
+    if state is None or state.ai_paused_at is None or state.ai_paused_by is None:
+        return None
+    row = (
+        (
+            await session.execute(
+                sa_text("SELECT login, first_name, last_name FROM users WHERE id = :uid LIMIT 1"),
+                {"uid": state.ai_paused_by},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        return None
+    full_name = f"{row['first_name'] or ''} {row['last_name'] or ''}".strip()
+    return full_name or str(row["login"])
+
+
 @router.get("", response_model=AiStateOut)
 async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) -> AiStateOut:
     try:
@@ -580,6 +608,8 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         manual_run_error_code=manual_run_error_code,
         manual_run_started_at=manual_run_started_at,
         ai_escalated_at=state.ai_escalated_at if state else None,
+        ai_paused_at=state.ai_paused_at if state else None,
+        ai_paused_by_name=await _paused_by_name(session, state),
         triage=await _open_triage_out(session, ticket_id),
     )
 
@@ -1062,6 +1092,41 @@ async def resume_ai_route(ticket_id: int, user: CurrentUser, session: DbSession)
         ticket_id=ticket_id,
         user_id=user.id,
         sysconfig=SysConfig(session),
+    )
+    await session.commit()
+
+
+async def _ticket_for_pause(session: DbSession, user: CurrentUser, ticket_id: int) -> None:
+    """Same access rule as resume: ticket visible and note permission on its queue."""
+    try:
+        ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        if isinstance(exc, TicketNotFound):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
+    await _assert_note_permission(session, user.id, ticket.queue_id)
+
+
+@router.post("/pause", status_code=status.HTTP_204_NO_CONTENT)
+async def pause_ai_route(ticket_id: int, user: CurrentUser, session: DbSession) -> None:
+    """Stop all automatic AI actions (auto-reply, triage, auto-summary) on this ticket.
+
+    Idempotent. Manual Assist stays available. See
+    :func:`tiqora.domain.ticket_write_service.pause_ai_automation`.
+    """
+    await _ticket_for_pause(session, user, ticket_id)
+    await _pause_ai_automation(
+        session, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
+    )
+    await session.commit()
+
+
+@router.post("/unpause", status_code=status.HTTP_204_NO_CONTENT)
+async def unpause_ai_route(ticket_id: int, user: CurrentUser, session: DbSession) -> None:
+    """Lift the per-ticket AI pause. Idempotent."""
+    await _ticket_for_pause(session, user, ticket_id)
+    await _unpause_ai_automation(
+        session, ticket_id=ticket_id, user_id=user.id, sysconfig=SysConfig(session)
     )
     await session.commit()
 

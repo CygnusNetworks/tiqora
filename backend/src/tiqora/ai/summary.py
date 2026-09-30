@@ -735,6 +735,11 @@ async def auto_summary_due(session: AsyncSession, ticket_id: int) -> bool:
     or total content chars since the last summary exceed the queue's
     threshold. ``NULL`` threshold columns mean "no auto-summary" (plan §3.1:
     "NULL = kein Auto-Summary")."""
+    # An agent paused all automatic AI actions on this ticket. Checked first
+    # and read-only (no get_or_create): a ticket without a state row is not paused.
+    paused_state = await session.get(TiqoraAiTicketState, ticket_id)
+    if paused_state is not None and paused_state.ai_paused_at is not None:
+        return False
     try:
         ticket = await ticket_snapshot(session, ticket_id)
     except TicketNotFoundError:

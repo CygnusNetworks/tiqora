@@ -70,6 +70,47 @@ async def clear_ai_escalated(session: AsyncSession, ticket_id: int) -> None:
         )
 
 
+async def set_ai_paused(session: AsyncSession, ticket_id: int, user_id: int) -> None:
+    """Pause all automatic AI actions on a ticket. Does not commit.
+
+    Upserts the per-ticket state row like :func:`mark_ai_escalated`. A ticket
+    that is already paused keeps its original ``ai_paused_at``/``ai_paused_by``.
+    Unlike the escalation flag this is never cleared by an agent reply or a
+    state change, only by :func:`clear_ai_paused`.
+    """
+    try:
+        async with session.begin_nested():
+            state = await session.get(TiqoraAiTicketState, ticket_id)
+            if state is None:
+                state = TiqoraAiTicketState(ticket_id=ticket_id)
+                session.add(state)
+                await session.flush()
+            if state.ai_paused_at is None:
+                state.ai_paused_at = datetime.now(UTC).replace(tzinfo=None)
+                state.ai_paused_by = user_id
+    except DBAPIError:
+        logger.debug(
+            "tiqora_ai_ticket_state write failed (table missing?) - skipping AI pause",
+            exc_info=True,
+        )
+
+
+async def clear_ai_paused(session: AsyncSession, ticket_id: int) -> None:
+    """Lift the per-ticket AI pause. No-op when the row is missing. Does not commit."""
+    try:
+        async with session.begin_nested():
+            await session.execute(
+                update(TiqoraAiTicketState)
+                .where(TiqoraAiTicketState.ticket_id == ticket_id)
+                .values(ai_paused_at=None, ai_paused_by=None)
+            )
+    except DBAPIError:
+        logger.debug(
+            "tiqora_ai_ticket_state write failed (table missing?) - skipping AI unpause",
+            exc_info=True,
+        )
+
+
 async def ai_escalated_ticket_ids(session: AsyncSession, ticket_ids: list[int]) -> set[int]:
     """Ids (of ``ticket_ids``) that currently carry the handoff flag.
 
@@ -99,5 +140,7 @@ async def ai_escalated_ticket_ids(session: AsyncSession, ticket_ids: list[int]) 
 __all__ = [
     "ai_escalated_ticket_ids",
     "clear_ai_escalated",
+    "clear_ai_paused",
     "mark_ai_escalated",
+    "set_ai_paused",
 ]
