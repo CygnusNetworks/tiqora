@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Tiada pelanggan ditemui.",
     "from": "daripada",
     "directionLabel": "Arah",
-    "directionIn": "Masuk",
-    "directionOut": "Keluar",
     "submitSend": "Buat & hantar",
     "sendError": "E-mel tidak dapat dihantar. Tiket telah dibuat — sila cuba semula menghantar balasan dari sana.",
     "goToTicket": "Pergi ke tiket",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

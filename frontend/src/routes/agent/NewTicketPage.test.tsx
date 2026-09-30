@@ -661,6 +661,7 @@ describe("NewTicketPage compact phone ticket", () => {
     const start = Date.now() - 200_000;
     return {
       type: "phone",
+      from_call: true,
       direction: "inbound",
       number: "+49 228 1234",
       call_started: start,
@@ -743,6 +744,29 @@ describe("NewTicketPage compact phone ticket", () => {
     expect(screen.queryByTestId("new-ticket-owner-source")).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("new-ticket-state-value")).toHaveTextContent(/open/i));
     expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Create ticket");
+  });
+
+  it("a missed call (ended, never answered) keeps the normal status", async () => {
+    searchParams.current = popupSearch({ call_started: undefined });
+    wrap(<NewTicketPage />);
+    await screen.findByTestId("new-ticket-direction-badge");
+    await waitFor(() => expect(screen.getByTestId("new-ticket-state-value")).toHaveTextContent(/open/i));
+    expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Create ticket");
+  });
+
+  it("a ringing call from the popup (no times yet) still shows the direction badge", async () => {
+    searchParams.current = { type: "phone", from_call: true, direction: "outbound", number: "0228 1" };
+    wrap(<NewTicketPage />);
+    expect(await screen.findByTestId("new-ticket-direction-badge")).toHaveTextContent("Outgoing call");
+    expect(screen.queryByTestId("new-ticket-direction-in")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-state-value")).toHaveTextContent(/open/i));
+  });
+
+  it("click-to-call from the customer page (direction without popup marker) shows the toggle", async () => {
+    searchParams.current = { type: "phone", direction: "outbound", number: "0228 1" };
+    wrap(<NewTicketPage />);
+    expect(await screen.findByTestId("new-ticket-direction-out")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByTestId("new-ticket-direction-badge")).not.toBeInTheDocument();
   });
 
   it("without a hang-up (call still running) the status stays open", async () => {

@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Nem található ügyfelek.",
     "from": "Feladó",
     "directionLabel": "Irány",
-    "directionIn": "Bejövő",
-    "directionOut": "Kimenő",
     "submitSend": "Létrehozás és küldés",
     "sendError": "Az e-mailt nem sikerült elküldeni. A jegy már létrejött – kérjük, próbálja meg újra elküldeni a választ onnan.",
     "goToTicket": "Tovább a jegyhez",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

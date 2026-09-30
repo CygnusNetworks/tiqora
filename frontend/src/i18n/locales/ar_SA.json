@@ -1060,8 +1060,6 @@
     "noCustomerResults": "لم يتم العثور على عملاء.",
     "from": "من",
     "directionLabel": "الاتجاه",
-    "directionIn": "واردة",
-    "directionOut": "الصادرة",
     "submitSend": "إنشاء وإرسال",
     "sendError": "لا يمكن إرسال البريد الإلكتروني. The ticket was already created — please retry sending the reply from there.",
     "goToTicket": "اذهب إلى التذكرة",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

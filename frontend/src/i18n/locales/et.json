@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Kliente ei leitud.",
     "from": "Alates",
     "directionLabel": "Suund",
-    "directionIn": "Sissetulev",
-    "directionOut": "Väljaminev",
     "submitSend": "Loo ja saada",
     "sendError": "Meili ei saanud saata. Pilet on juba loodud – proovige sealt vastus uuesti saata.",
     "goToTicket": "Mine pileti juurde",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

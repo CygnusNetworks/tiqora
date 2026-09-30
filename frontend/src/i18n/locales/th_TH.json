@@ -1060,8 +1060,6 @@
     "noCustomerResults": "ไม่พบลูกค้า",
     "from": "จาก",
     "directionLabel": "ทิศทาง",
-    "directionIn": "ขาเข้า",
-    "directionOut": "ขาออก",
     "submitSend": "สร้างและส่ง",
     "sendError": "ไม่สามารถส่งอีเมลได้ สร้างตั๋วแล้ว โปรดลองส่งคำตอบอีกครั้งจากที่นั่น",
     "goToTicket": "ไปที่ตั๋ว",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

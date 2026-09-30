@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Geen klanten gevonden.",
     "from": "Van",
     "directionLabel": "Richting",
-    "directionIn": "Inkomend",
-    "directionOut": "Uitgaand",
     "submitSend": "Aanmaken en verzenden",
     "sendError": "De e-mail kon niet worden verzonden. Het ticket is al aangemaakt. Probeer het antwoord vanaf daar opnieuw.",
     "goToTicket": "Ga naar ticket",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

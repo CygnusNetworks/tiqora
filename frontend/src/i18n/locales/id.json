@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Tidak ada pelanggan yang ditemukan.",
     "from": "Dari",
     "directionLabel": "Arah",
-    "directionIn": "Masuk",
-    "directionOut": "Keluar",
     "submitSend": "Buat & kirim",
     "sendError": "Email tidak dapat dikirim. Tiket sudah dibuat — silakan coba lagi mengirimkan balasan dari sana.",
     "goToTicket": "Pergi ke tiket",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {
