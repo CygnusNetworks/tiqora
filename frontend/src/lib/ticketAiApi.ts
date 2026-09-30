@@ -69,6 +69,9 @@ export type AiStateOut = {
   manual_run_error_code?: string | null;
   manual_run_started_at?: string | null;
   ai_escalated_at?: string | null;
+  /** Set while automatic AI actions are paused for this ticket. */
+  ai_paused_at?: string | null;
+  ai_paused_by_name?: string | null;
   /** Pending triage proposal, only present while its status is "open". */
   triage?: AiTriageOut | null;
 };
@@ -158,6 +161,18 @@ export const ticketAiApi = {
     return api.request<void>("POST", `/api/v1/tickets/${ticketId}/ai/resume`, {
       signal,
     });
+  },
+  pause(ticketId: number, signal?: AbortSignal) {
+    return api.request<void>("POST", `/api/v1/tickets/${ticketId}/ai/pause`, {
+      signal,
+    });
+  },
+  unpause(ticketId: number, signal?: AbortSignal) {
+    return api.request<void>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/unpause`,
+      { signal },
+    );
   },
   /**
    * Apply a triage proposal. Runs with the agent's own permissions, so this

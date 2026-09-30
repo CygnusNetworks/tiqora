@@ -346,6 +346,16 @@ export function AiPanel({
     },
   });
 
+  // Pausing/unpausing writes an internal note, so refresh the whole ticket
+  // (articles, history, AI state) rather than only the ai key.
+  const pauseMutation = useMutation({
+    mutationFn: (pause: boolean) =>
+      pause ? ticketAiApi.pause(ticketId) : ticketAiApi.unpause(ticketId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
+    },
+  });
+
   const acceptTriageMutation = useMutation({
     mutationFn: ({
       triageId,
@@ -1163,9 +1173,59 @@ export function AiPanel({
       </HoverCard>
     ) : null;
 
-  const banners =
-    state.ai_escalated_at || state.triage ? (
+  const banners = (
       <div className="space-y-2" data-testid="ai-banners">
+        {state.ai_paused_at ? (
+          <div
+            className="space-y-1 rounded-md border border-hairline bg-surface-subtle px-2.5 py-1.5 text-xs text-muted"
+            data-testid="ai-panel-paused-banner"
+          >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="font-semibold">⏸</span>
+              <span className="min-w-0 flex-1">
+                {t("ticket.ai.pause.banner", {
+                  name: state.ai_paused_by_name ?? "?",
+                  date: formatDateTime(state.ai_paused_at, locale),
+                })}
+              </span>
+              <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  data-testid="ai-panel-unpause-button"
+                  disabled={!canNote || pauseMutation.isPending}
+                  onClick={() => pauseMutation.mutate(false)}
+                >
+                  {pauseMutation.isPending ? (
+                    <Spinner className="h-3.5 w-3.5" />
+                  ) : (
+                    t("ticket.ai.pause.unpause")
+                  )}
+                </Button>
+              </span>
+            </div>
+            <p>{t("ticket.ai.pause.hint")}</p>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
+              <button
+                type="button"
+                className="text-[11px] text-muted underline-offset-2 transition-colors hover:text-ink hover:underline disabled:opacity-60"
+                data-testid="ai-panel-pause-button"
+                disabled={!canNote || pauseMutation.isPending}
+                onClick={() => pauseMutation.mutate(true)}
+              >
+                {t("ticket.ai.pause.pause")}
+              </button>
+            </span>
+          </div>
+        )}
+        {pauseMutation.isError && (
+          <p className="text-xs text-danger" role="alert" data-testid="ai-panel-pause-error">
+            {t("ticket.ai.pause.error")}
+          </p>
+        )}
         {state.ai_escalated_at && (
           <div
             className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-amber/35 bg-amber/10 px-2.5 py-1.5 text-xs text-ink"
@@ -1276,7 +1336,7 @@ export function AiPanel({
           </div>
         )}
       </div>
-    ) : null;
+  );
 
   const overlays = (
     <>

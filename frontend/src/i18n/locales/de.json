@@ -563,6 +563,13 @@
       "toolArguments": "Aufgerufen mit",
       "originTraceEmpty": "Für diese Antwort wurden keine Tool-Aufrufe erfasst.",
       "escalatedBanner": "KI hat um {{dateTime}} an einen Menschen übergeben — die automatische Antwort bleibt aus, bis ein Agent eine kundensichtbare Antwort sendet oder sie hier reaktiviert.",
+      "pause": {
+        "pause": "KI für dieses Ticket pausieren",
+        "unpause": "Fortsetzen",
+        "banner": "KI-Automatik pausiert von {{name}} am {{date}}",
+        "hint": "Auto-Antwort, Triage und automatische Zusammenfassung sind für dieses Ticket aus. Manuelle KI-Funktionen gehen weiter.",
+        "error": "Die KI-Pause konnte nicht geändert werden. Bitte erneut versuchen."
+      },
       "resumeButton": "KI reaktivieren",
       "expand": "Aufklappen",
       "collapse": "Zuklappen",

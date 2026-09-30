@@ -563,6 +563,13 @@
       "toolArguments": "فراخوانی‌شده با",
       "originTraceEmpty": "No tool calls were recorded for this reply.",
       "escalatedBanner": "AI handed off to a human at {{dateTime}} — auto-reply stays off until an agent sends a customer-visible reply, or resumes it here.",
+      "pause": {
+        "pause": "Pause AI for this ticket",
+        "unpause": "Resume",
+        "banner": "AI automation paused by {{name}} on {{date}}",
+        "hint": "Auto-reply, triage and automatic summaries are off for this ticket. Manual AI features keep working.",
+        "error": "Could not change the AI pause. Please try again."
+      },
       "resumeButton": "Resume AI",
       "expand": "گسترش دهید",
       "collapse": "فرو ریختن",
