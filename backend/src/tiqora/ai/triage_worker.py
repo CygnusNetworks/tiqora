@@ -145,7 +145,9 @@ async def _ticket_guard_row(session: AsyncSession, ticket_id: int) -> Any:
                 text(
                     "SELECT t.ticket_lock_id, t.create_time, t.create_by,"
                     " (SELECT s.ai_escalated_at FROM tiqora_ai_ticket_state s"
-                    "    WHERE s.ticket_id = t.id) AS ai_escalated_at"
+                    "    WHERE s.ticket_id = t.id) AS ai_escalated_at,"
+                    " (SELECT s.ai_paused_at FROM tiqora_ai_ticket_state s"
+                    "    WHERE s.ticket_id = t.id) AS ai_paused_at"
                     " FROM ticket t WHERE t.id = :tid LIMIT 1"
                 ),
                 {"tid": ticket_id},
@@ -191,6 +193,8 @@ async def _skip_reason(
         return "agent_created"
     if row["ai_escalated_at"] is not None:
         return "escalated_to_human"
+    if row["ai_paused_at"] is not None:
+        return "ai_paused"
     created = row["create_time"]
     if isinstance(created, datetime):
         age = datetime.now(UTC).replace(tzinfo=None) - created.replace(tzinfo=None)

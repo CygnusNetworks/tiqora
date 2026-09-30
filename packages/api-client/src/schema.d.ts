@@ -5991,6 +5991,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Ai Route
+         * @description Stop all automatic AI actions (auto-reply, triage, auto-summary) on this ticket.
+         *
+         *     Idempotent. Manual Assist stays available. See
+         *     :func:`tiqora.domain.ticket_write_service.pause_ai_automation`.
+         */
+        post: operations["pause_ai_route_api_v1_tickets__ticket_id__ai_pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/resume": {
         parameters: {
             query?: never;
@@ -6107,6 +6130,26 @@ export interface paths {
          *     calibrate the confidence thresholds.
          */
         post: operations["reject_ai_triage_api_v1_tickets__ticket_id__ai_triage__triage_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/ai/unpause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unpause Ai Route
+         * @description Lift the per-ticket AI pause. Idempotent.
+         */
+        post: operations["unpause_ai_route_api_v1_tickets__ticket_id__ai_unpause_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8126,6 +8169,10 @@ export interface components {
         AiStateOut: {
             /** Ai Escalated At */
             ai_escalated_at?: string | null;
+            /** Ai Paused At */
+            ai_paused_at?: string | null;
+            /** Ai Paused By Name */
+            ai_paused_by_name?: string | null;
             /** Can Summarize */
             can_summarize: boolean;
             /** Drafts */
@@ -30845,6 +30892,39 @@ export interface operations {
             };
         };
     };
+    pause_ai_route_api_v1_tickets__ticket_id__ai_pause_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     resume_ai_route_api_v1_tickets__ticket_id__ai_resume_post: {
         parameters: {
             query?: never;
@@ -31013,6 +31093,39 @@ export interface operations {
                 "application/json": components["schemas"]["AiTriageRejectIn"] | null;
             };
         };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unpause_ai_route_api_v1_tickets__ticket_id__ai_unpause_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             204: {

@@ -1256,6 +1256,13 @@ async def run_ticket_agent(
             raise PolicyDisabledError("Manual Assist is disabled for this queue")
         if trigger == TRIGGER_AUTO and not policy.enabled_auto_reply:
             raise PolicyDisabledError("Auto-reply is disabled for this queue")
+        if trigger == TRIGGER_AUTO:
+            # Race guard: the worker gate (auto_worker._cap_reason) already
+            # skips paused tickets; this catches a pause that landed between
+            # that check and the run. Manual Assist is unaffected.
+            paused_state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
+            if paused_state is not None and paused_state.ai_paused_at is not None:
+                raise PolicyDisabledError("AI automation is paused for this ticket")
 
         if trigger == TRIGGER_MANUAL:
             if acting_user_id is None:

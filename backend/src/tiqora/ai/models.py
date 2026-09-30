@@ -771,6 +771,11 @@ class TiqoraAiTicketState(TiqoraBase):
     # timestamp. Cleared when an agent sends a customer-visible article or
     # the ticket moves to closed/merged/removed.
     ai_escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Set by an agent to stop all automatic AI actions on this ticket
+    # (auto-reply, triage, auto-summary). Unlike ai_escalated_at, never
+    # cleared automatically: only the explicit unpause route clears it.
+    ai_paused_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    ai_paused_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 AUDIT_PAYLOAD_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")

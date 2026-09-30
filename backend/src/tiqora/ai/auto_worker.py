@@ -171,6 +171,10 @@ async def _cap_reason(
     # Manual Assist is unaffected: it never runs through this worker.
     if getattr(state, "ai_escalated_at", None) is not None:
         return "escalated_to_human"
+    # An agent paused all automatic AI actions for this ticket. Unlike the
+    # handoff flag above, nothing clears this on its own.
+    if getattr(state, "ai_paused_at", None) is not None:
+        return "ai_paused"
     if state.auto_reply_count >= policy.max_auto_replies:
         return "max_auto_replies"
     if state.clarification_count >= policy.max_clarifications:

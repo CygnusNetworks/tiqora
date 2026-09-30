@@ -34,7 +34,8 @@ from typing import TYPE_CHECKING, Any, Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.ai.handoff import clear_ai_escalated
+from tiqora.ai.handoff import clear_ai_escalated, clear_ai_paused, set_ai_paused
+from tiqora.ai.models import TiqoraAiTicketState
 from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.permissions.engine import PermissionEngine
@@ -946,6 +947,77 @@ async def resume_ai_automation(
         sysconfig=sysconfig,
     )
     await clear_ai_escalated(session, ticket_id)
+
+
+async def pause_ai_automation(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Stop all automatic AI actions on one ticket (auto-reply, triage, auto-summary).
+
+    Manual Assist, refine and manual summaries stay available. Independent of
+    the handoff flag; nothing but :func:`unpause_ai_automation` lifts it.
+    Writes an *internal* note for the audit trail. Already paused: no-op
+    (no second note).
+    """
+    state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
+    if state is not None and state.ai_paused_at is not None:
+        return
+    await add_article(
+        session,
+        ticket_id=ticket_id,
+        article=ArticleIn(
+            sender_type="agent",
+            is_visible_for_customer=False,
+            subject="KI-Automatik pausiert",
+            body=(
+                "Die KI-Automatik wurde für dieses Ticket pausiert. "
+                "Neue Kundennachrichten werden nicht automatisch bearbeitet."
+            ),
+            channel="note",
+        ),
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+    await set_ai_paused(session, ticket_id, user_id)
+
+
+async def unpause_ai_automation(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """Lift the per-ticket AI pause. Not paused: no-op (no note).
+
+    Customer messages that arrived during the pause are not processed
+    retroactively (their outbox events were consumed); the note says so.
+    """
+    state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
+    if state is None or state.ai_paused_at is None:
+        return
+    await add_article(
+        session,
+        ticket_id=ticket_id,
+        article=ArticleIn(
+            sender_type="agent",
+            is_visible_for_customer=False,
+            subject="KI-Automatik fortgesetzt",
+            body=(
+                "Die KI-Automatik wurde für dieses Ticket fortgesetzt. "
+                "Nachrichten, die während der Pause eingegangen sind, "
+                "werden nicht nachträglich bearbeitet."
+            ),
+            channel="note",
+        ),
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+    await clear_ai_paused(session, ticket_id)
 
 
 # ---------------------------------------------------------------------------
