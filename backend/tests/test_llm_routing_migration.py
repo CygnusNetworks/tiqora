@@ -250,3 +250,31 @@ def test_duplicate_fallback_entries_are_removed_keeping_first() -> None:
         ],
     )
     assert _resolve(plan, 10, "agent") == ((1, "a"), (2, "b"))
+
+
+def test_triage_on_the_agent_provider_without_model_keeps_the_agent_model() -> None:
+    """Narrowed fix: same provider as the agent → the agent's model_override
+    (the old, correct behaviour), not the provider's default model."""
+    plan = mig._plan_conversion(
+        [_provider(1, "A", "a-default")],
+        [
+            _policy(
+                10,
+                llm_provider_id=1,
+                model_override="a-big",
+                triage_llm_provider_id=1,
+            )
+        ],
+    )
+    assert _resolve(plan, 10, "triage") == ((1, "a-big"),)
+    # Identical to the agent chain → shares its profile.
+    assert _resolve(plan, 10, "agent") == ((1, "a-big"),)
+    assert len(plan.profiles) == 1
+
+
+def test_triage_on_the_agent_provider_without_any_override_uses_default() -> None:
+    plan = mig._plan_conversion(
+        [_provider(1, "A", "a-default")],
+        [_policy(10, llm_provider_id=1, triage_llm_provider_id=1)],
+    )
+    assert _resolve(plan, 10, "triage") == ((1, "a-default"),)

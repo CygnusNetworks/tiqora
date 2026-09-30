@@ -70,6 +70,8 @@ tiqora_ai_queue_task_profile
   UNIQUE(queue_policy_id, task)
 ```
 
+Added (fix round 1): nullable `llm_model_id INT` (no FK) on `tiqora_ai_usage` and `tiqora_ai_audit_log` — the model row that served the call; cost is priced from it, the (provider, model name) match is only the fallback for rows without it.
+
 Dropped: from `tiqora_ai_queue_policy`: `llm_provider_id`, `model_override`, `llm_fallback_json`, `final_answer_llm_provider_id`, `final_answer_model_override`, `vision_provider_id`, `triage_llm_provider_id`, `triage_model_override` (drop FKs first). From `tiqora_llm_provider`: `default_model`, `supports_tools`, `supports_streaming`, `supports_vision`, `max_tool_rounds`, `price_input_per_1m`, `price_output_per_1m`. Provider keeps: name, kind, base_url, api_key_enc, extra_json, eu_hosted, price_currency, budgets, valid_id, audit columns.
 
 ### Data migration (inside the same Alembic revision, before the drops)
@@ -79,7 +81,7 @@ Dropped: from `tiqora_ai_queue_policy`: `llm_provider_id`, `model_override`, `ll
 3. Per policy build chains (lists of model row ids, duplicates removed keeping first):
    - agent = [primary] + fallback entries (skip entries whose provider is gone) — only if `llm_provider_id` set.
    - final_answer = [final model] if `final_answer_llm_provider_id` set.
-   - triage = [triage primary] + agent fallback entries, if `triage_llm_provider_id` or `triage_model_override` set. Triage primary = (`triage_llm_provider_id` or `llm_provider_id`, `triage_model_override` or **that provider's** `default_model`). (This is the triage bug fix — old code sent the queue's `model_override` to the triage provider.)
+   - triage = [triage primary] + agent fallback entries, if `triage_llm_provider_id` or `triage_model_override` set. Triage provider = `triage_llm_provider_id` or `llm_provider_id`. Triage model = `triage_model_override`; if empty: when the triage provider equals `llm_provider_id` (incl. `triage_llm_provider_id` NULL) → `model_override` or that provider's `default_model` (old, correct behaviour); when it **differs** from `llm_provider_id` → **that provider's** `default_model`. (This is the triage bug fix — old code sent the queue's `model_override` to a different triage provider.)
    - vision = [(vision_provider_id, its default_model)] if set.
    - summary/refine: none (they inherit agent, as today).
 4. Identical chains share one profile. Profile name = display of the first model (`<model_id> @ <provider name>`), plus ` +N` when N fallbacks; on name collision append ` (2)`, ` (3)`…

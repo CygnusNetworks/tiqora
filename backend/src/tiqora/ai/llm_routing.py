@@ -25,8 +25,9 @@ for their task.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
+from typing import Any
 
 import structlog
 from fastapi import HTTPException, status
@@ -124,24 +125,39 @@ def make_llm_client(
 async def _own_profile_id(
     session: AsyncSession, policy: TiqoraAiQueuePolicy | None, task: str
 ) -> int | None:
-    """queue row > global default row > None, without the agent fallback."""
+    """queue row > global default row > None, without the agent fallback.
+
+    A row pointing at a disabled profile (``valid_id != 1``) counts as "no
+    own profile" — exactly like a row with ``profile_id`` NULL.
+    """
+
+    def _usable(row: Any) -> int | None:
+        profile_id, valid_id = row
+        return int(profile_id) if profile_id is not None and valid_id == 1 else None
+
     if policy is not None:
         row = (
             await session.execute(
-                select(TiqoraAiQueueTaskProfile.profile_id).where(
+                select(TiqoraAiQueueTaskProfile.profile_id, TiqoraLlmProfile.valid_id)
+                .outerjoin(
+                    TiqoraLlmProfile, TiqoraLlmProfile.id == TiqoraAiQueueTaskProfile.profile_id
+                )
+                .where(
                     TiqoraAiQueueTaskProfile.queue_policy_id == policy.id,
                     TiqoraAiQueueTaskProfile.task == task,
                 )
             )
         ).first()
         if row is not None:
-            return int(row[0]) if row[0] is not None else None
+            return _usable(row)
     default = (
         await session.execute(
-            select(TiqoraAiTaskDefault.profile_id).where(TiqoraAiTaskDefault.task == task)
+            select(TiqoraAiTaskDefault.profile_id, TiqoraLlmProfile.valid_id)
+            .outerjoin(TiqoraLlmProfile, TiqoraLlmProfile.id == TiqoraAiTaskDefault.profile_id)
+            .where(TiqoraAiTaskDefault.task == task)
         )
     ).first()
-    return int(default[0]) if default is not None and default[0] is not None else None
+    return _usable(default) if default is not None else None
 
 
 async def resolve_task_profile_id(
@@ -228,28 +244,12 @@ async def _resolve_usable(
     profile = (
         await session.execute(select(TiqoraLlmProfile).where(TiqoraLlmProfile.id == profile_id))
     ).scalar_one_or_none()
-    if profile is None:
+    if profile is None or profile.valid_id != 1:  # changed since the lookup
         return None
-    if profile.valid_id != 1:
-        logger.warning("ai_llm_profile_disabled", task=task, profile_id=profile.id)
-        raise NoUsableModel(profile.name, ["profile_disabled"])
     usable, reasons = await _usable_entries(session, profile, task)
     if not usable:
         raise NoUsableModel(profile.name, reasons)
     return profile, usable
-
-
-async def resolve_task_models(
-    session: AsyncSession, policy: TiqoraAiQueuePolicy | None, task: str
-) -> list[ChainModel]:
-    """The usable models of *task*'s profile, in order — empty when there is
-    no profile or nothing in it is usable. Never raises; for audit/usage
-    defaults and the tool-round budget, where a client is not needed."""
-    try:
-        resolved = await _resolve_usable(session, policy, task)
-    except NoUsableModel:
-        return []
-    return [] if resolved is None else [u.chain for u in resolved[1]]
 
 
 # ---------------------------------------------------------------------------
@@ -337,11 +337,16 @@ async def require_task_llm(
     except NoUsableModel as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if task_llm is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Queue AI policy has no LLM profile for task {task!r}",
-        )
+        raise no_profile_error(task)
     return task_llm
+
+
+def no_profile_error(task: str) -> HTTPException:
+    """The 409 for a task that resolves to no profile at all."""
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=f"Queue AI policy has no LLM profile for task {task!r}",
+    )
 
 
 async def build_agent_llm(
@@ -351,28 +356,36 @@ async def build_agent_llm(
     return await require_task_llm(session, settings, policy, TASK_AGENT)
 
 
-async def build_vision_llm_factory(
+@dataclass(frozen=True, slots=True)
+class VisionSetup:
+    enabled: bool  # the queue has a vision profile (images are processed)
+    factory: Callable[[], LlmClient] | None  # None: no profile or nothing usable
+
+
+async def resolve_vision(
     session: AsyncSession,
     settings: Settings,
     policy: TiqoraAiQueuePolicy | None,
     *,
     audit: AuditContext | None = None,
-) -> Callable[[], LlmClient] | None:
-    """A sync ``() -> LlmClient`` factory for the attachment vision pre-pass
-    (:mod:`tiqora.ai.attachment_context`), or ``None`` (never raises) when
-    the queue has no vision profile or nothing in it is usable — the caller
-    then ignores images, as documented for "no vision profile".
+) -> VisionSetup:
+    """Vision profile + client factory for the attachment pre-pass
+    (:mod:`tiqora.ai.attachment_context`) in one resolution. Never raises.
 
-    With ``audit``, every call is written to ``tiqora_ai_audit_log`` with
-    ``feature="vision"`` and the provider/model of the entry that made it
-    (see :mod:`tiqora.ai.audit`) — image data-URLs are never persisted.
+    ``enabled`` is False when the queue has no vision profile (images are
+    ignored). ``factory`` is a sync ``() -> LlmClient`` over the usable
+    entries (with fallback), or None when there is no profile or every entry
+    is skipped. With ``audit``, every call is written to
+    ``tiqora_ai_audit_log`` with ``feature="vision"`` and the provider/model
+    of the entry that made it (see :mod:`tiqora.ai.audit`) — image data-URLs
+    are never persisted.
     """
     try:
         resolved = await _resolve_usable(session, policy, TASK_VISION)
     except NoUsableModel:
-        return None
+        return VisionSetup(enabled=True, factory=None)
     if resolved is None:
-        return None
+        return VisionSetup(enabled=False, factory=None)
     profile, usable = resolved
     timeout = _timeout(profile, settings)
 
@@ -390,6 +403,7 @@ async def build_vision_llm_factory(
                     feature="vision",
                     provider_id=entry.chain.provider_id,
                     model=entry.chain.model,
+                    llm_model_id=entry.chain.llm_model_id,
                 ),
                 session=session,
             )
@@ -401,7 +415,40 @@ async def build_vision_llm_factory(
     def _vision_factory() -> LlmClient:
         return _chain_client(usable, factories)
 
-    return _vision_factory
+    return VisionSetup(enabled=True, factory=_vision_factory)
+
+
+async def build_vision_llm_factory(
+    session: AsyncSession,
+    settings: Settings,
+    policy: TiqoraAiQueuePolicy | None,
+    *,
+    audit: AuditContext | None = None,
+) -> Callable[[], LlmClient] | None:
+    """Only the factory of :func:`resolve_vision` (None = images ignored)."""
+    return (await resolve_vision(session, settings, policy, audit=audit)).factory
+
+
+def primary_of(models: Sequence[ChainModel]) -> ChainModel | None:
+    """The chain's first usable model, if any."""
+    return models[0] if models else None
+
+
+def served_identity(
+    raw_llm: object, primary: ChainModel | None
+) -> tuple[int | None, str | None, int | None]:
+    """``(provider_id, configured model, llm_model_id)`` of the entry that
+    served a call: the fallback client's active entry, else *primary*."""
+    active_model_id = getattr(raw_llm, "active_llm_model_id", None)
+    if active_model_id is not None:
+        return (
+            getattr(raw_llm, "active_provider_id", None),
+            getattr(raw_llm, "active_model", None),
+            active_model_id,
+        )
+    if primary is None:
+        return None, None, None
+    return primary.provider_id, primary.model, primary.llm_model_id
 
 
 __all__ = [
@@ -418,11 +465,15 @@ __all__ = [
     "ChainModel",
     "NoUsableModel",
     "TaskLlm",
+    "VisionSetup",
     "build_agent_llm",
     "build_task_llm",
     "build_vision_llm_factory",
     "make_llm_client",
+    "no_profile_error",
+    "primary_of",
     "require_task_llm",
-    "resolve_task_models",
     "resolve_task_profile_id",
+    "resolve_vision",
+    "served_identity",
 ]

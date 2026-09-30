@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from email.utils import parseaddr
@@ -66,15 +67,16 @@ from tiqora.ai.llm import (
     LlmUsage,
 )
 from tiqora.ai.llm_routing import (
-    TASK_AGENT,
     TASK_FINAL_ANSWER,
     TASK_VISION,
     ChainModel,
     NoUsableModel,
+    TaskLlm,
     build_task_llm,
-    build_vision_llm_factory,
-    resolve_task_models,
+    primary_of,
     resolve_task_profile_id,
+    resolve_vision,
+    served_identity,
 )
 from tiqora.ai.models import (
     AUTONOMY_CLARIFY_ONLY,
@@ -1164,16 +1166,15 @@ def _tool_rounds_for(model: ChainModel | None, *, default: int) -> int:
 @dataclass(frozen=True, slots=True)
 class _FinalAnswerLlm:
     llm: LlmClient  # audited
-    raw: LlmClient  # for active_provider_id/active_model after a fallback
-    provider_id: int | None
-    model: str | None
+    raw: LlmClient  # for the active entry after a fallback
+    first: ChainModel | None  # the chain's first usable model
 
 
 async def _resolve_final_answer_llm(
     session: AsyncSession,
     settings: Settings,
     policy: TiqoraAiQueuePolicy,
-    injected: LlmClient | None,
+    injected: TaskLlm | None,
     *,
     audit_context: AuditContext,
     pii: PiiMapper,
@@ -1182,7 +1183,8 @@ async def _resolve_final_answer_llm(
     queue has no final-answer profile or nothing in it is usable right now
     (model/provider disabled, budget exceeded) — the primary model then
     answers, as before."""
-    if injected is None:
+    task_llm = injected
+    if task_llm is None:
         try:
             task_llm = await build_task_llm(session, settings, policy, TASK_FINAL_ANSWER)
         except NoUsableModel as exc:
@@ -1195,21 +1197,20 @@ async def _resolve_final_answer_llm(
             return None
         if task_llm is None:
             return None
-        injected = task_llm.client
-        first: ChainModel | None = task_llm.models[0]
-    else:
-        models = await resolve_task_models(session, policy, TASK_FINAL_ANSWER)
-        first = models[0] if models else None
-    provider_id = first.provider_id if first is not None else None
-    model = first.model if first is not None else None
+    first = primary_of(task_llm.models)
     audited = AuditingLlmClient(
-        injected,
+        task_llm.client,
         settings=settings,
-        context=replace(audit_context, provider_id=provider_id, model=model),
+        context=replace(
+            audit_context,
+            provider_id=first.provider_id if first else None,
+            model=first.model if first else None,
+            llm_model_id=first.llm_model_id if first else None,
+        ),
         session=session,
         pii_mapper=pii,
     )
-    return _FinalAnswerLlm(llm=audited, raw=injected, provider_id=provider_id, model=model)
+    return _FinalAnswerLlm(llm=audited, raw=task_llm.client, first=first)
 
 
 async def run_ticket_agent(
@@ -1231,7 +1232,8 @@ async def run_ticket_agent(
     vision_llm_factory: Any = None,
     source_channel: str | None = None,
     telegram_gateway: Any = None,
-    final_llm: LlmClient | None = None,
+    final_llm: TaskLlm | None = None,
+    llm_models: Sequence[ChainModel] = (),
 ) -> AgentRunResult:
     """Run the agent once for one ticket (plan §3.4 steps 1-12).
 
@@ -1250,7 +1252,11 @@ async def run_ticket_agent(
     built lazily from the channel config only when actually needed.
     ``final_llm`` is an injectable seam for the final-answer model (tests);
     production omits it and the queue's final-answer profile is resolved
-    instead.
+    instead. ``llm_models`` are the usable models of the chain behind
+    ``llm`` (``TaskLlm.models`` of the caller's agent resolution): the first
+    one supplies the default provider/model for audit and usage and the
+    tool-round budget. Empty (tests with a bare fake client) → no default
+    provider and ``DEFAULT_MAX_TOOL_ROUNDS``.
     """
     # 1. Readiness gate — auto-reply only (plan §3.0 v1.1 relaxation, Phase
     # E). Manual Assist always runs regardless of operation_mode: it only
@@ -1339,11 +1345,10 @@ async def run_ticket_agent(
         audit_feature = (
             AUDIT_FEATURE_DRAFT if trigger == TRIGGER_MANUAL else AUDIT_FEATURE_AUTO_REPLY
         )
-        # The agent profile's first usable model: default provider/model for
-        # audit and usage (a fallback that actually served overrides it) and
-        # the source of the tool-round budget.
-        agent_models = await resolve_task_models(session, policy, TASK_AGENT)
-        primary_model = agent_models[0] if agent_models else None
+        # The agent chain's first usable model (resolved by the caller):
+        # default provider/model for audit and usage (a fallback that actually
+        # served overrides it) and the source of the tool-round budget.
+        primary_model = primary_of(llm_models)
         audit_context = AuditContext(
             feature=audit_feature,
             run_id=run_id,
@@ -1353,6 +1358,7 @@ async def run_ticket_agent(
             trigger=trigger,
             provider_id=primary_model.provider_id if primary_model else None,
             model=primary_model.model if primary_model else None,
+            llm_model_id=primary_model.llm_model_id if primary_model else None,
         )
 
         # Identity check (Task 6, plan: identity verification) — wired ONLY
@@ -1393,12 +1399,12 @@ async def run_ticket_agent(
         # 5. AI-content filter is applied when rendering (labels own AI output,
         # see _build_user_message) — nothing is physically removed.
 
-        vision_enabled = await resolve_task_profile_id(session, policy, TASK_VISION) is not None
-        effective_vision_factory = vision_llm_factory
-        if effective_vision_factory is None and vision_enabled:
-            effective_vision_factory = await build_vision_llm_factory(
-                session, settings, policy, audit=audit_context
-            )
+        if vision_llm_factory is not None:
+            vision_enabled = await resolve_task_profile_id(session, policy, TASK_VISION) is not None
+            effective_vision_factory = vision_llm_factory
+        else:
+            vision = await resolve_vision(session, settings, policy, audit=audit_context)
+            vision_enabled, effective_vision_factory = vision.enabled, vision.factory
         attachment_context = await build_attachment_context(
             session,
             articles,
@@ -1681,41 +1687,33 @@ async def run_ticket_agent(
             )
 
         if handed_over and final_answer is not None:
+            final_provider_id, final_model, final_llm_model_id = served_identity(
+                final_answer.raw, final_answer.first
+            )
             await usage_service.record_usage(
                 session,
                 user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
                 queue_id=ticket.queue_id,
                 ticket_id=ticket_id,
                 feature=feature,
-                provider_id=(
-                    getattr(final_answer.raw, "active_provider_id", None)
-                    or final_answer.provider_id
-                ),
-                model=(
-                    final_served_model
-                    or getattr(final_answer.raw, "active_model", None)
-                    or final_answer.model
-                ),
+                provider_id=final_provider_id,
+                model=final_served_model or final_model,
+                llm_model_id=final_llm_model_id,
                 prompt_tokens=final_prompt_tokens,
                 completion_tokens=final_completion_tokens,
                 success=True,
                 extra_json=json.dumps({"final_answer": True}),
             )
+        agent_provider_id, agent_model, agent_llm_model_id = served_identity(raw_llm, primary_model)
         await usage_service.record_usage(
             session,
             user_id=acting_user_id if trigger == TRIGGER_MANUAL else None,
             queue_id=ticket.queue_id,
             ticket_id=ticket_id,
             feature=feature,
-            provider_id=(
-                getattr(raw_llm, "active_provider_id", None)
-                or (primary_model.provider_id if primary_model else None)
-            ),
-            model=(
-                served_model
-                or getattr(raw_llm, "active_model", None)
-                or (primary_model.model if primary_model else None)
-            ),
+            provider_id=agent_provider_id,
+            model=served_model or agent_model,
+            llm_model_id=agent_llm_model_id,
             prompt_tokens=prompt_tokens - final_prompt_tokens,
             completion_tokens=completion_tokens - final_completion_tokens,
             success=True,

@@ -35,6 +35,7 @@ from tiqora.ai.audit import (
 )
 from tiqora.ai.gate import OPERATION_MODE_TIQORA_PRIMARY, set_operation_mode
 from tiqora.ai.llm import LlmError, LlmHttpError, LlmMessage, LlmResponse, LlmUsage
+from tiqora.ai.llm_routing import build_agent_llm
 from tiqora.ai.models import TiqoraAiAuditLog
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.runtime import TRIGGER_MANUAL, run_ticket_agent
@@ -328,10 +329,14 @@ async def test_manual_assist_run_writes_masked_audit_row(mariadb_znuny_url: str)
 
         llm = ScriptedLlm([_propose_response("reply", "Here is the answer.")])
         async with factory() as session:
+            # The caller's resolution (as the API route does) supplies the
+            # chain's models; the scripted client stands in for the real one.
+            agent = await build_agent_llm(session, settings, _policy)
             result = await run_ticket_agent(
                 session,
                 settings=settings,
                 llm=llm,
+                llm_models=agent.models,
                 ticket_id=seed["ticket_id"],
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=seed["agent_id"],
@@ -730,3 +735,25 @@ async def test_stats_total_cost_single_currency_vs_mixed(mariadb_znuny_url: str)
             assert mixed_stats.cost_currency is None
     finally:
         await engine.dispose()
+
+
+def test_entry_cost_prefers_the_serving_model_row() -> None:
+    """Audit cost: the stored llm_model_id picks the price row; without it
+    (older rows) the model name is matched."""
+    from tiqora.ai.audit import ProviderPrices
+    from tiqora.ai.models import TiqoraAiAuditLog
+
+    prices = {7: ProviderPrices(currency="EUR", models=[(1, "a", 1.0, None), (2, "b", 9.0, None)])}
+
+    def _entry(model: str, llm_model_id: int | None) -> TiqoraAiAuditLog:
+        return TiqoraAiAuditLog(
+            provider_id=7,
+            model=model,
+            llm_model_id=llm_model_id,
+            prompt_tokens=1_000_000,
+            completion_tokens=0,
+        )
+
+    assert compute_entry_cost(_entry("vendor/x", 1), prices) == (pytest.approx(1.0), "EUR")
+    assert compute_entry_cost(_entry("b", None), prices) == (pytest.approx(9.0), "EUR")
+    assert compute_entry_cost(_entry("vendor/x", None), prices) == (None, None)

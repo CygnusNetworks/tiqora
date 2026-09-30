@@ -786,6 +786,9 @@ class TiqoraAiUsage(TiqoraBase):
         ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
     )
     model: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # The tiqora_llm_model row that served the call (pricing source); plain
+    # integer, no FK — see migration 20260930_0053.
+    llm_model_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     prompt_tokens: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
@@ -898,6 +901,9 @@ class TiqoraAiAuditLog(TiqoraBase):
     )
     provider_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     model: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    # The tiqora_llm_model row that served the call (pricing source); plain
+    # integer, no FK — see migration 20260930_0053.
+    llm_model_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     feature: Mapped[str] = mapped_column(String(30), nullable=False)
     ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     queue_id: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -679,12 +679,13 @@ async def _run_manual_draft_background(
             policy = await get_queue_policy_by_queue(session, queue_id)
             if policy is None or not policy.enabled_manual_assist:
                 raise PolicyDisabledError(f"Manual Assist is disabled for queue {queue_id}")
-            llm = (await build_agent_llm(session, settings, policy)).client
+            agent_llm = await build_agent_llm(session, settings, policy)
             bundle = await kb_bundle(session, settings, user_id, policy)
             result: AgentRunResult = await run_ticket_agent(
                 session,
                 settings=settings,
-                llm=llm,
+                llm=agent_llm.client,
+                llm_models=agent_llm.models,
                 ticket_id=ticket_id,
                 trigger=TRIGGER_MANUAL,
                 acting_user_id=user_id,
@@ -844,12 +845,13 @@ async def request_summarize(
             status_code=status.HTTP_409_CONFLICT, detail="Summary is disabled for this queue"
         )
 
-    llm = (await require_task_llm(session, settings, policy, TASK_SUMMARY)).client
+    summary_llm = await require_task_llm(session, settings, policy, TASK_SUMMARY)
 
     try:
         result: SummaryResult = await summarize_ticket(
             session,
-            llm=llm,
+            llm=summary_llm.client,
+            llm_models=summary_llm.models,
             ticket_id=ticket_id,
             trigger=SUMMARY_TRIGGER_MANUAL,
             acting_user_id=user.id,
@@ -891,11 +893,12 @@ async def request_custom_summary(
             status_code=status.HTTP_409_CONFLICT, detail="Summary is disabled for this queue"
         )
 
-    llm = (await require_task_llm(session, settings, policy, TASK_SUMMARY)).client
+    summary_llm = await require_task_llm(session, settings, policy, TASK_SUMMARY)
     try:
         result = await custom_summarize_ticket(
             session,
-            llm=llm,
+            llm=summary_llm.client,
+            llm_models=summary_llm.models,
             ticket_id=ticket_id,
             acting_user_id=user.id,
             instruction=body.instruction,
@@ -1201,12 +1204,13 @@ async def request_refine(
             RefinePolicyDisabledError(f"Refine is disabled for queue {queue_id}")
         )
 
-    llm = (await require_task_llm(session, settings, policy, TASK_REFINE)).client
+    refine_llm = await require_task_llm(session, settings, policy, TASK_REFINE)
 
     try:
         result = await refine_text(
             session,
-            llm=llm,
+            llm=refine_llm.client,
+            llm_models=refine_llm.models,
             queue_id=queue_id,
             segments=[RefineSegment(kind=s.kind, text=s.text) for s in body.segments],
             tone=body.tone,
