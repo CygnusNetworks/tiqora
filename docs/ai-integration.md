@@ -261,8 +261,8 @@ Two admin-managed building blocks sit under the per-queue policies:
   budget (below). Only `openai_compat` can be created; a provider holds no
   model, capability or price data any more.
 - **Models, profiles and tasks** (`/admin/ai/models`) — see "Model routing"
-  below. Queue policies no longer point at a provider; they point at profiles
-  per task.
+  below. Queue policies no longer point at a provider; they point at
+  profiles per task.
 - **MCP clients** (`/admin/ai/mcp-clients`) — external MCP servers registered as
   tool sources the built-in agent may call, subject to the same ACLs. Each
   discovered tool is listed per client with its own `enabled` and `mutating`
@@ -304,8 +304,9 @@ Four levels, configured under Admin › KI › Modelle:
 | `refine` | Text verfeinern | — | uses the `agent` chain |
 | `vision` | Bilder beschreiben | vision | images are ignored |
 
-"Needs" is enforced on every model of a profile when it is assigned or edited
-(422 listing the tasks). Deleting a model that is in a profile, or a profile
+A disabled profile (`valid_id != 1`) behaves like no profile: the task's
+fallback from the table applies. "Needs" is enforced on every model of a
+profile when it is assigned or edited (422 listing the tasks). Deleting a model that is in a profile, or a profile
 that is assigned, returns 409 with the names. If every entry of a resolved
 profile is skipped, `agent` answers 409, `final_answer` falls back to the
 agent, `vision` is unused.
@@ -320,8 +321,11 @@ behaviour is unchanged on day one: each provider's `default_model` and every
 model referenced by a policy became a model row; identical chains share one
 profile (named `<model> @ <provider>`, ` +N` for fallbacks); the most
 frequent value per task became the global default and differing queues got
-override rows. Fixed on the way: triage with a different provider but no
-model no longer receives the queue's `model_override`; final answer and
+override rows. Triage rule: with the same provider as the agent (or none
+set) the triage model keeps the queue's `model_override`; with a different
+triage provider it uses that provider's own `default_model`. Fixed on the
+way: triage with a different provider but no model no longer receives the
+queue's `model_override`; final answer and
 vision now have fallback chains; a budget-exceeded primary falls back
 instead of returning 409; disabled providers/models are skipped; prices are
 per model; `anthropic` providers can no longer be created (the runtime only
@@ -662,7 +666,7 @@ first run — never replays history), drains the batch even outside
 "Readiness-Gate"). The auto-reply tick never overtakes the triage watermark.
 Per event it skips (cheapest check first) unless: the article is
 customer-authored and not `auto_generated`; the ticket's queue has a valid
-policy with `enabled_triage`, a `service_user_id` and a provider; the article
+policy with `enabled_triage`, a `service_user_id` and an agent profile; the article
 is the ticket's first (`MIN(article.id)`) and no later article exists; the
 ticket has no `tiqora_ai_triage` row yet, no `Move` history, is unlocked, was
 created by the system/postmaster user (an agent-created ticket is a human
@@ -714,7 +718,7 @@ editor):
 
 | Field | Default | Notes |
 |---|---|---|
-| `enabled_triage` | off | Requires `tiqora_primary`, a `service_user_id`, a provider and at least one target. |
+| `enabled_triage` | off | Requires `tiqora_primary`, a `service_user_id`, an agent profile and at least one target. |
 | `routing_description` | — | What belongs in **this** queue; shown to other queues' runs and under "stay" in this queue's run. Set it on every target. |
 | `triage_target_queue_ids` | — | JSON array of queue ids this queue may route into; validated at save (real, valid, not the queue itself). |
 | `triage_suggest_threshold` / `triage_auto_threshold` | 50 / 100 | 0–100; suggest must not exceed auto. |
@@ -824,8 +828,11 @@ prompt/completion tokens, success/error). `cost_hint` is computed at record
 time from the model's `price_input_per_1m` / `price_output_per_1m`
 (`tokens × price / 1e6` per side; a missing side counts as 0 only if the
 other is set, both unset = `null`, "no pricing configured", not "free"), in
-the provider's `price_currency` (no matching model row = `null`). Changing a price therefore does not
-re-price past rows. The same `cost_hint` sums drive the provider cost budget
+the provider's `price_currency`. The price is looked up on the model row
+that served the call (`llm_model_id` on `tiqora_ai_usage` and
+`tiqora_ai_audit_log`); only rows without it fall back to an exact, then
+longest-prefix, (provider, model name) match, and no match = `null`.
+Changing a price therefore does not re-price past rows. The same `cost_hint` sums drive the provider cost budget
 (see "Cost budget per provider"). `GET /api/v1/admin/ai/usage` lists rows
 with `queue_id`, `feature`, `from`, `to`, `page`, `page_size` (≤ 500)
 filters and returns total prompt/completion tokens for the filter; the admin
