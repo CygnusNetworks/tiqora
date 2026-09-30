@@ -759,7 +759,25 @@
       "error": "Die Überarbeitung ist fehlgeschlagen. Dein Text ist unverändert.",
       "nothingToRefineShort": "kein eigener Text",
       "toneMenuLabel": "Tonfall wählen",
-      "buttonShort": "Verfeinern"
+      "buttonShort": "Verfeinern",
+      "review": {
+        "title": "✦ Verfeinert · {{tone}}",
+        "count_one": "{{count}} Änderung",
+        "count_other": "{{count}} Änderungen",
+        "countPartial": "{{on}} von {{total}} Änderungen aktiv",
+        "inline": "Im Text",
+        "side": "Nebeneinander",
+        "before": "Vorher",
+        "after": "Nachher",
+        "prev": "Vorherige Änderung",
+        "next": "Nächste Änderung",
+        "discard": "Verwerfen",
+        "accept": "Übernehmen",
+        "toggleHint": "Klicken: Änderung zurücknehmen oder wieder übernehmen",
+        "noChanges": "Keine Änderungen vorgeschlagen",
+        "applied": "Verfeinert ({{tone}}) · {{on}} von {{total}} Änderungen übernommen",
+        "show": "Änderungen anzeigen"
+      }
     },
     "nav": {
       "label": "Herkunft",
