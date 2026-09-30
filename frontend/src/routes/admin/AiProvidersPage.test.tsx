@@ -11,6 +11,22 @@ const updateProvider = vi.fn();
 const deleteProvider = vi.fn();
 const testProvider = vi.fn();
 const duplicateProvider = vi.fn();
+const listModels = vi.fn();
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    children,
+    to,
+    ...rest
+  }: {
+    children: React.ReactNode;
+    to: string;
+  } & Record<string, unknown>) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -33,6 +49,7 @@ vi.mock("@/lib/aiApi", () => ({
     deleteProvider: (...args: unknown[]) => deleteProvider(...args),
     testProvider: (...args: unknown[]) => testProvider(...args),
     duplicateProvider: (...args: unknown[]) => duplicateProvider(...args),
+    listModels: (...args: unknown[]) => listModels(...args),
   },
 }));
 
@@ -41,13 +58,13 @@ const sampleProvider = {
   name: "Nebius",
   kind: "openai_compat",
   base_url: "https://api.studio.nebius.ai",
-  default_model: "llama-3.3-70b",
   has_api_key: true,
   extra_json: null,
-  supports_tools: true,
-  supports_streaming: true,
   eu_hosted: true,
-  supports_vision: false,
+  price_currency: "EUR",
+  budget_cost_day: null,
+  budget_cost_week: null,
+  budget_cost_month: null,
   valid_id: 1,
   create_time: "2026-07-01T00:00:00Z",
   change_time: "2026-07-01T00:00:00Z",
@@ -74,6 +91,12 @@ describe("AiProvidersPage", () => {
     deleteProvider.mockReset();
     testProvider.mockReset();
     duplicateProvider.mockReset();
+    listModels.mockReset();
+    listModels.mockResolvedValue([
+      { id: 10, provider_id: 1 },
+      { id: 11, provider_id: 1 },
+      { id: 12, provider_id: 2 },
+    ]);
 
     listProviders.mockResolvedValue({
       items: [sampleProvider],
@@ -109,23 +132,28 @@ describe("AiProvidersPage", () => {
     fireEvent.change(screen.getByTestId("admin-ai-provider-form-base_url"), {
       target: { value: "https://api.openai.com/v1" },
     });
-    fireEvent.change(
-      screen.getByTestId("admin-ai-provider-form-default_model"),
-      {
-        target: { value: "gpt-4.1" },
-      },
-    );
     fireEvent.click(screen.getByTestId("admin-ai-provider-form-submit"));
 
     await waitFor(() => {
       expect(createProvider).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "OpenAI",
+          kind: "openai_compat",
           base_url: "https://api.openai.com/v1",
-          default_model: "gpt-4.1",
         }),
       );
     });
+    const body = createProvider.mock.calls[0][0] as Record<string, unknown>;
+    // Model, capabilities, tool rounds and prices moved to the models page.
+    for (const gone of [
+      "default_model",
+      "supports_tools",
+      "supports_vision",
+      "max_tool_rounds",
+      "price_input_per_1m",
+    ]) {
+      expect(body).not.toHaveProperty(gone);
+    }
   });
 
   it("submits provider cost-budget fields via the drawer", async () => {
@@ -146,10 +174,6 @@ describe("AiProvidersPage", () => {
     fireEvent.change(screen.getByTestId("admin-ai-provider-form-base_url"), {
       target: { value: "https://api.example.com/v1" },
     });
-    fireEvent.change(
-      screen.getByTestId("admin-ai-provider-form-default_model"),
-      { target: { value: "model-a" } },
-    );
     fireEvent.change(
       screen.getByTestId("admin-ai-provider-form-budget_cost_day"),
       { target: { value: "5" } },
@@ -207,12 +231,7 @@ describe("AiProvidersPage", () => {
   });
 
   it("shows the test result after testing via the ⋯-menu", async () => {
-    testProvider.mockResolvedValue({
-      ok: true,
-      model: "llama-3.3-70b",
-      tool_calling_ok: true,
-      error: null,
-    });
+    testProvider.mockResolvedValue({ ok: true, detail: null, model_count: 42 });
     renderPage();
     await waitFor(() =>
       expect(
@@ -225,7 +244,7 @@ describe("AiProvidersPage", () => {
     await waitFor(() => {
       expect(
         screen.getByTestId("admin-ai-provider-test-result-1").textContent,
-      ).toMatch(/llama-3.3-70b/);
+      ).toMatch(/42/);
     });
   });
 
@@ -254,5 +273,43 @@ describe("AiProvidersPage", () => {
         "Nebius (Kopie)",
       ),
     );
+  });
+
+  it("offers only the OpenAI-compatible kind for a new provider", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("admin-ai-providers-new"));
+    fireEvent.click(screen.getByTestId("admin-ai-provider-form-kind"));
+    const menu = await screen.findByTestId("admin-ai-provider-form-kind-menu");
+    expect(menu.querySelectorAll('[role="option"]')).toHaveLength(1);
+    expect(
+      screen.getByTestId("admin-ai-provider-form-kind-menu-option-openai_compat"),
+    ).toBeInTheDocument();
+  });
+
+  it("links the provider's model count to the models page", async () => {
+    renderPage();
+    const link = await screen.findByTestId("admin-ai-provider-models-1");
+    await waitFor(() => expect(link.textContent).toMatch(/2/));
+    expect(link.getAttribute("href")).toBe("/admin/ai/models");
+  });
+
+  it("shows the server message when deleting is refused (409)", async () => {
+    const { ApiError } = await import("@/lib/api");
+    deleteProvider.mockRejectedValue(
+      new ApiError(
+        409,
+        "Modelle dieses Providers werden in Profil(en) „Agent“ verwendet.",
+        "/x",
+      ),
+    );
+    renderPage();
+    fireEvent.click(
+      await screen.findByTestId("admin-ai-provider-menu-trigger-1"),
+    );
+    fireEvent.click(await screen.findByTestId("admin-row-delete-1"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    expect(
+      (await screen.findByTestId("admin-ai-providers-action-error")).textContent,
+    ).toMatch(/Profil\(en\) „Agent“/);
   });
 });

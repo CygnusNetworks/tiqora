@@ -1202,7 +1202,8 @@
         "disclosure": "Dezvăluire și valori implicite globale",
         "disclosureText": "Text de divulgare implicit global",
         "globalCap": "Limită globală de răspuns automat (pe oră)",
-        "globalCapPlaceholder": "empty = oprit"
+        "globalCapPlaceholder": "empty = oprit",
+        "statModels": "Models"
       },
       "acl": {
         "title": "Controlul accesului (ACL)",
@@ -1247,35 +1248,29 @@
           "anthropic": "antropică"
         },
         "baseUrl": "Adresa URL de bază",
-        "defaultModel": "Model implicit",
         "flags": "Steaguri",
-        "flagTools": "Apelarea instrumentului",
-        "flagStreaming": "Streaming",
         "flagEu": "gazduit de UE",
-        "flagVision": "Viziunea",
-        "flagVisionHelp": "Acest furnizor poate descrie imagini (utilizate numai de atașamentul vizual pre-pass, niciodată pentru textul biletului).",
         "hasKey": "Set de chei API",
         "test": "Testează",
         "testAction": "Testați conexiunea",
-        "testOk": "OK",
         "testFail": "A eșuat",
         "duplicateAction": "Duplicat",
         "apiKey": "cheie API",
         "apiKeySetHelp": "Este stocată o cheie API. Lăsați gol pentru a-l păstra.",
         "apiKeyHelp": "Stocat criptat și nu se mai afișează niciodată.",
-        "deleteConfirm": "Ștergeți cu adevărat furnizorul „{{name}}”?",
-        "price": "Preț (1 milion de jetoane)",
-        "priceInput": "Preț introdus pentru 1 milion de jetoane",
-        "priceOutput": "Ieșire de preț pentru 1 milion de jetoane",
         "priceCurrency": "Moneda",
-        "priceHelp": "Costul pe 1 milion de jetoane (intrare/ieșire) în moneda dată - utilizat pentru calcularea costurilor în auditul LLM.",
         "priceCurrencyNone": "— niciunul —",
         "budgetCostDay": "Cost budget / day",
         "budgetCostWeek": "Cost budget / week",
         "budgetCostMonth": "Cost budget / month",
-        "maxToolRounds": "Max. runde de instrumente",
-        "maxToolRoundsHelp": "Câți pași de cercetare primește acest model înainte de a trebui să răspundă. Fiecare pas retrimite întreaga conversație, deci creșterea costă mai mult decât proporțional. Gol = valoarea implicită.",
-        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets."
+        "budgetCostHelp": "Optional spend cap in the provider's currency. Once reached, calls to this provider are blocked until the window resets.",
+        "modelCount_one": "{{count}} model",
+        "modelCount_other": "{{count}} models",
+        "testOkModels_one": "OK – the provider offers {{count}} model",
+        "testOkModels_other": "OK – the provider offers {{count}} models",
+        "priceCurrencyHelp": "Applies to the prices of all models of this provider and to the cost limits.",
+        "kindLegacyHelp": "Anthropic providers are no longer supported. New providers are always OpenAI-compatible.",
+        "deleteConfirmWithModels": "Really delete provider \"{{name}}\"? Its models are deleted with it."
       },
       "mcp": {
         "title": "Clienți MCP",
@@ -1570,6 +1565,124 @@
         "noHit": "Nicio lovitură",
         "hitDetail": "Regula #{{index}} · câmp: {{field}} · valoare: {{value}}",
         "requestError": "Testul a eșuat — vă rugăm să încercați din nou."
+      },
+      "models": {
+        "title": "Models",
+        "tabs": {
+          "models": "Models",
+          "profiles": "Profiles",
+          "tasks": "Tasks"
+        },
+        "intro": "An entry is always one model at exactly one provider. The model ID is exactly the name this provider expects in its API – best picked from the provider's model list rather than typed. The display name is for humans only. The same model at two providers means two entries.",
+        "new": "New model",
+        "empty": "No models yet. Create a provider first, then add its models here.",
+        "colName": "Display name",
+        "colProvider": "Provider",
+        "colModelId": "Model ID at the provider",
+        "colCaps": "Can",
+        "colPrice": "Price in / out",
+        "cap": {
+          "tools": "Tools",
+          "vision": "Images"
+        },
+        "inactive": "disabled",
+        "provider": "Provider",
+        "modelId": "Model ID at the provider",
+        "modelIdHelp": "Exactly as the provider names the model in its API.",
+        "loadRemote": "Load models from provider",
+        "loadRemoteDone_one": "{{count}} model loaded – pick it in the field.",
+        "loadRemoteDone_other": "{{count}} models loaded – pick one in the field.",
+        "loadRemoteFail": "Model list not loaded",
+        "displayName": "Display name",
+        "displayNameHelp": "For humans only. Leave empty to show the model ID.",
+        "supportsTools": "Can use tools",
+        "supportsVision": "Can read images",
+        "active": "Active",
+        "disableWarning": "This model is in profile {{profiles}}. While disabled it is skipped there; if a profile has no model left, its task has no model anymore.",
+        "priceInput": "Input price per 1M tokens",
+        "priceOutput": "Output price per 1M tokens",
+        "priceHelp": "In {{currency}}, the provider's currency. Basis for the costs in the LLM audit and for the cost limits.",
+        "priceHelpNoCurrency": "The provider has no currency set; costs are shown without a currency.",
+        "contextTokens": "Context length (tokens)",
+        "contextTokensHelp": "For information only. Empty = unknown.",
+        "maxToolRounds": "Max. tool rounds",
+        "maxToolRoundsHelp": "How many research steps this model gets before it must answer. Every step resends the whole conversation, so raising it costs disproportionately more. Empty = built-in default.",
+        "testAction": "Test",
+        "testOk": "OK",
+        "testFail": "Failed",
+        "testToolsOk": "tool call OK",
+        "testToolsFail": "tool call failed",
+        "deleteConfirm": "Really delete model \"{{name}}\"?"
+      },
+      "profiles": {
+        "title": "Profiles",
+        "intro": "A profile is an ordered list of models. If the first one fails, the next one takes over (fallback model). Every task requires certain capabilities, and every model in the profile must have them.",
+        "new": "New profile",
+        "empty": "No profiles yet.",
+        "name": "Name",
+        "descriptionField": "Description",
+        "models": "Models",
+        "modelsHelp": "Order = fallback order: the first model answers, the others step in when it fails.",
+        "noModelsYet": "No model in the profile yet.",
+        "addModel": "Add model …",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "remove": "Remove",
+        "needOneModel": "A profile needs at least one model.",
+        "timeout": "Timeout (seconds)",
+        "timeoutHelp": "Empty = global timeout.",
+        "timeoutValue": "Timeout {{seconds}} s",
+        "timeoutGlobal": "Timeout: global",
+        "active": "Active",
+        "inactive": "disabled",
+        "modelCount_one": "{{count}} model",
+        "modelCount_other": "{{count}} models",
+        "modelSkipped": "Disabled model – skipped",
+        "usedBy": "Used for",
+        "usedByNone": "no task",
+        "scopeGlobal": "global",
+        "inheritedVia": "inherited via {{task}}",
+        "deleteConfirm": "Really delete profile \"{{name}}\"?"
+      },
+      "tasks": {
+        "intro": "Global assignment. Queues inherit it and can override single tasks. Every task requires certain capabilities, and every model in the profile must have them.",
+        "colTask": "Task",
+        "colNeeds": "Needs",
+        "colProfile": "Profile",
+        "needsNothing": "nothing special",
+        "noProfile": "No own profile ({{fallback}})",
+        "cannot": "cannot: {{needs}}",
+        "profileInactive": "disabled",
+        "selectedInactive": "The profile is disabled and counts as \"No own profile\" ({{fallback}}).",
+        "saved": "Saved.",
+        "name": {
+          "agent": "Research and tools",
+          "final_answer": "Write the answer",
+          "triage": "Triage",
+          "summary": "Summarize",
+          "refine": "Refine text",
+          "vision": "Describe images"
+        },
+        "description": {
+          "agent": "Reads ticket and knowledge base, calls tools",
+          "final_answer": "Writes the customer text from the research result",
+          "triage": "Queue, customer and internal note for new tickets",
+          "summary": "Automatic and manual summaries",
+          "refine": "Reworks the draft in the reply editor",
+          "vision": "Describes image attachments before the other tasks"
+        },
+        "fallback": {
+          "agent": "no AI",
+          "final_answer": "research model answers itself",
+          "triage": "like research and tools",
+          "summary": "like research and tools",
+          "refine": "like research and tools",
+          "vision": "images are ignored"
+        },
+        "missing": {
+          "tools": "cannot use tools",
+          "vision": "cannot read images"
+        }
       }
     },
     "help": {
@@ -1783,7 +1896,8 @@
       "notificationEvents": "Evenimente de notificare",
       "ticketAttributeRelations": "Relații de atribute",
       "pgp": "PGP keys",
-      "smime": "S/MIME certificates"
+      "smime": "S/MIME certificates",
+      "aiModels": "Models"
     },
     "table": {
       "id": "ID",
@@ -2946,7 +3060,8 @@
       "notificationEvents": "Configurați notificările agenților declanșate de evenimente.",
       "ticketAttributeRelations": "Matrici de dependență compatibile Znuny (serviciu/coadă etc.) în CSV.",
       "pgp": "Import, inspect and delete the PGP keys used to sign, encrypt and decrypt mail.",
-      "smime": "Manage S/MIME certificates, private keys and signer relations."
+      "smime": "Manage S/MIME certificates, private keys and signer relations.",
+      "aiModels": "Models at the providers, profiles with fallback models, and which profile handles which task."
     },
     "types": {
       "title_plural": "Tipuri de tichete",

@@ -1288,9 +1288,12 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                     value: NONE,
                     label: t("admin.ai.queues.visionProviderNone"),
                   },
-                  ...(providersQ.data?.items ?? [])
-                    .filter((p) => p.supports_vision)
-                    .map((p) => ({ value: p.id, label: p.name })),
+                  // Vision capability moved to the model (Task 5 replaces
+                  // this field with the per-queue task table).
+                  ...(providersQ.data?.items ?? []).map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                  })),
                 ]}
                 placeholder={t("admin.form.selectPlaceholder")}
                 loading={providersQ.isLoading}
