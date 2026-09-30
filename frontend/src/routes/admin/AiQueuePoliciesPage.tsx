@@ -111,7 +111,13 @@ export function AiQueuePoliciesPage() {
   /** Profile "Recherche und Werkzeuge" runs on in this queue (own override,
    * else global default; a disabled profile counts as none). */
   const agentProfileLabel = (row: AiQueuePolicyOut) => {
-    if (!profilesQ.data || !taskDefaultsQ.data) return "";
+    if (profilesQ.isError || taskDefaultsQ.isError)
+      return (
+        <span className="text-danger">
+          ⚠ —
+        </span>
+      );
+    if (!profilesQ.data || !taskDefaultsQ.data) return "—";
     const byId = new Map(profilesQ.data.map((p) => [p.id, p]));
     const id = resolveTaskProfile(
       "agent",

@@ -504,8 +504,12 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     if (isEdit || autoProfileApplied.current || !form) return;
     if (!profilesQ.data || !taskDefaultsQ.data) return;
     autoProfileApplied.current = true;
-    if (form.task_profiles.has("agent") || globalDefaults.get("agent") != null)
-      return;
+    const globalAgent = globalDefaults.get("agent");
+    const globalAgentActive =
+      globalAgent != null &&
+      profilesQ.data.some((p) => p.id === globalAgent && p.valid_id === 1);
+    // A global default pointing at a disabled profile counts as none.
+    if (form.task_profiles.has("agent") || globalAgentActive) return;
     const only = profilesQ.data.length === 1 ? profilesQ.data[0] : null;
     if (!only || only.valid_id !== 1) return;
     if (missingNeeds("agent", only.entries).length > 0) return;
@@ -1019,12 +1023,21 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
             )}
 
             <div className="sm:col-span-2">
-              <QueueTaskProfilesTable
-                value={form.task_profiles}
-                onChange={(next) => setField("task_profiles", next)}
-                profiles={profilesQ.data ?? []}
-                globalDefaults={globalDefaults}
-              />
+              {profilesQ.data && taskDefaultsQ.data ? (
+                <QueueTaskProfilesTable
+                  value={form.task_profiles}
+                  onChange={(next) => setField("task_profiles", next)}
+                  profiles={profilesQ.data}
+                  globalDefaults={globalDefaults}
+                />
+              ) : (
+                <div
+                  className="flex justify-center py-6"
+                  data-testid="admin-ai-queue-models-loading"
+                >
+                  <Spinner />
+                </div>
+              )}
             </div>
           </div>
         )}
