@@ -25,6 +25,9 @@ import { EmailSecurityControl } from "./EmailSecurityControl";
 import { useEmailSecurity } from "./useEmailSecurity";
 import { MentionTextarea } from "./MentionTextarea";
 import { RefineControls } from "./RefineControls";
+import { toneLabelKey } from "@/lib/refineTone";
+import { RefineDiffView } from "./RefineDiffView";
+import { useRefineReview } from "./useRefineReview";
 import {
   defaultPendingDate,
   todayIso,
@@ -101,6 +104,9 @@ export function ReplyDialog({
   // Answer and quoted original share ONE editable field; the quote is seeded
   // below an empty answer area and the agent edits the whole thing inline.
   const [body, setBody] = useState("");
+  const refineReview = useRefineReview(setBody);
+  /** Text the open review would produce with its current on/off selection. */
+  const reviewTextRef = useRef("");
   const [templateId, setTemplateId] = useState("");
   // Collected while writing, recorded after the article is created.
   const [mentions, setMentions] = useState<PickedMention[]>([]);
@@ -306,6 +312,7 @@ export function ReplyDialog({
     const nextCc = parseRecipientList(baseline.cc);
     setSubject(baseline.subject);
     setBody(baseline.body);
+    refineReview.clear();
     setTo(parseRecipientList(baseline.to));
     setCc(nextCc);
     setBcc([]);
@@ -349,14 +356,14 @@ export function ReplyDialog({
   });
 
   const sendMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (text: string) => {
       await api.createArticle(ticketId, {
         sender_type: "agent",
         // Telegram has no subject line — the backend fills the ticket
         // title in. The field is hidden below, but seed it explicitly
         // rather than trusting `subject` never got edited some other way.
         subject: isTelegram ? "" : subject,
-        body,
+        body: text,
         content_type: "text/plain; charset=utf-8",
         channel: isTelegram ? "telegram" : "email",
         is_visible_for_customer: true,
@@ -377,7 +384,7 @@ export function ReplyDialog({
       // The reply is out; mentions and the booking follow and may fail on
       // their own without costing the message.
       return postComposerExtras(ticketId, {
-        body,
+        body: text,
         mentions,
         timeUnits,
         queryClient,
@@ -412,6 +419,18 @@ export function ReplyDialog({
       finishSend();
     },
   });
+
+  /** Sends the body — or, while a refine review is open, exactly the text its
+   * current on/off selection produces (as if "Übernehmen" had been pressed). */
+  const send = () => {
+    let text = body;
+    if (refineReview.review) {
+      text = reviewTextRef.current;
+      setBody(text);
+      refineReview.clear();
+    }
+    sendMutation.mutate(text);
+  };
 
   // Re-runs only the writes that failed, so a successful mention is never
   // duplicated by retrying a failed booking.
@@ -568,7 +587,7 @@ export function ReplyDialog({
                 size="sm"
                 data-testid="reply-send"
                 disabled={!canSend || (nextState === "pending" && !pendingDate)}
-                onClick={() => sendMutation.mutate()}
+                onClick={send}
               >
                 {sendMutation.isPending
                   ? t("ticket.replySending")
@@ -740,9 +759,23 @@ export function ReplyDialog({
             className="overflow-hidden rounded-lg border border-hairline bg-surface-subtle/40 focus-within:border-accent/60"
             data-testid="reply-editor"
           >
+            {refineReview.review ? (
+              <RefineDiffView
+                key={refineReview.reviewKey}
+                before={refineReview.review.before}
+                after={refineReview.review.after}
+                toneLabel={t(toneLabelKey(refineReview.review.tone))}
+                onAccept={refineReview.accept}
+                onDiscard={refineReview.discard}
+                onGroupsChange={(text) => {
+                  reviewTextRef.current = text;
+                }}
+                className="min-h-[19rem]"
+              />
+            ) : (
             <MentionTextarea
               value={body}
-              onChange={setBody}
+              onChange={refineReview.onEdit}
               mentions={mentions}
               onMentionsChange={setMentions}
               rows={12}
@@ -754,6 +787,7 @@ export function ReplyDialog({
               // only resurrect a draft for a reply that no longer exists.
               readOnly={extrasFailed.length > 0}
             />
+            )}
             {/* Read-only signature preview — backend appends on send; do not
                 put this into the editable body (would double on send).
                 Telegram never appends a signature. */}
@@ -790,10 +824,13 @@ export function ReplyDialog({
                 <RefineControls
                   target={{ ticket_id: ticketId }}
                   body={body}
-                  onChange={setBody}
+                  onChange={refineReview.onEdit}
                   disabled={extrasFailed.length > 0}
                   testIdPrefix="reply-refine"
                   variant="toolbar"
+                  onRefined={refineReview.onRefined}
+                  appliedStats={refineReview.applied?.stats ?? null}
+                  onShowChanges={refineReview.showChanges}
                 />
               )}
               <span className="ml-auto">

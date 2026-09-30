@@ -28,3 +28,8 @@ export function saveRefineTone(tone: RefineTone): void {
     // private mode / SSR — ignore
   }
 }
+
+/** i18n key of a tone's label (`ticket.refine.toneFormal`, ...). */
+export function toneLabelKey(tone: RefineTone): string {
+  return `ticket.refine.tone${tone[0].toUpperCase()}${tone.slice(1)}`;
+}
