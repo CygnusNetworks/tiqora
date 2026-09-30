@@ -141,6 +141,19 @@ def _seed_old_schema(sync_url: str) -> dict[str, int]:
                 },
             ),
             (
+                # Same model as the provider default, other case + trailing
+                # space: MariaDB's unique index would reject a second row.
+                "q4",
+                9904,
+                {
+                    "llm_provider_id": ids["p1"],
+                    "llm_fallback_json": None,
+                    "triage_llm_provider_id": None,
+                    "model_override": "Main-Model ",
+                    "vision_provider_id": None,
+                },
+            ),
+            (
                 "q3",
                 9903,
                 {
@@ -189,7 +202,7 @@ async def _resolved(
     out: dict[str, dict[str, list[tuple[int, str]]]] = {}
     try:
         async with factory() as session:
-            for key in ("q1", "q2", "q3"):
+            for key in ("q1", "q2", "q3", "q4"):
                 policy = await session.get(TiqoraAiQueuePolicy, ids[key])
                 out[key] = {
                     task: [(m.provider_id, m.model) for m in await _models(session, policy, task)]
@@ -250,6 +263,7 @@ def test_upgrade_resolves_like_before_and_downgrade_restores(alembic_env: str) -
         assert resolved["q2"]["triage"] == agent
         assert resolved["q2"]["vision"] == [(p2, "eye-model")]
         assert all(chain == [] for chain in resolved["q3"].values())
+        assert resolved["q4"]["agent"] == [(p1, "main-model")]
 
         engine = create_engine(sync_url)
         with engine.connect() as conn:

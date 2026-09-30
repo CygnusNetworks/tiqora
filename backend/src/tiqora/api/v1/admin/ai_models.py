@@ -39,7 +39,7 @@ async def _catalog_call[T](call: Awaitable[T]) -> T:
         return await call
     except llm_catalog.CatalogValidationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
     except llm_catalog.CatalogConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

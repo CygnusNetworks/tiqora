@@ -15,6 +15,7 @@ from datetime import datetime
 from typing import Any
 
 import pytest
+import structlog.testing
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -879,8 +880,14 @@ async def test_provider_budget_cost_day_exceeded_blocks_run(
             )
 
         _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
-        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        with structlog.testing.capture_logs() as logs:
+            totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
         assert totals["auto_replies"] == 0
+        # Visible in the logs at warning level, with the skip reasons.
+        skip = next(e for e in logs if e["event"] == "ai_auto_worker_cap_skip")
+        assert skip["log_level"] == "warning"
+        assert skip["reason"] == "llm_unavailable"
+        assert any("provider_budget_day" in r for r in skip["details"])
     finally:
         await engine.dispose()
 

@@ -341,11 +341,14 @@ async def _process_customer_article_event(
     try:
         task_llm = await build_task_llm(session, settings, policy, TASK_AGENT)
     except NoUsableModel as exc:
-        logger.info(
+        # Warning, not info: after a deploy a disabled provider or model
+        # silently stops all auto-replies of the queue otherwise.
+        logger.warning(
             "ai_auto_worker_cap_skip",
             ticket_id=ticket_id,
             queue_id=ticket.queue_id,
             reason="llm_unavailable",
+            profile=exc.profile_name,
             details=exc.reasons,
         )
         return None
@@ -384,7 +387,13 @@ async def _maybe_auto_summarize(session: AsyncSession, settings: Settings, ticke
     try:
         task_llm = await build_task_llm(session, settings, policy, TASK_SUMMARY)
     except NoUsableModel as exc:
-        logger.info("ai_auto_summary_skip", ticket_id=ticket_id, reasons=exc.reasons)
+        logger.warning(
+            "ai_auto_summary_skip",
+            ticket_id=ticket_id,
+            reason="llm_unavailable",
+            profile=exc.profile_name,
+            details=exc.reasons,
+        )
         return False
     if task_llm is None:
         return False

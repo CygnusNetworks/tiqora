@@ -499,6 +499,20 @@ async def _validated_model_fields(
     for price in (fields.price_input_per_1m, fields.price_output_per_1m):
         if price is not None and price < 0:
             raise CatalogValidationError("Preise dürfen nicht negativ sein.")
+    has_budget = any(
+        limit is not None
+        for limit in (
+            provider.budget_cost_day,
+            provider.budget_cost_week,
+            provider.budget_cost_month,
+        )
+    )
+    if has_budget and fields.price_input_per_1m is None and fields.price_output_per_1m is None:
+        # An unpriced model is never costed, so the provider budget would
+        # silently stop applying to everything it serves.
+        raise CatalogValidationError(
+            "Für diesen Provider ist ein Budget gesetzt – bitte Preise für das Modell angeben."
+        )
     clash = (
         await session.execute(
             select(TiqoraLlmModel.id).where(
