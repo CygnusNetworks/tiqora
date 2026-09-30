@@ -317,6 +317,11 @@ export function NewTicketPage() {
   };
 
   const richText = composeContextQ.data?.rich_text ?? false;
+  // A rich-text body is HTML and never reviewed: drop a review left open.
+  const clearReview = refineReview.clear;
+  useEffect(() => {
+    if (richText) clearReview();
+  }, [richText, clearReview]);
 
   const selectedState = statesQ.data?.find((s) => s.id === state);
   const pendingSelected = Boolean(selectedState?.type_name.startsWith("pending"));
@@ -910,6 +915,7 @@ export function NewTicketPage() {
               }
               appliedStats={refineReview.applied?.stats ?? null}
               onShowChanges={refineReview.showChanges}
+              reviewOpen={refineReview.review !== null}
               mode={ticketType === "phone" ? "call_note" : "message"}
             />
 
