@@ -113,7 +113,12 @@ export function AiQueuePoliciesPage() {
   const agentProfileLabel = (row: AiQueuePolicyOut) => {
     if (profilesQ.isError || taskDefaultsQ.isError)
       return (
-        <span className="text-danger">
+        <span
+          className="text-danger"
+          role="img"
+          title={t("admin.ai.queues.list.agentProfileError")}
+          aria-label={t("admin.ai.queues.list.agentProfileError")}
+        >
           ⚠ —
         </span>
       );
