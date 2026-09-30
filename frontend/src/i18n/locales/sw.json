@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Hakuna wateja waliopatikana.",
     "from": "Kutoka",
     "directionLabel": "Mwelekeo",
-    "directionIn": "Inayoingia",
-    "directionOut": "Nje",
     "submitSend": "Unda na utume",
     "sendError": "Barua pepe haikuweza kutumwa. Tikiti ilikuwa tayari imeundwa - tafadhali jaribu tena kutuma jibu kutoka hapo.",
     "goToTicket": "Nenda kwa tikiti",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

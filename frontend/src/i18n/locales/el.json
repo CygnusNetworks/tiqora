@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Δεν βρέθηκαν πελάτες.",
     "from": "Από",
     "directionLabel": "Κατεύθυνση",
-    "directionIn": "Εισερχόμενα",
-    "directionOut": "Εξερχόμενη",
     "submitSend": "Δημιουργία & αποστολή",
     "sendError": "Δεν ήταν δυνατή η αποστολή του email. Το εισιτήριο έχει ήδη δημιουργηθεί — δοκιμάστε ξανά να στείλετε την απάντηση από εκεί.",
     "goToTicket": "Πήγαινε στο εισιτήριο",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

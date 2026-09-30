@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Không tìm thấy khách hàng nào",
     "from": "Từ",
     "directionLabel": "Hướng",
-    "directionIn": "Trong nước",
-    "directionOut": "Đi",
     "submitSend": "Tạo và gửi",
     "sendError": "Không thể gửi email. Phiếu đã được tạo — vui lòng thử gửi lại thư trả lời từ đó.",
     "goToTicket": "Đi đến vé",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

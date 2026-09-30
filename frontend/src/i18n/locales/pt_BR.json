@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Nenhum cliente encontrado.",
     "from": "De",
     "directionLabel": "Direção",
-    "directionIn": "Entrada",
-    "directionOut": "Saída",
     "submitSend": "Criar e enviar",
     "sendError": "O e-mail não pôde ser enviado. O ticket já foi criado. Tente enviar a resposta novamente a partir daí.",
     "goToTicket": "Ir para o ticket",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

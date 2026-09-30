@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Не се најдени клиенти.",
     "from": "Од",
     "directionLabel": "Насока",
-    "directionIn": "Влезни",
-    "directionOut": "Излез",
     "submitSend": "Креирај и прати",
     "sendError": "Е-поштата не можеше да се испрати. Билетот е веќе создаден - ве молиме обидете се повторно да го испратите одговорот од таму.",
     "goToTicket": "Одете на билет",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

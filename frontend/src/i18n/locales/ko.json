@@ -1060,8 +1060,6 @@
     "noCustomerResults": "고객을 찾을 수 없습니다.",
     "from": "에서",
     "directionLabel": "방향",
-    "directionIn": "인바운드",
-    "directionOut": "아웃바운드",
     "submitSend": "작성 및 보내기",
     "sendError": "이메일을 보낼 수 없습니다. 티켓이 이미 생성되었습니다. 거기에서 답장을 다시 보내보세요.",
     "goToTicket": "티켓으로 이동",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

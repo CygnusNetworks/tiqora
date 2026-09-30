@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Ingen kunder funnet.",
     "from": "Fra",
     "directionLabel": "Retning",
-    "directionIn": "Innkommende",
-    "directionOut": "Utgående",
     "submitSend": "Opprett og send",
     "sendError": "E-posten kunne ikke sendes. Billetten er allerede opprettet – prøv å sende svaret på nytt derfra.",
     "goToTicket": "Gå til billett",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

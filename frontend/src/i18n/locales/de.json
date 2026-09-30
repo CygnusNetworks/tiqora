@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Keine Kunden gefunden.",
     "from": "Von",
     "directionLabel": "Richtung",
-    "directionIn": "Eingehend",
-    "directionOut": "Ausgehend",
     "submitSend": "Erstellen & senden",
     "sendError": "E-Mail konnte nicht versendet werden. Das Ticket wurde bereits angelegt — bitte die Antwort von dort erneut senden.",
     "goToTicket": "Zum Ticket",
@@ -3572,7 +3570,6 @@
     "openTickets": "Offene Tickets dieses Anrufers",
     "logOnTicket": "Anruf zu diesem Ticket erfassen",
     "pendingUntil": "Wartend bis",
-    "autoReplyHint": "Die Auto-Antwort der Queue geht an den Kunden (eingehende Anrufe).",
     "noCustomerNumber": "Keine Nummer"
   },
   "callPopup": {

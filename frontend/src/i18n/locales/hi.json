@@ -1060,8 +1060,6 @@
     "noCustomerResults": "कोई ग्राहक नहीं मिला.",
     "from": "से",
     "directionLabel": "दिशा",
-    "directionIn": "भीतर का",
-    "directionOut": "आउटबाउंड",
     "submitSend": "बनाएं और भेजें",
     "sendError": "ईमेल नहीं भेजा जा सका. टिकट पहले ही बन चुका था - कृपया वहां से उत्तर भेजने का पुनः प्रयास करें।",
     "goToTicket": "टिकट पर जाएँ",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

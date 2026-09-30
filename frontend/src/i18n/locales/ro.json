@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Nu s-au găsit clienți.",
     "from": "De la",
     "directionLabel": "Direcția",
-    "directionIn": "Intrare",
-    "directionOut": "Ieșire",
     "submitSend": "Creați și trimiteți",
     "sendError": "E-mailul nu a putut fi trimis. Biletul a fost deja creat - vă rugăm să reîncercați să trimiteți răspunsul de acolo.",
     "goToTicket": "Du-te la bilet",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

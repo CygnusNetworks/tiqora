@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Žádní zákazníci nenalezeni.",
     "from": "Od",
     "directionLabel": "Směr",
-    "directionIn": "Příchozí",
-    "directionOut": "Odchozí",
     "submitSend": "Vytvořit a odeslat",
     "sendError": "E-mail se nepodařilo odeslat. Tiket už byl vytvořen — zkuste odeslat odpověď z něj.",
     "goToTicket": "Přejít na tiket",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

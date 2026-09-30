@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Müşteri bulunamadı.",
     "from": "Başlangıç",
     "directionLabel": "Yön",
-    "directionIn": "Gelen",
-    "directionOut": "Giden",
     "submitSend": "Oluştur ve gönder",
     "sendError": "E-posta gönderilemedi. Bilet zaten oluşturuldu; lütfen yanıtı oradan göndermeyi yeniden deneyin.",
     "goToTicket": "Bilete git",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {

@@ -1060,8 +1060,6 @@
     "noCustomerResults": "Nav atrasts neviens klients.",
     "from": "No",
     "directionLabel": "Virziens",
-    "directionIn": "Ienākošais",
-    "directionOut": "Izejošais",
     "submitSend": "Izveidot un nosūtīt",
     "sendError": "E-pastu nevarēja nosūtīt. Biļete jau ir izveidota — lūdzu, mēģiniet vēlreiz nosūtīt atbildi no turienes.",
     "goToTicket": "Iet uz biļeti",
@@ -3564,7 +3562,6 @@
     "openTickets": "Open tickets of this caller",
     "logOnTicket": "Log call on this ticket",
     "pendingUntil": "Pending until",
-    "autoReplyHint": "The queue's auto reply goes to the customer (inbound calls).",
     "noCustomerNumber": "No number"
   },
   "callPopup": {
