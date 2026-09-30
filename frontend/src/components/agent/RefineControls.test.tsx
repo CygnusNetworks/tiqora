@@ -356,6 +356,7 @@ function ReviewHarness({
         }}
         appliedStats={rr.applied?.stats ?? null}
         onShowChanges={rr.showChanges}
+        reviewOpen={rr.review !== null}
       />
     </>
   );
@@ -431,6 +432,8 @@ describe("RefineControls with review (onRefined)", () => {
 
     fireEvent.click(screen.getByTestId("refine-show-changes"));
     expect(screen.getByTestId("refine-review")).toBeTruthy();
+    // No undo while the review is open.
+    expect(screen.queryByTestId("refine-undo")).toBeNull();
     fireEvent.click(screen.getByTestId("refine-review-discard"));
     expect(body()).toBe("Poliert.");
 

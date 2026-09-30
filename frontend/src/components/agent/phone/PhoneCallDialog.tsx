@@ -384,6 +384,7 @@ export function PhoneCallDialog({
               onRefined={refineReview.onRefined}
               appliedStats={refineReview.applied?.stats ?? null}
               onShowChanges={refineReview.showChanges}
+              reviewOpen={refineReview.review !== null}
               testIdPrefix="phone-refine"
               variant="toolbar"
               mode="call_note"

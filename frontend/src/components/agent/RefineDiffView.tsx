@@ -75,16 +75,7 @@ export function RefineDiffView({
   const [cur, setCur] = useState(-1);
   const curRef = useRef<HTMLElement | null>(null);
 
-  // A new before/after pair starts a fresh review.
-  const firstRun = useRef(true);
-  useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false;
-      return;
-    }
-    setGroups(buildRefineDiff(before, after));
-    setCur(-1);
-  }, [before, after]);
+  // A new refine gets a fresh view via the parent's `key`; no reset effect.
 
   useEffect(() => {
     curRef.current?.scrollIntoView?.({ block: "nearest" });
