@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
@@ -90,6 +90,11 @@ export function RefineControls({
   const [lastTone, setLastTone] = useState<RefineTone>("standard");
   /** The last refine came back identical to the input. */
   const [noChanges, setNoChanges] = useState(false);
+
+  // The message is about the text as it was; any edit makes it stale.
+  useEffect(() => {
+    setNoChanges(false);
+  }, [body]);
 
   const availabilityQ = useQuery({
     queryKey: ["ai-refine-availability", target],

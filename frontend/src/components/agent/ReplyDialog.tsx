@@ -105,8 +105,7 @@ export function ReplyDialog({
   // below an empty answer area and the agent edits the whole thing inline.
   const [body, setBody] = useState("");
   const refineReview = useRefineReview(setBody);
-  /** Text the open review would produce with its current on/off selection. */
-  const reviewTextRef = useRef("");
+  const clearReview = refineReview.clear;
   const [templateId, setTemplateId] = useState("");
   // Collected while writing, recorded after the article is created.
   const [mentions, setMentions] = useState<PickedMention[]>([]);
@@ -235,6 +234,7 @@ export function ReplyDialog({
     setShowBcc(nextBcc.length > 0);
     setShowReplyTo(nextReplyTo.trim().length > 0);
     setSubject(stored?.subject ?? serverSubject);
+    clearReview();
     setBody(stored?.body ?? serverBody);
   }, [
     draftQ.data,
@@ -244,6 +244,7 @@ export function ReplyDialog({
     ticketId,
     articleId,
     replyAll,
+    clearReview,
   ]);
 
   const aiDraftId = initialDraft?.id ?? null;
@@ -423,13 +424,7 @@ export function ReplyDialog({
   /** Sends the body — or, while a refine review is open, exactly the text its
    * current on/off selection produces (as if "Übernehmen" had been pressed). */
   const send = () => {
-    let text = body;
-    if (refineReview.review) {
-      text = reviewTextRef.current;
-      setBody(text);
-      refineReview.clear();
-    }
-    sendMutation.mutate(text);
+    sendMutation.mutate(refineReview.flush() ?? body);
   };
 
   // Re-runs only the writes that failed, so a successful mention is never
@@ -468,7 +463,10 @@ export function ReplyDialog({
   const onPickTemplate = (id: string) => {
     setTemplateId(id);
     const tpl = templates.find((x) => String(x.id) === id);
-    if (tpl) setBody((prev) => `${tpl.text}\n${prev}`);
+    if (tpl) {
+      refineReview.clear();
+      setBody((prev) => `${tpl.text}\n${prev}`);
+    }
   };
 
   const title = useMemo(
@@ -767,9 +765,7 @@ export function ReplyDialog({
                 toneLabel={t(toneLabelKey(refineReview.review.tone))}
                 onAccept={refineReview.accept}
                 onDiscard={refineReview.discard}
-                onGroupsChange={(text) => {
-                  reviewTextRef.current = text;
-                }}
+                onGroupsChange={refineReview.onGroupsChange}
                 className="min-h-[19rem]"
               />
             ) : (

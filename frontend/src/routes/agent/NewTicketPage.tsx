@@ -269,7 +269,7 @@ export function NewTicketPage() {
     savePhoneDraft(tk.id, {
       direction,
       subject: subject.trim(),
-      body,
+      body: refineReview.flush() ?? body,
       elapsed: timer.elapsed,
     });
     requestPhoneCall(tk.id, { direction, number: callerNumber.trim() || null });
@@ -357,6 +357,8 @@ export function NewTicketPage() {
       setError(t("newTicket.validationError"));
       return;
     }
+    // Submitting while a refine review is open = accept as marked.
+    const text = refineReview.flush() ?? body;
     setSubmitting(true);
     try {
       if (ticketType === "phone") {
@@ -380,7 +382,7 @@ export function NewTicketPage() {
           pending_time: pendingSelected ? pendingIso(phoneFields.pendingAt) : null,
           phone_call: {
             direction,
-            body,
+            body: text,
             content_type: "text/plain",
             is_visible_for_customer: true,
             time_unit: minutes,
@@ -414,7 +416,7 @@ export function NewTicketPage() {
           channel: "email",
           is_visible_for_customer: true,
           subject: subject.trim(),
-          body,
+          body: text,
           content_type: richText
             ? "text/html; charset=utf-8"
             : "text/plain; charset=utf-8",
@@ -868,6 +870,7 @@ export function NewTicketPage() {
                   toneLabel={t(toneLabelKey(refineReview.review.tone))}
                   onAccept={refineReview.accept}
                   onDiscard={refineReview.discard}
+                  onGroupsChange={refineReview.onGroupsChange}
                   className="min-h-[15rem] rounded-md border border-hairline"
                 />
               </div>

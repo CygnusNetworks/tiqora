@@ -93,6 +93,7 @@ export function PhoneCallDialog({
   const [subjectTouched, setSubjectTouched] = useState(Boolean(draft?.subject));
   const [body, setBody] = useState(draft?.body ?? "");
   const refineReview = useRefineReview(setBody);
+  const { review: reviewOpen, currentReviewText } = refineReview;
   const [callTimer] = useState(() => timerFromCall(startedAt, endedAt));
   const timer = useCallTimer(callTimer ?? { initialSeconds: draft?.elapsed ?? 0 });
   const [timeUnits, setTimeUnits] = useState("");
@@ -152,17 +153,19 @@ export function PhoneCallDialog({
   useEffect(() => {
     const handle = window.setTimeout(() => {
       if (savedRef.current) return;
-      if (body.trim() || subjectTouched) {
+      // While a refine review is open the text to keep is its current selection.
+      const text = reviewOpen ? currentReviewText() : body;
+      if (text.trim() || subjectTouched) {
         savePhoneDraft(ticketId, {
           direction,
           subject: subjectTouched ? subject : "",
-          body,
+          body: text,
           elapsed: timer.elapsed,
         });
       }
     }, 400);
     return () => window.clearTimeout(handle);
-  }, [ticketId, direction, subject, subjectTouched, body, timer.elapsed]);
+  }, [ticketId, direction, subject, subjectTouched, body, timer.elapsed, reviewOpen, currentReviewText]);
 
   const missing = missingRequired(fields, dfValues);
   const callbackIso = pendingIso(callbackAt);
@@ -187,12 +190,12 @@ export function PhoneCallDialog({
   };
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: (text: string) => {
       const units = Number(effectiveTime);
       return phoneApi.logPhoneCall(ticketId, {
         direction,
         subject: subject.trim(),
-        body,
+        body: text,
         content_type: "text/plain",
         is_visible_for_customer: visible,
         time_unit: Number.isFinite(units) && units > 0 ? units : null,
@@ -287,7 +290,7 @@ export function PhoneCallDialog({
             size="sm"
             data-testid="phone-save"
             disabled={!canSave}
-            onClick={() => saveMutation.mutate()}
+            onClick={() => saveMutation.mutate(refineReview.flush() ?? body)}
           >
             {saveMutation.isPending ? t("phone.saving") : t("phone.save")}
           </Button>
@@ -361,6 +364,7 @@ export function PhoneCallDialog({
                 toneLabel={t(toneLabelKey(refineReview.review.tone))}
                 onAccept={refineReview.accept}
                 onDiscard={refineReview.discard}
+                onGroupsChange={refineReview.onGroupsChange}
                 className="min-h-[12rem] rounded-md border border-hairline"
               />
             ) : (

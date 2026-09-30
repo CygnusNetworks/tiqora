@@ -438,6 +438,15 @@ describe("RefineControls with review (onRefined)", () => {
     expect(body()).toBe("roh getippt");
   });
 
+  it("drops the no-changes message once the text is edited", async () => {
+    refine.mockResolvedValue({ sections: [{ id: 0, text: "schon gut" }] });
+    renderReview("schon gut");
+    await pressRefine();
+    await screen.findByTestId("refine-no-changes");
+    fireEvent.change(screen.getByTestId("body"), { target: { value: "schon gut!" } });
+    expect(screen.queryByTestId("refine-no-changes")).toBeNull();
+  });
+
   it("compares a second refine against the text right before it", async () => {
     refine.mockResolvedValueOnce({ sections: [{ id: 0, text: "Eins zwei." }] });
     const spy = vi.fn();
