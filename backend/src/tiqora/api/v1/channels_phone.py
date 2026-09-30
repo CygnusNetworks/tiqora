@@ -139,7 +139,7 @@ async def call_event(
     redis_client: Annotated[redis.Redis, Depends(get_redis)],
     x_tiqora_phone_secret: str | None = Header(default=None),
 ) -> CallEventAccepted:
-    """PBX call events (ringing / answered / hangup) for the agent call popup.
+    """PBX call events (ringing / answered / hangup / handled) for the agent call popup.
 
     Body as JSON or form-encoded (same fields). The extension is mapped to
     agents via their ``TiqoraPhoneExtension`` preference; an event nobody is

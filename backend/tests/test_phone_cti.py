@@ -240,6 +240,69 @@ async def test_dismissed_agent_is_not_renotified() -> None:
     assert result.recipients == [8]
 
 
+async def test_handled_dismisses_card_for_all_notified_agents() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing")
+    await _event(redis, "ringing", ext="101")
+    redis.published.clear()
+    result = await _event(redis, "handled", ext=None, number=None, at=T0 + timedelta(seconds=25))
+
+    assert result.recipients == [7, 8]
+    [msg] = redis.events()
+    assert msg["event"] == "dismissed"
+    assert msg["user_ids"] == [7, 8]
+    stored = json.loads(redis.store["tiqora:call:c1"])
+    assert stored["state"] == "ended"
+    assert stored["ended_at"].startswith("2026-09-29T10:00:25")
+    assert stored["dismissed_user_ids"] == [7, 8]
+    for uid in (7, 8):
+        assert await cti.list_active_calls(cast(Any, redis), uid, now=T0) == []
+
+
+async def test_handled_after_answered_is_ignored() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing")
+    await _event(redis, "answered", at=T0 + timedelta(seconds=3))
+    redis.published.clear()
+    result = await _event(redis, "handled", ext=None, at=T0 + timedelta(seconds=9))
+
+    assert result.recipients == []
+    assert redis.published == []
+    assert json.loads(redis.store["tiqora:call:c1"])["state"] == "answered"
+    assert [c.call_id for c in await cti.list_active_calls(cast(Any, redis), 7, now=T0)] == ["c1"]
+
+
+async def test_handled_for_unknown_call_is_ignored() -> None:
+    redis = _FakeRedis()
+    result = await _event(redis, "handled", ext=None)
+    assert result.recipients == []
+    assert redis.store == {}
+
+
+async def test_handled_twice_notifies_nobody_the_second_time() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing")
+    assert (await _event(redis, "handled", ext=None)).recipients == [7]
+    assert (await _event(redis, "handled", ext=None)).recipients == []
+
+
+async def test_late_hangup_after_handled_does_not_reopen() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing")
+    await _event(redis, "handled", ext=None, at=T0 + timedelta(seconds=25))
+    redis.published.clear()
+    late = await _event(redis, "hangup", ext=None, at=T0 + timedelta(seconds=60))
+    ring = await _event(redis, "ringing", at=T0 + timedelta(seconds=61))
+
+    assert late.recipients == [] and ring.recipients == []
+    assert redis.events() == []
+    stored = json.loads(redis.store["tiqora:call:c1"])
+    assert stored["state"] == "ended"
+    assert stored["ended_at"].startswith("2026-09-29T10:00:25")
+    assert stored["dismissed_user_ids"] == [7]
+    assert await cti.list_active_calls(cast(Any, redis), 7, now=T0) == []
+
+
 # ---------------------------------------------------------------------------
 # SSE filter
 # ---------------------------------------------------------------------------
@@ -351,6 +414,30 @@ async def test_webhook_accepts_form_encoded_body(monkeypatch: pytest.MonkeyPatch
         assert bad.status_code == 422
     [msg] = redis.events()
     assert msg["call"]["ringing_at"] == "2026-09-29T10:00:00+00:00"
+
+
+async def test_webhook_accepts_form_encoded_handled(monkeypatch: pytest.MonkeyPatch) -> None:
+    from httpx import ASGITransport, AsyncClient
+
+    redis = _FakeRedis()
+    app = _app(redis, monkeypatch)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        headers = {"X-Tiqora-Phone-Secret": "s3cret"}
+        await client.post("/api/v1/channels/phone/events", data=RINGING, headers=headers)
+        resp = await client.post(
+            "/api/v1/channels/phone/events",
+            data={"event": "handled", "call_id": RINGING["call_id"]},
+            headers=headers,
+        )
+        assert resp.status_code == 202, resp.text
+        assert resp.json() == {"accepted": True, "delivered_to": 1}
+        bad = await client.post(
+            "/api/v1/channels/phone/events",
+            data={"event": "nope", "call_id": RINGING["call_id"]},
+            headers=headers,
+        )
+        assert bad.status_code == 422
+    assert redis.events()[-1]["event"] == "dismissed"
 
 
 async def test_webhook_unknown_extension_is_202(monkeypatch: pytest.MonkeyPatch) -> None:

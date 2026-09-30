@@ -9,7 +9,7 @@ import type { ActiveCall } from "./phoneApi";
  * viewer (answered by a colleague) is hidden by `visibleCalls`.
  */
 
-export type CallEventName = "ringing" | "answered" | "hangup" | "dismissed";
+export type CallEventName = "ringing" | "answered" | "hangup" | "handled" | "dismissed";
 
 export type CallEventMessage = {
   type: "call_event";

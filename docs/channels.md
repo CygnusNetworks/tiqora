@@ -221,9 +221,9 @@ the agent can read.
   `X-Tiqora-Phone-Secret` / `channel.phone.enabled` gate as `/note` (401 bad
   secret, 404 channel disabled). Body as JSON **or** form-encoded (same
   fields — Asterisk's `CURL()` posts form data):
-  `event` (`ringing`|`answered`|`hangup`), `call_id` (PBX-unique, e.g.
+  `event` (`ringing`|`answered`|`hangup`|`handled`), `call_id` (PBX-unique, e.g.
   Asterisk `${UNIQUEID}` of the caller leg), `caller_number`, `extension`
-  (the agent's extension that rings/answered; optional on `hangup`),
+  (the agent's extension that rings/answered; optional on `hangup`/`handled`),
   `direction` (`inbound` default | `outbound`), `timestamp` (ISO 8601 or
   epoch seconds, naive = UTC; default: time of receipt).
   Answers `202 {"accepted": true, "delivered_to": n}`; an unknown extension
@@ -238,8 +238,13 @@ the agent can read.
   2 h (number, extension, direction, agents, ringing/answered/ended times).
   A ring group sends one `ringing` per extension with the same `call_id` —
   the audience grows; `answered` narrows the call to the answering
-  extension's agents (the others' cards disappear); `hangup` ends it. Late
-  events never reopen an ended call. Nothing is written to the database until
+  extension's agents (the others' cards disappear); `hangup` ends it (the
+  card then reads "missed" and stays loggable for 15 min); `handled` means the
+  PBX took the call over itself (secretary / IVR / voicemail): it ends the call
+  and dismisses the card for every notified agent, never offered for logging;
+  it is ignored for unknown calls and once an agent has answered. In the
+  dialplan send `handled` instead of `hangup` when the call continues on the
+  PBX. Late events never reopen an ended call. Nothing is written to the database until
   the agent logs the call.
 - **Push**: SSE message `{"type": "call_event", "user_ids": [...], "event",
   "call": {...}}`, forwarded by `/events/stream` only to the listed agents.
