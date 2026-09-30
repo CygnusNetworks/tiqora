@@ -107,4 +107,32 @@ describe("RefineDiffView", () => {
     setup({ before: "a b", after: "a b" });
     expect(screen.getByTestId("refine-review")).toHaveTextContent("Keine Änderungen vorgeschlagen");
   });
+
+  it("keeps a turned-off pure insertion visible and restorable", () => {
+    setup({ before: "Hallo Welt", after: "Hallo liebe Welt" });
+    const change = screen.getByTestId("refine-review-change");
+    fireEvent.click(change);
+    const off = screen.getByTestId("refine-review-change");
+    expect(off).toHaveTextContent("liebe");
+    expect(off).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(off);
+    expect(screen.getByTestId("refine-review-change")).toHaveAttribute("aria-pressed", "true");
+    // side view, new column, while off
+    fireEvent.click(screen.getByTestId("refine-review-view-side"));
+    fireEvent.click(screen.getAllByTestId("refine-review-change")[0]);
+    const cols = screen.getAllByTestId("refine-review-change");
+    expect(cols[1]).toHaveTextContent("liebe");
+    fireEvent.click(cols[1]);
+    expect(screen.getAllByTestId("refine-review-change")[0]).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("mutes quotes in both side-view columns", () => {
+    const q = "\n\n> Zitat";
+    setup({ before: "a" + q, after: "b" + q });
+    fireEvent.click(screen.getByTestId("refine-review-view-side"));
+    const muted = Array.from(
+      screen.getByTestId("refine-review").querySelectorAll("span.text-muted"),
+    ).filter((m) => m.textContent?.includes("> Zitat"));
+    expect(muted).toHaveLength(2);
+  });
 });
