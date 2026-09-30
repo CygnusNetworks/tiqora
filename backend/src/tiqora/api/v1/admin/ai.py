@@ -24,7 +24,9 @@ the next auto-reply run.
 LLM models: a queue policy's ``task_profiles`` (its task overrides) are
 validated by :func:`tiqora.ai.llm_catalog.normalize_task_profiles`, and an
 enabled AI feature must resolve to a profile
-(:func:`tiqora.ai.llm_catalog.check_policy_llm_requirements`, 422). That check
+(:func:`tiqora.ai.llm_catalog.check_policy_llm_requirements`, 422 — only when
+the create/update newly leaves a feature unserved, so a queue already without
+a profile can still get unrelated edits). That check
 runs here, before the service call, so it precedes the gate's 409 like the old
 "needs a provider" validation did; service-level callers (tests, seed code)
 can still write a policy first and assign profiles afterwards. Models,
@@ -483,21 +485,24 @@ async def update_queue_policy_route(
         raise _not_found("Queue policy", policy_id)
     fields = body.model_dump(exclude_unset=True, exclude={"task_profiles"})
     try:
+        stored_overrides = (await llm_catalog.load_queue_task_profiles(session, [row.id])).get(
+            row.id, {}
+        )
         new_overrides: dict[str, int | None] | None = None
         if body.task_profiles is not None:
             new_overrides = await llm_catalog.normalize_task_profiles(
                 session, [(i.task, i.profile_id) for i in body.task_profiles]
             )
-            overrides = new_overrides
-        else:
-            overrides = (await llm_catalog.load_queue_task_profiles(session, [row.id])).get(
-                row.id, {}
-            )
-        flags = {
-            flag: fields.get(flag, getattr(row, flag))
-            for flag, _task, _label in llm_catalog.POLICY_FEATURE_TASKS
+        stored_flags = {
+            flag: getattr(row, flag) for flag, _task, _label in llm_catalog.POLICY_FEATURE_TASKS
         }
-        await llm_catalog.check_policy_llm_requirements(session, flags=flags, overrides=overrides)
+        await llm_catalog.check_policy_llm_requirements(
+            session,
+            flags={flag: fields.get(flag, value) for flag, value in stored_flags.items()},
+            overrides=new_overrides if new_overrides is not None else stored_overrides,
+            previous_flags=stored_flags,
+            previous_overrides=stored_overrides,
+        )
         updated = await ai_policies.update_queue_policy(
             session, row, change_by=admin.id, task_profiles=new_overrides, **fields
         )
