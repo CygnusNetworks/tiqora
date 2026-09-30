@@ -101,6 +101,7 @@ class PolicyRow:
     vision_provider_id: int | None = None
     triage_llm_provider_id: int | None = None
     triage_model_override: str | None = None
+    valid_id: int = 1
 
 
 ModelKey = tuple[int, str]  # (provider_id, API model id)
@@ -255,45 +256,56 @@ def _global_value(values: list[int | None]) -> int | None:
     return min(v for v in tied if v is not None)
 
 
+# Tasks whose profiles must be tools-capable (TASK_NEEDS in llm_routing).
+_TOOL_TASKS = frozenset({"agent", "final_answer", "triage"})
+
+
 def _plan_conversion(providers: list[ProviderRow], policies: list[PolicyRow]) -> ConversionPlan:
     plan = ConversionPlan()
     by_id = {p.id: p for p in providers}
-    known_models: dict[ModelKey, ModelPlan] = {}
+    # (provider_id, casefolded stripped name) -> first spelling seen. MariaDB's
+    # *_ci collation (PAD SPACE) treats "GPT-4o", "gpt-4o" and "gpt-4o " as
+    # the same value, so the unique (provider_id, model_id) index would
+    # reject them mid-migration; they are one model row here.
+    spelling: dict[tuple[int, str], str] = {}
+    model_order: list[ModelKey] = []
+    tool_keys: set[ModelKey] = set()
 
-    def _ensure_model(key: ModelKey) -> None:
-        if key in known_models:
-            return
-        provider = by_id[key[0]]
-        row = ModelPlan(
-            provider_id=provider.id,
-            model_id=key[1],
-            supports_tools=bool(provider.supports_tools),
-            supports_vision=bool(provider.supports_vision),
-            max_tool_rounds=provider.max_tool_rounds,
-            price_input_per_1m=provider.price_input_per_1m,
-            price_output_per_1m=provider.price_output_per_1m,
-        )
-        known_models[key] = row
-        plan.models.append(row)
+    def _canon(key: ModelKey) -> ModelKey:
+        provider_id, model = key
+        model = model.strip() or by_id[provider_id].default_model.strip()
+        canonical = spelling.setdefault((provider_id, model.casefold()), model)
+        out = (provider_id, canonical)
+        if out not in model_order:
+            model_order.append(out)
+        return out
 
-    # 1. Every provider's default model.
+    # 1. Every provider's default model (its spelling wins).
     for provider in sorted(providers, key=lambda p: p.id):
-        _ensure_model((provider.id, provider.default_model))
+        _canon((provider.id, provider.default_model))
 
     # 2./3. Per-policy chains (creating any referenced model on the way).
     profile_index: dict[tuple[ModelKey, ...], int] = {}
     taken_names: set[str] = set()
     values: dict[str, dict[int, int | None]] = {task: {} for task in TASKS}
+    valid_policy: dict[int, bool] = {}
     for policy in sorted(policies, key=lambda p: p.id):
-        chains = _policy_chains(policy, by_id)
+        valid_policy[policy.id] = policy.valid_id == 1
+        raw_chains = _policy_chains(policy, by_id)
+        # The old runtime ignored vision providers without supports_vision
+        # (images were never described) — no vision chain for those.
+        vision = raw_chains.get("vision")
+        if vision is not None and not by_id[vision[0][0]].supports_vision:
+            del raw_chains["vision"]
         for task in TASKS:
-            chain = chains.get(task)
-            if chain is None:
+            raw = raw_chains.get(task)
+            if raw is None:
                 values[task][policy.id] = None
                 continue
+            chain = _dedupe([_canon(key) for key in raw])
             plan.chains[(policy.id, task)] = chain
-            for key in chain:
-                _ensure_model(key)
+            if task in _TOOL_TASKS:
+                tool_keys.update(chain)
             # 4. Identical chains share one profile.
             if chain not in profile_index:
                 name = _unique_name(_profile_base_name(chain, by_id), taken_names)
@@ -301,10 +313,32 @@ def _plan_conversion(providers: list[ProviderRow], policies: list[PolicyRow]) ->
                 plan.profiles.append(ProfilePlan(name=name, models=chain))
             values[task][policy.id] = profile_index[chain]
 
+    for key in model_order:
+        provider = by_id[key[0]]
+        plan.models.append(
+            ModelPlan(
+                provider_id=provider.id,
+                model_id=key[1],
+                # The old runtime never read the provider's supports_tools, so
+                # a model serving a tools task gets it — otherwise the
+                # converted profiles would violate "needs tools" and every
+                # later admin save would be rejected.
+                supports_tools=bool(provider.supports_tools) or key in tool_keys,
+                supports_vision=bool(provider.supports_vision),
+                max_tool_rounds=provider.max_tool_rounds,
+                price_input_per_1m=provider.price_input_per_1m,
+                price_output_per_1m=provider.price_output_per_1m,
+            )
+        )
+
     # 5. Global default = most frequent value; queue rows where they differ.
     for task in TASKS:
         per_policy = values[task]
-        global_value = _global_value(list(per_policy.values()))
+        # Only valid policies vote; every other one that differs still gets
+        # its own queue row, so its resolution is unchanged.
+        global_value = _global_value(
+            [value for pid, value in per_policy.items() if valid_policy[pid]]
+        )
         if global_value is not None:
             plan.task_defaults[task] = global_value
         for policy_id, value in per_policy.items():
@@ -583,13 +617,14 @@ def upgrade() -> None:
             vision_provider_id=r.vision_provider_id,
             triage_llm_provider_id=r.triage_llm_provider_id,
             triage_model_override=r.triage_model_override,
+            valid_id=int(r.valid_id),
         )
         for r in bind.execute(
             sa.text(
                 "SELECT id, llm_provider_id, model_override, llm_fallback_json, "
                 "final_answer_llm_provider_id, final_answer_model_override, "
-                "vision_provider_id, triage_llm_provider_id, triage_model_override "
-                "FROM tiqora_ai_queue_policy"
+                "vision_provider_id, triage_llm_provider_id, triage_model_override, "
+                "valid_id FROM tiqora_ai_queue_policy"
             )
         )
     ]

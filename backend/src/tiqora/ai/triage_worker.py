@@ -294,7 +294,14 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
     try:
         task_llm = await build_task_llm(session, settings, policy, TASK_TRIAGE)
     except NoUsableModel as exc:
-        logger.info("ai_triage_llm_unavailable", ticket_id=ticket_id, reasons=exc.reasons)
+        logger.warning(
+            "ai_triage_llm_unavailable",
+            ticket_id=ticket_id,
+            queue_id=ticket.queue_id,
+            reason="llm_unavailable",
+            profile=exc.profile_name,
+            details=exc.reasons,
+        )
         return "llm_unavailable"
     if task_llm is None:
         return "no_provider"

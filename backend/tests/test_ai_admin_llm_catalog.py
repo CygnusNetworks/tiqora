@@ -881,3 +881,23 @@ async def test_queue_already_without_profile_still_accepts_unrelated_edits(
         ),
     )
     assert detail.startswith("Kein Modellprofil für: Automatische Antworten.")
+
+
+async def test_model_without_prices_is_rejected_when_the_provider_has_a_budget(
+    session: AsyncSession,
+) -> None:
+    """An unpriced model is never costed — provider budgets would silently
+    stop applying to it."""
+    budgeted = await _provider(session, "budgeted", price_currency="EUR", budget_cost_week=10.0)
+    detail = await _expect(422, _model(session, budgeted, "free-ride"))
+    assert "Budget" in detail and "Preise" in detail
+    priced = await _model(session, budgeted, "priced", price_output_per_1m=2.0)
+    await _expect(
+        422,
+        ai_models.update_llm_model(
+            priced.id, LlmModelIn(provider_id=budgeted, model_id="priced"), _admin(), session
+        ),
+    )
+    # No budget on the provider: prices stay optional.
+    unbudgeted = await _provider(session, "unbudgeted")
+    assert (await _model(session, unbudgeted, "free")).price_input_per_1m is None
