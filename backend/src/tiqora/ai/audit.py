@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.ai.llm import LlmClient, LlmHttpError, LlmMessage, LlmResponse
 from tiqora.ai.models import TiqoraAiAuditLog, TiqoraLlmProvider
 from tiqora.ai.pii import PiiMapper
-from tiqora.ai.usage import load_model_prices, match_model_price, price_cost
+from tiqora.ai.usage import ModelPriceRow, load_model_prices, match_model_price, price_cost
 from tiqora.config import Settings
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 
@@ -86,6 +86,9 @@ class AuditContext:
     trigger: str | None = None
     provider_id: int | None = None
     model: str | None = None
+    # The tiqora_llm_model row expected to serve the call (pricing source);
+    # replaced by the fallback client's active entry after a call.
+    llm_model_id: int | None = None
 
 
 def _own_session_factory(session: AsyncSession) -> async_sessionmaker[AsyncSession]:
@@ -163,6 +166,7 @@ async def write_audit_log(
         provider_id=context.provider_id,
         provider_name=provider_name,
         model=context.model or "",
+        llm_model_id=context.llm_model_id,
         feature=context.feature,
         ticket_id=context.ticket_id,
         queue_id=context.queue_id,
@@ -186,6 +190,20 @@ async def write_audit_log(
         logger.exception(
             "ai_audit_write_failed", feature=context.feature, ticket_id=context.ticket_id
         )
+
+
+def _served_context(inner: LlmClient, context: AuditContext) -> AuditContext:
+    """After a successful call through a fallback chain, attribute the row to
+    the entry that actually answered (not the chain's first entry)."""
+    active_model_id = getattr(inner, "active_llm_model_id", None)
+    if active_model_id is None:
+        return context
+    return replace(
+        context,
+        llm_model_id=active_model_id,
+        provider_id=getattr(inner, "active_provider_id", None) or context.provider_id,
+        model=getattr(inner, "active_model", None) or context.model,
+    )
 
 
 class AuditingLlmClient:
@@ -236,6 +254,7 @@ class AuditingLlmClient:
         error: str | None = None
         response_json: str | None = None
         model_used = self._context.model
+        served_context = self._context
         prompt_tokens: int | None = None
         completion_tokens: int | None = None
         try:
@@ -248,6 +267,7 @@ class AuditingLlmClient:
             )
             status_code = 200
             model_used = response.model or model_used
+            served_context = _served_context(self._inner, self._context)
             prompt_tokens = response.usage.prompt_tokens
             completion_tokens = response.usage.completion_tokens
             response_json = json.dumps(
@@ -278,7 +298,7 @@ class AuditingLlmClient:
             await write_audit_log(
                 self._session,
                 settings=self._settings,
-                context=replace(self._context, model=model_used),
+                context=replace(served_context, model=model_used),
                 request_json=json.dumps(request_payload),
                 response_json=response_json,
                 status_code=status_code,
@@ -354,10 +374,10 @@ async def list_audit_log(
 @dataclass(frozen=True, slots=True)
 class ProviderPrices:
     """One provider's currency plus its model price rows
-    ``(model_id, price_input_per_1m, price_output_per_1m)``."""
+    ``(llm_model_id, model_id, price_input_per_1m, price_output_per_1m)``."""
 
     currency: str | None
-    models: list[tuple[str, float | None, float | None]]
+    models: list[ModelPriceRow]
 
 
 async def load_provider_prices(
@@ -391,6 +411,7 @@ def _cost_for(
     provider_id: int | None,
     model: str | None,
     *,
+    llm_model_id: int | None,
     prompt_tokens: int,
     completion_tokens: int,
 ) -> tuple[float | None, str | None]:
@@ -400,7 +421,7 @@ def _cost_for(
     if provider is None:
         return None, None
     cost = price_cost(
-        match_model_price(provider.models, model),
+        match_model_price(provider.models, model, llm_model_id=llm_model_id),
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
     )
@@ -411,13 +432,14 @@ def compute_entry_cost(
     entry: TiqoraAiAuditLog, prices: dict[int, ProviderPrices]
 ) -> tuple[float | None, str | None]:
     """``(cost, currency)`` for one audit row given a bulk-loaded price map
-    (see :func:`load_provider_prices`), priced by the row's provider *and*
-    model. ``(None, None)`` when the row has no provider, no model row of
-    that provider matches, or neither price component is set."""
+    (see :func:`load_provider_prices`), priced by the model row that served
+    the call, or — unknown — by the row's model name. ``(None, None)`` when
+    the row has no provider, no model row matches, or no price is set."""
     return _cost_for(
         prices,
         entry.provider_id,
         entry.model,
+        llm_model_id=entry.llm_model_id,
         prompt_tokens=entry.prompt_tokens or 0,
         completion_tokens=entry.completion_tokens or 0,
     )
@@ -512,7 +534,7 @@ async def _audit_log_cost_totals(
     session: AsyncSession, *, filters: list[Any]
 ) -> tuple[float | None, str | None]:
     """Total cost across all rows matching ``filters`` (not just one page),
-    grouped by provider and model so each model's tokens are priced with its
+    grouped by provider, model name and model row so each model's tokens are priced with its
     own rates. ``total_cost`` is only ever a number when every group that
     contributed tokens and has pricing shares the same currency — otherwise
     ``(None, None)``, since summing mismatched currencies would silently
@@ -522,11 +544,16 @@ async def _audit_log_cost_totals(
             select(
                 TiqoraAiAuditLog.provider_id,
                 TiqoraAiAuditLog.model,
+                TiqoraAiAuditLog.llm_model_id,
                 func.coalesce(func.sum(TiqoraAiAuditLog.prompt_tokens), 0),
                 func.coalesce(func.sum(TiqoraAiAuditLog.completion_tokens), 0),
             )
             .where(*filters, TiqoraAiAuditLog.provider_id.is_not(None))
-            .group_by(TiqoraAiAuditLog.provider_id, TiqoraAiAuditLog.model)
+            .group_by(
+                TiqoraAiAuditLog.provider_id,
+                TiqoraAiAuditLog.model,
+                TiqoraAiAuditLog.llm_model_id,
+            )
         )
     ).all()
     if not groups:
@@ -536,11 +563,12 @@ async def _audit_log_cost_totals(
     total = 0.0
     currencies: set[str | None] = set()
     priced_any = False
-    for provider_id, model, prompt_sum, completion_sum in groups:
+    for provider_id, model, llm_model_id, prompt_sum, completion_sum in groups:
         cost, currency = _cost_for(
             prices,
             provider_id,
             model,
+            llm_model_id=llm_model_id,
             prompt_tokens=int(prompt_sum),
             completion_tokens=int(completion_sum),
         )

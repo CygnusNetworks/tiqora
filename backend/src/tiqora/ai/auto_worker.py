@@ -59,7 +59,7 @@ from tiqora.ai.llm_routing import (
     TASK_SUMMARY,
     NoUsableModel,
     build_task_llm,
-    require_task_llm,
+    no_profile_error,
 )
 from tiqora.ai.models import (
     FEATURE_AUTO_REPLY,
@@ -351,13 +351,14 @@ async def _process_customer_article_event(
         return None
     if task_llm is None:
         # No agent profile at all: an error, as before (no provider).
-        task_llm = await require_task_llm(session, settings, policy, TASK_AGENT)
+        raise no_profile_error(TASK_AGENT)
     bundle = await kb_bundle(session, settings, policy.service_user_id, policy)
 
     return await run_ticket_agent(
         session,
         settings=settings,
         llm=task_llm.client,
+        llm_models=task_llm.models,
         ticket_id=ticket_id,
         trigger=TRIGGER_AUTO,
         acting_user_id=None,
@@ -390,6 +391,7 @@ async def _maybe_auto_summarize(session: AsyncSession, settings: Settings, ticke
     await summary_service.summarize_ticket(
         session,
         llm=task_llm.client,
+        llm_models=task_llm.models,
         ticket_id=ticket_id,
         trigger=summary_service.TRIGGER_AUTO,
         acting_user_id=None,

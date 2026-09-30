@@ -33,6 +33,7 @@ import json
 import re
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,7 +54,7 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.llm import LlmClient, LlmMessage
-from tiqora.ai.llm_routing import TASK_REFINE, resolve_task_models
+from tiqora.ai.llm_routing import ChainModel, primary_of, served_identity
 from tiqora.ai.models import FEATURE_REFINE
 from tiqora.ai.ner import extract_person_names
 from tiqora.ai.pii import PiiMapper
@@ -454,12 +455,17 @@ async def refine_text(
     run_id: str | None = None,
     mode: str = MODE_MESSAGE,
     language: str | None = None,
+    llm_models: Sequence[ChainModel] = (),
 ) -> RefineResult:
     """Rewrite the agent's own sections of *segments*; quotes are context only.
 
     Returns the refined text keyed by segment index. Raises
     :class:`RefineEmptyOutputError` when nothing usable came back, so the
     caller can leave the composer exactly as the agent left it.
+
+    ``llm_models`` are the usable models behind ``llm`` (the caller's
+    ``TaskLlm.models``); the first supplies the default provider/model for
+    audit and usage.
     """
     policy = await get_queue_policy_by_queue(session, queue_id)
     if policy is None or not policy.enabled_refine:
@@ -494,10 +500,10 @@ async def refine_text(
     )
     pii = PiiMapper(known_names=known_names or None, never_mask=never_mask or None)
 
-    # The refine profile's first usable model: default provider/model for
-    # audit and usage (a fallback that actually served overrides it).
-    refine_models = await resolve_task_models(session, policy, TASK_REFINE)
-    primary_model = refine_models[0] if refine_models else None
+    # The refine chain's first usable model (resolved by the caller): default
+    # provider/model for audit and usage (a fallback that actually served
+    # overrides it).
+    primary_model = primary_of(llm_models)
     audit_context = AuditContext(
         feature=AUDIT_FEATURE_REFINE,
         run_id=run_id or uuid.uuid4().hex,
@@ -507,6 +513,7 @@ async def refine_text(
         trigger="manual",
         provider_id=primary_model.provider_id if primary_model else None,
         model=primary_model.model if primary_model else None,
+        llm_model_id=primary_model.llm_model_id if primary_model else None,
     )
     raw_llm = llm
     audited = AuditingLlmClient(
@@ -565,21 +572,16 @@ async def refine_text(
             recovered.update(single)
         sections = recovered if len(recovered) == len(section_ids) else None
 
+    served_provider_id, served_model, served_llm_model_id = served_identity(raw_llm, primary_model)
     await usage_service.record_usage(
         session,
         user_id=acting_user_id,
         queue_id=queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_REFINE,
-        provider_id=(
-            getattr(raw_llm, "active_provider_id", None)
-            or (primary_model.provider_id if primary_model else None)
-        ),
-        model=(
-            model_served
-            or getattr(raw_llm, "active_model", None)
-            or (primary_model.model if primary_model else None)
-        ),
+        provider_id=served_provider_id,
+        model=model_served or served_model,
+        llm_model_id=served_llm_model_id,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool(sections),

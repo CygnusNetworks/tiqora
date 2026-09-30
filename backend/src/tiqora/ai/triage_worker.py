@@ -53,6 +53,7 @@ from tiqora.ai.llm_routing import (
     NoUsableModel,
     build_task_llm,
     resolve_task_profile_id,
+    served_identity,
 )
 from tiqora.ai.models import (
     FEATURE_TRIAGE,
@@ -316,6 +317,7 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
             trigger="auto",
             provider_id=task_llm.models[0].provider_id,
             model=task_llm.models[0].model,
+            llm_model_id=task_llm.models[0].llm_model_id,
         ),
         session=session,
         pii_mapper=pii,
@@ -342,13 +344,17 @@ async def _process_event(session: AsyncSession, settings: Settings, event: Outbo
         decision=decision,
     )
 
+    served_provider_id, served_model, served_llm_model_id = served_identity(
+        raw_llm, task_llm.models[0]
+    )
     await usage_service.record_usage(
         session,
         queue_id=ticket.queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_TRIAGE,
-        provider_id=decision.provider_id or task_llm.models[0].provider_id,
-        model=decision.model or task_llm.models[0].model,
+        provider_id=served_provider_id,
+        model=decision.model or served_model,
+        llm_model_id=served_llm_model_id,
         prompt_tokens=decision.prompt_tokens,
         completion_tokens=decision.completion_tokens,
         success=decision.error is None,
