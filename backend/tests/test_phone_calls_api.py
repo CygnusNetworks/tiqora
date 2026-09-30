@@ -455,14 +455,38 @@ async def test_invalid_direction_is_422(
 
 
 @pytest.mark.asyncio
-async def test_phone_screen_dynamic_fields_fall_back_to_all_editable_ticket_fields(
+async def test_phone_screen_without_configured_dynamic_fields_offers_none(
     db: tuple[str, async_sessionmaker[AsyncSession]],
 ) -> None:
+    """Nothing enabled in ``###DynamicField`` → no fields (no "all fields" fallback)."""
     url, factory = db
     _seed(url)
     async with _client(factory, AGENT_RW) as client:
+        for screen in ("AgentTicketPhone", "AgentTicketPhoneInbound", "AgentTicketPhoneOutbound"):
+            resp = await client.get("/api/v1/reference/dynamic-fields", params={"screen": screen})
+            assert resp.status_code == 200, resp.text
+            assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_phone_screen_dynamic_fields_report_optional_and_required(
+    db: tuple[str, async_sessionmaker[AsyncSession]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.znuny.sysconfig import SysConfig
+
+    url, factory = db
+    _seed(url)
+    original = SysConfig.get
+
+    async def fake_get(self: SysConfig, name: str, default: Any = None) -> Any:
+        if name == "Ticket::Frontend::AgentTicketPhone###DynamicField":
+            return {"PhoneCallTopic": 1, "ProcessManagementProcessID": 1}
+        return await original(self, name, default)
+
+    monkeypatch.setattr(SysConfig, "get", fake_get)
+    async with _client(factory, AGENT_RW) as client:
         resp = await client.get(
-            "/api/v1/reference/dynamic-fields", params={"screen": "AgentTicketPhoneInbound"}
+            "/api/v1/reference/dynamic-fields", params={"screen": "AgentTicketPhone"}
         )
     assert resp.status_code == 200, resp.text
     by_name = {f["name"]: f for f in resp.json()}

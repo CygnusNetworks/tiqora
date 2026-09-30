@@ -4849,6 +4849,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/{login}/suggested-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggested Queue
+         * @description Queue for a new ticket of this customer user, for the current agent.
+         *
+         *     Newest ticket of the customer user (``source=customer``) → newest ticket of
+         *     their company (``company``) → the screen's ``QueueDefault`` sysconfig
+         *     (``default``) → first queue that is not Junk/Raw/Postmaster (``fallback``).
+         *     Only queues the agent may create tickets in; tickets in Junk/Raw/Postmaster
+         *     never count. Unknown logins just skip the history steps. Both fields are
+         *     null when the agent may create tickets nowhere.
+         */
+        get: operations["suggested_queue_api_v1_customers__login__suggested_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/events/stream": {
         parameters: {
             query?: never;
@@ -5428,9 +5455,11 @@ export interface paths {
          * @description Ticket dynamic fields to show on a screen, in field order.
          *
          *     Reads ``Ticket::Frontend::<screen>###DynamicField`` (1 = shown, 2 =
-         *     required); when that config enables nothing, every valid, non-internal
-         *     ticket field of an editable type is offered (optional). Article-level
-         *     fields are not offered -- the write paths set ticket fields only.
+         *     required); only valid, non-internal ticket fields of an editable type that
+         *     config enables are offered. Nothing enabled → empty list (no "all fields"
+         *     fallback: stock Znuny enables none on the phone screens, and offering every
+         *     field there filled the form with unrelated ones). Article-level fields are
+         *     not offered -- the write paths set ticket fields only.
          */
         get: operations["screen_dynamic_fields_api_v1_reference_dynamic_fields_get"];
         put?: never;
@@ -5964,6 +5993,31 @@ export interface paths {
          *     ticket id.
          */
         get: operations["my_ticket_counts_api_v1_tickets_my_counts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/new/default-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * New Ticket Default Queue
+         * @description Queue a new ticket starts in before (or without) a customer.
+         *
+         *     The screen's ``QueueDefault`` sysconfig (``source=default``), else the first
+         *     queue that is not Junk/Raw/Postmaster (``fallback``), else the first queue;
+         *     only queues the agent may create tickets in. With a customer use
+         *     ``GET /customers/{login}/suggested-queue``.
+         */
+        get: operations["new_ticket_default_queue_api_v1_tickets_new_default_queue_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7408,6 +7462,8 @@ export interface components {
         ActiveCall: {
             /** Answered At */
             answered_at: string | null;
+            /** Answered By User Id */
+            answered_by_user_id?: number | null;
             /** Call Id */
             call_id: string;
             /**
@@ -13064,6 +13120,16 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+        };
+        /**
+         * QueueSuggestion
+         * @description Queue a new ticket starts in and which rule picked it (both null: none).
+         */
+        QueueSuggestion: {
+            /** Queue Id */
+            queue_id: number | null;
+            /** Source */
+            source: ("customer" | "company" | "default" | "fallback") | null;
         };
         /** QueueTemplateAssignment */
         QueueTemplateAssignment: {
@@ -28783,6 +28849,44 @@ export interface operations {
             };
         };
     };
+    suggested_queue_api_v1_customers__login__suggested_queue_get: {
+        parameters: {
+            query?: {
+                /** @description New-ticket form variant */
+                screen?: "phone" | "email";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueSuggestion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     stream_events_api_v1_events_stream_get: {
         parameters: {
             query?: never;
@@ -31243,6 +31347,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyTicketCounts"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_ticket_default_queue_api_v1_tickets_new_default_queue_get: {
+        parameters: {
+            query?: {
+                /** @description New-ticket form variant */
+                screen?: "phone" | "email";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueSuggestion"];
                 };
             };
             /** @description Validation Error */

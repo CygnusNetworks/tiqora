@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -14,6 +16,11 @@ from tiqora.api.v1.admin.common import (
 )
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.domain.customer_service import CustomerService
+from tiqora.domain.new_ticket_queue import (
+    NewTicketScreen,
+    QueueSuggestion,
+    suggest_new_ticket_queue,
+)
 from tiqora.domain.schemas import CustomerUserOut
 
 router = APIRouter(prefix="/customers", tags=["customers"])
@@ -111,3 +118,22 @@ async def get_customer(
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return result
+
+
+@router.get("/{login}/suggested-queue", response_model=QueueSuggestion)
+async def suggested_queue(
+    login: str,
+    user: CurrentUser,
+    session: DbSession,
+    screen: Annotated[NewTicketScreen, Query(description="New-ticket form variant")] = "phone",
+) -> QueueSuggestion:
+    """Queue for a new ticket of this customer user, for the current agent.
+
+    Newest ticket of the customer user (``source=customer``) → newest ticket of
+    their company (``company``) → the screen's ``QueueDefault`` sysconfig
+    (``default``) → first queue that is not Junk/Raw/Postmaster (``fallback``).
+    Only queues the agent may create tickets in; tickets in Junk/Raw/Postmaster
+    never count. Unknown logins just skip the history steps. Both fields are
+    null when the agent may create tickets nowhere.
+    """
+    return await suggest_new_ticket_queue(session, user.id, screen, login)

@@ -166,6 +166,52 @@ async def test_ring_group_unions_then_answer_narrows_and_tells_the_others() -> N
     assert stored["answered_at"].startswith("2026-09-29T10:00:05")
 
 
+async def test_answered_by_one_agent_is_recorded_for_the_owner_prefill() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing", ext="100")
+    await _event(redis, "ringing", ext="101")
+    ringing = json.loads(redis.store["tiqora:call:c1"])
+    assert ringing["answered_by_user_id"] is None
+
+    await _event(redis, "answered", ext="101", at=T0 + timedelta(seconds=5))
+    stored = json.loads(redis.store["tiqora:call:c1"])
+    assert stored["answered_by_user_id"] == 8
+    assert redis.events()[-1]["call"]["answered_by_user_id"] == 8
+    # Survives hangup and is what list_active_calls hands the popup.
+    await _event(redis, "hangup", ext=None, number=None, at=T0 + timedelta(seconds=60))
+    [call] = await cti.list_active_calls(cast(Any, redis), 8, now=T0 + timedelta(seconds=61))
+    assert call.answered_by_user_id == 8
+
+
+async def test_answered_on_a_shared_extension_names_nobody() -> None:
+    redis = _FakeRedis()
+    mapping = {"100": [7], "200": [7, 9]}
+    await _event(redis, "ringing", ext="100", mapping=mapping)
+    await _event(redis, "answered", ext="200", mapping=mapping)
+    stored = json.loads(redis.store["tiqora:call:c1"])
+    assert stored["user_ids"] == [7, 9]
+    assert stored["answered_by_user_id"] is None
+
+
+async def test_answered_without_extension_names_nobody() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing")
+    await _event(redis, "answered", ext=None)
+    stored = json.loads(redis.store["tiqora:call:c1"])
+    assert stored["state"] == "answered"
+    assert stored["answered_by_user_id"] is None
+
+
+async def test_call_state_stored_before_answered_by_existed_still_loads() -> None:
+    redis = _FakeRedis()
+    await _event(redis, "ringing")
+    stored = json.loads(redis.store["tiqora:call:c1"])
+    del stored["answered_by_user_id"]
+    redis.store["tiqora:call:c1"] = json.dumps(stored)
+    await _event(redis, "answered")
+    assert json.loads(redis.store["tiqora:call:c1"])["answered_by_user_id"] == 7
+
+
 async def test_hangup_ends_call_and_keeps_number_and_users() -> None:
     redis = _FakeRedis()
     await _event(redis, "ringing")

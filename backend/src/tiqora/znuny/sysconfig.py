@@ -73,6 +73,12 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     "AutoResponseForWebTickets": 1,
 }
 
+# New-ticket screen (API wire value) → QueueDefault sysconfig key (a queue name).
+NEW_TICKET_QUEUE_DEFAULT_KEYS: Final[dict[str, str]] = {
+    "phone": "Ticket::Frontend::AgentTicketPhone###QueueDefault",
+    "email": "Ticket::Frontend::AgentTicketEmail###QueueDefault",
+}
+
 # Composer action name (API wire value) → RequiredLock sysconfig key.
 REQUIRED_LOCK_ACTIONS: Final[dict[str, str]] = {
     "compose": "Ticket::Frontend::AgentTicketCompose###RequiredLock",
@@ -289,6 +295,20 @@ class SysConfig:
     async def postmaster_user_id(self) -> int:
         return int(await self.get("PostmasterUserID", 1) or 1)
 
+    # --- new-ticket screens ---
+
+    async def new_ticket_queue_default(self, screen: str) -> str | None:
+        """``Ticket::Frontend::AgentTicket{Phone,Email}###QueueDefault`` (a queue name).
+
+        *screen* is ``phone`` or ``email``. ``None`` when unset, disabled or
+        not a plain name (Znuny ships the setting disabled and empty).
+        """
+        key = NEW_TICKET_QUEUE_DEFAULT_KEYS[screen]
+        value = await self.get(key, "")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return None
+
     # --- session lifetime (compat GenericInterface) ---
 
     async def session_max_time(self) -> int:
@@ -366,6 +386,7 @@ def yaml_encode_effective(value: Any) -> bytes:
 
 # Re-export for type checkers / callers that build fixtures
 __all__ = [
+    "NEW_TICKET_QUEUE_DEFAULT_KEYS",
     "TIQORA_SYSCONFIG_KEYS",
     "ZNUNY_SETTING_DEFAULTS",
     "SysConfig",
