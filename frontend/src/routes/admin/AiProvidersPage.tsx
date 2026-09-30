@@ -23,9 +23,12 @@ import { Menu, MenuItem, MenuSeparator } from "@/components/ui/Menu";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import {
+  MODELS_KEY,
+  PROVIDERS_KEY,
+  numberOrNull,
+} from "@/components/admin/ai-models/shared";
 
-const QUERY_KEY = ["admin", "ai", "providers"] as const;
-const MODELS_KEY = ["admin", "ai", "models"] as const;
 /** Only OpenAI-compatible providers can be created; a legacy Anthropic row
  * keeps its kind (the select offers it only while editing that row). */
 const CREATABLE_KIND: ProviderKind = "openai_compat";
@@ -72,7 +75,7 @@ export function AiProvidersPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const listQ = useQuery({
-    queryKey: QUERY_KEY,
+    queryKey: PROVIDERS_KEY,
     queryFn: ({ signal }) => aiApi.listProviders(signal),
   });
 
@@ -91,7 +94,7 @@ export function AiProvidersPage() {
 
   const invalidate = () =>
     Promise.all([
-      qc.invalidateQueries({ queryKey: QUERY_KEY }),
+      qc.invalidateQueries({ queryKey: PROVIDERS_KEY }),
       // Deleting a provider deletes its models; names show on the models page.
       qc.invalidateQueries({ queryKey: MODELS_KEY }),
     ]);
@@ -166,13 +169,6 @@ export function AiProvidersPage() {
     setDrawerOpen(true);
   };
 
-  const priceOrNull = (v: unknown): number | null => {
-    const s = String(v ?? "").trim();
-    if (!s) return null;
-    const n = Number(s.replace(",", "."));
-    return Number.isFinite(n) && n >= 0 ? n : null;
-  };
-
   const handleSubmit = async (values: FieldValues) => {
     setFormError(null);
     const kind = values.kind as ProviderKind;
@@ -184,9 +180,9 @@ export function AiProvidersPage() {
         String(values.price_currency ?? "")
           .trim()
           .toUpperCase() || null,
-      budget_cost_day: priceOrNull(values.budget_cost_day),
-      budget_cost_week: priceOrNull(values.budget_cost_week),
-      budget_cost_month: priceOrNull(values.budget_cost_month),
+      budget_cost_day: numberOrNull(values.budget_cost_day),
+      budget_cost_week: numberOrNull(values.budget_cost_week),
+      budget_cost_month: numberOrNull(values.budget_cost_month),
     };
     const apiKey =
       typeof values.api_key === "string" ? values.api_key.trim() : "";

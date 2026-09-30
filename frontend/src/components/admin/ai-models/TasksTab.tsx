@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { aiApi, type AiTaskProfileItem, type LlmProfileOut } from "@/lib/aiApi";
+import { aiApi, type AiTaskProfileItem } from "@/lib/aiApi";
 import {
   AI_TASKS,
   AI_TASK_NEEDS,
@@ -9,7 +9,6 @@ import {
   aiTaskDescriptionKey,
   aiTaskFallbackKey,
   aiTaskNameKey,
-  missingNeeds,
   taskProfileMap,
   type AiTask,
 } from "@/lib/aiTasks";
@@ -17,7 +16,13 @@ import { Badge } from "@/components/ui/Badge";
 import { SelectField } from "@/components/ui/SelectField";
 import type { SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
-import { PROFILES_KEY, TASK_DEFAULTS_KEY, errorText, invalidateCatalog } from "./shared";
+import {
+  PROFILES_KEY,
+  TASK_DEFAULTS_KEY,
+  errorText,
+  invalidateCatalog,
+  taskProfileItems,
+} from "./shared";
 
 const NONE = "none";
 
@@ -64,22 +69,7 @@ export function TasksTab() {
       value: NONE,
       label: t("admin.ai.tasks.noProfile", { fallback: t(aiTaskFallbackKey(task)) }),
     },
-    ...profiles.map((p: LlmProfileOut) => {
-      const missing = missingNeeds(task, p.entries);
-      return {
-        value: String(p.id),
-        label: p.name,
-        disabled: missing.length > 0,
-        hint:
-          missing.length > 0
-            ? t("admin.ai.tasks.cannot", {
-                needs: missing.map((n) => t(aiNeedLabelKey(n))).join(", "),
-              })
-            : p.valid_id !== 1
-              ? t("admin.ai.tasks.profileInactive")
-              : undefined,
-      };
-    }),
+    ...taskProfileItems(task, profiles, t),
   ];
 
   if (defaultsQ.isLoading || profilesQ.isLoading) {
