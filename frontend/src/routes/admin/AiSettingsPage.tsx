@@ -5,7 +5,6 @@ import { aiApi, type AiSettingsUpdate, type OperationMode } from "@/lib/aiApi";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/cn";
-
 import {
   MODELS_KEY,
   POLICIES_KEY,

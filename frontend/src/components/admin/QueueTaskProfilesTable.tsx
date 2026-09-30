@@ -81,6 +81,8 @@ export function QueueTaskProfilesTable({
     // Resolved to something other than the task's own level → the agent's.
     const ownLevel = value.has(task) ? value.get(task) : globalDefaults.get(task);
     const own = ownLevel === id;
+    // Static hint: entries carry only the model's validity, not its provider's
+    // (a disabled provider is skipped by the backend but not visible here).
     const first = profile.entries.find((e) => e.valid_id === 1) ?? profile.entries[0];
     return (
       <div className="min-w-0">
