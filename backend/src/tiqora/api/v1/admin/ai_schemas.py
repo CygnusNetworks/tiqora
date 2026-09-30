@@ -35,8 +35,8 @@ class AiSettingsOut(BaseModel):
     # Global kill-switch for auto-reply (independent of operation_mode).
     auto_reply_paused: bool = False
     default_max_tool_rounds: int = 0
-    """Read-only: the built-in tool-round budget a provider gets when it does
-    not set its own. Served so the provider form can show it as a placeholder
+    """Read-only: the built-in tool-round budget a model gets when it does
+    not set its own. Served so the model form can show it as a placeholder
     instead of the help text naming a number that would go stale in 48 locale
     files the next time the default moves."""
 
@@ -102,10 +102,116 @@ class LlmProviderUpdate(BaseModel):
 
 
 class LlmProviderTestOut(BaseModel):
+    """Result of reading the provider's model list (URL + key check)."""
+
+    ok: bool
+    detail: str | None
+    model_count: int | None
+
+
+class RemoteModelsOut(BaseModel):
+    models: list[str]
+
+
+# ---------------------------------------------------------------------------
+# LLM models, profiles, task assignments (tiqora.ai.llm_catalog)
+# ---------------------------------------------------------------------------
+
+
+class LlmModelIn(BaseModel):
+    """POST and PUT (full replace)."""
+
+    provider_id: int
+    # The provider's exact API model id.
+    model_id: str = Field(min_length=1, max_length=200)
+    display_name: str | None = Field(default=None, max_length=200)
+    supports_tools: bool = True
+    supports_vision: bool = False
+    # 0/empty → not set.
+    context_tokens: int | None = None
+    max_tool_rounds: int | None = None
+    price_input_per_1m: float | None = None
+    price_output_per_1m: float | None = None
+    valid_id: int = 1
+
+
+class LlmModelOut(BaseModel):
+    id: int
+    provider_id: int
+    provider_name: str
+    # Currency of the prices (set on the provider).
+    price_currency: str | None
+    model_id: str
+    display_name: str | None
+    # display_name or model_id.
+    label: str
+    supports_tools: bool
+    supports_vision: bool
+    context_tokens: int | None
+    max_tool_rounds: int | None
+    price_input_per_1m: float | None
+    price_output_per_1m: float | None
+    valid_id: int
+    used_in_profiles: list[str]
+    create_time: datetime
+    change_time: datetime
+
+
+class LlmModelTestOut(BaseModel):
     ok: bool
     model: str | None
     tool_calling_ok: bool
     error: str | None
+
+
+class LlmProfileEntryOut(BaseModel):
+    llm_model_id: int
+    model_id: str
+    model_label: str
+    provider_id: int
+    provider_name: str
+    supports_tools: bool
+    supports_vision: bool
+    valid_id: int
+
+
+class LlmProfileUseOut(BaseModel):
+    """A direct assignment: global default (queue fields null) or queue override."""
+
+    task: str
+    queue_policy_id: int | None
+    queue_name: str | None
+
+
+class LlmProfileIn(BaseModel):
+    """POST and PUT (full replace; ``llm_model_ids`` in fallback order)."""
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    # 0/empty → the global LLM timeout.
+    timeout_seconds: int | None = None
+    valid_id: int = 1
+    llm_model_ids: list[int] = Field(min_length=1)
+
+
+class LlmProfileOut(BaseModel):
+    id: int
+    name: str
+    description: str | None
+    timeout_seconds: int | None
+    valid_id: int
+    entries: list[LlmProfileEntryOut]
+    used_by: list[LlmProfileUseOut]
+    create_time: datetime
+    change_time: datetime
+
+
+class AiTaskProfileItem(BaseModel):
+    """One task → profile assignment. ``profile_id`` null = "no own
+    profile" (the task's fallback)."""
+
+    task: str
+    profile_id: int | None
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +328,8 @@ class AiQueuePolicyOut(BaseModel):
     triage_customer_fix_enabled: bool
     triage_customer_fix_auto_threshold: int
     triage_delay_reply: bool
+    # This queue's task overrides only (task absent = global default).
+    task_profiles: list[AiTaskProfileItem]
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -272,6 +380,7 @@ class AiQueuePolicyCreate(BaseModel):
     triage_customer_fix_enabled: bool = False
     triage_customer_fix_auto_threshold: int = 100
     triage_delay_reply: bool = False
+    task_profiles: list[AiTaskProfileItem] = Field(default_factory=list)
 
 
 class AiQueuePolicyUpdate(BaseModel):
@@ -318,6 +427,8 @@ class AiQueuePolicyUpdate(BaseModel):
     triage_customer_fix_enabled: bool | None = None
     triage_customer_fix_auto_threshold: int | None = None
     triage_delay_reply: bool | None = None
+    # Omitted/null keeps the overrides; a list replaces them.
+    task_profiles: list[AiTaskProfileItem] | None = None
     valid_id: int | None = None
 
 

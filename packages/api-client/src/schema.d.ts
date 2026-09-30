@@ -709,6 +709,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Llm Models */
+        get: operations["list_llm_models_api_v1_admin_ai_models_get"];
+        put?: never;
+        /** Create Llm Model */
+        post: operations["create_llm_model_api_v1_admin_ai_models_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/models/{model_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Llm Model */
+        put: operations["update_llm_model_api_v1_admin_ai_models__model_id__put"];
+        post?: never;
+        /** Delete Llm Model */
+        delete: operations["delete_llm_model_api_v1_admin_ai_models__model_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/models/{model_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Llm Model
+         * @description Chat call with a tool schema (when the model supports tools) against
+         *     the model's provider: checks key, model id and tool calling.
+         */
+        post: operations["test_llm_model_api_v1_admin_ai_models__model_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Llm Profiles */
+        get: operations["list_llm_profiles_api_v1_admin_ai_profiles_get"];
+        put?: never;
+        /** Create Llm Profile */
+        post: operations["create_llm_profile_api_v1_admin_ai_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/profiles/{profile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Llm Profile */
+        put: operations["update_llm_profile_api_v1_admin_ai_profiles__profile_id__put"];
+        post?: never;
+        /** Delete Llm Profile */
+        delete: operations["delete_llm_profile_api_v1_admin_ai_profiles__profile_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/providers": {
         parameters: {
             query?: never;
@@ -762,6 +855,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/providers/{provider_id}/remote-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Llm Provider Remote Models
+         * @description The model ids the provider offers (``GET {base_url}/models``), for the
+         *     model form's suggestions. Provider errors → 502 with their text.
+         */
+        get: operations["list_llm_provider_remote_models_api_v1_admin_ai_providers__provider_id__remote_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/providers/{provider_id}/test": {
         parameters: {
             query?: never;
@@ -771,7 +885,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test Llm Provider */
+        /**
+         * Test Llm Provider
+         * @description Access check: can the provider's model list be read with this URL and
+         *     key? (Per-model chat/tool probes: ``POST /models/{id}/test``.)
+         */
         post: operations["test_llm_provider_api_v1_admin_ai_providers__provider_id__test_post"];
         delete?: never;
         options?: never;
@@ -903,6 +1021,30 @@ export interface paths {
          *     summarize run starts from scratch.
          */
         delete: operations["delete_ai_summary_api_v1_admin_ai_summaries__ticket_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/ai/task-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ai Task Defaults
+         * @description All six tasks; ``profile_id`` null = no global profile.
+         */
+        get: operations["get_ai_task_defaults_api_v1_admin_ai_task_defaults_get"];
+        /**
+         * Put Ai Task Defaults
+         * @description Replaces all global defaults (a task not listed → no profile).
+         */
+        put: operations["put_ai_task_defaults_api_v1_admin_ai_task_defaults_put"];
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4394,7 +4536,7 @@ export interface paths {
         put?: never;
         /**
          * Call Event
-         * @description PBX call events (ringing / answered / hangup) for the agent call popup.
+         * @description PBX call events (ringing / answered / hangup / handled) for the agent call popup.
          *
          *     Body as JSON or form-encoded (same fields). The extension is mapped to
          *     agents via their ``TiqoraPhoneExtension`` preference; an event nobody is
@@ -7774,6 +7916,8 @@ export interface components {
              * @default
              */
             system_prompt: string;
+            /** Task Profiles */
+            task_profiles?: components["schemas"]["AiTaskProfileItem"][];
             /**
              * Triage Auto Threshold
              * @default 100
@@ -7907,6 +8051,8 @@ export interface components {
             summary_incremental_min_chars: number | null;
             /** System Prompt */
             system_prompt: string;
+            /** Task Profiles */
+            task_profiles: components["schemas"]["AiTaskProfileItem"][];
             /** Triage Auto Threshold */
             triage_auto_threshold: number;
             /** Triage Customer Fix Auto Threshold */
@@ -7998,6 +8144,8 @@ export interface components {
             summary_incremental_min_chars?: number | null;
             /** System Prompt */
             system_prompt?: string | null;
+            /** Task Profiles */
+            task_profiles?: components["schemas"]["AiTaskProfileItem"][] | null;
             /** Triage Auto Threshold */
             triage_auto_threshold?: number | null;
             /** Triage Customer Fix Auto Threshold */
@@ -8168,6 +8316,17 @@ export interface components {
             summary_body?: string | null;
             /** Upto Article Id */
             upto_article_id?: number | null;
+        };
+        /**
+         * AiTaskProfileItem
+         * @description One task → profile assignment. ``profile_id`` null = "no own
+         *     profile" (the task's fallback).
+         */
+        AiTaskProfileItem: {
+            /** Profile Id */
+            profile_id: number | null;
+            /** Task */
+            task: string;
         };
         /** AiToolTraceOut */
         AiToolTraceOut: {
@@ -10883,6 +11042,172 @@ export interface components {
             /** Supported */
             supported: boolean;
         };
+        /**
+         * LlmModelIn
+         * @description POST and PUT (full replace).
+         */
+        LlmModelIn: {
+            /** Context Tokens */
+            context_tokens?: number | null;
+            /** Display Name */
+            display_name?: string | null;
+            /** Max Tool Rounds */
+            max_tool_rounds?: number | null;
+            /** Model Id */
+            model_id: string;
+            /** Price Input Per 1M */
+            price_input_per_1m?: number | null;
+            /** Price Output Per 1M */
+            price_output_per_1m?: number | null;
+            /** Provider Id */
+            provider_id: number;
+            /**
+             * Supports Tools
+             * @default true
+             */
+            supports_tools: boolean;
+            /**
+             * Supports Vision
+             * @default false
+             */
+            supports_vision: boolean;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** LlmModelOut */
+        LlmModelOut: {
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            /** Context Tokens */
+            context_tokens: number | null;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Display Name */
+            display_name: string | null;
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Max Tool Rounds */
+            max_tool_rounds: number | null;
+            /** Model Id */
+            model_id: string;
+            /** Price Currency */
+            price_currency: string | null;
+            /** Price Input Per 1M */
+            price_input_per_1m: number | null;
+            /** Price Output Per 1M */
+            price_output_per_1m: number | null;
+            /** Provider Id */
+            provider_id: number;
+            /** Provider Name */
+            provider_name: string;
+            /** Supports Tools */
+            supports_tools: boolean;
+            /** Supports Vision */
+            supports_vision: boolean;
+            /** Used In Profiles */
+            used_in_profiles: string[];
+            /** Valid Id */
+            valid_id: number;
+        };
+        /** LlmModelTestOut */
+        LlmModelTestOut: {
+            /** Error */
+            error: string | null;
+            /** Model */
+            model: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Tool Calling Ok */
+            tool_calling_ok: boolean;
+        };
+        /** LlmProfileEntryOut */
+        LlmProfileEntryOut: {
+            /** Llm Model Id */
+            llm_model_id: number;
+            /** Model Id */
+            model_id: string;
+            /** Model Label */
+            model_label: string;
+            /** Provider Id */
+            provider_id: number;
+            /** Provider Name */
+            provider_name: string;
+            /** Supports Tools */
+            supports_tools: boolean;
+            /** Supports Vision */
+            supports_vision: boolean;
+            /** Valid Id */
+            valid_id: number;
+        };
+        /**
+         * LlmProfileIn
+         * @description POST and PUT (full replace; ``llm_model_ids`` in fallback order).
+         */
+        LlmProfileIn: {
+            /** Description */
+            description?: string | null;
+            /** Llm Model Ids */
+            llm_model_ids: number[];
+            /** Name */
+            name: string;
+            /** Timeout Seconds */
+            timeout_seconds?: number | null;
+            /**
+             * Valid Id
+             * @default 1
+             */
+            valid_id: number;
+        };
+        /** LlmProfileOut */
+        LlmProfileOut: {
+            /**
+             * Change Time
+             * Format: date-time
+             */
+            change_time: string;
+            /**
+             * Create Time
+             * Format: date-time
+             */
+            create_time: string;
+            /** Description */
+            description: string | null;
+            /** Entries */
+            entries: components["schemas"]["LlmProfileEntryOut"][];
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Timeout Seconds */
+            timeout_seconds: number | null;
+            /** Used By */
+            used_by: components["schemas"]["LlmProfileUseOut"][];
+            /** Valid Id */
+            valid_id: number;
+        };
+        /**
+         * LlmProfileUseOut
+         * @description A direct assignment: global default (queue fields null) or queue override.
+         */
+        LlmProfileUseOut: {
+            /** Queue Name */
+            queue_name: string | null;
+            /** Queue Policy Id */
+            queue_policy_id: number | null;
+            /** Task */
+            task: string;
+        };
         /** LlmProviderCreate */
         LlmProviderCreate: {
             /** Api Key */
@@ -10953,16 +11278,17 @@ export interface components {
             /** Valid Id */
             valid_id: number;
         };
-        /** LlmProviderTestOut */
+        /**
+         * LlmProviderTestOut
+         * @description Result of reading the provider's model list (URL + key check).
+         */
         LlmProviderTestOut: {
-            /** Error */
-            error: string | null;
-            /** Model */
-            model: string | null;
+            /** Detail */
+            detail: string | null;
+            /** Model Count */
+            model_count: number | null;
             /** Ok */
             ok: boolean;
-            /** Tool Calling Ok */
-            tool_calling_ok: boolean;
         };
         /** LlmProviderUpdate */
         LlmProviderUpdate: {
@@ -12854,6 +13180,11 @@ export interface components {
             used_memory_bytes?: number | null;
             /** Version */
             version?: string | null;
+        };
+        /** RemoteModelsOut */
+        RemoteModelsOut: {
+            /** Models */
+            models: string[];
         };
         /**
          * ReplyDraftOut
@@ -16559,6 +16890,325 @@ export interface operations {
             };
         };
     };
+    list_llm_models_api_v1_admin_ai_models_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmModelOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_llm_model_api_v1_admin_ai_models_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmModelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_llm_model_api_v1_admin_ai_models__model_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                model_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmModelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_model_api_v1_admin_ai_models__model_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                model_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_llm_model_api_v1_admin_ai_models__model_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                model_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmModelTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_llm_profiles_api_v1_admin_ai_profiles_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProfileOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_llm_profile_api_v1_admin_ai_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmProfileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_llm_profile_api_v1_admin_ai_profiles__profile_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                profile_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmProfileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_profile_api_v1_admin_ai_profiles__profile_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                profile_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_llm_providers_api_v1_admin_ai_providers_get: {
         parameters: {
             query?: never;
@@ -16723,6 +17373,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LlmProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_llm_provider_remote_models_api_v1_admin_ai_providers__provider_id__remote_models_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoteModelsOut"];
                 };
             };
             /** @description Validation Error */
@@ -17191,6 +17876,76 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_task_defaults_api_v1_admin_ai_task_defaults_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiTaskProfileItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_ai_task_defaults_api_v1_admin_ai_task_defaults_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiTaskProfileItem"][];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiTaskProfileItem"][];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -27375,7 +28130,7 @@ export interface operations {
                      * Event
                      * @enum {string}
                      */
-                    event: "ringing" | "answered" | "hangup";
+                    event: "ringing" | "answered" | "hangup" | "handled";
                     /** Extension */
                     extension?: string | null;
                     /** Timestamp */
@@ -27396,7 +28151,7 @@ export interface operations {
                      * Event
                      * @enum {string}
                      */
-                    event: "ringing" | "answered" | "hangup";
+                    event: "ringing" | "answered" | "hangup" | "handled";
                     /** Extension */
                     extension?: string | null;
                     /** Timestamp */

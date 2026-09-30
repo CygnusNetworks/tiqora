@@ -12,6 +12,7 @@ blocked (plan §3.0).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -28,6 +29,7 @@ from tiqora.ai.gate import (
 )
 from tiqora.ai.identity import get_customer_user_columns, valid_column_name
 from tiqora.ai.listfields import parse_int_list
+from tiqora.ai.llm_catalog import replace_queue_task_profiles
 from tiqora.ai.models import (
     AUTONOMY_MODES,
     FEATURE_AUTO_REPLY,
@@ -468,7 +470,12 @@ async def create_queue_policy(
     triage_customer_fix_enabled: bool = False,
     triage_customer_fix_auto_threshold: int = 100,
     triage_delay_reply: bool = False,
+    task_profiles: Mapping[str, int | None] | None = None,
 ) -> TiqoraAiQueuePolicy:
+    """``task_profiles`` = the queue's task overrides (``{task: profile_id |
+    None}``), already validated by
+    :func:`tiqora.ai.llm_catalog.normalize_task_profiles`; written in the
+    same transaction as the policy."""
     _validate_fields(
         autonomy=autonomy,
         identity_mode=identity_mode,
@@ -550,6 +557,9 @@ async def create_queue_policy(
         change_by=change_by,
     )
     session.add(row)
+    if task_profiles:
+        await session.flush()
+        await replace_queue_task_profiles(session, row.id, task_profiles)
     await session.commit()
     await session.refresh(row)
     return row
@@ -560,10 +570,13 @@ async def update_queue_policy(
     row: TiqoraAiQueuePolicy,
     *,
     change_by: int,
+    task_profiles: Mapping[str, int | None] | None = None,
     **fields: Any,
 ) -> TiqoraAiQueuePolicy:
     """Partial update. ``fields`` keys must be model attribute names; only
-    keys present are applied (caller passes ``model_dump(exclude_unset=True)``)."""
+    keys present are applied (caller passes ``model_dump(exclude_unset=True)``).
+    ``task_profiles`` not None replaces the queue's task overrides (see
+    :func:`create_queue_policy`)."""
     effective_autonomy = fields.get("autonomy", row.autonomy)
     effective_identity_mode = fields.get("identity_mode", row.identity_mode)
     effective_enabled_auto_reply = fields.get("enabled_auto_reply", row.enabled_auto_reply)
@@ -627,6 +640,8 @@ async def update_queue_policy(
             setattr(row, key, value)
     row.change_by = change_by
     row.change_time = datetime.now(UTC).replace(tzinfo=None)
+    if task_profiles is not None:
+        await replace_queue_task_profiles(session, row.id, task_profiles)
     await session.commit()
     await session.refresh(row)
     return row

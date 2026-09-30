@@ -20,6 +20,15 @@ channel's configured ``queue_name`` (currently Telegram) may enable
 re-run — the AI runtime's per-event gate re-check
 (:func:`tiqora.ai.runtime.run_ticket_agent`) is what actually catches that on
 the next auto-reply run.
+
+LLM models: a queue policy's ``task_profiles`` (its task overrides) are
+validated by :func:`tiqora.ai.llm_catalog.normalize_task_profiles`, and an
+enabled AI feature must resolve to a profile
+(:func:`tiqora.ai.llm_catalog.check_policy_llm_requirements`, 422). That check
+runs here, before the service call, so it precedes the gate's 409 like the old
+"needs a provider" validation did; service-level callers (tests, seed code)
+can still write a policy first and assign profiles afterwards. Models,
+profiles and global task defaults: :mod:`tiqora.api.v1.admin.ai_models`.
 """
 
 from __future__ import annotations
@@ -33,6 +42,7 @@ from starlette.concurrency import run_in_threadpool
 
 from tiqora.ai import acl as ai_acl
 from tiqora.ai import drafts as ai_drafts
+from tiqora.ai import llm_catalog
 from tiqora.ai import mcp as ai_mcp
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -51,8 +61,8 @@ from tiqora.ai.gate import (
 from tiqora.ai.models import (
     TRIAGE_STATUSES,
     TiqoraAiPromptPart,
+    TiqoraAiQueuePolicy,
     TiqoraAiTriage,
-    TiqoraLlmModel,
     TiqoraMcpClient,
 )
 from tiqora.ai.policies import PromptPartValidationError, QueuePolicyValidationError
@@ -89,6 +99,7 @@ from tiqora.api.v1.admin.ai_schemas import (
     McpDiscoverOut,
     McpToolPolicyOut,
     McpToolPolicyUpdate,
+    RemoteModelsOut,
 )
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.config import get_settings
@@ -252,6 +263,10 @@ async def delete_llm_provider(provider_id: int, admin: AdminUser, session: DbSes
     row = await ai_providers.get_provider(session, provider_id)
     if row is None:
         raise _not_found("Provider", provider_id)
+    try:
+        await llm_catalog.ensure_provider_deletable(session, row.id)
+    except llm_catalog.CatalogConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     await ai_providers.delete_provider(session, row)
 
 
@@ -274,34 +289,36 @@ async def duplicate_llm_provider(
 async def test_llm_provider(
     provider_id: int, admin: AdminUser, session: DbSession
 ) -> LlmProviderTestOut:
+    """Access check: can the provider's model list be read with this URL and
+    key? (Per-model chat/tool probes: ``POST /models/{id}/test``.)"""
     _ = admin
     row = await ai_providers.get_provider(session, provider_id)
     if row is None:
         raise _not_found("Provider", provider_id)
-    # Interim until the model-level test exists: probe the provider's first
-    # valid model.
-    model = (
-        await session.execute(
-            select(TiqoraLlmModel)
-            .where(TiqoraLlmModel.provider_id == row.id, TiqoraLlmModel.valid_id == 1)
-            .order_by(TiqoraLlmModel.id)
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-    if model is None:
-        return LlmProviderTestOut(
-            ok=False, model=None, tool_calling_ok=False, error="Provider has no models"
-        )
-    result = await ai_providers.test_provider_connection(
-        row,
-        model=model.model_id,
-        supports_tools=bool(model.supports_tools),
-        settings=get_settings(),
-        session=session,
-    )
-    return LlmProviderTestOut(
-        ok=result.ok, model=result.model, tool_calling_ok=result.tool_calling_ok, error=result.error
-    )
+    try:
+        models = await ai_providers.list_remote_models(row, settings=get_settings())
+    except ai_providers.RemoteModelsError as exc:
+        return LlmProviderTestOut(ok=False, detail=ai_providers.shorten(str(exc)), model_count=None)
+    return LlmProviderTestOut(ok=True, detail=None, model_count=len(models))
+
+
+@router.get("/providers/{provider_id}/remote-models", response_model=RemoteModelsOut)
+async def list_llm_provider_remote_models(
+    provider_id: int, admin: AdminUser, session: DbSession
+) -> RemoteModelsOut:
+    """The model ids the provider offers (``GET {base_url}/models``), for the
+    model form's suggestions. Provider errors → 502 with their text."""
+    _ = admin
+    row = await ai_providers.get_provider(session, provider_id)
+    if row is None:
+        raise _not_found("Provider", provider_id)
+    try:
+        models = await ai_providers.list_remote_models(row, settings=get_settings())
+    except ai_providers.RemoteModelsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=ai_providers.shorten(str(exc))
+        ) from exc
+    return RemoteModelsOut(models=models)
 
 
 # ---------------------------------------------------------------------------
@@ -408,11 +425,29 @@ async def update_mcp_tool_policy(
 # ---------------------------------------------------------------------------
 
 
+async def _policy_out(session: DbSession, row: TiqoraAiQueuePolicy) -> AiQueuePolicyOut:
+    return (await _policies_out(session, [row]))[0]
+
+
+async def _policies_out(
+    session: DbSession, rows: list[TiqoraAiQueuePolicy]
+) -> list[AiQueuePolicyOut]:
+    overrides = await llm_catalog.load_queue_task_profiles(session, [r.id for r in rows])
+    fields = [f for f in AiQueuePolicyOut.model_fields if f != "task_profiles"]
+    return [
+        AiQueuePolicyOut.model_validate(
+            {f: getattr(r, f) for f in fields}
+            | {"task_profiles": llm_catalog.task_profile_items(overrides.get(r.id, {}))}
+        )
+        for r in rows
+    ]
+
+
 @router.get("/queue-policies", response_model=list[AiQueuePolicyOut])
 async def list_queue_policies_route(admin: AdminUser, session: DbSession) -> list[AiQueuePolicyOut]:
     _ = admin
     rows = await ai_policies.list_queue_policies(session)
-    return [AiQueuePolicyOut.model_validate(r) for r in rows]
+    return await _policies_out(session, rows)
 
 
 @router.post(
@@ -421,17 +456,22 @@ async def list_queue_policies_route(admin: AdminUser, session: DbSession) -> lis
 async def create_queue_policy_route(
     body: AiQueuePolicyCreate, admin: AdminUser, session: DbSession
 ) -> AiQueuePolicyOut:
+    fields = body.model_dump(exclude={"task_profiles"})
     try:
-        row = await ai_policies.create_queue_policy(
-            session, change_by=admin.id, **body.model_dump()
+        overrides = await llm_catalog.normalize_task_profiles(
+            session, [(i.task, i.profile_id) for i in body.task_profiles]
         )
-    except QueuePolicyValidationError as exc:
+        await llm_catalog.check_policy_llm_requirements(session, flags=fields, overrides=overrides)
+        row = await ai_policies.create_queue_policy(
+            session, change_by=admin.id, task_profiles=overrides, **fields
+        )
+    except (QueuePolicyValidationError, llm_catalog.CatalogValidationError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
     except AiGateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    return AiQueuePolicyOut.model_validate(row)
+    return await _policy_out(session, row)
 
 
 @router.put("/queue-policies/{policy_id}", response_model=AiQueuePolicyOut)
@@ -441,17 +481,33 @@ async def update_queue_policy_route(
     row = await ai_policies.get_queue_policy(session, policy_id)
     if row is None:
         raise _not_found("Queue policy", policy_id)
+    fields = body.model_dump(exclude_unset=True, exclude={"task_profiles"})
     try:
+        new_overrides: dict[str, int | None] | None = None
+        if body.task_profiles is not None:
+            new_overrides = await llm_catalog.normalize_task_profiles(
+                session, [(i.task, i.profile_id) for i in body.task_profiles]
+            )
+            overrides = new_overrides
+        else:
+            overrides = (await llm_catalog.load_queue_task_profiles(session, [row.id])).get(
+                row.id, {}
+            )
+        flags = {
+            flag: fields.get(flag, getattr(row, flag))
+            for flag, _task, _label in llm_catalog.POLICY_FEATURE_TASKS
+        }
+        await llm_catalog.check_policy_llm_requirements(session, flags=flags, overrides=overrides)
         updated = await ai_policies.update_queue_policy(
-            session, row, change_by=admin.id, **body.model_dump(exclude_unset=True)
+            session, row, change_by=admin.id, task_profiles=new_overrides, **fields
         )
-    except QueuePolicyValidationError as exc:
+    except (QueuePolicyValidationError, llm_catalog.CatalogValidationError) as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
     except AiGateError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    return AiQueuePolicyOut.model_validate(updated)
+    return await _policy_out(session, updated)
 
 
 @router.delete("/queue-policies/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)

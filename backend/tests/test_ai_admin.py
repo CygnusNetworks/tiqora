@@ -19,9 +19,11 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import assign_task, make_model, make_profile, make_provider
 from tiqora.ai import acl as ai_acl
 from tiqora.ai import context as ai_context
 from tiqora.ai import drafts as ai_drafts
+from tiqora.ai import llm_catalog
 from tiqora.ai import mcp as ai_mcp
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -55,6 +57,9 @@ def _ensure_tiqora_tables(sync_url: str) -> None:
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
         for table in (
+            "tiqora_ai_task_default",
+            "tiqora_ai_queue_task_profile",
+            "tiqora_llm_profile",
             "tiqora_ai_acl",
             "tiqora_ai_usage",
             "tiqora_ai_ticket_state",
@@ -197,7 +202,15 @@ async def test_provider_duplicate_copies_api_key_and_suffixes_name(
         get_settings.cache_clear()
 
 
-async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: str) -> None:
+async def _global_agent_profile(session: Any) -> None:
+    """A provider + model + profile set as the global ``agent`` default, so
+    enabling AI features on a queue policy passes the profile check."""
+    provider = await make_provider(session, name="admin-test-agent-provider")
+    profile = await make_profile(session, provider, ["agent-model"])
+    await assign_task(session, None, "agent", profile)
+
+
+async def test_model_probe_mocked_tool_calling(mariadb_znuny_url: str) -> None:
     _ensure_tiqora_tables(mariadb_znuny_url)
     get_settings.cache_clear()
     settings = get_settings()
@@ -229,9 +242,10 @@ async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: s
                     },
                 )
 
+            model = await make_model(session, row, "test-model")
             client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-            result = await ai_providers.test_provider_connection(
-                row, model="test-model", settings=settings, client=client
+            result = await llm_catalog.probe_model_connection(
+                row, model, settings=settings, client=client
             )
             await client.aclose()
             assert result.ok is True
@@ -242,8 +256,8 @@ async def test_provider_test_connection_mocked_tool_calling(mariadb_znuny_url: s
                 return httpx.Response(401, text="unauthorized")
 
             client2 = httpx.AsyncClient(transport=httpx.MockTransport(error_handler))
-            result2 = await ai_providers.test_provider_connection(
-                row, model="test-model", settings=settings, client=client2
+            result2 = await llm_catalog.probe_model_connection(
+                row, model, settings=settings, client=client2
             )
             await client2.aclose()
             assert result2.ok is False
@@ -573,6 +587,7 @@ async def test_queue_policy_gate_enforcement_409_then_ok_then_regression(
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as session:
+            await _global_agent_profile(session)
             # operation_mode defaults to "parallel" -> enabling auto_reply is 409.
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.create_queue_policy_route(
@@ -634,6 +649,7 @@ async def test_queue_policy_triage_enable_requires_tiqora_primary(
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as session:
+            await _global_agent_profile(session)
             with pytest.raises(HTTPException) as exc_info:
                 await admin_ai.create_queue_policy_route(
                     AiQueuePolicyCreate(
@@ -665,6 +681,7 @@ async def test_queue_policy_manual_assist_and_summary_enable_in_parallel_operati
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as session:
+            await _global_agent_profile(session)
             created = await admin_ai.create_queue_policy_route(
                 AiQueuePolicyCreate(queue_id=1, enabled_manual_assist=True, enabled_summary=True),
                 _root_user(),
@@ -708,6 +725,15 @@ async def test_queue_policy_auto_reply_requires_service_user_and_provider(
                     session,
                 )
             assert exc_info.value.status_code == 422
+            # Service user set, but no profile for the agent task anywhere.
+            with pytest.raises(HTTPException) as exc_info:
+                await admin_ai.create_queue_policy_route(
+                    AiQueuePolicyCreate(queue_id=2, enabled_auto_reply=True, service_user_id=42),
+                    _root_user(),
+                    session,
+                )
+            assert exc_info.value.status_code == 422
+            assert "Automatische Antworten" in str(exc_info.value.detail)
     finally:
         await engine.dispose()
 

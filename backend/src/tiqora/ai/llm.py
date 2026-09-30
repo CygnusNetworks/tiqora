@@ -2,7 +2,7 @@
 
 No ``openai`` SDK dependency — ``httpx`` is already a dependency of this
 repo and the OpenAI-compatible ``/chat/completions`` wire format is simple
-enough to hand-roll (same approach as ``tiqora.ai.providers.test_provider_connection``).
+enough to hand-roll (same approach as ``tiqora.ai.llm_catalog.probe_model_connection``).
 
 :class:`LlmClient` is a ``Protocol`` so :class:`~tiqora.ai.runtime.AgentRuntime`
 and its tests can inject a scripted ``FakeLlmClient`` instead of
