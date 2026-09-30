@@ -1,204 +1,28 @@
-"""Shared LLM-client + KB wiring for the agent runtime (plan §3.4 step 7-8).
+"""Shared KB wiring for the agent runtime (plan §3.4 step 7-8).
 
 Extracted from ``tiqora.api.v1.ai`` (Phase B) so the auto-reply worker
-(``tiqora.ai.auto_worker``, Phase D) does not copy-paste the same
-provider/KB plumbing per queue — both the manual-assist API route and the
-worker build a :class:`~tiqora.ai.llm.LlmClient` and the KB
-bundle/search/get-article seams the same way.
+(``tiqora.ai.auto_worker``, Phase D) does not copy-paste the same KB plumbing
+per queue — both the manual-assist API route and the worker build the KB
+bundle/search/get-article seams the same way. Which LLM a queue uses is
+resolved in :mod:`tiqora.ai.llm_routing`.
 """
 
 from __future__ import annotations
 
-import json
 from collections.abc import Awaitable, Callable
-from dataclasses import replace
 from typing import Any
 
 import structlog
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.ai.audit import AuditContext, AuditingLlmClient
 from tiqora.ai.listfields import parse_int_list, parse_str_list
-from tiqora.ai.llm import LlmClient, OpenAiCompatLlmClient
-from tiqora.ai.llm_fallback import FallbackEntry, FallbackLlmClient
-from tiqora.ai.models import TiqoraAiQueuePolicy, TiqoraLlmProvider
-from tiqora.ai.providers import get_provider
-from tiqora.ai.usage import provider_budget_exceeded
+from tiqora.ai.models import TiqoraAiQueuePolicy
 from tiqora.config import Settings
-from tiqora.crypto.secret import decrypt_secret
 
 logger = structlog.get_logger(__name__)
 
 _KB_ARTICLE_BUNDLE_LIMIT = 20
 _KB_ARTICLE_BODY_CHARS = 2000
-
-
-def _client_factory(
-    provider: TiqoraLlmProvider, *, api_key: str | None, model: str, settings: Settings
-) -> Callable[[], LlmClient]:
-    def _factory() -> LlmClient:
-        return OpenAiCompatLlmClient(
-            base_url=provider.base_url,
-            api_key=api_key,
-            model=model,
-            timeout_seconds=settings.llm_timeout_seconds,
-        )
-
-    return _factory
-
-
-def _parse_fallback_entries(fallback_json: str | None) -> list[dict[str, Any]]:
-    """Best-effort parse of ``llm_fallback_json`` — malformed content is
-    logged and treated as "no fallback entries" rather than breaking the
-    run; :func:`tiqora.ai.policies._validate_llm_fallback_json` is what
-    actually rejects bad input at write time."""
-    if not fallback_json:
-        return []
-    try:
-        parsed = json.loads(fallback_json)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning("ai_llm_fallback_json_invalid")
-        return []
-    if not isinstance(parsed, list):
-        logger.warning("ai_llm_fallback_json_invalid")
-        return []
-    return [item for item in parsed if isinstance(item, dict)]
-
-
-async def _resolve_entry(
-    session: AsyncSession, settings: Settings, *, provider_id: int, model: str | None
-) -> FallbackEntry | None:
-    provider = await get_provider(session, provider_id)
-    if provider is None:
-        return None
-    api_key = (
-        decrypt_secret(settings.secret_key, provider.api_key_enc) if provider.api_key_enc else None
-    )
-    effective_model = model or provider.default_model
-    return FallbackEntry(
-        provider_id=provider.id,
-        model=effective_model,
-        factory=_client_factory(
-            provider, api_key=api_key, model=effective_model, settings=settings
-        ),
-    )
-
-
-async def build_llm_client(
-    session: AsyncSession,
-    settings: Settings,
-    provider_id: int | None,
-    model_override: str | None,
-    fallback_json: str | None = None,
-) -> LlmClient:
-    """Build the configured :class:`LlmClient` for a queue policy, including
-    the priority-ordered fallback list (``fallback_json`` — see
-    :mod:`tiqora.ai.llm_fallback`).
-
-    Raises :class:`fastapi.HTTPException` (409) when the policy has no
-    provider configured, the primary provider row is gone, or the primary
-    provider's cost budget (day/week/month) is exceeded — safe to call from
-    an HTTP route. The worker (no HTTP context) catches this and treats it
-    as a skip/error like any other :class:`Exception`. Fallback entries
-    whose provider no longer exists are skipped (logged), not fatal — a
-    budget-exceeded *primary*, like a missing primary, is not retried
-    against the fallback chain.
-    """
-    if provider_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Queue AI policy has no llm_provider_id configured",
-        )
-    exceeded_window = await provider_budget_exceeded(session, provider_id)
-    if exceeded_window is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"LLM provider budget exceeded ({exceeded_window})",
-        )
-    primary = await _resolve_entry(session, settings, provider_id=provider_id, model=model_override)
-    if primary is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Configured LLM provider no longer exists"
-        )
-
-    entries = [primary]
-    for item in _parse_fallback_entries(fallback_json):
-        raw_provider_id = item.get("provider_id")
-        if not isinstance(raw_provider_id, int):
-            logger.warning("ai_llm_fallback_entry_invalid", entry=item)
-            continue
-        model = item.get("model")
-        entry = await _resolve_entry(
-            session,
-            settings,
-            provider_id=raw_provider_id,
-            model=model if isinstance(model, str) else None,
-        )
-        if entry is None:
-            logger.warning("ai_llm_fallback_provider_missing", provider_id=raw_provider_id)
-            continue
-        entries.append(entry)
-
-    if len(entries) == 1:
-        return entries[0].factory()
-    return FallbackLlmClient(entries)
-
-
-async def build_vision_llm_factory(
-    session: AsyncSession,
-    settings: Settings,
-    vision_provider_id: int | None,
-    *,
-    audit: AuditContext | None = None,
-) -> Callable[[], LlmClient] | None:
-    """Resolve ``vision_provider_id`` into a sync ``() -> LlmClient`` factory
-    for the attachment vision pre-pass (:mod:`tiqora.ai.attachment_context`).
-
-    Returns ``None`` (never raises) when no provider is configured, the
-    provider row is gone, it does not have ``supports_vision`` set, or its
-    cost budget (day/week/month) is exceeded — the caller treats this as
-    "images are ignored for this run", matching the documented "NULL =
-    Bilder werden ignoriert" policy semantics.
-
-    When ``audit`` is given, every call made through the returned client is
-    written to ``tiqora_ai_audit_log`` with ``feature="vision"`` (see
-    :mod:`tiqora.ai.audit`) — image data-URLs are never persisted, only a
-    byte-count placeholder.
-    """
-    if vision_provider_id is None:
-        return None
-    provider = await get_provider(session, vision_provider_id)
-    if provider is None or not provider.supports_vision:
-        return None
-    if await provider_budget_exceeded(session, vision_provider_id) is not None:
-        return None
-    api_key = (
-        decrypt_secret(settings.secret_key, provider.api_key_enc) if provider.api_key_enc else None
-    )
-
-    def _factory() -> LlmClient:
-        client: LlmClient = OpenAiCompatLlmClient(
-            base_url=provider.base_url,
-            api_key=api_key,
-            model=provider.default_model,
-            timeout_seconds=settings.llm_timeout_seconds,
-        )
-        if audit is not None:
-            client = AuditingLlmClient(
-                client,
-                settings=settings,
-                context=replace(
-                    audit,
-                    feature="vision",
-                    provider_id=provider.id,
-                    model=provider.default_model,
-                ),
-                session=session,
-            )
-        return client
-
-    return _factory
 
 
 async def kb_bundle(
@@ -280,8 +104,6 @@ def kb_get_article_fn(
 
 
 __all__ = [
-    "build_llm_client",
-    "build_vision_llm_factory",
     "kb_bundle",
     "kb_get_article_fn",
     "kb_search_fn",

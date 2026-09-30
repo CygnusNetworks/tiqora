@@ -56,8 +56,15 @@ from tiqora.ai.context import (
     render_ticket_header,
     ticket_snapshot,
 )
-from tiqora.ai.kb_wiring import build_vision_llm_factory
 from tiqora.ai.llm import LlmClient, LlmMessage
+from tiqora.ai.llm_routing import (
+    TASK_SUMMARY,
+    TASK_VISION,
+    ChainModel,
+    build_vision_llm_factory,
+    resolve_task_models,
+    resolve_task_profile_id,
+)
 from tiqora.ai.models import (
     DETAIL_DETAILED,
     FEATURE_SUMMARY,
@@ -394,6 +401,21 @@ class _PreparedRun:
     raw_llm: LlmClient
     pii: PiiMapper
     attachment_context: AttachmentContextResult
+    primary_model: ChainModel | None
+
+
+def _served_provider_id(raw_llm: LlmClient, primary: ChainModel | None) -> int | None:
+    """The provider a fallback client actually used, else the profile's first."""
+    active = getattr(raw_llm, "active_provider_id", None)
+    return active if active is not None else (primary.provider_id if primary else None)
+
+
+def _served_model(echoed: str | None, raw_llm: LlmClient, primary: ChainModel | None) -> str | None:
+    return (
+        echoed
+        or getattr(raw_llm, "active_model", None)
+        or (primary.model if primary is not None else None)
+    )
 
 
 async def _prepare_run(
@@ -411,6 +433,10 @@ async def _prepare_run(
 ) -> _PreparedRun:
     """Attachment extraction, PII mapper and audit wrapping shared by the
     stored and the custom summary."""
+    # The summary profile's first usable model: default provider/model for
+    # audit and usage (a fallback that actually served overrides it).
+    summary_models = await resolve_task_models(session, policy, TASK_SUMMARY)
+    primary_model = summary_models[0] if summary_models else None
     audit_context = AuditContext(
         feature=AUDIT_FEATURE_SUMMARY,
         run_id=run_id or uuid.uuid4().hex,
@@ -418,20 +444,21 @@ async def _prepare_run(
         queue_id=ticket.queue_id,
         acting_user_id=acting_user_id,
         trigger=trigger,
-        provider_id=policy.llm_provider_id,
-        model=policy.model_override,
+        provider_id=primary_model.provider_id if primary_model else None,
+        model=primary_model.model if primary_model else None,
     )
 
+    vision_enabled = await resolve_task_profile_id(session, policy, TASK_VISION) is not None
     effective_vision_factory = vision_llm_factory
-    if effective_vision_factory is None and policy.vision_provider_id is not None:
+    if effective_vision_factory is None and vision_enabled:
         effective_settings = settings or get_settings()
         effective_vision_factory = await build_vision_llm_factory(
-            session, effective_settings, policy.vision_provider_id, audit=audit_context
+            session, effective_settings, policy, audit=audit_context
         )
     attachment_context = await build_attachment_context(
         session,
         articles,
-        vision_enabled=policy.vision_provider_id is not None,
+        vision_enabled=vision_enabled,
         vision_llm_factory=effective_vision_factory,
     )
     attachment_blocks = attachment_context.blocks
@@ -458,7 +485,13 @@ async def _prepare_run(
         pii_mapper=pii,
     )
 
-    return _PreparedRun(llm=llm, raw_llm=raw_llm, pii=pii, attachment_context=attachment_context)
+    return _PreparedRun(
+        llm=llm,
+        raw_llm=raw_llm,
+        pii=pii,
+        attachment_context=attachment_context,
+        primary_model=primary_model,
+    )
 
 
 async def summarize_ticket(
@@ -485,8 +518,8 @@ async def summarize_ticket(
     ``settings``/``vision_llm_factory`` support the same attachment vision
     pre-pass as :func:`tiqora.ai.runtime.run_ticket_agent` (see
     :mod:`tiqora.ai.attachment_context`); ``settings`` defaults to
-    :func:`tiqora.config.get_settings` when a ``vision_provider_id`` is
-    configured and no factory was injected.
+    :func:`tiqora.config.get_settings` when the queue has a vision profile
+    and no factory was injected.
 
     Not gated by the Readiness-Gate (plan §3.0 v1.1 / Phase E) — see the
     module docstring.
@@ -589,11 +622,10 @@ async def summarize_ticket(
         queue_id=ticket.queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_SUMMARY,
-        provider_id=getattr(raw_llm, "active_provider_id", None) or policy.llm_provider_id,
-        # The provider echoes back what it actually served, which is the only
-        # source that also covers "no override configured, provider default
-        # used" — the common case, which recorded NULL before.
-        model=response.model or getattr(raw_llm, "active_model", None) or policy.model_override,
+        provider_id=_served_provider_id(raw_llm, run.primary_model),
+        # The provider echoes back what it actually served — preferred over
+        # the configured model id.
+        model=_served_model(response.model, raw_llm, run.primary_model),
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool(response.content),
@@ -708,8 +740,8 @@ async def custom_summarize_ticket(
         queue_id=ticket.queue_id,
         ticket_id=ticket_id,
         feature=FEATURE_SUMMARY,
-        provider_id=getattr(run.raw_llm, "active_provider_id", None) or policy.llm_provider_id,
-        model=response.model or getattr(run.raw_llm, "active_model", None) or policy.model_override,
+        provider_id=_served_provider_id(run.raw_llm, run.primary_model),
+        model=_served_model(response.model, run.raw_llm, run.primary_model),
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         success=bool((response.content or "").strip()),

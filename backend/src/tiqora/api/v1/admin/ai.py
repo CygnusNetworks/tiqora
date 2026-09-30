@@ -7,7 +7,7 @@ enabling ``enabled_auto_reply`` on a queue policy raises
 :class:`~tiqora.ai.gate.AiGateError`, translated here to **409** — the client
 action was rejected because of the current ``operation_mode``, not because
 the request itself was malformed (422 is reserved for validation errors: bad
-autonomy value, missing service_user_id/llm_provider_id on auto-reply enable,
+autonomy value, missing service_user_id on auto-reply enable,
 etc.). ``enabled_summary``/``enabled_manual_assist`` are no longer gated —
 see ``tiqora.ai.gate`` and ``tiqora.ai.policies`` module docstrings.
 
@@ -52,6 +52,7 @@ from tiqora.ai.models import (
     TRIAGE_STATUSES,
     TiqoraAiPromptPart,
     TiqoraAiTriage,
+    TiqoraLlmModel,
     TiqoraMcpClient,
 )
 from tiqora.ai.policies import PromptPartValidationError, QueuePolicyValidationError
@@ -206,20 +207,13 @@ async def create_llm_provider(
             name=body.name,
             kind=body.kind,
             base_url=body.base_url,
-            default_model=body.default_model,
             api_key=body.api_key,
             extra_json=body.extra_json,
-            supports_tools=body.supports_tools,
-            supports_streaming=body.supports_streaming,
             eu_hosted=body.eu_hosted,
-            supports_vision=body.supports_vision,
-            price_input_per_1m=body.price_input_per_1m,
-            price_output_per_1m=body.price_output_per_1m,
             price_currency=body.price_currency,
             budget_cost_day=body.budget_cost_day,
             budget_cost_week=body.budget_cost_week,
             budget_cost_month=body.budget_cost_month,
-            max_tool_rounds=body.max_tool_rounds,
         )
     except ai_providers.ProviderValidationError as exc:
         raise HTTPException(
@@ -284,8 +278,26 @@ async def test_llm_provider(
     row = await ai_providers.get_provider(session, provider_id)
     if row is None:
         raise _not_found("Provider", provider_id)
+    # Interim until the model-level test exists: probe the provider's first
+    # valid model.
+    model = (
+        await session.execute(
+            select(TiqoraLlmModel)
+            .where(TiqoraLlmModel.provider_id == row.id, TiqoraLlmModel.valid_id == 1)
+            .order_by(TiqoraLlmModel.id)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if model is None:
+        return LlmProviderTestOut(
+            ok=False, model=None, tool_calling_ok=False, error="Provider has no models"
+        )
     result = await ai_providers.test_provider_connection(
-        row, settings=get_settings(), session=session
+        row,
+        model=model.model_id,
+        supports_tools=bool(model.supports_tools),
+        settings=get_settings(),
+        session=session,
     )
     return LlmProviderTestOut(
         ok=result.ok, model=result.model, tool_calling_ok=result.tool_calling_ok, error=result.error

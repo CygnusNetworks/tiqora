@@ -61,22 +61,13 @@ class LlmProviderOut(BaseModel):
     name: str
     kind: ProviderKind
     base_url: str
-    default_model: str
     has_api_key: bool
     extra_json: str | None
-    supports_tools: bool
-    supports_streaming: bool
     eu_hosted: bool
-    supports_vision: bool
-    price_input_per_1m: float | None
-    price_output_per_1m: float | None
     price_currency: str | None
     budget_cost_day: float | None
     budget_cost_week: float | None
     budget_cost_month: float | None
-    max_tool_rounds: int | None
-    """Tool rounds the agent loop grants this model. ``None`` = the built-in
-    default (see ``tiqora.ai.runtime.DEFAULT_MAX_TOOL_ROUNDS``)."""
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -86,43 +77,27 @@ class LlmProviderCreate(BaseModel):
     name: str
     kind: ProviderKind = "openai_compat"
     base_url: str
-    default_model: str
     api_key: str | None = None
     extra_json: str | None = None
-    supports_tools: bool = True
-    supports_streaming: bool = True
     eu_hosted: bool = False
-    supports_vision: bool = False
-    price_input_per_1m: float | None = None
-    price_output_per_1m: float | None = None
     price_currency: str | None = None
     budget_cost_day: float | None = None
     budget_cost_week: float | None = None
     budget_cost_month: float | None = None
-    max_tool_rounds: int | None = None
-    """Omit, or send 0, for the built-in default."""
 
 
 class LlmProviderUpdate(BaseModel):
     name: str | None = None
     kind: ProviderKind | None = None
     base_url: str | None = None
-    default_model: str | None = None
     # Write-only: omit or empty string keeps the stored key.
     api_key: str | None = None
     extra_json: str | None = None
-    supports_tools: bool | None = None
-    supports_streaming: bool | None = None
     eu_hosted: bool | None = None
-    supports_vision: bool | None = None
-    price_input_per_1m: float | None = None
-    price_output_per_1m: float | None = None
     price_currency: str | None = None
     budget_cost_day: float | None = None
     budget_cost_week: float | None = None
     budget_cost_month: float | None = None
-    max_tool_rounds: int | None = None
-    """Send 0 to go back to the built-in default; omit to leave it unchanged."""
     valid_id: int | None = None
 
 
@@ -207,10 +182,6 @@ class AiQueuePolicyOut(BaseModel):
     system_prompt: str
     autonomy: Autonomy
     service_user_id: int | None
-    llm_provider_id: int | None
-    model_override: str | None
-    llm_fallback_json: str | None = None
-    vision_provider_id: int | None
     kb_tags: str | None
     kb_category_ids: str | None
     mcp_client_ids: str | None
@@ -251,10 +222,6 @@ class AiQueuePolicyOut(BaseModel):
     triage_customer_fix_enabled: bool
     triage_customer_fix_auto_threshold: int
     triage_delay_reply: bool
-    triage_llm_provider_id: int | None
-    triage_model_override: str | None
-    final_answer_llm_provider_id: int | None
-    final_answer_model_override: str | None
     valid_id: int
     create_time: datetime
     change_time: datetime
@@ -269,10 +236,6 @@ class AiQueuePolicyCreate(BaseModel):
     system_prompt: str = ""
     autonomy: Autonomy = "off"
     service_user_id: int | None = None
-    llm_provider_id: int | None = None
-    model_override: str | None = None
-    llm_fallback_json: str | None = None
-    vision_provider_id: int | None = None
     kb_tags: str | None = None
     kb_category_ids: str | None = None
     mcp_client_ids: str | None = None
@@ -309,10 +272,6 @@ class AiQueuePolicyCreate(BaseModel):
     triage_customer_fix_enabled: bool = False
     triage_customer_fix_auto_threshold: int = 100
     triage_delay_reply: bool = False
-    triage_llm_provider_id: int | None = None
-    triage_model_override: str | None = None
-    final_answer_llm_provider_id: int | None = None
-    final_answer_model_override: str | None = None
 
 
 class AiQueuePolicyUpdate(BaseModel):
@@ -323,10 +282,6 @@ class AiQueuePolicyUpdate(BaseModel):
     system_prompt: str | None = None
     autonomy: Autonomy | None = None
     service_user_id: int | None = None
-    llm_provider_id: int | None = None
-    model_override: str | None = None
-    llm_fallback_json: str | None = None
-    vision_provider_id: int | None = None
     kb_tags: str | None = None
     kb_category_ids: str | None = None
     mcp_client_ids: str | None = None
@@ -363,10 +318,6 @@ class AiQueuePolicyUpdate(BaseModel):
     triage_customer_fix_enabled: bool | None = None
     triage_customer_fix_auto_threshold: int | None = None
     triage_delay_reply: bool | None = None
-    triage_llm_provider_id: int | None = None
-    triage_model_override: str | None = None
-    final_answer_llm_provider_id: int | None = None
-    final_answer_model_override: str | None = None
     valid_id: int | None = None
 
 

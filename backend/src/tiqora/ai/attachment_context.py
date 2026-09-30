@@ -30,8 +30,8 @@ from tiqora.ai.llm import LlmClient, LlmUsage
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.vision import describe_images
 
-# Sync on purpose: the caller already resolved the vision provider row (a DB
-# fetch) before calling build_attachment_context, so constructing the actual
+# Sync on purpose: the caller already resolved the vision profile (DB
+# fetches) before calling build_attachment_context, so constructing the actual
 # LlmClient here needs no further I/O.
 VisionLlmFactory = Callable[[], LlmClient]
 
@@ -92,9 +92,9 @@ async def build_attachment_context(
     appends the block after the article body, before PII masking (so
     extracted/described text is masked exactly like the rest of the body).
 
-    ``vision_enabled`` gates the image path entirely — when ``False`` (no
-    ``vision_provider_id`` configured, or the configured provider is
-    invalid), images are skipped without ever being loaded from the DB.
+    ``vision_enabled`` gates the image path entirely — when ``False`` (the
+    queue has no vision profile), images are skipped without ever being
+    loaded from the DB.
     """
     doc_blocks: dict[int, tuple[str, str]] = {}
     # attachment_id, filename, content_type, content

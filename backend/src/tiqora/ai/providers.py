@@ -28,18 +28,7 @@ class ProviderValidationError(Exception):
     """Raised for invalid provider pricing fields (translated to 422)."""
 
 
-def _validate_pricing(
-    *,
-    price_input_per_1m: float | None,
-    price_output_per_1m: float | None,
-    price_currency: str | None,
-) -> None:
-    for label, value in (
-        ("price_input_per_1m", price_input_per_1m),
-        ("price_output_per_1m", price_output_per_1m),
-    ):
-        if value is not None and value < 0:
-            raise ProviderValidationError(f"{label} must be >= 0")
+def _validate_pricing(*, price_currency: str | None) -> None:
     if price_currency is not None and not (
         len(price_currency) == 3 and price_currency.isalpha() and price_currency.isupper()
     ):
@@ -101,39 +90,6 @@ async def get_provider(session: AsyncSession, provider_id: int) -> TiqoraLlmProv
     return await session.get(TiqoraLlmProvider, provider_id)
 
 
-async def resolve_max_tool_rounds(
-    session: AsyncSession, provider_id: int | None, *, default: int
-) -> int:
-    """Tool-round budget for *provider_id*, falling back to *default*.
-
-    Resolved from the queue policy's configured provider, not from whichever
-    provider a mid-run fallback ends up on: the budget shapes the whole run and
-    has to be known before the first call. A non-positive stored value is
-    treated as unset rather than as "no rounds at all", which would leave the
-    terminal-force as the only call the agent ever makes.
-    """
-    if provider_id is None:
-        return default
-    provider = await get_provider(session, provider_id)
-    if provider is None or provider.max_tool_rounds is None or provider.max_tool_rounds < 1:
-        return default
-    return provider.max_tool_rounds
-
-
-def _normalize_tool_rounds(value: int | None) -> int | None:
-    """Map "no override" onto NULL.
-
-    The update path uses ``None`` to mean "field not supplied" (house pattern
-    throughout this module), which would otherwise make a column whose whole
-    point is "NULL = use the default" impossible to reset. Accepting 0 — what
-    an emptied number input sends — as "back to the default" keeps the reset
-    expressible without changing the sentinel everywhere else.
-    """
-    if value is None or value < 1:
-        return None
-    return value
-
-
 async def create_provider(
     session: AsyncSession,
     *,
@@ -142,26 +98,15 @@ async def create_provider(
     name: str,
     kind: str,
     base_url: str,
-    default_model: str,
     api_key: str | None,
-    extra_json: str | None,
-    supports_tools: bool,
-    supports_streaming: bool,
-    eu_hosted: bool,
-    supports_vision: bool = False,
-    price_input_per_1m: float | None = None,
-    price_output_per_1m: float | None = None,
+    extra_json: str | None = None,
+    eu_hosted: bool = False,
     price_currency: str | None = None,
     budget_cost_day: float | None = None,
     budget_cost_week: float | None = None,
     budget_cost_month: float | None = None,
-    max_tool_rounds: int | None = None,
 ) -> TiqoraLlmProvider:
-    _validate_pricing(
-        price_input_per_1m=price_input_per_1m,
-        price_output_per_1m=price_output_per_1m,
-        price_currency=price_currency,
-    )
+    _validate_pricing(price_currency=price_currency)
     _validate_budget(
         budget_cost_day=budget_cost_day,
         budget_cost_week=budget_cost_week,
@@ -174,20 +119,13 @@ async def create_provider(
         name=name,
         kind=kind,
         base_url=base_url.strip(),
-        default_model=default_model.strip(),
         api_key_enc=encrypt_secret(settings.secret_key, api_key) if api_key else None,
         extra_json=extra_json,
-        supports_tools=supports_tools,
-        supports_streaming=supports_streaming,
         eu_hosted=eu_hosted,
-        supports_vision=supports_vision,
-        price_input_per_1m=price_input_per_1m,
-        price_output_per_1m=price_output_per_1m,
         price_currency=price_currency,
         budget_cost_day=budget_cost_day,
         budget_cost_week=budget_cost_week,
         budget_cost_month=budget_cost_month,
-        max_tool_rounds=_normalize_tool_rounds(max_tool_rounds),
         create_by=change_by,
         change_by=change_by,
     )
@@ -206,27 +144,16 @@ async def update_provider(
     name: str | None = None,
     kind: str | None = None,
     base_url: str | None = None,
-    default_model: str | None = None,
     api_key: str | None = None,
     extra_json: str | None = None,
-    supports_tools: bool | None = None,
-    supports_streaming: bool | None = None,
     eu_hosted: bool | None = None,
-    supports_vision: bool | None = None,
-    price_input_per_1m: float | None = None,
-    price_output_per_1m: float | None = None,
     price_currency: str | None = None,
     budget_cost_day: float | None = None,
     budget_cost_week: float | None = None,
     budget_cost_month: float | None = None,
-    max_tool_rounds: int | None = None,
     valid_id: int | None = None,
 ) -> TiqoraLlmProvider:
-    _validate_pricing(
-        price_input_per_1m=price_input_per_1m,
-        price_output_per_1m=price_output_per_1m,
-        price_currency=price_currency,
-    )
+    _validate_pricing(price_currency=price_currency)
     _validate_budget(
         budget_cost_day=budget_cost_day,
         budget_cost_week=budget_cost_week,
@@ -238,24 +165,12 @@ async def update_provider(
         row.kind = kind
     if base_url is not None:
         row.base_url = base_url.strip()
-    if default_model is not None:
-        row.default_model = default_model.strip()
     if api_key is not None and api_key.strip() != "":
         row.api_key_enc = encrypt_secret(settings.secret_key, api_key.strip())
     if extra_json is not None:
         row.extra_json = extra_json
-    if supports_tools is not None:
-        row.supports_tools = supports_tools
-    if supports_streaming is not None:
-        row.supports_streaming = supports_streaming
     if eu_hosted is not None:
         row.eu_hosted = eu_hosted
-    if supports_vision is not None:
-        row.supports_vision = supports_vision
-    if price_input_per_1m is not None:
-        row.price_input_per_1m = price_input_per_1m
-    if price_output_per_1m is not None:
-        row.price_output_per_1m = price_output_per_1m
     if price_currency is not None:
         row.price_currency = price_currency
     if budget_cost_day is not None:
@@ -264,10 +179,6 @@ async def update_provider(
         row.budget_cost_week = budget_cost_week
     if budget_cost_month is not None:
         row.budget_cost_month = budget_cost_month
-    # Normalized rather than guarded: 0 is a supplied value meaning "back to the
-    # code default", so it must reach the column as NULL.
-    if max_tool_rounds is not None:
-        row.max_tool_rounds = _normalize_tool_rounds(max_tool_rounds)
     if valid_id is not None:
         row.valid_id = valid_id
     row.change_by = change_by
@@ -299,8 +210,7 @@ async def duplicate_provider(
 ) -> TiqoraLlmProvider:
     """Copy a provider row, including its encrypted API key ciphertext (the
     plaintext key never leaves the server — this is a same-process copy of
-    the Fernet-encrypted column, not a re-entry). Typical use case: several
-    models at the same provider/API key.
+    the Fernet-encrypted column, not a re-entry). Models are not copied.
     """
     name = await _next_copy_name(session, row.name)
     copy = TiqoraLlmProvider(
@@ -308,14 +218,8 @@ async def duplicate_provider(
         kind=row.kind,
         base_url=row.base_url,
         api_key_enc=row.api_key_enc,
-        default_model=row.default_model,
         extra_json=row.extra_json,
-        supports_tools=row.supports_tools,
-        supports_streaming=row.supports_streaming,
         eu_hosted=row.eu_hosted,
-        supports_vision=row.supports_vision,
-        price_input_per_1m=row.price_input_per_1m,
-        price_output_per_1m=row.price_output_per_1m,
         price_currency=row.price_currency,
         budget_cost_day=row.budget_cost_day,
         budget_cost_week=row.budget_cost_week,
@@ -336,20 +240,13 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
         "name": row.name,
         "kind": row.kind,
         "base_url": row.base_url,
-        "default_model": row.default_model,
         "has_api_key": bool(row.api_key_enc),
         "extra_json": row.extra_json,
-        "supports_tools": bool(row.supports_tools),
-        "supports_streaming": bool(row.supports_streaming),
         "eu_hosted": bool(row.eu_hosted),
-        "supports_vision": bool(row.supports_vision),
-        "price_input_per_1m": row.price_input_per_1m,
-        "price_output_per_1m": row.price_output_per_1m,
         "price_currency": row.price_currency,
         "budget_cost_day": row.budget_cost_day,
         "budget_cost_week": row.budget_cost_week,
         "budget_cost_month": row.budget_cost_month,
-        "max_tool_rounds": row.max_tool_rounds,
         "valid_id": int(row.valid_id),
         "create_time": row.create_time,
         "change_time": row.change_time,
@@ -359,12 +256,15 @@ def provider_to_public_dict(row: TiqoraLlmProvider) -> dict[str, object]:
 async def test_provider_connection(
     row: TiqoraLlmProvider,
     *,
+    model: str,
+    supports_tools: bool = True,
     settings: Settings,
     client: httpx.AsyncClient | None = None,
     session: AsyncSession | None = None,
 ) -> ProviderTestResult:
-    """Call ``POST {base_url}/chat/completions`` with a mini prompt + a mini
-    tool schema to verify both connectivity/auth and tool-calling support.
+    """Call ``POST {base_url}/chat/completions`` for *model* with a mini
+    prompt (+ a mini tool schema when *supports_tools*) to verify both
+    connectivity/auth and tool-calling support.
 
     ``client`` is injectable (``httpx.AsyncClient(transport=httpx.MockTransport(...))``)
     so tests never hit the network; production callers omit it and a
@@ -379,11 +279,11 @@ async def test_provider_connection(
         headers["Authorization"] = f"Bearer {api_key}"
 
     payload: dict[str, object] = {
-        "model": row.default_model,
+        "model": model,
         "messages": [{"role": "user", "content": "Reply with the single word: pong"}],
         "max_tokens": 16,
     }
-    if row.supports_tools:
+    if supports_tools:
         payload["tools"] = _TEST_TOOL_SCHEMA
 
     url = row.base_url.rstrip("/") + "/chat/completions"
@@ -403,7 +303,7 @@ async def test_provider_connection(
     status_code: int | None = None
     error: str | None = None
     response_json: str | None = None
-    model: str | None = None
+    served_model: str | None = None
     try:
         response = await http_client.post(
             pinned.request_url, headers=headers, json=payload, extensions=extensions
@@ -414,13 +314,15 @@ async def test_provider_connection(
             return ProviderTestResult(ok=False, model=None, tool_calling_ok=False, error=error)
         data = response.json()
         response_json = json.dumps(data)
-        model = data.get("model")
+        served_model = data.get("model")
         choices = data.get("choices") or []
         tool_calling_ok = False
         if choices:
             message = choices[0].get("message") or {}
             tool_calling_ok = bool(message.get("tool_calls"))
-        return ProviderTestResult(ok=True, model=model, tool_calling_ok=tool_calling_ok, error=None)
+        return ProviderTestResult(
+            ok=True, model=served_model, tool_calling_ok=tool_calling_ok, error=None
+        )
     except httpx.HTTPError as exc:
         error = str(exc)
         return ProviderTestResult(ok=False, model=None, tool_calling_ok=False, error=error)
@@ -434,7 +336,7 @@ async def test_provider_connection(
                 context=AuditContext(
                     feature=AUDIT_FEATURE_TEST,
                     provider_id=row.id,
-                    model=model or row.default_model,
+                    model=served_model or model,
                 ),
                 request_json=json.dumps(payload),
                 response_json=response_json,

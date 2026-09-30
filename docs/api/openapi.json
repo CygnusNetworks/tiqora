@@ -1517,28 +1517,6 @@
             ],
             "title": "Escalation Rules"
           },
-          "final_answer_llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Final Answer Llm Provider Id"
-          },
-          "final_answer_model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Final Answer Model Override"
-          },
           "identity_mode": {
             "default": "ticket_customer_id",
             "enum": [
@@ -1587,28 +1565,6 @@
             ],
             "title": "Kb Tags"
           },
-          "llm_fallback_json": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Fallback Json"
-          },
-          "llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Provider Id"
-          },
           "max_auto_replies": {
             "default": 5,
             "title": "Max Auto Replies",
@@ -1651,17 +1607,6 @@
               }
             ],
             "title": "Mcp Tool Overrides"
-          },
-          "model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Override"
           },
           "pii_masking": {
             "default": true,
@@ -1809,28 +1754,6 @@
             "title": "Triage Delay Reply",
             "type": "boolean"
           },
-          "triage_llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Triage Llm Provider Id"
-          },
-          "triage_model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Triage Model Override"
-          },
           "triage_samples": {
             "default": 3,
             "title": "Triage Samples",
@@ -1851,17 +1774,6 @@
               }
             ],
             "title": "Triage Target Queue Ids"
-          },
-          "vision_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vision Provider Id"
           }
         },
         "required": [
@@ -1981,28 +1893,6 @@
             ],
             "title": "Escalation Rules"
           },
-          "final_answer_llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Final Answer Llm Provider Id"
-          },
-          "final_answer_model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Final Answer Model Override"
-          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -2053,28 +1943,6 @@
             ],
             "title": "Kb Tags"
           },
-          "llm_fallback_json": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Fallback Json"
-          },
-          "llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Provider Id"
-          },
           "max_auto_replies": {
             "title": "Max Auto Replies",
             "type": "integer"
@@ -2115,17 +1983,6 @@
               }
             ],
             "title": "Mcp Tool Overrides"
-          },
-          "model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Override"
           },
           "pii_masking": {
             "title": "Pii Masking",
@@ -2264,28 +2121,6 @@
             "title": "Triage Delay Reply",
             "type": "boolean"
           },
-          "triage_llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Triage Llm Provider Id"
-          },
-          "triage_model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Triage Model Override"
-          },
           "triage_samples": {
             "title": "Triage Samples",
             "type": "integer"
@@ -2308,17 +2143,6 @@
           "valid_id": {
             "title": "Valid Id",
             "type": "integer"
-          },
-          "vision_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vision Provider Id"
           }
         },
         "required": [
@@ -2331,9 +2155,6 @@
           "system_prompt",
           "autonomy",
           "service_user_id",
-          "llm_provider_id",
-          "model_override",
-          "vision_provider_id",
           "kb_tags",
           "kb_category_ids",
           "mcp_client_ids",
@@ -2369,10 +2190,6 @@
           "triage_customer_fix_enabled",
           "triage_customer_fix_auto_threshold",
           "triage_delay_reply",
-          "triage_llm_provider_id",
-          "triage_model_override",
-          "final_answer_llm_provider_id",
-          "final_answer_model_override",
           "valid_id",
           "create_time",
           "change_time"
@@ -2530,28 +2347,6 @@
             ],
             "title": "Escalation Rules"
           },
-          "final_answer_llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Final Answer Llm Provider Id"
-          },
-          "final_answer_model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Final Answer Model Override"
-          },
           "identity_mode": {
             "anyOf": [
               {
@@ -2612,28 +2407,6 @@
             ],
             "title": "Kb Tags"
           },
-          "llm_fallback_json": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Fallback Json"
-          },
-          "llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Llm Provider Id"
-          },
           "max_auto_replies": {
             "anyOf": [
               {
@@ -2688,17 +2461,6 @@
               }
             ],
             "title": "Mcp Tool Overrides"
-          },
-          "model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Override"
           },
           "pii_masking": {
             "anyOf": [
@@ -2896,28 +2658,6 @@
             ],
             "title": "Triage Delay Reply"
           },
-          "triage_llm_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Triage Llm Provider Id"
-          },
-          "triage_model_override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Triage Model Override"
-          },
           "triage_samples": {
             "anyOf": [
               {
@@ -2961,17 +2701,6 @@
               }
             ],
             "title": "Valid Id"
-          },
-          "vision_provider_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Vision Provider Id"
           }
         },
         "title": "AiQueuePolicyUpdate",
@@ -11632,10 +11361,6 @@
             ],
             "title": "Budget Cost Week"
           },
-          "default_model": {
-            "title": "Default Model",
-            "type": "string"
-          },
           "eu_hosted": {
             "default": false,
             "title": "Eu Hosted",
@@ -11661,17 +11386,6 @@
             "title": "Kind",
             "type": "string"
           },
-          "max_tool_rounds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Tool Rounds"
-          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -11686,49 +11400,11 @@
               }
             ],
             "title": "Price Currency"
-          },
-          "price_input_per_1m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Price Input Per 1M"
-          },
-          "price_output_per_1m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Price Output Per 1M"
-          },
-          "supports_streaming": {
-            "default": true,
-            "title": "Supports Streaming",
-            "type": "boolean"
-          },
-          "supports_tools": {
-            "default": true,
-            "title": "Supports Tools",
-            "type": "boolean"
-          },
-          "supports_vision": {
-            "default": false,
-            "title": "Supports Vision",
-            "type": "boolean"
           }
         },
         "required": [
           "name",
-          "base_url",
-          "default_model"
+          "base_url"
         ],
         "title": "LlmProviderCreate",
         "type": "object"
@@ -11782,10 +11458,6 @@
             "title": "Create Time",
             "type": "string"
           },
-          "default_model": {
-            "title": "Default Model",
-            "type": "string"
-          },
           "eu_hosted": {
             "title": "Eu Hosted",
             "type": "boolean"
@@ -11817,17 +11489,6 @@
             "title": "Kind",
             "type": "string"
           },
-          "max_tool_rounds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Tool Rounds"
-          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -11843,40 +11504,6 @@
             ],
             "title": "Price Currency"
           },
-          "price_input_per_1m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Price Input Per 1M"
-          },
-          "price_output_per_1m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Price Output Per 1M"
-          },
-          "supports_streaming": {
-            "title": "Supports Streaming",
-            "type": "boolean"
-          },
-          "supports_tools": {
-            "title": "Supports Tools",
-            "type": "boolean"
-          },
-          "supports_vision": {
-            "title": "Supports Vision",
-            "type": "boolean"
-          },
           "valid_id": {
             "title": "Valid Id",
             "type": "integer"
@@ -11887,20 +11514,13 @@
           "name",
           "kind",
           "base_url",
-          "default_model",
           "has_api_key",
           "extra_json",
-          "supports_tools",
-          "supports_streaming",
           "eu_hosted",
-          "supports_vision",
-          "price_input_per_1m",
-          "price_output_per_1m",
           "price_currency",
           "budget_cost_day",
           "budget_cost_week",
           "budget_cost_month",
-          "max_tool_rounds",
           "valid_id",
           "create_time",
           "change_time"
@@ -12007,17 +11627,6 @@
             ],
             "title": "Budget Cost Week"
           },
-          "default_model": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Default Model"
-          },
           "eu_hosted": {
             "anyOf": [
               {
@@ -12055,17 +11664,6 @@
             ],
             "title": "Kind"
           },
-          "max_tool_rounds": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Tool Rounds"
-          },
           "name": {
             "anyOf": [
               {
@@ -12087,61 +11685,6 @@
               }
             ],
             "title": "Price Currency"
-          },
-          "price_input_per_1m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Price Input Per 1M"
-          },
-          "price_output_per_1m": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Price Output Per 1M"
-          },
-          "supports_streaming": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Supports Streaming"
-          },
-          "supports_tools": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Supports Tools"
-          },
-          "supports_vision": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Supports Vision"
           },
           "valid_id": {
             "anyOf": [

@@ -196,36 +196,12 @@ class TiqoraLlmProvider(TiqoraBase):
     )
     base_url: Mapped[str] = mapped_column(String(500), nullable=False)
     api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
-    default_model: Mapped[str] = mapped_column(String(200), nullable=False)
     extra_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    supports_tools: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default=true()
-    )
-    supports_streaming: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True, server_default=true()
-    )
     eu_hosted: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
-    # Vision (image-description) capability — a separate pre-pass call, never
-    # the main agent/summary model (see tiqora.ai.vision module docstring).
-    supports_vision: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=false()
-    )
-    # How many tool rounds the agent loop grants this model before the
-    # terminal-force closes the run (see tiqora.ai.runtime). A model that
-    # batches its tool calls needs fewer; a weaker one needs more. ``None``
-    # means "use DEFAULT_MAX_TOOL_ROUNDS", the same "not configured" semantics
-    # as the pricing and budget columns above.
-    #
-    # Every extra round re-sends the whole grown conversation, so raising this
-    # costs more than linearly — see the module docstring of
-    # ``tiqora.ai.runtime`` for the loop that spends it.
-    max_tool_rounds: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Token pricing (per 1M tokens), all optional — see
-    # ``tiqora.ai.usage.record_usage`` for how these feed ``cost_hint``.
-    price_input_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
-    price_output_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Currency of the per-model prices (tiqora_llm_model.price_*_per_1m) and
+    # of the budgets below — one currency per provider account.
     price_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     # Cost budgets (in price_currency), all optional — see
     # ``tiqora.ai.usage.provider_budget_exceeded`` for enforcement. ``None``
@@ -243,6 +219,137 @@ class TiqoraLlmProvider(TiqoraBase):
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
     change_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
+    )
+
+
+class TiqoraLlmModel(TiqoraBase):
+    """One model at one provider (``model_id`` is that provider's exact API
+    model name — the same model may be called differently elsewhere).
+
+    Capabilities, tool rounds and prices are per model; the currency and the
+    cost budgets stay on the provider. See :mod:`tiqora.ai.llm_routing`.
+    """
+
+    __tablename__ = "tiqora_llm_model"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    provider_id: Mapped[int] = mapped_column(
+        ForeignKey("tiqora_llm_provider.id", ondelete="CASCADE"), nullable=False
+    )
+    model_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    # UI only; NULL → show model_id.
+    display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    supports_tools: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
+    # Image description (the vision pre-pass, see tiqora.ai.vision).
+    supports_vision: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    context_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # How many tool rounds the agent loop grants this model before the
+    # terminal-force closes the run (see tiqora.ai.runtime). ``None`` means
+    # "use DEFAULT_MAX_TOOL_ROUNDS". Every extra round re-sends the whole
+    # grown conversation, so raising this costs more than linearly.
+    max_tool_rounds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Token pricing per 1M tokens (currency on the provider), both optional —
+    # see ``tiqora.ai.usage.record_usage`` for how these feed ``cost_hint``.
+    price_input_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    price_output_per_1m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    valid_id: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=1, server_default="1"
+    )
+    create_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("provider_id", "model_id", name="uq_tiqora_llm_model_provider_model"),
+    )
+
+
+class TiqoraLlmProfile(TiqoraBase):
+    """An ordered fallback chain of models (entries in
+    :class:`TiqoraLlmProfileEntry`), assigned to tasks globally or per queue."""
+
+    __tablename__ = "tiqora_llm_profile"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Per-call HTTP timeout for every model of this profile; NULL →
+    # settings.llm_timeout_seconds.
+    timeout_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    valid_id: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=1, server_default="1"
+    )
+    create_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+    change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+
+class TiqoraLlmProfileEntry(TiqoraBase):
+    """One model at one position (0 = tried first) of a profile."""
+
+    __tablename__ = "tiqora_llm_profile_entry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("tiqora_llm_profile.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    llm_model_id: Mapped[int] = mapped_column(
+        ForeignKey("tiqora_llm_model.id", ondelete="RESTRICT"), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("profile_id", "position", name="uq_tiqora_llm_profile_entry_position"),
+        UniqueConstraint("profile_id", "llm_model_id", name="uq_tiqora_llm_profile_entry_model"),
+    )
+
+
+class TiqoraAiTaskDefault(TiqoraBase):
+    """Global profile per task (``tiqora.ai.llm_routing.ALL_TASKS``).
+    ``profile_id`` NULL = "no own profile" (the task's fallback behaviour)."""
+
+    __tablename__ = "tiqora_ai_task_default"
+
+    task: Mapped[str] = mapped_column(String(30), primary_key=True)
+    profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tiqora_llm_profile.id", ondelete="RESTRICT"), nullable=True
+    )
+
+
+class TiqoraAiQueueTaskProfile(TiqoraBase):
+    """Per-queue override of a task's profile. A row with ``profile_id`` NULL
+    means "no own profile" for this queue even when a global default exists;
+    no row means "inherit the global default"."""
+
+    __tablename__ = "tiqora_ai_queue_task_profile"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    queue_policy_id: Mapped[int] = mapped_column(
+        ForeignKey("tiqora_ai_queue_policy.id", ondelete="CASCADE"), nullable=False
+    )
+    task: Mapped[str] = mapped_column(String(30), nullable=False)
+    profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("tiqora_llm_profile.id", ondelete="RESTRICT"), nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "queue_policy_id", "task", name="uq_tiqora_ai_queue_task_profile_policy_task"
+        ),
     )
 
 
@@ -333,16 +440,8 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     # is flipped true (API-validated requirement, not a DB constraint).
     service_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    llm_provider_id: Mapped[int | None] = mapped_column(
-        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
-    )
-    model_override: Mapped[str | None] = mapped_column(String(200), nullable=True)
-
-    # Image attachments are never shown to the main model (plan: vision
-    # pre-pass) — NULL means images are ignored entirely for this queue.
-    vision_provider_id: Mapped[int | None] = mapped_column(
-        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
-    )
+    # Which models this queue uses lives in tiqora_ai_queue_task_profile /
+    # tiqora_ai_task_default (see tiqora.ai.llm_routing).
 
     kb_tags: Mapped[str | None] = mapped_column(Text, nullable=True)
     kb_category_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -384,11 +483,6 @@ class TiqoraAiQueuePolicy(TiqoraBase):
         String(30), nullable=False, default=IDENTITY_TICKET_CUSTOMER_ID
     )
     clarify_schema_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    # Priority-ordered LLM provider fallback list (plan block: LLM fallback) —
-    # JSON array of {"provider_id": int, "model": str|null}, tried in order
-    # when llm_provider_id errors or is unavailable. NULL/empty = no fallback.
-    llm_fallback_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Sender blocklist (plan block 2) — JSON array of exact addresses or
     # "*@domain" globs (see tiqora.ai.senders.matches_ignored). NULL/empty =
@@ -476,22 +570,6 @@ class TiqoraAiQueuePolicy(TiqoraBase):
     triage_delay_reply: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
-
-    # Triage may use a cheaper model than the reply agent. NULL falls back to
-    # llm_provider_id / model_override.
-    triage_llm_provider_id: Mapped[int | None] = mapped_column(
-        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
-    )
-    triage_model_override: Mapped[str | None] = mapped_column(String(200), nullable=True)
-
-    # Final-answer model for the reply agent: the (cheaper) primary model runs
-    # the research/tool loop; once it wants to write the customer message, the
-    # run is handed over to this model, which writes the answer from the same
-    # conversation (see tiqora.ai.runtime). NULL = the primary model answers.
-    final_answer_llm_provider_id: Mapped[int | None] = mapped_column(
-        ForeignKey("tiqora_llm_provider.id", ondelete="SET NULL"), nullable=True
-    )
-    final_answer_model_override: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     valid_id: Mapped[int] = mapped_column(
         SmallInteger, nullable=False, default=1, server_default="1"

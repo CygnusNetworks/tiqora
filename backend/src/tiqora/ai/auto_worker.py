@@ -45,7 +45,6 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.ai import summary as summary_service
-from tiqora.ai import usage as usage_service
 from tiqora.ai.context import (
     TicketNotFoundError,
     article_from_address,
@@ -53,8 +52,15 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
-from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
+from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
+from tiqora.ai.llm_routing import (
+    TASK_AGENT,
+    TASK_SUMMARY,
+    NoUsableModel,
+    build_task_llm,
+    require_task_llm,
+)
 from tiqora.ai.models import (
     FEATURE_AUTO_REPLY,
     FEATURE_TRIAGE,
@@ -192,10 +198,6 @@ async def _cap_reason(
         tokens_today = await _tokens_used_today(session, queue_id)
         if tokens_today >= policy.budget_tokens_day:
             return "budget_tokens_day"
-    if policy.llm_provider_id is not None:
-        window = await usage_service.provider_budget_exceeded(session, policy.llm_provider_id)
-        if window is not None:
-            return f"provider_budget_{window}"
     return None
 
 
@@ -326,15 +328,29 @@ async def _process_customer_article_event(
         )
         return None
 
-    llm = await build_llm_client(
-        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
-    )
+    # Resolving the agent chain is also the provider-budget pre-check: an
+    # entry whose provider is over budget is skipped, and when nothing is
+    # left the run is skipped like any other cap.
+    try:
+        task_llm = await build_task_llm(session, settings, policy, TASK_AGENT)
+    except NoUsableModel as exc:
+        logger.info(
+            "ai_auto_worker_cap_skip",
+            ticket_id=ticket_id,
+            queue_id=ticket.queue_id,
+            reason="llm_unavailable",
+            details=exc.reasons,
+        )
+        return None
+    if task_llm is None:
+        # No agent profile at all: an error, as before (no provider).
+        task_llm = await require_task_llm(session, settings, policy, TASK_AGENT)
     bundle = await kb_bundle(session, settings, policy.service_user_id, policy)
 
     return await run_ticket_agent(
         session,
         settings=settings,
-        llm=llm,
+        llm=task_llm.client,
         ticket_id=ticket_id,
         trigger=TRIGGER_AUTO,
         acting_user_id=None,
@@ -355,14 +371,18 @@ async def _maybe_auto_summarize(session: AsyncSession, settings: Settings, ticke
     except TicketNotFoundError:
         return False
     policy = await get_queue_policy_by_queue(session, ticket.queue_id)
-    if policy is None or policy.llm_provider_id is None:
+    if policy is None:
         return False
-    llm = await build_llm_client(
-        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
-    )
+    try:
+        task_llm = await build_task_llm(session, settings, policy, TASK_SUMMARY)
+    except NoUsableModel as exc:
+        logger.info("ai_auto_summary_skip", ticket_id=ticket_id, reasons=exc.reasons)
+        return False
+    if task_llm is None:
+        return False
     await summary_service.summarize_ticket(
         session,
-        llm=llm,
+        llm=task_llm.client,
         ticket_id=ticket_id,
         trigger=summary_service.TRIGGER_AUTO,
         acting_user_id=None,

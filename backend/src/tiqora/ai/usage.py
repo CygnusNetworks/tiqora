@@ -4,41 +4,50 @@ limits is wired into the agent runtime in later phases."""
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.ai.models import TiqoraAiUsage, TiqoraLlmProvider
+from tiqora.ai.models import TiqoraAiUsage, TiqoraLlmModel, TiqoraLlmProvider
+
+ModelPrice = tuple[float | None, float | None]
 
 
-async def _compute_cost_hint(
-    session: AsyncSession,
-    *,
-    provider_id: int | None,
-    prompt_tokens: int,
-    completion_tokens: int,
-) -> float | None:
-    """``prompt_tokens * price_input_per_1m/1e6 + completion_tokens *
-    price_output_per_1m/1e6`` using the provider's configured prices.
+def match_model_price(
+    candidates: Iterable[tuple[str, float | None, float | None]], model: str | None
+) -> ModelPrice | None:
+    """Pick the price row for *model* among one provider's model rows
+    ``(model_id, price_input_per_1m, price_output_per_1m)``.
 
-    A missing price component counts as 0 *only* if the other component is
-    set; if both are unset (or there is no provider), the result is
-    ``None`` — "no pricing configured", not "free".
+    Exact ``model_id`` match first. Otherwise the longest ``model_id`` that
+    is a prefix of *model*: the usage/audit rows store the model name the
+    provider echoed back, which is often the configured id plus a version
+    suffix (``gpt-4o`` → ``gpt-4o-2024-08-06``). No match → ``None``.
     """
-    if provider_id is None:
+    if not model:
         return None
-    prices = (
-        await session.execute(
-            select(
-                TiqoraLlmProvider.price_input_per_1m, TiqoraLlmProvider.price_output_per_1m
-            ).where(TiqoraLlmProvider.id == provider_id)
-        )
-    ).first()
-    if prices is None:
+    best: tuple[str, float | None, float | None] | None = None
+    for model_id, price_input, price_output in candidates:
+        if model_id == model:
+            return price_input, price_output
+        longer = best is None or len(model_id) > len(best[0])
+        if model_id and model.startswith(model_id) and longer:
+            best = (model_id, price_input, price_output)
+    return None if best is None else (best[1], best[2])
+
+
+def price_cost(
+    price: ModelPrice | None, *, prompt_tokens: int, completion_tokens: int
+) -> float | None:
+    """A missing price component counts as 0 *only* if the other component
+    is set; if both are unset (or there is no price row) the result is
+    ``None`` — "no pricing configured", not "free"."""
+    if price is None:
         return None
-    price_input, price_output = prices
+    price_input, price_output = price
     if price_input is None and price_output is None:
         return None
     cost = 0.0
@@ -47,6 +56,51 @@ async def _compute_cost_hint(
     if price_output is not None:
         cost += completion_tokens * price_output / 1_000_000
     return cost
+
+
+async def load_model_prices(
+    session: AsyncSession, provider_ids: Iterable[int | None]
+) -> dict[int, list[tuple[str, float | None, float | None]]]:
+    """``{provider_id: [(model_id, price_in, price_out), ...]}`` for a set of
+    providers — one query for a whole page/result set."""
+    ids = {i for i in provider_ids if i is not None}
+    if not ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(
+                TiqoraLlmModel.provider_id,
+                TiqoraLlmModel.model_id,
+                TiqoraLlmModel.price_input_per_1m,
+                TiqoraLlmModel.price_output_per_1m,
+            ).where(TiqoraLlmModel.provider_id.in_(ids))
+        )
+    ).all()
+    out: dict[int, list[tuple[str, float | None, float | None]]] = {}
+    for provider_id, model_id, price_input, price_output in rows:
+        out.setdefault(int(provider_id), []).append((model_id, price_input, price_output))
+    return out
+
+
+async def _compute_cost_hint(
+    session: AsyncSession,
+    *,
+    provider_id: int | None,
+    model: str | None,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> float | None:
+    """Cost from the price of the model row (``tiqora_llm_model``) matching
+    ``(provider_id, model)`` — see :func:`match_model_price`. No provider,
+    no matching model row or no price configured → ``None``."""
+    if provider_id is None:
+        return None
+    prices = await load_model_prices(session, [provider_id])
+    return price_cost(
+        match_model_price(prices.get(provider_id, []), model),
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
 
 
 async def provider_budget_exceeded(
@@ -117,6 +171,7 @@ async def record_usage(
         cost_hint = await _compute_cost_hint(
             session,
             provider_id=provider_id,
+            model=model,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
@@ -201,4 +256,12 @@ async def list_usage(
     )
 
 
-__all__ = ["UsagePage", "list_usage", "provider_budget_exceeded", "record_usage"]
+__all__ = [
+    "UsagePage",
+    "list_usage",
+    "load_model_prices",
+    "match_model_price",
+    "price_cost",
+    "provider_budget_exceeded",
+    "record_usage",
+]

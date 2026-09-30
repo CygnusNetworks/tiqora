@@ -19,6 +19,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import make_model, routing_cleanup_statements, setup_agent_llm
 from tests.test_ai_runtime import ScriptedLlm, _propose_response
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
@@ -71,6 +72,7 @@ def _seed_ticket(sync_url: str, *, ns: int, ticket_state_id: int = STATE_OPEN_ID
             ("DELETE FROM tiqora_ai_article_origin WHERE queue_id = :id", {"id": queue_id}),
             ("DELETE FROM tiqora_ai_usage WHERE queue_id = :id", {"id": queue_id}),
             ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :id", {"id": queue_id}),
+            *routing_cleanup_statements(f"fake-policyfields-provider-{queue_id}"),
             (
                 "DELETE FROM tiqora_llm_provider WHERE name = :n",
                 {"n": f"fake-policyfields-provider-{queue_id}"},
@@ -206,31 +208,28 @@ async def _setup_auto_reply_policy(
         name=f"fake-policyfields-provider-{seed['queue_id']}",
         kind="openai_compat",
         base_url="https://llm.example/v1",
-        default_model="fake-model",
         api_key=None,
         extra_json=None,
-        supports_tools=True,
-        supports_streaming=False,
         eu_hosted=True,
     )
-    await ai_policies.create_queue_policy(
+    await make_model(session, provider, "fake-model")
+    _policy = await ai_policies.create_queue_policy(
         session,
         change_by=1,
         queue_id=seed["queue_id"],
         enabled_auto_reply=True,
         autonomy=AUTONOMY_FULL,
         service_user_id=seed["agent_id"],
-        llm_provider_id=provider.id,
         pii_masking=False,
         ignored_senders=ignored_senders,
     )
+    await setup_agent_llm(session, _policy, provider)
 
 
 def _patch_llm(monkeypatch: pytest.MonkeyPatch, llm: LlmClient) -> None:
-    async def _fake_build_llm_client(*_args: Any, **_kwargs: Any) -> LlmClient:
-        return llm
-
-    monkeypatch.setattr("tiqora.ai.auto_worker.build_llm_client", _fake_build_llm_client)
+    # The real routing runs (profile, skips, provider budget); only the
+    # client it would construct is replaced.
+    monkeypatch.setattr("tiqora.ai.llm_routing.make_llm_client", lambda **_kwargs: llm)
 
 
 # ---------------------------------------------------------------------------

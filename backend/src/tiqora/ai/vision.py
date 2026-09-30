@@ -3,17 +3,17 @@ architecture in ``docs/ai-integration.md``.
 
 Image attachments are **never** shown to the main agent/summary model. Instead
 this module sends each image, on its own, to a dedicated vision-capable
-provider (``tiqora_llm_provider.supports_vision``, selected per-queue via
-``tiqora_ai_queue_policy.vision_provider_id``) with a neutral description
-prompt. The resulting plain-text description is what gets embedded into the
+model (``tiqora_llm_model.supports_vision``, selected through the queue's
+``vision`` task profile, see :mod:`tiqora.ai.llm_routing`) with a neutral
+description prompt. The resulting plain-text description is what gets embedded into the
 main model's context, exactly like a document attachment's extracted text.
 The vision model never sees ticket text; the main model never sees image
 bytes.
 
 PII note: images cannot be masked the way text is (:mod:`tiqora.ai.pii`) —
 the only control is *which* provider is allowed to see them. Operators should
-prefer an ``eu_hosted`` provider for ``vision_provider_id`` and treat
-enabling it per-queue as a deliberate decision, not a default.
+prefer ``eu_hosted`` providers for the vision profile and treat assigning
+one as a deliberate decision, not a default.
 """
 
 from __future__ import annotations

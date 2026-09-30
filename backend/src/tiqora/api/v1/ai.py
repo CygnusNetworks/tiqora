@@ -34,9 +34,10 @@ from tiqora.ai.context import (
     load_articles,
 )
 from tiqora.ai.gate import is_tiqora_primary
-from tiqora.ai.kb_wiring import build_llm_client, kb_bundle, kb_get_article_fn, kb_search_fn
+from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm import LlmEmptyOutputError, LlmError, LlmHttpError, LlmTimeoutError
+from tiqora.ai.llm_routing import TASK_REFINE, TASK_SUMMARY, build_agent_llm, require_task_llm
 from tiqora.ai.models import (
     FEATURE_REFINE,
     TRIAGE_STATUS_ACCEPTED,
@@ -678,13 +679,7 @@ async def _run_manual_draft_background(
             policy = await get_queue_policy_by_queue(session, queue_id)
             if policy is None or not policy.enabled_manual_assist:
                 raise PolicyDisabledError(f"Manual Assist is disabled for queue {queue_id}")
-            llm = await build_llm_client(
-                session,
-                settings,
-                policy.llm_provider_id,
-                policy.model_override,
-                policy.llm_fallback_json,
-            )
+            llm = (await build_agent_llm(session, settings, policy)).client
             bundle = await kb_bundle(session, settings, user_id, policy)
             result: AgentRunResult = await run_ticket_agent(
                 session,
@@ -849,9 +844,7 @@ async def request_summarize(
             status_code=status.HTTP_409_CONFLICT, detail="Summary is disabled for this queue"
         )
 
-    llm = await build_llm_client(
-        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
-    )
+    llm = (await require_task_llm(session, settings, policy, TASK_SUMMARY)).client
 
     try:
         result: SummaryResult = await summarize_ticket(
@@ -898,9 +891,7 @@ async def request_custom_summary(
             status_code=status.HTTP_409_CONFLICT, detail="Summary is disabled for this queue"
         )
 
-    llm = await build_llm_client(
-        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
-    )
+    llm = (await require_task_llm(session, settings, policy, TASK_SUMMARY)).client
     try:
         result = await custom_summarize_ticket(
             session,
@@ -1217,9 +1208,7 @@ async def request_refine(
             RefinePolicyDisabledError(f"Refine is disabled for queue {queue_id}")
         )
 
-    llm = await build_llm_client(
-        session, settings, policy.llm_provider_id, policy.model_override, policy.llm_fallback_json
-    )
+    llm = (await require_task_llm(session, settings, policy, TASK_REFINE)).client
 
     try:
         result = await refine_text(

@@ -7696,10 +7696,6 @@ export interface components {
             enabled_triage: boolean;
             /** Escalation Rules */
             escalation_rules?: string | null;
-            /** Final Answer Llm Provider Id */
-            final_answer_llm_provider_id?: number | null;
-            /** Final Answer Model Override */
-            final_answer_model_override?: string | null;
             /**
              * Identity Mode
              * @default ticket_customer_id
@@ -7717,10 +7713,6 @@ export interface components {
             kb_category_ids?: string | null;
             /** Kb Tags */
             kb_tags?: string | null;
-            /** Llm Fallback Json */
-            llm_fallback_json?: string | null;
-            /** Llm Provider Id */
-            llm_provider_id?: number | null;
             /**
              * Max Auto Replies
              * @default 5
@@ -7737,8 +7729,6 @@ export interface components {
             mcp_client_ids?: string | null;
             /** Mcp Tool Overrides */
             mcp_tool_overrides?: string | null;
-            /** Model Override */
-            model_override?: string | null;
             /**
              * Pii Masking
              * @default true
@@ -7804,10 +7794,6 @@ export interface components {
              * @default false
              */
             triage_delay_reply: boolean;
-            /** Triage Llm Provider Id */
-            triage_llm_provider_id?: number | null;
-            /** Triage Model Override */
-            triage_model_override?: string | null;
             /**
              * Triage Samples
              * @default 3
@@ -7820,8 +7806,6 @@ export interface components {
             triage_suggest_threshold: number;
             /** Triage Target Queue Ids */
             triage_target_queue_ids?: string | null;
-            /** Vision Provider Id */
-            vision_provider_id?: number | null;
         };
         /** AiQueuePolicyOut */
         AiQueuePolicyOut: {
@@ -7864,10 +7848,6 @@ export interface components {
             enabled_triage: boolean;
             /** Escalation Rules */
             escalation_rules: string | null;
-            /** Final Answer Llm Provider Id */
-            final_answer_llm_provider_id: number | null;
-            /** Final Answer Model Override */
-            final_answer_model_override: string | null;
             /** Id */
             id: number;
             /**
@@ -7883,10 +7863,6 @@ export interface components {
             kb_category_ids: string | null;
             /** Kb Tags */
             kb_tags: string | null;
-            /** Llm Fallback Json */
-            llm_fallback_json?: string | null;
-            /** Llm Provider Id */
-            llm_provider_id: number | null;
             /** Max Auto Replies */
             max_auto_replies: number;
             /** Max Clarifications */
@@ -7897,8 +7873,6 @@ export interface components {
             mcp_client_ids: string | null;
             /** Mcp Tool Overrides */
             mcp_tool_overrides: string | null;
-            /** Model Override */
-            model_override: string | null;
             /** Pii Masking */
             pii_masking: boolean;
             /** Pii Ner Enabled */
@@ -7941,10 +7915,6 @@ export interface components {
             triage_customer_fix_enabled: boolean;
             /** Triage Delay Reply */
             triage_delay_reply: boolean;
-            /** Triage Llm Provider Id */
-            triage_llm_provider_id: number | null;
-            /** Triage Model Override */
-            triage_model_override: string | null;
             /** Triage Samples */
             triage_samples: number;
             /** Triage Suggest Threshold */
@@ -7953,8 +7923,6 @@ export interface components {
             triage_target_queue_ids: string | null;
             /** Valid Id */
             valid_id: number;
-            /** Vision Provider Id */
-            vision_provider_id: number | null;
         };
         /** AiQueuePolicyUpdate */
         AiQueuePolicyUpdate: {
@@ -7984,10 +7952,6 @@ export interface components {
             enabled_triage?: boolean | null;
             /** Escalation Rules */
             escalation_rules?: string | null;
-            /** Final Answer Llm Provider Id */
-            final_answer_llm_provider_id?: number | null;
-            /** Final Answer Model Override */
-            final_answer_model_override?: string | null;
             /** Identity Mode */
             identity_mode?: ("ticket_customer_id" | "clarify_schema" | "off") | null;
             /** Ignore Senders Manual */
@@ -7998,10 +7962,6 @@ export interface components {
             kb_category_ids?: string | null;
             /** Kb Tags */
             kb_tags?: string | null;
-            /** Llm Fallback Json */
-            llm_fallback_json?: string | null;
-            /** Llm Provider Id */
-            llm_provider_id?: number | null;
             /** Max Auto Replies */
             max_auto_replies?: number | null;
             /** Max Clarifications */
@@ -8012,8 +7972,6 @@ export interface components {
             mcp_client_ids?: string | null;
             /** Mcp Tool Overrides */
             mcp_tool_overrides?: string | null;
-            /** Model Override */
-            model_override?: string | null;
             /** Pii Masking */
             pii_masking?: boolean | null;
             /** Pii Ner Enabled */
@@ -8048,10 +8006,6 @@ export interface components {
             triage_customer_fix_enabled?: boolean | null;
             /** Triage Delay Reply */
             triage_delay_reply?: boolean | null;
-            /** Triage Llm Provider Id */
-            triage_llm_provider_id?: number | null;
-            /** Triage Model Override */
-            triage_model_override?: string | null;
             /** Triage Samples */
             triage_samples?: number | null;
             /** Triage Suggest Threshold */
@@ -8060,8 +8014,6 @@ export interface components {
             triage_target_queue_ids?: string | null;
             /** Valid Id */
             valid_id?: number | null;
-            /** Vision Provider Id */
-            vision_provider_id?: number | null;
         };
         /** AiRefineAvailabilityOut */
         AiRefineAvailabilityOut: {
@@ -10943,8 +10895,6 @@ export interface components {
             budget_cost_month?: number | null;
             /** Budget Cost Week */
             budget_cost_week?: number | null;
-            /** Default Model */
-            default_model: string;
             /**
              * Eu Hosted
              * @default false
@@ -10958,31 +10908,10 @@ export interface components {
              * @enum {string}
              */
             kind: "openai_compat" | "anthropic";
-            /** Max Tool Rounds */
-            max_tool_rounds?: number | null;
             /** Name */
             name: string;
             /** Price Currency */
             price_currency?: string | null;
-            /** Price Input Per 1M */
-            price_input_per_1m?: number | null;
-            /** Price Output Per 1M */
-            price_output_per_1m?: number | null;
-            /**
-             * Supports Streaming
-             * @default true
-             */
-            supports_streaming: boolean;
-            /**
-             * Supports Tools
-             * @default true
-             */
-            supports_tools: boolean;
-            /**
-             * Supports Vision
-             * @default false
-             */
-            supports_vision: boolean;
         };
         /** LlmProviderOut */
         LlmProviderOut: {
@@ -11004,8 +10933,6 @@ export interface components {
              * Format: date-time
              */
             create_time: string;
-            /** Default Model */
-            default_model: string;
             /** Eu Hosted */
             eu_hosted: boolean;
             /** Extra Json */
@@ -11019,22 +10946,10 @@ export interface components {
              * @enum {string}
              */
             kind: "openai_compat" | "anthropic";
-            /** Max Tool Rounds */
-            max_tool_rounds: number | null;
             /** Name */
             name: string;
             /** Price Currency */
             price_currency: string | null;
-            /** Price Input Per 1M */
-            price_input_per_1m: number | null;
-            /** Price Output Per 1M */
-            price_output_per_1m: number | null;
-            /** Supports Streaming */
-            supports_streaming: boolean;
-            /** Supports Tools */
-            supports_tools: boolean;
-            /** Supports Vision */
-            supports_vision: boolean;
             /** Valid Id */
             valid_id: number;
         };
@@ -11061,30 +10976,16 @@ export interface components {
             budget_cost_month?: number | null;
             /** Budget Cost Week */
             budget_cost_week?: number | null;
-            /** Default Model */
-            default_model?: string | null;
             /** Eu Hosted */
             eu_hosted?: boolean | null;
             /** Extra Json */
             extra_json?: string | null;
             /** Kind */
             kind?: ("openai_compat" | "anthropic") | null;
-            /** Max Tool Rounds */
-            max_tool_rounds?: number | null;
             /** Name */
             name?: string | null;
             /** Price Currency */
             price_currency?: string | null;
-            /** Price Input Per 1M */
-            price_input_per_1m?: number | null;
-            /** Price Output Per 1M */
-            price_output_per_1m?: number | null;
-            /** Supports Streaming */
-            supports_streaming?: boolean | null;
-            /** Supports Tools */
-            supports_tools?: boolean | null;
-            /** Supports Vision */
-            supports_vision?: boolean | null;
             /** Valid Id */
             valid_id?: number | null;
         };

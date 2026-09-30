@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._llm_routing_helpers import make_model, routing_cleanup_statements, setup_agent_llm
 from tiqora.ai import policies as ai_policies
 from tiqora.ai import providers as ai_providers
 from tiqora.ai.gate import OPERATION_MODE_TIQORA_PRIMARY, set_operation_mode
@@ -144,6 +145,7 @@ def _seed_ticket(sync_url: str, *, ns: int) -> dict[str, Any]:
             ),
             ("DELETE FROM tiqora_ai_queue_policy WHERE queue_id = :id", {"id": queue_id}),
             ("DELETE FROM tiqora_ai_acl WHERE subject_id = :id", {"id": agent_id}),
+            *routing_cleanup_statements(f"fake-summary-provider-{queue_id}"),
             (
                 "DELETE FROM tiqora_llm_provider WHERE name = :n",
                 {"n": f"fake-summary-provider-{queue_id}"},
@@ -317,19 +319,16 @@ async def _setup_policy(
         name=f"fake-summary-provider-{seed['queue_id']}",
         kind="openai_compat",
         base_url="https://llm.example/v1",
-        default_model="fake-model",
         api_key=None,
         extra_json=None,
-        supports_tools=True,
-        supports_streaming=False,
         eu_hosted=True,
     )
-    await ai_policies.create_queue_policy(
+    await make_model(session, provider, "fake-model")
+    _policy = await ai_policies.create_queue_policy(
         session,
         change_by=1,
         queue_id=seed["queue_id"],
         enabled_summary=enabled_summary,
-        llm_provider_id=provider.id,
         pii_masking=pii_masking,
         pii_ner_enabled=pii_ner_enabled,
         summary_incremental_min_articles=summary_incremental_min_articles,
@@ -338,6 +337,7 @@ async def _setup_policy(
         summary_char_threshold=summary_char_threshold,
         summary_detail=summary_detail,
     )
+    await setup_agent_llm(session, _policy, provider)
 
 
 async def test_full_summary_when_no_previous_summary(mariadb_znuny_url: str) -> None:
@@ -1098,12 +1098,10 @@ def test_completion_budget_grows_with_docs_and_detail() -> None:
 async def test_usage_records_the_model_the_provider_actually_served(
     mariadb_znuny_url: str,
 ) -> None:
-    """``tiqora_ai_usage.model`` must name the model that answered, not the
-    policy's ``model_override``.
-
-    With no override configured (the common case — the provider's
-    ``default_model`` is used), recording the override wrote NULL and left
-    the usage table unable to say which model produced a run.
+    """``tiqora_ai_usage.model`` must name the model that answered (the
+    provider's echo), not only the configured model id — once, recording the
+    configured override wrote NULL whenever none was set and left the usage
+    table unable to say which model produced a run.
     """
     seed = _seed_ticket(mariadb_znuny_url, ns=18)
     _add_article(
