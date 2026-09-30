@@ -135,7 +135,10 @@ describe("CallPopup", () => {
   it("opens a prefilled new phone ticket", async () => {
     const start = Date.now() - 90_000;
     renderPopup();
-    push("hangup", call({ state: "ended", answered_at: iso(start), ended_at: iso(start + 60_000) }));
+    push(
+      "hangup",
+      call({ state: "ended", answered_at: iso(start), ended_at: iso(start + 60_000), answered_by_user_id: 7 }),
+    );
     await waitFor(() => expect(screen.getByTestId("call-card-who")).toHaveTextContent("Bob Builder"));
     fireEvent.click(screen.getByTestId("call-card-new-ticket"));
     expect(navigate).toHaveBeenCalledWith({
@@ -147,8 +150,16 @@ describe("CallPopup", () => {
         customer: "bob",
         call_started: start,
         call_ended: start + 60_000,
+        owner_id: 7,
       },
     });
+  });
+
+  it("leaves the owner open when nobody single answered (shared extension)", async () => {
+    renderPopup();
+    push("answered", call({ state: "answered", answered_at: iso(Date.now()), answered_by_user_id: null }));
+    fireEvent.click(await screen.findByTestId("call-card-new-ticket"));
+    expect(navigate.mock.calls.at(-1)?.[0].search).not.toHaveProperty("owner_id", expect.anything());
   });
 
   it("restores active calls after a reload", async () => {

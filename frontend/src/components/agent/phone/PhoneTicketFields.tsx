@@ -1,18 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import type { DynamicFieldDef } from "@/lib/phoneApi";
-import { elapsedToMinutes, formatElapsed } from "@/lib/phoneCall";
 import type { PhoneTicketFieldsValue } from "./phoneTicketValue";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { ComposerTimeChip } from "../ComposerTimeChip";
-import { AttachmentChips } from "../telegram/ComposerChips";
-import type { ChatAttachment } from "../telegram/useChatAttachments";
 import { DynamicFieldInputs } from "./DynamicFieldInputs";
-import { PendingTimeInput } from "./PendingTimeInput";
 
 const SELECT_TRIGGER_CLASS =
   "flex w-full items-center justify-between gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-left text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -64,36 +59,25 @@ function Picker<T extends number>({
 }
 
 /**
- * The AgentTicketPhone parity fields of the New-ticket page's phone mode
- * (the owner sits in `TicketPropsBar`): responsible, type, service, SLA, the pending time of a pending
- * initial state, the booked time (timer from page open), dynamic fields and
- * attachments. Controlled — the page owns the value and submits it.
+ * "Weitere Felder" of the New-ticket page's phone mode (Decision 7): the
+ * rarely used AgentTicketPhone fields — responsible, type, service, SLA and
+ * the optional dynamic fields — collapsed by default behind a header that
+ * names what is inside. Required dynamic fields, the owner (in
+ * `TicketPropsBar`), the pending time, the timer, the time accounting and the
+ * attachments live elsewhere on the page. Controlled — the page owns the value.
  */
 export function PhoneTicketFields({
   value,
   onChange,
-  pendingState,
-  elapsed,
-  timerRunning,
-  onToggleTimer,
   fields,
-  attachments,
-  onAttach,
-  onRemoveAttachment,
 }: {
   value: PhoneTicketFieldsValue;
   onChange: (next: PhoneTicketFieldsValue) => void;
-  /** The chosen initial state is a pending one — ask for the time. */
-  pendingState: boolean;
-  elapsed: number;
-  timerRunning: boolean;
-  onToggleTimer: () => void;
+  /** Optional dynamic fields only; required ones are rendered by the page. */
   fields: DynamicFieldDef[];
-  attachments: ChatAttachment[];
-  onAttach: (files: FileList) => void;
-  onRemoveAttachment: (id: number) => void;
 }) {
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
   const set = (patch: Partial<PhoneTicketFieldsValue>) => onChange({ ...value, ...patch });
 
   const agentsQ = useQuery({ queryKey: ["reference", "agents"], queryFn: () => api.listReferenceAgents() });
@@ -109,98 +93,85 @@ export function PhoneTicketFields({
   const slaItems = (slasQ.data ?? []).map((x) => ({ value: x.id, label: x.name }));
   const none = t("admin.form.selectPlaceholder");
 
-  // The time chip keeps its own text: re-key it for each new timer minute,
-  // but only while the agent has not typed a value.
-  const autoMinutes = elapsedToMinutes(elapsed);
-  const [chipKey, setChipKey] = useState(0);
-  useEffect(() => {
-    if (value.timeUnits === null) setChipKey(autoMinutes);
-  }, [autoMinutes, value.timeUnits]);
+  const showType = typeItems.length > 1;
+  const showService = serviceItems.length > 0;
+  const showSla = slaItems.length > 0;
+  // What the header promises: the field names, then "n Zusatzfelder".
+  const summary = [
+    t("ticket.toolbar.responsible"),
+    showType && t("ticket.type"),
+    showService && t("ticket.service"),
+    showSla && t("ticket.sla"),
+    fields.length > 0 && t("newTicket.moreFieldsCount", { count: fields.length }),
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
-    <div className="space-y-4" data-testid="phone-ticket-fields">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Picker
-          label={t("ticket.toolbar.responsible")}
-          items={agentItems}
-          value={value.responsibleId}
-          onSelect={(v) => set({ responsibleId: v })}
-          onClear={() => set({ responsibleId: null })}
-          testId="new-ticket-responsible"
-          noneLabel={none}
-        />
-        {typeItems.length > 1 && (
-          <Picker label={t("ticket.type")} items={typeItems} value={value.typeId} onSelect={(v) => set({ typeId: v })} testId="new-ticket-type" noneLabel={none} />
-        )}
-        {serviceItems.length > 0 && (
-          <Picker
-            label={t("ticket.service")}
-            items={serviceItems}
-            value={value.serviceId}
-            onSelect={(v) => set({ serviceId: v, slaId: null })}
-            onClear={() => set({ serviceId: null, slaId: null })}
-            testId="new-ticket-service"
-            noneLabel={none}
+    <div data-testid="phone-ticket-fields">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="new-ticket-more-fields"
+        data-testid="new-ticket-more-toggle"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 rounded py-1 text-left text-[12.5px] text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+      >
+        <ChevronDownIcon aria-hidden className={cn("shrink-0 transition-transform duration-150", !open && "-rotate-90")} />
+        {t("newTicket.moreFields")}
+        <span
+          className="rounded-full border border-hairline px-1.5 text-[11px] text-muted"
+          data-testid="new-ticket-more-summary"
+        >
+          {summary}
+        </span>
+      </button>
+      {open && (
+        <div id="new-ticket-more-fields" className="mt-2.5 space-y-4" data-testid="new-ticket-more-fields">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Picker
+              label={t("ticket.toolbar.responsible")}
+              items={agentItems}
+              value={value.responsibleId}
+              onSelect={(v) => set({ responsibleId: v })}
+              onClear={() => set({ responsibleId: null })}
+              testId="new-ticket-responsible"
+              noneLabel={none}
+            />
+            {showType && (
+              <Picker label={t("ticket.type")} items={typeItems} value={value.typeId} onSelect={(v) => set({ typeId: v })} testId="new-ticket-type" noneLabel={none} />
+            )}
+            {showService && (
+              <Picker
+                label={t("ticket.service")}
+                items={serviceItems}
+                value={value.serviceId}
+                onSelect={(v) => set({ serviceId: v, slaId: null })}
+                onClear={() => set({ serviceId: null, slaId: null })}
+                testId="new-ticket-service"
+                noneLabel={none}
+              />
+            )}
+            {showSla && (
+              <Picker
+                label={t("ticket.sla")}
+                items={slaItems}
+                value={value.slaId}
+                onSelect={(v) => set({ slaId: v })}
+                onClear={() => set({ slaId: null })}
+                testId="new-ticket-sla"
+                noneLabel={none}
+              />
+            )}
+          </div>
+          <DynamicFieldInputs
+            fields={fields}
+            values={value.dfValues}
+            onChange={(name, values) => set({ dfValues: { ...value.dfValues, [name]: values } })}
+            testId="new-ticket-df"
           />
-        )}
-        {slaItems.length > 0 && (
-          <Picker
-            label={t("ticket.sla")}
-            items={slaItems}
-            value={value.slaId}
-            onSelect={(v) => set({ slaId: v })}
-            onClear={() => set({ slaId: null })}
-            testId="new-ticket-sla"
-            noneLabel={none}
-          />
-        )}
-      </div>
-
-      {pendingState && (
-        <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="new-ticket-pending">
-          <span className="text-muted">{t("phone.pendingUntil")}</span>
-          <PendingTimeInput value={value.pendingAt} onChange={(v) => set({ pendingAt: v })} testId="new-ticket-pending-time" />
         </div>
       )}
-
-      <DynamicFieldInputs
-        fields={fields}
-        values={value.dfValues}
-        onChange={(name, values) => set({ dfValues: { ...value.dfValues, [name]: values } })}
-        testId="new-ticket-df"
-      />
-
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="inline-flex items-center gap-2 rounded-md border border-hairline bg-surface px-2 py-1" title={t("phone.timer")}>
-          <span aria-hidden className={cn("h-2 w-2 rounded-full", timerRunning ? "animate-pulse bg-danger" : "bg-muted")} />
-          <span className="font-mono tabular-nums text-ink" data-testid="new-ticket-timer">
-            {formatElapsed(elapsed)}
-          </span>
-          <button type="button" onClick={onToggleTimer} data-testid="new-ticket-timer-toggle" className="text-muted hover:text-ink">
-            {timerRunning ? t("phone.pause") : t("phone.resume")}
-          </button>
-        </span>
-        <ComposerTimeChip
-          key={chipKey}
-          value={value.timeUnits ?? (autoMinutes > 0 ? String(autoMinutes) : "")}
-          onChange={(v) => set({ timeUnits: v })}
-          testId="new-ticket-time"
-        />
-        <label className="cursor-pointer rounded border border-hairline px-2 py-0.5 text-muted hover:text-ink">
-          📎 {t("phone.attach")}
-          <input
-            type="file"
-            multiple
-            hidden
-            data-testid="new-ticket-attach-input"
-            onChange={(e) => {
-              if (e.target.files) onAttach(e.target.files);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        <AttachmentChips items={attachments} onRemove={onRemoveAttachment} />
-      </div>
     </div>
   );
 }

@@ -1069,7 +1069,22 @@
     "propsLabel": "Ticket details",
     "queueSourceCustomer": "like {{name}}'s last ticket",
     "queueSourceCompany": "like the company's last ticket",
-    "submitClose": "Log and close"
+    "submitClose": "Log and close",
+    "ownerSourceCall": "answered the call",
+    "moreFields": "More fields",
+    "moreFieldsCount_one": "{{count}} extra field",
+    "moreFieldsCount_other": "{{count}} extra fields",
+    "attachFile": "File",
+    "call": {
+      "badgeIn": "Incoming call",
+      "badgeOut": "Outgoing call",
+      "toggleIn": "Call came in",
+      "toggleOut": "I called",
+      "autoReplyYes": "· customer gets the acknowledgement",
+      "autoReplyNo": "· no acknowledgement",
+      "answeredAt": "answered {{time}}",
+      "endedAt": "ended {{time}}"
+    }
   },
   "connection": {
     "live": "Connecté en direct",
@@ -1380,7 +1395,8 @@
           "tabPolicies": "Politiques",
           "tabUsage": "Utilisation",
           "agentProfile": "Profile: {{name}}",
-          "noAgentProfile": "No model profile ({{fallback}})"
+          "noAgentProfile": "No model profile ({{fallback}})",
+          "agentProfileError": "Model profiles could not be loaded"
         },
         "tab": {
           "basics": "Bases",

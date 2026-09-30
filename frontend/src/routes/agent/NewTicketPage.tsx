@@ -29,6 +29,10 @@ import { RefineDiffView } from "@/components/agent/RefineDiffView";
 import { useRefineReview } from "@/components/agent/useRefineReview";
 import { CallerLookup } from "@/components/agent/phone/CallerLookup";
 import { PhoneTicketFields } from "@/components/agent/phone/PhoneTicketFields";
+import { PhoneCallStrip } from "@/components/agent/phone/PhoneCallStrip";
+import { PhoneNoteFooter } from "@/components/agent/phone/PhoneNoteFooter";
+import { DynamicFieldInputs } from "@/components/agent/phone/DynamicFieldInputs";
+import { PendingTimeInput } from "@/components/agent/phone/PendingTimeInput";
 import {
   EMPTY_PHONE_TICKET_FIELDS,
   bookedMinutes,
@@ -49,6 +53,16 @@ import { useEmailSecurity } from "@/components/agent/useEmailSecurity";
 
 const FIELD_CLASS =
   "w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent";
+
+/** Decision 4: a call logged from the popup is usually done — the first
+ * closed state named "successful"/"erfolgreich" (not "unsuccessful"), else
+ * the first closed one. */
+function closedSuccessfulId(
+  options: { id: number; name: string; type_name: string }[],
+): number | undefined {
+  const closed = options.filter((o) => o.type_name.startsWith("closed"));
+  return (closed.find((o) => /\b(successful|erfolgreich)\b/i.test(o.name)) ?? closed[0])?.id;
+}
 
 const toggleCls =
   "inline-flex items-center gap-1 rounded border border-hairline px-2 py-0.5 text-muted transition-colors duration-100 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -109,6 +123,8 @@ export type NewTicketSearch = {
   /** CTI popup: epoch ms the call was answered / ended — seeds the timer. */
   call_started?: number;
   call_ended?: number;
+  /** CTI popup: the agent who answered the call — the default owner. */
+  owner_id?: number;
 };
 
 export function NewTicketPage() {
@@ -178,7 +194,12 @@ export function NewTicketPage() {
   // Phone mode: caller number + lookup, the parity fields and the call timer
   // (running from page open).
   const [callerNumber, setCallerNumber] = useState(search.number ?? "");
-  const [phoneFields, setPhoneFields] = useState<PhoneTicketFieldsValue>(EMPTY_PHONE_TICKET_FIELDS);
+  const [phoneFields, setPhoneFields] = useState<PhoneTicketFieldsValue>(() => ({
+    ...EMPTY_PHONE_TICKET_FIELDS,
+    ownerId: search.owner_id ?? null,
+  }));
+  // Opened from the call popup: the call's direction is a fact, not a choice.
+  const fromCall = search.call_started !== undefined || search.call_ended !== undefined;
   const [callTimer] = useState(() => timerFromCall(search.call_started, search.call_ended));
   const timer = useCallTimer(callTimer ?? undefined);
   const attachments = useChatAttachments();
@@ -188,6 +209,10 @@ export function NewTicketPage() {
     enabled: ticketType === "phone",
   });
   const phoneDfs = useMemo(() => phoneFieldsQ.data ?? [], [phoneFieldsQ.data]);
+  // Required fields stay visible in the main form (Decision 2); optional ones
+  // go into "Weitere Felder".
+  const requiredDfs = useMemo(() => phoneDfs.filter((f) => f.required), [phoneDfs]);
+  const optionalDfs = useMemo(() => phoneDfs.filter((f) => !f.required), [phoneDfs]);
   // Customer preselected by login (click-to-call from the customer page).
   const presetCustomerQ = useQuery({
     queryKey: ["customers", search.customer],
@@ -272,11 +297,15 @@ export function NewTicketPage() {
       setPriority(defaultId(priorities, ["normal", "3"]) ?? priorities[0].id);
     }
   }, [priorities, priority]);
+  // Also re-seeds when the ticket type changes and the chosen state is not
+  // offered for the other type (e.g. "closed" is phone-only).
+  const callEnded = search.call_ended !== undefined;
   useEffect(() => {
-    if (state === "" && states.length > 0) {
-      setState(defaultId(states, ["open", "new"]) ?? states[0].id);
-    }
-  }, [states, state]);
+    if (states.length === 0) return;
+    if (state !== "" && states.some((s) => s.id === state)) return;
+    const closed = ticketType === "phone" && callEnded ? closedSuccessfulId(states) : undefined;
+    setState(closed ?? defaultId(states, ["open", "new"]) ?? states[0].id);
+  }, [states, state, ticketType, callEnded]);
 
   const presetCustomer = presetCustomerQ.data;
   useEffect(() => {
@@ -492,6 +521,33 @@ export function NewTicketPage() {
     }
   };
 
+  // No quote here, so the whole body is the agent's own text. Phone: in the
+  // note's footer bar; e-mail: under the message.
+  const refineControls = (
+    <RefineControls
+      target={
+        queue === ""
+          ? null
+          : {
+              queue_id: queue,
+              customer_user_id: customer?.login ?? null,
+            }
+      }
+      body={body}
+      onChange={refineReview.onEdit}
+      testIdPrefix="new-ticket-refine"
+      // A rich-text body is HTML: a word diff of markup is unreadable,
+      // so that case applies the refined text directly as before.
+      onRefined={
+        ticketType === "email" && richText ? undefined : refineReview.onRefined
+      }
+      appliedStats={refineReview.applied?.stats ?? null}
+      onShowChanges={refineReview.showChanges}
+      reviewOpen={refineReview.review !== null}
+      mode={ticketType === "phone" ? "call_note" : "message"}
+    />
+  );
+
   const loading =
     queuesQ.isLoading || prioritiesQ.isLoading || statesQ.isLoading;
 
@@ -546,6 +602,19 @@ export function NewTicketPage() {
       ) : (
         <form onSubmit={(e) => void onSubmit(e)} className="mt-4 space-y-4">
           <div className="space-y-3 rounded-xl border border-hairline bg-surface p-4">
+            {ticketType === "phone" && (
+              <PhoneCallStrip
+                direction={direction}
+                onDirectionChange={setDirection}
+                fixed={fromCall && search.direction !== undefined}
+                number={callerNumber}
+                answeredAt={search.call_started}
+                endedAt={search.call_ended}
+                elapsed={timer.elapsed}
+                running={timer.running}
+                onToggleTimer={timer.running ? timer.pause : timer.resume}
+              />
+            )}
             {ticketType === "phone" && (
               <CallerLookup
                 number={callerNumber}
@@ -650,7 +719,7 @@ export function NewTicketPage() {
               !formUnlocked && "pointer-events-none opacity-50",
             )}
           >
-            {ticketType === "email" ? (
+            {ticketType === "email" && (
               <div className="block">
                 <span className="mb-1 block text-[12px] font-medium text-muted">
                   {t("newTicket.from")}
@@ -663,43 +732,6 @@ export function NewTicketPage() {
                     ? "…"
                     : (composeContextQ.data?.from_address ?? "—")}
                 </p>
-              </div>
-            ) : (
-              <div className="block">
-                <span className="mb-1 block text-[12px] font-medium text-muted">
-                  {t("newTicket.directionLabel")}
-                </span>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    data-testid="new-ticket-direction-in"
-                    aria-pressed={direction === "inbound"}
-                    onClick={() => setDirection("inbound")}
-                    className={cn(
-                      toggleCls,
-                      direction === "inbound" && toggleActiveCls,
-                    )}
-                  >
-                    {t("newTicket.directionIn")}
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="new-ticket-direction-out"
-                    aria-pressed={direction === "outbound"}
-                    onClick={() => setDirection("outbound")}
-                    className={cn(
-                      toggleCls,
-                      direction === "outbound" && toggleActiveCls,
-                    )}
-                  >
-                    {t("newTicket.directionOut")}
-                  </button>
-                </div>
-                {direction === "inbound" && (
-                  <p className="mt-1 text-[11px] text-muted" data-testid="new-ticket-autoreply-hint">
-                    {t("phone.autoReplyHint")}
-                  </p>
-                )}
               </div>
             )}
 
@@ -792,6 +824,10 @@ export function NewTicketPage() {
                       agents: agentsQ.data ?? [],
                       value: phoneFields.ownerId ?? user?.id ?? null,
                       onChange: (id) => setPhoneFields((f) => ({ ...f, ownerId: id })),
+                      source:
+                        search.owner_id !== undefined && phoneFields.ownerId === search.owner_id
+                          ? t("newTicket.ownerSourceCall")
+                          : null,
                     }
                   : undefined
               }
@@ -803,78 +839,107 @@ export function NewTicketPage() {
               onStateChange={setState}
             />
 
+            {ticketType === "phone" && pendingSelected && (
+              <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="new-ticket-pending">
+                <span className="text-muted">{t("phone.pendingUntil")}</span>
+                <PendingTimeInput
+                  value={phoneFields.pendingAt}
+                  onChange={(v) => setPhoneFields((f) => ({ ...f, pendingAt: v }))}
+                  testId="new-ticket-pending-time"
+                />
+              </div>
+            )}
+
             {ticketType === "phone" && (
-              <PhoneTicketFields
-                value={phoneFields}
-                onChange={setPhoneFields}
-                pendingState={pendingSelected}
-                elapsed={timer.elapsed}
-                timerRunning={timer.running}
-                onToggleTimer={timer.running ? timer.pause : timer.resume}
-                fields={phoneDfs}
-                attachments={attachments.items}
-                onAttach={attachments.add}
-                onRemoveAttachment={attachments.remove}
+              <DynamicFieldInputs
+                fields={requiredDfs}
+                values={phoneFields.dfValues}
+                onChange={(name, values) =>
+                  setPhoneFields((f) => ({ ...f, dfValues: { ...f.dfValues, [name]: values } }))
+                }
+                testId="new-ticket-df-required"
               />
             )}
 
-            {refineReview.review ? (
-              <div className="block">
-                <span className="mb-1 block text-[12px] font-medium text-muted">
-                  {ticketType === "email"
-                    ? t("newTicket.message")
-                    : t("newTicket.note")}
-                </span>
-                <RefineDiffView
-                  key={refineReview.reviewKey}
-                  before={refineReview.review.before}
-                  after={refineReview.review.after}
-                  toneLabel={t(toneLabelKey(refineReview.review.tone))}
-                  onAccept={refineReview.accept}
-                  onDiscard={refineReview.discard}
-                  onGroupsChange={refineReview.onGroupsChange}
-                  className="min-h-[15rem] rounded-md border border-hairline"
-                />
-              </div>
-            ) : (
-              <label className="block">
-                <span className="mb-1 block text-[12px] font-medium text-muted">
-                  {ticketType === "email"
-                    ? t("newTicket.message")
-                    : t("newTicket.note")}
-                </span>
-                <ComposerBody
-                  richText={ticketType === "email" && richText}
-                  value={body}
-                  onChange={refineReview.onEdit}
-                  testId="new-ticket-body"
-                />
-              </label>
+            {ticketType === "phone" && (
+              <PhoneTicketFields value={phoneFields} onChange={setPhoneFields} fields={optionalDfs} />
             )}
 
-            {/* No quote here, so the whole body is the agent's own text. */}
-            <RefineControls
-              target={
-                queue === ""
-                  ? null
-                  : {
-                      queue_id: queue,
-                      customer_user_id: customer?.login ?? null,
-                    }
-              }
-              body={body}
-              onChange={refineReview.onEdit}
-              testIdPrefix="new-ticket-refine"
-              // A rich-text body is HTML: a word diff of markup is unreadable,
-              // so that case applies the refined text directly as before.
-              onRefined={
-                ticketType === "email" && richText ? undefined : refineReview.onRefined
-              }
-              appliedStats={refineReview.applied?.stats ?? null}
-              onShowChanges={refineReview.showChanges}
-              reviewOpen={refineReview.review !== null}
-              mode={ticketType === "phone" ? "call_note" : "message"}
-            />
+            {ticketType === "phone" ? (
+              <div className="block">
+                <label
+                  htmlFor="new-ticket-note"
+                  className="mb-1 block text-[12px] font-medium text-muted"
+                >
+                  {t("newTicket.note")}
+                </label>
+                <div className="overflow-hidden rounded-lg border border-hairline bg-surface focus-within:border-accent">
+                  {refineReview.review ? (
+                    <RefineDiffView
+                      key={refineReview.reviewKey}
+                      before={refineReview.review.before}
+                      after={refineReview.review.after}
+                      toneLabel={t(toneLabelKey(refineReview.review.tone))}
+                      onAccept={refineReview.accept}
+                      onDiscard={refineReview.discard}
+                      onGroupsChange={refineReview.onGroupsChange}
+                      className="min-h-[12rem]"
+                    />
+                  ) : (
+                    <textarea
+                      id="new-ticket-note"
+                      data-testid="new-ticket-body"
+                      value={body}
+                      spellCheck={false}
+                      onChange={(e) => refineReview.onEdit(e.target.value)}
+                      className="block min-h-[190px] w-full resize-y border-0 bg-surface px-3 py-2.5 font-mono text-[12.5px] leading-relaxed text-ink focus-visible:outline-none"
+                    />
+                  )}
+                  <PhoneNoteFooter
+                    refine={refineControls}
+                    elapsed={timer.elapsed}
+                    timeUnits={phoneFields.timeUnits}
+                    onTimeUnitsChange={(v) => setPhoneFields((f) => ({ ...f, timeUnits: v }))}
+                    attachments={attachments.items}
+                    onAttach={attachments.add}
+                    onRemoveAttachment={attachments.remove}
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                {refineReview.review ? (
+                  <div className="block">
+                    <span className="mb-1 block text-[12px] font-medium text-muted">
+                      {t("newTicket.message")}
+                    </span>
+                    <RefineDiffView
+                      key={refineReview.reviewKey}
+                      before={refineReview.review.before}
+                      after={refineReview.review.after}
+                      toneLabel={t(toneLabelKey(refineReview.review.tone))}
+                      onAccept={refineReview.accept}
+                      onDiscard={refineReview.discard}
+                      onGroupsChange={refineReview.onGroupsChange}
+                      className="min-h-[15rem] rounded-md border border-hairline"
+                    />
+                  </div>
+                ) : (
+                  <label className="block">
+                    <span className="mb-1 block text-[12px] font-medium text-muted">
+                      {t("newTicket.message")}
+                    </span>
+                    <ComposerBody
+                      richText={richText}
+                      value={body}
+                      onChange={refineReview.onEdit}
+                      testId="new-ticket-body"
+                    />
+                  </label>
+                )}
+                {refineControls}
+              </>
+            )}
 
             {ticketType === "email" &&
               Boolean(composeContextQ.data?.signature?.trim()) && (

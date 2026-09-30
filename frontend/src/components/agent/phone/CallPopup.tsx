@@ -88,6 +88,8 @@ function CallCard({ call, now }: { call: ActiveCall; now: number }) {
         customer: single?.login,
         call_started: timing.startedAt ?? undefined,
         call_ended: timing.endedAt ?? undefined,
+        // The agent who answered becomes the owner (one agent per extension).
+        owner_id: call.answered_by_user_id ?? undefined,
       },
     });
   };

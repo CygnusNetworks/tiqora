@@ -165,6 +165,16 @@ describe("AiQueuePoliciesPage", () => {
     expect(screen.getByTestId("admin-ai-queue-agent-profile-4")).toHaveTextContent(none);
   });
 
+  it("names the error behind the ⚠ marker when the profiles cannot be loaded", async () => {
+    listProfiles.mockRejectedValue(new Error("boom"));
+    renderPage();
+    const marker = await screen.findByRole("img", {
+      name: i18n.t("admin.ai.queues.list.agentProfileError"),
+    });
+    expect(marker).toHaveAttribute("title", i18n.t("admin.ai.queues.list.agentProfileError"));
+    expect(screen.getByTestId("admin-ai-queue-agent-profile-1")).toContainElement(marker);
+  });
+
   it("navigates to the editor from the row's ⋯ edit action", async () => {
     renderPage();
     await waitFor(() =>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, act, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
@@ -22,6 +22,7 @@ const {
   getCustomer,
   suggestedQueue,
   defaultQueue,
+  screenDynamicFields,
 } = vi.hoisted(() => ({
   navigate: vi.fn(),
   listQueues: vi.fn(),
@@ -38,6 +39,7 @@ const {
   getCustomer: vi.fn(),
   suggestedQueue: vi.fn(),
   defaultQueue: vi.fn(),
+  screenDynamicFields: vi.fn(),
 }));
 
 vi.mock("@/lib/newTicketApi", () => ({
@@ -48,7 +50,7 @@ vi.mock("@/lib/phoneApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/phoneApi")>("@/lib/phoneApi");
   return {
     ...actual,
-    phoneApi: { callerLookup, screenDynamicFields: vi.fn().mockResolvedValue([]) },
+    phoneApi: { callerLookup, screenDynamicFields },
   };
 });
 
@@ -106,7 +108,10 @@ vi.mock("@/lib/api", async () => {
       createTicket,
       createArticle,
       getCustomer,
-      listReferenceAgents: vi.fn().mockResolvedValue([{ id: 5, login: "agent1", full_name: "Agent One" }]),
+      listReferenceAgents: vi.fn().mockResolvedValue([
+        { id: 5, login: "agent1", full_name: "Agent One" },
+        { id: 7, login: "jwolff", full_name: "Jana Wolff" },
+      ]),
       listReferenceTypes: vi.fn().mockResolvedValue([]),
       listReferenceServices: vi.fn().mockResolvedValue([]),
       listReferenceSlas: vi.fn().mockResolvedValue([]),
@@ -184,6 +189,7 @@ describe("NewTicketPage", () => {
     getCustomer.mockReset();
     defaultQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "fallback" });
     suggestedQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "default" });
+    screenDynamicFields.mockReset().mockResolvedValue([]);
     window.localStorage.clear();
   });
 
@@ -458,6 +464,7 @@ describe("NewTicketPage property bar and queue default", () => {
     callerLookup.mockReset().mockResolvedValue({ number_normalized: "", customers: [], open_tickets: [] });
     getCustomer.mockReset();
     defaultQueue.mockReset().mockResolvedValue({ queue_id: 2, source: "default" });
+    screenDynamicFields.mockReset().mockResolvedValue([]);
     suggestedQueue.mockReset().mockImplementation((login: string) =>
       Promise.resolve(
         login === "jane.doe"
@@ -584,6 +591,235 @@ describe("NewTicketPage property bar and queue default", () => {
     fireEvent.click(await screen.findByTestId("new-ticket-state-panel-option-4"));
     expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Create ticket");
   });
+
+  it("a slow suggestion that lands after the agent picked a queue is not applied", async () => {
+    let resolveJane: (v: unknown) => void = () => {};
+    suggestedQueue.mockImplementation(
+      () => new Promise((r) => {
+        resolveJane = r;
+      }),
+    );
+    await renderReady();
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Hotline"));
+    await pick("jane.doe");
+    await waitFor(() =>
+      expect(suggestedQueue).toHaveBeenCalledWith("jane.doe", "email", expect.anything()),
+    );
+
+    fireEvent.click(screen.getByTestId("new-ticket-queue"));
+    fireEvent.click(await screen.findByTestId("new-ticket-queue-panel-option-1"));
+    expect(queueValue()).toHaveTextContent("Support");
+
+    await act(async () => {
+      resolveJane({ queue_id: 3, source: "customer" });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(queueValue()).toHaveTextContent("Support");
+    expect(screen.queryByTestId("new-ticket-queue-source")).not.toBeInTheDocument();
+  });
+
+  it("a slow answer for the previous customer is not applied after switching customers", async () => {
+    const pending: Record<string, (v: unknown) => void> = {};
+    suggestedQueue.mockImplementation(
+      (login: string) => new Promise((r) => {
+        pending[login] = r;
+      }),
+    );
+    await renderReady();
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Hotline"));
+    await pick("jane.doe");
+    await waitFor(() => expect(pending["jane.doe"]).toBeDefined());
+    fireEvent.click(screen.getByTestId("new-ticket-customer-clear"));
+    await pick("max.muster");
+    await waitFor(() => expect(pending["max.muster"]).toBeDefined());
+
+    // Jane's answer arrives late: Max is the customer now.
+    await act(async () => {
+      pending["jane.doe"]({ queue_id: 3, source: "customer" });
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(queueValue()).not.toHaveTextContent("Technik");
+    expect(screen.queryByTestId("new-ticket-queue-source")).not.toBeInTheDocument();
+
+    await act(async () => {
+      pending["max.muster"]({ queue_id: 1, source: "company" });
+    });
+    await waitFor(() => expect(queueValue()).toHaveTextContent("Support"));
+    expect(screen.getByTestId("new-ticket-queue-source")).toHaveTextContent(
+      "like the company's last ticket",
+    );
+  });
+});
+
+describe("NewTicketPage compact phone ticket", () => {
+  const closedStates = [
+    ...states,
+    { id: 10, name: "closed unsuccessful", type_name: "closed" },
+    { id: 11, name: "closed successful", type_name: "closed" },
+  ];
+  const popupSearch = (extra: Record<string, unknown> = {}) => {
+    const start = Date.now() - 200_000;
+    return {
+      type: "phone",
+      direction: "inbound",
+      number: "+49 228 1234",
+      call_started: start,
+      call_ended: start + 192_000,
+      ...extra,
+    };
+  };
+
+  beforeEach(() => {
+    navigate.mockReset();
+    listQueues.mockReset().mockResolvedValue([queue]);
+    listReferencePriorities.mockReset().mockResolvedValue(priorities);
+    listReferenceStates.mockReset().mockResolvedValue(closedStates);
+    searchReferenceCustomers.mockReset().mockResolvedValue([customer]);
+    getComposeContext.mockReset().mockResolvedValue(composeContext);
+    createTicket.mockReset().mockResolvedValue({ ticket_id: 42 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 1 });
+    callerLookup.mockReset().mockResolvedValue({ number_normalized: "", customers: [], open_tickets: [] });
+    getCustomer.mockReset();
+    defaultQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "fallback" });
+    suggestedQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "default" });
+    screenDynamicFields.mockReset().mockResolvedValue([]);
+    refine.mockReset();
+    refineAvailability.mockReset().mockResolvedValue({ available: false });
+    searchParams.current = {};
+    window.localStorage.clear();
+  });
+
+  it("from the call popup: direction badge, owner who answered, closed-successful status, timer in the strip", async () => {
+    searchParams.current = popupSearch({ owner_id: 7 });
+    wrap(<NewTicketPage />);
+    const strip = await screen.findByTestId("phone-call-strip");
+    expect(within(strip).getByTestId("new-ticket-direction-badge")).toHaveTextContent("Incoming call");
+    expect(screen.queryByTestId("new-ticket-direction-in")).not.toBeInTheDocument();
+    expect(within(strip).getByTestId("new-ticket-autoreply-hint")).toHaveTextContent(
+      "customer gets the acknowledgement",
+    );
+    expect(within(strip).getByTestId("new-ticket-timer")).toHaveTextContent("03:12");
+    expect(within(strip).getByTestId("phone-call-strip-number")).toHaveTextContent("+49 228 1234");
+
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-owner-value")).toHaveTextContent("Jana Wolff"),
+    );
+    expect(screen.getByTestId("new-ticket-owner-source")).toHaveTextContent("answered the call");
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-state-value")).toHaveTextContent(/successful/i),
+    );
+    expect(screen.getByTestId("new-ticket-state-value")).not.toHaveTextContent(/unsuccessful/i);
+    expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Log and close");
+
+    // Another owner picked by hand: the source line goes.
+    fireEvent.click(screen.getByTestId("new-ticket-owner"));
+    fireEvent.click(await screen.findByTestId("new-ticket-owner-panel-option-5"));
+    expect(screen.getByTestId("new-ticket-owner-value")).toHaveTextContent("Agent One");
+    expect(screen.queryByTestId("new-ticket-owner-source")).not.toBeInTheDocument();
+  });
+
+  it("submits the owner from the call and the closed state", async () => {
+    searchParams.current = popupSearch({ owner_id: 7 });
+    wrap(<NewTicketPage />);
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), { target: { value: "Router" } });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Neu gestartet." } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() => expect(createTicket).toHaveBeenCalledTimes(1));
+    expect(createTicket.mock.calls[0][0]).toMatchObject({ owner_id: 7, state_id: 11 });
+  });
+
+  it("opened by hand: toggle, the current user as owner without source, open status", async () => {
+    searchParams.current = { type: "phone" };
+    wrap(<NewTicketPage />);
+    const strip = await screen.findByTestId("phone-call-strip");
+    expect(within(strip).getByTestId("new-ticket-direction-in")).toHaveAttribute("aria-pressed", "true");
+    expect(within(strip).queryByTestId("new-ticket-direction-badge")).not.toBeInTheDocument();
+    expect(within(strip).getByTestId("new-ticket-timer")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-owner-value")).toHaveTextContent("Agent One"),
+    );
+    expect(screen.queryByTestId("new-ticket-owner-source")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("new-ticket-state-value")).toHaveTextContent(/open/i));
+    expect(screen.getByTestId("new-ticket-submit")).toHaveTextContent("Create ticket");
+  });
+
+  it("without a hang-up (call still running) the status stays open", async () => {
+    searchParams.current = popupSearch({ call_ended: undefined });
+    wrap(<NewTicketPage />);
+    await screen.findByTestId("new-ticket-direction-badge");
+    await waitFor(() => expect(screen.getByTestId("new-ticket-state-value")).toHaveTextContent(/open/i));
+  });
+
+  it("keeps rare fields collapsed behind a summary; a required field stays visible and blocks submit", async () => {
+    screenDynamicFields.mockResolvedValue([
+      { name: "Building", label: "Building", field_type: "Text", required: true, possible_values: null },
+      { name: "Room", label: "Room", field_type: "Text", required: false, possible_values: null },
+    ]);
+    searchParams.current = { type: "phone" };
+    wrap(<NewTicketPage />);
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+
+    const toggle = screen.getByTestId("new-ticket-more-toggle");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveTextContent("More fields");
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-more-summary")).toHaveTextContent("Responsible, 1 extra field"),
+    );
+    expect(screen.queryByTestId("new-ticket-responsible")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("new-ticket-df-Room")).not.toBeInTheDocument();
+    // The required field is outside the collapsed section.
+    const required = screen.getByTestId("new-ticket-df-required-Building");
+    expect(screen.getByTestId("new-ticket-more-toggle").parentElement).not.toContainElement(required);
+
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), { target: { value: "Kein Netz" } });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Router aus." } });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+
+    fireEvent.change(required, { target: { value: "Haus 3" } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("new-ticket-responsible")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("new-ticket-df-Room"), { target: { value: "214" } });
+
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() => expect(createTicket).toHaveBeenCalledTimes(1));
+    expect(createTicket.mock.calls[0][0].dynamic_fields).toEqual({ Building: ["Haus 3"], Room: ["214"] });
+  });
+
+  it("the pending time sits directly under the bar, outside the collapsed section", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...states,
+      { id: 6, name: "pending reminder", type_name: "pending reminder" },
+    ]);
+    searchParams.current = { type: "phone" };
+    wrap(<NewTicketPage />);
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+    fireEvent.click(screen.getByTestId("new-ticket-state"));
+    fireEvent.click(await screen.findByTestId("new-ticket-state-panel-option-6"));
+    const pending = await screen.findByTestId("new-ticket-pending");
+    expect(screen.getByTestId("phone-ticket-fields")).not.toContainElement(pending);
+    expect(screen.getByTestId("new-ticket-more-toggle")).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("the note's footer holds refine, file and time accounting", async () => {
+    refineAvailability.mockResolvedValue({ available: true });
+    searchParams.current = { type: "phone" };
+    wrap(<NewTicketPage />);
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+    const footer = screen.getByTestId("new-ticket-note-footer");
+    expect(await within(footer).findByTestId("new-ticket-refine-button")).toHaveTextContent(
+      "Structure note",
+    );
+    expect(within(footer).getByTestId("new-ticket-attach-input")).toBeInTheDocument();
+    expect(within(footer).getByTestId("new-ticket-time")).toBeInTheDocument();
+    // The timer is not in the footer any more — it lives in the call strip.
+    expect(within(footer).queryByTestId("new-ticket-timer")).not.toBeInTheDocument();
+  });
 });
 
 describe("NewTicketPage refine", () => {
@@ -596,8 +832,10 @@ describe("NewTicketPage refine", () => {
     getComposeContext.mockReset().mockResolvedValue(composeContext);
     defaultQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "fallback" });
     suggestedQueue.mockReset().mockResolvedValue({ queue_id: 1, source: "default" });
+    screenDynamicFields.mockReset().mockResolvedValue([]);
     refine.mockReset();
     refineAvailability.mockReset().mockResolvedValue({ available: true });
+    searchParams.current = {};
   });
 
   it("rewrites the body and addresses the request by the picked queue", async () => {

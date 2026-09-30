@@ -252,6 +252,11 @@ function epochMs(v: unknown): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+function positiveInt(v: unknown): number | undefined {
+  const n = typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
 // NB: register the literal "/tickets/new" route before the "$ticketId" param
 // route so "new" isn't captured as a ticket id.
 const agentNewTicketRoute = createRoute({
@@ -275,6 +280,7 @@ const agentNewTicketRoute = createRoute({
           : undefined,
     call_started: epochMs(s.call_started),
     call_ended: epochMs(s.call_ended),
+    owner_id: positiveInt(s.owner_id),
   }),
   component: AgentNewTicketPage,
 });
