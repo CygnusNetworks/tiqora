@@ -34,6 +34,7 @@ logger = structlog.get_logger(__name__)
 
 LOGIN_MAX_LENGTH = 150
 EMAIL_CHANNEL = "Email"
+INTERNAL_CHANNEL = "Internal"
 
 
 class InvalidLogin(ValueError):
@@ -101,6 +102,7 @@ async def list_customer_tickets(
     ticket_ids = [r[0] for r in rows]
     customer_user_ids = sorted({r[4] for r in rows if r[4]})
     email_stats = await _email_stats_by_ticket(session, ticket_ids)
+    channel_stats = await _channel_stats_by_ticket(session, ticket_ids)
     summaries = await _summaries_by_ticket(session, ticket_ids)
     customer_names = await _customer_names(session, customer_user_ids)
     from_names = await _from_names_by_ticket(session, ticket_ids)
@@ -128,6 +130,7 @@ async def list_customer_tickets(
     ) in rows:
         count, first_time, last_time = email_stats.get(ticket_id, (0, None, None))
         summary, summary_created_at = summaries.get(ticket_id, (None, None))
+        message_count, channel = channel_stats.get(ticket_id, (0, None))
         tickets.append(
             CustomerTicketItem(
                 ticket_id=ticket_id,
@@ -148,6 +151,8 @@ async def list_customer_tickets(
                 first_article_time=first_time,
                 last_article_time=last_time,
                 email_count=count,
+                message_count=message_count,
+                channel=channel,
                 summary=summary,
                 summary_created_at=summary_created_at,
             )
@@ -176,6 +181,32 @@ async def _email_stats_by_ticket(
         .group_by(Article.ticket_id)
     )
     return {tid: (int(count), first, last) for tid, count, first, last in rows.all()}
+
+
+async def _channel_stats_by_ticket(
+    session: AsyncSession, ticket_ids: list[int]
+) -> dict[int, tuple[int, str | None]]:
+    """``(count, first channel)`` of each ticket's customer-visible articles
+    on every channel except ``Internal``; tickets without one are absent."""
+    rows = await session.execute(
+        select(
+            Article.ticket_id,
+            CommunicationChannel.name,
+            func.count(Article.id),
+            func.min(Article.id),
+        )
+        .join(CommunicationChannel, CommunicationChannel.id == Article.communication_channel_id)
+        .where(
+            Article.ticket_id.in_(ticket_ids),
+            CommunicationChannel.name != INTERNAL_CHANNEL,
+            Article.is_visible_for_customer == 1,
+        )
+        .group_by(Article.ticket_id, CommunicationChannel.name)
+    )
+    per_ticket: dict[int, list[tuple[int, str, int]]] = defaultdict(list)
+    for tid, name, count, first_id in rows.all():
+        per_ticket[tid].append((int(first_id), str(name), int(count)))
+    return {tid: (sum(c for _, _, c in chans), min(chans)[1]) for tid, chans in per_ticket.items()}
 
 
 async def _summaries_by_ticket(

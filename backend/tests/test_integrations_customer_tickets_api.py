@@ -319,6 +319,10 @@ async def test_email_stats_summary_and_utc_datetimes(seeded: str) -> None:
     t1 = by_id[94101]
     # Internal note, internal (not customer-visible) e-mail and phone call excluded.
     assert t1["email_count"] == 2
+    # Visible e-mails plus the visible phone article; internal ones excluded.
+    assert t1["message_count"] == 3
+    assert t1["channel"] == "Email"
+    assert by_id[94109]["message_count"] == 1
     assert t1["first_article_time"] == "2026-09-01T08:00:00+00:00"
     assert t1["last_article_time"] == "2026-09-01T09:00:00+00:00"
     assert t1["created"] == "2026-09-01T08:00:00+00:00"
@@ -328,6 +332,8 @@ async def test_email_stats_summary_and_utc_datetimes(seeded: str) -> None:
 
     t3 = by_id[94103]
     assert t3["email_count"] == 0
+    assert t3["message_count"] == 0
+    assert t3["channel"] is None
     assert t3["first_article_time"] is None
     assert t3["last_article_time"] is None
     assert t3["summary"] is None

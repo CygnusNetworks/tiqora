@@ -525,6 +525,12 @@ class CustomerTicketItem(BaseModel):
     email_count: int
     """Customer-visible articles on the ``Email`` channel (internal notes,
     internal e-mails, phone/chat articles excluded)."""
+    message_count: int
+    """Customer-visible articles on every channel except ``Internal`` (e-mail,
+    Telegram, chat, phone)."""
+    channel: str | None
+    """Channel of the first customer-visible non-internal article
+    (``Email``, ``Telegram``, ...); ``None`` when there is none."""
     summary: str | None
     """Stored AI summary (``tiqora_ai_ticket_state.summary_body``), as is."""
     summary_created_at: UtcDateTime | None

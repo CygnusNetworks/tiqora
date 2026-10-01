@@ -8339,6 +8339,17 @@
             "title": "Changed",
             "type": "string"
           },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
           "created": {
             "format": "date-time",
             "title": "Created",
@@ -8382,6 +8393,10 @@
               }
             ],
             "title": "Last Article Time"
+          },
+          "message_count": {
+            "title": "Message Count",
+            "type": "integer"
           },
           "queue": {
             "anyOf": [
@@ -8477,6 +8492,8 @@
           "first_article_time",
           "last_article_time",
           "email_count",
+          "message_count",
+          "channel",
           "summary",
           "summary_created_at"
         ],
