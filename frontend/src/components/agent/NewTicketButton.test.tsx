@@ -96,6 +96,23 @@ describe("NewTicketButton", () => {
     });
   });
 
+  it("leaves the system queues (Postmaster, Raw, Junk) out of the picker", async () => {
+    listQueues.mockResolvedValue([
+      { id: 1, name: "Support", group_id: 1, valid: true },
+      { id: 2, name: "Sales", group_id: 1, valid: true },
+      { id: 3, name: "Postmaster", group_id: 1, valid: true },
+      { id: 4, name: "Raw", group_id: 1, valid: true },
+      { id: 5, name: "Junk", group_id: 1, valid: true },
+    ]);
+    await renderButton();
+    fireEvent.click(screen.getByTestId("new-ticket-button"));
+    expect(screen.getByTestId("new-ticket-queue-1")).toBeInTheDocument();
+    expect(screen.getByTestId("new-ticket-queue-2")).toBeInTheDocument();
+    for (const id of [3, 4, 5]) {
+      expect(screen.queryByTestId(`new-ticket-queue-${id}`)).not.toBeInTheDocument();
+    }
+  });
+
   it("shows only the short name (after '::') for nested queues in the picker", async () => {
     listQueues.mockResolvedValue([
       { id: 1, name: "Support::Tier1", group_id: 1, valid: true },
