@@ -14,6 +14,7 @@ from tiqora.api.v1 import (
     customer_keys,
     customers,
     events,
+    integrations,
     kb,
     oauth2_callback,
     phone_calls,
@@ -57,6 +58,7 @@ api_v1_router.include_router(channels_whatsapp.router)
 api_v1_router.include_router(channels_telegram.router)
 api_v1_router.include_router(channels_phone.router)
 api_v1_router.include_router(stats.router)
+api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(admin_router)
 
 __all__ = ["api_v1_router"]

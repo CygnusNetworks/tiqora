@@ -55,6 +55,7 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/reference", "tickets"),
     ("/api/v1/templates", "tickets"),
     ("/api/v1/search", "tickets"),
+    ("/api/v1/integrations", "tickets"),
     ("/api/v1/customers", "customers"),
     ("/api/v1/kb", "kb"),
     ("/api/v1/calendar", "calendar"),
