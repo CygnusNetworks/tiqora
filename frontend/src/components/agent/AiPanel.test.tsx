@@ -184,6 +184,34 @@ describe("AiPanel", () => {
     expect(container.textContent).toBe("");
   });
 
+  it("says why the auto worker skipped the ticket and that a draft still works", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      manual_assist_available: true,
+      auto_skip_reason: "budget_tokens_day",
+      auto_skip_at: "2026-10-01T15:16:20Z",
+    });
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    const banner = await screen.findByTestId("ai-panel-auto-skip-banner");
+    expect(banner.textContent).toContain("daily token budget is used up");
+    expect(banner.textContent).toContain(i18n.t("ticket.ai.autoSkip.manualHint"));
+  });
+
+  it("leaves the auto-skip notice to the pause banner while paused", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      summary_available: true,
+      ai_paused_at: "2026-10-01T15:00:00Z",
+      auto_skip_reason: "ai_paused",
+      auto_skip_at: "2026-10-01T15:16:20Z",
+    });
+    wrap(<AiPanel ticketId={1} canNote />);
+
+    await screen.findByTestId("ai-panel-paused-banner");
+    expect(screen.queryByTestId("ai-panel-auto-skip-banner")).not.toBeInTheDocument();
+  });
+
   it("shows the escalated banner and resumes AI when clicked", async () => {
     getState
       .mockResolvedValueOnce({

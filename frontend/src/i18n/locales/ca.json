@@ -8,7 +8,17 @@
     "title": "Notificacions",
     "empty": "No hi ha notificacions noves.",
     "newTicket": "Nou a la teva cua",
-    "noSubject": "(sense tema)"
+    "noSubject": "(sense tema)",
+    "aiLimits": "AI limit reached",
+    "aiLimitQueue": "Daily token budget of queue {{name}}",
+    "aiLimitProvider": "Cost budget ({{window}}) of {{name}}",
+    "aiLimitWindow": {
+      "day": "day",
+      "week": "week",
+      "month": "month"
+    },
+    "aiLimitDetail": "{{amount}} · frees up at {{time}}",
+    "aiLimitTokensUnit": "M tokens"
   },
   "onlineAgents": {
     "title": "Agents en línia",
@@ -635,7 +645,17 @@
       "more": "more",
       "less": "less",
       "scopeAndInstruction": "Scope & own instruction …",
-      "pinOpen": "Pin (stays expanded)"
+      "pinOpen": "Pin (stays expanded)",
+      "autoSkip": {
+        "budget_tokens_day": "Not answered automatically ({{dateTime}}): this queue's daily token budget is used up.",
+        "queue_rate_limit": "Not answered automatically ({{dateTime}}): the queue reached its hourly auto-reply limit.",
+        "global_rate_limit": "Not answered automatically ({{dateTime}}): the global hourly auto-reply limit is reached.",
+        "max_auto_replies": "Not answered automatically ({{dateTime}}): the maximum number of auto-replies for this ticket is reached.",
+        "max_clarifications": "Not answered automatically ({{dateTime}}): the maximum number of clarifying questions for this ticket is reached.",
+        "llm_unavailable": "Not answered automatically ({{dateTime}}): no AI model available (provider disabled or cost budget used up).",
+        "other": "Not answered automatically ({{dateTime}}).",
+        "manualHint": "You can still create an AI draft manually."
+      }
     },
     "toolbar": {
       "print": "Imprimeix",
@@ -1416,7 +1436,7 @@
         "maxClarifications": "Màxim aclariments/tiquet",
         "maxAutoReplies": "Màxim de respostes automàtiques/ticket",
         "maxRepliesPerHour": "Màxim de respostes/hora",
-        "budgetTokensDay": "Pressupost testimoni/dia",
+        "budgetTokensDay": "Pressupost testimoni/dia (M)",
         "escalationRules": "Regles d'escalada (JSON)",
         "escalationRulesHint": "Matriu JSON de regles de concordança amb resultats de l'eina MCP que desencadenen l'escalada a un humà.",
         "escalationRulesPlaceholder": "buit = sense regles, p. ex. [{\"tool\":\"client:*\",\"match\":\"subcadena\",\"valors\":[\"ESCALAT\"]}]",
@@ -1434,7 +1454,9 @@
           "tabUsage": "Ús",
           "agentProfile": "Profile: {{name}}",
           "noAgentProfile": "No model profile ({{fallback}})",
-          "agentProfileError": "Model profiles could not be loaded"
+          "agentProfileError": "Model profiles could not be loaded",
+          "budgetToday": "today {{amount}}M tokens",
+          "budgetExhausted": "Budget reached: {{amount}}M tokens"
         },
         "tab": {
           "basics": "Conceptes bàsics",

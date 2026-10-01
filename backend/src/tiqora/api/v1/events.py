@@ -52,6 +52,7 @@ from tiqora.api.deps import CurrentUser, DbSession, get_redis
 from tiqora.domain.queue_service import QueueService
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL, publish_presence_changed
+from tiqora.permissions.engine import PermissionEngine
 
 logger = structlog.get_logger(__name__)
 
@@ -85,8 +86,17 @@ _QUEUE_SCOPED_EVENT_TYPES = frozenset({"ticket_new_in_queue", "ticket_changed"})
 # whose extension rang.
 _USER_SCOPED_EVENT_TYPES = frozenset({"call_event"})
 
+# Message types only admins receive: AI budget notices (tiqora.ai.limits).
+_ADMIN_SCOPED_EVENT_TYPES = frozenset({"ai_limit_changed"})
 
-def _should_forward(raw: str, allowed_queue_ids: set[int], *, user_id: int | None = None) -> bool:
+
+def _should_forward(
+    raw: str,
+    allowed_queue_ids: set[int],
+    *,
+    user_id: int | None = None,
+    is_admin: bool = False,
+) -> bool:
     """Whether one raw pub/sub payload should reach *this* connection.
 
     Queue-scoped message types are dropped unless their ``queue_id`` is one the
@@ -105,6 +115,7 @@ def _should_forward(raw: str, allowed_queue_ids: set[int], *, user_id: int | Non
 
     User-scoped types (``call_event``) are forwarded only when *user_id* is in
     the message's ``user_ids`` list; anything malformed is dropped.
+    Admin-scoped types (``ai_limit_changed``) reach admins only.
     """
     try:
         payload = json.loads(raw)
@@ -112,6 +123,8 @@ def _should_forward(raw: str, allowed_queue_ids: set[int], *, user_id: int | Non
         return True
     if not isinstance(payload, dict):
         return True
+    if payload.get("type") in _ADMIN_SCOPED_EVENT_TYPES:
+        return is_admin
     if payload.get("type") in _USER_SCOPED_EVENT_TYPES:
         targets = payload.get("user_ids")
         return user_id is not None and isinstance(targets, list) and user_id in targets
@@ -125,6 +138,7 @@ async def _event_stream(
     redis_client: redis.Redis,
     allowed_queue_ids: set[int],
     user_id: int | None = None,
+    is_admin: bool = False,
 ) -> AsyncGenerator[bytes, None]:
     pubsub = redis_client.pubsub()
     await pubsub.subscribe(TIQORA_EVENTS_CHANNEL)
@@ -146,7 +160,7 @@ async def _event_stream(
                 continue
             if isinstance(data, bytes):
                 data = data.decode("utf-8")
-            if not _should_forward(data, allowed_queue_ids, user_id=user_id):
+            if not _should_forward(data, allowed_queue_ids, user_id=user_id, is_admin=is_admin):
                 continue
             yield f"data: {data}\n\n".encode()
     except asyncio.CancelledError:
@@ -182,8 +196,9 @@ async def stream_events(
     life of the connection (see the module docstring's v1 limitations).
     """
     allowed_queue_ids = await QueueService(session).allowed_queue_ids(user.id, "ro")
+    is_admin = await PermissionEngine(session).is_admin(user.id)
     return StreamingResponse(
-        _event_stream(request, redis_client, allowed_queue_ids, user.id),
+        _event_stream(request, redis_client, allowed_queue_ids, user.id, is_admin),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

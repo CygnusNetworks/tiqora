@@ -44,6 +44,7 @@ from starlette.concurrency import run_in_threadpool
 
 from tiqora.ai import acl as ai_acl
 from tiqora.ai import drafts as ai_drafts
+from tiqora.ai import limits as ai_limits
 from tiqora.ai import llm_catalog
 from tiqora.ai import mcp as ai_mcp
 from tiqora.ai import policies as ai_policies
@@ -74,6 +75,8 @@ from tiqora.api.v1.admin.ai_schemas import (
     AiAclCreate,
     AiAclOut,
     AiAclUpdate,
+    AiLimitOut,
+    AiLimitsOut,
     AiPromptPartCreate,
     AiPromptPartOut,
     AiPromptPartReorder,
@@ -704,6 +707,31 @@ async def list_ai_usage(
         total_completion_tokens=result.total_completion_tokens,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get("/limits", response_model=AiLimitsOut)
+async def list_ai_limits(admin: AdminUser, session: DbSession) -> AiLimitsOut:
+    """Every configured budget cap with today's/this window's spend — queue
+    token budgets and provider cost budgets. Drives the admin bell (exhausted
+    entries) and the usage column of the queue policy list."""
+    _ = admin
+    return AiLimitsOut(
+        items=[
+            AiLimitOut(
+                kind=s.kind,  # type: ignore[arg-type]
+                subject_id=s.subject_id,
+                subject_name=s.subject_name,
+                window=s.window,  # type: ignore[arg-type]
+                used=s.used,
+                limit=s.limit,
+                currency=s.currency,
+                exhausted=s.exhausted,
+                window_start=s.window_start,
+                resets_at=s.resets_at,
+            )
+            for s in await ai_limits.collect_limits(session)
+        ]
     )
 
 

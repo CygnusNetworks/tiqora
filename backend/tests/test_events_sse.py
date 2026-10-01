@@ -306,6 +306,16 @@ def test_ticket_changed_is_queue_scoped() -> None:
     assert _should_forward(msg, set()) is False
 
 
+def test_ai_limit_changed_reaches_admins_only() -> None:
+    """Budget notices name queues and providers — admin information."""
+    from tiqora.api.v1.events import _should_forward
+
+    msg = json.dumps({"type": "ai_limit_changed"})
+    assert _should_forward(msg, {5}, user_id=1, is_admin=True) is True
+    assert _should_forward(msg, {5}, user_id=2, is_admin=False) is False
+    assert _should_forward(msg, {5}) is False
+
+
 def test_ticket_changed_without_queue_id_is_dropped() -> None:
     """Fail closed: an unscoped message would otherwise be a broadcast. The
     frontend still reconciles via its normal refetch path."""

@@ -8,7 +8,17 @@
     "title": "Notifications",
     "empty": "No new notifications.",
     "newTicket": "New in your queue",
-    "noSubject": "(no subject)"
+    "noSubject": "(no subject)",
+    "aiLimits": "AI limit reached",
+    "aiLimitQueue": "Daily token budget of queue {{name}}",
+    "aiLimitProvider": "Cost budget ({{window}}) of {{name}}",
+    "aiLimitWindow": {
+      "day": "day",
+      "week": "week",
+      "month": "month"
+    },
+    "aiLimitDetail": "{{amount}} · frees up at {{time}}",
+    "aiLimitTokensUnit": "M tokens"
   },
   "onlineAgents": {
     "title": "Agents online",
@@ -635,7 +645,17 @@
       "more": "more",
       "less": "less",
       "scopeAndInstruction": "Scope & own instruction …",
-      "pinOpen": "Pin (stays expanded)"
+      "pinOpen": "Pin (stays expanded)",
+      "autoSkip": {
+        "budget_tokens_day": "Not answered automatically ({{dateTime}}): this queue's daily token budget is used up.",
+        "queue_rate_limit": "Not answered automatically ({{dateTime}}): the queue reached its hourly auto-reply limit.",
+        "global_rate_limit": "Not answered automatically ({{dateTime}}): the global hourly auto-reply limit is reached.",
+        "max_auto_replies": "Not answered automatically ({{dateTime}}): the maximum number of auto-replies for this ticket is reached.",
+        "max_clarifications": "Not answered automatically ({{dateTime}}): the maximum number of clarifying questions for this ticket is reached.",
+        "llm_unavailable": "Not answered automatically ({{dateTime}}): no AI model available (provider disabled or cost budget used up).",
+        "other": "Not answered automatically ({{dateTime}}).",
+        "manualHint": "You can still create an AI draft manually."
+      }
     },
     "toolbar": {
       "print": "Print",
@@ -1416,7 +1436,7 @@
         "maxClarifications": "Max clarifications/ticket",
         "maxAutoReplies": "Max auto replies/ticket",
         "maxRepliesPerHour": "Max replies/hour",
-        "budgetTokensDay": "Token budget/day",
+        "budgetTokensDay": "Token budget/day (millions)",
         "escalationRules": "Escalation rules (JSON)",
         "escalationRulesHint": "JSON array of matching rules against MCP tool results that trigger escalation to a human.",
         "escalationRulesPlaceholder": "empty = no rules, e.g. [{\"tool\":\"client:*\",\"match\":\"substring\",\"values\":[\"ESCALATE\"]}]",
@@ -1434,7 +1454,9 @@
           "tabUsage": "Usage",
           "agentProfile": "Profile: {{name}}",
           "noAgentProfile": "No model profile ({{fallback}})",
-          "agentProfileError": "Model profiles could not be loaded"
+          "agentProfileError": "Model profiles could not be loaded",
+          "budgetToday": "today {{amount}}M tokens",
+          "budgetExhausted": "Budget reached: {{amount}}M tokens"
         },
         "tab": {
           "basics": "Basics",
@@ -1762,7 +1784,7 @@
         "maxClarifications": "Maximum number of automatic clarifying questions per ticket before escalating.",
         "maxAutoReplies": "Maximum number of automatic replies per ticket.",
         "maxRepliesPerHour": "Maximum number of automatic replies for this queue per hour — a cost brake.",
-        "budgetTokensDay": "Daily token budget for this queue's auto-reply path. Once exceeded, the auto-worker pauses until the next day.",
+        "budgetTokensDay": "This queue's daily token budget in millions of tokens (e.g. 3 = 3,000,000). Auto-replies and triage count against it. Once used up, the queue answers nothing automatically until midnight (UTC) and admins are notified. AI drafts and summaries keep working.",
         "disclosureEnabled": "Appends an AI-disclosure footer to autonomously sent customer replies. Drafts an agent accepts and sends count as a human reply and get no footer.",
         "disclosureText": "Queue-specific disclosure text. Empty = the global default text from AI settings is used.",
         "escalationRules": "JSON rules that check MCP tool results before PII masking; any match hard-stops automatic sending and escalates to a human (pure OR logic, no priority between rules).",

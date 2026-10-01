@@ -1208,6 +1208,98 @@
         "title": "AiDraftRequestOut",
         "type": "object"
       },
+      "AiLimitOut": {
+        "description": "One budget cap with its current spend (see :mod:`tiqora.ai.limits`).\n\n``kind`` ``queue_tokens_day``: ``subject_id`` is a queue id, ``used`` /\n``limit`` are tokens. ``provider_cost``: a provider id, amounts in\n``currency``.",
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "exhausted": {
+            "title": "Exhausted",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "queue_tokens_day",
+              "provider_cost"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "number"
+          },
+          "resets_at": {
+            "format": "date-time",
+            "title": "Resets At",
+            "type": "string"
+          },
+          "subject_id": {
+            "title": "Subject Id",
+            "type": "integer"
+          },
+          "subject_name": {
+            "title": "Subject Name",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "number"
+          },
+          "window": {
+            "enum": [
+              "day",
+              "week",
+              "month"
+            ],
+            "title": "Window",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "date-time",
+            "title": "Window Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "subject_id",
+          "subject_name",
+          "window",
+          "used",
+          "limit",
+          "exhausted",
+          "window_start",
+          "resets_at"
+        ],
+        "title": "AiLimitOut",
+        "type": "object"
+      },
+      "AiLimitsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AiLimitOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AiLimitsOut",
+        "type": "object"
+      },
       "AiOriginOut": {
         "description": "AI-origin marker for an auto-sent article, with its tool trace \u2014 same\nwire shape as ``AiDraftOut.tool_trace`` (see ``tiqora.api.v1.ai``) so the\nfrontend can reuse the draft tool-trace renderer.",
         "properties": {
@@ -3046,6 +3138,29 @@
               }
             ],
             "title": "Ai Paused By Name"
+          },
+          "auto_skip_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Skip At"
+          },
+          "auto_skip_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Skip Reason"
           },
           "can_summarize": {
             "title": "Can Summarize",
@@ -27500,6 +27615,72 @@
           }
         },
         "summary": "Escalation Test Route",
+        "tags": [
+          "admin:ai"
+        ]
+      }
+    },
+    "/api/v1/admin/ai/limits": {
+      "get": {
+        "description": "Every configured budget cap with today's/this window's spend \u2014 queue\ntoken budgets and provider cost budgets. Drives the admin bell (exhausted\nentries) and the usage column of the queue policy list.",
+        "operationId": "list_ai_limits_api_v1_admin_ai_limits_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiLimitsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Ai Limits",
         "tags": [
           "admin:ai"
         ]
@@ -67328,6 +67509,30 @@
           }
         },
         "summary": "Health",
+        "tags": [
+          "ops"
+        ]
+      }
+    },
+    "/health/ai": {
+      "get": {
+        "description": "AI budget probe for external monitoring (Zabbix, Checkmk, \u2026).\n\n``status`` is ``ok`` or ``limit_reached``; the list names each\nexhausted cap by kind, id and window only \u2014 no queue/provider names or\namounts, since this endpoint is unauthenticated like ``/health``.\nAlways HTTP 200: a spent budget is a state to alert on, not an outage.",
+        "operationId": "health_ai_health_ai_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Ai Health Ai Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Ai",
         "tags": [
           "ops"
         ]

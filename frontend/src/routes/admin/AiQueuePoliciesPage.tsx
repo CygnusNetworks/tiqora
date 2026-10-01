@@ -22,6 +22,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { PlusIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
+import { formatLimitAmount, useAiLimits } from "@/lib/aiLimits";
 import { aiTaskFallbackKey, resolveTaskProfile, taskProfileMap } from "@/lib/aiTasks";
 import {
   POLICIES_KEY,
@@ -98,6 +99,18 @@ export function AiQueuePoliciesPage() {
     const used = new Set((policiesQ.data?.items ?? []).map((p) => p.queue_id));
     return (queuesQ.data ?? []).filter((q) => !used.has(q.id));
   }, [queuesQ.data, policiesQ.data]);
+
+  // Today's spend against each queue's daily token budget.
+  const limitsQ = useAiLimits(true);
+  const tokenBudgetByQueue = useMemo(
+    () =>
+      new Map(
+        (limitsQ.data?.items ?? [])
+          .filter((l) => l.kind === "queue_tokens_day")
+          .map((l) => [l.subject_id, l]),
+      ),
+    [limitsQ.data],
+  );
 
   const deleteM = useMutation({
     mutationFn: (id: number) => aiApi.deleteQueuePolicy(id),
@@ -205,6 +218,26 @@ export function AiQueuePoliciesPage() {
             >
               {agentProfileLabel(r)}
             </span>
+            {(() => {
+              const budget = tokenBudgetByQueue.get(r.queue_id);
+              if (!budget) return null;
+              return (
+                <span
+                  className={cn(
+                    "shrink-0 text-xs tabular-nums",
+                    budget.exhausted ? "font-medium text-escalation" : "text-muted",
+                  )}
+                  data-testid={`admin-ai-queue-budget-${r.id}`}
+                >
+                  {t(
+                    budget.exhausted
+                      ? "admin.ai.queues.list.budgetExhausted"
+                      : "admin.ai.queues.list.budgetToday",
+                    { amount: formatLimitAmount(budget, locale) },
+                  )}
+                </span>
+              );
+            })()}
           </div>
           <div className="row-span-2 hidden flex-wrap items-center justify-end gap-1 md:flex">
             {r.enabled_manual_assist && (

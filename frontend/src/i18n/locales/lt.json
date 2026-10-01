@@ -8,7 +8,17 @@
     "title": "Pranešimai",
     "empty": "Nėra naujų pranešimų.",
     "newTicket": "Nauja jūsų eilėje",
-    "noSubject": "(be temos)"
+    "noSubject": "(be temos)",
+    "aiLimits": "AI limit reached",
+    "aiLimitQueue": "Daily token budget of queue {{name}}",
+    "aiLimitProvider": "Cost budget ({{window}}) of {{name}}",
+    "aiLimitWindow": {
+      "day": "day",
+      "week": "week",
+      "month": "month"
+    },
+    "aiLimitDetail": "{{amount}} · frees up at {{time}}",
+    "aiLimitTokensUnit": "M tokens"
   },
   "onlineAgents": {
     "title": "Agentai internete",
@@ -635,7 +645,17 @@
       "more": "more",
       "less": "less",
       "scopeAndInstruction": "Scope & own instruction …",
-      "pinOpen": "Pin (stays expanded)"
+      "pinOpen": "Pin (stays expanded)",
+      "autoSkip": {
+        "budget_tokens_day": "Not answered automatically ({{dateTime}}): this queue's daily token budget is used up.",
+        "queue_rate_limit": "Not answered automatically ({{dateTime}}): the queue reached its hourly auto-reply limit.",
+        "global_rate_limit": "Not answered automatically ({{dateTime}}): the global hourly auto-reply limit is reached.",
+        "max_auto_replies": "Not answered automatically ({{dateTime}}): the maximum number of auto-replies for this ticket is reached.",
+        "max_clarifications": "Not answered automatically ({{dateTime}}): the maximum number of clarifying questions for this ticket is reached.",
+        "llm_unavailable": "Not answered automatically ({{dateTime}}): no AI model available (provider disabled or cost budget used up).",
+        "other": "Not answered automatically ({{dateTime}}).",
+        "manualHint": "You can still create an AI draft manually."
+      }
     },
     "toolbar": {
       "print": "Spausdinti",
@@ -1416,7 +1436,7 @@
         "maxClarifications": "Maksimalus paaiškinimas / bilietas",
         "maxAutoReplies": "Maksimalus automatinis atsakymas / bilietas",
         "maxRepliesPerHour": "Maksimalus atsakymų skaičius per valandą",
-        "budgetTokensDay": "Žetoninis biudžetas per dieną",
+        "budgetTokensDay": "Žetoninis biudžetas per dieną (M)",
         "escalationRules": "Eskalavimo taisyklės (JSON)",
         "escalationRulesHint": "JSON taisyklių, atitinkančių MCP įrankio rezultatus, masyvas, suaktyvinantis perkėlimą į žmogų.",
         "escalationRulesPlaceholder": "tuščia = nėra taisyklių, pvz. [{\"įrankis\":\"klientas:*\",\"match\":\"substring\",\"values\":[\"ESCALATE\"]}]",
@@ -1434,7 +1454,9 @@
           "tabUsage": "Naudojimas",
           "agentProfile": "Profile: {{name}}",
           "noAgentProfile": "No model profile ({{fallback}})",
-          "agentProfileError": "Model profiles could not be loaded"
+          "agentProfileError": "Model profiles could not be loaded",
+          "budgetToday": "today {{amount}}M tokens",
+          "budgetExhausted": "Budget reached: {{amount}}M tokens"
         },
         "tab": {
           "basics": "Pagrindai",

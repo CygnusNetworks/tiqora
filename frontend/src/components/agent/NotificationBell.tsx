@@ -8,18 +8,53 @@ import {
   type NotificationItem,
 } from "@/lib/notificationStore";
 import { cn } from "@/lib/cn";
+import { useOptionalAuth } from "@/auth/AuthContext";
+import { toBcp47 } from "@/i18n";
+import type { AiLimitOut } from "@/lib/aiApi";
+import { formatLimitAmount, useAiLimits } from "@/lib/aiLimits";
 import { BellIcon } from "@/components/ui/icons";
 
 /**
  * Topbar bell showing the live SSE `ticket_new_in_queue` notifications:
  * an unread-count pill and a dropdown list. Clicking an item opens the
  * ticket and marks it read. Session-only (no persistence — see the store).
+ *
+ * Admins additionally see every exhausted AI budget (queue token budget,
+ * provider cost budget) on top. Those are state, not events: they come from
+ * `GET /api/v1/admin/ai/limits`, stay until the budget frees up, and turn
+ * the pill amber.
  */
 export function NotificationBell() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = toBcp47(i18n.language);
   const navigate = useNavigate();
   const { items, unreadCount } = useNotifications();
+  const auth = useOptionalAuth();
+  const limitsQ = useAiLimits(auth?.user?.is_admin === true);
+  const limits = (limitsQ.data?.items ?? []).filter((l) => l.exhausted);
   const [open, setOpen] = useState(false);
+  const pillCount = unreadCount + limits.length;
+
+  const openLimit = (limit: AiLimitOut) => {
+    setOpen(false);
+    void navigate({
+      to: limit.kind === "queue_tokens_day" ? "/admin/ai/queues" : "/admin/ai/providers",
+    });
+  };
+
+  const limitTitle = (limit: AiLimitOut) =>
+    limit.kind === "queue_tokens_day"
+      ? t("notifications.aiLimitQueue", { name: limit.subject_name })
+      : t("notifications.aiLimitProvider", {
+          name: limit.subject_name,
+          window: t(`notifications.aiLimitWindow.${limit.window}`),
+        });
+
+  const resetTime = (limit: AiLimitOut) =>
+    new Intl.DateTimeFormat(locale, {
+      dateStyle: limit.window === "day" ? undefined : "short",
+      timeStyle: "short",
+    }).format(new Date(limit.resets_at));
 
   const openItem = (item: NotificationItem) => {
     markNotificationRead(item.id);
@@ -46,12 +81,15 @@ export function NotificationBell() {
         className="relative flex h-8 w-8 items-center justify-center rounded-lg text-ink/70 transition-colors duration-100 hover:bg-surface-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
       >
         <BellIcon className="text-[17px]" />
-        {unreadCount > 0 && (
+        {pillCount > 0 && (
           <span
             data-testid="notification-unread-count"
-            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold tabular-nums text-accent-ink"
+            className={cn(
+              "absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold tabular-nums",
+              limits.length > 0 ? "bg-escalation text-white" : "bg-accent text-accent-ink",
+            )}
           >
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {pillCount > 9 ? "9+" : pillCount}
           </span>
         )}
       </button>
@@ -72,11 +110,42 @@ export function NotificationBell() {
             <div className="border-b border-hairline px-3 py-2 text-[12px] font-semibold text-ink">
               {t("notifications.title")}
             </div>
-            {items.length === 0 ? (
+            {limits.length > 0 && (
+              <ul
+                className="list-none border-b border-hairline bg-escalation/10"
+                data-testid="notification-ai-limits"
+              >
+                {limits.map((limit) => (
+                  <li key={`${limit.kind}-${limit.subject_id}-${limit.window}`}>
+                    <button
+                      type="button"
+                      data-testid={`notification-ai-limit-${limit.kind}-${limit.subject_id}`}
+                      onClick={() => openLimit(limit)}
+                      className="flex w-full flex-col gap-0.5 px-3 py-2 text-left transition-colors duration-100 hover:bg-escalation/15"
+                    >
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-escalation">
+                        {t("notifications.aiLimits")}
+                      </span>
+                      <span className="truncate text-[12.5px] text-ink">{limitTitle(limit)}</span>
+                      <span className="text-[11px] tabular-nums text-muted">
+                        {t("notifications.aiLimitDetail", {
+                          amount:
+                            limit.kind === "queue_tokens_day"
+                              ? `${formatLimitAmount(limit, locale)} ${t("notifications.aiLimitTokensUnit")}`
+                              : formatLimitAmount(limit, locale),
+                          time: resetTime(limit),
+                        })}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {items.length === 0 && limits.length === 0 ? (
               <p className="px-3 py-6 text-center text-[12.5px] text-muted">
                 {t("notifications.empty")}
               </p>
-            ) : (
+            ) : items.length === 0 ? null : (
               <ul className="max-h-80 list-none overflow-y-auto">
                 {items.map((item) => (
                   <li key={item.id}>

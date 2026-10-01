@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tests._llm_routing_helpers import (
     assign_task,
+    delete_limit_alerts,
     make_model,
     make_profile,
     make_provider,
@@ -84,6 +85,7 @@ def _cleanup(sync_url: str) -> None:
             text("DELETE FROM tiqora_llm_provider WHERE name LIKE :p"),
             {"p": f"{_PROVIDER_PREFIX}%"},
         )
+        delete_limit_alerts(conn)
     engine.dispose()
 
 
