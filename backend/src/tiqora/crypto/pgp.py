@@ -190,8 +190,13 @@ class PgpEngine:
         gnupg = _require_gnupg()
         home = Path(self._gnupghome)
         if not home.exists():
-            home.mkdir(parents=True, exist_ok=True)
-            home.chmod(0o700)
+            try:
+                home.mkdir(parents=True, exist_ok=True)
+                home.chmod(0o700)
+            except OSError as exc:
+                raise CryptoUnavailableError(
+                    f"PGP keyring (--homedir) {self._gnupghome} cannot be created: {exc}"
+                ) from exc
         try:
             gpg = gnupg.GPG(
                 gpgbinary=self._gpg_bin,
