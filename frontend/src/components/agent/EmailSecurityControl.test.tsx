@@ -221,6 +221,55 @@ describe("EmailSecurityControl", () => {
     expect(screen.getByTestId("sec-backend-smime")).not.toHaveAttribute("aria-disabled");
   });
 
+  it("hides the PGP method when the queue's sign key fixes it", async () => {
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue({
+      ...OPTIONS,
+      default: { ...OPTIONS.default!, method: "inline" },
+      queue_sign: { ...OPTIONS.queue_sign!, method: "inline" },
+    });
+    wrap();
+    await screen.findByTestId("sec");
+    expect(screen.queryByTestId("sec-method")).toBeNull();
+    await waitFor(() => expect(payload()).toMatchObject({ backend: "pgp", method: "inline" }));
+
+    // Over to S/MIME and back: the queue's method sticks.
+    fireEvent.click(screen.getByTestId("sec-backend-smime"));
+    fireEvent.click(screen.getByTestId("sec-backend-pgp"));
+    expect(payload()).toMatchObject({ backend: "pgp", method: "inline" });
+  });
+
+  it("offers the PGP method when the queue has no PGP sign key", async () => {
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue({ ...OPTIONS, queue_sign: null });
+    wrap();
+    await screen.findByTestId("sec");
+    expect(screen.getByTestId("sec-method")).toBeInTheDocument();
+  });
+
+  it("labels sign keys with id and the sender address only", async () => {
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue({
+      ...OPTIONS,
+      backends: [
+        {
+          ...OPTIONS.backends![0],
+          sign_keys: [
+            {
+              key: "AB12CD34",
+              label: "AB12CD34 Support Team <support@tiqora.test>",
+              status: "good",
+              usable: true,
+              emails: ["other@tiqora.test", "support@tiqora.test"],
+            },
+          ],
+        },
+        OPTIONS.backends![1],
+      ],
+    });
+    wrap();
+    const key = await screen.findByTestId("sec-sign-key");
+    expect(key).toHaveTextContent("AB12CD34 support@tiqora.test");
+    expect(key).not.toHaveTextContent("Support Team");
+  });
+
   it("moves to the backend that has a sign key when the mode starts signing", async () => {
     const pgpNoKey = {
       ...OPTIONS,
