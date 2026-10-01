@@ -192,6 +192,30 @@
         left: 0.8rem;
       }
 
+      /* Each section repeats the product names, so the columns stay labelled
+         while scrolling down the long table. */
+      .matrix.compare tr.group-names th {
+        color: var(--ink);
+        white-space: nowrap;
+      }
+
+      .matrix.compare tr.group-names th:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        color: var(--accent);
+        border-right: 1px solid var(--hairline);
+      }
+
+      .matrix.compare tr.group-names th:first-child span {
+        position: static;
+      }
+
+      .matrix.compare tr.group-names th.col-tiqora {
+        color: var(--accent);
+        background: #1b2236;
+      }
+
       .matrix.compare td .badge {
         margin-bottom: 0.25rem;
       }
@@ -522,7 +546,7 @@
                   <td>Classic, functional</td>
                 </tr>
 
-                <tr class="group"><th colspan="7"><span>Coming from OTRS / Znuny</span></th></tr>
+                <tr class="group group-names"><th scope="colgroup"><span>Coming from OTRS / Znuny</span></th><th scope="col" class="col-tiqora">Tiqora</th><th scope="col">Znuny</th><th scope="col">OTRS</th><th scope="col">Zammad</th><th scope="col">FreeScout</th><th scope="col">osTicket</th></tr>
                 <tr>
                   <th scope="row">Runs on an existing OTRS/Znuny database</th>
                   <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>OTRS 6.0.x and Znuny 6.0–7.3, in parallel on the same DB; only adds <code>tiqora_*</code> tables</small></td>
@@ -551,7 +575,7 @@
                   <td><span class="badge badge-partial">Partial</span><small>API supports ticket creation only<sup class="ref"><a href="#s39">39</a></sup></small></td>
                 </tr>
 
-                <tr class="group"><th colspan="7"><span>AI</span></th></tr>
+                <tr class="group group-names"><th scope="colgroup"><span>AI</span></th><th scope="col" class="col-tiqora">Tiqora</th><th scope="col">Znuny</th><th scope="col">OTRS</th><th scope="col">Zammad</th><th scope="col">FreeScout</th><th scope="col">osTicket</th></tr>
                 <tr>
                   <th scope="row">AI drafts / summaries / triage</th>
                   <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Drafts, summaries, triage (queue routing), refine with diff review; per-queue policies</small></td>
@@ -598,7 +622,7 @@
                   <td>—</td>
                 </tr>
 
-                <tr class="group"><th colspan="7"><span>Security &amp; privacy</span></th></tr>
+                <tr class="group group-names"><th scope="colgroup"><span>Security &amp; privacy</span></th><th scope="col" class="col-tiqora">Tiqora</th><th scope="col">Znuny</th><th scope="col">OTRS</th><th scope="col">Zammad</th><th scope="col">FreeScout</th><th scope="col">osTicket</th></tr>
                 <tr>
                   <th scope="row">PGP / S/MIME</th>
                   <td class="col-tiqora"><span class="badge badge-ok">Both</span><small>Inbound verify/decrypt, outbound sign/encrypt, per-queue defaults; key stores shared with Znuny</small></td>
@@ -627,7 +651,7 @@
                   <td><span class="badge badge-addon">Plugins</span><small>LDAP/AD, OAuth2, CAS, 2FA (official plugins)<sup class="ref"><a href="#s37">37</a></sup></small></td>
                 </tr>
 
-                <tr class="group"><th colspan="7"><span>Channels &amp; service desk</span></th></tr>
+                <tr class="group group-names"><th scope="colgroup"><span>Channels &amp; service desk</span></th><th scope="col" class="col-tiqora">Tiqora</th><th scope="col">Znuny</th><th scope="col">OTRS</th><th scope="col">Zammad</th><th scope="col">FreeScout</th><th scope="col">osTicket</th></tr>
                 <tr>
                   <th scope="row">Channels</th>
                   <td class="col-tiqora">Email, phone with CTI popup, Telegram, SMS, WhatsApp<small>No web chat widget, no Facebook/X</small></td>
