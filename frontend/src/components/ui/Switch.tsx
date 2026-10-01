@@ -7,14 +7,20 @@ export function Switch({
   disabled,
   size = "md",
   testId,
+  id,
   "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;
   size?: "md" | "lg";
   testId?: string;
+  id?: string;
   "aria-label"?: string;
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
 }) {
   const lg = size === "lg";
   return (
@@ -25,7 +31,10 @@ export function Switch({
         className="peer sr-only"
         checked={checked}
         disabled={disabled}
+        id={id}
         aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
         data-testid={testId}
         onChange={(e) => onChange(e.target.checked)}
       />

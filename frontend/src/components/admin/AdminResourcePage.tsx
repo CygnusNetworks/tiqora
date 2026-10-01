@@ -18,7 +18,7 @@ import {
   type DataTableSortOrder,
   type DataTableSortState,
 } from "./DataTable";
-import { CrudDrawer, type FieldDef, type FieldValues } from "./CrudDrawer";
+import { CrudDrawer, type CrudDrawerProps, type FieldDef, type FieldValues } from "./CrudDrawer";
 
 export type AdminCrudApi<Out, Create, Update> = {
   list: (params?: AdminListParams, signal?: AbortSignal) => Promise<AdminPage<Out>>;
@@ -99,6 +99,10 @@ export type AdminResourcePageProps<Out, Create, Update> = {
    * users). Return `<MenuItem>`s or `null`; rendered after edit/deactivate.
    */
   rowActions?: (row: Out) => ReactNode;
+  /** Opt-in presentation of the create/edit dialog (see CrudDrawerProps). */
+  drawer?: Pick<CrudDrawerProps, "size" | "appearance" | "stableTabHeight" | "footerStatus">;
+  /** Edit dialog title for a row (default: admin.form.editTitle with `title`). */
+  editTitle?: (row: Out) => string;
 };
 
 const defaultIsRowValid = (row: unknown): boolean =>
@@ -203,6 +207,8 @@ export function AdminResourcePage<Out, Create, Update>({
   sortable = false,
   statusSortable = false,
   rowActions,
+  drawer,
+  editTitle,
 }: AdminResourcePageProps<Out, Create, Update>) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -720,13 +726,18 @@ export function AdminResourcePage<Out, Create, Update>({
       <CrudDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={editing ? t("admin.form.editTitle", { title }) : newLabel}
+        title={
+          editing
+            ? (editTitle?.(editing) ?? t("admin.form.editTitle", { title }))
+            : newLabel
+        }
         fields={fields}
         mode={editing ? "edit" : "create"}
         initialValues={toFormValues(editing)}
         onSubmit={handleSubmit}
         submitError={formError}
         testIdPrefix="admin-form"
+        {...drawer}
       />
     </div>
   );

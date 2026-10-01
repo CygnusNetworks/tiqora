@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
@@ -122,5 +123,142 @@ describe("CrudDrawer field help popover", () => {
     expect(screen.getByTestId("admin-form-text-help-panel")).toHaveTextContent(
       "Explains what this field does.",
     );
+  });
+});
+
+describe("CrudDrawer tab accessibility", () => {
+  it("links tabs and panels and moves with arrow keys", () => {
+    wrap(TABBED, { initialValues: {} });
+    const [account, person] = screen.getAllByRole("tab");
+    expect(account).toHaveAttribute("aria-selected", "true");
+    expect(account).toHaveAttribute("tabindex", "0");
+    expect(person).toHaveAttribute("tabindex", "-1");
+    const panel = screen.getByRole("tabpanel");
+    expect(account.getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel).toHaveAttribute("aria-labelledby", account.id);
+
+    fireEvent.keyDown(account, { key: "ArrowRight" });
+    expect(person).toHaveAttribute("aria-selected", "true");
+    expect(person).toHaveFocus();
+    fireEvent.keyDown(person, { key: "ArrowRight" });
+    expect(account).toHaveAttribute("aria-selected", "true");
+    fireEvent.keyDown(account, { key: "End" });
+    expect(person).toHaveAttribute("aria-selected", "true");
+  });
+});
+
+function wrapWith(
+  fields: FieldDef[],
+  props: Partial<ComponentProps<typeof CrudDrawer>>,
+  initialValues: Record<string, unknown> = {},
+  onSubmit: (v: Record<string, unknown>) => Promise<void> = async () => undefined,
+) {
+  return render(
+    <I18nextProvider i18n={i18n}>
+      <CrudDrawer
+        open
+        onClose={vi.fn()}
+        title="Edit"
+        fields={fields}
+        initialValues={initialValues}
+        mode="edit"
+        onSubmit={onSubmit}
+        testIdPrefix="admin-form"
+        {...props}
+      />
+    </I18nextProvider>,
+  );
+}
+
+describe("CrudDrawer stableTabHeight", () => {
+  it("keeps every tab mounted, only the active one exposed", () => {
+    wrapWith(TABBED, { stableTabHeight: true });
+    // Both tabs' fields exist (one shared grid cell sizes the body)…
+    expect(screen.getByTestId("admin-form-login")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-form-first_name")).toBeInTheDocument();
+    // …but only the active panel is exposed to assistive tech.
+    expect(screen.getAllByRole("tabpanel")).toHaveLength(1);
+    expect(screen.getByTestId("admin-form-tabpanel-1")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.click(screen.getByRole("tab", { name: /Person/ }));
+    expect(screen.getByTestId("admin-form-tabpanel-0")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByTestId("admin-form-tabpanel-1")).not.toHaveAttribute("aria-hidden");
+  });
+});
+
+describe("CrudDrawer settings appearance", () => {
+  const FIELDS: FieldDef[] = [
+    { name: "intro", label: "", type: "section", helpText: "What this is about." },
+    { name: "name", label: "Display name", type: "text", required: true },
+    { name: "timeout", label: "Timeout", type: "number", unit: "min" },
+    {
+      name: "valid_id",
+      label: "Status",
+      type: "switch",
+      switchValues: { on: 1, off: 2 },
+      switchLabels: { on: "Valid", off: "Invalid" },
+    },
+    {
+      name: "mode",
+      label: "Mode",
+      type: "segmented",
+      required: true,
+      options: [
+        { value: "a", label: "Alpha" },
+        { value: "b", label: "Beta" },
+        { value: "c", label: "Gamma" },
+      ],
+    },
+  ];
+
+  it("uses sentence-case labels; the default appearance keeps uppercase", () => {
+    const { unmount } = wrapWith(
+      FIELDS,
+      { appearance: "settings" },
+      { name: "x", valid_id: 1, mode: "a" },
+    );
+    expect(document.getElementById("admin-form-name-label")?.className).not.toContain("uppercase");
+    expect(screen.getByText("What this is about.")).toBeInTheDocument();
+    expect(screen.getByText("min")).toBeInTheDocument();
+    unmount();
+    wrapWith([{ name: "name", label: "Display name", type: "text" }], {});
+    expect(document.getElementById("admin-form-name-label")?.className).toContain("uppercase");
+  });
+
+  it("maps switch values and drives the segmented radiogroup with arrows", async () => {
+    const onSubmit = vi.fn(async (_v: Record<string, unknown>) => undefined);
+    wrapWith(FIELDS, { appearance: "settings" }, { name: "x", valid_id: 1, mode: "a" }, onSubmit);
+
+    const sw = screen.getByRole("switch", { name: "Status" });
+    expect(sw).toBeChecked();
+    expect(screen.getByText("Valid")).toBeInTheDocument();
+    fireEvent.click(sw);
+    expect(screen.getByText("Invalid")).toBeInTheDocument();
+
+    const group = screen.getByRole("radiogroup", { name: /Mode/ });
+    const alpha = screen.getByRole("radio", { name: "Alpha" });
+    expect(group).toContainElement(alpha);
+    expect(alpha).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("radio", { name: "Beta" })).toHaveAttribute("tabindex", "-1");
+    fireEvent.keyDown(alpha, { key: "ArrowLeft" });
+    expect(screen.getByRole("radio", { name: "Gamma" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Gamma" })).toHaveFocus();
+
+    fireEvent.click(screen.getByTestId("admin-form-submit"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toEqual({ name: "x", valid_id: 2, mode: "c" });
+  });
+
+  it("flags an empty required segmented field and focuses its first option", async () => {
+    const onSubmit = vi.fn(async () => undefined);
+    wrapWith(FIELDS, { appearance: "settings" }, { name: "x", valid_id: 1 }, onSubmit);
+    fireEvent.click(screen.getByTestId("admin-form-submit"));
+    await waitFor(() =>
+      expect(screen.getByRole("radiogroup", { name: /Mode/ })).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      ),
+    );
+    expect(screen.getByRole("radio", { name: "Alpha" })).toHaveFocus();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });
