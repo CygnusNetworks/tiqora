@@ -40,6 +40,18 @@ export function pickableBackends(options: CryptoOptionsOut | null) {
   return available.length > 1 ? available : [];
 }
 
+/** A backend can serve the chosen mode: signing needs a usable sign key.
+ * Unusable ones stay visible but locked. Encryption is not checked here: it
+ * depends on the recipients' keys, which the recipient chips and `blocked`
+ * already report. */
+export function backendUsable(
+  b: CryptoComposeBackendOut | undefined,
+  mode: SecurityMode,
+): boolean {
+  if (!b || !b.available) return false;
+  return !signs(mode) || (b.sign_keys ?? []).some((k) => k.usable);
+}
+
 function initialState(options: CryptoOptionsOut): EmailSecurityState {
   const modes = offeredModes(options);
   const d = options.default;
