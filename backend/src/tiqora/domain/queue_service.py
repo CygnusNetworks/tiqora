@@ -148,13 +148,17 @@ class QueueService:
             else:
                 roots.append(node)
 
-        def sort_tree(items: list[QueueNode]) -> list[QueueNode]:
-            items.sort(key=lambda n: n.name)
-            for n in items:
-                n.children = sort_tree(n.children)
-            return items
+        return sort_queue_tree(roots)
 
-        return sort_tree(roots)
+
+def sort_queue_tree(items: list[QueueNode]) -> list[QueueNode]:
+    """Sort every level by name, case-insensitively — Znuny's capitalised
+    stock queues (Junk, Postmaster, Raw) must not float above lower-case
+    custom names."""
+    items.sort(key=lambda n: (n.name.casefold(), n.name))
+    for n in items:
+        n.children = sort_queue_tree(n.children)
+    return items
 
 
 def age_seconds(create_time: datetime, now: datetime | None = None) -> int:

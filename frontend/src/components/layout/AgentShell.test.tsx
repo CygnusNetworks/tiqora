@@ -154,6 +154,48 @@ describe("AgentShell sidebar", () => {
     expect(screen.getByTestId("sidebar-queues-toggle-all")).toBeInTheDocument();
   });
 
+  it("hides Znuny's system queues behind a remembered toggle", async () => {
+    window.localStorage.removeItem("tiqora.sidebar.showSystemQueues");
+    const q = (id: number, name: string) => ({
+      id,
+      name,
+      group_id: 1,
+      valid: true,
+      counts: { open: 2, new: 0, total: 2 },
+      children: [],
+    });
+    listQueues.mockResolvedValue([q(3, "Junk"), q(1, "Postmaster"), q(2, "Raw"), q(10, "support")]);
+    await renderShell();
+    await screen.findByTestId("sidebar-queue-10");
+    expect(screen.queryByTestId("sidebar-queue-3")).toBeNull();
+    expect(screen.queryByTestId("sidebar-queue-1")).toBeNull();
+
+    // A search for one finds it regardless.
+    fireEvent.change(screen.getByTestId("sidebar-queue-search"), { target: { value: "junk" } });
+    expect(screen.getByTestId("sidebar-queue-3")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("sidebar-queue-search"), { target: { value: "" } });
+
+    const toggle = screen.getByTestId("sidebar-queues-toggle-system");
+    expect(toggle).toHaveTextContent("Systemqueues einblenden (3)");
+    fireEvent.click(toggle);
+    expect(screen.getByTestId("sidebar-queue-3")).toBeInTheDocument();
+    expect(screen.getByTestId("sidebar-queues-toggle-system")).toHaveTextContent(
+      "Systemqueues ausblenden",
+    );
+    expect(window.localStorage.getItem("tiqora.sidebar.showSystemQueues")).toBe("1");
+    window.localStorage.removeItem("tiqora.sidebar.showSystemQueues");
+  });
+
+  it("keeps the open system queue visible", async () => {
+    window.localStorage.removeItem("tiqora.sidebar.showSystemQueues");
+    listQueues.mockResolvedValue([
+      { id: 2, name: "Raw", group_id: 1, valid: true, counts: { open: 1, new: 1, total: 1 }, children: [] },
+    ]);
+    await renderShell("/agent/queues?queue_id=2");
+    expect(await screen.findByTestId("sidebar-queue-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("sidebar-queues-toggle-system")).toBeNull();
+  });
+
   it("lists who-owns-it views only — locked/escalated moved to the list's filter chips", async () => {
     await renderShell();
     await screen.findByTestId("agent-sidebar-nav");

@@ -6,6 +6,7 @@ import { api, type QueueNode } from "@/lib/api";
 import { logoUrl } from "@/lib/assets";
 import { useAuth } from "@/auth/AuthContext";
 import { flattenQueues } from "@/components/agent/QueueTree";
+import { isSystemQueue } from "@/lib/systemQueues";
 import { Button } from "@/components/ui/Button";
 import { ShortcutHelp } from "@/components/agent/ShortcutHelp";
 import { NotificationBell, NotificationToaster } from "@/components/agent/NotificationBell";
@@ -185,6 +186,15 @@ function NavItem({
 }
 
 const SIDEBAR_COLLAPSED_GROUPS_KEY = "tiqora.sidebar.collapsedGroups";
+const SIDEBAR_SHOW_SYSTEM_QUEUES_KEY = "tiqora.sidebar.showSystemQueues";
+
+function readShowSystemQueues(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_SHOW_SYSTEM_QUEUES_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function readCollapsedGroups(): Record<string, boolean> {
   if (typeof window === "undefined") return {};
@@ -297,7 +307,8 @@ function QueueNavRow({
 /** The single queue navigator in the app sidebar (QueuesPage no longer
  * renders its own tree). Defaults to queues that have content (open or new
  * tickets); a search box filters by name and an "all queues" toggle reveals
- * zero-count queues. */
+ * zero-count queues. Znuny's plumbing queues (Postmaster, Raw, Junk) stay
+ * hidden behind a remembered per-browser toggle unless searched for or open. */
 function QueueNavSection({
   flat,
   onNavigate,
@@ -313,15 +324,29 @@ function QueueNavSection({
   const location = useLocation();
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [showSystem, setShowSystem] = useState(readShowSystemQueues);
+  const toggleSystem = () => {
+    const next = !showSystem;
+    setShowSystem(next);
+    try {
+      window.localStorage.setItem(SIDEBAR_SHOW_SYSTEM_QUEUES_KEY, next ? "1" : "0");
+    } catch {
+      // best-effort persistence only
+    }
+  };
 
   const activeQueueId = (location.search as { queue_id?: number } | undefined)?.queue_id ?? null;
 
   const term = query.trim().toLowerCase();
-  const visible = flat.filter((q) => {
+  const listed = flat.filter((q) => {
     if (term) return q.name.toLowerCase().includes(term);
     if (showAll) return true;
     return (q.counts?.open ?? 0) > 0 || (q.counts?.new ?? 0) > 0;
   });
+  const hiddenSystem = term
+    ? []
+    : listed.filter((q) => isSystemQueue(q) && q.id !== activeQueueId);
+  const visible = showSystem ? listed : listed.filter((q) => !hiddenSystem.includes(q));
 
   return (
     <NavGroup
@@ -358,6 +383,18 @@ function QueueNavSection({
           <p className="px-2.5 py-2 text-[11.5px] text-muted" data-testid="sidebar-queue-empty">
             {term ? t("sidebar.noQueueMatch") : t("queue.empty")}
           </p>
+        )}
+        {hiddenSystem.length > 0 && (
+          <button
+            type="button"
+            data-testid="sidebar-queues-toggle-system"
+            onClick={toggleSystem}
+            className="w-full rounded-lg px-2.5 py-1 text-left text-[11.5px] text-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          >
+            {showSystem
+              ? t("sidebar.hideSystemQueues")
+              : t("sidebar.showSystemQueues", { count: hiddenSystem.length })}
+          </button>
         )}
       </div>
     </NavGroup>

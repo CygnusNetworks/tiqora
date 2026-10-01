@@ -41,8 +41,9 @@ export type FieldDef = {
   /** Static, or computed from the form's current values (e.g. required only
    * when a sibling toggle picks a certain mode). */
   required?: boolean | ((values: FieldValues) => boolean);
-  /** Choices for "select" and "segmented". */
-  options?: FieldOption[];
+  /** Choices for "select" and "segmented" — static, or computed from the
+   * form's current values (e.g. keys matching the chosen sender address). */
+  options?: FieldOption[] | ((values: FieldValues) => FieldOption[]);
   placeholder?: string;
   /** Static, or computed from the form's current values. */
   helpText?: string | ((values: FieldValues) => string | undefined);
@@ -270,6 +271,9 @@ export function CrudDrawer({
   const resolveHelpText = (f: FieldDef): string | undefined =>
     typeof f.helpText === "function" ? f.helpText(values) : f.helpText;
 
+  const resolveOptions = (f: FieldDef): FieldOption[] =>
+    (typeof f.options === "function" ? f.options(values) : f.options) ?? [];
+
   const visibleFields = fields.filter(
     (f) =>
       !(mode === "create" && f.hideOnCreate) &&
@@ -416,18 +420,19 @@ export function CrudDrawer({
       );
     }
     if (f.type === "select") {
+      const options = resolveOptions(f);
       return (
         <SelectMenu
-          items={(f.options ?? []).map((o) => ({ value: String(o.value), label: o.label }))}
+          items={options.map((o) => ({ value: String(o.value), label: o.label }))}
           value={value == null ? null : String(value)}
           onSelect={(v) => {
-            const opt = f.options?.find((o) => String(o.value) === v);
+            const opt = options.find((o) => String(o.value) === v);
             setField(f.name, opt ? opt.value : v);
           }}
           placeholder={t("admin.form.selectPlaceholder")}
           panelTestId={`${id}-menu`}
           trigger={({ open, ref, toggleProps }) => {
-            const selected = f.options?.find((o) => String(o.value) === String(value ?? ""));
+            const selected = options.find((o) => String(o.value) === String(value ?? ""));
             return (
               <button
                 ref={ref}
@@ -459,7 +464,7 @@ export function CrudDrawer({
         <SegmentedControl
           id={id}
           testId={id}
-          items={f.options ?? []}
+          items={resolveOptions(f)}
           value={value as string | number | null | undefined}
           onChange={(v) => setField(f.name, v)}
           invalid={invalid}
