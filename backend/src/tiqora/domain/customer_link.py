@@ -43,6 +43,20 @@ def _strip_login_suffix(customer_user_id: str, separator: str | None) -> str:
     return customer_user_id.split(separator, 1)[0]
 
 
+async def login_suffix_separators(session: AsyncSession) -> list[str]:
+    """Every distinct non-empty ``login_suffix_separator`` configured on any
+    queue's customer link, sorted. The separator describes the site's login
+    scheme (``z50test#3`` is contract 3 of account ``z50test``), so the
+    customer-ticket integration (``tiqora.domain.integrations``) reuses the
+    same setting to group a bare login with its suffixed variants."""
+    rows = await session.execute(
+        select(TiqoraQueueCustomerLink.login_suffix_separator)
+        .where(TiqoraQueueCustomerLink.login_suffix_separator.is_not(None))
+        .distinct()
+    )
+    return sorted({sep for sep in rows.scalars().all() if sep})
+
+
 async def _customer_name_email(session: AsyncSession, login: str) -> tuple[str, str]:
     """``(full_name, email)`` for a ``customer_user.login`` (the RAW ticket
     login — the suffix strip only applies to the ``{customer_user}``

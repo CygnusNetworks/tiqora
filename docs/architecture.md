@@ -358,6 +358,54 @@ current agent and ticket:
      `customer_user` by the stripped login (`email`, `first_name` +
      `last_name`); empty string when there is no match.
 
+#### Customer ticket history for external tools (netadmin)
+
+`GET /api/v1/integrations/customer-tickets?login=<id>&limit=<1..200, default 100>`
+(`api/v1/integrations.py`, `tiqora.domain.integrations.customer_tickets`)
+returns the tickets of one customer account for an external per-account
+history view (netadmin). Read-only; it never writes and never generates AI
+summaries.
+
+- `login` is the account id **without** the contract suffix (`z50test`). It
+  matches `customer_user_id = login` and `customer_user_id` starting with
+  `login` + a suffix separator (`z50test#1`, `z50test#3`). The separators are
+  the distinct `login_suffix_separator` values of the customer-link rows
+  above; with none configured, only exact matches are returned. LIKE
+  wildcards in `login` match literally. `login` must be 1..150 characters
+  without whitespace, control characters or a separator, otherwise `422`.
+- Archived tickets are included. Tickets in queues where the caller lacks
+  `ro` are silently omitted. Sorted by ticket `create_time` desc, then id
+  desc; `limit` applies after that.
+- Per ticket: `ticket_id`, `ticket_number`, `title`, `title_pii_free`,
+  `queue`, `state`, `state_type`, `customer_user_id` (full login with
+  suffix), `created`, `changed`, `email_count`, `first_article_time`,
+  `last_article_time`, `summary`, `summary_created_at`. All datetimes are
+  UTC with an explicit offset (`"2026-09-30T08:12:01+00:00"`).
+- `email_count` and the first/last article times cover customer-visible
+  articles on the `Email` channel only (no internal notes, internal mails,
+  phone or chat articles); `null` times when there is none.
+- `summary` is the stored AI summary (`tiqora_ai_ticket_state.summary_body`)
+  as is, `null` when none exists.
+- `title_pii_free` is conservative (`domain/integrations/subject_safety.py`):
+  `true` only if the title is non-empty, `PiiMapper` (with the customer's
+  first/last names and the From display names of the ticket's articles as
+  known names) masks nothing, it has no `@`, no run of 5+ digits (dates
+  excepted), no IPv4/IPv6/MAC, contains neither the login nor a matched
+  `customer_user_id`, and — for queues whose AI policy has PII masking with
+  NER on — spaCy finds no person name.
+
+API-key scope area is `tickets` (`/api/v1/integrations/**` →
+`tickets`), so `tickets:ro` suffices. Recommended setup: a dedicated agent
+user with only `ro` on the queues netadmin may show, and a key bound to it:
+
+```sh
+tiqora api-key create --user <agent_user_id> --name netadmin --scopes tickets:ro
+curl -H "Authorization: Bearer $KEY" \
+  "$TIQORA_URL/api/v1/integrations/customer-tickets?login=z50test&limit=50"
+```
+
+The consumer links a ticket as `{TIQORA_PUBLIC_BASE_URL}/agent/tickets/{ticket_id}`.
+
 ### Stats / reporting
 
 `tiqora/stats/` — a modern equivalent of Znuny's `Kernel::System::Stats`

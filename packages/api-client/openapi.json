@@ -8331,6 +8331,179 @@
         "title": "CustomerSmimeCertificateIn",
         "type": "object"
       },
+      "CustomerTicketItem": {
+        "description": "One ticket of a customer, for an external per-account history view.",
+        "properties": {
+          "changed": {
+            "format": "date-time",
+            "title": "Changed",
+            "type": "string"
+          },
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
+          "email_count": {
+            "title": "Email Count",
+            "type": "integer"
+          },
+          "first_article_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Article Time"
+          },
+          "last_article_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Article Time"
+          },
+          "queue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "state_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Type"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "summary_created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Created At"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "ticket_number": {
+            "title": "Ticket Number",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "title_pii_free": {
+            "title": "Title Pii Free",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "ticket_number",
+          "title",
+          "title_pii_free",
+          "queue",
+          "state",
+          "state_type",
+          "customer_user_id",
+          "created",
+          "changed",
+          "first_article_time",
+          "last_article_time",
+          "email_count",
+          "summary",
+          "summary_created_at"
+        ],
+        "title": "CustomerTicketItem",
+        "type": "object"
+      },
+      "CustomerTicketsOut": {
+        "properties": {
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "tickets": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerTicketItem"
+            },
+            "title": "Tickets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "login",
+          "tickets"
+        ],
+        "title": "CustomerTicketsOut",
+        "type": "object"
+      },
       "CustomerUserAdminCreate": {
         "properties": {
           "city": {
@@ -54475,6 +54648,97 @@
         "summary": "Stream Events",
         "tags": [
           "events"
+        ]
+      }
+    },
+    "/api/v1/integrations/customer-tickets": {
+      "get": {
+        "description": "Tickets of one customer account, newest first (``create_time`` desc,\nthen id desc), archived tickets included. Tickets in queues the caller\ncannot read (``ro``) are silently omitted. ``email_count`` and the\nfirst/last article times cover customer-visible ``Email`` articles only;\n``summary`` is the stored AI summary (never generated here).",
+        "operationId": "customer_tickets_api_v1_integrations_customer_tickets_get",
+        "parameters": [
+          {
+            "description": "Customer login WITHOUT the contract suffix (e.g. z50test). Matches tickets whose customer_user_id equals it or starts with it plus a configured customer-link login_suffix_separator (z50test#1, z50test#3). Must not contain a separator, whitespace or control characters.",
+            "in": "query",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "description": "Customer login WITHOUT the contract suffix (e.g. z50test). Matches tickets whose customer_user_id equals it or starts with it plus a configured customer-link login_suffix_separator (z50test#1, z50test#3). Must not contain a separator, whitespace or control characters.",
+              "maxLength": 150,
+              "minLength": 1,
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerTicketsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Customer Tickets",
+        "tags": [
+          "integrations"
         ]
       }
     },
