@@ -48,7 +48,7 @@ def _seed_tickets(sync_url: str) -> dict[str, Any]:
 
         # Idempotent cleanup of our block (shared session-scoped DB).
         # Children before parents so FKs do not block.
-        conn.execute(text("DELETE FROM article_data_mime_attachment WHERE id = 700"))
+        conn.execute(text("DELETE FROM article_data_mime_attachment WHERE id BETWEEN 700 AND 704"))
         conn.execute(text("DELETE FROM article_data_mime WHERE id = 600"))
         conn.execute(text("DELETE FROM tiqora_ai_article_origin WHERE article_id = 600"))
         conn.execute(text("DELETE FROM article WHERE id = 600"))
@@ -427,6 +427,85 @@ async def test_queue_ticket_detail_attachment_permissions(
             await ts.get_ticket(ids["reader"], 999999)
 
     await engine.dispose()
+
+
+_CRYPTO_SIDE_FILES = (
+    # id, filename, content type, content
+    (701, "PGPexch.htm", "text/html", b"<html><body><p>Hallo</p></body></html>"),
+    (
+        702,
+        "public_key_someone@example.org.asc",
+        "application/pgp-keys",
+        b"-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nmQENBF==\n-----END PGP PUBLIC KEY BLOCK-----\n",
+    ),
+    # Generic MIME type: the armor line decides.
+    (
+        703,
+        "signature.asc",
+        "application/octet-stream",
+        b"-----BEGIN PGP SIGNATURE-----\n\niQEz==\n-----END PGP SIGNATURE-----\n",
+    ),
+    (704, "smime.p7s", "application/pkcs7-signature", b"0\x82\x01"),
+)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_list_attachments_classifies_crypto_side_files(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    from sqlalchemy import LargeBinary, bindparam
+
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed_tickets(sync_url)
+    sync_engine = create_engine(sync_url)
+    insert = text(
+        """
+        INSERT INTO article_data_mime_attachment (
+            id, article_id, filename, content_size, content_type, content_id,
+            content_alternative, disposition, content,
+            create_time, create_by, change_time, change_by
+        ) VALUES (
+            :id, 600, :fn, :size, :ct, '', '', 'attachment', :content, :t, 1, :t, 1
+        )
+        """
+    ).bindparams(bindparam("content", type_=LargeBinary()))
+    with sync_engine.begin() as conn:
+        for att_id, fn, ct, content in _CRYPTO_SIDE_FILES:
+            conn.execute(
+                insert,
+                {
+                    "id": att_id,
+                    "fn": fn,
+                    "size": str(len(content)),
+                    "ct": ct,
+                    "content": content,
+                    "t": NOW,
+                },
+            )
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            atts = await TicketService(session).list_attachments(
+                ids["reader"], ids["ticket"], ids["article"]
+            )
+        kinds = {a.filename: a.crypto_kind for a in atts}
+        assert kinds == {
+            "note.txt": None,  # sniffed (small .txt), no armor
+            "PGPexch.htm": "pgp_html_body",
+            "public_key_someone@example.org.asc": "pgp_public_key",
+            "signature.asc": "pgp_signature",
+            "smime.p7s": "smime_signature",
+        }
+    finally:
+        await engine.dispose()
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM article_data_mime_attachment WHERE id BETWEEN 701 AND 704")
+            )
+        sync_engine.dispose()
 
 
 def _seed_dashboard(sync_url: str) -> dict[str, Any]:

@@ -17,6 +17,11 @@ from sqlalchemy.orm import aliased
 from tiqora.ai.handoff import ai_escalated_ticket_ids as _ai_escalated_ticket_ids
 from tiqora.ai.models import TiqoraAiArticleOrigin, TiqoraAiTicketState
 from tiqora.channels.email.parser import get_email_address, split_address_line
+from tiqora.crypto.attachment_kind import (
+    SNIFF_HEAD_BYTES,
+    classify_attachment,
+    needs_sniff,
+)
 from tiqora.db.legacy.article import (
     Article,
     ArticleDataMime,
@@ -1611,22 +1616,37 @@ class TicketService:
         atts = await self._storage.list_attachments(article_id)
         body = await self._article_body_text(article_id)
         _security, view = await self._crypto_view(user_id, article_id, body, atts)
+        virtual: dict[int, bytes] = {}
         if view is not None and view.body is not None:
             atts = view.attachment_meta(article_id)
-        return [
-            AttachmentMetaOut(
-                id=a.id,
-                article_id=a.article_id,
-                filename=a.filename,
-                content_type=a.content_type,
-                content_size=a.content_size,
-                content_id=a.content_id,
-                disposition=a.disposition,
-                inline=_is_inline_attachment(a),
+            virtual = {
+                meta.id: parsed.content for meta, parsed in zip(atts, view.attachments, strict=True)
+            }
+        out: list[AttachmentMetaOut] = []
+        for a in atts:
+            if _is_body_part_attachment(a):
+                continue
+            head: bytes | None = None
+            if needs_sniff(a.filename, a.content_type, a.content_size):
+                if a.id in virtual:
+                    head = virtual[a.id][:SNIFF_HEAD_BYTES]
+                else:
+                    content = await self._storage.get_attachment(a.id)
+                    head = content.content[:SNIFF_HEAD_BYTES] if content else None
+            out.append(
+                AttachmentMetaOut(
+                    id=a.id,
+                    article_id=a.article_id,
+                    filename=a.filename,
+                    content_type=a.content_type,
+                    content_size=a.content_size,
+                    content_id=a.content_id,
+                    disposition=a.disposition,
+                    inline=_is_inline_attachment(a),
+                    crypto_kind=classify_attachment(a.filename, a.content_type, head),
+                )
             )
-            for a in atts
-            if not _is_body_part_attachment(a)
-        ]
+        return out
 
     async def get_attachment(
         self,

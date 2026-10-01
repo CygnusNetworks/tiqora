@@ -28,6 +28,8 @@ export {
   type ArticleListItem,
   type ArticleBody,
   type AttachmentMetaOut,
+  type AttachmentPgpKeyOut,
+  type AttachmentPgpKeysOut,
   type HistoryEntry,
   type CustomerUserOut,
   type SearchHit,

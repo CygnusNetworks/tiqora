@@ -912,6 +912,43 @@
         "error": "Die Prüfung von Signatur oder Verschlüsselung ist fehlgeschlagen."
       }
     },
+    "cryptoAttachment": {
+      "group": "Signatur & Schlüssel",
+      "show": "Anzeigen",
+      "kind": {
+        "pgp_public_key": "PGP-Schlüssel",
+        "pgp_signature": "PGP-Signatur",
+        "pgp_signed_message": "PGP-signierter Text",
+        "pgp_message": "Verschlüsselte PGP-Nachricht",
+        "pgp_html_body": "HTML-Fassung der Nachricht",
+        "smime_signature": "S/MIME-Signatur",
+        "x509_certificate": "Zertifikat"
+      },
+      "hint": {
+        "pgp_public_key": "Öffentlicher Schlüssel des Absenders – importiert lassen sich Antworten an ihn verschlüsseln und seine Signaturen prüfen.",
+        "pgp_signature": "Digitale Signatur dieser Nachricht; das Prüfergebnis steht im Artikelkopf.",
+        "pgp_signed_message": "Mit PGP signierter Text; das Prüfergebnis steht im Artikelkopf.",
+        "pgp_message": "Verschlüsselter Inhalt – nur mit dem passenden privaten Schlüssel lesbar.",
+        "pgp_html_body": "Von PGP für Outlook angehängt; gleicher Inhalt wie die Nachricht oben.",
+        "smime_signature": "Digitale Signatur dieser Nachricht; das Prüfergebnis steht im Artikelkopf.",
+        "x509_certificate": "X.509-Zertifikat, z. B. um Antworten an den Absender zu verschlüsseln."
+      },
+      "key": {
+        "fingerprint": "Fingerabdruck",
+        "created": "Erstellt",
+        "expires": "Läuft ab",
+        "never": "nie",
+        "inKeyring": "Im Schlüsselbund",
+        "notInKeyring": "Nicht im Schlüsselbund",
+        "import": "In Schlüsselbund importieren",
+        "importFailed": "Import fehlgeschlagen: {{error}}",
+        "unavailable": "Schlüsseldetails konnten nicht gelesen werden.",
+        "status": {
+          "expired": "Abgelaufen",
+          "revoked": "Widerrufen"
+        }
+      }
+    },
     "emailSecurity": {
       "label": "Sicherheit",
       "backend": "Verfahren",
