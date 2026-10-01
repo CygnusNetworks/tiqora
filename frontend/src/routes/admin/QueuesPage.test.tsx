@@ -234,31 +234,101 @@ describe("QueuesPage", () => {
     }
   });
 
-  it("offers default sign keys from sign-key-options and keeps unknown stored values", async () => {
+  const pgpOptions = (key: string, email: string) =>
+    (["Detached", "Inline"] as const).map((method) => ({
+      value: `PGP::${method}::${key}`,
+      backend: "PGP",
+      method,
+      key,
+      label: `PGP-${method}: [good] ${key} Support <${email}>`,
+      status: "good",
+      expires: null,
+      emails: [email],
+    }));
+
+  async function openSignKeyMenu() {
+    const trigger = await screen.findByTestId("admin-form-sign_key");
+    fireEvent.click(trigger);
+    return { trigger, panel: screen.getByTestId("admin-form-sign_key-menu") };
+  }
+
+  it("offers only sign keys for the queue's sender address, once per key", async () => {
+    signKeyOptions.mockResolvedValue([
+      ...pgpOptions("AAAA1111", "znuny@localhost"),
+      ...pgpOptions("BBBB2222", "other@example.org"),
+    ]);
+    renderPage();
+    await openEdit();
+    fireEvent.click(screen.getByRole("tab", { name: "Email security" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Only keys for znuny@localhost.")).toBeInTheDocument(),
+    );
+    const { panel } = await openSignKeyMenu();
+    expect(within(panel).getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "No automatic signing",
+      "PGP · [good] AAAA1111 Support <znuny@localhost>",
+    ]);
+  });
+
+  it.each([
+    ["PGP::Detached::BBBB2222", "does not match the sender address"],
+    ["PGP::Detached::DEADBEEF", "PGP::DEADBEEF (not available)"],
+  ])("keeps the stored key %s selectable", async (stored, shown) => {
+    signKeyOptions.mockResolvedValue(pgpOptions("BBBB2222", "other@example.org"));
     list.mockResolvedValue({
-      items: [{ ...sampleQueue, default_sign_key: "PGP::Detached::DEADBEEF" }],
+      items: [{ ...sampleQueue, default_sign_key: stored }],
       total: 1,
       page: 1,
       page_size: 25,
     });
     renderPage();
-    await waitFor(() => {
-      expect(screen.getByText("Support")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-7"));
-    fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
+    await openEdit();
+    fireEvent.click(screen.getByRole("tab", { name: "Email security" }));
+    const trigger = await screen.findByTestId("admin-form-sign_key");
+    await waitFor(() => expect(trigger).toHaveTextContent(shown));
+    expect(screen.getByText(/No key for znuny@localhost yet/)).toBeInTheDocument();
+  });
 
-    const trigger = await screen.findByTestId("admin-form-default_sign_key");
-    expect(trigger.tagName).toBe("BUTTON");
-    await waitFor(() => {
-      expect(trigger).toHaveTextContent("PGP::Detached::DEADBEEF");
+  it("edits the PGP signature format as its own control", async () => {
+    signKeyOptions.mockResolvedValue(pgpOptions("AAAA1111", "znuny@localhost"));
+    update.mockResolvedValue({ ...sampleQueue });
+    list.mockResolvedValue({
+      items: [{ ...sampleQueue, default_sign_key: "PGP::Inline::AAAA1111" }],
+      total: 1,
+      page: 1,
+      page_size: 25,
     });
-    fireEvent.click(trigger);
-    const panel = screen.getByTestId("admin-form-default_sign_key-menu");
-    expect(
-      within(panel).getByText("SMIME-Detached: [valid] 1a2b3c4d.0 [2027-01-01] znuny@localhost"),
-    ).toBeInTheDocument();
-    expect(within(panel).getByText("No automatic signing")).toBeInTheDocument();
+    renderPage();
+    await openEdit();
+    fireEvent.click(screen.getByRole("tab", { name: "Email security" }));
+
+    expect(await screen.findByTestId("admin-form-sign_key")).toHaveTextContent("AAAA1111");
+    expect(screen.getByTestId("admin-form-sign_method-Inline")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    fireEvent.click(screen.getByTestId("admin-form-sign_method-Detached"));
+    fireEvent.click(screen.getByTestId("admin-form-submit"));
+
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][1]).toMatchObject({ default_sign_key: "PGP::Detached::AAAA1111" });
+  });
+
+  it("hides the signature format for S/MIME keys", async () => {
+    list.mockResolvedValue({
+      items: [{ ...sampleQueue, default_sign_key: "SMIME::Detached::1a2b3c4d.0" }],
+      total: 1,
+      page: 1,
+      page_size: 25,
+    });
+    renderPage();
+    await openEdit();
+    fireEvent.click(screen.getByRole("tab", { name: "Email security" }));
+    expect(await screen.findByTestId("admin-form-sign_key")).toHaveTextContent(
+      "S/MIME · [valid] 1a2b3c4d.0",
+    );
+    expect(screen.queryByTestId("admin-form-sign_method")).toBeNull();
   });
 
   it("shows email security fields only while a crypto backend runs", async () => {
@@ -267,7 +337,7 @@ describe("QueuesPage", () => {
     fireEvent.click(screen.getByTestId("admin-row-menu-trigger-7"));
     fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
     expect(await screen.findByTestId("admin-form-email_encrypt")).toBeInTheDocument();
-    expect(screen.getByTestId("admin-form-default_sign_key")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-form-sign_key")).toBeInTheDocument();
   });
 
   it("hides email security fields when no backend is enabled", async () => {
@@ -287,7 +357,7 @@ describe("QueuesPage", () => {
     fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
     await screen.findByTestId("admin-form-group_id");
     expect(screen.queryByTestId("admin-form-email_encrypt")).toBeNull();
-    expect(screen.queryByTestId("admin-form-default_sign_key")).toBeNull();
+    expect(screen.queryByTestId("admin-form-sign_key")).toBeNull();
     // …and with it the whole "Email security" tab.
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
       "General",
