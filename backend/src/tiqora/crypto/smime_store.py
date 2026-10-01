@@ -194,7 +194,11 @@ class SmimeStore:
     def cert_attributes(self, data: bytes) -> SmimeCertInfo:
         cert = load_certificate(data)
         pem = cert.public_bytes(serialization.Encoding.PEM)
-        proc = self._run(["x509", "-noout", "-subject_hash", "-subject", "-issuer"], pem)
+        # `-nameopt compat` pins the old "/CN=a/emailAddress=b" form Znuny stores;
+        # OpenSSL 3.0 would print "CN = a, emailAddress = b" by default.
+        proc = self._run(
+            ["x509", "-noout", "-nameopt", "compat", "-subject_hash", "-subject", "-issuer"], pem
+        )
         if proc.returncode != 0:
             raise SmimeStoreError(
                 f"openssl x509 failed: {proc.stderr.decode('utf-8', 'replace').strip()}"
