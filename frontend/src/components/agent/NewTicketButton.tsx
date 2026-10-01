@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
+import { isSystemQueue } from "@/lib/systemQueues";
 import { Menu, MenuItem, MenuLabel } from "@/components/ui/Menu";
 import { PlusIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
@@ -15,7 +16,8 @@ import { cn } from "@/lib/cn";
  *
  * Queue options come from `listQueues()`, which returns viewable queues —
  * create permission is enforced by the server on submit. Showing viewable
- * queues here is acceptable for v1.
+ * queues here is acceptable for v1. Znuny's plumbing queues (Postmaster, Raw,
+ * Junk — see `isSystemQueue`) are left out: nobody opens a ticket there.
  */
 function newTicketTriggerClass(open: boolean): string {
   return cn(
@@ -29,7 +31,9 @@ export function NewTicketButton() {
   const navigate = useNavigate();
 
   const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });
-  const queues = flattenQueues(queuesQ.data ?? []).filter((q) => q.valid);
+  const queues = flattenQueues(queuesQ.data ?? []).filter(
+    (q) => q.valid && !isSystemQueue(q),
+  );
 
   const goToForm = (queueId?: number) => {
     void navigate({

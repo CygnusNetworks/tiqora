@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { SelectField } from "@/components/ui/SelectField";
 import { BanIcon, KeyIcon, LockIcon, PencilIcon, ShieldIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import type { CryptoComposeKeyOut } from "@/lib/api";
 import {
   signs,
   encrypts,
@@ -94,9 +95,17 @@ function Segmented<T extends string>({
   );
 }
 
+/** A sign key as "<id> <address>": the key id plus the queue's sender address
+ * when the key carries it (else its first one) — no user-id name, no dates. */
+function signKeyLabel(k: CryptoComposeKeyOut, from: string | null | undefined): string {
+  const emails = k.emails ?? [];
+  const email = from && emails.includes(from) ? from : emails[0];
+  return email ? `${k.key} ${email}` : k.label;
+}
+
 /** The compose "Sicherheit" row: the modes the queue allows (icons), the
- * backend only when PGP and S/MIME are both enabled and set up, method, sign
- * key, and the recipients' key status when encrypting. Renders nothing when
+ * backend only when PGP and S/MIME are both enabled and set up, the PGP method
+ * (only when the queue's sign key does not fix it already), sign key, and the recipients' key status when encrypting. Renders nothing when
  * the queue offers nothing but a plain mail. */
 export function EmailSecurityControl({
   security,
@@ -120,12 +129,16 @@ export function EmailSecurityControl({
     );
   const signKeys = backendOpts?.sign_keys ?? [];
   const queueSign = options.queue_sign ?? null;
+  // The queue's sign key (PGP::Detached::<id> / PGP::Inline::<id>) already
+  // fixes the PGP method; the agent only picks one when the queue has none.
+  const queueMethod = queueSign?.backend === "pgp" ? queueSign.method : null;
+  const methodFor = (b: Backend) => (b === "pgp" && queueMethod) || "detached";
   const onBackend = (b: Backend) => {
     const next = (options.backends ?? []).find((x) => x.backend === b);
     const firstKey = (next?.sign_keys ?? []).find((k) => k.usable)?.key ?? "";
     update({
       backend: b,
-      method: "detached",
+      method: methodFor(b),
       signKey: queueSign?.backend === b ? (queueSign.sign_key ?? firstKey) : firstKey,
     });
   };
@@ -154,7 +167,7 @@ export function EmailSecurityControl({
               if (alt) {
                 be = alt;
                 patch.backend = alt.backend;
-                patch.method = "detached";
+                patch.method = methodFor(alt.backend);
                 patch.signKey = "";
               }
             }
@@ -190,7 +203,7 @@ export function EmailSecurityControl({
               label={t("ticket.emailSecurity.backend")}
             />
           )}
-          {state.backend === "pgp" && (
+          {state.backend === "pgp" && !queueMethod && (
             <div className="flex items-stretch border-l border-hairline first:border-l-0">
               <SelectField
                 items={(backendOpts?.methods ?? ["detached"]).map((m) => ({
@@ -212,7 +225,7 @@ export function EmailSecurityControl({
               <SelectField
                 items={signKeys.map((k) => ({
                   value: k.key,
-                  label: k.label,
+                  label: signKeyLabel(k, options.from_address),
                   hint: k.usable ? undefined : t(`ticket.emailSecurity.keyStatus.${k.status}`, { defaultValue: k.status }),
                 }))}
                 value={state.signKey || null}
