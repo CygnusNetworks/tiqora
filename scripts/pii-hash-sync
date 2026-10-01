@@ -7,7 +7,7 @@ identifiers. No plaintext leaves production. .githooks/pii_check.py uses the
 digests to refuse commits, pushes and edits that contain real personal data.
 
 Configuration (environment):
-    TIQORA_PII_SYNC_SSH        ssh target (default root@prod-host.example.org)
+    TIQORA_PII_SYNC_SSH        ssh target, e.g. root@prod-host.example.org (required)
     TIQORA_PII_SYNC_CONTAINER  container with DATABASE_URL (default tiqora-api)
     TIQORA_PII_SYNC_PRE        shell command run first, e.g. a port knock
 """
@@ -74,7 +74,9 @@ print(json.dumps({k: sorted(v) for k, v in out.items()}))
 
 
 def main() -> int:
-    target = os.environ.get("TIQORA_PII_SYNC_SSH", "root@prod-host.example.org")
+    target = os.environ.get("TIQORA_PII_SYNC_SSH")
+    if not target:
+        sys.exit("TIQORA_PII_SYNC_SSH is not set (ssh target of the production host)")
     container = os.environ.get("TIQORA_PII_SYNC_CONTAINER", "tiqora-api")
     pre = os.environ.get("TIQORA_PII_SYNC_PRE")
     info = Path(

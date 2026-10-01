@@ -39,9 +39,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 # Internal-only escape hatch: compiling gssapi's C extension against
 # libkrb5-dev costs ~2min per build for a package that essentially never
-# changes (measured on jenkins.cygnusnet.de: "Prepared 142 packages in
+# changes (measured on the internal CI: "Prepared 142 packages in
 # 2m 01s", almost entirely gssapi). GSSAPI_AMD64_WHEEL_URL, when set, points
-# at a wheel prebuilt once (by hand) and hosted on pypi.cygnusnet.de,
+# at a wheel prebuilt once (by hand) and hosted on an internal package index,
 # sidestepping the compile. Left empty (the default, and what GitHub Actions
 # always uses), this is a no-op and both this and the `uv sync` step below
 # behave exactly as before. Same pattern as ~/git/auzui's Dockerfile/
