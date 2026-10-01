@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -90,3 +91,22 @@ async def test_backend_status_reports_problems(tmp_path: Path) -> None:
     assert any("PrivatePath" in p for p in by["smime"].problems)
     assert by["pgp"].available is False
     assert any("gpg" in p for p in by["pgp"].problems)
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_pgp_status_flags_homedir_that_cannot_be_created(tmp_path: Path) -> None:
+    locked = tmp_path / "locked"
+    locked.mkdir(mode=0o500)
+    try:
+        settings = Settings(TIQORA_CRYPTO_PGP_GNUPGHOME=str(locked / "otrs" / ".gnupg"))
+        by = {s.backend: s for s in backend_status_sync(CryptoConfig.from_settings(settings))}
+        assert by["pgp"].available is False
+        assert any("cannot be created" in p for p in by["pgp"].problems)
+    finally:
+        locked.chmod(0o700)
+
+
+def test_pgp_status_accepts_missing_but_creatable_homedir(tmp_path: Path) -> None:
+    settings = Settings(TIQORA_CRYPTO_PGP_GNUPGHOME=str(tmp_path / "new" / ".gnupg"))
+    by = {s.backend: s for s in backend_status_sync(CryptoConfig.from_settings(settings))}
+    assert not any("--homedir" in p for p in by["pgp"].problems)

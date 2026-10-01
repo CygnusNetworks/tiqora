@@ -8,9 +8,11 @@ socket path limit on macOS, see test_crypto_pgp.py).
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
@@ -204,6 +206,19 @@ def test_trust_model_option_is_passed_to_gpg(gnupghome: str) -> None:
     bad = PgpEngine(gnupghome, options=["--no-such-option-xyz"])
     with pytest.raises(CryptoUnavailableError):
         bad.list_keys()
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root ignores directory permissions")
+def test_uncreatable_homedir_is_unavailable_not_oserror(tmp_path: Path) -> None:
+    # Prod: PGP::Options --homedir /opt/otrs/.gnupg, but the container has no
+    # /opt/otrs and runs unprivileged -> mkdir raised PermissionError (HTTP 500).
+    locked = tmp_path / "locked"
+    locked.mkdir(mode=0o500)
+    try:
+        with pytest.raises(CryptoUnavailableError, match="homedir"):
+            PgpEngine(str(locked / "otrs" / ".gnupg")).list_keys()
+    finally:
+        locked.chmod(0o700)
 
 
 def test_normalize_key_ref() -> None:

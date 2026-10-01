@@ -271,6 +271,14 @@ def _dir_problem(label: str, path: str) -> str | None:
         return f"{label} {path} is not a directory"
     if p.exists() and not os.access(p, os.W_OK):
         return f"{label} {path} is not writable"
+    if not p.exists():
+        # Created on first use (PgpEngine) — only if the nearest existing
+        # ancestor lets us, e.g. not /opt/otrs/.gnupg in an unprivileged container.
+        parent = p.parent
+        while not parent.exists() and parent != parent.parent:
+            parent = parent.parent
+        if not os.access(parent, os.W_OK | os.X_OK):
+            return f"{label} {path} does not exist and cannot be created"
     return None
 
 
