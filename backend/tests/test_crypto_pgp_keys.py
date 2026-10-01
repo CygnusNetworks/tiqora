@@ -221,6 +221,22 @@ def test_uncreatable_homedir_is_unavailable_not_oserror(tmp_path: Path) -> None:
         locked.chmod(0o700)
 
 
+def test_trusted_network_controls_encryption_to_uncertified_keys() -> None:
+    # PGP::TrustedNetwork: a public key imported from elsewhere is not
+    # certified; gpg refuses to encrypt to it unless always_trust is on.
+    with (
+        tempfile.TemporaryDirectory(dir="/tmp") as other,  # noqa: S108
+        tempfile.TemporaryDirectory(dir="/tmp") as home,  # noqa: S108
+    ):
+        source = PgpEngine(other)
+        fp = _gen(source, "remote@example.org")
+        public = source.export_public(fp)
+        PgpEngine(home).import_key(public)
+        with pytest.raises(CryptoError):
+            PgpEngine(home, trusted_network=False).encrypt(b"hi", [fp])
+        assert PgpEngine(home, trusted_network=True).encrypt(b"hi", [fp])
+
+
 def test_normalize_key_ref() -> None:
     assert normalize_key_ref("0xdeadbeef") == "DEADBEEF"
     assert normalize_key_ref("AB12 CD34 EF56 7890") == "AB12CD34EF567890"

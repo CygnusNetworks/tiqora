@@ -7608,6 +7608,128 @@
         "title": "CryptoOptionsOut",
         "type": "object"
       },
+      "CryptoSettingOut": {
+        "properties": {
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "env_var": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env Var"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tiqora_value": {
+            "title": "Tiqora Value"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "znuny_setting": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Znuny Setting"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "value",
+          "source",
+          "locked"
+        ],
+        "title": "CryptoSettingOut",
+        "type": "object"
+      },
+      "CryptoSettingsOut": {
+        "properties": {
+          "pgp": {
+            "items": {
+              "$ref": "#/components/schemas/CryptoSettingOut"
+            },
+            "title": "Pgp",
+            "type": "array"
+          },
+          "pgp_passphrases": {
+            "items": {
+              "$ref": "#/components/schemas/PgpPassphraseOut"
+            },
+            "title": "Pgp Passphrases",
+            "type": "array"
+          },
+          "pgp_passphrases_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pgp Passphrases Error"
+          },
+          "smime": {
+            "items": {
+              "$ref": "#/components/schemas/CryptoSettingOut"
+            },
+            "title": "Smime",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pgp",
+          "smime",
+          "pgp_passphrases"
+        ],
+        "title": "CryptoSettingsOut",
+        "type": "object"
+      },
+      "CryptoSettingsUpdate": {
+        "description": "Field name \u2192 new Tiqora value; ``null`` clears the Tiqora value.",
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "title": "CryptoSettingsUpdate",
+        "type": "object"
+      },
       "CustomerCompanyCreate": {
         "properties": {
           "city": {
@@ -15570,6 +15692,52 @@
           "subkey_ids"
         ],
         "title": "PgpKeyOut",
+        "type": "object"
+      },
+      "PgpPassphraseIn": {
+        "properties": {
+          "passphrase": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Passphrase",
+            "type": "string"
+          }
+        },
+        "required": [
+          "passphrase"
+        ],
+        "title": "PgpPassphraseIn",
+        "type": "object"
+      },
+      "PgpPassphraseOut": {
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "key_id": {
+            "title": "Key Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "uids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "key_id",
+          "uids",
+          "source"
+        ],
+        "title": "PgpPassphraseOut",
         "type": "object"
       },
       "PgpUploadIn": {
@@ -33548,6 +33716,301 @@
           }
         },
         "summary": "Crypto Status",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-settings": {
+      "get": {
+        "operationId": "get_crypto_settings_api_v1_admin_crypto_settings_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Crypto Settings",
+        "tags": [
+          "admin:crypto"
+        ]
+      },
+      "put": {
+        "description": "Store Tiqora values. 422 for unknown fields / invalid values, 409 for locked ones.",
+        "operationId": "put_crypto_settings_api_v1_admin_crypto_settings_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CryptoSettingsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Crypto Settings",
+        "tags": [
+          "admin:crypto"
+        ]
+      }
+    },
+    "/api/v1/admin/crypto-settings/pgp-passphrases/{key_ref}": {
+      "delete": {
+        "operationId": "delete_pgp_passphrase_api_v1_admin_crypto_settings_pgp_passphrases__key_ref__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_ref",
+            "required": true,
+            "schema": {
+              "title": "Key Ref",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Pgp Passphrase",
+        "tags": [
+          "admin:crypto"
+        ]
+      },
+      "put": {
+        "operationId": "put_pgp_passphrase_api_v1_admin_crypto_settings_pgp_passphrases__key_ref__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_ref",
+            "required": true,
+            "schema": {
+              "title": "Key Ref",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PgpPassphraseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CryptoSettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Pgp Passphrase",
         "tags": [
           "admin:crypto"
         ]

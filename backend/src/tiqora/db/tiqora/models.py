@@ -306,7 +306,8 @@ class TiqoraCryptoKey(TiqoraBase):
         server_default=func.now(),
     )
     # import | delete | delete_secret | add_certificate | add_private |
-    # delete_private | relation_add | relation_delete | migrate | rehash
+    # delete_private | relation_add | relation_delete | migrate | rehash |
+    # passphrase_set | passphrase_delete
     action: Mapped[str] = mapped_column(
         String(32), nullable=False, default="import", server_default="import"
     )

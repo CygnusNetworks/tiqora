@@ -151,6 +151,11 @@ class SysConfig:
         self._fetch = fetch
         self._cache: dict[str, tuple[float, Any]] = {}
 
+    @property
+    def session(self) -> AsyncSession | None:
+        """The DB session this reader queries (``None`` with an injected ``fetch``)."""
+        return self._session
+
     def clear_cache(self) -> None:
         """Drop all cached settings."""
         self._cache.clear()
@@ -331,6 +336,33 @@ class SysConfig:
         value = await self.get(key, 1)
         return bool(int(value or 0))
 
+    async def get_layers(self, name: str) -> tuple[Any | None, Any | None]:
+        """``(set, default)`` for *name*, decoded; ``None`` where absent.
+
+        *set* is the valid system-wide ``sysconfig_modified`` row — a value an
+        admin explicitly configured in Znuny — and *default* the valid
+        ``sysconfig_default`` row. :meth:`get` merges both; callers that let
+        their own settings sit between the two need them apart. With an
+        injected ``fetch`` (tests) the fetched value counts as set.
+        """
+        key = f"layers:{name}"
+        now = time.monotonic()
+        cached = self._cache.get(key)
+        if cached is not None and now < cached[0]:
+            return cached[1]  # type: ignore[no-any-return]
+        if self._fetch is not None:
+            layers: tuple[Any | None, Any | None] = (
+                decode_effective_value(await self._fetch(name)),
+                None,
+            )
+        elif self._session is None:
+            layers = (None, None)
+        else:
+            modified, default = await _fetch_layers_from_db(self._session, name)
+            layers = (decode_effective_value(modified), decode_effective_value(default))
+        self._cache[key] = (now + self._ttl, layers)
+        return layers
+
     async def tiqora_settings(self) -> dict[str, Any]:
         """All settings currently required by Tiqora core."""
         return await self.get_many(TIQORA_SYSCONFIG_KEYS)
@@ -376,6 +408,32 @@ async def _fetch_effective_from_db(session: AsyncSession, name: str) -> Any | No
     if row is not None:
         return row[0]
     return None
+
+
+async def _fetch_layers_from_db(session: AsyncSession, name: str) -> tuple[Any | None, Any | None]:
+    """Raw ``(sysconfig_modified, sysconfig_default)`` effective values, valid rows only."""
+    modified = (
+        await session.execute(
+            text(
+                """
+                SELECT effective_value FROM sysconfig_modified
+                WHERE name = :name AND is_valid = 1 AND user_id IS NULL
+                ORDER BY id DESC LIMIT 1
+                """
+            ),
+            {"name": name},
+        )
+    ).first()
+    default = (
+        await session.execute(
+            text(
+                "SELECT effective_value FROM sysconfig_default"
+                " WHERE name = :name AND is_valid = 1 LIMIT 1"
+            ),
+            {"name": name},
+        )
+    ).first()
+    return (modified[0] if modified else None, default[0] if default else None)
 
 
 def yaml_encode_effective(value: Any) -> bytes:
