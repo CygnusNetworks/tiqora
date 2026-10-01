@@ -20,23 +20,48 @@ notifications) are done.
 
 ## Configuration
 
-Tiqora reads Znuny's SysConfig (DB-backed, `sysconfig_modified` over
-`sysconfig_default`). `TIQORA_CRYPTO_*` env vars override a setting when set
-— mainly for container paths, where Znuny's host paths do not exist.
+Every setting below can be set in the admin UI (section **Settings** on the
+PGP and S/MIME pages, `GET/PUT /api/v1/admin/crypto-settings`). Per setting
+the value is resolved in this order:
+
+1. `TIQORA_CRYPTO_*` env var, where one exists (mainly container paths)
+2. Znuny SysConfig, **set** — a valid system-wide `sysconfig_modified` row
+3. the Tiqora value from the admin UI (`tiqora_settings`, key `crypto.<field>`)
+4. Znuny's shipped default (`sysconfig_default`, valid rows only)
+5. code default
+
+Levels 1 and 2 lock the field in the UI (it shows where the value comes
+from); a Tiqora value stays stored and applies again once the Znuny/env
+value is gone. `PGP::Options` sets both the keyring and the extra options,
+so a Znuny value locks both fields.
 
 | SysConfig | Meaning | Env override |
 |---|---|---|
 | `PGP` | PGP on/off | `TIQORA_CRYPTO_PGP_ENABLED` |
-| `PGP::Bin` | gpg binary; ignored if the path does not exist here → `gpg` on `PATH` | `TIQORA_CRYPTO_GPG_BIN` |
+| `PGP::Bin` | gpg binary; a path that does not exist here (or a name not on `PATH`) → `gpg` on `PATH` | `TIQORA_CRYPTO_GPG_BIN` |
 | `PGP::Options` | `--homedir <dir>` = the keyring; remaining options (e.g. `--trust-model always`) are passed to gpg | `TIQORA_CRYPTO_PGP_GNUPGHOME` (homedir only) |
-| `PGP::Key::Password` | key id → passphrase, used for signing, decrypting and deleting secret keys | — |
+| `PGP::Key::Password` | key id → passphrase, used for signing, decrypting and deleting secret keys; merged per key id (see below) | — |
 | `PGP::Options::DigestPreference` | signature digest (`--personal-digest-preferences`) | — |
+| `PGP::Method` | `Detached`/`Inline` for notifications without rich text | — |
+| `PGP::TrustedNetwork` | encrypt/decrypt with `always_trust`. Znuny ships `0`, which Tiqora ignores: its default is **on** (the behaviour before this setting was read); an explicit `0` in Znuny or Tiqora turns it off | — |
 | `SMIME` | S/MIME on/off | `TIQORA_CRYPTO_SMIME_ENABLED` |
 | `SMIME::Bin` | openssl binary; same fallback as `PGP::Bin` | `TIQORA_CRYPTO_OPENSSL_BIN` |
 | `SMIME::CertPath` | certificate directory | `TIQORA_CRYPTO_SMIME_CERT_DIR` |
 | `SMIME::PrivatePath` | private key directory | `TIQORA_CRYPTO_SMIME_PRIVATE_DIR` |
-| `SMIME::CacheTTL` | ignored (Tiqora reads the files directly) | — |
-| — | extra CA bundle (`-CAfile`) for inbound signature chain checks, on top of `SMIME::CertPath` | `TIQORA_CRYPTO_SMIME_CA_PATH` |
+| `SMIME::FetchFromCustomer` | import certificates from the customer backend | — |
+| `SMIME::NoVerify` | a valid signature counts as `verified` without a trusted chain | — |
+| `SMIME::CacheTTL`, `PGP::Log` | ignored (no effect in Tiqora), not in the UI | — |
+| — | extra CA bundle (`-CAfile`) for inbound signature chain checks, on top of `SMIME::CertPath` (Tiqora only) | `TIQORA_CRYPTO_SMIME_CA_PATH` |
+
+**Passphrases** are merged per key id: entries set in Znuny win for their
+ids, Tiqora entries fill in the other keys, Znuny's shipped demo entries
+(`SomePassword`) come last. In the UI a secret key's menu has *Set
+passphrase*: the passphrase is checked with a test signature (gpg-agent's
+cache is flushed first, so a wrong passphrase cannot pass on a cached right
+one), then stored Fernet-encrypted with the app secret key
+(`crypto.pgp.key_passwords`) and never returned —
+`PUT/DELETE /api/v1/admin/crypto-settings/pgp-passphrases/{key}`, audited as
+`passphrase_set` / `passphrase_delete`.
 
 Znuny ships `SMIME::CertPath`/`SMIME::PrivatePath` as *invalid* (inactive)
 settings; they only count once enabled in Znuny's SysConfig — or set the env
@@ -279,9 +304,8 @@ delivery: a layer that cannot be processed stays as it is (e.g. the
   call. CAs linked through signer relations are in CertPath, so they are
   trust anchors automatically; a customer's self-signed certificate
   uploaded to CertPath is trusted too. A signature that is cryptographically
-  valid but whose chain does not validate is `signed_untrusted` — Znuny's
-  `SMIME::NoVerify` retry, but never shown as verified (Tiqora always
-  retries; the setting itself is not read).
+  valid but whose chain does not validate is `signed_untrusted` (Znuny's
+  `-noverify` retry) — or `verified` when `SMIME::NoVerify` is on.
 - **PGP**: a good signature from a key in the keyring is `verified`
   (Znuny's `GOODSIG` rule, regardless of ownertrust); an expired/revoked key
   or ownertrust *never* gives `signed_untrusted`, a signer missing from the
