@@ -23,6 +23,31 @@ fork of Znuny — no Znuny source code is included or redistributed.
 | **AI surface** | MCP server (FastMCP) under the same permission engine as UI/REST |
 | **License** | [AGPL-3.0](./LICENSE) — Copyright © 2026 Cygnus Networks GmbH |
 
+## Try it
+
+**In the browser, nothing to install:** the [interactive demo](https://cygnusnetworks.github.io/tiqora/demo/)
+runs the full agent, admin and portal UI against mock data.
+
+**On your machine, one command** (Docker with Compose v2):
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/CygnusNetworks/tiqora/main/docker-compose.quickstart.yml
+docker compose -f docker-compose.quickstart.yml up -d
+```
+
+Open <http://localhost:8000/> and sign in as `root@localhost` / `tiqora-demo`. The first
+start creates the database and seeds 40 fake tickets; `docker compose -f
+docker-compose.quickstart.yml down -v` removes everything again. The quickstart is for
+evaluation only (fixed passwords, plain HTTP). For a real installation see
+[Getting started](#getting-started--three-ways-to-run).
+
+Running OTRS or Znuny already? Tiqora can work on **your existing database, next to
+Znuny** — read [Moving off OTRS/Znuny without a big-bang migration](https://cygnusnetworks.github.io/tiqora/znuny-migration.html)
+or the [comparison with Znuny, OTRS, Zammad and others](https://cygnusnetworks.github.io/tiqora/compare.html).
+
+Questions, ideas, war stories from your OTRS migration:
+[GitHub Discussions](https://github.com/CygnusNetworks/tiqora/discussions).
+
 ## Why Tiqora
 
 - **Modern web UI** — agent workspace, admin console, and customer portal that feel
@@ -31,7 +56,7 @@ fork of Znuny — no Znuny source code is included or redistributed.
   runtime schema profile detects the peer (see
   [docs/support-matrix.md](./docs/support-matrix.md)). **Parallel operation** on
   one shared database is a first-class path (additive `tiqora_*` tables only until
-  you explicitly take schema ownership). Preferred peer LTS: **Znuny 6.5** or
+  you explicitly take schema ownership). Preferred peers: **Znuny 6.5** (LTS) or
   **7.3**.
 - **AI-ready ticket search** — Meilisearch indexing plus an **MCP server** so AI agents
   act with the same ACLs as humans.
@@ -307,6 +332,7 @@ See [docs/parallel-operation.md](./docs/parallel-operation.md) for the full inva
 
 | Path | When | Doc |
 |---|---|---|
+| **Quickstart** | Evaluate locally in two minutes, demo data included | [`docker-compose.quickstart.yml`](./docker-compose.quickstart.yml) — see [Try it](#try-it) |
 | **Fresh standalone** | Empty database, no Znuny — greenfield install via `tiqora bootstrap` | [docs/guide/fresh-install.md](./docs/guide/fresh-install.md) |
 | **Parallel to Znuny** | Co-run with an existing OTRS/Znuny **6.0–7.3** database (additive `tiqora_*` only) | [docs/support-matrix.md](./docs/support-matrix.md), [docs/parallel-operation.md](./docs/parallel-operation.md), [docs/guide/znuny-to-tiqora.md](./docs/guide/znuny-to-tiqora.md) |
 | **Migrate away** | After parallel operation: schema ownership, cutover checklist | [docs/cutover.md](./docs/cutover.md) |
@@ -465,7 +491,7 @@ Full index: **[docs/README.md](./docs/README.md)**
 
 - **Target**: OTRS **6.0.x** and Znuny **6.0–7.3** database schemas (MariaDB/MySQL
   and PostgreSQL). Full matrix: [docs/support-matrix.md](./docs/support-matrix.md).
-  Preferred LTS peers: **Znuny 6.5** or **7.3**. Unknown schemas refuse to start
+  Preferred peers: **Znuny 6.5** (LTS) or **7.3** (current release). Unknown schemas refuse to start
   unless overridden (`TIQORA_ALLOW_UNKNOWN_LEGACY_SCHEMA` /
   `TIQORA_LEGACY_SCHEMA_PROFILE=<profile_id>`).
 - **Behaviour**: Ticket numbering, history name formats, escalation columns, and
@@ -477,11 +503,12 @@ Full index: **[docs/README.md](./docs/README.md)**
 
 ## Contributing
 
-1. Open an issue or discuss the change before large design work.
-2. Keep all documentation, user-facing strings (via i18n keys), and code comments in **English**.
-3. Do **not** copy any Znuny/OTRS source into the tree (AGPL cleanliness for Znuny; Tiqora is AGPL-3.0 of its own).
-4. Run `make lint` and `make test` before opening a PR.
-5. Prefer small, reviewable PRs.
+Contributions are welcome. Read **[CONTRIBUTING.md](./CONTRIBUTING.md)** first, especially
+the clean-room rule (never copy Znuny/OTRS source) and the rule about test data
+(no real tickets, names or addresses). Good starting points are issues labelled
+[`good first issue`](https://github.com/CygnusNetworks/tiqora/labels/good%20first%20issue).
+Questions go to [GitHub Discussions](https://github.com/CygnusNetworks/tiqora/discussions);
+security problems go through [SECURITY.md](./SECURITY.md), not public issues.
 
 ## License
 

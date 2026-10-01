@@ -54,9 +54,10 @@ jobs:
           rm -rf _site
           mkdir -p _site/assets/screenshots _site/demo
 
-          # Landing
-          cp site/index.html site/styles.css _site/
+          # Landing, comparison and migration article, social preview image
+          cp site/index.html site/styles.css site/compare.html site/znuny-migration.html _site/
           cp frontend/public/logo.svg frontend/public/logo-wordmark.svg frontend/public/favicon.svg _site/assets/
+          cp docs/images/og-image.png _site/assets/og-image.png
 
           # Sample AI-audit export PDF (masked; placeholder tokens only, no real PII)
           cp site/ai-audit-sample.pdf _site/assets/ai-audit-sample.pdf

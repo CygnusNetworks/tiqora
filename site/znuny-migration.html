@@ -1,0 +1,1341 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Moving off OTRS/Znuny without a big-bang migration — Tiqora</title>
+    <meta
+      name="description"
+      content="How to migrate from Znuny or OTRS 6 step by step: run Tiqora on the same database, move agents and background jobs over one by one, keep a rollback at every stage, and retire Znuny only at the end."
+    />
+    <meta name="theme-color" content="#0e1015" />
+    <link rel="canonical" href="https://cygnusnetworks.github.io/tiqora/znuny-migration.html" />
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Tiqora" />
+    <meta property="og:title" content="Moving off OTRS/Znuny without a big-bang migration" />
+    <meta
+      property="og:description"
+      content="Run Tiqora next to Znuny on the same database, hand over agents and daemons one at a time, and cut over only when you are ready. A step-by-step guide with a rollback at every stage."
+    />
+    <meta property="og:url" content="https://cygnusnetworks.github.io/tiqora/znuny-migration.html" />
+    <meta property="og:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="article:published_time" content="2026-10-01" />
+    <meta property="article:author" content="Cygnus Networks GmbH" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Moving off OTRS/Znuny without a big-bang migration" />
+    <meta
+      name="twitter:description"
+      content="Run Tiqora next to Znuny on the same database, hand over agents and daemons one at a time, and cut over only when you are ready."
+    />
+    <meta name="twitter:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "TechArticle",
+        "headline": "Moving off OTRS/Znuny without a big-bang migration",
+        "description": "How to migrate from Znuny or OTRS 6 step by step: run Tiqora on the same database, move agents and background jobs over one by one, keep a rollback at every stage, and retire Znuny only at the end.",
+        "image": "https://cygnusnetworks.github.io/tiqora/assets/og-image.png",
+        "datePublished": "2026-10-01",
+        "dateModified": "2026-10-01",
+        "inLanguage": "en",
+        "proficiencyLevel": "Expert",
+        "keywords": "Znuny migration, OTRS migration, Znuny alternative, OTRS alternative, OTRS Community Edition replacement, helpdesk migration, parallel operation",
+        "about": [
+          { "@type": "SoftwareApplication", "name": "Znuny" },
+          { "@type": "SoftwareApplication", "name": "OTRS" },
+          { "@type": "SoftwareApplication", "name": "Tiqora", "applicationCategory": "BusinessApplication" }
+        ],
+        "mainEntityOfPage": {
+          "@type": "WebPage",
+          "@id": "https://cygnusnetworks.github.io/tiqora/znuny-migration.html"
+        },
+        "author": {
+          "@type": "Organization",
+          "name": "Cygnus Networks GmbH",
+          "url": "https://github.com/CygnusNetworks"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Cygnus Networks GmbH",
+          "url": "https://github.com/CygnusNetworks",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://cygnusnetworks.github.io/tiqora/assets/logo.svg"
+          }
+        }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "Do I need to stop Znuny to try Tiqora?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "No. Tiqora runs next to Znuny on the same database and only adds its own tiqora_* tables. Znuny keeps running, including its daemon, until you decide to cut over."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Which OTRS and Znuny versions are supported?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "OTRS 6.0.x (including Centuran ((OTRS)) CE 6.0.x) and Znuny 6.0 to 7.3. OTRS 5 and older, OTOBO and commercial OTRS are out of scope; upgrade older installs to 6.0 or later first."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Does it work with MariaDB/MySQL and PostgreSQL?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, both. The schema matrix tests run on MariaDB and PostgreSQL. The tests against real running Znuny instances currently run on MariaDB only."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "What happens to my OPM add-ons and ITSM?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Tiqora leaves add-on tables alone but does not provide add-on functionality such as an ITSM CMDB, and it has no OPM package manager. Inventory what your add-ons do and keep, replace or retire each function before switching Znuny off."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Can I go back to Znuny?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes, at every stage before schema ownership: stop Tiqora, uninstall the TiqoraSync add-on, or flip a daemon flag back and re-enable the Znuny task. After schema ownership the supported way back is restoring the database dump taken before the cutover."
+            }
+          }
+        ]
+      }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      /* Article typography — uses the tokens from styles.css only. */
+      .article-hero {
+        padding: 3.5rem 0 1.5rem;
+      }
+
+      .article-hero h1 {
+        font-size: clamp(1.9rem, 4vw, 2.9rem);
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+        margin: 0 0 1rem;
+        max-width: 22ch;
+        font-weight: 800;
+      }
+
+      .article-hero .lede {
+        font-size: 1.12rem;
+        color: var(--muted);
+        max-width: 62ch;
+        margin: 0;
+      }
+
+      .byline {
+        margin-top: 1.25rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .prose {
+        min-width: 0;
+        font-size: 1.02rem;
+      }
+
+      /* Prose measure: a standalone .prose block is capped; on a .wrap the
+         container keeps the page grid (left-aligned with the hero) and only
+         its children are capped. */
+      .prose:not(.wrap),
+      .wrap.prose > * {
+        max-width: 72ch;
+      }
+
+      section.article-section {
+        padding: 2.25rem 0;
+        scroll-margin-top: 2.5rem; /* clears the sticky nav on #anchor jumps */
+      }
+
+      .prose h2 {
+        font-size: clamp(1.4rem, 2.4vw, 1.8rem);
+        letter-spacing: -0.02em;
+        line-height: 1.2;
+        margin: 0 0 1rem;
+        scroll-margin-top: 5rem;
+      }
+
+      .prose h3 {
+        font-size: 1.15rem;
+        letter-spacing: -0.01em;
+        margin: 2rem 0 0.6rem;
+        scroll-margin-top: 5rem;
+      }
+
+      .prose h4 {
+        font-size: 0.95rem;
+        margin: 1.4rem 0 0.4rem;
+      }
+
+      .prose p,
+      .prose ul,
+      .prose ol {
+        margin: 0 0 1rem;
+      }
+
+      .prose ul,
+      .prose ol {
+        padding-left: 1.3rem;
+      }
+
+      .prose li {
+        margin-bottom: 0.35rem;
+      }
+
+      .prose li::marker {
+        color: var(--muted);
+      }
+
+      .prose strong {
+        color: var(--ink);
+      }
+
+      .prose a {
+        text-decoration: underline;
+        text-decoration-color: rgba(91, 140, 255, 0.4);
+        text-underline-offset: 2px;
+      }
+
+      .prose code,
+      .faq code,
+      .matrix code {
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 0.86em;
+        background: var(--surface-subtle);
+        border: 1px solid var(--hairline);
+        border-radius: 5px;
+        padding: 0.05em 0.35em;
+        overflow-wrap: anywhere;
+      }
+
+      .prose pre {
+        margin: 0 0 1.2rem;
+        padding: 0.9rem 1rem;
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        overflow-x: auto;
+        max-width: 100%;
+        font-size: 0.85rem;
+        line-height: 1.55;
+      }
+
+      .prose pre code {
+        background: none;
+        border: 0;
+        padding: 0;
+        font-size: inherit;
+        overflow-wrap: normal;
+        white-space: pre;
+      }
+
+      .prose pre .c {
+        color: var(--muted);
+      }
+
+      /* Callouts */
+      .callout {
+        margin: 0 0 1.2rem;
+        padding: 0.85rem 1rem;
+        border-radius: 10px;
+        border: 1px solid var(--hairline);
+        border-left-width: 4px;
+        background: var(--surface);
+        font-size: 0.95rem;
+      }
+
+      .callout p:last-child {
+        margin-bottom: 0;
+      }
+
+      .callout-title {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 0.3rem;
+      }
+
+      .callout-info {
+        border-left-color: var(--accent);
+      }
+
+      .callout-info .callout-title {
+        color: var(--accent);
+      }
+
+      .callout-warn {
+        border-color: rgba(245, 168, 60, 0.28);
+        border-left-color: var(--amber);
+        background: rgba(245, 168, 60, 0.06);
+      }
+
+      .callout-warn .callout-title {
+        color: var(--amber);
+      }
+
+      .callout-back {
+        border-left-color: var(--green);
+      }
+
+      .callout-back .callout-title {
+        color: var(--green);
+      }
+
+      /* Table of contents */
+      .toc {
+        margin: 1.75rem 0 0;
+        padding: 1rem 1.2rem;
+        max-width: 72ch;
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        font-size: 0.92rem;
+      }
+
+      .toc strong {
+        display: block;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 0.4rem;
+      }
+
+      .toc ol {
+        margin: 0;
+        padding-left: 1.2rem;
+        columns: 2 16rem;
+        column-gap: 2rem;
+      }
+
+      .toc li {
+        margin: 0.15rem 0;
+        break-inside: avoid;
+      }
+
+      /* Phase rail (the step diagram) */
+      .phases {
+        list-style: none;
+        margin: 1.5rem 0 0.5rem;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 0.5rem;
+        counter-reset: phase;
+      }
+
+      .phases li {
+        position: relative;
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        padding: 0.75rem 0.7rem 0.8rem;
+        font-size: 0.84rem;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .phases li a {
+        color: inherit;
+        text-decoration: none;
+        display: block;
+      }
+
+      .phases li:hover {
+        border-color: var(--muted);
+      }
+
+      .phases .num {
+        display: inline-grid;
+        place-items: center;
+        width: 1.7rem;
+        height: 1.7rem;
+        border-radius: 999px;
+        background: var(--accent-dim);
+        color: var(--accent);
+        font-weight: 800;
+        font-size: 0.85rem;
+        margin-bottom: 0.45rem;
+      }
+
+      .phases b {
+        display: block;
+        color: var(--ink);
+        font-size: 0.9rem;
+        margin-bottom: 0.2rem;
+      }
+
+      .phases li:last-child {
+        border-color: rgba(245, 168, 60, 0.45);
+      }
+
+      .phases li:last-child .num {
+        background: rgba(245, 168, 60, 0.14);
+        color: var(--amber);
+      }
+
+      .phase-legend {
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin: 0.5rem 0 0;
+      }
+
+      /* Phase heading badge */
+      .phase-tag {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: var(--accent-dim);
+        border-radius: 999px;
+        padding: 0.12rem 0.55rem;
+        margin-bottom: 0.5rem;
+      }
+
+      /* Who owns what */
+      .matrix-wrap {
+        margin: 0 0 1.25rem;
+      }
+
+      .matrix td,
+      .matrix th {
+        font-size: 0.88rem;
+      }
+
+      .matrix th {
+        font-size: 0.74rem;
+      }
+
+      .matrix td code {
+        white-space: nowrap;
+        overflow-wrap: normal;
+      }
+
+      .matrix td:first-child {
+        white-space: nowrap;
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .owner-z {
+        color: var(--muted);
+      }
+
+      .owner-t {
+        color: var(--green);
+        font-weight: 600;
+      }
+
+      /* Gaps cards */
+      .cards.gaps {
+        margin: 0.5rem 0 1.25rem;
+      }
+
+      .card ul {
+        margin: 0.4rem 0 0;
+        padding-left: 1.1rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .card li {
+        margin-bottom: 0.25rem;
+      }
+
+      .card .chip {
+        display: inline-block;
+        margin-bottom: 0.6rem;
+        font-size: 0.72rem;
+      }
+
+      /* FAQ */
+      .faq details {
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 10px;
+        margin-bottom: 0.6rem;
+      }
+
+      .faq summary {
+        cursor: pointer;
+        padding: 0.85rem 1rem;
+        font-weight: 600;
+        list-style: none;
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .faq summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .faq summary::after {
+        content: "+";
+        color: var(--muted);
+        font-weight: 400;
+        font-size: 1.2rem;
+        line-height: 1;
+      }
+
+      .faq details[open] summary::after {
+        content: "–";
+      }
+
+      .faq .answer {
+        padding: 0 1rem 0.9rem;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .faq .answer p {
+        margin: 0 0 0.6rem;
+      }
+
+      .faq .answer p:last-child {
+        margin-bottom: 0;
+      }
+
+      .sources {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .sources li {
+        overflow-wrap: anywhere;
+      }
+
+      /* Keep the "Live demo" pill reachable on phones; styles.css hides the
+         whole link list below 720px. */
+      @media (max-width: 720px) {
+        .nav-links {
+          display: flex;
+        }
+
+        .nav-links li:not(.nav-cta) {
+          display: none;
+        }
+
+        .nav-links .btn {
+          padding: 0.5rem 0.9rem;
+          font-size: 0.85rem;
+        }
+
+        .article-hero {
+          padding-top: 2.5rem;
+        }
+
+        .phases {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .prose {
+          font-size: 1rem;
+        }
+      }
+
+      @media (min-width: 721px) and (max-width: 980px) {
+        .phases {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="./">
+          <img src="./assets/logo.svg" alt="" width="28" height="28" />
+          tiqora
+        </a>
+        <ul class="nav-links">
+          <li><a href="./#features">Features</a></li>
+          <li><a href="./#screenshots">Screenshots</a></li>
+          <li><a href="./compare.html">Compare</a></li>
+          <li><a href="./znuny-migration.html" aria-current="page" style="color: var(--ink)">Migrate from Znuny</a></li>
+          <li><a href="https://github.com/CygnusNetworks/tiqora">GitHub</a></li>
+          <li class="nav-cta"><a class="btn btn-primary" href="./demo/">Live demo</a></li>
+        </ul>
+      </div>
+    </header>
+
+    <main>
+      <article>
+        <header class="article-hero">
+          <div class="wrap">
+            <div class="eyebrow">Guide · Znuny &amp; OTRS migration</div>
+            <h1>Moving off OTRS/Znuny without a big-bang migration</h1>
+            <p class="lede">
+              Years of tickets, customers, queues and permissions sit in your Znuny database.
+              Tiqora does not ask you to export them. It runs next to Znuny on the same
+              database, takes over one job at a time, and leaves you a way back at every step
+              until the last one.
+            </p>
+            <p class="byline">
+              Cygnus Networks GmbH · <time datetime="2026-10-01">1 October 2026</time> · about
+              12 minutes to read
+            </p>
+
+            <nav class="toc" aria-label="On this page">
+              <strong>On this page</strong>
+              <ol>
+                <li><a href="#problem">The problem with migrating a helpdesk</a></li>
+                <li><a href="#idea">The idea: share the database</a></li>
+                <li><a href="#steps">Step by step, phases 0–5</a></li>
+                <li><a href="#gaps">What is not there yet</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#next">Try it</a></li>
+              </ol>
+            </nav>
+          </div>
+        </header>
+
+        <!-- 1. Problem -->
+        <section class="article-section" id="problem">
+          <div class="wrap prose">
+            <h2>The problem with migrating a helpdesk</h2>
+            <p>
+              In December 2020 OTRS AG announced that OTRS&nbsp;6 had reached end of life,
+              with no security updates after 1 January 2021. That ended the open-source
+              ((OTRS)) Community Edition at version 6.0.x. Znuny picked up the codebase as a
+              community fork. Its first LTS release, 6.0, shipped in January 2021, and the
+              current LTS is Znuny&nbsp;6.5. The 7.x line, currently 7.3, continues in
+              parallel. Znuny is still mostly Perl and JavaScript running on a classic
+              mod_perl setup.<sup><a href="#sources">[1–4]</a></sup>
+            </p>
+            <p>
+              Many teams have run that system for ten years or more. The database holds every
+              ticket and article, customer users and companies, queues, groups and roles,
+              dynamic fields, SLAs, notification rules, GenericAgent jobs and the
+              escalation calendars. Whatever comes next has to take all of that with it.
+            </p>
+            <p>A classic helpdesk migration usually works like this:</p>
+            <ol>
+              <li>Export everything, map it onto a different data model and import it.</li>
+              <li>Freeze the old system over a weekend.</li>
+              <li>Switch every agent, mailbox, notification and integration at once.</li>
+              <li>Hope nothing important was lost in the mapping.</li>
+            </ol>
+            <p>
+              The risky part is not the export. Everything depends on one moment. Ticket
+              numbers, follow-up threading, history and SLA timers all have to come out right
+              on the first try, and once mail flows into the new system the old one is out
+              of date.
+            </p>
+          </div>
+        </section>
+
+        <!-- 2. Idea -->
+        <section class="article-section" id="idea">
+          <div class="wrap prose">
+            <h2>The idea: don't move the data, share it</h2>
+            <p>
+              Tiqora is a clean-room helpdesk built on Python (FastAPI) and React, with no
+              Znuny code inside. It reads and writes the same database as an existing
+              OTRS&nbsp;6.0.x or Znuny&nbsp;6.0–7.3 installation, on MariaDB/MySQL or
+              PostgreSQL. You point it at your Znuny database, and both systems work on the
+              same tickets at the same time.
+            </p>
+            <p>That only works if Tiqora follows a few strict rules while Znuny is still running:</p>
+            <ul>
+              <li>
+                <strong>No changes to Znuny's schema.</strong> Tiqora does not alter Znuny tables
+                during parallel operation. Its migrations only touch its own tables.
+              </li>
+              <li>
+                <strong>New state goes into new tables only.</strong> API keys, 2FA,
+                drafts, AI settings and similar data live in additive <code>tiqora_*</code>
+                tables. Znuny never reads them.
+              </li>
+              <li>
+                <strong>Writes look like Znuny's own.</strong> Tiqora allocates ticket numbers
+                with Znuny's lock-free counter algorithm and uses the configured number
+                generator. It writes <code>ticket_history</code> rows in the exact formats
+                Znuny's parsers expect, recomputes the four escalation columns with the same
+                working-time math, and sets the same search-index flags.
+              </li>
+              <li>
+                <strong>Background duties stay with Znuny</strong> until you hand each one
+                over with its own switch: mail fetching, escalations, notifications,
+                GenericAgent, automatic unlock and pending checks.
+              </li>
+            </ul>
+            <p>
+              <strong>How this is tested.</strong> A schema-matrix suite loads the real
+              upstream database definitions for each supported release on MariaDB and
+              PostgreSQL. A golden-master suite runs real OTRS/Znuny containers from
+              6.0.45 up to 7.3.5 next to Tiqora on one MariaDB database, then checks that a
+              full ticket lifecycle produces matching history rows (create, state change,
+              move, priority, owner, note, close). The same suite covers ticket-number
+              interleaving, checksum digits and escalation columns.
+            </p>
+            <p>
+              At startup Tiqora detects which version your schema belongs to (for example
+              <code>znuny-6.5</code> or <code>znuny-7.3</code>) and adjusts to it. If it
+              cannot recognise the schema, it <strong>refuses to start</strong> instead of
+              failing later in production. The detected profile is shown under
+              <em>Admin → System info</em>.
+            </p>
+            <div class="callout callout-info">
+              <span class="callout-title">Preferred starting point</span>
+              <p>
+                Any version from 6.0 to 7.3 works. If you can upgrade first, the docs
+                recommend Znuny&nbsp;6.5 (LTS) or 7.3 as the peer. OTRS&nbsp;5 and older need
+                the upstream upgrade to 6.0+ first; Tiqora does not replace that database
+                upgrade.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Steps -->
+        <section class="article-section" id="steps">
+          <div class="wrap">
+            <div class="prose">
+              <h2>Step by step</h2>
+              <p>
+                The migration has six phases. You can stay in any phase for as long as
+                you like, from a day to several months. Every phase before the last one can
+                be undone without restoring a backup.
+              </p>
+            </div>
+
+            <ol class="phases" aria-label="Migration phases">
+              <li><a href="#phase-0"><span class="num">0</span><b>Backup</b>Verified dump + staging copy</a></li>
+              <li><a href="#phase-1"><span class="num">1</span><b>Install</b>Tiqora on the same DB, pilot agents look around</a></li>
+              <li><a href="#phase-2"><span class="num">2</span><b>Cache sync</b>TiqoraSync add-on or lower cache TTLs</a></li>
+              <li><a href="#phase-3"><span class="num">3</span><b>Agents move</b>Daily work in Tiqora, Znuny keeps the daemons</a></li>
+              <li><a href="#phase-4"><span class="num">4</span><b>Daemons move</b>One flag at a time, postmaster last</a></li>
+              <li><a href="#phase-5"><span class="num">5</span><b>Cutover</b>Znuny off, Tiqora owns the schema</a></li>
+            </ol>
+            <p class="phase-legend">Phases 0–4 and the first half of phase 5 are reversible by configuration. Schema ownership at the end is the only step that needs a backup to undo.</p>
+
+            <div class="prose" style="margin-top: 2rem">
+              <h3>Who owns what, phase by phase</h3>
+            </div>
+            <div class="matrix-wrap">
+              <table class="matrix">
+                <thead>
+                  <tr>
+                    <th>Phase</th>
+                    <th>Agents work in</th>
+                    <th>Background jobs</th>
+                    <th>Database schema</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>0–2</td>
+                    <td><span class="owner-z">Znuny</span> (pilot group tries Tiqora)</td>
+                    <td><span class="owner-z">Znuny</span></td>
+                    <td><span class="owner-z">Znuny</span> + additive <code>tiqora_*</code></td>
+                  </tr>
+                  <tr>
+                    <td>3</td>
+                    <td><span class="owner-t">Tiqora</span> (Znuny still available)</td>
+                    <td><span class="owner-z">Znuny</span></td>
+                    <td><span class="owner-z">Znuny</span> + additive <code>tiqora_*</code></td>
+                  </tr>
+                  <tr>
+                    <td>4</td>
+                    <td><span class="owner-t">Tiqora</span></td>
+                    <td>Moving one by one to <span class="owner-t">Tiqora</span></td>
+                    <td><span class="owner-z">Znuny</span> + additive <code>tiqora_*</code></td>
+                  </tr>
+                  <tr>
+                    <td>5</td>
+                    <td><span class="owner-t">Tiqora</span></td>
+                    <td><span class="owner-t">Tiqora</span></td>
+                    <td><span class="owner-t">Tiqora</span> (additive migrations only)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="prose">
+              <!-- Phase 0 -->
+              <h3 id="phase-0"><span class="phase-tag">Phase 0</span><br />Back up, and prove the backup restores</h3>
+              <p>
+                Before anything touches the production database, take a dump and restore it
+                into a scratch database. A backup job that reports success does not prove the
+                restore works. The same restored copy is a good staging environment for
+                trying out phases 1–4.
+              </p>
+              <pre><code><span class="c"># MariaDB / MySQL: --single-transaction avoids locking a live Znuny</span>
+mysqldump --single-transaction --routines --triggers \
+  -h db.example.internal -u backup_user -p \
+  znuny_production &gt; znuny_pre_tiqora_$(date +%Y%m%d).sql
+
+<span class="c"># PostgreSQL</span>
+pg_dump --format=custom -h db.example.internal -U backup_user \
+  znuny_production &gt; znuny_pre_tiqora_$(date +%Y%m%d).dump</code></pre>
+              <div class="callout callout-warn">
+                <span class="callout-title">On a staging copy</span>
+                <p>
+                  Never start mail fetchers or outbound workers against a copy of production
+                  data. They would read your real mailboxes and write to your real customers.
+                </p>
+              </div>
+              <div class="callout callout-back">
+                <span class="callout-title">If you stop here</span>
+                <p>Nothing has changed. Keep the dump until well after the cutover; it is the only way back from the final step.</p>
+              </div>
+
+              <!-- Phase 1 -->
+              <h3 id="phase-1"><span class="phase-tag">Phase 1</span><br />Install Tiqora next to Znuny</h3>
+              <p>
+                Deploy the <code>tiqora-api</code> and <code>tiqora-worker</code> containers,
+                plus Redis and Meilisearch (both are in the example Compose file). Give Tiqora
+                its own database user with <code>SELECT, INSERT, UPDATE, DELETE</code> on the
+                Znuny database. Do not grant <code>ALTER</code> or <code>DROP</code>, and do
+                not reuse Znuny's credentials. Then point <code>DATABASE_URL</code> at the
+                <em>existing</em> database:
+              </p>
+              <pre><code>environment:
+  DATABASE_URL: mysql+aiomysql://tiqora:…@db.example.internal:3306/znuny_production
+  <span class="c"># or: postgresql+asyncpg://tiqora:…@db.example.internal:5432/znuny_production</span>
+  <span class="c"># TIQORA_SCHEMA_OWNERSHIP stays unset for the whole parallel period</span></code></pre>
+              <p>Create Tiqora's own tables and build the search index:</p>
+              <pre><code>docker compose run --rm --entrypoint tiqora tiqora-api migrate upgrade
+docker compose run --rm --entrypoint tiqora tiqora-api index rebuild</code></pre>
+              <p>
+                <code>tiqora migrate upgrade</code> only creates <code>tiqora_*</code> tables.
+                The migrations that may touch Znuny's tables sit in a separate chain that
+                stays locked until phase 5. Check <em>Admin → System info</em> to confirm the
+                detected schema profile matches your Znuny version.
+              </p>
+              <p>
+                If you use PGP or S/MIME, mount Znuny's keyring and certificate directories
+                into the containers. Tiqora uses the same key stores and respects the same
+                SysConfig switches. The customer portal is off by default; turn it on with
+                <code>TIQORA_PORTAL_ENABLED=true</code>.
+              </p>
+              <p>
+                Now give a small pilot group the Tiqora URL. Technically they can already
+                edit tickets, so tell them clearly that this is an evaluation for now.
+              </p>
+              <div class="callout callout-back">
+                <span class="callout-title">If you stop here</span>
+                <p>
+                  Stop the Tiqora containers. Znuny was never touched. The leftover
+                  <code>tiqora_*</code> tables do no harm and can be ignored or dropped.
+                </p>
+              </div>
+
+              <!-- Phase 2 -->
+              <h3 id="phase-2"><span class="phase-tag">Phase 2</span><br />Keep Znuny's cache in step</h3>
+              <p>
+                Znuny caches tickets in memory. When Tiqora writes straight to the database,
+                Znuny does not see the change until the cache expires. The fix is
+                <strong>TiqoraSync</strong>, a small optional OPM add-on (GPL-3.0, Framework
+                6.0.x–7.3.x). Install it into the running Znuny:
+              </p>
+              <pre><code>bin/znuny.Console.pl Admin::Package::Install /path/to/TiqoraSync-1.1.1.opm
+<span class="c"># OTRS 6.0: bin/otrs.Console.pl</span></code></pre>
+              <p>
+                It adds one Znuny scheduler task that runs every minute. The task reads the
+                invalidation signals Tiqora writes alongside each ticket change and clears
+                those tickets from Znuny's cache. Worst-case staleness in the Znuny UI is
+                therefore about 60 seconds. If you cannot install add-ons, lowering Znuny's
+                cache TTLs is the documented fallback.
+              </p>
+              <p>
+                <strong>Check it:</strong> create or edit a queue in Tiqora and confirm it
+                shows up in Znuny without a restart.
+              </p>
+              <div class="callout callout-back">
+                <span class="callout-title">If you stop here</span>
+                <p><code>Admin::Package::Uninstall TiqoraSync</code>, and you are back to phase 1.</p>
+              </div>
+
+              <!-- Phase 3 -->
+              <h3 id="phase-3"><span class="phase-tag">Phase 3</span><br />Agents switch, Znuny keeps the daemons</h3>
+              <p>
+                There is no global "writes on" switch. This step is a decision you
+                communicate: tell a team that Tiqora is now their main interface for their
+                queues. Expand team by team. Znuny's daemon keeps fetching mail, sending
+                notifications and running escalations, so nothing about mail flow changes
+                yet.
+              </p>
+              <p>
+                Tickets edited in Tiqora are stored in Znuny's format with Znuny's history
+                rows, so an agent who opens the same ticket in Znuny sees a normal Znuny
+                ticket.
+              </p>
+              <div class="callout callout-info">
+                <span class="callout-title">AI stays manual in this phase</span>
+                <p>
+                  Autonomous AI replies need <code>system.operation_mode = tiqora_primary</code>.
+                  The default during parallel operation is <code>parallel</code>, so no
+                  automatic customer reply can go out from Tiqora while Znuny still owns the
+                  mailbox. AI drafts and summaries that an agent triggers still work. The one
+                  exception is Telegram, which Znuny never handles.
+                </p>
+              </div>
+              <div class="callout callout-back">
+                <span class="callout-title">If you stop here</span>
+                <p>
+                  Agents go back to the Znuny UI. Whatever they did in Tiqora is already
+                  valid Znuny data, so nothing needs to be repaired.
+                </p>
+              </div>
+
+              <!-- Phase 4 -->
+              <h3 id="phase-4"><span class="phase-tag">Phase 4</span><br />Hand over the daemons, one flag at a time</h3>
+              <p>
+                Each background duty moves on its own. Every Tiqora worker job has a flag in
+                <code>tiqora_settings</code>, off by default, which you switch under
+                <em>Admin → Services</em>. The worker picks up the change on its next tick
+                without a restart. Run each duty on <strong>one</strong> side only, or work
+                gets done twice: two tickets for one mail, notifications sent twice.
+                <strong>Always switch Znuny's side off first</strong>, then turn Tiqora's on.
+              </p>
+              <p>Recommended order:</p>
+              <div class="matrix-wrap">
+                <table class="matrix">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Duty</th>
+                      <th>Disable in Znuny</th>
+                      <th>Enable in Tiqora</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>1</td>
+                      <td>Escalation sweep</td>
+                      <td><code>EscalationCheck</code> cron task</td>
+                      <td><code>daemon.escalation.enabled</code></td>
+                    </tr>
+                    <tr>
+                      <td>2</td>
+                      <td>Event notifications</td>
+                      <td><code>Ticket::<wbr />EventModulePost###<wbr />900-NotificationEvent</code></td>
+                      <td><code>daemon.notifications.enabled</code></td>
+                    </tr>
+                    <tr>
+                      <td>3</td>
+                      <td>Automatic unlock</td>
+                      <td><code>TicketUnlockTimeout</code> cron task</td>
+                      <td><code>daemon.unlock_timeout.enabled</code></td>
+                    </tr>
+                    <tr>
+                      <td>3</td>
+                      <td>Pending states &amp; reminders</td>
+                      <td><code>TicketPendingCheck</code> cron task</td>
+                      <td><code>daemon.pending_check.enabled</code></td>
+                    </tr>
+                    <tr>
+                      <td>4</td>
+                      <td>GenericAgent</td>
+                      <td><code>GenericAgent</code> cron task + scheduled job executor</td>
+                      <td><code>daemon.generic_agent.enabled</code></td>
+                    </tr>
+                    <tr>
+                      <td>5</td>
+                      <td>Inbound mail (postmaster)</td>
+                      <td><code>MailAccountFetch</code> cron task</td>
+                      <td><code>daemon.postmaster.enabled</code></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p>
+                Escalations go first because the math is deterministic: a short overlap just
+                computes the same value twice. Inbound mail goes <strong>last</strong> because
+                a mistake there costs the most. With POP3/IMAP delete-after-fetch, two
+                fetchers can create duplicate tickets or lose mail. Auto-responses do not get
+                a flag of their own; they move with the postmaster. Pending reminders only
+                reach anyone once notifications are on Tiqora's side.
+              </p>
+              <p>A cron task is switched off in Znuny like this:</p>
+              <pre><code>bin/znuny.Console.pl Admin::Config::Update \
+  --setting-name "Daemon::SchedulerCronTaskManager::Task###MailAccountFetch" \
+  --valid 0
+<span class="c"># then deploy, and confirm the task is really gone:</span>
+bin/znuny.Console.pl Maint::Daemon::Summary</code></pre>
+              <div class="callout callout-warn">
+                <span class="callout-title">"Done." is not proof</span>
+                <p>
+                  Some Znuny settings are marked <em>required</em>. For those,
+                  <code>Admin::Config::Update</code> prints its usual success line and
+                  changes nothing. Always check the deployed configuration
+                  (<code>Kernel/Config/Files/ZZZAAuto.pm</code>) and
+                  <code>Maint::Daemon::Summary</code>. The scheduled GenericAgent executor is
+                  usually such a required setting, so plan its handover for the moment you
+                  stop the Znuny daemon.
+                </p>
+              </div>
+              <p>Before taking over notifications, list which events your rules actually listen to:</p>
+              <pre><code>SELECT ne.name, nei.event_key, nei.event_value
+  FROM notification_event ne
+  JOIN notification_event_item nei ON nei.notification_id = ne.id
+ WHERE ne.valid_id = 1 AND nei.event_key IN ('Events', 'Recipients')
+ ORDER BY ne.id;</code></pre>
+              <p>
+                Rules carried over from older OTRS versions are often bound to the legacy
+                <code>Notification*</code> events. Tiqora emits those too, but a rule bound
+                to an event nobody emits never fires, even while the takeover reports
+                healthy runs. Also set <code>notification.sender_email</code> explicitly so
+                notifications do not go out from the queue's address.
+              </p>
+              <p>
+                For each duty: disable the Znuny task, set the Tiqora flag, wait at least one
+                interval, and check that the work happened <em>exactly once</em> (one ticket
+                per test mail, one history row per escalation event). Only then move on to
+                the next duty. GenericAgent jobs with <code>NewDelete</code> stay inactive
+                until you also set <code>daemon.generic_agent.allow_delete</code>.
+              </p>
+              <div class="callout callout-back">
+                <span class="callout-title">If you stop here</span>
+                <p>
+                  For any duty: set its flag back to <code>0</code>, let an in-flight Tiqora
+                  run finish, and re-enable the Znuny task. Escalation columns re-converge on
+                  Znuny's next run. The notification position is kept, so turning it on again
+                  later does not resend old events. Mail that Tiqora left on the server is
+                  picked up by Znuny's next fetch.
+                </p>
+              </div>
+
+              <!-- Phase 5 -->
+              <h3 id="phase-5"><span class="phase-tag">Phase 5</span><br />Cutover: Znuny off, schema ownership on</h3>
+              <p>
+                You get here when all six flags have run cleanly in production for a
+                representative period. The cutover runbook has its own preconditions. The
+                most important ones: a freshly tested restore, a maintenance window, and an
+                inventory of everything the Znuny host still does (OS cron jobs, add-ons,
+                calendar jobs, the outgoing <code>mail_queue</code>). Then:
+              </p>
+              <ol>
+                <li>
+                  <strong>Freeze Znuny's web UI.</strong> Put a 503 maintenance response on the
+                  nginx vhost in front of <code>index.pl</code>/<code>customer.pl</code>, and
+                  leave Tiqora reachable.
+                </li>
+                <li>
+                  <strong>Check the flags and stop the Znuny daemon.</strong> All six
+                  <code>daemon.*.enabled</code> flags must be <code>1</code>. Stop the
+                  daemon and confirm it stays stopped through at least one full interval and
+                  the next scheduled job time.
+                </li>
+                <li>
+                  <strong>Repoint GenericInterface clients (optional).</strong> Only needed if
+                  external integrations call Znuny's webservices. An nginx rewrite from
+                  <code>nph-genericinterface.pl</code> to Tiqora's <code>/znuny-compat</code>
+                  layer covers the common <code>Session*</code> and <code>Ticket*</code>
+                  operations over REST and SOAP. Test each operation your integrators use.
+                </li>
+                <li>
+                  <strong>Monitor.</strong> Watch error rates and per-service status under
+                  <em>Admin → Services</em> for at least an hour, or a business day for a
+                  cautious rollout.
+                </li>
+                <li>
+                  <strong>Set the operation mode on purpose.</strong> Switching
+                  <code>system.operation_mode</code> to <code>tiqora_primary</code> can
+                  activate AI auto-reply rules that were configured but inactive. Review them
+                  first.
+                </li>
+                <li>
+                  <strong>Take schema ownership.</strong> Only now may Tiqora run migrations
+                  that touch Znuny's tables. This takes two separate switches:
+                </li>
+              </ol>
+              <pre><code>tiqora ownership status
+tiqora ownership enable --confirm "I have shut down Znuny"
+<span class="c"># preflight: ticket_history idle ≥ 15 min, Znuny sessions table empty</span>
+
+<span class="c"># then set TIQORA_SCHEMA_OWNERSHIP=1 on every Tiqora process and restart</span>
+tiqora migrate upgrade
+tiqora ownership orphan-report   <span class="c"># optional, read-only</span></code></pre>
+              <p>
+                The first owned migration today only adds three composite indexes. It does
+                not change any rows. Afterwards, archive Znuny's crontab and decommission its
+                frontend. TiqoraSync is retired together with Znuny.
+              </p>
+              <div class="callout callout-back">
+                <span class="callout-title">If you stop here</span>
+                <p>
+                  Steps 1–5 are undone by configuration: remove the nginx 503 override,
+                  turn the flags you are returning off <em>before</em> restarting the Znuny
+                  daemon, and revert the GenericInterface rewrite. If the ownership marker is
+                  set but <code>TIQORA_SCHEMA_OWNERSHIP</code> is not, delete the marker rows
+                  and nothing has changed. If owned migrations have been applied, the current
+                  index-only migration can be stepped back with
+                  <code>tiqora migrate downgrade owned@-1</code>. For anything beyond that,
+                  the only supported way back is <strong>restoring the phase 0 dump</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Gaps -->
+        <section class="article-section" id="gaps">
+          <div class="wrap">
+            <div class="prose">
+              <h2>What is not there yet, and what is out of scope</h2>
+              <p>
+                Tiqora covers everyday agent, customer-portal and admin work. Some things are
+                still missing or narrower than in Znuny. Check this list against how your team
+                actually works (as of 1 October 2026):
+              </p>
+            </div>
+            <div class="cards gaps">
+              <article class="card">
+                <span class="chip">Missing</span>
+                <h3>Not built yet</h3>
+                <ul>
+                  <li>Saved searches</li>
+                  <li>Configurable dashboard widgets</li>
+                  <li>Link overview and link-type admin</li>
+                  <li>Admin screens for sessions, SQL box, maintenance, system log</li>
+                  <li>Calendar admin and appointment rules</li>
+                  <li>Portal print view</li>
+                </ul>
+              </article>
+              <article class="card">
+                <span class="chip">Partial</span>
+                <h3>Narrower than Znuny</h3>
+                <ul>
+                  <li>Statistics: fixed reports, not the Znuny stats framework</li>
+                  <li>GenericAgent: a subset of search criteria</li>
+                  <li>Bulk actions and user preferences</li>
+                  <li>GenericInterface edge cases</li>
+                  <li>Process conditions and actions</li>
+                </ul>
+              </article>
+              <article class="card">
+                <span class="chip">By design</span>
+                <h3>Out of scope</h3>
+                <ul>
+                  <li>OPM package manager</li>
+                  <li>Process designer (processes run, but are designed elsewhere)</li>
+                  <li>SysConfig edit UI (settings are read from Znuny's SysConfig tables)</li>
+                  <li>GenericInterface webservice editor and requester side</li>
+                </ul>
+              </article>
+            </div>
+            <div class="prose">
+              <p>
+                The daemon ports also have documented simplifications. Escalation
+                "notify before" uses one fixed window instead of per-SLA percentages.
+                Notifications send by email only and ignore per-agent opt-outs. The postmaster
+                converts HTML mail to plain text more crudely and matches customers by login
+                or email only. The full lists are in the
+                <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md#znuny-features-not-implemented">compatibility
+                notes</a> and in the "Uncertainties" sections of the
+                <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/parallel-operation.md">parallel-operation
+                guide</a>. Read them before phase 4; this is exactly where running both
+                systems side by side helps, because you find out on real traffic and can still
+                switch back.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. FAQ -->
+        <section class="article-section" id="faq">
+          <div class="wrap">
+            <div class="prose">
+              <h2>FAQ</h2>
+            </div>
+            <div class="faq prose">
+              <details open>
+                <summary>Do I need to stop Znuny to try Tiqora?</summary>
+                <div class="answer">
+                  <p>
+                    No. Tiqora runs next to Znuny on the same database and only adds its own
+                    <code>tiqora_*</code> tables. Znuny, including its daemon, keeps running
+                    until you choose to cut over in phase 5. For a first look without any
+                    install, use the <a href="./demo/">live demo</a>. It runs on mock data in
+                    your browser.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>Which OTRS and Znuny versions are supported?</summary>
+                <div class="answer">
+                  <p>
+                    OTRS&nbsp;6.0.x (including Centuran ((OTRS)) CE&nbsp;6.0.x) and
+                    Znuny&nbsp;6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 7.0, 7.1, 7.2 and 7.3. OTRS&nbsp;5
+                    and older, OTOBO and the commercial OTRS product are out of scope. Upgrade
+                    an older install to 6.0+ with the upstream tools first. A schema Tiqora
+                    cannot recognise makes it refuse to start instead of misbehaving.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>MariaDB/MySQL or PostgreSQL?</summary>
+                <div class="answer">
+                  <p>
+                    Both. The schema-matrix tests load each supported release's real schema on
+                    MariaDB and PostgreSQL. The tests against running OTRS/Znuny instances
+                    currently use MariaDB only, because Znuny on PostgreSQL is rare. If you
+                    run PostgreSQL, rehearse on a staging copy.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>What about my OPM add-ons, or ITSM?</summary>
+                <div class="answer">
+                  <p>
+                    Tiqora leaves add-on tables alone, and it has no package manager, so
+                    add-ons do not carry over. It provides no ITSM/CMDB module. The
+                    GenericInterface compatibility layer does not emulate custom operations
+                    such as <code>ConfigItem*</code>, and process actions like
+                    <code>ConfigItemUpdate</code> are logged as unsupported.
+                  </p>
+                  <p>
+                    The cutover runbook asks you to list everything your add-ons and custom
+                    jobs actually do and decide for each: replaced, no longer needed, or kept
+                    running as a separate service. If an add-on changed Znuny's core tables,
+                    try Tiqora on a staging copy first. We have not tested specific
+                    third-party add-ons, so we cannot promise any of them works.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>Can I go back to Znuny?</summary>
+                <div class="answer">
+                  <p>
+                    Yes, at every step before schema ownership, and without restoring a backup.
+                    Stop Tiqora, uninstall TiqoraSync, or set a daemon flag back to
+                    <code>0</code> and re-enable the Znuny task. The data Tiqora wrote is
+                    already in Znuny's format. Once owned migrations have been applied, the
+                    supported way back is restoring the dump from phase 0, which is why that
+                    step comes last.
+                  </p>
+                </div>
+              </details>
+              <details>
+                <summary>Is Tiqora a Znuny fork?</summary>
+                <div class="answer">
+                  <p>
+                    No. It is an independent reimplementation in Python and React, licensed
+                    under AGPL-3.0, with no Znuny or OTRS source code in it. Only the optional
+                    TiqoraSync add-on is Perl, and it runs inside your Znuny during parallel
+                    operation.
+                  </p>
+                </div>
+              </details>
+            </div>
+          </div>
+        </section>
+      </article>
+
+      <!-- 6. CTA -->
+      <section class="cta" id="next">
+        <div class="wrap">
+          <h2>See it before you plan anything</h2>
+          <p>
+            Click through the agent, admin and portal UI in the live demo, then read the full
+            runbooks. Questions about your setup are welcome in GitHub Discussions.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="./demo/">Try the live demo</a>
+            <a class="btn btn-ghost" href="https://github.com/CygnusNetworks/tiqora/discussions">Ask in Discussions</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="article-section">
+        <div class="wrap prose">
+          <h2 style="font-size: 1.2rem">The full runbooks</h2>
+          <ul>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/guide/znuny-to-tiqora.md">Operator playbook: Znuny → Tiqora</a>,
+              the overview of all stages
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/parallel-operation.md">Parallel operation</a>:
+              invariants and the enable/verify/rollback steps for every daemon takeover
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/cutover.md">Cutover runbook</a>:
+              preconditions, freeze, daemon stop, GenericInterface, schema ownership
+            </li>
+            <li>
+              <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/support-matrix.md">Support matrix</a>:
+              versions, database engines and test coverage
+            </li>
+          </ul>
+
+          <h2 id="sources" style="font-size: 1.2rem; margin-top: 2rem">Sources</h2>
+          <ol class="sources">
+            <li>
+              End of OTRS&nbsp;6 / ((OTRS)) Community Edition, announced December 2020, no
+              security updates after 1 January 2021:
+              <a href="https://www.geekersdigest.com/the-end-of-otrs-community-edition-but-here-comes-znuny-and-other-forks/">Geeker's Digest</a>;
+              <a href="https://en.wikipedia.org/wiki/OTRS">Wikipedia: OTRS</a>
+            </li>
+            <li>
+              OTRS AG's own statement that the Community Edition is no longer maintained:
+              <a href="https://otrs.com/blog/otrs-community-edition/">otrs.com</a>
+            </li>
+            <li>
+              Znuny release dates and LTS status (LTS 6.0: January 2021; LTS 6.5: March 2023;
+              7.3: March 2026, not LTS):
+              <a href="https://www.znuny.org/en/roadmap">Znuny roadmap</a>
+            </li>
+            <li>
+              Znuny's technology stack (Perl, mod_perl) and its continuation of the OTRS
+              Community Edition: <a href="https://github.com/znuny/Znuny">github.com/znuny/Znuny</a>
+            </li>
+          </ol>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div>
+            <strong style="color: var(--ink)">Tiqora</strong>
+            · Copyright © 2026 Cygnus Networks GmbH
+          </div>
+          <div class="footer-links">
+            <a href="https://github.com/CygnusNetworks/tiqora">GitHub</a>
+            <a href="https://github.com/CygnusNetworks/tiqora/blob/main/LICENSE">License</a>
+            <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/README.md">Documentation</a>
+            <a href="./demo/">Demo</a>
+          </div>
+        </div>
+        <p class="legal">
+          “Znuny” is a trademark of Znuny GmbH; “OTRS” is a registered trademark of
+          OTRS AG. Tiqora is not affiliated with, endorsed by, or sponsored by either
+          company; the names are used solely to describe factual compatibility.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

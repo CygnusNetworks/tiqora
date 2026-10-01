@@ -1,0 +1,45 @@
+name: Znuny/OTRS compatibility gap
+description: Tiqora reads, writes or shows something differently from Znuny/OTRS.
+labels: ["compatibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Compatibility with the Znuny/OTRS database is Tiqora's core promise, so these
+        reports matter a lot. **Use made-up data only.**
+  - type: input
+    id: peer
+    attributes:
+      label: Znuny/OTRS version and database
+      placeholder: OTRS 6.0.x on PostgreSQL 14
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tiqora version
+      placeholder: v0.16.1
+    validations:
+      required: true
+  - type: textarea
+    id: difference
+    attributes:
+      label: What differs?
+      description: |
+        For example: ticket history entry, ticket number format, escalation time,
+        a dynamic field type, an ACL, a GenericInterface response. Name the table,
+        screen or operation if you know it.
+    validations:
+      required: true
+  - type: textarea
+    id: znuny
+    attributes:
+      label: What does Znuny/OTRS do?
+    validations:
+      required: true
+  - type: textarea
+    id: tiqora
+    attributes:
+      label: What does Tiqora do?
+    validations:
+      required: true

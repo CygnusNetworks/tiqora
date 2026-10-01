@@ -1,0 +1,123 @@
+# Tiqora quickstart — evaluate Tiqora locally with ONE command.
+#
+#   curl -fsSLO https://raw.githubusercontent.com/CygnusNetworks/tiqora/main/docker-compose.quickstart.yml
+#   docker compose -f docker-compose.quickstart.yml up -d
+#
+# Then open http://localhost:8000/ and sign in as root@localhost with the
+# password "tiqora-demo" (override with TIQORA_ADMIN_PASSWORD=...).
+# The first start loads the Znuny base schema and seeds fake customers and
+# tickets; later starts keep your data. Remove everything with
+#   docker compose -f docker-compose.quickstart.yml down -v
+#
+# EVALUATION ONLY: fixed passwords, plain HTTP, TIQORA_ENV=evaluation (no
+# production safety checks, Secure cookies off, API docs at /docs), and the
+# app is bound to 127.0.0.1. For a real installation use
+# docker-compose.example.yml and docs/guide/fresh-install.md; to run next to
+# an existing OTRS/Znuny database see docs/guide/znuny-to-tiqora.md.
+
+x-tiqora-env: &tiqora-env
+  DATABASE_URL: postgresql+asyncpg://tiqora:tiqora-quickstart@postgres:5432/tiqora
+  REDIS_URL: redis://redis:6379/0
+  MEILI_URL: http://meilisearch:7700
+  MEILI_MASTER_KEY: tiqora-quickstart-meili-key
+  TIQORA_SECRET_KEY: tiqora-quickstart-not-for-production-use-0000000000
+  TIQORA_ENV: evaluation
+  TIQORA_LOG_LEVEL: INFO
+  TIQORA_PUBLIC_BASE_URL: http://localhost:${TIQORA_PORT:-8000}
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tiqora
+      POSTGRES_USER: tiqora
+      POSTGRES_PASSWORD: tiqora-quickstart
+    volumes:
+      - tiqora_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tiqora -d tiqora"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - tiqora_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: tiqora-quickstart-meili-key
+      MEILI_NO_ANALYTICS: "true"
+    volumes:
+      - tiqora_meili:/meili_data
+
+  # One-shot: on an empty database, load the Znuny base schema, set the admin
+  # password and seed demo data. Skipped once the database has users, so a
+  # restart never seeds a second batch.
+  bootstrap:
+    image: ghcr.io/cygnusnetworks/tiqora:latest
+    environment:
+      <<: *tiqora-env
+      TIQORA_ADMIN_PASSWORD: ${TIQORA_ADMIN_PASSWORD:-tiqora-demo}
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if python -c "import os, sys; from tiqora.cli.bootstrap import _users_table_populated; sys.exit(0 if _users_table_populated(os.environ['DATABASE_URL']) else 1)"; then
+          echo "Database already bootstrapped; nothing to do."
+        else
+          tiqora bootstrap --admin-password "$$TIQORA_ADMIN_PASSWORD" --seed --customers 12 --tickets 40
+        fi
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tiqora-api:
+    # API + web UI (agent, admin, portal) in one container.
+    image: ghcr.io/cygnusnetworks/tiqora:latest
+    restart: unless-stopped
+    command: ["api"]
+    environment:
+      <<: *tiqora-env
+    ports:
+      - "127.0.0.1:${TIQORA_PORT:-8000}:8000"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Background jobs (search indexing, outbox, timers). Mail fetching,
+  # escalations and the other daemon functions stay off until you switch
+  # their daemon.*.enabled flags on (docs/parallel-operation.md). The AI
+  # worker and the MCP server are left out here; see docker-compose.example.yml.
+  tiqora-worker:
+    image: ghcr.io/cygnusnetworks/tiqora:latest
+    restart: unless-stopped
+    command: ["worker"]
+    environment:
+      <<: *tiqora-env
+    depends_on:
+      tiqora-api:
+        condition: service_healthy
+
+volumes:
+  tiqora_pg:
+  tiqora_redis:
+  tiqora_meili:

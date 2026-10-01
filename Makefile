@@ -56,3 +56,4 @@ build:
 compose-check:
 	docker compose -f docker-compose.dev.yml config -q
 	docker compose -f docker-compose.example.yml config -q
+	docker compose -f docker-compose.quickstart.yml config -q

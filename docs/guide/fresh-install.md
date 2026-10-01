@@ -5,6 +5,11 @@ existing OTRS/Znuny instance. If you already run Znuny/OTRS (6.0–7.3) and want
 migrate, use [znuny-to-tiqora.md](znuny-to-tiqora.md) and
 [parallel-operation.md](../parallel-operation.md) instead.
 
+> **Just want to look around?** [`docker-compose.quickstart.yml`](../../docker-compose.quickstart.yml)
+> does all of the steps below in one `docker compose up`, with demo data and fixed
+> evaluation passwords (see [README → Try it](../../README.md#try-it)). Use this runbook
+> for an installation you intend to keep.
+
 ## What `tiqora bootstrap` does
 
 On an empty database, `tiqora bootstrap`:

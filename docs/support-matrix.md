@@ -12,7 +12,7 @@ and 7.0+ state/priority colour defaults.
 upgrade them to 6.0+ first (see [Out of scope](#out-of-scope-pre-60-and-other-forks)).
 
 **Preferred production path** remains: upgrade the peer to **Znuny 6.5 LTS**
-or **7.3 LTS**, then run parallel-op. Multi-version support is for sites that
+or **7.3** (current release), then run parallel-op. Multi-version support is for sites that
 cannot upgrade immediately.
 
 Implementation: `tiqora.db.legacy.profile` (`SchemaProfileId`, detection gate).
@@ -56,7 +56,7 @@ tests/ops: `TIQORA_LEGACY_SCHEMA_PROFILE=<profile_id>`.
 | Heavily custom OPM / unknown DDL | **No** unless override | Unknown profile → startup refuse; see gate docs in [parallel-operation.md](parallel-operation.md). |
 
 **Migration message for OTRS ≤5 sites:** upgrade the peer along the official
-chain to **at least 6.0** (preferably **Znuny 6.5 or 7.3 LTS**), then start
+chain to **at least 6.0** (preferably **Znuny 6.5 LTS or 7.3**), then start
 parallel-op per [guide/znuny-to-tiqora.md](guide/znuny-to-tiqora.md).
 
 ---
@@ -109,4 +109,4 @@ Layer A CI: `.github/workflows/schema-matrix.yml` (release tags, nightly,
    ([install README](../packages/znuny-addon/TiqoraSync/install/README.md)).
 4. Enable writes only after smoke checks
    ([guide/znuny-to-tiqora.md](guide/znuny-to-tiqora.md)).
-5. Prefer upgrading stuck peers to **6.5** or **7.3 LTS** when possible.
+5. Prefer upgrading stuck peers to **6.5 LTS** or **7.3** when possible.

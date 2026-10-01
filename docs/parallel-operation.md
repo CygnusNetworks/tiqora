@@ -7,7 +7,7 @@ coherent.
 
 **Canonical matrix:** [support-matrix.md](support-matrix.md) (profiles,
 engines, TiqoraSync Framework tags, validation evidence). Preferred production
-peers: **Znuny 6.5 LTS** or **7.3 LTS**.
+peers: **Znuny 6.5 LTS** or **7.3** (current release).
 
 **Support floor is 6.0** — including Centuran ((OTRS)) CE 6.0.x (same schema
 as OTRS CE 6.0 → profile `otrs-znuny-6.0`). OTRS **5.x and older**, **OTOBO**,
@@ -49,7 +49,7 @@ Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileI
   `DEFAULT_STATE_PRIORITY_COLOR` (`#FFFFFF`) because the API does not yet accept
   a client colour. Intentional minimal support — recolour later in UI if needed.
 - The detected profile is shown on **Admin → System info** (database card).
-- Preferred path when possible: upgrade the peer to **6.5 or 7.3 LTS**, then
+- Preferred path when possible: upgrade the peer to **6.5 LTS or 7.3**, then
   parallel-op. Multi-version support is a bridge for sites that cannot upgrade yet.
 - Full matrix (profiles, engines, validation): [support-matrix.md](support-matrix.md).
 - **Layer A release tests** (`-m schema_matrix`) load real upstream DDLs for
