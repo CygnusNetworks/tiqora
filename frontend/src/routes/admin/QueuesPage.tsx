@@ -23,6 +23,25 @@ function emptyToNullStr(v: unknown): string | null {
   return s === "" ? null : s;
 }
 
+/** `queue.default_sign_key` (Znuny `PGP::Detached::<id>`, `PGP::Inline::<id>`,
+ * `SMIME::Detached::<file>`) split into the key (`PGP::<id>`) and the PGP
+ * signing method — the dialog edits them as two controls. */
+function splitSignKey(v: string | null | undefined): { key: string; method: "Detached" | "Inline" } {
+  const parts = (v ?? "").split("::");
+  if (parts.length < 3) return { key: "", method: "Detached" };
+  const [backend, method, ...rest] = parts;
+  return { key: `${backend}::${rest.join("::")}`, method: method === "Inline" ? "Inline" : "Detached" };
+}
+
+function joinSignKey(key: unknown, method: unknown): string | null {
+  const k = emptyToNullStr(key);
+  if (!k) return null;
+  const [backend, ...rest] = k.split("::");
+  // S/MIME only signs detached (Znuny offers nothing else).
+  const m = backend === "PGP" && method === "Inline" ? "Inline" : "Detached";
+  return `${backend}::${m}::${rest.join("::")}`;
+}
+
 function encryptMode(v: unknown): "off" | "auto" | "required" {
   return v === "auto" || v === "required" ? v : "off";
 }
@@ -78,8 +97,8 @@ export function QueuesPage() {
     staleTime: 60 * 1000,
   });
   const cryptoActive = (cryptoStatusQ.data ?? []).some((b) => b.enabled && b.available);
-  // Every queue (valid or not) — stored sign keys / calendars Tiqora cannot
-  // offer itself must stay selectable.
+  // Every queue (valid or not) — stored calendars Tiqora cannot offer itself
+  // must stay selectable.
   const allQueuesQ = useQuery({
     queryKey: ["admin", "queues", "sign-keys"],
     queryFn: () => api.adminQueues.list({ valid: "all", pageSize: 500 }),
@@ -121,23 +140,47 @@ export function QueuesPage() {
     () => (signaturesQ.data?.items ?? []).map((s) => ({ value: s.id, label: s.name })),
     [signaturesQ.data],
   );
-  const signKeyOptions = useMemo(() => {
+  // One entry per key (`PGP::<id>` / `SMIME::<file>`); the PGP method is a
+  // separate control, so the backend's Detached/Inline twins collapse here.
+  const signKeys = useMemo(() => {
+    const seen = new Map<string, { value: string; label: string; emails: string[] }>();
+    for (const o of signKeysQ.data ?? []) {
+      const value = `${o.backend}::${o.key}`;
+      if (seen.has(value)) continue;
+      const prefix = o.backend === "SMIME" ? "S/MIME" : o.backend;
+      const label = `${prefix} · ${o.label.replace(/^[A-Z]+-(Detached|Inline):\s*/, "")}`;
+      seen.set(value, { value, label, emails: o.emails.map((e) => e.toLowerCase()) });
+    }
+    return [...seen.values()];
+  }, [signKeysQ.data]);
+  const senderEmail = (v: FieldValues) =>
+    systemAddressesQ.data?.find((a) => a.id === Number(v.system_address_id))?.value0.toLowerCase() ??
+    null;
+  /** Keys whose user IDs / certificate carry the queue's sender address. */
+  const matchingSignKeys = (v: FieldValues) => {
+    const email = senderEmail(v);
+    return email ? signKeys.filter((k) => k.emails.includes(email)) : signKeys;
+  };
+  const signKeyOptions = (v: FieldValues) => {
     const opts = [
       { value: "", label: t("admin.queues.defaultSignKeyNone") },
-      ...(signKeysQ.data ?? []).map((o) => ({ value: o.value, label: o.label })),
+      ...matchingSignKeys(v).map(({ value, label }) => ({ value, label })),
     ];
-    // Keep a value Tiqora cannot see (backend off here, key only in Znuny)
-    // selectable so editing other fields does not silently drop it.
-    const known = new Set(opts.map((o) => o.value));
-    for (const q of allQueuesQ.data?.items ?? []) {
-      const v = q.default_sign_key;
-      if (v && !known.has(v)) {
-        opts.push({ value: v, label: t("admin.queues.defaultSignKeyUnknown", { value: v }) });
-        known.add(v);
-      }
+    // Keep the stored key selectable even when it does not match the sender
+    // (address changed) or Tiqora cannot see it (backend off, key only in
+    // Znuny), so editing other fields does not silently drop it.
+    const current = emptyToNullStr(v.sign_key);
+    if (current && !opts.some((o) => o.value === current)) {
+      const known = signKeys.find((k) => k.value === current);
+      opts.push({
+        value: current,
+        label: known
+          ? t("admin.queues.dialog.signKeyMismatch", { label: known.label })
+          : t("admin.queues.defaultSignKeyUnknown", { value: current }),
+      });
     }
     return opts;
-  }, [signKeysQ.data, allQueuesQ.data, t]);
+  };
   const followUpOptions = useMemo(
     () =>
       (followUpQ.data ?? []).map((f) => {
@@ -352,11 +395,19 @@ export function QueuesPage() {
       showIf: () => cryptoActive,
     },
     {
-      name: "default_sign_key",
+      // Composed back into `default_sign_key` together with `sign_method`.
+      name: "sign_key",
       label: t("admin.queues.dialog.signKey"),
       type: "select",
       options: signKeyOptions,
       tab: tabSecurity,
+      helpText: (v) => {
+        const email = senderEmail(v);
+        if (!email) return undefined;
+        return matchingSignKeys(v).length > 0
+          ? t("admin.queues.dialog.signKeyForAddress", { email })
+          : t("admin.queues.dialog.signKeyNoneForAddress", { email });
+      },
       showIf: () => cryptoActive,
       help: {
         title: t("admin.queues.dialog.signKey"),
@@ -364,12 +415,27 @@ export function QueuesPage() {
       },
     },
     {
+      name: "sign_method",
+      label: t("admin.queues.dialog.signMethod"),
+      type: "segmented",
+      options: [
+        { value: "Detached", label: t("admin.queues.dialog.signMethodDetached") },
+        { value: "Inline", label: t("admin.queues.dialog.signMethodInline") },
+      ],
+      tab: tabSecurity,
+      helpText: (v) =>
+        v.sign_method === "Inline"
+          ? t("admin.queues.dialog.signMethodInlineHint")
+          : t("admin.queues.dialog.signMethodDetachedHint"),
+      showIf: (v) => cryptoActive && String(v.sign_key ?? "").startsWith("PGP::"),
+    },
+    {
       name: "email_sign_default",
       label: t("admin.queues.emailSignDefault"),
       type: "switch",
       switchLabels: yesNo,
       tab: tabSecurity,
-      showIf: (v) => cryptoActive && Boolean(v.default_sign_key),
+      showIf: (v) => cryptoActive && Boolean(v.sign_key),
       help: {
         title: t("admin.queues.emailSignDefault"),
         description: t("admin.help.queues.emailSignDefault"),
@@ -433,13 +499,21 @@ export function QueuesPage() {
               solution_time: row.solution_time ?? "",
               solution_notify: row.solution_notify ?? "",
               calendar_name: row.calendar_name ?? "",
-              default_sign_key: row.default_sign_key ?? "",
+              sign_key: splitSignKey(row.default_sign_key).key,
+              sign_method: splitSignKey(row.default_sign_key).method,
               email_sign_default: row.email_sign_default ?? true,
               email_encrypt: row.email_encrypt ?? "off",
               comments: row.comments ?? "",
               valid_id: row.valid_id,
             }
-          : { follow_up_lock: 0, valid_id: 1, email_sign_default: true, email_encrypt: "off" }
+          : {
+              follow_up_lock: 0,
+              valid_id: 1,
+              sign_key: "",
+              sign_method: "Detached",
+              email_sign_default: true,
+              email_encrypt: "off",
+            }
       }
       toCreateBody={(v: FieldValues): QueueCreate => ({
         name: v.name as string,
@@ -457,7 +531,7 @@ export function QueuesPage() {
         solution_time: emptyToNull(v.solution_time),
         solution_notify: emptyToNull(v.solution_notify),
         calendar_name: emptyToNullStr(v.calendar_name),
-        default_sign_key: emptyToNullStr(v.default_sign_key),
+        default_sign_key: joinSignKey(v.sign_key, v.sign_method),
         email_sign_default: v.email_sign_default !== false,
         email_encrypt: encryptMode(v.email_encrypt),
         comments: emptyToNullStr(v.comments),
@@ -479,7 +553,7 @@ export function QueuesPage() {
         solution_time: emptyToNull(v.solution_time),
         solution_notify: emptyToNull(v.solution_notify),
         calendar_name: emptyToNullStr(v.calendar_name),
-        default_sign_key: emptyToNullStr(v.default_sign_key),
+        default_sign_key: joinSignKey(v.sign_key, v.sign_method),
         email_sign_default: v.email_sign_default !== false,
         email_encrypt: encryptMode(v.email_encrypt),
         comments: emptyToNullStr(v.comments),
