@@ -692,7 +692,6 @@ async def _notification_security(
         ).first()
         default_sign_key = str(row[0]) if row is not None and row[0] else None
     rich_text = _sysconfig_flag(await sysconfig.get("Frontend::RichText", 1))
-    pgp_method = await sysconfig.get_str("PGP::Method", "Detached")
     decision = await asyncio.to_thread(
         notification_security_sync,
         config,
@@ -702,7 +701,7 @@ async def _notification_security(
         recipient_email=recipient.email,
         queue_default_sign_key=default_sign_key,
         rich_text=rich_text,
-        pgp_method=pgp_method,
+        pgp_method=config.pgp.method,
     )
     for level, message in decision.log:
         getattr(logger, _SECURITY_LOG_LEVELS.get(level, "info"))(

@@ -18,6 +18,8 @@ from __future__ import annotations
 import contextlib
 import os
 import re
+import shutil
+import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -160,6 +162,7 @@ class PgpEngine:
         options: tuple[str, ...] | list[str] = (),
         passwords: dict[str, str] | None = None,
         digest: str = "",
+        trusted_network: bool = True,
     ) -> None:
         if not gnupghome:
             raise CryptoUnavailableError(
@@ -170,6 +173,8 @@ class PgpEngine:
         self._options = list(options)
         self._passwords = {normalize_key_ref(k): v for k, v in (passwords or {}).items()}
         self._digest = digest
+        #: ``PGP::TrustedNetwork`` — default for ``always_trust`` on encrypt/decrypt.
+        self._always_trust = trusted_network
 
     @classmethod
     def from_config(cls, cfg: Any) -> PgpEngine:
@@ -180,6 +185,7 @@ class PgpEngine:
             options=cfg.options,
             passwords=cfg.passwords,
             digest=cfg.digest,
+            trusted_network=getattr(cfg, "trusted_network", True),
         )
 
     @property
@@ -324,6 +330,42 @@ class PgpEngine:
                 return self._passwords[ident]
         return None
 
+    def _flush_agent_cache(self) -> None:
+        """Make gpg-agent forget cached passphrases (``SIGHUP`` via gpgconf)."""
+        gpgconf = shutil.which("gpgconf", path=os.path.dirname(shutil.which(self._gpg_bin) or ""))
+        gpgconf = gpgconf or shutil.which("gpgconf")
+        if not gpgconf:
+            return
+        subprocess.run(  # noqa: S603 — fixed arg list
+            [gpgconf, "--homedir", self._gnupghome, "--reload", "gpg-agent"],
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+
+    def check_passphrase(self, key_ref: str, passphrase: str) -> PgpKeyInfo:
+        """Verify *passphrase* for the secret key *key_ref* with a test signature.
+
+        The agent cache is flushed first, otherwise a passphrase entered
+        correctly a moment ago would let a wrong one pass.
+        """
+        key = self.find_key(key_ref)
+        if key is None or not key.has_secret:
+            raise CryptoNotFoundError(f"PGP secret key {key_ref!r} not found")
+        self._flush_agent_cache()
+        try:
+            signed = self._gpg().sign(
+                b"tiqora passphrase check",
+                keyid=key.fingerprint,
+                passphrase=passphrase,
+                detach=True,
+            )
+        finally:
+            self._flush_agent_cache()
+        if not signed.data:
+            raise CryptoError("wrong passphrase for this PGP key")
+        return key
+
     # ------------------------------------------------------------- operations
 
     def _digest_args(self) -> list[str]:
@@ -382,11 +424,13 @@ class PgpEngine:
         *,
         sign_key_id: str | None = None,
         passphrase: str | None = None,
-        always_trust: bool = True,
+        always_trust: bool | None = None,
         armor: bool = True,
     ) -> bytes:
         if sign_key_id and passphrase is None:
             passphrase = self.passphrase_for(sign_key_id)
+        if always_trust is None:
+            always_trust = self._always_trust
         result = self._gpg().encrypt(
             data,
             recipients,
@@ -400,7 +444,7 @@ class PgpEngine:
         return bytes(result.data)
 
     def decrypt(
-        self, data: bytes, *, passphrase: str | None = None, always_trust: bool = True
+        self, data: bytes, *, passphrase: str | None = None, always_trust: bool | None = None
     ) -> PgpDecryptResult:
         """Decrypt (and, if the payload is also signed, verify).
 
@@ -414,6 +458,8 @@ class PgpEngine:
         success independently of signature validity.
         """
         gpg = self._gpg()
+        if always_trust is None:
+            always_trust = self._always_trust
         candidates: list[str | None] = (
             [passphrase]
             if passphrase is not None

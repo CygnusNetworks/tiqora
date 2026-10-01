@@ -1,21 +1,20 @@
-"""Resolved PGP / S/MIME configuration: Znuny SysConfig + ``TIQORA_CRYPTO_*`` overrides.
+"""Resolved PGP / S/MIME configuration: env, Znuny SysConfig and Tiqora admin settings.
 
-Tiqora shares its key stores with a (possibly still running) Znuny, so the
-authoritative settings are Znuny's own SysConfig entries (``Framework.xml``):
+Tiqora shares its key stores with a (possibly still running) Znuny and reads
+Znuny's own SysConfig entries (``Framework.xml``); every one that has an effect
+in Tiqora can also be set in the admin UI. Per field the precedence is
+``TIQORA_CRYPTO_*`` env > Znuny value *set* in ``sysconfig_modified`` > Tiqora
+admin value > Znuny default > code default — see
+:mod:`tiqora.crypto.settings_store` for the field list:
 
-* ``PGP`` (on/off) — ``TIQORA_CRYPTO_PGP_ENABLED``
-* ``PGP::Bin`` (``/usr/bin/gpg``) — ``TIQORA_CRYPTO_GPG_BIN``
-* ``PGP::Options`` (``--homedir <dir> --batch …``, extra gpg options such as a
-  trust model) — ``TIQORA_CRYPTO_PGP_GNUPGHOME`` overrides the homedir only
-* ``PGP::Key::Password`` (key id → passphrase) — no override
-* ``PGP::Options::DigestPreference`` (signature digest) — no override
-* ``SMIME`` (on/off) — ``TIQORA_CRYPTO_SMIME_ENABLED``
-* ``SMIME::Bin`` (``/usr/bin/openssl``) — ``TIQORA_CRYPTO_OPENSSL_BIN``
-* ``SMIME::CertPath`` (``<hash>.<n>`` certificates) — ``TIQORA_CRYPTO_SMIME_CERT_DIR``
-* ``SMIME::PrivatePath`` (``<hash>.<n>`` keys + ``.P`` secrets) —
-  ``TIQORA_CRYPTO_SMIME_PRIVATE_DIR``
+* ``PGP``, ``PGP::Bin``, ``PGP::Options`` (``--homedir`` + extra gpg options),
+  ``PGP::Options::DigestPreference``, ``PGP::Method``, ``PGP::TrustedNetwork``,
+  ``PGP::Key::Password`` (merged per key id)
+* ``SMIME``, ``SMIME::Bin``, ``SMIME::CertPath``, ``SMIME::PrivatePath``,
+  ``SMIME::FetchFromCustomer``, ``SMIME::NoVerify``; the CA bundle for chain
+  validation is Tiqora-only (``TIQORA_CRYPTO_SMIME_CA_PATH`` or admin UI)
 
-``SMIME::CacheTTL`` is deliberately ignored (Tiqora reads the files directly).
+``SMIME::CacheTTL`` and ``PGP::Log`` are deliberately ignored (no effect here).
 
 Env vars win when set: inside a container the Znuny host paths usually do not
 exist, so the compose file mounts the key directories somewhere and points the
@@ -40,12 +39,6 @@ if TYPE_CHECKING:
     from tiqora.config import Settings
     from tiqora.znuny.sysconfig import SysConfig
 
-_TRUE = {"1", "true", "yes", "on"}
-
-
-def _truthy(value: Any) -> bool:
-    return str(value if value is not None else "").strip().lower() in _TRUE
-
 
 @dataclass(frozen=True)
 class PgpConfig:
@@ -57,6 +50,10 @@ class PgpConfig:
     #: ``PGP::Key::Password`` — key id (short/long/fingerprint) → passphrase.
     passwords: dict[str, str] = field(default_factory=dict)
     digest: str = ""
+    #: ``PGP::Method`` — ``Detached`` or ``Inline`` (notifications without rich text).
+    method: str = "Detached"
+    #: ``PGP::TrustedNetwork`` — encrypt/decrypt with ``always_trust``.
+    trusted_network: bool = True
 
 
 @dataclass(frozen=True)
@@ -70,6 +67,9 @@ class SmimeConfig:
     #: ``SMIME::FetchFromCustomer`` — import certificates from the customer
     #: backend attribute ``UserSMIMECertificate`` (see ``customer_fetch``).
     fetch_from_customer: bool = False
+    #: ``SMIME::NoVerify`` — a valid signature counts as verified without a
+    #: trusted certificate chain.
+    no_verify: bool = False
 
 
 @dataclass(frozen=True)
@@ -96,12 +96,16 @@ class CryptoConfig:
         )
 
 
-def _resolve_bin(env_value: str, sysconfig_value: str, default: str) -> str:
-    """Env override > SysConfig path (if it exists here) > ``PATH`` lookup of *default*."""
+def _resolve_bin(env_value: str, configured: str, default: str) -> str:
+    """Env override > configured binary (if it exists here) > ``PATH`` lookup of *default*.
+
+    *configured* may be a path (Znuny's ``/usr/bin/gpg``) or a bare program
+    name set in the admin UI (``gpg2``), which is looked up on ``PATH``.
+    """
     if env_value:
         return env_value
-    if sysconfig_value and os.path.isfile(sysconfig_value):
-        return sysconfig_value
+    if configured and (os.path.isfile(configured) or shutil.which(configured)):
+        return configured
     return default
 
 
@@ -134,59 +138,65 @@ def parse_pgp_options(raw: str) -> tuple[str, tuple[str, ...]]:
     return homedir, tuple(rest)
 
 
-def _as_password_map(value: Any) -> dict[str, str]:
-    if not isinstance(value, dict):
-        return {}
-    return {str(k).strip(): str(v) for k, v in value.items() if str(k).strip()}
+async def resolve_crypto_config(
+    settings: Settings,
+    sysconfig: SysConfig | None,
+    tiqora: dict[str, str] | None = None,
+) -> CryptoConfig:
+    """Merge env overrides, Znuny SysConfig and the Tiqora admin settings.
 
+    Precedence per field: env > Znuny set > Tiqora > Znuny default > code
+    default (:mod:`tiqora.crypto.settings_store`). *tiqora* (the
+    ``crypto.*`` rows of ``tiqora_settings``) is loaded through the
+    SysConfig's session when not given.
+    """
+    from tiqora.crypto import settings_store as store
 
-async def resolve_crypto_config(settings: Settings, sysconfig: SysConfig | None) -> CryptoConfig:
-    """Merge Znuny SysConfig with the ``TIQORA_CRYPTO_*`` env overrides."""
     if sysconfig is None:
         return CryptoConfig.from_settings(settings)
+    if tiqora is None:
+        tiqora = {}
+        if sysconfig.session is not None:
+            try:
+                tiqora = await store.load_tiqora_values(sysconfig.session)
+            except Exception:  # noqa: BLE001 — tiqora_settings absent (fresh test DB)
+                tiqora = {}
 
-    async def _get(name: str) -> Any:
-        try:
-            return await sysconfig.get(name)
-        except Exception:  # noqa: BLE001 — SysConfig tables absent (fresh test DB)
-            return None
+    fields = await store.resolve_fields(settings, sysconfig, tiqora)
+    pw = await store.resolve_passwords(settings, sysconfig, tiqora)
 
-    pgp_sc = await _get("PGP")
-    pgp_bin = await _get("PGP::Bin")
-    pgp_options = await _get("PGP::Options")
-    pgp_passwords = await _get("PGP::Key::Password")
-    pgp_digest = await _get("PGP::Options::DigestPreference")
-    smime_sc = await _get("SMIME")
-    smime_bin = await _get("SMIME::Bin")
-    cert_path = await _get("SMIME::CertPath")
-    private_path = await _get("SMIME::PrivatePath")
-    fetch_from_customer = await _get("SMIME::FetchFromCustomer")
+    def v(name: str) -> Any:
+        return fields[name].value
 
-    sc_homedir, options = parse_pgp_options(str(pgp_options or ""))
-    pgp_enabled = (
-        settings.crypto_pgp_enabled if settings.crypto_pgp_enabled is not None else _truthy(pgp_sc)
-    )
-    smime_enabled = (
-        settings.crypto_smime_enabled
-        if settings.crypto_smime_enabled is not None
-        else _truthy(smime_sc)
-    )
+    def binary(name: str, default: str) -> str:
+        f = fields[name]
+        if f.source == "env":
+            return str(f.value)
+        return _resolve_bin("", str(f.value or ""), default)
+
+    try:
+        options = tuple(shlex.split(str(v("pgp.options"))))
+    except ValueError:
+        options = tuple(str(v("pgp.options")).split())
     return CryptoConfig(
         pgp=PgpConfig(
-            enabled=bool(pgp_enabled),
-            gpg_bin=_resolve_bin(settings.crypto_gpg_bin, str(pgp_bin or ""), "gpg"),
-            homedir=settings.crypto_pgp_gnupghome or sc_homedir,
-            options=options,
-            passwords=_as_password_map(pgp_passwords),
-            digest=str(pgp_digest or ""),
+            enabled=bool(v("pgp.enabled")),
+            gpg_bin=binary("pgp.gpg_bin", "gpg"),
+            homedir=str(v("pgp.homedir")),
+            options=tuple(o for o in options if o not in ("--batch", "--no-tty")),
+            passwords=pw.passwords,
+            digest=str(v("pgp.digest")),
+            method=str(v("pgp.method")) or "Detached",
+            trusted_network=bool(v("pgp.trusted_network")),
         ),
         smime=SmimeConfig(
-            enabled=bool(smime_enabled),
-            openssl_bin=_resolve_bin(settings.crypto_openssl_bin, str(smime_bin or ""), "openssl"),
-            cert_path=settings.crypto_smime_cert_dir or str(cert_path or ""),
-            private_path=settings.crypto_smime_private_dir or str(private_path or ""),
-            ca_path=settings.crypto_smime_ca_path,
-            fetch_from_customer=_truthy(fetch_from_customer),
+            enabled=bool(v("smime.enabled")),
+            openssl_bin=binary("smime.openssl_bin", "openssl"),
+            cert_path=str(v("smime.cert_path")),
+            private_path=str(v("smime.private_path")),
+            ca_path=str(v("smime.ca_path")),
+            fetch_from_customer=bool(v("smime.fetch_from_customer")),
+            no_verify=bool(v("smime.no_verify")),
         ),
     )
 
