@@ -1,7 +1,7 @@
 name: Docker
 
 # Only release tags (v*) trigger this — day-to-day pushes to main build via
-# the internal Jenkins job (git.cygnusnet.de) instead, so GHCR/Docker Hub
+# an internal CI job instead, so GHCR/Docker Hub
 # don't duplicate that work on every commit. Native linux/amd64 only unless
 # multi-arch is requested (see MULTIARCH below).
 # Manual dispatch can force multi-arch via the multiarch input.

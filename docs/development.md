@@ -68,7 +68,7 @@ Placeholder rows that look like names (`Invalid User`) are listed in
 noreply address (`.githooks/allowed-identities`).
 
 **GitHub is a release mirror.** Day-to-day work goes to `origin`
-(git.cygnusnet.de). The `github` remote only receives `main` and `v*` tags
+(the internal Git server). The `github` remote only receives `main` and `v*` tags
 of a signed-off release, and `pre-push` refuses anything else unless the push
 runs with `TIQORA_GITHUB_PUSH=approved`. Never use `--no-verify` to get past a
 finding; replace the value instead. History once published cannot be taken
