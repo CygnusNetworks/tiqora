@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Hva skjer når en kunde svarer på en allerede lukket billett i denne køen: avhengig av alternativet, åpnes billetten på nytt, svaret avvises, eller en helt ny billett opprettes i stedet.",
         "followUpLock": "Låser automatisk opp en låst billett tilbake til eieren så snart en kundeoppfølging kommer.",
         "calendarName": "Refererer til en arbeidstidskalender (helligdager, åpningstider) som brukes ved beregning av eskaleringer. Tom = standard døgnkalender.",
-        "defaultSignKey": "Navn på en PGP/S-MIME-nøkkel som brukes til å automatisk signere utgående e-post fra denne køen. Tom = ingen automatisk signering."
+        "defaultSignKey": "Navn på en PGP/S-MIME-nøkkel som brukes til å automatisk signere utgående e-post fra denne køen. Tom = ingen automatisk signering.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Typen — ikke navnet — driver oppførsel: «nye»/«åpne»/«ventende»-typer teller som åpne billetter, mens «sammenslått» skjuler billetten fra normalt søk (selve posten beholdes). Flere delstatsnavn kan dele samme type."
@@ -2108,7 +2111,14 @@
       "yes": "Ja",
       "no": "Nei",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "stater",

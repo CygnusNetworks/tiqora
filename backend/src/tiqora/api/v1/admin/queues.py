@@ -29,6 +29,12 @@ from tiqora.api.v1.admin.schemas import (
     QueueOut,
     QueueUpdate,
 )
+from tiqora.crypto.queue_security import (
+    QueueSecurityPolicy,
+    load_queue_policies,
+    load_queue_policy,
+    save_queue_policy,
+)
 from tiqora.db.legacy.queue import Queue, QueueAutoResponse, QueueStandardTemplate
 
 router = APIRouter(prefix="/queues", tags=["admin:queues"])
@@ -72,7 +78,33 @@ async def list_queues(
 ) -> Page[QueueOut]:
     _ = admin
     stmt = apply_valid_filter(select(Queue), Queue.valid_id, params.valid).order_by(Queue.name)
-    return await paginate(session, QueueOut, stmt, params)
+    page = await paginate(session, QueueOut, stmt, params)
+    policies = await load_queue_policies(session)
+    page.items = [_with_policy(q, policies.get(q.id, QueueSecurityPolicy())) for q in page.items]
+    return page
+
+
+def _with_policy(queue: Queue | QueueOut, policy: QueueSecurityPolicy) -> QueueOut:
+    out = queue if isinstance(queue, QueueOut) else QueueOut.model_validate(queue)
+    return out.model_copy(
+        update={"email_sign_default": policy.sign_default, "email_encrypt": policy.encrypt}
+    )
+
+
+async def _save_policy(
+    session: DbSession, queue_id: int, sign_default: bool | None, encrypt: str | None
+) -> None:
+    if sign_default is None and encrypt is None:
+        return
+    current = await load_queue_policy(session, queue_id)
+    await save_queue_policy(
+        session,
+        queue_id,
+        QueueSecurityPolicy(
+            sign_default=current.sign_default if sign_default is None else sign_default,
+            encrypt=current.encrypt if encrypt is None else encrypt,  # type: ignore[arg-type]
+        ),
+    )
 
 
 @router.get("/assignment-counts", response_model=dict[int, int])
@@ -89,12 +121,12 @@ async def queue_assignment_counts(
 
 
 @router.get("/{queue_id}", response_model=QueueOut)
-async def get_queue(queue_id: int, admin: AdminUser, session: DbSession) -> Queue:
+async def get_queue(queue_id: int, admin: AdminUser, session: DbSession) -> QueueOut:
     _ = admin
     queue = await session.get(Queue, queue_id)
     if queue is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Queue not found")
-    return queue
+    return _with_policy(queue, await load_queue_policy(session, queue_id))
 
 
 @router.get("/{queue_id}/physical-variables", response_model=list[PhysicalQueueVariableOut])
@@ -168,11 +200,11 @@ async def _check_sign_key(session: DbSession, value: str | None) -> str | None:
 
 
 @router.post("", response_model=QueueOut, status_code=status.HTTP_201_CREATED)
-async def create_queue(body: QueueCreate, admin: AdminUser, session: DbSession) -> Queue:
+async def create_queue(body: QueueCreate, admin: AdminUser, session: DbSession) -> QueueOut:
     body.default_sign_key = await _check_sign_key(session, body.default_sign_key)
     ts = now()
     queue = Queue(
-        **body.model_dump(),
+        **body.model_dump(exclude={"email_sign_default", "email_encrypt"}),
         create_time=ts,
         create_by=admin.id,
         change_time=ts,
@@ -180,19 +212,24 @@ async def create_queue(body: QueueCreate, admin: AdminUser, session: DbSession) 
     )
     session.add(queue)
     await invalidate_znuny_cache_types(session, QUEUE_CACHE_TYPES)
+    await session.flush()
+    await _save_policy(session, queue.id, body.email_sign_default, body.email_encrypt)
     await session.commit()
     await session.refresh(queue)
-    return queue
+    return _with_policy(queue, await load_queue_policy(session, queue.id))
 
 
 @router.patch("/{queue_id}", response_model=QueueOut)
 async def update_queue(
     queue_id: int, body: QueueUpdate, admin: AdminUser, session: DbSession
-) -> Queue:
+) -> QueueOut:
     queue = await session.get(Queue, queue_id)
     if queue is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Queue not found")
     changes = body.model_dump(exclude_unset=True)
+    sign_default = changes.pop("email_sign_default", None)
+    encrypt = changes.pop("email_encrypt", None)
+    await _save_policy(session, queue_id, sign_default, encrypt)
     if "default_sign_key" in changes and (changes["default_sign_key"] or None) != (
         queue.default_sign_key or None
     ):
@@ -209,7 +246,7 @@ async def update_queue(
     await invalidate_cache_for_queue(session, queue_id)
     await session.commit()
     await session.refresh(queue)
-    return queue
+    return _with_policy(queue, await load_queue_policy(session, queue_id))
 
 
 @router.delete("/{queue_id}", status_code=status.HTTP_204_NO_CONTENT)

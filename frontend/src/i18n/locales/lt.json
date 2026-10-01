@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Kas atsitinka, kai klientas atsako į jau uždarytą bilietą šioje eilėje: priklausomai nuo parinkties, bilietas vėl atidaromas, atsakymas atmetamas arba vietoj jo sukuriamas visiškai naujas bilietas.",
         "followUpLock": "Automatiškai atrakina užrakintą bilietą atgal jo savininkui, kai tik ateina klientas.",
         "calendarName": "Nurodomas darbo valandų kalendorius (šventės, darbo laikas), naudojamas skaičiuojant eskalacijas. Tuščias = numatytasis visą parą veikiantis kalendorius.",
-        "defaultSignKey": "PGP/S-MIME rakto, naudojamo automatiškai pasirašyti siunčiamiems laiškams iš šios eilės, pavadinimas. Tuščia = nėra automatinio pasirašymo."
+        "defaultSignKey": "PGP/S-MIME rakto, naudojamo automatiškai pasirašyti siunčiamiems laiškams iš šios eilės, pavadinimas. Tuščia = nėra automatinio pasirašymo.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Tipas, o ne pavadinimas, skatina elgesį: tipai \"naujas\" / \"atidarytas\" / \"laukiama\" laikomi atvirais bilietais, o \"sulietas\" paslepia bilietą nuo įprastos paieškos (pats įrašas išsaugomas). Keli valstybių pavadinimai gali turėti tą patį tipą."
@@ -2108,7 +2111,14 @@
       "yes": "Taip",
       "no": "Nr",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "valstybėse",

@@ -15,6 +15,7 @@ const signaturesList = vi.fn();
 const listSystemAddresses = vi.fn();
 const listFollowUpPossible = vi.fn();
 const signKeyOptions = vi.fn();
+const cryptoStatus = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -43,6 +44,7 @@ vi.mock("@/lib/api", () => ({
     listFollowUpPossible: (...args: unknown[]) => listFollowUpPossible(...args),
     adminCrypto: {
       signKeyOptions: (...args: unknown[]) => signKeyOptions(...args),
+      status: (...args: unknown[]) => cryptoStatus(...args),
     },
   },
 }));
@@ -96,6 +98,17 @@ describe("QueuesPage", () => {
     listSystemAddresses.mockReset();
     listFollowUpPossible.mockReset();
     signKeyOptions.mockReset();
+    cryptoStatus.mockReset();
+    cryptoStatus.mockResolvedValue([
+      {
+        backend: "smime",
+        enabled: true,
+        available: true,
+        binary: { available: true, path: "openssl", version: "OpenSSL 3", reason: "" },
+        paths: {},
+        problems: [],
+      },
+    ]);
     signKeyOptions.mockResolvedValue([
       {
         value: "SMIME::Detached::1a2b3c4d.0",
@@ -235,4 +248,34 @@ describe("QueuesPage", () => {
     ).toBeInTheDocument();
     expect(within(panel).getByText("No automatic signing")).toBeInTheDocument();
   });
+
+  it("shows email security fields only while a crypto backend runs", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Support")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-7"));
+    fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
+    expect(await screen.findByTestId("admin-form-email_encrypt")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-form-default_sign_key")).toBeInTheDocument();
+  });
+
+  it("hides email security fields when no backend is enabled", async () => {
+    cryptoStatus.mockResolvedValue([
+      {
+        backend: "pgp",
+        enabled: false,
+        available: true,
+        binary: { available: true, path: "gpg", version: "gpg 2", reason: "" },
+        paths: {},
+        problems: [],
+      },
+    ]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText("Support")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-7"));
+    fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
+    await screen.findByTestId("admin-form-group_id");
+    expect(screen.queryByTestId("admin-form-email_encrypt")).toBeNull();
+    expect(screen.queryByTestId("admin-form-default_sign_key")).toBeNull();
+  });
 });
+

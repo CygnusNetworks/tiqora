@@ -1853,29 +1853,86 @@ async def run_ticket_agent(
                 to_address = parseaddr(src.from_address)[1] or None
 
             if to_address:
-                from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
-
-                article_id = await deliver_agent_email_reply(
-                    session,
-                    sysconfig,
-                    None,
-                    ticket_id=ticket_id,
-                    queue_id=ticket.queue_id,
-                    user_id=actor_user_id,
-                    article=ArticleIn(
-                        sender_type="agent",
-                        is_visible_for_customer=True,
-                        subject=outcome.proposal.get("subject") or ticket.title,
-                        body=body,
-                        to_address=to_address,
-                        channel="email",
-                    ),
-                    # Nobody read this before it left. RFC 3834 is what stops
-                    # the recipient's vacation responder and ticket system from
-                    # answering it -- Znuny's PostMaster folds any "auto-*" into
-                    # its own loop flag, so one header covers both.
-                    auto_submitted="auto-replied",
+                from tiqora.channels.email.outbound_reply import (
+                    EmailSecurityBlocked,
+                    deliver_agent_email_reply,
                 )
+
+                try:
+                    article_id = await deliver_agent_email_reply(
+                        session,
+                        sysconfig,
+                        None,
+                        ticket_id=ticket_id,
+                        queue_id=ticket.queue_id,
+                        user_id=actor_user_id,
+                        article=ArticleIn(
+                            sender_type="agent",
+                            is_visible_for_customer=True,
+                            subject=outcome.proposal.get("subject") or ticket.title,
+                            body=body,
+                            to_address=to_address,
+                            channel="email",
+                        ),
+                        # Nobody read this before it left. RFC 3834 is what stops
+                        # the recipient's vacation responder and ticket system from
+                        # answering it -- Znuny's PostMaster folds any "auto-*" into
+                        # its own loop flag, so one header covers both.
+                        auto_submitted="auto-replied",
+                    )
+                except EmailSecurityBlocked as blocked:
+                    # The queue requires encryption and a recipient has no
+                    # usable key: nothing left the building. Keep the answer
+                    # as a draft and say why in an internal note. The check runs
+                    # before deliver_agent_email_reply writes anything, so the
+                    # run's other changes stay and are committed with the draft.
+                    draft = await draft_service.create_draft(
+                        session,
+                        ticket_id=ticket_id,
+                        queue_id=ticket.queue_id,
+                        kind=outcome.proposal["kind"],
+                        body=outcome.proposal["body"],
+                        subject=outcome.proposal.get("subject") or None,
+                        based_on_article_id=based_on_article_id,
+                        tool_trace_json=encode_tool_trace(_tool_trace_wire(messages)),
+                        created_by_user_id=None,
+                        source=source,
+                        actor_user_id=actor_user_id,
+                    )
+                    await add_article(
+                        session,
+                        ticket_id=ticket_id,
+                        article=ArticleIn(
+                            sender_type="agent",
+                            is_visible_for_customer=False,
+                            subject="KI-Antwort nicht gesendet",
+                            body=(
+                                "Die KI-Antwort wurde nicht gesendet: Die Queue verlangt "
+                                f"Verschlüsselung ({blocked}). Sie liegt als Entwurf bereit."
+                            ),
+                            channel="note",
+                        ),
+                        user_id=actor_user_id,
+                        sysconfig=sysconfig,
+                    )
+                    blocked_state = await session.get(TiqoraAiTicketState, ticket_id)
+                    if blocked_state is not None:
+                        blocked_state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
+                        blocked_state.last_customer_article_id = based_on_article_id
+                    await session.commit()
+                    logger.warning(
+                        "ai_send_blocked_by_queue_security",
+                        ticket_id=ticket_id,
+                        draft_id=draft.id,
+                        reason=str(blocked),
+                    )
+                    return AgentRunResult(
+                        status=STATUS_DRAFTED,
+                        draft_id=draft.id,
+                        notes=str(blocked),
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                    )
             else:
                 article_id = await add_article(
                     session,

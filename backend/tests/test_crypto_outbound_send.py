@@ -82,6 +82,7 @@ def _cleanup(conn: Any) -> None:
         "DELETE FROM tiqora_mail_log WHERE subject LIKE 'crypto-out %'"
         " OR subject LIKE '%crypto-out %'",
         f"DELETE FROM queue WHERE id = {QUEUE_ID}",
+        f"DELETE FROM tiqora_settings WHERE `key` = 'queue_security.{QUEUE_ID}'",
         f"DELETE FROM system_address WHERE id = {SA_ID}",
         f"DELETE FROM group_user WHERE user_id = {AGENT} OR group_id = {GROUP_ID}",
         f"DELETE FROM permission_groups WHERE id = {GROUP_ID}",
@@ -497,3 +498,93 @@ class _SessionStoreStub:
 
     async def get(self, session_id: str) -> tuple[int, str]:
         return self.user_id, "crypto.outbound"
+
+
+def _policy(url: str, encrypt: str, sign_default: bool = True) -> None:
+    engine = _sync(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("DELETE FROM tiqora_settings WHERE `key` = :k"),
+            {"k": f"queue_security.{QUEUE_ID}"},
+        )
+        conn.execute(
+            text("INSERT INTO tiqora_settings (`key`, value) VALUES (:k, :v)"),
+            {
+                "k": f"queue_security.{QUEUE_ID}",
+                "v": f'{{"sign_default": {str(sign_default).lower()}, "encrypt": "{encrypt}"}}',
+            },
+        )
+    engine.dispose()
+
+
+def _plain_email(subject: str, *, to: str = CUSTOMER) -> dict[str, Any]:
+    """An API call that does not choose: no ``email_security`` key at all."""
+    body = _email(subject, None, to=to)
+    del body["email_security"]
+    return body
+
+
+@pytest.mark.asyncio
+async def test_queue_auto_encrypts_a_mail_nobody_chose_for(
+    env: tuple[str, async_sessionmaker[AsyncSession], Sent], world: CryptoWorld
+) -> None:
+    url, factory, sent = env
+    _policy(url, "auto")
+    async with _client(factory) as client:
+        tid = await _new_ticket(client, "crypto-out queue auto")
+        opts = await client.get(f"/api/v1/tickets/{tid}/crypto-options", params={"to": CUSTOMER})
+        body = opts.json()
+        assert body["modes"] == ["none", "sign", "encrypt", "sign_encrypt"]
+        assert body["encrypt_policy"] == "auto" and body["default"]["encrypt"] is True
+        resp = await client.post(
+            f"/api/v1/tickets/{tid}/articles", json=_plain_email("crypto-out queue auto")
+        )
+        assert resp.status_code == 201, resp.text
+    raw = _raw(sent)
+    assert b"multipart/encrypted" in raw and b"4711" not in raw
+    walked = walk_message(raw, _customer_config(world))
+    assert walked.security is not None and walked.security.status == "verified"
+
+
+@pytest.mark.asyncio
+async def test_queue_auto_explicit_plain_choice_is_respected(
+    env: tuple[str, async_sessionmaker[AsyncSession], Sent],
+) -> None:
+    url, factory, sent = env
+    _policy(url, "auto")
+    async with _client(factory) as client:
+        tid = await _new_ticket(client, "crypto-out queue explicit")
+        resp = await client.post(
+            f"/api/v1/tickets/{tid}/articles", json=_email("crypto-out queue explicit", None)
+        )
+        assert resp.status_code == 201, resp.text
+    message, _kw = sent.calls[0]
+    assert b"4711" in (message if isinstance(message, bytes) else message.as_bytes())
+
+
+@pytest.mark.asyncio
+async def test_queue_requires_encryption(
+    env: tuple[str, async_sessionmaker[AsyncSession], Sent],
+) -> None:
+    url, factory, sent = env
+    _policy(url, "required")
+    async with _client(factory) as client:
+        tid = await _new_ticket(client, "crypto-out queue required")
+        opts = await client.get(
+            f"/api/v1/tickets/{tid}/crypto-options", params={"to": "nokey@example.net"}
+        )
+        body = opts.json()
+        assert body["modes"] == ["encrypt", "sign_encrypt"]
+        assert "nokey@example.net" in body["blocked"]
+        # explicit plain mail and a mail to a recipient without key: both refused
+        plain = await client.post(
+            f"/api/v1/tickets/{tid}/articles", json=_email("crypto-out queue required", None)
+        )
+        assert plain.status_code == 422 and "requires encryption" in plain.json()["detail"]
+        nokey = await client.post(
+            f"/api/v1/tickets/{tid}/articles",
+            json=_plain_email("crypto-out queue required", to="nokey@example.net"),
+        )
+        assert nokey.status_code == 422 and "nokey@example.net" in nokey.json()["detail"]
+    assert sent.calls == []
+    assert _rows(url, "SELECT id FROM article WHERE ticket_id = :t", t=tid) == []

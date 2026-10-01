@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Mitä tapahtuu, kun asiakas vastaa jo suljettuun lippuun tässä jonossa: vaihtoehdosta riippuen lippu avautuu uudelleen, vastaus hylätään tai sen tilalle luodaan aivan uusi lippu.",
         "followUpLock": "Avaa lukitun lipun automaattisesti takaisin omistajalleen heti, kun asiakasseuranta saapuu.",
         "calendarName": "Viittaa työaikakalenteriin (pyhäpäivät, aukioloajat), jota käytetään eskalaatioiden laskemisessa. Tyhjä = oletusarvoinen ympärivuorokautinen kalenteri.",
-        "defaultSignKey": "PGP/S-MIME-avaimen nimi, jota käytetään lähtevän postin automaattiseen allekirjoittamiseen tästä jonosta. Tyhjä = ei automaattista allekirjoitusta."
+        "defaultSignKey": "PGP/S-MIME-avaimen nimi, jota käytetään lähtevän postin automaattiseen allekirjoittamiseen tästä jonosta. Tyhjä = ei automaattista allekirjoitusta.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Tyyppi – ei nimi – ohjaa toimintaa: \"new\"/\"open\"/\"doping\"-tyypit lasketaan avoimina lipuiksi, kun taas \"yhdistetty\" piilottaa lipun normaalilta haulta (itse tietue säilytetään). Useat osavaltioiden nimet voivat jakaa saman tyypin."
@@ -2108,7 +2111,14 @@
       "yes": "Kyllä",
       "no": "Ei",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "osavaltioissa",

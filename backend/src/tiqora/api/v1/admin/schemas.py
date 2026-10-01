@@ -259,6 +259,11 @@ class QueueOut(BaseModel):
     valid_id: int
     create_time: UtcDateTime | None
     change_time: UtcDateTime | None
+    #: Tiqora email security defaults (crypto.queue_security); filled by the
+    #: queue endpoints, ``None`` where a queue list does not load them.
+    email_sign_default: bool | None = None
+    #: off | auto | required
+    email_encrypt: str | None = None
 
 
 class QueueCreate(BaseModel):
@@ -280,6 +285,8 @@ class QueueCreate(BaseModel):
     default_sign_key: str | None = None
     comments: str | None = None
     valid_id: int = 1
+    email_sign_default: bool | None = None
+    email_encrypt: Literal["off", "auto", "required"] | None = None
 
 
 class QueueUpdate(BaseModel):
@@ -301,6 +308,8 @@ class QueueUpdate(BaseModel):
     default_sign_key: str | None = None
     comments: str | None = None
     valid_id: int | None = None
+    email_sign_default: bool | None = None
+    email_encrypt: Literal["off", "auto", "required"] | None = None
 
 
 # ---------------------------------------------------------------------------

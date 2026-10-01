@@ -9837,11 +9837,26 @@ export interface components {
         CryptoOptionsOut: {
             /** Backends */
             backends?: components["schemas"]["CryptoComposeBackendOut"][];
+            /** Blocked */
+            blocked?: string | null;
             default?: components["schemas"]["EmailSecurityIn"] | null;
             /** Enabled */
             enabled: boolean;
+            /**
+             * Encrypt Policy
+             * @default off
+             */
+            encrypt_policy: string;
             /** From Address */
             from_address?: string | null;
+            /** Modes */
+            modes?: string[];
+            queue_sign?: components["schemas"]["EmailSecurityIn"] | null;
+            /**
+             * Sign Default
+             * @default true
+             */
+            sign_default: boolean;
             /** Warnings */
             warnings?: string[];
         };
@@ -13050,6 +13065,10 @@ export interface components {
             comments?: string | null;
             /** Default Sign Key */
             default_sign_key?: string | null;
+            /** Email Encrypt */
+            email_encrypt?: ("off" | "auto" | "required") | null;
+            /** Email Sign Default */
+            email_sign_default?: boolean | null;
             /** First Response Notify */
             first_response_notify?: number | null;
             /** First Response Time */
@@ -13178,6 +13197,10 @@ export interface components {
             create_time: string | null;
             /** Default Sign Key */
             default_sign_key: string | null;
+            /** Email Encrypt */
+            email_encrypt?: string | null;
+            /** Email Sign Default */
+            email_sign_default?: boolean | null;
             /** First Response Notify */
             first_response_notify: number | null;
             /** First Response Time */
@@ -13241,6 +13264,10 @@ export interface components {
             comments?: string | null;
             /** Default Sign Key */
             default_sign_key?: string | null;
+            /** Email Encrypt */
+            email_encrypt?: ("off" | "auto" | "required") | null;
+            /** Email Sign Default */
+            email_sign_default?: boolean | null;
             /** First Response Notify */
             first_response_notify?: number | null;
             /** First Response Time */

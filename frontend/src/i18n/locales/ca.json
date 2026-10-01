@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Què passa quan un client respon a un bitllet ja tancat en aquesta cua: segons l'opció, el bitllet es reobre, la resposta es rebutja o es crea un bitllet nou.",
         "followUpLock": "Desbloqueja automàticament un bitllet bloquejat al seu propietari tan bon punt arriba un seguiment del client.",
         "calendarName": "Fa referència a un calendari d'horaris comercials (vacances, hores d'obertura) que s'utilitza per calcular les escalades. Buit = el calendari predeterminat durant tot el dia.",
-        "defaultSignKey": "Nom d'una clau PGP/S-MIME utilitzada per signar automàticament el correu sortint d'aquesta cua. Buit = sense signatura automàtica."
+        "defaultSignKey": "Nom d'una clau PGP/S-MIME utilitzada per signar automàticament el correu sortint d'aquesta cua. Buit = sense signatura automàtica.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "El tipus, no el nom, determina el comportament: els tipus \"nous\"/\"oberts\"/\"pendents\" compten com a bitllets oberts, mentre que \"fusionat\" amaga el bitllet de la cerca normal (el registre en si es conserva). Diversos noms d'estat poden compartir el mateix tipus."
@@ -2108,7 +2111,14 @@
       "yes": "Sí",
       "no": "No",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Estats",

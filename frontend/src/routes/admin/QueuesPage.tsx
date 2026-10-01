@@ -4,6 +4,7 @@ import { toBcp47 } from "@/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { api, type QueueOut, type QueueCreate, type QueueUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
+import { CRYPTO_STATUS_KEY } from "@/components/admin/CryptoStatusBanner";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { formatDateTime } from "@/lib/format";
@@ -18,6 +19,10 @@ function emptyToNullStr(v: unknown): string | null {
   if (v === undefined || v === null) return null;
   const s = String(v).trim();
   return s === "" ? null : s;
+}
+
+function encryptMode(v: unknown): "off" | "auto" | "required" {
+  return v === "auto" || v === "required" ? v : "off";
 }
 
 export function QueuesPage() {
@@ -51,6 +56,14 @@ export function QueuesPage() {
     queryFn: ({ signal }) => api.adminCrypto.signKeyOptions({}, signal),
     staleTime: 60 * 1000,
   });
+  // The email security section only exists while PGP or S/MIME is enabled
+  // and set up — with nothing running there is nothing to configure.
+  const cryptoStatusQ = useQuery({
+    queryKey: CRYPTO_STATUS_KEY,
+    queryFn: ({ signal }) => api.adminCrypto.status(signal),
+    staleTime: 60 * 1000,
+  });
+  const cryptoActive = (cryptoStatusQ.data ?? []).some((b) => b.enabled && b.available);
   const queueSignKeysQ = useQuery({
     queryKey: ["admin", "queues", "sign-keys"],
     queryFn: () => api.adminQueues.list({ valid: "all", pageSize: 500 }),
@@ -243,13 +256,46 @@ export function QueuesPage() {
       },
     },
     {
+      name: "email_security_section",
+      label: t("admin.queues.emailSecurity"),
+      type: "section",
+      helpText: t("admin.queues.emailSecurityHint"),
+      showIf: () => cryptoActive,
+    },
+    {
       name: "default_sign_key",
       label: t("admin.queues.defaultSignKey"),
       type: "select",
       options: signKeyOptions,
+      showIf: () => cryptoActive,
       help: {
         title: t("admin.queues.defaultSignKey"),
         description: t("admin.help.queues.defaultSignKey"),
+      },
+    },
+    {
+      name: "email_sign_default",
+      label: t("admin.queues.emailSignDefault"),
+      type: "checkbox",
+      showIf: (v) => cryptoActive && Boolean(v.default_sign_key),
+      help: {
+        title: t("admin.queues.emailSignDefault"),
+        description: t("admin.help.queues.emailSignDefault"),
+      },
+    },
+    {
+      name: "email_encrypt",
+      label: t("admin.queues.emailEncrypt"),
+      type: "select",
+      options: [
+        { value: "off", label: t("admin.queues.emailEncryptOff") },
+        { value: "auto", label: t("admin.queues.emailEncryptAuto") },
+        { value: "required", label: t("admin.queues.emailEncryptRequired") },
+      ],
+      showIf: () => cryptoActive,
+      help: {
+        title: t("admin.queues.emailEncrypt"),
+        description: t("admin.help.queues.emailEncrypt"),
       },
     },
     { name: "comments", label: t("admin.table.comments"), type: "textarea" },
@@ -293,10 +339,12 @@ export function QueuesPage() {
               solution_notify: row.solution_notify ?? "",
               calendar_name: row.calendar_name ?? "",
               default_sign_key: row.default_sign_key ?? "",
+              email_sign_default: row.email_sign_default ?? true,
+              email_encrypt: row.email_encrypt ?? "off",
               comments: row.comments ?? "",
               valid_id: row.valid_id,
             }
-          : { follow_up_lock: 0, valid_id: 1 }
+          : { follow_up_lock: 0, valid_id: 1, email_sign_default: true, email_encrypt: "off" }
       }
       toCreateBody={(v: FieldValues): QueueCreate => ({
         name: v.name as string,
@@ -315,6 +363,8 @@ export function QueuesPage() {
         solution_notify: emptyToNull(v.solution_notify),
         calendar_name: emptyToNullStr(v.calendar_name),
         default_sign_key: emptyToNullStr(v.default_sign_key),
+        email_sign_default: v.email_sign_default !== false,
+        email_encrypt: encryptMode(v.email_encrypt),
         comments: emptyToNullStr(v.comments),
         valid_id: Number(v.valid_id) || 1,
       })}
@@ -335,6 +385,8 @@ export function QueuesPage() {
         solution_notify: emptyToNull(v.solution_notify),
         calendar_name: emptyToNullStr(v.calendar_name),
         default_sign_key: emptyToNullStr(v.default_sign_key),
+        email_sign_default: v.email_sign_default !== false,
+        email_encrypt: encryptMode(v.email_encrypt),
         comments: emptyToNullStr(v.comments),
         valid_id: Number(v.valid_id) || 1,
       })}

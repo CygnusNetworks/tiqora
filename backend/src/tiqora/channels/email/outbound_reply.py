@@ -412,7 +412,7 @@ async def send_prepared_agent_email(
         raise OutboundMailError(f"SMTP send failed: {exc}") from exc
 
 
-async def _store_security(
+async def store_security(
     session: AsyncSession, article_id: int, secured: SecuredMessage | None, user_id: int
 ) -> None:
     """Keep the sent (signed/encrypted) mail as the article's plain source + badge flags.
@@ -426,6 +426,31 @@ async def _store_security(
 
     await store_raw_message(session, article_id, secured.raw, user_id)
     await write_security(session, article_id, secured.security, user_id)
+
+
+class EmailSecurityBlocked(InvalidInput):
+    """The queue requires encryption, but this mail cannot / would not be encrypted."""
+
+
+async def _apply_queue_security(
+    session: AsyncSession, article: ArticleIn, queue_id: int
+) -> ArticleIn:
+
+    from tiqora.crypto.compose import split_addresses
+    from tiqora.crypto.queue_security import QueueSecurityRequiredError, resolve_mail_security
+
+    try:
+        security = await resolve_mail_security(
+            session,
+            queue_id=queue_id,
+            from_address=article.from_address,
+            recipients=split_addresses(article.to_address, article.cc, article.bcc),
+            requested=article.email_security,
+            explicit=article.email_security_explicit,
+        )
+    except QueueSecurityRequiredError as exc:
+        raise EmailSecurityBlocked(f"email_security: {exc}") from exc
+    return replace(article, email_security=security)
 
 
 async def deliver_agent_email_reply(
@@ -466,7 +491,10 @@ async def deliver_agent_email_reply(
     resolved = await resolve_outbound_smtp(session)
     should_dispatch = resolved.enabled if dispatch is None else dispatch
     # Signing/encryption is resolved and applied before anything is sent or
-    # stored, so a key problem fails the request without side effects.
+    # stored, so a key problem fails the request without side effects. The
+    # queue's defaults fill in when nobody chose, and "encryption required"
+    # vetoes a plain send (crypto.queue_security).
+    prepared = await _apply_queue_security(session, prepared, queue_id)
     secured: SecuredMessage | None = None
     banner = await sysconfig.mail_banner_headers()
     if prepared.email_security is not None and prepared.email_security.active:
@@ -542,7 +570,7 @@ async def deliver_agent_email_reply(
             user_id=user_id,
             sysconfig=sysconfig,
         )
-        await _store_security(session, article_id, secured, user_id)
+        await store_security(session, article_id, secured, user_id)
         await write_mail_log(
             session,
             direction="out",
@@ -585,7 +613,7 @@ async def deliver_agent_email_reply(
         user_id=user_id,
         sysconfig=sysconfig,
     )
-    await _store_security(session, article_id, secured, user_id)
+    await store_security(session, article_id, secured, user_id)
     # SMTP disabled: still record a queued row so the admin log shows the
     # prepared outbound message (no SMTP attempt, no 502).
     await write_mail_log(

@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Điều gì sẽ xảy ra khi khách hàng trả lời một yêu cầu đã đóng trong hàng đợi này: tùy thuộc vào tùy chọn, yêu cầu sẽ mở lại, phản hồi bị từ chối hoặc một yêu cầu hoàn toàn mới được tạo thay thế.",
         "followUpLock": "Tự động mở lại vé đã khóa cho chủ sở hữu của nó ngay khi có khách hàng theo dõi.",
         "calendarName": "Tham chiếu lịch giờ làm việc (ngày lễ, thời gian mở cửa) được sử dụng khi tính toán mức tăng. Trống = lịch mặc định suốt ngày đêm.",
-        "defaultSignKey": "Tên của khóa PGP/S-MIME được sử dụng để tự động ký thư gửi đi từ hàng đợi này. Trống = không có chữ ký tự động."
+        "defaultSignKey": "Tên của khóa PGP/S-MIME được sử dụng để tự động ký thư gửi đi từ hàng đợi này. Trống = không có chữ ký tự động.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Loại — không phải tên — thúc đẩy hành vi: loại \"mới\"/\"mở\"/\"đang chờ xử lý\" được tính là vé mở, trong khi \"đã hợp nhất\" sẽ ẩn vé khỏi tìm kiếm thông thường (bản thân bản ghi được lưu giữ). Nhiều tên tiểu bang có thể chia sẻ cùng một loại."
@@ -2108,7 +2111,14 @@
       "yes": "Có",
       "no": "Không",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "tiểu bang",
