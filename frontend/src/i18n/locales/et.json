@@ -372,7 +372,6 @@
     "filterByCustomer": "Kuva ainult selle kliendi pileteid",
     "pagination": "{{from}}–{{to}} / {{total}}",
     "escalated": "Eskaleeritud",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Vastus SLA",
     "escUpdate": "SLA värskendamine",
     "escSolution": "Lahendus SLA",

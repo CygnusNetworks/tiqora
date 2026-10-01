@@ -372,7 +372,6 @@
     "filterByCustomer": "Покажите само карте овог купца",
     "pagination": "{{from}}–{{to}} од {{total}}",
     "escalated": "Есцалатед",
-    "slaCountdown": "СЛА {{value}}",
     "escResponse": "Одговор СЛА",
     "escUpdate": "Ажурирајте СЛА",
     "escSolution": "Решење СЛА",

@@ -372,7 +372,6 @@
     "filterByCustomer": "Visa endast denna kunds ärenden",
     "pagination": "{{from}}–{{to}} av {{total}}",
     "escalated": "Eskalerad",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Respons SLA",
     "escUpdate": "Uppdatera SLA",
     "escSolution": "Lösning SLA",

@@ -372,7 +372,6 @@
     "filterByCustomer": "Pokaži samo vstopnice te stranke",
     "pagination": "{{from}}–{{to}} od {{total}}",
     "escalated": "Stopnjeno",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Odziv SLA",
     "escUpdate": "Posodobite SLA",
     "escSolution": "Rešitev SLA",

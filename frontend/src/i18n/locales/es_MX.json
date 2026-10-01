@@ -372,7 +372,6 @@
     "filterByCustomer": "Mostrar solo los boletos de este cliente",
     "pagination": "{{from}}–{{to}} de {{total}}",
     "escalated": "escalado",
-    "slaCountdown": "Acuerdo de Nivel de Servicio {{value}}",
     "escResponse": "SLA de respuesta",
     "escUpdate": "Actualizar SLA",
     "escSolution": "SLA de solución",

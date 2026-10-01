@@ -372,7 +372,6 @@
     "filterByCustomer": "Afficher uniquement les billets de ce client",
     "pagination": "{{from}}–{{to}} sur {{total}}",
     "escalated": "Escaladé",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Réponse SLA",
     "escUpdate": "Mettre à jour le SLA",
     "escSolution": "SLA de la solution",

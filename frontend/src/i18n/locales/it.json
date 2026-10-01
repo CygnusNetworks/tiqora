@@ -372,7 +372,6 @@
     "filterByCustomer": "Mostra solo i ticket di questo cliente",
     "pagination": "{{from}}–{{to}} di {{total}}",
     "escalated": "Escalato",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "SLA di risposta",
     "escUpdate": "SLA di aggiornamento",
     "escSolution": "SLA di soluzione",

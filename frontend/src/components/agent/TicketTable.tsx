@@ -14,7 +14,7 @@ import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { LockIcon } from "@/components/ui/icons";
 import {
   combinedEscalationLevel,
-  formatCountdown,
+  humanDuration,
   spineClassName,
   stateColorVar,
   type EscalationLevel,
@@ -470,14 +470,22 @@ function TicketRow({
   const escalationBadge = escLevel !== "none" && nearest != null && (
     <span
       className={cn(
-        "flex-none whitespace-nowrap rounded px-1.5 py-px font-mono text-[10px] font-semibold tabular-nums",
+        "flex-none whitespace-nowrap rounded px-1.5 py-px text-[10.5px] font-semibold",
         escLevel === "breached" ? "bg-danger/15 text-danger" : "bg-amber/15 text-amber",
       )}
       title={formatDateTime(new Date(nearest * 1000), locale)}
       data-testid={`ticket-escalation-badge-${ticket.id}`}
       data-level={escLevel}
     >
-      {t("ticket.slaCountdown", { value: formatCountdown(nearest) })}
+      {escLevel === "breached"
+        ? t("ticket.slaOverdue", {
+            label: t("ticket.sla"),
+            duration: humanDuration(t, Date.now() / 1000 - nearest),
+          })
+        : t("ticket.slaDue", {
+            label: t("ticket.sla"),
+            duration: humanDuration(t, nearest - Date.now() / 1000),
+          })}
     </span>
   );
 
