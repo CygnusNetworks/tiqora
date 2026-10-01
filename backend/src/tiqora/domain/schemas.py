@@ -497,6 +497,45 @@ class SimilarTicketsOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Integrations (external read-only consumers, e.g. netadmin)
+# ---------------------------------------------------------------------------
+
+
+class CustomerTicketItem(BaseModel):
+    """One ticket of a customer, for an external per-account history view."""
+
+    ticket_id: int
+    ticket_number: str
+    title: str | None
+    title_pii_free: bool
+    """Conservative: ``True`` only when the title shows no sign of personal
+    data (see ``tiqora.domain.integrations.subject_safety``)."""
+    queue: str | None
+    state: str | None
+    state_type: str | None
+    customer_user_id: str | None
+    """The ticket's full customer login, including any contract suffix
+    (``z50test#3``)."""
+    created: UtcDateTime
+    changed: UtcDateTime
+    first_article_time: UtcDateTime | None
+    """``create_time`` of the first customer-visible e-mail article."""
+    last_article_time: UtcDateTime | None
+    """``create_time`` of the newest customer-visible e-mail article."""
+    email_count: int
+    """Customer-visible articles on the ``Email`` channel (internal notes,
+    internal e-mails, phone/chat articles excluded)."""
+    summary: str | None
+    """Stored AI summary (``tiqora_ai_ticket_state.summary_body``), as is."""
+    summary_created_at: UtcDateTime | None
+
+
+class CustomerTicketsOut(BaseModel):
+    login: str
+    tickets: list[CustomerTicketItem]
+
+
+# ---------------------------------------------------------------------------
 # Customer portal (Phase 3a)
 # ---------------------------------------------------------------------------
 
