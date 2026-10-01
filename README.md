@@ -9,9 +9,6 @@
 [![Backend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/CygnusNetworks/tiqora/badges/backend-coverage.json)](./backend)
 [![Frontend coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/CygnusNetworks/tiqora/badges/frontend-coverage.json)](./frontend)
 
-> **Still under active development.** Production use is not yet recommended.
-> APIs, schema conventions, and operational behaviour may still change.
-
 **Tiqora** is a modern, self-hosted ticket / helpdesk system that is
 **database-compatible with OTRS 6.0.x and Znuny 6.0–7.3** (MariaDB/MySQL and
 PostgreSQL). It is a clean-room reimplementation (Python FastAPI + React), not a
@@ -383,10 +380,25 @@ approximation.
 
 Core functionality is implemented and covered by automated tests, including
 schema-matrix (Layer A) and multi-peer golden-master (Layer B) checks for
-OTRS/Znuny **6.0–7.3**. The product is still under active development: production
-cutover against a live Znuny estate has not been performed with this codebase,
-and APIs may still change. Schema ownership defaults **off** and requires an
+OTRS/Znuny **6.0–7.3**. Schema ownership defaults **off** and requires an
 explicit operator action — see [docs/cutover.md](./docs/cutover.md).
+
+### Znuny feature parity
+
+Day-to-day agent, customer-portal and admin work is covered. What is still
+missing or narrower than Znuny (last reviewed 2026-10-01):
+
+- **Missing:** saved searches, configurable dashboard widgets, link overview
+  and link-type admin, admin screens for sessions / SQL box / maintenance /
+  system log, calendar admin and appointment rules, portal print view.
+- **Partial:** statistics (fixed reports instead of the Znuny stats framework),
+  GenericAgent execution, bulk actions, user preferences, GenericInterface
+  edge cases, process conditions/actions.
+- **By design:** Package Manager (OPM), process designer, SysConfig edit UI,
+  GenericInterface webservice editor/requester.
+
+The maintained, detailed list lives in
+[docs/compatibility.md](./docs/compatibility.md#znuny-features-not-implemented).
 
 ## Documentation
 

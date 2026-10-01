@@ -385,26 +385,66 @@ MariaDB and validated:
 
 ## Znuny features not implemented
 
+*Last reviewed: 2026-10-01. This is the single maintained parity list — update
+the row when a gap is closed (and mirror the summary in the README if the
+headline changes).*
+
 Tiqora covers the agent, customer-portal and admin surface used in day-to-day
-operation. The following Znuny features are **not** implemented; most are
-deliberate platform choices, a few are open work.
+operation. Status values: **missing** (open work), **partial** (exists, but
+narrower than Znuny), **by design** (deliberate platform choice).
 
-**Out of scope (by design)**
+### Agent UI
 
-- Process *designer*: processes are imported from Znuny and executed, the
-  admin UI is list/detail only (see [process-management.md](process-management.md)).
-- SysConfig edit/deploy UI — settings are read from the `sysconfig_*` tables;
-  change them in Znuny or via `Admin::Config::Update`.
-- Package Manager (OPM), Support Data Collector, Cloud Services, OTRSBusiness,
-  web installer.
-- Znuny Stats framework (Tiqora ships fixed reports under `/api/v1/stats`).
-- Admin screens for sessions, SelectBox SQL, performance log and system
-  maintenance windows (a user's sessions can be revoked from user admin).
-- GenericInterface requester side and GI webservice admin (see
-  [What is not emulated](#what-is-not-emulated-and-why)).
+| Znuny feature | Status | Note |
+|---|---|---|
+| Saved searches | missing | Search supports filters/tokens, but they cannot be saved |
+| Configurable dashboard widgets | missing | Fixed dashboard sections, no per-agent layout |
+| Link overview / link-type admin | missing | Ticket links can be listed and created; no delete, overview page or FAQ/appointment targets |
+| Note to linked tickets (`AgentTicketNoteToLinkedTicket`) | missing | |
+| Stats framework | partial | Fixed reports under `/api/v1/stats` (volume, open snapshot, SLA, workload, backlog) with CSV export; no configurable statistics, no scheduled delivery |
+| Bulk action | partial | State, priority, owner, queue, lock only |
+| Preferences | partial | Language, TOTP/passkeys; no queue favourites, ticket-list options or notification matrix |
+| Free-text edit screen | partial | Dynamic fields shown in header and on new-ticket screens |
 
-**Open**
+### Admin
 
-- "Note to linked tickets" (Znuny's `AgentTicketNoteToLinkedTicket`).
-- Customer portal: print view.
-- Hybrid (vector + keyword) Meilisearch retrieval for KB/RAG.
+| Znuny feature | Status | Note |
+|---|---|---|
+| SysConfig edit/deploy UI | by design | Settings are read from `sysconfig_*`; change them in Znuny or via `Admin::Config::Update` |
+| Package Manager (OPM), Support Data Collector, Cloud Services, OTRSBusiness, web installer | by design | |
+| Sessions, SelectBox SQL, performance log, maintenance windows | missing | A user's sessions can be revoked from user admin |
+| General system log / communication log | missing | Mail log and AI audit exist |
+| Calendar admin, ticket appointment rules (queue/SLA) | missing | Agent calendar exists; only the calendar name is set on queue/SLA |
+| DynamicFieldScreen admin | missing | Screen assignment is read, not editable |
+| `group_customer` (company level) assignment | missing | `group_customer_user` is implemented |
+
+### GenericInterface
+
+| Znuny feature | Status | Note |
+|---|---|---|
+| Webservice admin / editor | by design | Webservices are loaded from the database; no editor |
+| Requester side / invokers | by design | See [What is not emulated](#what-is-not-emulated-and-why) |
+| `ArticleSend`, `TimeUnit`, multiple articles in TicketCreate/Update | partial | See [TicketCreate / TicketUpdate](#ticketcreate--ticketupdate--deferred-side-effects) |
+| TicketSearch `Created*`, flags, attachment search, `Result=COUNT` | partial | See [partial fidelity](#ticketget--search--session--timeaccounting--partial-fidelity) |
+
+### Processes, daemon, calendar
+
+| Znuny feature | Status | Note |
+|---|---|---|
+| Process designer | by design | Processes are imported and executed; admin UI is list/detail ([process-management.md](process-management.md)) |
+| `Module` conditions, `ExecuteInvoker`/`Appointment*`/`ConfigItemUpdate` actions, smart tags | missing | Logged as unsupported |
+| GenericAgent execution | partial | Pragmatic subset: no absolute `TimeSlot`, `Next`/`After`, dynamic-field criteria; off by default |
+| Edit single occurrence of a recurring appointment | missing | Exclusion list (`recur_exclude`) instead |
+
+### Customer portal
+
+| Znuny feature | Status | Note |
+|---|---|---|
+| Print view | missing | |
+| Follow-up "new ticket" (`queue.follow_up_id == 3`) | missing | Behaves like reopen |
+
+### Search / AI
+
+| Znuny feature | Status | Note |
+|---|---|---|
+| Hybrid (vector + keyword) retrieval for KB/RAG | missing | Planned |
