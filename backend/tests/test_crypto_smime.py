@@ -173,3 +173,44 @@ def test_sign_with_encrypted_key_needs_secret(engine: SmimeEngine, tmp_path: Pat
     result = engine.verify(signed, ca_path=str(ca_file))
     assert result.valid is True
     assert result.chain_trusted is True
+
+
+# ---------------------------------------------------------------------------
+# public roots (bundled Mozilla e-mail trust anchors)
+# ---------------------------------------------------------------------------
+
+
+def test_extra_ca_files_are_merged_with_ca_path(engine: SmimeEngine, tmp_path: Path) -> None:
+    """openssl takes one -CAfile: a CA in either file must anchor the chain."""
+    from tests._smime_fixtures import make_ca, make_leaf
+
+    ca, other = make_ca(), make_ca("Unrelated Test CA")
+    leaf = make_leaf("signer@example.org", ca=ca)
+    cert, key = tmp_path / "leaf.pem", tmp_path / "leaf.key"
+    cert.write_bytes(leaf.cert_pem)
+    key.write_bytes(leaf.key_pem)
+    ca_file, other_file = tmp_path / "ca.pem", tmp_path / "other.pem"
+    ca_file.write_bytes(ca.cert_pem)
+    other_file.write_bytes(other.cert_pem)
+    signed = engine.sign(b"data", str(cert), str(key))
+
+    result = engine.verify(signed, ca_path=str(other_file), extra_ca_files=[str(ca_file)])
+    assert result.valid is True
+    assert result.chain_trusted is True
+
+    unrelated = engine.verify(signed, extra_ca_files=[str(other_file)])
+    assert unrelated.valid is False
+
+
+def test_public_roots_bundle_has_email_only_roots() -> None:
+    """The point of the bundle: roots Debian's TLS-only ca-certificates lacks."""
+    from tiqora.crypto.smime import PUBLIC_ROOTS_FILE
+
+    pem = Path(PUBLIC_ROOTS_FILE).read_text(encoding="utf-8")
+    assert pem.count("-----BEGIN CERTIFICATE-----") > 50
+    for label in (
+        "HARICA Client RSA Root CA 2021",
+        "USERTrust RSA Certification Authority",
+        "T-TeleSec GlobalRoot Class 2",
+    ):
+        assert f"# {label}\n" in pem

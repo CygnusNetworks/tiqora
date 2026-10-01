@@ -143,6 +143,16 @@ async def test_resolve_crypto_config_uses_layers() -> None:
     assert cfg.pgp.trusted_network is False
     assert cfg.pgp.options == ("--trust-model", "always")
     assert cfg.pgp.method == "Detached"
+    assert cfg.smime.public_roots is True
+
+
+async def test_public_roots_default_on_and_env_can_turn_it_off() -> None:
+    sc = _LayeredSysConfig({}, _DEFAULTS)
+    off = Settings(crypto_smime_public_roots=False)
+    cfg = await resolve_crypto_config(off, sc, _tq(smime__public_roots="1"))  # type: ignore[arg-type]
+    assert cfg.smime.public_roots is False
+    cfg = await resolve_crypto_config(Settings(), sc, _tq(smime__public_roots="0"))  # type: ignore[arg-type]
+    assert cfg.smime.public_roots is False
 
 
 @pytest.mark.parametrize(

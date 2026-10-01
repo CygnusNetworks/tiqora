@@ -228,6 +228,7 @@ point the env overrides at them:
 | `TIQORA_CRYPTO_SMIME_PRIVATE_DIR` | *(unset → `SMIME::PrivatePath`)* | `<hash>.<n>` keys + `.P` secrets. |
 | `TIQORA_CRYPTO_OPENSSL_BIN` | *(unset → `SMIME::Bin` if present, else `openssl`)* | |
 | `TIQORA_CRYPTO_SMIME_CA_PATH` | *(empty)* | Optional CA bundle for signature chain checks. |
+| `TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS` | *(admin setting, default `true`)* | Trust the bundled Mozilla e-mail roots (HARICA/GEANT, Sectigo, T-TeleSec, D-Trust, DigiCert, …) when checking inbound S/MIME signatures, so signatures from public CAs show as verified. Regenerate the bundle with `scripts/update-smime-roots.py`. |
 
 Compose wiring for `tiqora-api` **and** `tiqora-worker` (the worker runs the
 postmaster, which verifies/decrypts inbound mail):

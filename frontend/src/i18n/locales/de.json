@@ -3360,6 +3360,10 @@
             "help": "Zusätzliche CA-Bundle-Datei (PEM) für die Kettenprüfung. Nur in Tiqora, kein Znuny-Setting.",
             "placeholder": "optional"
           },
+          "public_roots": {
+            "label": "Öffentlichen CAs vertrauen",
+            "help": "Signaturen mit Zertifikaten einer öffentlichen CA (Mozillas Root-Liste für E-Mail, z. B. HARICA/GEANT, Sectigo, T-TeleSec, D-Trust, DigiCert) gelten als geprüft. Nur in Tiqora, kein Znuny-Setting."
+          },
           "fetch_from_customer": {
             "label": "Zertifikate vom Kunden holen",
             "help": "Übernimmt S/MIME-Zertifikate aus dem Kundenbenutzer-Attribut UserSMIMECertificate (Znuny: SMIME::FetchFromCustomer)."

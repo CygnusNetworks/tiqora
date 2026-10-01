@@ -26,7 +26,8 @@ Znuny articles, see :mod:`tiqora.crypto.article_view`):
 Trust:
 
 * S/MIME chains are validated with ``SMIME::CertPath`` as ``-CApath`` (plus
-  the optional ``TIQORA_CRYPTO_SMIME_CA_PATH`` bundle and openssl's default
+  the optional ``TIQORA_CRYPTO_SMIME_CA_PATH`` bundle, the bundled Mozilla
+  e-mail roots unless ``smime.public_roots`` is off, and openssl's default
   store, like Znuny's call). Signer-relation CAs live in CertPath, so they are
   trust anchors automatically. A signature that is cryptographically fine but
   whose chain does not validate is ``signed_untrusted`` (Znuny's ``-noverify``
@@ -60,7 +61,7 @@ from cryptography.x509.oid import NameOID
 from tiqora.crypto import CryptoError, CryptoUnavailableError
 from tiqora.crypto.config import CryptoConfig
 from tiqora.crypto.pgp import PgpEngine, PgpVerifyStatus
-from tiqora.crypto.smime import SmimeEngine
+from tiqora.crypto.smime import PUBLIC_ROOTS_FILE, SmimeEngine
 from tiqora.crypto.smime_store import SmimeStore, load_certificate
 from tiqora.crypto.smime_store import _emails as cert_emails
 
@@ -387,7 +388,8 @@ class _Walker:
         engine = self.smime()
         ca_dir = cfg.cert_path or None
         ca_file = cfg.ca_path or None
-        trusted = engine.verify(entity, ca_dir=ca_dir, ca_path=ca_file)
+        extra = (PUBLIC_ROOTS_FILE,) if cfg.public_roots else ()
+        trusted = engine.verify(entity, ca_dir=ca_dir, ca_path=ca_file, extra_ca_files=extra)
         result = trusted
         if not trusted.valid:
             result = engine.verify(entity, no_verify=True)

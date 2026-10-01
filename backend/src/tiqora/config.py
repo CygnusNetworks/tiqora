@@ -453,6 +453,12 @@ class Settings(BaseSettings):
     # (self-signed passes) — such messages are reported "signed_untrusted", not
     # "verified" (security review M4).
     crypto_smime_ca_path: str = Field(default="", validation_alias="TIQORA_CRYPTO_SMIME_CA_PATH")
+    # Trust Mozilla's e-mail roots (bundled, scripts/update-smime-roots.py) on
+    # top of CertPath / CA_PATH, so signatures from public CAs verify out of
+    # the box. None = not forced here (the admin value or the default, on).
+    crypto_smime_public_roots: bool | None = Field(
+        default=None, validation_alias="TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS"
+    )
     crypto_openssl_bin: str = Field(default="", validation_alias="TIQORA_CRYPTO_OPENSSL_BIN")
     # SMIME::FetchFromCustomer sources for the customer backend attribute
     # ``UserSMIMECertificate`` (Znuny maps it to an LDAP attribute or a DB

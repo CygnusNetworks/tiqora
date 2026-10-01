@@ -64,6 +64,8 @@ class SmimeConfig:
     private_path: str = ""
     #: Extra CA bundle (-CAfile) for chain validation, on top of CertPath (-CApath).
     ca_path: str = ""
+    #: Also trust the bundled Mozilla e-mail roots (``smime.PUBLIC_ROOTS_FILE``).
+    public_roots: bool = True
     #: ``SMIME::FetchFromCustomer`` — import certificates from the customer
     #: backend attribute ``UserSMIMECertificate`` (see ``customer_fetch``).
     fetch_from_customer: bool = False
@@ -92,6 +94,7 @@ class CryptoConfig:
                 cert_path=settings.crypto_smime_cert_dir,
                 private_path=settings.crypto_smime_private_dir,
                 ca_path=settings.crypto_smime_ca_path,
+                public_roots=settings.crypto_smime_public_roots is not False,
             ),
         )
 
@@ -195,6 +198,7 @@ async def resolve_crypto_config(
             cert_path=str(v("smime.cert_path")),
             private_path=str(v("smime.private_path")),
             ca_path=str(v("smime.ca_path")),
+            public_roots=bool(v("smime.public_roots")),
             fetch_from_customer=bool(v("smime.fetch_from_customer")),
             no_verify=bool(v("smime.no_verify")),
         ),
