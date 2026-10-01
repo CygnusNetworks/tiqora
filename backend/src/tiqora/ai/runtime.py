@@ -101,6 +101,7 @@ from tiqora.ai.models import (
 from tiqora.ai.output_guards import (
     CustomerMessageGuardError,
     strip_hallucinated_signoff,
+    strip_markdown_bold,
     validate_customer_message,
 )
 from tiqora.ai.pii import PiiMapper
@@ -989,7 +990,7 @@ async def _run_identity_exchange(
     kind = args.get("kind")
     body = args.get("body")
     if isinstance(body, str):
-        body = strip_hallucinated_signoff(body)
+        body = strip_markdown_bold(strip_hallucinated_signoff(body))
     subject_raw = args.get("subject")
     subject = subject_raw if isinstance(subject_raw, str) else ""
     if kind not in ("reply", "clarify") or not isinstance(body, str) or not body.strip():
