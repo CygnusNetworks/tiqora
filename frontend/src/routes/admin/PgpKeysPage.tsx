@@ -5,6 +5,8 @@ import { toBcp47 } from "@/i18n";
 import { api, ApiError, type PgpKeyOut } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CryptoStatusBanner } from "@/components/admin/CryptoStatusBanner";
+import { CryptoSettingsForm } from "@/components/admin/CryptoSettingsForm";
+import { CRYPTO_SETTINGS_KEY, useCryptoSettings } from "@/components/admin/cryptoSettingsQuery";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -38,6 +40,13 @@ export function PgpKeysPage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [details, setDetails] = useState<PgpKeyOut | null>(null);
+  const [passphraseKey, setPassphraseKey] = useState<PgpKeyOut | null>(null);
+  const [passphrase, setPassphrase] = useState("");
+  const [passphraseError, setPassphraseError] = useState<string | null>(null);
+  const settingsQ = useCryptoSettings();
+  const passphraseSource = (key: PgpKeyOut) =>
+    settingsQ.data?.pgp_passphrases.find((p) => p.fingerprint === key.fingerprint)?.source ??
+    "none";
 
   const listQ = useQuery({
     queryKey: QUERY_KEY,
@@ -66,6 +75,24 @@ export function PgpKeysPage() {
       await refresh();
     },
     onError: (err) => setNotice({ ok: false, text: errText(err) }),
+  });
+
+  const passphraseM = useMutation({
+    mutationFn: ({ key, value }: { key: PgpKeyOut; value: string | null }) =>
+      value === null
+        ? api.adminCrypto.pgpPassphraseDelete(key.fingerprint)
+        : api.adminCrypto.pgpPassphraseSet(key.fingerprint, value),
+    onSuccess: (data, { value }) => {
+      qc.setQueryData(CRYPTO_SETTINGS_KEY, data);
+      setPassphraseKey(null);
+      setPassphrase("");
+      setPassphraseError(null);
+      setNotice({
+        ok: true,
+        text: value === null ? t("admin.pgp.passphraseRemoved") : t("admin.pgp.passphraseSaved"),
+      });
+    },
+    onError: (err) => setPassphraseError(errText(err)),
   });
 
   const onDelete = async (key: PgpKeyOut, secretOnly: boolean) => {
@@ -118,6 +145,22 @@ export function PgpKeysPage() {
       render: (r) => (r.expires ? formatDateOnly(r.expires, locale) : t("admin.pgp.never")),
     },
     {
+      key: "passphrase",
+      header: t("admin.pgp.passphrase"),
+      render: (r) => {
+        if (!r.has_secret) return null;
+        const source = passphraseSource(r);
+        return (
+          <Badge
+            tone={source === "none" ? "warn" : "success"}
+            data-testid={`pgp-passphrase-${r.fingerprint}`}
+          >
+            {t(`admin.pgp.passphraseSource.${source}`, { defaultValue: source })}
+          </Badge>
+        );
+      },
+    },
+    {
       key: "status",
       header: t("admin.table.status"),
       render: (r) => (
@@ -150,6 +193,8 @@ export function PgpKeysPage() {
 
       <CryptoStatusBanner backend="pgp" />
 
+      <CryptoSettingsForm backend="pgp" />
+
       {notice ? (
         <p
           className={`text-sm ${notice.ok ? "text-green" : "text-danger"}`}
@@ -179,6 +224,26 @@ export function PgpKeysPage() {
               <MenuItem testId={`pgp-download-${r.fingerprint}`} onSelect={() => void onDownload(r)}>
                 {t("admin.pgp.download")}
               </MenuItem>
+              {r.has_secret && passphraseSource(r) !== "znuny" ? (
+                <MenuItem
+                  testId={`pgp-passphrase-set-${r.fingerprint}`}
+                  onSelect={() => {
+                    setPassphrase("");
+                    setPassphraseError(null);
+                    setPassphraseKey(r);
+                  }}
+                >
+                  {t("admin.pgp.passphraseSet")}
+                </MenuItem>
+              ) : null}
+              {r.has_secret && passphraseSource(r) === "tiqora" ? (
+                <MenuItem
+                  testId={`pgp-passphrase-remove-${r.fingerprint}`}
+                  onSelect={() => passphraseM.mutate({ key: r, value: null })}
+                >
+                  {t("admin.pgp.passphraseRemove")}
+                </MenuItem>
+              ) : null}
               {r.has_secret ? (
                 <MenuItem
                   danger
@@ -280,6 +345,53 @@ export function PgpKeysPage() {
             </dd>
           </dl>
         ) : null}
+      </Dialog>
+      <Dialog
+        open={passphraseKey !== null}
+        onClose={() => setPassphraseKey(null)}
+        title={t("admin.pgp.passphraseTitle", { key: passphraseKey?.znuny_key_id ?? "" })}
+        description={t("admin.pgp.passphraseDescription")}
+        footer={
+          <>
+            <Button onClick={() => setPassphraseKey(null)}>{t("common.cancel")}</Button>
+            <Button
+              variant="primary"
+              disabled={passphrase.length === 0 || passphraseM.isPending}
+              onClick={() => {
+                if (passphraseKey) passphraseM.mutate({ key: passphraseKey, value: passphrase });
+              }}
+              data-testid="pgp-passphrase-submit"
+            >
+              {passphraseM.isPending ? t("admin.pgp.passphraseChecking") : t("common.save")}
+            </Button>
+          </>
+        }
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (passphraseKey && passphrase) passphraseM.mutate({ key: passphraseKey, value: passphrase });
+          }}
+          className="space-y-2"
+        >
+          <p className="break-all text-sm text-muted">{passphraseKey?.uids.join(", ")}</p>
+          <label className="block text-sm">
+            <span className="mb-1 block text-muted">{t("admin.pgp.passphrase")}</span>
+            <input
+              type="password"
+              value={passphrase}
+              onChange={(e) => setPassphrase(e.target.value)}
+              autoComplete="new-password"
+              data-testid="pgp-passphrase-input"
+              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-1.5 text-sm text-ink"
+            />
+          </label>
+          {passphraseError ? (
+            <p className="text-sm text-danger" data-testid="pgp-passphrase-error">
+              {passphraseError}
+            </p>
+          ) : null}
+        </form>
       </Dialog>
       {confirmDialog}
     </div>

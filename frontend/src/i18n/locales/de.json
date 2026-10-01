@@ -3156,7 +3156,7 @@
       "disabled": "Deaktiviert",
       "usable": "Einsatzbereit",
       "unusable": "Nicht nutzbar",
-      "disabledHint": "Schlüssel lassen sich verwalten, Tiqora signiert, verschlüsselt, entschlüsselt und prüft aber erst, wenn das Backend aktiviert ist (SysConfig „{{setting}}“ oder TIQORA_CRYPTO_{{setting}}_ENABLED).",
+      "disabledHint": "Schlüssel lassen sich verwalten, Tiqora signiert, verschlüsselt, entschlüsselt und prüft aber erst, wenn das Backend unten in den Einstellungen aktiviert ist ({{setting}}).",
       "path": {
         "homedir": "Schlüsselbund (--homedir)",
         "cert_path": "Zertifikate (SMIME::CertPath)",
@@ -3165,7 +3165,7 @@
     },
     "pgp": {
       "title": "PGP-Schlüssel",
-      "description": "Der Schlüsselbund wird mit Znuny geteilt (PGP::Options --homedir). Passphrasen kommen aus der SysConfig-Einstellung PGP::Key::Password.",
+      "description": "Der Schlüsselbund wird mit Znuny geteilt (PGP::Options --homedir). Passphrasen für geheime Schlüssel setzt du über das Menü des Schlüssels.",
       "upload": "Schlüssel importieren",
       "uploading": "Importiere …",
       "uploadTitle": "PGP-Schlüssel importieren",
@@ -3200,7 +3200,21 @@
       "deleteConfirm": "Schlüssel {{key}} samt geheimem Teil aus dem gemeinsamen Schlüsselbund löschen?",
       "deleted": "Schlüssel gelöscht.",
       "empty": "Keine PGP-Schlüssel im Schlüsselbund.",
-      "loadError": "PGP-Schlüssel konnten nicht geladen werden"
+      "loadError": "PGP-Schlüssel konnten nicht geladen werden",
+      "passphrase": "Passphrase",
+      "passphraseSource": {
+        "none": "fehlt",
+        "tiqora": "gesetzt",
+        "znuny": "aus Znuny",
+        "znuny_default": "Znuny-Standard"
+      },
+      "passphraseSet": "Passphrase setzen",
+      "passphraseRemove": "Passphrase entfernen",
+      "passphraseTitle": "Passphrase für {{key}}",
+      "passphraseDescription": "Wird vor dem Speichern mit einer Probesignatur geprüft und verschlüsselt abgelegt. Sie wird nie wieder angezeigt.",
+      "passphraseChecking": "Prüfe …",
+      "passphraseSaved": "Passphrase geprüft und gespeichert.",
+      "passphraseRemoved": "Passphrase entfernt."
     },
     "smime": {
       "title": "S/MIME-Zertifikate",
@@ -3254,6 +3268,86 @@
       "renamed": "Neu nummeriert: {{renamed}}.",
       "empty": "Keine S/MIME-Zertifikate gespeichert.",
       "loadError": "S/MIME-Zertifikate konnten nicht geladen werden"
+    },
+    "cryptoSettings": {
+      "title": "Einstellungen",
+      "description": "Wie Znunys SysConfig. Ein Wert aus einer Umgebungsvariable oder aus Znunys SysConfig hat Vorrang und ist hier gesperrt.",
+      "save": "Speichern",
+      "saving": "Speichere …",
+      "saved": "Gespeichert.",
+      "reset": "Tiqora-Wert entfernen",
+      "shadowed": "Der hier gespeicherte Tiqora-Wert greift erst, wenn dieser Wert entfernt wird.",
+      "loadError": "Einstellungen konnten nicht geladen werden",
+      "choiceAuto": "(gpg entscheidet)",
+      "source": {
+        "env": "Umgebungsvariable {{name}} – hat Vorrang",
+        "znuny": "In Znuny-SysConfig gesetzt ({{name}}) – hat Vorrang",
+        "tiqora": "In Tiqora gesetzt",
+        "znunyDefault": "Znuny-Standard ({{name}})",
+        "default": "Standard"
+      },
+      "fields": {
+        "pgp": {
+          "enabled": {
+            "label": "PGP aktiv",
+            "help": "Schaltet Signieren, Verschlüsseln, Entschlüsseln und Prüfen mit PGP ein (Znuny: PGP). Schlüssel lassen sich auch bei ausgeschaltetem PGP verwalten."
+          },
+          "gpg_bin": {
+            "label": "gpg-Programm",
+            "help": "Pfad oder Name des gpg-Programms (Znuny: PGP::Bin). Gibt es den Pfad hier nicht, sucht Tiqora gpg im PATH."
+          },
+          "homedir": {
+            "label": "Schlüsselbund",
+            "help": "Verzeichnis des gpg-Schlüsselbunds (Znuny: --homedir in PGP::Options). Muss für Tiqora beschreibbar sein und Neustarts überstehen."
+          },
+          "options": {
+            "label": "Weitere gpg-Optionen",
+            "help": "Zusätzliche Optionen für jeden gpg-Aufruf, z. B. --trust-model always (Znuny: PGP::Options ohne --homedir). --batch und --no-tty setzt Tiqora selbst."
+          },
+          "digest": {
+            "label": "Signatur-Digest",
+            "help": "Bevorzugter Hash für Signaturen (Znuny: PGP::Options::DigestPreference)."
+          },
+          "method": {
+            "label": "Methode ohne Rich-Text",
+            "help": "Detached (PGP/MIME) oder Inline, wenn Benachrichtigungen als reiner Text gehen (Znuny: PGP::Method)."
+          },
+          "trusted_network": {
+            "label": "Allen Schlüsseln vertrauen",
+            "help": "Verschlüsselt auch an Schlüssel, die nicht beglaubigt sind (Znuny: PGP::TrustedNetwork). Importierte Kundenschlüssel sind praktisch nie beglaubigt; ausgeschaltet scheitert das Verschlüsseln an sie."
+          }
+        },
+        "smime": {
+          "enabled": {
+            "label": "S/MIME aktiv",
+            "help": "Schaltet Signieren, Verschlüsseln, Entschlüsseln und Prüfen mit S/MIME ein (Znuny: SMIME)."
+          },
+          "openssl_bin": {
+            "label": "openssl-Programm",
+            "help": "Pfad oder Name des openssl-Programms (Znuny: SMIME::Bin). Gibt es den Pfad hier nicht, sucht Tiqora openssl im PATH."
+          },
+          "cert_path": {
+            "label": "Zertifikate",
+            "help": "Verzeichnis der Zertifikate im Znuny-Layout <Hash>.<n>, zugleich Vertrauensanker für Signaturprüfungen (Znuny: SMIME::CertPath)."
+          },
+          "private_path": {
+            "label": "Private Schlüssel",
+            "help": "Verzeichnis der privaten Schlüssel, Secret jeweils in <Datei>.P (Znuny: SMIME::PrivatePath)."
+          },
+          "ca_path": {
+            "label": "CA-Datei",
+            "help": "Zusätzliche CA-Bundle-Datei (PEM) für die Kettenprüfung. Nur in Tiqora, kein Znuny-Setting."
+          },
+          "fetch_from_customer": {
+            "label": "Zertifikate vom Kunden holen",
+            "help": "Übernimmt S/MIME-Zertifikate aus dem Kundenbenutzer-Attribut UserSMIMECertificate (Znuny: SMIME::FetchFromCustomer)."
+          },
+          "no_verify": {
+            "label": "Signer nicht prüfen",
+            "help": "Eine kryptografisch gültige Signatur gilt als geprüft, auch wenn die Zertifikatskette nicht vertrauenswürdig ist (Znuny: SMIME::NoVerify). Nur einschalten, wenn keine CA-Kette verfügbar ist."
+          }
+        }
+      }
     }
   },
   "kb": {

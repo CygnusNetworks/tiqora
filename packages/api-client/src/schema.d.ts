@@ -1682,6 +1682,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/crypto-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Crypto Settings */
+        get: operations["get_crypto_settings_api_v1_admin_crypto_settings_get"];
+        /**
+         * Put Crypto Settings
+         * @description Store Tiqora values. 422 for unknown fields / invalid values, 409 for locked ones.
+         */
+        put: operations["put_crypto_settings_api_v1_admin_crypto_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/crypto-settings/pgp-passphrases/{key_ref}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Pgp Passphrase */
+        put: operations["put_pgp_passphrase_api_v1_admin_crypto_settings_pgp_passphrases__key_ref__put"];
+        post?: never;
+        /** Delete Pgp Passphrase */
+        delete: operations["delete_pgp_passphrase_api_v1_admin_crypto_settings_pgp_passphrases__key_ref__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/customer-companies": {
         parameters: {
             query?: never;
@@ -9806,6 +9845,48 @@ export interface components {
             /** Warnings */
             warnings?: string[];
         };
+        /** CryptoSettingOut */
+        CryptoSettingOut: {
+            /** Choices */
+            choices?: string[];
+            /** Env Var */
+            env_var?: string | null;
+            /** Kind */
+            kind: string;
+            /** Locked */
+            locked: boolean;
+            /** Name */
+            name: string;
+            /** Source */
+            source: string;
+            /** Tiqora Value */
+            tiqora_value?: unknown;
+            /** Value */
+            value: unknown;
+            /** Znuny Setting */
+            znuny_setting?: string | null;
+        };
+        /** CryptoSettingsOut */
+        CryptoSettingsOut: {
+            /** Pgp */
+            pgp: components["schemas"]["CryptoSettingOut"][];
+            /** Pgp Passphrases */
+            pgp_passphrases: components["schemas"]["PgpPassphraseOut"][];
+            /** Pgp Passphrases Error */
+            pgp_passphrases_error?: string | null;
+            /** Smime */
+            smime: components["schemas"]["CryptoSettingOut"][];
+        };
+        /**
+         * CryptoSettingsUpdate
+         * @description Field name → new Tiqora value; ``null`` clears the Tiqora value.
+         */
+        CryptoSettingsUpdate: {
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
         /** CustomerCompanyCreate */
         CustomerCompanyCreate: {
             /** City */
@@ -12472,6 +12553,22 @@ export interface components {
             uids: string[];
             /** Znuny Key Id */
             znuny_key_id: string;
+        };
+        /** PgpPassphraseIn */
+        PgpPassphraseIn: {
+            /** Passphrase */
+            passphrase: string;
+        };
+        /** PgpPassphraseOut */
+        PgpPassphraseOut: {
+            /** Fingerprint */
+            fingerprint: string;
+            /** Key Id */
+            key_id: string;
+            /** Source */
+            source: string;
+            /** Uids */
+            uids: string[];
         };
         /** PgpUploadIn */
         PgpUploadIn: {
@@ -19710,6 +19807,150 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CryptoBackendStatusOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_crypto_settings_api_v1_admin_crypto_settings_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CryptoSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_crypto_settings_api_v1_admin_crypto_settings_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CryptoSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CryptoSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_pgp_passphrase_api_v1_admin_crypto_settings_pgp_passphrases__key_ref__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key_ref: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PgpPassphraseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CryptoSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_pgp_passphrase_api_v1_admin_crypto_settings_pgp_passphrases__key_ref__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key_ref: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CryptoSettingsOut"];
                 };
             };
             /** @description Validation Error */

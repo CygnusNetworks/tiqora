@@ -10,6 +10,10 @@ const pgpList = vi.fn();
 const pgpUpload = vi.fn();
 const pgpDelete = vi.fn();
 const pgpExport = vi.fn();
+const settings = vi.fn();
+const settingsUpdate = vi.fn();
+const pgpPassphraseSet = vi.fn();
+const pgpPassphraseDelete = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {},
@@ -20,6 +24,10 @@ vi.mock("@/lib/api", () => ({
       pgpUpload: (...a: unknown[]) => pgpUpload(...a),
       pgpDelete: (...a: unknown[]) => pgpDelete(...a),
       pgpExport: (...a: unknown[]) => pgpExport(...a),
+      settings: (...a: unknown[]) => settings(...a),
+      settingsUpdate: (...a: unknown[]) => settingsUpdate(...a),
+      pgpPassphraseSet: (...a: unknown[]) => pgpPassphraseSet(...a),
+      pgpPassphraseDelete: (...a: unknown[]) => pgpPassphraseDelete(...a),
     },
   },
 }));
@@ -42,6 +50,51 @@ const secretKey = {
   subkey_ids: ["197CBF6EFB862437"],
 };
 
+function settingsOut(passphraseSource: string) {
+  return {
+    pgp: [
+      {
+        name: "pgp.enabled",
+        kind: "bool",
+        choices: [],
+        value: false,
+        source: "znuny_default",
+        locked: false,
+        tiqora_value: null,
+        znuny_setting: "PGP",
+        env_var: "TIQORA_CRYPTO_PGP_ENABLED",
+      },
+      {
+        name: "pgp.homedir",
+        kind: "str",
+        choices: [],
+        value: "/keys/gnupg",
+        source: "env",
+        locked: true,
+        tiqora_value: null,
+        znuny_setting: "PGP::Options",
+        env_var: "TIQORA_CRYPTO_PGP_GNUPGHOME",
+      },
+      {
+        name: "pgp.method",
+        kind: "choice",
+        choices: ["Detached", "Inline"],
+        value: "Detached",
+        source: "znuny",
+        locked: true,
+        tiqora_value: "Inline",
+        znuny_setting: "PGP::Method",
+        env_var: null,
+      },
+    ],
+    smime: [],
+    pgp_passphrases: [
+      { fingerprint: FP, key_id: "FB862437", uids: secretKey.uids, source: passphraseSource },
+    ],
+    pgp_passphrases_error: null,
+  };
+}
+
 function renderPage() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -57,7 +110,19 @@ function renderPage() {
 
 describe("PgpKeysPage", () => {
   beforeEach(() => {
-    for (const fn of [status, pgpList, pgpUpload, pgpDelete, pgpExport]) fn.mockReset();
+    for (const fn of [
+      status,
+      pgpList,
+      pgpUpload,
+      pgpDelete,
+      pgpExport,
+      settings,
+      settingsUpdate,
+      pgpPassphraseSet,
+      pgpPassphraseDelete,
+    ])
+      fn.mockReset();
+    settings.mockResolvedValue(settingsOut("none"));
     status.mockResolvedValue([
       {
         backend: "pgp",
@@ -127,5 +192,49 @@ describe("PgpKeysPage", () => {
     fireEvent.click(screen.getByTestId(`admin-row-menu-trigger-${FP}`));
     fireEvent.click(await screen.findByTestId(`pgp-details-${FP}`));
     expect(await screen.findByTestId("pgp-details")).toHaveTextContent(FP);
+  });
+
+  it("shows sources, locks env/Znuny fields and saves only changed Tiqora values", async () => {
+    settingsUpdate.mockResolvedValue(settingsOut("none"));
+    renderPage();
+    const enabled = await screen.findByTestId("crypto-setting-pgp-enabled");
+    expect(screen.getByTestId("crypto-setting-pgp-homedir")).toBeDisabled();
+    expect(screen.getByTestId("crypto-setting-pgp-homedir-source")).toHaveTextContent(
+      "TIQORA_CRYPTO_PGP_GNUPGHOME",
+    );
+    expect(screen.getByTestId("crypto-setting-pgp-method-source")).toHaveTextContent(
+      i18n.t("admin.cryptoSettings.source.znuny", { name: "PGP::Method" }),
+    );
+    expect(screen.getByTestId("crypto-setting-pgp-method-row")).toHaveTextContent(
+      i18n.t("admin.cryptoSettings.shadowed"),
+    );
+    expect(screen.getByTestId("crypto-settings-save-pgp")).toBeDisabled();
+    fireEvent.click(enabled);
+    fireEvent.click(screen.getByTestId("crypto-settings-save-pgp"));
+    await waitFor(() => expect(settingsUpdate).toHaveBeenCalledWith({ "pgp.enabled": true }));
+  });
+
+  it("sets a passphrase for a secret key and shows wrong-passphrase errors", async () => {
+    pgpPassphraseSet.mockRejectedValueOnce(new Error("wrong passphrase for this PGP key"));
+    pgpPassphraseSet.mockResolvedValueOnce(settingsOut("tiqora"));
+    renderPage();
+    expect(await screen.findByTestId(`pgp-passphrase-${FP}`)).toHaveTextContent(
+      i18n.t("admin.pgp.passphraseSource.none"),
+    );
+    fireEvent.click(screen.getByTestId(`admin-row-menu-trigger-${FP}`));
+    fireEvent.click(await screen.findByTestId(`pgp-passphrase-set-${FP}`));
+    fireEvent.change(await screen.findByTestId("pgp-passphrase-input"), {
+      target: { value: "nope" },
+    });
+    fireEvent.click(screen.getByTestId("pgp-passphrase-submit"));
+    expect(await screen.findByTestId("pgp-passphrase-error")).toHaveTextContent("wrong passphrase");
+    fireEvent.change(screen.getByTestId("pgp-passphrase-input"), { target: { value: "right" } });
+    fireEvent.click(screen.getByTestId("pgp-passphrase-submit"));
+    await waitFor(() => expect(pgpPassphraseSet).toHaveBeenLastCalledWith(FP, "right"));
+    await waitFor(() =>
+      expect(screen.getByTestId(`pgp-passphrase-${FP}`)).toHaveTextContent(
+        i18n.t("admin.pgp.passphraseSource.tiqora"),
+      ),
+    );
   });
 });

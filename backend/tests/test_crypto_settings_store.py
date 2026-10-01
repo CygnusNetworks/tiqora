@@ -76,6 +76,13 @@ async def test_znuny_set_value_beats_tiqora_and_locks() -> None:
     assert fields["pgp.options"].value == "" and fields["pgp.options"].locked
 
 
+async def test_empty_tiqora_value_is_explicit() -> None:
+    fields = await store.resolve_fields(
+        Settings(), _LayeredSysConfig({}, _DEFAULTS), _tq(pgp__digest="")
+    )
+    assert fields["pgp.digest"].value == "" and fields["pgp.digest"].source == "tiqora"
+
+
 async def test_env_beats_everything() -> None:
     sc = _LayeredSysConfig({"PGP::Options": "--homedir /znuny/gpg"}, _DEFAULTS)
     settings = Settings(TIQORA_CRYPTO_PGP_GNUPGHOME="/env/gpg", TIQORA_CRYPTO_PGP_ENABLED="0")
