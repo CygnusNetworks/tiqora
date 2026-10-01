@@ -1499,6 +1499,8 @@ async def create_article(
                     attachments=attachments,
                     telegram=telegram_options,
                     email_security=body.email_security,
+                    # Sent (also as null) = the agent's choice; omitted = queue default.
+                    email_security_explicit="email_security" in body.model_fields_set,
                 ),
             )
             if body.state_id is not None:
@@ -1704,6 +1706,7 @@ async def forward_article_endpoint(
                 to_address=body.to_address,
                 cc=body.cc,
                 email_security=body.email_security,
+                email_security_explicit="email_security" in body.model_fields_set,
             )
     except (WriteAccessDenied, WriteNotFound, InvalidInput, OutboundMailError) as exc:
         raise _map_exc(exc) from exc

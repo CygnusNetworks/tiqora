@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Co se stane, když zákazník odpoví na již uzavřený tiket v této frontě: podle volby se tiket znovu otevře, odpověď se odmítne, nebo se místo toho vytvoří úplně nový tiket.",
         "followUpLock": "Automaticky odemkne zamčený tiket zpět jeho řešiteli, jakmile dorazí zákaznická follow-up zpráva.",
         "calendarName": "Odkazuje na kalendář pracovní doby (svátky, otevírací doba) pro výpočet eskalací. Prázdné = výchozí kalendář 24/7.",
-        "defaultSignKey": "Název PGP/S-MIME klíče pro automatické podepisování odchozí pošty z této fronty. Prázdné = bez automatického podpisu."
+        "defaultSignKey": "Název PGP/S-MIME klíče pro automatické podepisování odchozí pošty z této fronty. Prázdné = bez automatického podpisu.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Chování řídí typ — ne název: typy „new“/„open“/„pending“ se počítají jako otevřené tikety, zatímco „merged“ tiket skryje z běžného hledání (záznam zůstane). Více názvů stavů může sdílet stejný typ."
@@ -2108,7 +2111,14 @@
       "yes": "Ano",
       "no": "Ne",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Stavy",

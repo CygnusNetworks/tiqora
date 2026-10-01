@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Шта се дешава када купац одговори на већ затворену карту у овом реду: у зависности од опције, тикет се поново отвара, одговор се одбија или се уместо тога креира потпуно нова карта.",
         "followUpLock": "Аутоматски откључава закључану карту назад њеном власнику чим клијент стигне.",
         "calendarName": "Реферира се на календар радног времена (празници, радно време) који се користи приликом израчунавања ескалације. Празно = подразумевани календар који ради нон-стоп.",
-        "defaultSignKey": "Назив ПГП/С-МИМЕ кључа који се користи за аутоматско потписивање одлазне поште из овог реда. Празно = нема аутоматског потписивања."
+        "defaultSignKey": "Назив ПГП/С-МИМЕ кључа који се користи за аутоматско потписивање одлазне поште из овог реда. Празно = нема аутоматског потписивања.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Тип — не име — покреће понашање: типови „нови“/„отворени“/„на чекању“ се рачунају као отворене тикете, док „спојен“ сакрива тикет од уобичајене претраге (сама евиденција се чува). Више имена држава може да дели исти тип."
@@ -2108,7 +2111,14 @@
       "yes": "Да",
       "no": "бр",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "државе",

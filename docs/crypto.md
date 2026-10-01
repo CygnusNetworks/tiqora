@@ -422,9 +422,9 @@ mail verbatim). Forward now really sends (send-then-store like a reply,
   S/MIME file names). Omitted: the first usable key of every To/Cc/Bcc
   recipient (Znuny's preselection). An explicit selection must cover every
   recipient (Znuny `_CheckRecipient`).
-- Omitted/`null` `email_security` = plain mail. The server does **not**
-  apply the queue default on its own (API clients, AI replies and process
-  automation keep sending as before); the compose UI preselects it.
+- `email_security: null` (sent explicitly) = plain mail. **Omitted** = the
+  queue's security defaults apply (see *Queue security defaults* below) —
+  the same as for AI replies, auto-responses, process and MCP sends.
 
 Errors: **422** `email_security: no usable PGP encryption key: a@x
 (missing), b@y (expired)` — reasons `missing`, `expired`, `revoked`,
@@ -437,21 +437,49 @@ ticket) and `GET /tickets/crypto-options?queue_id=&to=…` (new ticket,
 `create` on the queue) return per enabled backend the sign keys for the
 sender (the queue's system address; the queue default key is always listed),
 the methods, each recipient's keys with status (`ok`, `missing`, `expired`,
-`revoked`) and the preselected key, `can_encrypt`, and top-level `default`
-(the queue's `default_sign_key` as an `email_security` object, or `null`) and
-`warnings` (default key missing/expired, backend disabled). With both
+`revoked`) and the preselected key, `can_encrypt`, and top-level
+`queue_sign` (the queue's usable `default_sign_key` as an `email_security`
+object), `default` (what the queue policy selects for this mail, possibly
+with `encrypt: true`, or `null`), `modes` (what the composer offers),
+`sign_default`, `encrypt_policy`, `blocked` (required encryption impossible)
+and `warnings` (default key missing/expired, backend disabled). With both
 backends off: `{"enabled": false}`.
+
+### Queue security defaults
+
+Per queue (admin queue form, section *E-Mail-Sicherheit*, shown only while
+PGP or S/MIME is enabled and usable; stored in `tiqora_settings` as
+`queue_security.<queue_id>`, see `tiqora.crypto.queue_security`):
+
+| Setting | Values | Effect |
+|---|---|---|
+| sign key | Znuny `default_sign_key` | without one, signing is not offered |
+| `email_sign_default` | on (default) / off | sign with the queue key unless the sender opts out; the option shows only with a sign key |
+| `email_encrypt` | `off` (default) / `auto` / `required` | `off`: encryption not offered. `auto`: encrypt when every recipient has a usable key, else plain (signed if on). `required`: no usable key for a recipient → nothing is sent |
+
+The decision (`decide`) runs for the composer preselection **and** for every
+mail nobody chose for: AI replies (`required` without keys → the reply is
+kept as a draft and an internal note says why), auto-responses (skipped,
+history line + failed mail-log row), process/MCP sends and API calls that
+omit `email_security` (422). An explicit choice wins, except that
+`required` rejects a choice that does not encrypt (422). Encryption uses
+the sign key's backend when every recipient has a key there, otherwise the
+other usable backend. Event notifications keep their own per-notification
+settings and ignore the queue defaults.
 
 ### Compose UI
 
 Reply, Forward and New ticket (email) show a **Sicherheit** row
 (`EmailSecurityControl` + `useEmailSecurity`, a self-contained component):
-*Keine / Signieren / Verschlüsseln / Signieren + verschlüsseln*, PGP or
-S/MIME, PGP/MIME or inline PGP, the sign key; when encrypting each recipient
-is shown with its key status. Default: sign with the queue default sign key
-if configured, otherwise none. Sending is blocked with a message naming the
-recipients without a usable key. Nothing is shown when PGP and S/MIME are
-both disabled.
+an icon switch with only the modes the queue allows (*Keine / Signieren /
+Verschlüsseln / Signieren + verschlüsseln*, from `options.modes`), PGP or
+S/MIME only when **both** are enabled and usable, PGP/MIME or inline PGP,
+the sign key; when encrypting each recipient is shown with its key status.
+The preselection is the queue default (`options.default`). Sending is
+blocked with a message naming the recipients without a usable key. Nothing
+is shown when the queue offers nothing but a plain mail (no backend, no
+sign key, encryption off). The composer always sends `email_security`
+(`null` for *Keine*), so its choice counts as explicit.
 
 ### GenericInterface `EmailSecurity`
 

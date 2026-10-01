@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Čo sa stane, keď zákazník odpovie na už zatvorený tiket v tomto rade: v závislosti od možnosti sa tiket znova otvorí, odpoveď sa zamietne alebo sa namiesto toho vytvorí úplne nový tiket.",
         "followUpLock": "Automaticky odomkne zamknutý lístok späť jeho majiteľovi hneď, ako príde zákaznícka kontrola.",
         "calendarName": "Odkazuje na kalendár pracovných hodín (sviatky, otváracie časy), ktorý sa používa pri výpočte eskalácií. Prázdny = predvolený kalendár s nepretržitou prevádzkou.",
-        "defaultSignKey": "Názov kľúča PGP/S-MIME používaného na automatické podpisovanie odchádzajúcej pošty z tohto frontu. Prázdne = žiadne automatické podpisovanie."
+        "defaultSignKey": "Názov kľúča PGP/S-MIME používaného na automatické podpisovanie odchádzajúcej pošty z tohto frontu. Prázdne = žiadne automatické podpisovanie.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Typ – nie názov – riadi správanie: typy „nové“/„otvorené“/„čakajúce“ sa počítajú ako otvorené lístky, zatiaľ čo „zlúčený“ skryje lístok pred normálnym vyhľadávaním (samotný záznam sa uchováva). Viaceré názvy štátov môžu zdieľať rovnaký typ."
@@ -2108,7 +2111,14 @@
       "yes": "áno",
       "no": "Nie",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "štátov",

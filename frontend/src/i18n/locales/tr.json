@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Bir müşteri bu kuyrukta zaten kapatılmış bir ticket'a yanıt verdiğinde ne olur: Seçeneğe bağlı olarak ticket yeniden açılır, cevap reddedilir veya bunun yerine yepyeni bir ticket oluşturulur.",
         "followUpLock": "Müşteri takibi geldiğinde kilitli biletin kilidini otomatik olarak sahibine geri verir.",
         "calendarName": "İlerletmeler hesaplanırken kullanılan iş saatleri takvimine (tatiller, açılış saatleri) atıfta bulunur. Boş = 24 saat varsayılan takvim.",
-        "defaultSignKey": "Bu kuyruktan giden postayı otomatik olarak imzalamak için kullanılan PGP/S-MIME anahtarının adı. Boş = otomatik imzalama yok."
+        "defaultSignKey": "Bu kuyruktan giden postayı otomatik olarak imzalamak için kullanılan PGP/S-MIME anahtarının adı. Boş = otomatik imzalama yok.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Davranışı isim değil tür yönlendirir: \"yeni\"/\"açık\"/\"beklemede\" türleri açık biletler olarak sayılır, \"birleştirilmiş\" ise bileti normal aramadan gizler (kaydın kendisi tutulur). Birden fazla durum adı aynı türü paylaşabilir."
@@ -2108,7 +2111,14 @@
       "yes": "Evet",
       "no": "Hayır",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Durumlar",

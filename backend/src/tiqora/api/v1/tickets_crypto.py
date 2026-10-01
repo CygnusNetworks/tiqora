@@ -18,6 +18,7 @@ from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.channels.email.outbound_reply import queue_outbound_meta
 from tiqora.crypto.compose import CryptoOptionsOut, crypto_options, split_addresses
 from tiqora.crypto.config import load_crypto_config
+from tiqora.crypto.queue_security import decide, load_queue_policy
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
@@ -40,12 +41,21 @@ async def _options(
     config = await load_crypto_config(session)
     if not (config.pgp.enabled or config.smime.enabled):
         return CryptoOptionsOut(enabled=False, from_address=None)
-    return await crypto_options(
+    options = await crypto_options(
         config,
         from_address=from_line,
         recipients=split_addresses(to, cc, bcc),
         default_sign_key=str(default_sign_key) if default_sign_key else None,
     )
+    policy = await load_queue_policy(session, queue_id)
+    decision = decide(options, policy)
+    options.queue_sign = options.default
+    options.default = decision.default
+    options.modes = list(decision.modes)
+    options.sign_default = policy.sign_default
+    options.encrypt_policy = policy.encrypt
+    options.blocked = decision.blocked
+    return options
 
 
 @router.get("/crypto-options", response_model=CryptoOptionsOut)

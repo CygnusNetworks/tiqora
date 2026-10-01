@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Wat gebeurt er als een klant antwoordt op een reeds gesloten ticket in deze wachtrij: afhankelijk van de optie wordt het ticket opnieuw geopend, wordt het antwoord afgewezen of wordt er een gloednieuw ticket aangemaakt.",
         "followUpLock": "Ontgrendelt automatisch een vergrendeld ticket terug naar de eigenaar zodra er een vervolgactie van de klant arriveert.",
         "calendarName": "Verwijst naar een kantoorurenkalender (feestdagen, openingstijden) die wordt gebruikt bij het berekenen van escalaties. Leeg = de standaard 24-uurskalender.",
-        "defaultSignKey": "Naam van een PGP/S-MIME-sleutel die wordt gebruikt om uitgaande e-mail uit deze wachtrij automatisch te ondertekenen. Leeg = geen automatische ondertekening."
+        "defaultSignKey": "Naam van een PGP/S-MIME-sleutel die wordt gebruikt om uitgaande e-mail uit deze wachtrij automatisch te ondertekenen. Leeg = geen automatische ondertekening.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Het type (niet de naam) bepaalt het gedrag: de typen 'nieuw'/'open'/'in behandeling' tellen als open tickets, terwijl 'samengevoegd' het ticket verbergt voor normaal zoeken (de record zelf wordt bewaard). Meerdere staatsnamen kunnen hetzelfde type delen."
@@ -2108,7 +2111,14 @@
       "yes": "Ja",
       "no": "Nee",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Statussen",

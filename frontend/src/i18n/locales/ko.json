@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "고객이 이 대기열에서 이미 종료된 티켓에 답장하면 어떻게 됩니까? 옵션에 따라 티켓이 다시 열리거나 답장이 거부되거나 대신 새로운 티켓이 생성됩니다.",
         "followUpLock": "고객 후속 조치가 도착하자마자 소유자에게 잠긴 티켓을 자동으로 잠금 해제합니다.",
         "calendarName": "에스컬레이션을 계산할 때 사용되는 업무 시간 달력(휴일, 영업 시간)을 참조합니다. 비어 있음 = 기본 연중무휴 달력입니다.",
-        "defaultSignKey": "이 대기열에서 보내는 메일에 자동으로 서명하는 데 사용되는 PGP/S-MIME 키의 이름입니다. 비어 있음 = 자동 서명이 없습니다."
+        "defaultSignKey": "이 대기열에서 보내는 메일에 자동으로 서명하는 데 사용되는 PGP/S-MIME 키의 이름입니다. 비어 있음 = 자동 서명이 없습니다.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "이름이 아닌 유형이 동작을 결정합니다. \"new\"/\"open\"/\"pending\" 유형은 공개 티켓으로 간주되는 반면, \"merged\" 유형은 일반 검색에서 티켓을 숨깁니다(기록 자체는 유지됨). 여러 상태 이름이 동일한 유형을 공유할 수 있습니다."
@@ -2108,7 +2111,14 @@
       "yes": "예",
       "no": "아니요",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "상태",

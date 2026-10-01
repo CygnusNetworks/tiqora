@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Apa yang terjadi ketika pelanggan membalas tiket yang sudah ditutup dalam antrean ini: bergantung pada pilihannya, tiket dibuka kembali, balasannya ditolak, atau tiket baru malah dibuat.",
         "followUpLock": "Secara otomatis membuka kunci tiket yang terkunci kembali ke pemiliknya segera setelah pelanggan tindak lanjut tiba.",
         "calendarName": "Referensi kalender jam kerja (hari libur, jam buka) yang digunakan saat menghitung eskalasi. Kosong = kalender default sepanjang waktu.",
-        "defaultSignKey": "Nama kunci PGP/S-MIME yang digunakan untuk menandatangani email keluar dari antrean ini secara otomatis. Kosong = tidak ada penandatanganan otomatis."
+        "defaultSignKey": "Nama kunci PGP/S-MIME yang digunakan untuk menandatangani email keluar dari antrean ini secara otomatis. Kosong = tidak ada penandatanganan otomatis.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Jenis — bukan nama — yang menentukan perilaku: jenis \"baru\"/\"terbuka\"/\"tertunda\" dihitung sebagai tiket terbuka, sementara \"digabung\" menyembunyikan tiket dari pencarian normal (catatannya sendiri disimpan). Beberapa nama negara bagian dapat memiliki tipe yang sama."
@@ -2108,7 +2111,14 @@
       "yes": "Ya",
       "no": "Tidak",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Amerika",

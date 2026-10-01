@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Ce se întâmplă atunci când un client răspunde la un bilet deja închis în această coadă: în funcție de opțiune, biletul se redeschide, răspunsul este respins sau este creat un bilet nou-nouț.",
         "followUpLock": "Deblochează automat un bilet blocat înapoi proprietarului său, de îndată ce sosește o urmărire a clientului.",
         "calendarName": "Face referire la un calendar al programului de lucru (sărbători, orele de deschidere) utilizat la calculul escaladelor. Gol = calendarul implicit non-stop.",
-        "defaultSignKey": "Numele unei chei PGP/S-MIME utilizată pentru a semna automat e-mailurile trimise din această coadă. Gol = fără semnare automată."
+        "defaultSignKey": "Numele unei chei PGP/S-MIME utilizată pentru a semna automat e-mailurile trimise din această coadă. Gol = fără semnare automată.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Tipul – nu numele – determină comportamentul: tipurile „nou”/„deschise”/„în așteptare” sunt considerate bilete deschise, în timp ce „combinat” ascunde biletul de căutarea normală (înregistrarea în sine este păstrată). Mai multe nume de state pot împărtăși același tip."
@@ -2108,7 +2111,14 @@
       "yes": "Da",
       "no": "Nu",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "state",

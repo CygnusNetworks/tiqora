@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Que ocorre cando un cliente responde a un ticket xa pechado nesta cola: dependendo da opción, o ticket reabre, a resposta é rexeitada ou no seu lugar créase un ticket novo.",
         "followUpLock": "Desbloquea automaticamente un billete bloqueado para o seu propietario en canto chega o seguimento dun cliente.",
         "calendarName": "Fai referencia a un calendario de horarios laborais (vacacións, horarios de apertura) que se usa ao calcular as escalas. Baleiro = o calendario predeterminado durante todo o día.",
-        "defaultSignKey": "Nome dunha chave PGP/S-MIME utilizada para asinar automaticamente o correo saínte desta cola. Baleiro = sen sinatura automática."
+        "defaultSignKey": "Nome dunha chave PGP/S-MIME utilizada para asinar automaticamente o correo saínte desta cola. Baleiro = sen sinatura automática.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "O tipo, non o nome, determina o comportamento: os tipos \"novo\"/\"aberto\"/\"pendente\" contan como tickets abertos, mentres que \"fusionado\" oculta o ticket da busca normal (consérvase o propio rexistro). Varios nomes de estado poden compartir o mesmo tipo."
@@ -2108,7 +2111,14 @@
       "yes": "Si",
       "no": "Non",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Estados",

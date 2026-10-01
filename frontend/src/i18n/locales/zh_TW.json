@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "當客戶回覆此佇列中已關閉的工單時會發生什麼：根據選項，工單會重新打開，回覆會被拒絕，或會建立一個全新的工單。",
         "followUpLock": "一旦客戶跟進到達，就會自動將鎖定的票證解鎖回其所有者。",
         "calendarName": "引用計算升級時所使用的工作時間日曆（假日、營業時間）。空=預設的全天候日曆。",
-        "defaultSignKey": "用於自動簽署從此佇列發出的郵件的 PGP/S-MIME 金鑰的名稱。空=無自動簽名。"
+        "defaultSignKey": "用於自動簽署從此佇列發出的郵件的 PGP/S-MIME 金鑰的名稱。空=無自動簽名。",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "類型（而非名稱）驅動行為：「新」/「開啟」/「待處理」類型算作開放票證，而「合併」則在正常搜尋中隱藏票證（記錄本身被保留）。多個狀態名稱可以共享相同的類型。"
@@ -2108,7 +2111,14 @@
       "yes": "是的",
       "no": "否",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "州",

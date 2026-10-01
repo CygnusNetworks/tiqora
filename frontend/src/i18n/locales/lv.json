@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Kas notiek, ja klients atbild uz jau aizvērtu biļeti šajā rindā: atkarībā no opcijas biļete tiek atvērta atkārtoti, atbilde tiek noraidīta vai tā vietā tiek izveidota pavisam jauna biļete.",
         "followUpLock": "Automātiski atbloķē bloķētu biļeti atpakaļ tās īpašniekam, tiklīdz tiek saņemts klienta ziņojums.",
         "calendarName": "Atsaucas uz darba stundu kalendāru (brīvdienas, darba laiki), ko izmanto, lai aprēķinātu eskalācijas. Tukšs = noklusējuma diennakts kalendārs.",
-        "defaultSignKey": "PGP/S-MIME atslēgas nosaukums, ko izmanto, lai automātiski parakstītu izejošos pastu no šīs rindas. Tukšs = nav automātiskas parakstīšanas."
+        "defaultSignKey": "PGP/S-MIME atslēgas nosaukums, ko izmanto, lai automātiski parakstītu izejošos pastu no šīs rindas. Tukšs = nav automātiskas parakstīšanas.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Veids, nevis nosaukums, nosaka uzvedību: \"jauns\"/\"atvērts\"/\"apstiprināts\" tipi tiek uzskatīti par atvērtām biļetēm, savukārt \"apvienots\" paslēpj biļeti no parastās meklēšanas (tiek saglabāts pats ieraksts). Vairāki štatu nosaukumi var būt vienādi."
@@ -2108,7 +2111,14 @@
       "yes": "Jā",
       "no": "Nē",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "valstis",

@@ -725,6 +725,8 @@ def _as_send_article(article_in: ArticleIn, art_data: dict[str, Any]) -> Article
         sender_type="agent",
         is_visible_for_customer=True,
         email_security=email_security_from_znuny(art_data.get("EmailSecurity")),
+        # Without an EmailSecurity hash the queue's security defaults apply.
+        email_security_explicit="EmailSecurity" in art_data,
     )
 
 

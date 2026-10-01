@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Co się stanie, gdy klient odpowie na już zamknięte zgłoszenie w tej kolejce: w zależności od opcji zgłoszenie zostanie ponownie otwarte, odpowiedź zostanie odrzucona lub zamiast tego zostanie utworzone zupełnie nowe zgłoszenie.",
         "followUpLock": "Automatycznie odblokowuje zablokowany ticket z powrotem do właściciela, gdy tylko nadejdzie kolejna wizyta klienta.",
         "calendarName": "Odwołuje się do kalendarza godzin pracy (święta, godziny otwarcia) używanego przy obliczaniu eskalacji. Pusty = domyślny kalendarz całodobowy.",
-        "defaultSignKey": "Nazwa klucza PGP/S-MIME używanego do automatycznego podpisywania poczty wychodzącej z tej kolejki. Pusty = brak automatycznego podpisywania."
+        "defaultSignKey": "Nazwa klucza PGP/S-MIME używanego do automatycznego podpisywania poczty wychodzącej z tej kolejki. Pusty = brak automatycznego podpisywania.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Typ — a nie nazwa — steruje zachowaniem: typy „nowy”/„otwarty”/„oczekujący” liczą się jako otwarte zgłoszenia, natomiast „scalone” ukrywają zgłoszenie przed normalnym wyszukiwaniem (sam rekord zostaje zachowany). Wiele nazw stanów może mieć ten sam typ."
@@ -2108,7 +2111,14 @@
       "yes": "Tak",
       "no": "Nie",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Stany",

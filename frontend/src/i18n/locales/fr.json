@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Que se passe-t-il lorsqu'un client répond à un ticket déjà clôturé dans cette file d'attente : selon l'option, le ticket rouvre, la réponse est rejetée ou un tout nouveau ticket est créé à la place.",
         "followUpLock": "Déverrouille automatiquement un ticket verrouillé pour son propriétaire dès qu'un suivi client arrive.",
         "calendarName": "Fait référence à un calendrier des heures de travail (jours fériés, heures d'ouverture) utilisé lors du calcul des escalades. Vide = le calendrier par défaut 24 heures sur 24.",
-        "defaultSignKey": "Nom d'une clé PGP/S-MIME utilisée pour signer automatiquement le courrier sortant de cette file d'attente. Vide = pas de signature automatique."
+        "defaultSignKey": "Nom d'une clé PGP/S-MIME utilisée pour signer automatiquement le courrier sortant de cette file d'attente. Vide = pas de signature automatique.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Le type - et non le nom - détermine le comportement : les types \"nouveau\"/\"ouvert\"/\"en attente\" comptent comme des tickets ouverts, tandis que \"fusionné\" masque le ticket de la recherche normale (l'enregistrement lui-même est conservé). Plusieurs noms d'état peuvent partager le même type."
@@ -2108,7 +2111,14 @@
       "yes": "Oui",
       "no": "Non",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "États",

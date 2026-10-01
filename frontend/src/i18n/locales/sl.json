@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Kaj se zgodi, ko stranka odgovori na že zaprto vozovnico v tej čakalni vrsti: glede na možnost se vozovnica znova odpre, je odgovor zavrnjen ali pa se namesto tega ustvari popolnoma nova vstopnica.",
         "followUpLock": "Samodejno odklene zaklenjeno vstopnico nazaj njenemu lastniku takoj, ko prispe stranka.",
         "calendarName": "Sklicuje se na koledar delovnih ur (prazniki, odpiralni čas), ki se uporablja pri izračunu stopnjevanja. Prazno = privzeti 24-urni koledar.",
-        "defaultSignKey": "Ime ključa PGP/S-MIME, ki se uporablja za samodejno podpisovanje odhodne pošte iz te čakalne vrste. Prazno = brez samodejnega podpisovanja."
+        "defaultSignKey": "Ime ključa PGP/S-MIME, ki se uporablja za samodejno podpisovanje odhodne pošte iz te čakalne vrste. Prazno = brez samodejnega podpisovanja.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Vrsta – ne ime – določa vedenje: vrste »novo«/»odprto«/»čakajoče« štejejo kot odprte vstopnice, medtem ko »združeno« skrije vstopnico pred običajnim iskanjem (zapis se hrani sam). Več imen držav ima lahko isto vrsto."
@@ -2108,7 +2111,14 @@
       "yes": "ja",
       "no": "št",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "države",
