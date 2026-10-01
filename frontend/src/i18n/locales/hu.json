@@ -372,7 +372,6 @@
     "filterByCustomer": "Csak ennek az ügyfélnek a jegyeit jelenítse meg",
     "pagination": "{{from}}–{{to}} / {{total}}",
     "escalated": "Eszkalálódott",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Válasz SLA",
     "escUpdate": "SLA frissítése",
     "escSolution": "Megoldás SLA",

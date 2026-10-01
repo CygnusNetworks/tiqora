@@ -372,7 +372,6 @@
     "filterByCustomer": "Показати лише квитки цього клієнта",
     "pagination": "{{from}}–{{to}} з {{total}}",
     "escalated": "Ескалація",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Відповідь SLA",
     "escUpdate": "Оновити SLA",
     "escSolution": "Рішення SLA",

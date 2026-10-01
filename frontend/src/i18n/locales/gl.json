@@ -372,7 +372,6 @@
     "filterByCustomer": "Mostra só as entradas deste cliente",
     "pagination": "{{from}}–{{to}} de {{total}}",
     "escalated": "Escalada",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "SLA de resposta",
     "escUpdate": "Actualizar SLA",
     "escSolution": "SLA de solución",

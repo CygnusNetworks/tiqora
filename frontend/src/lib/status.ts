@@ -163,18 +163,17 @@ export function combinedEscalationLevel(
   return level;
 }
 
-/** Human-readable mono countdown badge text for a breached/approaching escalation. */
-export function formatCountdown(epochSeconds: number | null | undefined): string {
-  if (!epochSeconds) return "";
-  const diffMs = epochSeconds * 1000 - Date.now();
-  const abs = Math.abs(Math.round(diffMs / 60000));
-  const sign = diffMs < 0 ? "-" : "";
-  const h = Math.floor(abs / 60);
-  const m = abs % 60;
-  // Beyond two days, minutes (and hours) are noise: "-3d", not "-72h14m".
-  if (h >= 48) return `${sign}${Math.floor(h / 24)}d`;
-  const body = h > 0 ? `${h}h${String(m).padStart(2, "0")}m` : `${m}m`;
-  return `${sign}${body}`;
+/** Rounded-down duration in the largest whole unit — "40 Tage", "3 Std.",
+ * "25 Min." — for SLA overdue / due-in text. A raw signed countdown like
+ * "-973h19m" or "-110d" reads like a glitch; this reads like a sentence. */
+export function humanDuration(
+  t: (key: string, opts: { count: number }) => string,
+  seconds: number,
+): string {
+  const abs = Math.max(0, Math.floor(seconds));
+  if (abs >= 86400) return t("ticket.durationDays", { count: Math.floor(abs / 86400) });
+  if (abs >= 3600) return t("ticket.durationHours", { count: Math.floor(abs / 3600) });
+  return t("ticket.durationMinutes", { count: Math.max(1, Math.floor(abs / 60)) });
 }
 
 export function spineClassName(level: EscalationLevel): string {

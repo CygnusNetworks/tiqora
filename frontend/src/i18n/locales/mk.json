@@ -372,7 +372,6 @@
     "filterByCustomer": "Прикажи само билети на овој клиент",
     "pagination": "{{from}}–{{to}} од {{total}}",
     "escalated": "Ескалираше",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Одговор SLA",
     "escUpdate": "Ажурирајте го SLA",
     "escSolution": "Решение SLA",

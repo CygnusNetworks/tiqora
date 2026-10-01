@@ -57,6 +57,7 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
   return (
     <Menu
       panelTestId="account-menu"
+      maxHeight={null}
       trigger={({ open, ref, toggleProps }) => (
         <button
           ref={ref}

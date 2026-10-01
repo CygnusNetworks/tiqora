@@ -372,7 +372,6 @@
     "filterByCustomer": "Tunjukkan tiket pelanggan ini sahaja",
     "pagination": "{{from}}–{{to}} daripada {{total}}",
     "escalated": "Ditingkatkan",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "SLA respons",
     "escUpdate": "Kemas kini SLA",
     "escSolution": "Penyelesaian SLA",

@@ -372,7 +372,6 @@
     "filterByCustomer": "केवल इस ग्राहक के टिकट दिखाएं",
     "pagination": "{{from}}–{{to}} का {{total}}",
     "escalated": "बढ़ा हुआ",
-    "slaCountdown": "एसएलए {{value}}",
     "escResponse": "प्रतिक्रिया एसएलए",
     "escUpdate": "एसएलए अपडेट करें",
     "escSolution": "समाधान एसएलए",

@@ -14,7 +14,7 @@ import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PriorityChip } from "@/components/ui/StatusChip";
 import { formatDateTime } from "@/lib/format";
-import { escalationLevel, stateLabel } from "@/lib/status";
+import { escalationLevel, humanDuration, stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
 import { useReplyDraft } from "@/lib/replyDrafts";
 import { channelNameOf, dominantChannel } from "@/lib/articleChannel";
@@ -806,16 +806,6 @@ function HeaderPickMenu({
 }
 
 /* ── SLA chip ─────────────────────────────────────────────────────────── */
-
-function humanDuration(
-  t: (key: string, opts: { count: number }) => string,
-  seconds: number,
-): string {
-  const abs = Math.max(0, Math.floor(seconds));
-  if (abs >= 86400) return t("ticket.durationDays", { count: Math.floor(abs / 86400) });
-  if (abs >= 3600) return t("ticket.durationHours", { count: Math.floor(abs / 3600) });
-  return t("ticket.durationMinutes", { count: Math.max(1, Math.floor(abs / 60)) });
-}
 
 /** Humanized SLA state: "⚠ Update-SLA überfällig · 40 Tage" (breached, red)
  * or "Update-SLA in 25 Min." (approaching, amber). Replaces the raw

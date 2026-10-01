@@ -372,7 +372,6 @@
     "filterByCustomer": "فقط بلیط های این مشتری را نشان دهید",
     "pagination": "{{from}}–{{to}} از {{total}}",
     "escalated": "تشدید شد",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "پاسخ SLA",
     "escUpdate": "به روز رسانی SLA",
     "escSolution": "راه حل SLA",

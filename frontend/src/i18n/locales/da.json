@@ -372,7 +372,6 @@
     "filterByCustomer": "Vis kun denne kundes billetter",
     "pagination": "{{from}}–{{to}} af {{total}}",
     "escalated": "Eskaleret",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Svar SLA",
     "escUpdate": "Opdater SLA",
     "escSolution": "Løsning SLA",

@@ -372,7 +372,6 @@
     "filterByCustomer": "הצג רק את הכרטיסים של הלקוח הזה",
     "pagination": "{{from}}–{{to}} מתוך {{total}}",
     "escalated": "הסלמה",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "SLA תגובה",
     "escUpdate": "עדכן SLA",
     "escSolution": "SLA של פתרון",

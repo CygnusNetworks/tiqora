@@ -372,7 +372,6 @@
     "filterByCustomer": "仅显示此客户的工单",
     "pagination": "{{from}}–{{to}} / 共 {{total}}",
     "escalated": "已升级",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "响应 SLA",
     "escUpdate": "更新 SLA",
     "escSolution": "解决 SLA",

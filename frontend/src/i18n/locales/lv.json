@@ -372,7 +372,6 @@
     "filterByCustomer": "Rādīt tikai šī klienta biļetes",
     "pagination": "{{from}}–{{to}} no {{total}}",
     "escalated": "Eskalēts",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Atbildes SLA",
     "escUpdate": "Atjauniniet SLA",
     "escSolution": "Risinājums SLA",

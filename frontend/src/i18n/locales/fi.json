@@ -372,7 +372,6 @@
     "filterByCustomer": "Näytä vain tämän asiakkaan liput",
     "pagination": "{{from}}–{{to}} / {{total}}",
     "escalated": "Eskaloitunut",
-    "slaCountdown": "Palvelusopimus {{value}}",
     "escResponse": "Vastaus SLA",
     "escUpdate": "Päivitä SLA",
     "escSolution": "Ratkaisu SLA",

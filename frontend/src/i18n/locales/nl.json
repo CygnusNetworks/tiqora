@@ -372,7 +372,6 @@
     "filterByCustomer": "Alleen tickets van deze klant tonen",
     "pagination": "{{from}}–{{to}} van {{total}}",
     "escalated": "Geëscaleerd",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Reactie SLA",
     "escUpdate": "Update-SLA",
     "escSolution": "Oplossing SLA",

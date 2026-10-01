@@ -16,7 +16,19 @@ import { cn } from "@/lib/cn";
  * above the trigger when there isn't room below (mirrors `SelectMenu`). */
 const PANEL_MAX_H = 280;
 
-type PanelPos = { top?: number; bottom?: number; left?: number; right?: number };
+/** Default height cap (20rem) before the panel scrolls. */
+const DEFAULT_MAX_HEIGHT = 320;
+
+/** Gap kept between the panel and the viewport edge. */
+const VIEWPORT_MARGIN = 8;
+
+type PanelPos = {
+  top?: number;
+  bottom?: number;
+  left?: number;
+  right?: number;
+  maxHeight: number;
+};
 
 /**
  * A lightweight dropdown menu primitive — no external dependency. Owns its own
@@ -53,12 +65,17 @@ export function Menu({
   align = "right",
   panelClassName,
   panelTestId,
+  maxHeight = DEFAULT_MAX_HEIGHT,
 }: {
   trigger: (args: TriggerArgs) => ReactNode;
   children: ReactNode;
   align?: "left" | "right";
   panelClassName?: string;
   panelTestId?: string;
+  /** Height cap before the panel scrolls; `null` grows up to the viewport
+   * (short fixed menus like the account menu that must show every entry).
+   * Either way the panel never extends past the viewport edge. */
+  maxHeight?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const [autoFocus, setAutoFocus] = useState(false);
@@ -84,13 +101,15 @@ export function Menu({
     const rect = el.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
     const flip = spaceBelow < PANEL_MAX_H && rect.top > spaceBelow;
+    const room = (flip ? rect.top : spaceBelow) - 6 - VIEWPORT_MARGIN;
     setPos({
+      maxHeight: maxHeight == null ? room : Math.min(maxHeight, room),
       top: flip ? undefined : rect.bottom + 6,
       bottom: flip ? window.innerHeight - rect.top + 6 : undefined,
       left: align === "right" ? undefined : rect.left,
       right: align === "right" ? window.innerWidth - rect.right : undefined,
     });
-  }, [open, align]);
+  }, [open, align, maxHeight]);
 
   // Outside pointer-down + Escape close, and initial focus into the panel when
   // opened by keyboard. Focus returns to the trigger on close.
@@ -202,7 +221,7 @@ export function Menu({
             onKeyDown={onPanelKeyDown}
             style={{ position: "fixed", ...pos }}
             className={cn(
-              "z-50 max-h-[min(20rem,80vh)] min-w-[13rem] overflow-y-auto rounded-xl border border-hairline bg-surface p-1 shadow-xl animate-route-in",
+              "z-50 min-w-[13rem] overflow-y-auto rounded-xl border border-hairline bg-surface p-1 shadow-xl animate-route-in",
               panelClassName,
             )}
           >

@@ -372,7 +372,6 @@
     "filterByCustomer": "إظهار تذاكر هذا العميل فقط",
     "pagination": "{{from}}–{{to}} من {{total}}",
     "escalated": "تصاعدت",
-    "slaCountdown": "اتفاقية مستوى الخدمة {{value}}",
     "escResponse": "الاستجابة لاتفاقية مستوى الخدمة",
     "escUpdate": "تحديث اتفاقية مستوى الخدمة",
     "escSolution": "اتفاقية مستوى الخدمة للحل",

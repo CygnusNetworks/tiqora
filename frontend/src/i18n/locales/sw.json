@@ -372,7 +372,6 @@
     "filterByCustomer": "Onyesha tikiti za mteja huyu pekee",
     "pagination": "{{from}}–{{to}} ya {{total}}",
     "escalated": "Imeongezeka",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "SLA ya majibu",
     "escUpdate": "Sasisha SLA",
     "escSolution": "Suluhisho la SLA",
