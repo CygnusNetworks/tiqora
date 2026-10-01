@@ -1293,6 +1293,15 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/admin/groups")) return page(adminGroups);
   if (p.endsWith("/admin/roles")) return page(adminRoles);
   if (p.endsWith("/admin/queues")) return page(adminQueuesFull);
+  // Reference data behind the queue dialog's selects
+  if (p.endsWith("/admin/system-addresses"))
+    return page([{ id: 1, value0: "support@example.com", value1: "Example Support", valid_id: 1, queue_id: 1, comments: null, create_time: t0, change_time: t0 }]);
+  if (p.endsWith("/admin/salutations"))
+    return page([{ id: 1, name: "Standard salutation", text: "Hello,", content_type: "text/plain", comments: null, valid_id: 1, create_time: t0, change_time: t0 }]);
+  if (p.endsWith("/admin/signatures"))
+    return page([{ id: 1, name: "Support team", text: "Your support team", content_type: "text/plain", comments: null, valid_id: 1, create_time: t0, change_time: t0 }]);
+  if (p.endsWith("/admin/follow-up-possible"))
+    return [{ id: 1, name: "possible", valid_id: 1 }, { id: 2, name: "reject", valid_id: 1 }, { id: 3, name: "new ticket", valid_id: 1 }];
   if (p.endsWith("/admin/customer-users")) return page(adminCustomerUsers);
   if (p.endsWith("/admin/customer-companies")) return page(adminCustomerCompanies);
   if (p.endsWith("/admin/gdpr/jobs")) return page([]);

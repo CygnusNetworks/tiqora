@@ -23,10 +23,20 @@ test.describe("admin queues", () => {
     await page.getByTestId("admin-new-button").click();
     await page.getByTestId("admin-form-name").fill("Support::Escalations");
     await selectAdminOption(page, "admin-form-group_id", "1");
+    // Sender, salutation, signature and follow-up live on the second tab,
+    // which flags its four empty required fields with a count badge.
+    const mailTab = page.getByTestId("admin-form-tab-1");
+    await expect(mailTab).toContainText("4");
+    await mailTab.click();
+    await expect(mailTab).toHaveAttribute("aria-selected", "true");
     await selectAdminOption(page, "admin-form-system_address_id", "1");
     await selectAdminOption(page, "admin-form-salutation_id", "1");
     await selectAdminOption(page, "admin-form-signature_id", "1");
-    await selectAdminOption(page, "admin-form-follow_up_id", "1");
+    await page.getByTestId("admin-form-follow_up_id-1").click();
+    await expect(page.getByTestId("admin-form-follow_up_id-1")).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     await page.getByTestId("admin-form-submit").click();
 
     await expect(page.getByTestId("admin-form")).not.toBeVisible();
