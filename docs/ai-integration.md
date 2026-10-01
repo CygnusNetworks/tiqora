@@ -484,9 +484,9 @@ falls straight through unchanged:
 ### Per-queue policy and autonomy
 
 Each queue that wants AI assistance needs its own `tiqora_ai_queue_policy`
-row (admin API, no inheritance to subqueues) — system prompt, LLM provider/
-model, KB tag/category binding, allowed MCP tools, and an **autonomy**
-level:
+row (admin API, no inheritance to subqueues) — system prompt, per-task
+profile overrides (`task_profiles`, see "Model routing"), KB tag/category
+binding, allowed MCP tools, and an **autonomy** level:
 
 | Autonomy | Factual reply | Clarifying question | Internal note |
 |---|---|---|---|
@@ -539,6 +539,21 @@ AI panel offers a resume button: `POST /api/v1/tickets/{id}/ai/resume`
 (requires `note` on the ticket's queue) clears `ai_escalated_at` and writes
 an internal note ("AI-Automatisierung reaktiviert") as the audit trail
 (`resume_ai_automation`).
+
+**Pausing a ticket.** Independent of the hand-off, an agent can stop all
+*automatic* AI actions on one ticket — auto-reply, triage and the
+auto-summary — from the AI panel (⋯ menu of the summary line):
+`POST /api/v1/tickets/{id}/ai/pause` / `…/unpause` (`note` on the queue,
+idempotent; `tiqora_ai_ticket_state.ai_paused_at` / `ai_paused_by`). Unlike
+`ai_escalated_at`, nothing clears the pause on its own — not an agent reply,
+not a state change. Manual Assist, refine and manual summaries stay
+available. The auto-reply worker skips with `ai_paused`, the triage tick
+likewise, and a reply parked behind an open triage is dropped rather than
+answered after the unpause; messages that arrived during the pause are not
+processed retroactively. Each real pause/unpause writes one internal note
+("KI-Automatik pausiert" / "…fortgesetzt"); the panel shows who paused it
+and when, and the banner stays liftable for agents without AI feature
+access.
 
 Note what this does **not** cover: `escalate_to_human` is the model's own
 judgement. The deterministic counterpart is `escalation_rules` on the queue
@@ -617,7 +632,7 @@ Everything the agent does is visible without opening the admin audit:
 | Article list (split view **and** timeline) | Non-interactive 🤖 marker (`AiOriginMarker`) on the same articles — a list row is itself clickable and selects the article, so a button inside it would fire both actions, and the trace only renders in the reader anyway. Its tooltip is deliberately shorter for the same reason: promising "click to see the tool trace" on something that does not respond to a click would be a lie. |
 | Ticket list | `TicketListItem.ai_reply_source` — how the most recent AI-written article on that ticket got sent: `auto` (the agent sent it itself) or `manual_accept` (a human accepted a draft). One field rather than two booleans, since the question is "how was this last handled". Read through a bulk join per page, with the same missing-table tolerance as the other AI lookups, so a Znuny-only deployment still gets its list. |
 | Ticket list + dashboard | `ai_escalated` filter/count — the tickets where the agent handed off to a human and stopped (see "Handing off to a human"). |
-| AI panel banners (ticket header) | Escalation banner with a **resume** button (see "Manual resume"), and the **AI triage suggestion** banner with *Apply* / *Dismiss* (see "AI triage"). Both only render when they apply, and their buttons are disabled without `note` permission. |
+| AI panel banners (ticket header) | **Pause** banner (who paused, when, *resume*; see "Pausing a ticket"), escalation banner with a **resume** button (see "Manual resume"), and the **AI triage suggestion** banner with *Apply* / *Dismiss* (see "AI triage"). Both only render when they apply, and their buttons are disabled without `note` permission. |
 
 ### AI triage
 
@@ -795,6 +810,22 @@ result is all sections or none. Gated by the queue's `enabled_refine` (409
 Readiness-Gate gated. `GET /api/v1/ai/refine/availability?ticket_id=|queue_id=`
 tells the composer whether to show the button at all (`{"available": bool}`,
 never an error).
+
+**Call-note mode.** `mode: "call_note"` (plus `language`, the agent's UI
+language) turns rough notes taken during a phone call into an internal note
+under three headings — *Issue / Agreed / Next steps* (German *Anliegen /
+Vereinbart / Nächste Schritte*; other languages get them translated by the
+model) — with the same no-new-facts
+rules (numbers and dates verbatim), PII masking and gating; `tone` does not
+apply. The phone-call dialog and the phone variant of the New-ticket form
+offer it as *Structure note*.
+
+**Review before applying.** The composers (reply/forward, New ticket, phone
+call) never overwrite the text directly: the result opens as a word-level
+diff (inline or side by side) in which every change can be switched off
+individually; *Apply* takes the current selection, *Discard* keeps the
+original, and sending while the review is open sends the text as marked.
+After applying, *Show changes* reopens the last diff.
 
 ### Per-queue prompt parts
 
