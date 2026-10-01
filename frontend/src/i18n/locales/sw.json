@@ -2866,7 +2866,7 @@
       "enforceAll": "Inahitaji 2FA kwa mawakala wote",
       "enforceGroups": "Inahitaji 2FA kwa wanachama wa vikundi hivi",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Hakuna vikundi halali vilivyopatikana.",
       "saveGlobal": "Hifadhi sera ya kimataifa",
       "globalSaved": "Sera ya kimataifa imehifadhiwa.",

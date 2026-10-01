@@ -1,9 +1,9 @@
 """Effective on/off state of the customer portal.
 
 Two configuration levels, one decision point: the deployment-level
-``TIQORA_PORTAL_ENABLED`` is a hard off that no database row can override;
-otherwise ``portal.enabled`` in ``tiqora_settings`` decides. Both default to
-enabled, so existing installations are unaffected.
+``TIQORA_PORTAL_ENABLED`` is an opt-in (default off) that no database row can
+override; once it is on, ``portal.enabled`` in ``tiqora_settings`` decides
+(default on, so setting the env var alone is enough).
 
 FastAPI wiring lives in ``tiqora.api.portal.deps.require_portal_enabled`` —
 this module stays free of web-layer imports.

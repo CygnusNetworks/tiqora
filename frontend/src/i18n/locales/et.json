@@ -2866,7 +2866,7 @@
       "enforceAll": "Nõua kõigi agentide jaoks 2FA-d",
       "enforceGroups": "Nõua nende rühmade liikmetelt 2FA-d",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Ühtegi kehtivat rühma ei leitud.",
       "saveGlobal": "Salvestage globaalne poliitika",
       "globalSaved": "Globaalne poliitika on salvestatud.",

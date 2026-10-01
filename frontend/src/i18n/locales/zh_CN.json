@@ -2866,7 +2866,7 @@
       "enforceAll": "要求所有坐席进行 2FA",
       "enforceGroups": "要求这些群组的成员进行 2FA",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "未找到有效的组。",
       "saveGlobal": "保存全局策略",
       "globalSaved": "全局策略已保存。",
