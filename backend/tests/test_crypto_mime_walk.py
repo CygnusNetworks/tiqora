@@ -298,6 +298,24 @@ def test_smime_untrusted_without_ca(world: CryptoWorld, tmp_path: Path) -> None:
     assert out.security.signer == CUSTOMER
 
 
+def test_smime_no_verify_counts_unverified_chain_as_verified(
+    world: CryptoWorld, tmp_path: Path
+) -> None:
+    # SMIME::NoVerify (Znuny semantics): same untrusted store as above, but on.
+    cert_dir, private_dir = tmp_path / "c", tmp_path / "p"
+    SmimeStore(str(cert_dir), str(private_dir)).add_certificate(world.support_cert.cert_pem)
+    cfg = CryptoConfig(
+        pgp=PgpConfig(enabled=False),
+        smime=SmimeConfig(
+            enabled=True, cert_path=str(cert_dir), private_path=str(private_dir), no_verify=True
+        ),
+    )
+    out = walk_message(outlook_smime_signed(world), cfg)
+    assert out.security is not None
+    assert out.security.status == "verified"
+    assert "NoVerify" in out.security.detail
+
+
 # ------------------------------------------------------------- combine rules
 
 

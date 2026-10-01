@@ -29,8 +29,8 @@ Trust:
   the optional ``TIQORA_CRYPTO_SMIME_CA_PATH`` bundle and openssl's default
   store, like Znuny's call). Signer-relation CAs live in CertPath, so they are
   trust anchors automatically. A signature that is cryptographically fine but
-  whose chain does not validate is ``signed_untrusted`` — Znuny's
-  ``SMIME::NoVerify`` retry, but never shown as verified.
+  whose chain does not validate is ``signed_untrusted`` (Znuny's ``-noverify``
+  retry), or ``verified`` when ``SMIME::NoVerify`` is on (Znuny semantics).
 * PGP: a good signature from a key in the keyring is ``verified`` (Znuny's
   ``GOODSIG`` rule); an expired/revoked key or ownertrust *never* makes it
   ``signed_untrusted``; a key missing from the keyring is ``unknown_key``.
@@ -407,6 +407,8 @@ class _Walker:
                 key_id = cert.fingerprint(hashes.SHA1()).hex().upper()
         if trusted.chain_trusted:
             status, detail = "verified", "certificate chain trusted"
+        elif result.valid and cfg.no_verify:
+            status, detail = "verified", "signer certificate not checked (SMIME::NoVerify)"
         elif result.valid:
             status = "signed_untrusted"
             detail = (
