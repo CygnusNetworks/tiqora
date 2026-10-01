@@ -372,7 +372,6 @@
     "filterByCustomer": "Chỉ hiển thị vé của khách hàng này",
     "pagination": "{{from}}–{{to}} trên {{total}}",
     "escalated": "Đã leo thang",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "SLA phản hồi",
     "escUpdate": "Cập nhật SLA",
     "escSolution": "Giải pháp SLA",

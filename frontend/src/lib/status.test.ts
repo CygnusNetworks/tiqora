@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  formatCountdown,
+  humanDuration,
   isNewTicketState,
   stateLabel,
   stateLabelI18nKey,
@@ -74,16 +74,17 @@ describe("isNewTicketState", () => {
   });
 });
 
-describe("formatCountdown", () => {
-  const inSeconds = (s: number) => Math.floor(Date.now() / 1000) + s;
+describe("humanDuration", () => {
+  const t = (key: string, { count }: { count: number }) => `${count} ${key.split(".")[1]}`;
 
-  it("uses minutes, then hours and minutes", () => {
-    expect(formatCountdown(inSeconds(-5 * 60 - 10))).toBe("-5m");
-    expect(formatCountdown(inSeconds(3 * 3600 + 10 * 60 + 10))).toBe("3h10m");
+  it("uses the largest whole unit", () => {
+    expect(humanDuration(t, 5 * 60 + 10)).toBe("5 durationMinutes");
+    expect(humanDuration(t, 3 * 3600 + 10 * 60)).toBe("3 durationHours");
+    expect(humanDuration(t, 110 * 86400 + 5 * 3600)).toBe("110 durationDays");
   });
 
-  it("switches to whole days beyond 48 hours", () => {
-    expect(formatCountdown(inSeconds(-(3 * 86400 + 5 * 3600)))).toBe("-3d");
-    expect(formatCountdown(inSeconds(47 * 3600 + 10))).toBe("47h00m");
+  it("never shows zero minutes", () => {
+    expect(humanDuration(t, 10)).toBe("1 durationMinutes");
+    expect(humanDuration(t, -30)).toBe("1 durationMinutes");
   });
 });

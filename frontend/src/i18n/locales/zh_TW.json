@@ -372,7 +372,6 @@
     "filterByCustomer": "僅顯示該客戶的門票",
     "pagination": "{{from}}–{{to}} / {{total}}",
     "escalated": "升級",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "回應SLA",
     "escUpdate": "更新服務等級協議",
     "escSolution": "解決方案SLA",

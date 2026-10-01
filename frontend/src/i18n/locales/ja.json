@@ -372,7 +372,6 @@
     "filterByCustomer": "この顧客のチケットのみ表示",
     "pagination": "{{from}}–{{to}} / {{total}}件",
     "escalated": "エスカレーション済み",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "応答SLA",
     "escUpdate": "更新SLA",
     "escSolution": "ソリューションSLA",

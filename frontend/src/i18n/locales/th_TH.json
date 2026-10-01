@@ -372,7 +372,6 @@
     "filterByCustomer": "แสดงเฉพาะตั๋วของลูกค้ารายนี้",
     "pagination": "{{from}}–{{to}} จาก {{total}}",
     "escalated": "ยกระดับแล้ว",
-    "slaCountdown": "สลา {{value}}",
     "escResponse": "SLA การตอบสนอง",
     "escUpdate": "อัปเดตข้อตกลงระดับการให้บริการ",
     "escSolution": "โซลูชัน SLA",

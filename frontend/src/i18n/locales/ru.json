@@ -372,7 +372,6 @@
     "filterByCustomer": "Показать только тикеты этого клиента",
     "pagination": "{{from}}–{{to}} из {{total}}",
     "escalated": "Эскалировано",
-    "slaCountdown": "Соглашение об уровне обслуживания {{value}}",
     "escResponse": "SLA ответа",
     "escUpdate": "Обновить соглашение об уровне обслуживания",
     "escSolution": "SLA решения",

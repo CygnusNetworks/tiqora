@@ -372,7 +372,6 @@
     "filterByCustomer": "Εμφάνιση μόνο των εισιτηρίων αυτού του πελάτη",
     "pagination": "{{from}}–{{to}} από {{total}}",
     "escalated": "Κλιμακώθηκε",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "SLA απόκρισης",
     "escUpdate": "Ενημέρωση SLA",
     "escSolution": "Λύση SLA",

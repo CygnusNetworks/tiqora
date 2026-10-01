@@ -372,7 +372,6 @@
     "filterByCustomer": "이 고객의 티켓만 표시",
     "pagination": "{{total}} 중 {{from}}–{{to}}",
     "escalated": "에스컬레이션됨",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "응답 SLA",
     "escUpdate": "SLA 업데이트",
     "escSolution": "솔루션 SLA",

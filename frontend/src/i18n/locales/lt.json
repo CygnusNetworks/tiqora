@@ -372,7 +372,6 @@
     "filterByCustomer": "Rodyti tik šio kliento bilietus",
     "pagination": "{{from}}–{{to}} iš {{total}}",
     "escalated": "Eskaluojamas",
-    "slaCountdown": "SLA {{value}}",
     "escResponse": "Atsakymo SLA",
     "escUpdate": "Atnaujinti SLA",
     "escSolution": "Sprendimas SLA",
