@@ -1,6 +1,7 @@
 import type { Page, Route } from "@playwright/test";
 import {
   resolveData,
+  demoRefine,
   demoUser as user,
   demoPortalUser as portalUser,
   demoPortalTickets as portalTickets,
@@ -45,6 +46,10 @@ export async function mockRich(page: Page) {
     if (p.endsWith("/api/portal/tickets")) { await json(r, 200, portalTickets); return; }
     if (p.startsWith("/api/portal/")) { await json(r, method === "GET" ? 200 : 204, method === "GET" ? [] : {}); return; }
     if (p.startsWith("/api/v1/") && !authed) { await json(r, 401, { detail: "Not authenticated" }); return; }
+    if (p.endsWith("/api/v1/ai/refine") && method === "POST") {
+      await json(r, 200, demoRefine(r.request().postDataJSON() ?? {}));
+      return;
+    }
     const body = resolveData(p, method);
     if (body === undefined) { await json(r, method === "GET" ? 200 : 204, method === "GET" ? [] : {}); return; }
     await json(r, 200, body);

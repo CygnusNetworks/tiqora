@@ -78,7 +78,7 @@ test("agent screenshots", async ({ page }) => {
     const card = page.getByTestId("ai-card-summary");
     await card.waitFor({ state: "visible", timeout: 5000 });
     await page.waitForTimeout(400);
-    await card.screenshot({ path: `${OUT}/agent-ai-assist${SUFFIX}.png` });
+    await page.screenshot({ path: `${OUT}/agent-ai-assist${SUFFIX}.png`, fullPage: false });
   } catch (err) {
     console.warn("screenshot 'agent-ai-assist' failed:", err);
   }
@@ -100,7 +100,9 @@ test("agent screenshots", async ({ page }) => {
         .catch(() => undefined);
     }
     await page.waitForTimeout(400);
-    await ai.screenshot({ path: `${OUT}/agent-ai-mcp${SUFFIX}.png` });
+    await ai.evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${OUT}/agent-ai-mcp${SUFFIX}.png`, fullPage: false });
   } catch (err) {
     console.warn("screenshot 'agent-ai-mcp' failed:", err);
   }
@@ -131,6 +133,81 @@ test("agent screenshots", async ({ page }) => {
     await page.screenshot({ path: `${OUT}/agent-ai-origin${SUFFIX}.png`, fullPage: false });
   } catch (err) {
     console.warn("screenshot 'agent-ai-origin' failed:", err);
+  }
+  // Telegram chat (ticket 114): contact header, composer on top, newest-first
+  // bubbles with a quote reply and the answered button bar.
+  await shot(page, "/agent/tickets/114", "agent-telegram-chat");
+  // PGP-signed mail (ticket 101): select the customer's article and open the
+  // security badge so the popover with signer and key id is in the shot.
+  try {
+    await page.goto("/agent/tickets/101", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page.getByText("Hi team, I'm working from home").first().click({ timeout: 5000 });
+    await page.getByTestId("article-security-510").click({ timeout: 5000 });
+    await page.getByTestId("article-security-panel-510").waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/agent-crypto-badge${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'agent-crypto-badge' failed:", err);
+  }
+  // Reply composer: a sloppy draft refined by the AI (word-level diff review)
+  // with the PGP Security control (sign + encrypt) underneath.
+  try {
+    await page.goto("/agent/tickets/100", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page.getByRole("button", { name: "Reply" }).first().click({ timeout: 5000 });
+    const body = page.getByTestId("reply-body");
+    await body.waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    const quoted = await body.inputValue();
+    await body.fill(
+      "hi jane, pls try printing again. if the amber light is still on we swap the fuser unit tmrw morning, the part is already here" +
+        quoted,
+    );
+    await page.getByTestId("reply-refine-button").click({ timeout: 5000 });
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/agent-reply-refine${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'agent-reply-refine' failed:", err);
+  }
+  // Compact phone ticket opened from a finished call: call strip, caller
+  // lookup with the matching customer and their open ticket.
+  {
+    const ended = Date.now() - 60_000;
+    await shot(
+      page,
+      `/agent/tickets/new?type=phone&direction=inbound&number=%2B15550142&from_call=1&call_started=${ended - 240_000}&call_ended=${ended}`,
+      "agent-phone-ticket",
+    );
+  }
+  // CTI popup: a call answered a minute and a half ago, resolved to the sample
+  // customer. Pushed as an SSE `call_event` (the `/phone/calls/active`
+  // restore is skipped while the mocked stream counts as reconnecting).
+  try {
+    await page.route("**/events/stream", (r) => {
+      const now = Date.now();
+      const call = {
+        call_id: "demo-call-1", direction: "inbound", number: "+15550142", extension: "61",
+        state: "answered", user_ids: [1], answered_by_user_id: 1,
+        ringing_at: new Date(now - 98_000).toISOString(),
+        answered_at: new Date(now - 92_000).toISOString(), ended_at: null,
+      };
+      const event = { type: "call_event", user_ids: [1], event: "answered", call };
+      return r.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: `data: ${JSON.stringify(event)}\n\n`,
+      });
+    });
+    await page.goto("/agent/queues", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page.getByTestId("call-popup").waitFor({ state: "visible", timeout: 5000 });
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${OUT}/agent-cti-popup${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'agent-cti-popup' failed:", err);
+  } finally {
+    await page.unroute("**/events/stream");
   }
   // User menu open (best-effort — never fail the run over it)
   try {
@@ -179,6 +256,51 @@ test("admin screenshots", async ({ page }) => {
     await page.screenshot({ path: `${OUT}/admin-ai-mcp${SUFFIX}.png`, fullPage: false });
   } catch (err) {
     console.warn("screenshot 'admin-ai-mcp' failed:", err);
+  }
+  // PGP keys and S/MIME certificates (the Keys/Certificates tab of each page).
+  for (const [route, name] of [
+    ["/admin/pgp", "admin-pgp"],
+    ["/admin/smime", "admin-smime"],
+  ] as const) {
+    try {
+      await page.goto(route, { waitUntil: "domcontentloaded" });
+      await page.waitForLoadState("networkidle").catch(() => undefined);
+      await page.getByTestId("crypto-tab-keys").click({ timeout: 5000 });
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${OUT}/${name}${SUFFIX}.png`, fullPage: false });
+    } catch (err) {
+      console.warn(`screenshot '${name}' failed:`, err);
+    }
+  }
+  // Tabbed queue dialog: the escalation matrix and the per-queue email
+  // security defaults (sign key for the sender address, encrypt policy).
+  try {
+    await page.goto("/admin/queues", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page.getByTestId("admin-row-menu-trigger-2").click({ timeout: 5000 });
+    await page.getByTestId("admin-row-edit-2").click({ timeout: 5000 });
+    for (const [tab, name] of [
+      ["admin-form-tab-2", "admin-queue-escalation"],
+      ["admin-form-tab-3", "admin-queue-security"],
+    ] as const) {
+      await page.getByTestId(tab).click({ timeout: 5000 });
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${OUT}/${name}${SUFFIX}.png`, fullPage: false });
+    }
+  } catch (err) {
+    console.warn("screenshot 'admin-queue-*' failed:", err);
+  }
+  // AI model catalog and the task → profile routing.
+  try {
+    await page.goto("/admin/ai/models", { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}/admin-ai-models${SUFFIX}.png`, fullPage: false });
+    await page.getByText("Tasks", { exact: true }).first().click({ timeout: 5000 });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}/admin-ai-routing${SUFFIX}.png`, fullPage: false });
+  } catch (err) {
+    console.warn("screenshot 'admin-ai-models/routing' failed:", err);
   }
   // Provider edit form: cost budgets (day/week/month) and the per-provider
   // tool-round override only exist in the form, not in the list row.

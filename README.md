@@ -19,7 +19,7 @@ fork of Znuny — no Znuny source code is included or redistributed.
 | **Backend** | Python 3.12+, FastAPI, SQLAlchemy 2 async, Alembic, Pydantic v2 |
 | **Frontend** | React + TypeScript + Vite, Tailwind, theming via CSS variables |
 | **Search** | Meilisearch (full-text; hybrid / vector RAG planned later) |
-| **Jobs** | taskiq on Redis |
+| **Jobs** | Plain asyncio worker loops (`tiqora-worker`, `tiqora-ai-worker`), Redis for sessions/pub-sub |
 | **AI surface** | MCP server (FastMCP) under the same permission engine as UI/REST |
 | **License** | [AGPL-3.0](./LICENSE) — Copyright © 2026 Cygnus Networks GmbH |
 
@@ -36,24 +36,41 @@ fork of Znuny — no Znuny source code is included or redistributed.
 - **AI-ready ticket search** — Meilisearch indexing plus an **MCP server** so AI agents
   act with the same ACLs as humans.
 - **AI agent assistance** — per-queue policies drive **draft replies**, **state-only
-  ticket summaries** (document- and attachment-aware), and an optional **autonomous
-  auto-reply** worker. Attachments get text extraction plus a **vision pre-pass** for
-  images; sensitive data is **PII-masked (spaCy NER)** before any LLM call; every
-  request lands in an **audit log** with per-subject ACLs, token/request limits and
-  per-provider **cost budgets** (day/week/month). Every AI-written article is marked
-  🤖 in the ticket and carries the **tool trace** behind it — each call with the
-  arguments it was made with. The agent can **hand off to a human**, which really
-  stops the auto-reply until someone takes over. Bring your own OpenAI-compatible or
-  Anthropic providers. Gated by the operation mode so nothing autonomous runs during
-  parallel operation (except auto-replies on Tiqora-only channels such as Telegram).
+  ticket summaries** (document- and attachment-aware), **AI triage** (queue routing
+  for new tickets), **text refine** with a word-level diff to review (and a
+  call-note mode for phone notes), and an optional **autonomous auto-reply** worker.
+  Attachments get text extraction plus a **vision pre-pass** for images; sensitive
+  data is **PII-masked (spaCy NER)** before any LLM call; every request lands in an
+  **audit log** with per-subject ACLs, token/request limits and per-provider **cost
+  budgets** (day/week/month). Every AI-written article is marked 🤖 in the ticket
+  and carries the **tool trace** behind it — each call with the arguments it was
+  made with. The agent can **hand off to a human**, which really stops the
+  auto-reply until someone takes over, and agents can **pause** all automatic AI
+  actions per ticket. Bring your own OpenAI-compatible endpoints: a **model
+  catalog** with fallback **profiles** and **per-task routing** (research, answer,
+  triage, summary, refine, vision — globally or per queue). Gated by the operation
+  mode so nothing autonomous runs during parallel operation (except auto-replies on
+  Tiqora-only channels such as Telegram).
+- **PGP and S/MIME** — Znuny-compatible key stores shared with a running Znuny;
+  inbound mail verified and decrypted (security badge per article), outbound
+  replies, forwards, new email tickets and event notifications signed and/or
+  encrypted, with per-queue defaults (sign by default; encryption off / when
+  possible / required), customer keys, and settings editable in the admin UI
+  (Znuny's SysConfig still wins where it is set).
+- **Telegram chat & phone/CTI** — a messenger-style chat composer for Telegram
+  tickets (attachments, quote replies, answer buttons that resolve the ticket,
+  edit/retract, chat snippets), and Znuny phone parity with an incoming-call
+  popup fed by a PBX webhook, caller lookup, click-to-call and a compact phone
+  ticket form.
 - **GDPR tooling** — anonymization, retention jobs, and audit trails in admin.
-- **Modern design** — dark/light themes, compact cobalt design system.
+- **Modern design** — light, dark and system themes, compact cobalt design system.
 - **49 UI languages** — full Znuny language catalogue (48 Znuny `.po` codes +
   English source), RTL included; agent preference syncs with Znuny
   `UserLanguage` (see [docs/i18n.md](./docs/i18n.md)).
 - **No Perl application stack** — Python FastAPI + React throughout Tiqora itself
   (optional small Znuny OPM addon only if you co-run Znuny for cache coherence).
-- **Customer portal & knowledge base** — self-service tickets and Markdown KB.
+- **Customer portal & knowledge base** — self-service tickets (opt-in via
+  `TIQORA_PORTAL_ENABLED`) and Markdown KB.
 - **Integration-friendly** — REST `/api/v1`, GenericInterface REST/SOAP compatibility,
   webhooks, channel plugins (email, SMS, WhatsApp, Telegram, phone/CTI).
 - **Modern auth** — legacy password hashes, OIDC, LDAP/AD, Kerberos/SPNEGO (with
@@ -73,75 +90,83 @@ VITE_BASE=/tiqora/demo/ pnpm --filter tiqora-frontend build:demo
 
 ## Screenshots
 
-### AI assistance
+![Inbox with channel filters and an incoming-call popup](./docs/images/agent-cti-popup.png)
+<sub>Inbox sorted by last activity, with e-mail / Telegram / phone filters — and a CTI popup for the call that is ringing through.</sub>
 
-![AI assist](./docs/images/agent-ai-assist.png)
-<sub>AI assist — state-only ticket summary and reviewable reply/clarification drafts, self-hosted</sub>
+Grouped by topic; click a section to expand it, click a picture for full size. The
+[product site](https://cygnusnetworks.github.io/tiqora/#screenshots) shows the same set as a gallery with a light/dark switch.
 
-![AI assist + MCP](./docs/images/agent-ai-mcp.png)
-<sub>AI assist + MCP — the draft is grounded in live results pulled from an MCP monitoring server (host metrics, active alerts)</sub>
+<details>
+<summary><b>AI assistance</b> — summaries, drafts with MCP tools, auto-replies, refine, model routing (12)</summary>
 
-![AI origin trace](./docs/images/agent-ai-origin.png)
-<sub>Auto-sent AI reply — the 🤖 marker flags it in the article list and the reader, and the trace
-below shows every tool the agent called <em>and what it called it with</em></sub>
-
-| AI administration | Per-queue policies |
-|---|---|
-| ![AI settings](./docs/images/admin-ai-settings.png) | ![Queue AI policies](./docs/images/admin-ai-queue-policies.png) |
-
-| LLM providers | Cost budget & tool rounds |
-|---|---|
-| ![LLM providers](./docs/images/admin-ai-providers.png) | ![Provider budget](./docs/images/admin-ai-provider-budget.png) |
-
-| MCP tool sources | LLM request audit |
-|---|---|
-| ![MCP clients](./docs/images/admin-ai-mcp.png) | ![AI audit](./docs/images/admin-ai-audit.png) |
-
-### Agent workspace
-
-| Agent dashboard | Ticket zoom |
-|---|---|
-| ![Agent dashboard](./docs/images/agent-dashboard.png) | ![Ticket zoom](./docs/images/agent-ticket-zoom.png) |
-
-| Queue view | Search |
-|---|---|
-| ![Queue view](./docs/images/agent-queues.png) | ![Search](./docs/images/agent-search.png) |
-
-| Reporting & SLA | Knowledge base |
-|---|---|
-| ![Reporting](./docs/images/agent-stats.png) | ![Knowledge base](./docs/images/agent-kb.png) |
-
-| Calendar | Security |
-|---|---|
-| ![Calendar](./docs/images/agent-calendar.png) | ![Security](./docs/images/agent-security.png) |
-
-### Administration
-
-| Admin — queues | Admin — users |
-|---|---|
-| ![Admin queues](./docs/images/admin-queues.png) | ![Admin users](./docs/images/admin-users.png) |
-
-| Admin — groups | Admin — role/group mapping |
-|---|---|
-| ![Admin groups](./docs/images/admin-groups.png) | ![Admin role groups](./docs/images/admin-role-groups.png) |
-
-| Admin — customer users | Admin — customer user groups |
-|---|---|
-| ![Admin customer users](./docs/images/admin-customer-users.png) | ![Admin customer user groups](./docs/images/admin-customer-user-groups.png) |
-
-| Admin — dynamic fields | Privacy / GDPR |
-|---|---|
-| ![Admin dynamic fields](./docs/images/admin-dynamic-fields.png) | ![GDPR](./docs/images/admin-gdpr.png) |
-
-| Authentication / 2FA |
-|---|
-| ![2FA administration](./docs/images/admin-2fa.png) |
-
-### Authentication & portal
-
-| Login | User menu | Customer portal |
+| Ticket summary | Draft grounded in MCP tools | Auto-reply with its tool trace |
 |---|---|---|
-| ![Login](./docs/images/login.png) | ![User menu](./docs/images/user-menu.png) | ![Customer portal](./docs/images/portal.png) |
+| ![AI summary](./docs/images/agent-ai-assist.png) | ![AI assist + MCP](./docs/images/agent-ai-mcp.png) | ![AI origin trace](./docs/images/agent-ai-origin.png) |
+| **Refine, reviewed as a diff** | **Model catalog** | **Task → profile routing** |
+| ![Refine diff](./docs/images/agent-reply-refine.png) | ![AI models](./docs/images/admin-ai-models.png) | ![AI routing](./docs/images/admin-ai-routing.png) |
+| **Per-queue policies** | **AI settings** | **Providers** |
+| ![Queue AI policies](./docs/images/admin-ai-queue-policies.png) | ![AI settings](./docs/images/admin-ai-settings.png) | ![LLM providers](./docs/images/admin-ai-providers.png) |
+| **Cost budget & tool rounds** | **MCP tool sources** | **LLM request audit** |
+| ![Provider budget](./docs/images/admin-ai-provider-budget.png) | ![MCP clients](./docs/images/admin-ai-mcp.png) | ![AI audit](./docs/images/admin-ai-audit.png) |
+
+</details>
+
+<details>
+<summary><b>Agent workspace</b> — inbox, ticket view, dashboard, search, reports, calendar, KB (7)</summary>
+
+| Inbox | Ticket view | Dashboard |
+|---|---|---|
+| ![Queue view](./docs/images/agent-queues.png) | ![Ticket zoom](./docs/images/agent-ticket-zoom.png) | ![Agent dashboard](./docs/images/agent-dashboard.png) |
+| **Search** | **Reporting & SLA** | **Calendar** |
+| ![Search](./docs/images/agent-search.png) | ![Reporting](./docs/images/agent-stats.png) | ![Calendar](./docs/images/agent-calendar.png) |
+| **Knowledge base** | | |
+| ![Knowledge base](./docs/images/agent-kb.png) | | |
+
+</details>
+
+<details>
+<summary><b>Chat &amp; phone</b> — Telegram chat, CTI call popup, compact phone ticket (3)</summary>
+
+| Telegram chat | CTI call popup | Phone ticket with caller lookup |
+|---|---|---|
+| ![Telegram chat](./docs/images/agent-telegram-chat.png) | ![CTI popup](./docs/images/agent-cti-popup.png) | ![Phone ticket](./docs/images/agent-phone-ticket.png) |
+
+</details>
+
+<details>
+<summary><b>PGP &amp; S/MIME</b> — verified mail, signed &amp; encrypted replies, queue defaults, key admin (5)</summary>
+
+| Verified signature on arrival | Sign &amp; encrypt in the composer | Per-queue security defaults |
+|---|---|---|
+| ![Security badge](./docs/images/agent-crypto-badge.png) | ![Security control](./docs/images/agent-reply-refine.png) | ![Queue security](./docs/images/admin-queue-security.png) |
+| **PGP keys** | **S/MIME certificates** | |
+| ![PGP keys](./docs/images/admin-pgp.png) | ![S/MIME certificates](./docs/images/admin-smime.png) | |
+
+</details>
+
+<details>
+<summary><b>Administration</b> — queues &amp; escalation, agents, groups, customers, fields, GDPR, 2FA (10)</summary>
+
+| Queues | Escalation matrix | Agents |
+|---|---|---|
+| ![Admin queues](./docs/images/admin-queues.png) | ![Escalation matrix](./docs/images/admin-queue-escalation.png) | ![Admin users](./docs/images/admin-users.png) |
+| **Groups** | **Roles ↔ groups** | **Customer users** |
+| ![Admin groups](./docs/images/admin-groups.png) | ![Admin role groups](./docs/images/admin-role-groups.png) | ![Admin customer users](./docs/images/admin-customer-users.png) |
+| **Customer user groups** | **Dynamic fields** | **Privacy / GDPR** |
+| ![Admin customer user groups](./docs/images/admin-customer-user-groups.png) | ![Admin dynamic fields](./docs/images/admin-dynamic-fields.png) | ![GDPR](./docs/images/admin-gdpr.png) |
+| **Two-factor** | | |
+| ![2FA administration](./docs/images/admin-2fa.png) | | |
+
+</details>
+
+<details>
+<summary><b>Sign-in &amp; portal</b> — login, account security, account menu, customer portal (4)</summary>
+
+| Login | Account security | Account menu | Customer portal |
+|---|---|---|---|
+| ![Login](./docs/images/login.png) | ![Security](./docs/images/agent-security.png) | ![User menu](./docs/images/user-menu.png) | ![Customer portal](./docs/images/portal.png) |
+
+</details>
 
 <sub>Generated with `SCREENSHOTS=1 pnpm exec playwright test screenshots`
 (`e2e/fixtures/rich-mock.ts`) — no backend required. Use `THEME=dark` / `LANG_UI=de` for variants.</sub>
@@ -153,11 +178,14 @@ below shows every tool the agent called <em>and what it called it with</em></sub
 | Ticket write path + Znuny invariants | Golden-master multi-peer matrix (OTRS/Znuny 6.0–7.3) |
 | GenericInterface compatibility | Session*, TicketCreate/Update/Get/Search/HistoryGet, TimeAccountingGet, OutOfOffice; REST + SOAP |
 | MCP tools | `ticket_*`, customer lookup, KB — see [docs/ai-integration.md](./docs/ai-integration.md) |
-| AI assistance subsystem | Draft replies, summaries, auto-reply worker, human handoff, 🤖 origin traces, attachment/vision, PII masking, per-subject ACL, cost budgets & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
+| AI assistance subsystem | Draft replies, summaries, triage, refine (diff review, call notes), auto-reply worker, human handoff, per-ticket pause, 🤖 origin traces, attachment/vision, PII masking, model catalog/profiles/task routing, per-subject ACL, cost budgets & audit — `/admin/ai/*`, [docs/ai-integration.md](./docs/ai-integration.md) |
 | Daemon takeover (mail, escalation, notify, GA) | Per-function flags, off by default |
 | Calendar / appointments | Month/week/agenda UI; reuses Znuny `calendar*` tables |
 | Process management (BPM) | Reuses Znuny `pm_*` tables — [docs/process-management.md](./docs/process-management.md) |
-| PGP / S-MIME | Flag-gated — [docs/crypto.md](./docs/crypto.md) |
+| PGP / S-MIME | Off by default (Znuny's `PGP` / `SMIME` switches). Shared Znuny key stores, admin pages with overview/keys/settings, inbound verify/decrypt, outbound sign/encrypt with per-queue defaults and per-sender sign keys, signed/encrypted notifications, customer keys, public S/MIME roots trusted out of the box — [docs/crypto.md](./docs/crypto.md) |
+| Telegram, SMS, WhatsApp, phone/CTI | Telegram chat composer; phone tickets, call logging and CTI incoming-call popup — [docs/channels.md](./docs/channels.md) |
+| New-ticket helpers | Queue suggested from the customer's history, property bar, compact phone ticket with call strip |
+| Integrations endpoint | Per-customer ticket history for external tools (`/api/v1/integrations/customer-tickets`) |
 | SSE realtime + agent presence | Live updates on ticket zoom |
 | CSV ticket export | Permission-filtered streaming export |
 | TiqoraSync Znuny addon | Optional OPM for cache coherence during parallel op |
@@ -198,7 +226,7 @@ below shows every tool the agent called <em>and what it called it with</em></sub
          └───────────────────────┘
                       │
          ┌────────────▼────────────────────────────────────┐
-         │  tiqora-worker (taskiq) · Redis · Meilisearch   │
+         │  tiqora-worker · ai-worker · Redis · Meili      │
          └─────────────────────────────────────────────────┘
 ```
 
@@ -214,7 +242,7 @@ flowchart TB
   subgraph tiqora [Tiqora]
     API[tiqora-api FastAPI]
     MCP[tiqora-mcp FastMCP]
-    Worker[tiqora-worker taskiq]
+    Worker[tiqora-worker + ai-worker]
     Domain[domain + permissions]
   end
 
@@ -257,7 +285,7 @@ backend/src/tiqora/
   storage/          # StorageBackend interface (DB MIME in V1)
   api/              # v1 routers + GenericInterface compat layer
   mcp_server/       # FastMCP process
-  worker/           # taskiq jobs
+  worker/           # asyncio worker loops (daemon takeover, outbox, pollers)
   kb/               # Knowledge base
 ```
 
@@ -363,7 +391,7 @@ tickets through it while the portal is off.
 | API | FastAPI + Pydantic v2 | Async-native, OpenAPI-first |
 | ORM | SQLAlchemy 2 async | Dual drivers: asyncpg + aiomysql |
 | Migrations | Alembic (two chains) | Own tables now; owned Znuny schema only after cutover |
-| Jobs | taskiq + Redis | Asyncio-native, FastAPI-like DI, cron for daemon takeover |
+| Jobs | Plain asyncio loops | Feature-flagged daemon takeover without an extra task queue; AI in its own worker |
 | Search | Meilisearch | Fast full-text; later hybrid/vector for RAG |
 | Sessions | Redis server-side | No JWT; Znuny-compatible session table for compat API |
 | Frontend | Vite, React, TS, Tailwind | One app, three route trees, code-split |
