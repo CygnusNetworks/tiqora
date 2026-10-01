@@ -141,3 +141,12 @@ def test_all_areas_read_only_preset() -> None:
     assert all(v == "ro" for v in expanded.values())
     assert not scopes_allow(scopes, method="POST", path="/api/v1/tickets")
     assert scopes_allow(scopes, method="GET", path="/api/v1/tickets")
+
+
+def test_integrations_path_maps_to_tickets_area() -> None:
+    path = "/api/v1/integrations/customer-tickets"
+    assert path_to_area(path) == "tickets"
+    ro = frozenset({"tickets:ro"})
+    assert scopes_allow(ro, method="GET", path=path + "?login=z50test")
+    assert not scopes_allow(ro, method="POST", path=path)
+    assert not scopes_allow(frozenset({"customers:ro"}), method="GET", path=path)
