@@ -1132,6 +1132,7 @@ const cryptoSettings = {
     cryptoField("smime.cert_path", "str", "", { znuny_setting: "SMIME::CertPath", env_var: "TIQORA_CRYPTO_SMIME_CERT_DIR" }),
     cryptoField("smime.private_path", "str", "", { znuny_setting: "SMIME::PrivatePath", env_var: "TIQORA_CRYPTO_SMIME_PRIVATE_DIR" }),
     cryptoField("smime.ca_path", "str", "", { env_var: "TIQORA_CRYPTO_SMIME_CA_PATH" }),
+    cryptoField("smime.public_roots", "bool", true, { env_var: "TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS" }),
     cryptoField("smime.openssl_bin", "str", "", { znuny_setting: "SMIME::Bin", env_var: "TIQORA_CRYPTO_OPENSSL_BIN" }),
   ],
   pgp_passphrases: [

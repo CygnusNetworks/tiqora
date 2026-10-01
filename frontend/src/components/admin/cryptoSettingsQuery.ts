@@ -16,7 +16,7 @@ export const CRYPTO_SECTIONS: Record<CryptoBackend, { id: string; fields: string
   ],
   smime: [
     { id: "general", fields: ["smime.enabled", "smime.fetch_from_customer", "smime.no_verify"] },
-    { id: "store", fields: ["smime.cert_path", "smime.private_path", "smime.ca_path"] },
+    { id: "store", fields: ["smime.cert_path", "smime.private_path", "smime.ca_path", "smime.public_roots"] },
     { id: "env", fields: ["smime.openssl_bin"] },
   ],
 };

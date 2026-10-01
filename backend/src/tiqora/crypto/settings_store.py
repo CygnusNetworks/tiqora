@@ -133,6 +133,14 @@ FIELDS: tuple[FieldSpec, ...] = (
     FieldSpec(
         "smime.ca_path", "str", None, "crypto_smime_ca_path", "TIQORA_CRYPTO_SMIME_CA_PATH", ""
     ),
+    FieldSpec(
+        "smime.public_roots",
+        "bool",
+        None,
+        "crypto_smime_public_roots",
+        "TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS",
+        True,
+    ),
     FieldSpec("smime.fetch_from_customer", "bool", "SMIME::FetchFromCustomer", None, None, False),
     FieldSpec("smime.no_verify", "bool", "SMIME::NoVerify", None, None, False),
 )
