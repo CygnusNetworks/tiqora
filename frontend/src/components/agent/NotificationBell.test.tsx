@@ -1,23 +1,37 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { NotificationBell, NotificationToaster } from "./NotificationBell";
 import { addNotification, clearNotifications } from "@/lib/notificationStore";
 
-const { navigate } = vi.hoisted(() => ({
+const { navigate, auth, listLimits } = vi.hoisted(() => ({
   navigate: vi.fn(),
+  auth: { current: null as { user: { is_admin: boolean } } | null },
+  listLimits: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
 }));
 
+vi.mock("@/auth/AuthContext", () => ({
+  useOptionalAuth: () => auth.current,
+}));
+
+vi.mock("@/lib/aiApi", () => ({
+  aiApi: { listLimits: (...args: unknown[]) => listLimits(...args) },
+}));
+
 function renderBell() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <I18nextProvider i18n={i18n}>
-      <NotificationBell />
-    </I18nextProvider>,
+    <QueryClientProvider client={client}>
+      <I18nextProvider i18n={i18n}>
+        <NotificationBell />
+      </I18nextProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -31,6 +45,8 @@ function renderToaster() {
 
 describe("NotificationBell", () => {
   beforeEach(() => {
+    auth.current = null;
+    listLimits.mockReset();
     navigate.mockClear();
     clearNotifications();
     void i18n.changeLanguage("en");
@@ -98,6 +114,51 @@ describe("NotificationBell", () => {
       params: { ticketId: "9" },
     });
     expect(screen.queryByTestId("notification-panel")).not.toBeInTheDocument();
+  });
+});
+
+describe("NotificationBell — AI limits (admins)", () => {
+  beforeEach(() => {
+    navigate.mockClear();
+    clearNotifications();
+    listLimits.mockReset();
+  });
+
+  const exhausted = {
+    kind: "queue_tokens_day",
+    subject_id: 5,
+    subject_name: "stw-bn",
+    window: "day",
+    used: 3_100_000,
+    limit: 3_000_000,
+    currency: null,
+    exhausted: true,
+    window_start: "2026-10-01T00:00:00Z",
+    resets_at: "2026-10-02T00:00:00Z",
+  };
+
+  it("shows exhausted limits to admins and links to the queue policies", async () => {
+    auth.current = { user: { is_admin: true } };
+    listLimits.mockResolvedValue({
+      items: [exhausted, { ...exhausted, subject_id: 7, subject_name: "ok", exhausted: false }],
+    });
+    renderBell();
+    await waitFor(() =>
+      expect(screen.getByTestId("notification-unread-count")).toHaveTextContent("1"),
+    );
+    fireEvent.click(screen.getByTestId("notification-bell"));
+    const item = screen.getByTestId("notification-ai-limit-queue_tokens_day-5");
+    expect(item).toHaveTextContent(i18n.t("notifications.aiLimitQueue", { name: "stw-bn" }));
+    expect(screen.queryByTestId("notification-ai-limit-queue_tokens_day-7")).toBeNull();
+    fireEvent.click(item);
+    expect(navigate).toHaveBeenCalledWith({ to: "/admin/ai/queues" });
+  });
+
+  it("does not ask for limits as a non-admin", () => {
+    auth.current = { user: { is_admin: false } };
+    renderBell();
+    expect(listLimits).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("notification-unread-count")).toBeNull();
   });
 });
 

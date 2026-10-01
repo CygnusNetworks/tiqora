@@ -72,6 +72,10 @@ export type AiStateOut = {
   /** Set while automatic AI actions are paused for this ticket. */
   ai_paused_at?: string | null;
   ai_paused_by_name?: string | null;
+  /** Why the auto worker last skipped a customer article on this ticket
+   * (`budget_tokens_day`, `queue_rate_limit`, `llm_unavailable`, …). */
+  auto_skip_reason?: string | null;
+  auto_skip_at?: string | null;
   /** Pending triage proposal, only present while its status is "open". */
   triage?: AiTriageOut | null;
 };

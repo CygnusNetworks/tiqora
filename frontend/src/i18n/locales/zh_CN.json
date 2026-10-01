@@ -8,7 +8,17 @@
     "title": "通知",
     "empty": "暂无新通知。",
     "newTicket": "队列中有新工单",
-    "noSubject": "（无主题）"
+    "noSubject": "（无主题）",
+    "aiLimits": "AI limit reached",
+    "aiLimitQueue": "Daily token budget of queue {{name}}",
+    "aiLimitProvider": "Cost budget ({{window}}) of {{name}}",
+    "aiLimitWindow": {
+      "day": "day",
+      "week": "week",
+      "month": "month"
+    },
+    "aiLimitDetail": "{{amount}} · frees up at {{time}}",
+    "aiLimitTokensUnit": "M tokens"
   },
   "onlineAgents": {
     "title": "在线坐席",
@@ -635,7 +645,17 @@
       "more": "more",
       "less": "less",
       "scopeAndInstruction": "Scope & own instruction …",
-      "pinOpen": "Pin (stays expanded)"
+      "pinOpen": "Pin (stays expanded)",
+      "autoSkip": {
+        "budget_tokens_day": "Not answered automatically ({{dateTime}}): this queue's daily token budget is used up.",
+        "queue_rate_limit": "Not answered automatically ({{dateTime}}): the queue reached its hourly auto-reply limit.",
+        "global_rate_limit": "Not answered automatically ({{dateTime}}): the global hourly auto-reply limit is reached.",
+        "max_auto_replies": "Not answered automatically ({{dateTime}}): the maximum number of auto-replies for this ticket is reached.",
+        "max_clarifications": "Not answered automatically ({{dateTime}}): the maximum number of clarifying questions for this ticket is reached.",
+        "llm_unavailable": "Not answered automatically ({{dateTime}}): no AI model available (provider disabled or cost budget used up).",
+        "other": "Not answered automatically ({{dateTime}}).",
+        "manualHint": "You can still create an AI draft manually."
+      }
     },
     "toolbar": {
       "print": "打印",
@@ -1416,7 +1436,7 @@
         "maxClarifications": "最多说明/工单",
         "maxAutoReplies": "最大自动回复/工单数量",
         "maxRepliesPerHour": "每小时最大回复数",
-        "budgetTokensDay": "代币预算/天",
+        "budgetTokensDay": "代币预算/天 (M)",
         "escalationRules": "升级规则 (JSON)",
         "escalationRulesHint": "针对 MCP 工具结果的匹配规则的 JSON 数组，触发升级给人工。",
         "escalationRulesPlaceholder": "空 = 没有规则，例如[{“工具”：“客户端：*”，“匹配”：“子字符串”，“值”：[“升级”]}]",
@@ -1434,7 +1454,9 @@
           "tabUsage": "用途",
           "agentProfile": "Profile: {{name}}",
           "noAgentProfile": "No model profile ({{fallback}})",
-          "agentProfileError": "Model profiles could not be loaded"
+          "agentProfileError": "Model profiles could not be loaded",
+          "budgetToday": "today {{amount}}M tokens",
+          "budgetExhausted": "Budget reached: {{amount}}M tokens"
         },
         "tab": {
           "basics": "基础知识",

@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from tiqora.domain.schemas import UtcDateTime
+
 OperationMode = Literal["parallel", "tiqora_primary"]
 ProviderKind = Literal["openai_compat", "anthropic"]
 McpTransport = Literal["streamable_http"]
@@ -528,6 +530,30 @@ class AiUsagePageOut(BaseModel):
     total_completion_tokens: int
     page: int
     page_size: int
+
+
+class AiLimitOut(BaseModel):
+    """One budget cap with its current spend (see :mod:`tiqora.ai.limits`).
+
+    ``kind`` ``queue_tokens_day``: ``subject_id`` is a queue id, ``used`` /
+    ``limit`` are tokens. ``provider_cost``: a provider id, amounts in
+    ``currency``.
+    """
+
+    kind: Literal["queue_tokens_day", "provider_cost"]
+    subject_id: int
+    subject_name: str
+    window: Literal["day", "week", "month"]
+    used: float
+    limit: float
+    currency: str | None = None
+    exhausted: bool
+    window_start: UtcDateTime
+    resets_at: UtcDateTime
+
+
+class AiLimitsOut(BaseModel):
+    items: list[AiLimitOut]
 
 
 # ---------------------------------------------------------------------------

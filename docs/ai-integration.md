@@ -59,6 +59,11 @@ and reject it.
   source of truth.
 - `events` filtering: a webhook subscribes to a JSON array of event names,
   or an empty array / `["*"]` for "all events" (`webhook_matches_event`).
+- `AiLimitReached` is the one non-ticket event: an AI budget cap was just
+  exhausted (see "Budget limits and notices" below). `ticket_id` is the
+  ticket whose LLM call crossed the line, `0` if that call had none;
+  `payload` is `{kind, subject_id, subject_name, window, used, limit,
+  currency, window_start, resets_at}`. Sent once per cap and window.
 
 **Backward compatibility**: adding a field to `payload` or to the envelope
 itself is not a breaking change and does not require a `schema_version`
@@ -346,6 +351,22 @@ ignored rather than the run failing; a budget-exceeded provider is skipped
 in profile chains, so the next model answers. Note this is a *provider*-wide cap
 shared by every queue pointing at that provider, unlike the per-queue
 `budget_tokens_day`.
+
+**Budget limits and notices** (`tiqora.ai.limits`): both caps —
+`budget_tokens_day` per queue (auto-reply + triage tokens since midnight UTC;
+the admin editor takes it in millions of tokens) and the provider cost
+windows — are reported by `GET /api/v1/admin/ai/limits` (spend vs. cap per
+cap and window). After every recorded LLM call the caps are re-checked; one
+that is newly exhausted is announced once per window: an admin-only SSE
+`ai_limit_changed` message (the agent bell shows exhausted caps to admins
+until they free up), an `AiLimitReached` webhook event, and a
+`ai_limit_reached` warning log line. When the auto worker skips a customer
+article for a cap (or because no model is usable), the reason is stored on
+`tiqora_ai_ticket_state.auto_skip_reason`/`auto_skip_at` and shown in the
+ticket's AI panel; it is cleared when an auto run starts. Unauthenticated
+`GET /health/ai` returns `{"status": "ok" | "limit_reached",
+"limits_reached": [{kind, subject_id, window, resets_at}]}` (always HTTP
+200, no names or amounts) for external monitoring.
 
 **Tool-round budget** (`max_tool_rounds`): how many research steps the agent
 gets before it has to answer.

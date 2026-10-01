@@ -8,7 +8,17 @@
     "title": "알림",
     "empty": "새로운 알림이 없습니다.",
     "newTicket": "대기열의 새로운 항목",
-    "noSubject": "(제목 없음)"
+    "noSubject": "(제목 없음)",
+    "aiLimits": "AI limit reached",
+    "aiLimitQueue": "Daily token budget of queue {{name}}",
+    "aiLimitProvider": "Cost budget ({{window}}) of {{name}}",
+    "aiLimitWindow": {
+      "day": "day",
+      "week": "week",
+      "month": "month"
+    },
+    "aiLimitDetail": "{{amount}} · frees up at {{time}}",
+    "aiLimitTokensUnit": "M tokens"
   },
   "onlineAgents": {
     "title": "온라인 에이전트",
@@ -635,7 +645,17 @@
       "more": "more",
       "less": "less",
       "scopeAndInstruction": "Scope & own instruction …",
-      "pinOpen": "Pin (stays expanded)"
+      "pinOpen": "Pin (stays expanded)",
+      "autoSkip": {
+        "budget_tokens_day": "Not answered automatically ({{dateTime}}): this queue's daily token budget is used up.",
+        "queue_rate_limit": "Not answered automatically ({{dateTime}}): the queue reached its hourly auto-reply limit.",
+        "global_rate_limit": "Not answered automatically ({{dateTime}}): the global hourly auto-reply limit is reached.",
+        "max_auto_replies": "Not answered automatically ({{dateTime}}): the maximum number of auto-replies for this ticket is reached.",
+        "max_clarifications": "Not answered automatically ({{dateTime}}): the maximum number of clarifying questions for this ticket is reached.",
+        "llm_unavailable": "Not answered automatically ({{dateTime}}): no AI model available (provider disabled or cost budget used up).",
+        "other": "Not answered automatically ({{dateTime}}).",
+        "manualHint": "You can still create an AI draft manually."
+      }
     },
     "toolbar": {
       "print": "인쇄",
@@ -1416,7 +1436,7 @@
         "maxClarifications": "최대 설명/티켓",
         "maxAutoReplies": "최대 자동 답장/티켓",
         "maxRepliesPerHour": "최대 응답/시간",
-        "budgetTokensDay": "토큰예산/일",
+        "budgetTokensDay": "토큰예산/일 (M)",
         "escalationRules": "에스컬레이션 규칙(JSON)",
         "escalationRulesHint": "인간에게 에스컬레이션을 트리거하는 MCP 도구 결과에 대한 일치 규칙의 JSON 배열입니다.",
         "escalationRulesPlaceholder": "비어 있음 = 규칙 없음, 예: [{\"도구\":\"클라이언트:*\",\"일치\":\"하위 문자열\",\"값\":[\"ESCALATE\"]}]",
@@ -1434,7 +1454,9 @@
           "tabUsage": "사용법",
           "agentProfile": "Profile: {{name}}",
           "noAgentProfile": "No model profile ({{fallback}})",
-          "agentProfileError": "Model profiles could not be loaded"
+          "agentProfileError": "Model profiles could not be loaded",
+          "budgetToday": "today {{amount}}M tokens",
+          "budgetExhausted": "Budget reached: {{amount}}M tokens"
         },
         "tab": {
           "basics": "기본사항",

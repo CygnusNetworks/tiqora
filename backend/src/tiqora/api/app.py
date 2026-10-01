@@ -293,6 +293,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Liveness probe — process is up."""
         return {"status": "ok", "version": __version__}
 
+    @app.get("/health/ai", tags=["ops"])
+    async def health_ai() -> dict[str, object]:
+        """AI budget probe for external monitoring (Zabbix, Checkmk, …).
+
+        ``status`` is ``ok`` or ``limit_reached``; the list names each
+        exhausted cap by kind, id and window only — no queue/provider names or
+        amounts, since this endpoint is unauthenticated like ``/health``.
+        Always HTTP 200: a spent budget is a state to alert on, not an outage.
+        """
+        from tiqora.ai.limits import exhausted_limits
+
+        async with get_session_factory()() as session:
+            reached = await exhausted_limits(session)
+        return {
+            "status": "limit_reached" if reached else "ok",
+            "limits_reached": [
+                {
+                    "kind": s.kind,
+                    "subject_id": s.subject_id,
+                    "window": s.window,
+                    "resets_at": s.resets_at.isoformat() + "Z",
+                }
+                for s in reached
+            ],
+        }
+
     @app.get("/ready", tags=["ops"])
     async def ready() -> dict[str, object]:
         """Readiness probe — critical dependencies reachable."""

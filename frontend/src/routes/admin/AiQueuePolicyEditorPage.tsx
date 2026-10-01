@@ -44,6 +44,7 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/cn";
+import { TOKENS_PER_MIO } from "@/lib/aiLimits";
 
 const NONE = 0;
 const MAX_PROMPT_FILE_BYTES = 2 * 1024 * 1024;
@@ -101,7 +102,9 @@ type FormState = {
   max_clarifications: string;
   max_auto_replies: string;
   max_replies_per_hour: string;
-  budget_tokens_day: string;
+  /** Daily token budget in MILLIONS of tokens ("3" = 3,000,000); the API
+   * field `budget_tokens_day` stays in tokens. */
+  budget_mio_tokens_day: string;
   escalation_rules: string;
   ai_disclosure_enabled: boolean;
   ai_disclosure_text: string;
@@ -155,7 +158,7 @@ function emptyForm(queueId: number): FormState {
     max_clarifications: "2",
     max_auto_replies: "5",
     max_replies_per_hour: "20",
-    budget_tokens_day: "500000",
+    budget_mio_tokens_day: "3",
     escalation_rules: "",
     ai_disclosure_enabled: false,
     ai_disclosure_text: "",
@@ -281,8 +284,8 @@ function toForm(row: AiQueuePolicyOut): FormState {
     max_auto_replies: String(row.max_auto_replies),
     max_replies_per_hour:
       row.max_replies_per_hour != null ? String(row.max_replies_per_hour) : "",
-    budget_tokens_day:
-      row.budget_tokens_day != null ? String(row.budget_tokens_day) : "",
+    budget_mio_tokens_day:
+      row.budget_tokens_day != null ? String(row.budget_tokens_day / TOKENS_PER_MIO) : "",
     escalation_rules: row.escalation_rules ?? "",
     ai_disclosure_enabled: row.ai_disclosure_enabled,
     ai_disclosure_text: row.ai_disclosure_text ?? "",
@@ -304,6 +307,12 @@ function numOrNull(v: string): number | null {
   if (!trimmed) return null;
   const n = Number(trimmed);
   return Number.isFinite(n) ? n : null;
+}
+
+/** "3" / "0,5" (millions) → whole tokens; empty → no budget. */
+function mioToTokens(v: string): number | null {
+  const n = numOrNull(v.replace(",", "."));
+  return n == null ? null : Math.round(n * TOKENS_PER_MIO);
 }
 
 function validateJson(
@@ -652,7 +661,7 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
     max_clarifications: numOrNull(f.max_clarifications) ?? 2,
     max_auto_replies: numOrNull(f.max_auto_replies) ?? 5,
     max_replies_per_hour: numOrNull(f.max_replies_per_hour),
-    budget_tokens_day: numOrNull(f.budget_tokens_day),
+    budget_tokens_day: mioToTokens(f.budget_mio_tokens_day),
     escalation_rules: f.escalation_rules.trim() || null,
     ai_disclosure_enabled: f.ai_disclosure_enabled,
     ai_disclosure_text: f.ai_disclosure_text.trim() || null,
@@ -1465,10 +1474,12 @@ function AiQueuePolicyEditor({ policyId }: { policyId?: number }) {
                   />
                   <input
                     type="number"
+                    min={0}
+                    step={0.1}
                     data-testid="admin-ai-queue-form-budget_tokens_day"
-                    value={form.budget_tokens_day}
+                    value={form.budget_mio_tokens_day}
                     onChange={(e) =>
-                      setField("budget_tokens_day", e.target.value)
+                      setField("budget_mio_tokens_day", e.target.value)
                     }
                     placeholder={t("admin.ai.queues.emptyUnlimited")}
                     className={inputClass}

@@ -857,6 +857,12 @@ class TiqoraAiTicketState(TiqoraBase):
     # cleared automatically: only the explicit unpause route clears it.
     ai_paused_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     ai_paused_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Why the auto worker last skipped a customer article on this ticket
+    # (``budget_tokens_day``, ``queue_rate_limit``, ``llm_unavailable``, …) —
+    # until now only a log line, so an agent saw "nothing happened". Cleared
+    # when an auto run actually starts.
+    auto_skip_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    auto_skip_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 AUDIT_PAYLOAD_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")

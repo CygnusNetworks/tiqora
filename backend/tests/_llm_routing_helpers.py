@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai import providers as ai_providers
@@ -216,3 +216,20 @@ def routing_cleanup_statements(provider_name: str) -> tuple[tuple[str, dict[str,
             params,
         ),
     )
+
+
+def delete_limit_alerts(conn: Any) -> None:
+    """Remove what :func:`tiqora.ai.limits.announce_exhausted_limits` wrote
+    when a test pushed a queue/provider over its budget: the webhook outbox
+    rows and the "announced in this window" markers."""
+    from sqlalchemy import delete
+
+    from tiqora.ai.limits import EVENT_AI_LIMIT_REACHED
+    from tiqora.db.tiqora.models import TiqoraSettings
+
+    conn.execute(
+        text("DELETE FROM tiqora_event_outbox WHERE event_type = :e"),
+        {"e": EVENT_AI_LIMIT_REACHED},
+    )
+    # Via the model: ``key`` is reserved in MySQL and needs dialect quoting.
+    conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key.like("ai.limit_alert.%")))
