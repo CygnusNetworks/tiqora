@@ -27,7 +27,7 @@
     "@tiqora/api-client": "workspace:*",
     "clsx": "^2.1.1",
     "diff": "^9.0.0",
-    "dompurify": "^3.4.13",
+    "dompurify": "^3.4.16",
     "i18next": "^24.2.0",
     "marked": "^18.0.6",
     "react": "^19.0.0",
