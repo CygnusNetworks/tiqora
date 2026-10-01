@@ -19,11 +19,17 @@ from __future__ import annotations
 import os
 import subprocess
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from tiqora.crypto import CryptoError, CryptoUnavailableError
 
 DEFAULT_OPENSSL_BIN = "openssl"
+#: Mozilla's roots trusted for e-mail protection, regenerated with
+#: ``scripts/update-smime-roots.py``. Debian's ca-certificates only carries the
+#: TLS roots, so e-mail-only roots (HARICA Client, DigiCert SMIME) live here.
+PUBLIC_ROOTS_FILE = str(Path(__file__).parent / "data" / "smime-public-roots.crt")
 _TIMEOUT_SECONDS = 30
 _SECRET_ENV = "TIQORA_SMIME_SECRET"
 
@@ -190,6 +196,7 @@ class SmimeEngine:
         *,
         ca_path: str | None = None,
         ca_dir: str | None = None,
+        extra_ca_files: Sequence[str] = (),
         no_verify: bool = False,
     ) -> SmimeVerifyResult:
         """Verify a signed S/MIME entity (``multipart/signed`` or opaque signed-data).
@@ -197,7 +204,9 @@ class SmimeEngine:
         Trust anchors: ``ca_dir`` is used as ``-CApath`` (Znuny passes
         ``SMIME::CertPath``, whose ``<subject_hash>.<n>`` names are exactly the
         ``-CApath`` lookup names), ``ca_path`` as ``-CAfile``; openssl adds its
-        default store as Znuny's call does. Without either, or with
+        default store as Znuny's call does. ``extra_ca_files`` (e.g.
+        :data:`PUBLIC_ROOTS_FILE`) are merged with ``ca_path`` into one
+        ``-CAfile``, since openssl takes only one. Without any of these, or with
         ``no_verify``, ``-noverify`` is used: the signature is checked
         cryptographically but the chain is NOT validated — a self-signed cert
         bearing the victim's address also passes (security review M4), so
@@ -206,18 +215,25 @@ class SmimeEngine:
         The result carries the signed content (``-out``) and the signer
         certificate (``-signer``, PEM) when openssl could extract them.
         """
-        noverify = no_verify or not (ca_path or ca_dir)
+        ca_files = [p for p in (ca_path, *extra_ca_files) if p]
+        noverify = no_verify or not (ca_files or ca_dir)
         with tempfile.TemporaryDirectory(prefix="tiqora-smime-") as tmp:
             signer_file = os.path.join(tmp, "signer.pem")
             out_file = os.path.join(tmp, "content")
+            ca_file = ca_files[0] if len(ca_files) == 1 else None
+            if len(ca_files) > 1:
+                ca_file = os.path.join(tmp, "ca-bundle.pem")
+                with open(ca_file, "wb") as bundle:
+                    for path in ca_files:
+                        bundle.write(_read(path) + b"\n")
             args = ["smime", "-verify", "-signer", signer_file, "-out", out_file]
             if noverify:
                 args.append("-noverify")
             else:
                 if ca_dir:
                     args += ["-CApath", ca_dir]
-                if ca_path:
-                    args += ["-CAfile", ca_path]
+                if ca_file:
+                    args += ["-CAfile", ca_file]
             proc = self._run(args, data)
             content = _read(out_file)
             signer = _read(signer_file)

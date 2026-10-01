@@ -3360,6 +3360,10 @@
             "help": "Additional CA bundle file (PEM) for chain validation. Tiqora only, no Znuny setting.",
             "placeholder": "optional"
           },
+          "public_roots": {
+            "label": "Trust public CAs",
+            "help": "Signatures from certificates issued by a public CA (Mozilla's root list for e-mail, e.g. HARICA/GEANT, Sectigo, T-TeleSec, D-Trust, DigiCert) count as verified. Tiqora only, no Znuny setting."
+          },
           "fetch_from_customer": {
             "label": "Fetch certificates from customer",
             "help": "Imports S/MIME certificates from the customer user attribute UserSMIMECertificate (Znuny: SMIME::FetchFromCustomer)."
