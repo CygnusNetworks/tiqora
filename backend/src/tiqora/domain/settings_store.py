@@ -132,8 +132,9 @@ KEY_SMIME_CUSTOMER_RENEW_ENABLED = "daemon.smime_customer_renew.enabled"
 KEY_AI_AUTO_REPLY_PAUSED = "ai.auto_reply.paused"
 
 # Customer portal master switch (runtime, admin-editable). The deployment-level
-# TIQORA_PORTAL_ENABLED is a hard off that this row cannot override — see
-# tiqora.domain.portal_gate for the single resolution point. Default ON.
+# TIQORA_PORTAL_ENABLED (opt-in, default off) gates this row — see
+# tiqora.domain.portal_gate for the single resolution point. Default ON once
+# the deployment has enabled the portal.
 KEY_PORTAL_ENABLED = "portal.enabled"
 
 # Telegram poller daemon (Phase T3) — takes over Telegram Bot API long-polling

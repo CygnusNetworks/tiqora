@@ -1366,7 +1366,7 @@ class AuthConfigGlobalOut(BaseModel):
     enforce_group_ids: list[int] = []
     # Customer portal master switch (tiqora_settings "portal.enabled").
     portal_enabled: bool = True
-    # True when TIQORA_PORTAL_ENABLED=false forces the portal off. The UI then
+    # True unless TIQORA_PORTAL_ENABLED=true (the portal is opt-in). The UI then
     # renders the switch disabled, and PUT rejects changes with 409.
     portal_locked_by_env: bool = False
 

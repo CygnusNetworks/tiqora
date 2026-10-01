@@ -2866,7 +2866,7 @@
       "enforceAll": "Pieprasīt 2FA visiem aģentiem",
       "enforceGroups": "Pieprasīt 2FA šo grupu dalībniekiem",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Nav atrasta neviena derīga grupa.",
       "saveGlobal": "Saglabājiet globālo politiku",
       "globalSaved": "Globālā politika ir saglabāta.",

@@ -65,7 +65,7 @@ are the code defaults, not necessarily sane production values.
 | `TIQORA_PUBLIC_BASE_URL` | *(empty)* | Public browser URL, no trailing slash (e.g. `https://tickets.example.com`). Used for notification/password-setup links and the OAuth2 mail callback; set it on API **and** worker. Empty falls back to the first absolute `TIQORA_CORS_ORIGINS` entry. |
 | `TIQORA_FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxy IPs whose `X-Forwarded-For`/`X-Real-IP` uvicorn trusts for `request.client.host`. **Set to the proxy / Docker gateway IP** when the proxy is not on `127.0.0.1` inside the container, or the per-IP rate limit keys every request on the proxy IP. |
 | `TIQORA_SERVE_FRONTEND` | `true` | Serve the bundled SPA from the API container at `/`. |
-| `TIQORA_PORTAL_ENABLED` | `true` | `false` hard-disables the customer portal (`/api/portal/*` → 404) regardless of the admin setting. |
+| `TIQORA_PORTAL_ENABLED` | `false` | The customer portal is opt-in. Unset/`false` hard-disables it (`/api/portal/*` → 404, `/` → agent login) regardless of the admin setting; `true` enables it, after which the admin switch can still turn it off. |
 
 ### Sessions
 

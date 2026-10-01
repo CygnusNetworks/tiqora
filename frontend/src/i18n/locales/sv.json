@@ -2866,7 +2866,7 @@
       "enforceAll": "Kräv 2FA för alla agenter",
       "enforceGroups": "Kräv 2FA för medlemmar i dessa grupper",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Inga giltiga grupper hittades.",
       "saveGlobal": "Spara global policy",
       "globalSaved": "Global policy sparad.",

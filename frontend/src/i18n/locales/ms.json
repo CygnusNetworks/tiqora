@@ -2866,7 +2866,7 @@
       "enforceAll": "Memerlukan 2FA untuk semua ejen",
       "enforceGroups": "Memerlukan 2FA untuk ahli kumpulan ini",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Tiada kumpulan yang sah ditemui.",
       "saveGlobal": "Selamatkan dasar global",
       "globalSaved": "Dasar global disimpan.",

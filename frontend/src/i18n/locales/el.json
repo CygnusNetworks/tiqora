@@ -2866,7 +2866,7 @@
       "enforceAll": "Απαιτείται 2FA για όλους τους πράκτορες",
       "enforceGroups": "Απαιτούνται 2FA για τα μέλη αυτών των ομάδων",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Δεν βρέθηκαν έγκυρες ομάδες.",
       "saveGlobal": "Αποθήκευση παγκόσμιας πολιτικής",
       "globalSaved": "Η παγκόσμια πολιτική σώθηκε.",

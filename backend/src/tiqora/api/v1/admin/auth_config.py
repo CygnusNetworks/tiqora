@@ -84,7 +84,7 @@ async def put_global_auth_config(
         # Storing the row would be a lie: the env hard-off wins at read time.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="customer portal is disabled by deployment (TIQORA_PORTAL_ENABLED)",
+            detail="customer portal is disabled by deployment (set TIQORA_PORTAL_ENABLED=true)",
         )
     await set_setting(session, KEY_TOTP_ENFORCE_ALL, "1" if body.enforce_all else "0")
     if body.enforce_group_ids is not None:

@@ -2866,7 +2866,7 @@
       "enforceAll": "Zahtevaj 2FA za vse posrednike",
       "enforceGroups": "Za člane teh skupin zahtevajte 2FA",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Ni veljavnih skupin.",
       "saveGlobal": "Shranite globalno politiko",
       "globalSaved": "Globalna politika je shranjena.",

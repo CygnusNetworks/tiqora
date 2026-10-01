@@ -2874,7 +2874,7 @@
       "enforceAll": "Require 2FA for all agents",
       "enforceGroups": "Require 2FA for members of these groups",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "No valid groups found.",
       "saveGlobal": "Save global policy",
       "globalSaved": "Global policy saved.",

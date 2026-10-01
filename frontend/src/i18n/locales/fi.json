@@ -2866,7 +2866,7 @@
       "enforceAll": "Vaadi 2FA kaikilta agenteilta",
       "enforceGroups": "Vaadi 2FA näiden ryhmien jäseniltä",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Kelvollisia ryhmiä ei löytynyt.",
       "saveGlobal": "Tallenna globaali politiikka",
       "globalSaved": "Globaali politiikka pelastettu.",

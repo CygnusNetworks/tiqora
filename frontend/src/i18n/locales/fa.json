@@ -2866,7 +2866,7 @@
       "enforceAll": "نیاز به 2FA برای همه عوامل",
       "enforceGroups": "نیاز به 2FA برای اعضای این گروه ها",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "هیچ گروه معتبری یافت نشد.",
       "saveGlobal": "صرفه جویی در سیاست جهانی",
       "globalSaved": "سیاست جهانی ذخیره شد.",

@@ -2874,7 +2874,7 @@
       "enforceAll": "すべてのエージェントに2FAを要求する",
       "enforceGroups": "これらのグループのメンバーには2FAが必要です",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "有効なグループが見つかりません。",
       "saveGlobal": "グローバルポリシーの保存",
       "globalSaved": "グローバル ポリシーが保存しました。",

@@ -2866,7 +2866,7 @@
       "enforceAll": "Krev 2FA for alle agenter",
       "enforceGroups": "Krev 2FA for medlemmer av disse gruppene",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Ingen gyldige grupper funnet.",
       "saveGlobal": "Lagre global politikk",
       "globalSaved": "Global policy lagret.",
