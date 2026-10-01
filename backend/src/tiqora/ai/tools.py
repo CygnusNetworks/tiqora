@@ -40,6 +40,7 @@ from tiqora.ai.models import DEFAULT_ALLOWED_STATE_TYPES
 from tiqora.ai.output_guards import (
     CustomerMessageGuardError,
     strip_hallucinated_signoff,
+    strip_markdown_bold,
     validate_customer_message,
 )
 from tiqora.ai.pii import PiiMapper
@@ -577,7 +578,7 @@ class ToolExecutor:
             raise ToolArgumentError(
                 "propose_customer_message requires kind in {reply, clarify} and a non-empty body"
             )
-        body = strip_hallucinated_signoff(body)
+        body = strip_markdown_bold(strip_hallucinated_signoff(body))
         if not body.strip():
             raise ToolArgumentError(
                 "propose_customer_message requires kind in {reply, clarify} and a non-empty body"

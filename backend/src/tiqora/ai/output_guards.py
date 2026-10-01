@@ -101,6 +101,15 @@ def strip_hallucinated_signoff(body: str) -> str:
     return "\n".join(lines[: _first_of_signoff_run(lines, signoff_at) + 1]).rstrip()
 
 
+_MD_BOLD_RE = re.compile(r"\*\*(?=\S)(.+?)(?<=\S)\*\*")
+
+
+def strip_markdown_bold(body: str) -> str:
+    """Drop ``**bold**`` markers: customer mails go out as text/plain, where
+    mail clients show the asterisks literally."""
+    return _MD_BOLD_RE.sub(r"\1", body)
+
+
 def validate_customer_message(*, kind: str, subject: str, body: str) -> None:
     """Raise :class:`CustomerMessageGuardError` if the proposal is not safe
     enough to hand to the draft/send path."""
@@ -134,5 +143,6 @@ __all__ = [
     "MAX_CUSTOMER_SUBJECT_CHARS",
     "CustomerMessageGuardError",
     "strip_hallucinated_signoff",
+    "strip_markdown_bold",
     "validate_customer_message",
 ]
