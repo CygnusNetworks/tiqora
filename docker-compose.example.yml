@@ -125,7 +125,7 @@ services:
       # straight to the agent login and the admin switch is locked)
       # TIQORA_PORTAL_ENABLED: "true"
       # Kerberos / SPNEGO (optional). Image ships gssapi + libkrb5; stays inert
-      # until enabled. Prod SPN: HTTP/tiqora.example.org@EXAMPLE.ORG
+      # until enabled. Example SPN: HTTP/tiqora.example.org@EXAMPLE.ORG
       # TIQORA_SPNEGO_ENABLED: "true"
       # KRB5_KTNAME: /etc/tiqora/tiqora.keytab
       # Build provenance shown on the admin System-Info page (Admin → System-Info).
