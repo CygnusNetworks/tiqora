@@ -24,7 +24,7 @@ Tiqora is designed to run **on the same database as an existing OTRS/Znuny
 install (6.0–7.3)**, adding only new `tiqora_*` tables. Supported peers are
 listed in [`../support-matrix.md`](../support-matrix.md) (floor **6.0**,
 including Centuran ((OTRS)) CE 6.0.x; OTRS ≤5 and OTOBO are out of scope —
-upgrade to 6.0+ first). Preferred LTS peers are **Znuny 6.5** or **7.3**.
+upgrade to 6.0+ first). Preferred peers are **Znuny 6.5** (LTS) or **7.3** (current release).
 Znuny/OTRS keeps owning its own schema
 (`ticket`, `article`, `queue`, `sessions`, …) throughout — Tiqora reads and,
 once verified, writes to those tables using logic ported to be behaviourally

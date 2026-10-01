@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tiqora vs Znuny, OTRS, Zammad, FreeScout — self-hosted helpdesk comparison</title>
+    <meta
+      name="description"
+      content="An honest comparison of self-hosted helpdesks as of October 2026: Tiqora, Znuny, OTRS, Zammad, FreeScout and osTicket. License, stack, AI and PII masking, PGP/S/MIME, GDPR tools, channels, SSO, ITSM and migration paths from OTRS/Znuny, with sources for every claim."
+    />
+    <meta name="theme-color" content="#0e1015" />
+    <link rel="canonical" href="https://cygnusnetworks.github.io/tiqora/compare.html" />
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:site_name" content="Tiqora" />
+    <meta property="og:title" content="Tiqora vs Znuny, OTRS, Zammad, FreeScout — self-hosted helpdesk comparison" />
+    <meta
+      property="og:description"
+      content="Znuny alternative, OTRS alternative or Zammad? A sourced feature matrix of six self-hosted helpdesks — including where the others are stronger."
+    />
+    <meta property="og:url" content="https://cygnusnetworks.github.io/tiqora/compare.html" />
+    <meta property="og:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:alt" content="Tiqora — modern helpdesk, Znuny/OTRS-compatible" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="article:modified_time" content="2026-10-01" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tiqora vs Znuny, OTRS, Zammad, FreeScout — self-hosted helpdesk comparison" />
+    <meta
+      name="twitter:description"
+      content="A sourced feature matrix of six self-hosted helpdesks as of October 2026 — including where the others are stronger."
+    />
+    <meta name="twitter:image" content="https://cygnusnetworks.github.io/tiqora/assets/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Tiqora",
+        "description": "Modern self-hosted helpdesk and ticket system, database-compatible with OTRS 6.0.x and Znuny 6.0–7.3, with AI-assisted drafts, summaries and auto-replies, PII masking before LLM calls, an MCP server, PGP/S/MIME and GDPR tooling.",
+        "applicationCategory": "BusinessApplication",
+        "applicationSubCategory": "Helpdesk / ticket system",
+        "operatingSystem": "Linux (Docker)",
+        "url": "https://cygnusnetworks.github.io/tiqora/",
+        "image": "https://cygnusnetworks.github.io/tiqora/assets/og-image.png",
+        "screenshot": "https://cygnusnetworks.github.io/tiqora/assets/screenshots/agent-ticket-zoom.png",
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "EUR"
+        },
+        "featureList": [
+          "Shared-database parallel operation with OTRS 6.0.x and Znuny 6.0–7.3",
+          "AI draft replies, summaries, triage and optional auto-replies",
+          "PII masking before every LLM call",
+          "MCP server with the same permission engine as the UI",
+          "PGP and S/MIME",
+          "GDPR anonymization and retention",
+          "OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP and passkeys",
+          "49 UI languages"
+        ],
+        "sameAs": ["https://github.com/CygnusNetworks/tiqora"],
+        "author": {
+          "@type": "Organization",
+          "name": "Cygnus Networks GmbH",
+          "url": "https://github.com/CygnusNetworks"
+        }
+      }
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      /* Page-local additions for the comparison page (styles.css stays shared). */
+      .hero h1 {
+        max-width: 22ch;
+      }
+
+      .hero .notice {
+        max-width: 64ch;
+      }
+
+      .badge-partial {
+        background: rgba(245, 168, 60, 0.15);
+        color: var(--amber);
+      }
+
+      .badge-addon {
+        background: var(--accent-dim);
+        color: var(--accent);
+      }
+
+      .badge-no {
+        background: rgba(136, 145, 163, 0.14);
+        color: var(--muted);
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.1rem;
+        align-items: center;
+        margin: 0 0 1rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .scroll-hint {
+        display: none;
+        margin: 0 0 0.6rem;
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+
+      /* The wide matrix scrolls inside .matrix-wrap, never the page. */
+      .matrix.compare {
+        min-width: 1080px;
+        font-size: 0.86rem;
+        line-height: 1.45;
+      }
+
+      .matrix.compare th,
+      .matrix.compare td {
+        padding: 0.65rem 0.8rem;
+      }
+
+      .matrix.compare thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        white-space: nowrap;
+      }
+
+      .matrix.compare th[scope="row"] {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        width: 11rem;
+        min-width: 11rem;
+        background: var(--surface);
+        color: var(--ink);
+        font-size: 0.84rem;
+        font-weight: 600;
+        text-transform: none;
+        letter-spacing: 0;
+        border-right: 1px solid var(--hairline);
+      }
+
+      .matrix.compare thead th:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        border-right: 1px solid var(--hairline);
+      }
+
+      .matrix.compare .col-tiqora {
+        background: rgba(91, 140, 255, 0.06);
+      }
+
+      .matrix.compare thead th.col-tiqora {
+        color: var(--accent);
+        background: #1b2236;
+      }
+
+      .matrix.compare tr.group th {
+        position: static;
+        background: var(--surface-subtle);
+        color: var(--accent);
+        font-size: 0.74rem;
+        letter-spacing: 0.06em;
+        padding-top: 0.55rem;
+        padding-bottom: 0.55rem;
+      }
+
+      .matrix.compare tr.group th span {
+        position: sticky;
+        left: 0.8rem;
+      }
+
+      .matrix.compare td .badge {
+        margin-bottom: 0.25rem;
+      }
+
+      .matrix.compare td small {
+        display: block;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+
+      sup.ref {
+        font-size: 0.68em;
+        line-height: 0;
+        margin-left: 0.1em;
+      }
+
+      sup.ref + sup.ref::before {
+        content: ",";
+        color: var(--muted);
+      }
+
+      sup.ref a {
+        color: var(--muted);
+      }
+
+      sup.ref a:hover {
+        color: var(--accent);
+      }
+
+      .card ul,
+      .prose ul {
+        margin: 0.4rem 0 0;
+        padding-left: 1.1rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .card li + li,
+      .prose li + li {
+        margin-top: 0.3rem;
+      }
+
+      .card .tag {
+        display: inline-block;
+        margin-bottom: 0.5rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .card p + p {
+        margin-top: 0.6rem;
+      }
+
+      .steps {
+        counter-reset: step;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 1rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .steps li {
+        counter-increment: step;
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        padding: 1.15rem 1.25rem;
+      }
+
+      .steps li::before {
+        content: counter(step);
+        display: grid;
+        place-items: center;
+        width: 1.8rem;
+        height: 1.8rem;
+        margin-bottom: 0.7rem;
+        border-radius: 999px;
+        background: var(--accent-dim);
+        color: var(--accent);
+        font-weight: 800;
+        font-size: 0.85rem;
+      }
+
+      .steps h3 {
+        margin: 0 0 0.35rem;
+        font-size: 1rem;
+      }
+
+      .steps p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .gaps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 1rem;
+      }
+
+      .sources {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 0.25rem 2rem;
+        font-size: 0.86rem;
+        color: var(--muted);
+      }
+
+      .sources h3 {
+        margin: 1rem 0 0.35rem;
+        font-size: 0.82rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--ink);
+      }
+
+      .sources ol {
+        margin: 0;
+        padding-left: 1.6rem;
+      }
+
+      .sources li {
+        margin: 0.2rem 0;
+        overflow-wrap: anywhere;
+      }
+
+      .sources li:target {
+        color: var(--ink);
+        background: var(--accent-dim);
+        border-radius: 6px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      .fine {
+        margin-top: 1.5rem;
+        font-size: 0.86rem;
+        color: var(--muted);
+        max-width: 75ch;
+      }
+
+      @media (max-width: 720px) {
+        .scroll-hint {
+          display: block;
+        }
+
+        .matrix.compare th[scope="row"] {
+          width: 8.5rem;
+          min-width: 8.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav">
+      <div class="wrap nav-inner">
+        <a class="brand" href="./">
+          <img src="./assets/logo.svg" alt="" width="28" height="28" />
+          tiqora
+        </a>
+        <ul class="nav-links">
+          <li><a href="./#features">Features</a></li>
+          <li><a href="./#screenshots">Screenshots</a></li>
+          <li><a href="./compare.html" aria-current="page" style="color: var(--ink)">Compare</a></li>
+          <li><a href="./znuny-migration.html">Migrate from Znuny</a></li>
+          <li><a href="https://github.com/CygnusNetworks/tiqora">GitHub</a></li>
+          <li><a class="btn btn-primary" href="./demo/">Live demo</a></li>
+        </ul>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap">
+          <div class="eyebrow">Comparison · as of October 2026</div>
+          <h1>Tiqora vs Znuny, OTRS, Zammad, FreeScout &amp; osTicket</h1>
+          <p class="lede">
+            For teams running OTRS or Znuny today, and for anyone choosing a
+            self-hosted helpdesk: what each option does, what it costs you in
+            licensing and migration effort, and where it is the better pick.
+          </p>
+          <p class="notice">
+            <strong>Fair warning:</strong> we build Tiqora, and Tiqora is young — the
+            first public release was in September 2026. This comparison reflects what
+            we could verify in each product's own docs, sites and repositories as of
+            October 2026. Every competitor claim links to a source; where we could not
+            verify something, the cell says “—”. Corrections are welcome in
+            <a href="https://github.com/CygnusNetworks/tiqora/discussions">GitHub Discussions</a>.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="#matrix">Jump to the matrix</a>
+            <a class="btn btn-ghost" href="#znuny">Running Znuny/OTRS?</a>
+            <a class="btn btn-ghost" href="#better-choice">When to pick something else</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="at-a-glance">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>The short version</h2>
+            <p>Six tools, three very different starting points.</p>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <span class="tag">You run OTRS 6 / Znuny 6.0–7.3</span>
+              <h3>Tiqora or stay on Znuny</h3>
+              <p>
+                Tiqora runs on your existing database next to Znuny, so you can try a
+                modern UI and AI assistance without a data migration. Znuny itself
+                remains the safe choice if you depend on ITSM/CMDB packages, the stats
+                framework or custom OPM add-ons.
+              </p>
+            </article>
+            <article class="card">
+              <span class="tag">Greenfield, many channels</span>
+              <h3>Zammad is the mature all-rounder</h3>
+              <p>
+                Long track record, a broad channel list (chat, social, phone, messaging),
+                hosted and self-hosted editions and commercial support. Tiqora is
+                stronger on PII masking, PGP/S/MIME depth and OTRS/Znuny compatibility.
+              </p>
+            </article>
+            <article class="card">
+              <span class="tag">Small team, shared inbox</span>
+              <h3>FreeScout or osTicket</h3>
+              <p>
+                Lightweight PHP apps that run almost anywhere. FreeScout keeps the core
+                small and sells modules; osTicket is a classic, simple ticket system.
+                Both are easier to operate than any OTRS-derived system.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="matrix">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Feature matrix</h2>
+            <p>
+              Znuny = 6.5 LTS / 7.3 · OTRS = the current commercial product (calendar
+              versions 2026.x) · Zammad 7.x · FreeScout 1.8.x · osTicket 1.18.x.
+              Small numbers link to the sources at the bottom.
+            </p>
+          </div>
+          <div class="legend" aria-label="Legend">
+            <span><span class="badge badge-ok">Yes</span> built in</span>
+            <span><span class="badge badge-partial">Partial</span> narrower scope</span>
+            <span><span class="badge badge-addon">Add-on</span> extra package / module / plugin</span>
+            <span><span class="badge badge-no">No</span> not available</span>
+            <span>— not offered or not documented in the sources we checked</span>
+          </div>
+          <p class="scroll-hint">Swipe the table sideways to see all six products →</p>
+          <div class="matrix-wrap" tabindex="0" role="region" aria-label="Helpdesk feature comparison table">
+            <table class="matrix compare">
+              <caption class="sr-only">
+                Tiqora compared with Znuny, OTRS, Zammad, FreeScout and osTicket, as of October 2026
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Feature</th>
+                  <th scope="col" class="col-tiqora">Tiqora</th>
+                  <th scope="col">Znuny</th>
+                  <th scope="col">OTRS</th>
+                  <th scope="col">Zammad</th>
+                  <th scope="col">FreeScout</th>
+                  <th scope="col">osTicket</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="group"><th colspan="7"><span>Platform</span></th></tr>
+                <tr>
+                  <th scope="row">License</th>
+                  <td class="col-tiqora">AGPL-3.0, free<sup class="ref"><a href="#s41">41</a></sup></td>
+                  <td>GPL-3.0, free<sup class="ref"><a href="#s5">5</a></sup></td>
+                  <td>Proprietary, subscription; pricing on request<sup class="ref"><a href="#s12">12</a></sup></td>
+                  <td>AGPL-3.0, free self-hosted<sup class="ref"><a href="#s30">30</a></sup></td>
+                  <td>AGPL-3.0 core; most modules are paid lifetime licences<sup class="ref"><a href="#s31">31</a></sup><sup class="ref"><a href="#s32">32</a></sup></td>
+                  <td>GPL-2.0, free<sup class="ref"><a href="#s36">36</a></sup></td>
+                </tr>
+                <tr>
+                  <th scope="row">Hosting model</th>
+                  <td class="col-tiqora">Self-hosted (Docker)</td>
+                  <td>Self-hosted; managed hosting offered by Znuny GmbH<sup class="ref"><a href="#s9">9</a></sup></td>
+                  <td>Managed SaaS (German data centres) or on-premise<sup class="ref"><a href="#s12">12</a></sup></td>
+                  <td>Self-hosted or SaaS (German data centres)<sup class="ref"><a href="#s26">26</a></sup></td>
+                  <td>Self-hosted only (third-party one-click hosts exist)<sup class="ref"><a href="#s31">31</a></sup></td>
+                  <td>Self-hosted, or hosted “SupportSystem” cloud<sup class="ref"><a href="#s38">38</a></sup></td>
+                </tr>
+                <tr>
+                  <th scope="row">Tech stack</th>
+                  <td class="col-tiqora">Python (FastAPI) + React; PostgreSQL or MariaDB/MySQL; Redis; Meilisearch</td>
+                  <td>Perl; MariaDB/MySQL or PostgreSQL<sup class="ref"><a href="#s5">5</a></sup></td>
+                  <td>Perl + Node.js; Elasticsearch; MySQL/MariaDB or PostgreSQL<sup class="ref"><a href="#s15">15</a></sup></td>
+                  <td>Ruby on Rails; PostgreSQL&nbsp;15+ only (MySQL dropped in 7.0); Elasticsearch; Redis<sup class="ref"><a href="#s19">19</a></sup><sup class="ref"><a href="#s25">25</a></sup></td>
+                  <td>PHP (Laravel); MySQL/MariaDB or PostgreSQL<sup class="ref"><a href="#s31">31</a></sup></td>
+                  <td>PHP 8.2+; MySQL<sup class="ref"><a href="#s36">36</a></sup></td>
+                </tr>
+                <tr>
+                  <th scope="row">Maturity</th>
+                  <td class="col-tiqora"><span class="badge badge-partial">Young</span><small>First public release Sept 2026 (0.x versions)</small></td>
+                  <td>Mature; continuation of the ((OTRS)) Community Edition, LTS line 6.5 + feature line 7.x<sup class="ref"><a href="#s1">1</a></sup><sup class="ref"><a href="#s2">2</a></sup></td>
+                  <td>Mature commercial product, frequent calendar-versioned releases<sup class="ref"><a href="#s11">11</a></sup></td>
+                  <td>Mature; large open-source community<sup class="ref"><a href="#s30">30</a></sup></td>
+                  <td>Mature; frequent releases<sup class="ref"><a href="#s31">31</a></sup></td>
+                  <td>Mature; long-standing project<sup class="ref"><a href="#s36">36</a></sup></td>
+                </tr>
+                <tr>
+                  <th scope="row">UI <small style="display:inline;font-weight:400">(our take)</small></th>
+                  <td class="col-tiqora">Single-page React app, light/dark themes</td>
+                  <td>Classic server-rendered UI; ticket screens refined in 7.3<sup class="ref"><a href="#s2">2</a></sup></td>
+                  <td>—</td>
+                  <td>Modern single-page app</td>
+                  <td>Clean, inbox-style UI (Help Scout-like)<sup class="ref"><a href="#s31">31</a></sup></td>
+                  <td>Classic, functional</td>
+                </tr>
+
+                <tr class="group"><th colspan="7"><span>Coming from OTRS / Znuny</span></th></tr>
+                <tr>
+                  <th scope="row">Runs on an existing OTRS/Znuny database</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>OTRS 6.0.x and Znuny 6.0–7.3, in parallel on the same DB; only adds <code>tiqora_*</code> tables</small></td>
+                  <td>It <em>is</em> that database</td>
+                  <td><span class="badge badge-no">No</span><small>Separate commercial product line</small></td>
+                  <td><span class="badge badge-no">No</span><small>Own schema</small></td>
+                  <td><span class="badge badge-no">No</span></td>
+                  <td><span class="badge badge-no">No</span></td>
+                </tr>
+                <tr>
+                  <th scope="row">Migration path from OTRS/Znuny</th>
+                  <td class="col-tiqora">No data migration: Znuny keeps running, Tiqora takes over daemons flag by flag, then cutover</td>
+                  <td>In-place upgrade from OTRS 6 via migration scripts, one minor at a time<sup class="ref"><a href="#s10">10</a></sup></td>
+                  <td>Vendor migration offer from ((OTRS)) CE<sup class="ref"><a href="#s17">17</a></sup></td>
+                  <td>One-time importer for OTRS 3.1–6.x, optional delta run<sup class="ref"><a href="#s24">24</a></sup></td>
+                  <td>—</td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">REST API / GenericInterface</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">REST</span> <span class="badge badge-partial">GI compat</span><small>REST <code>/api/v1</code>, webhooks; GenericTicketConnector REST/SOAP (provider side, documented gaps)</small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Native GenericInterface (REST/SOAP)</small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Web services; some depend on contract tier<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <td><span class="badge badge-ok">REST</span><small>Own REST API, no GI compatibility</small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>API &amp; Webhooks module (paid)<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td><span class="badge badge-partial">Partial</span><small>API supports ticket creation only<sup class="ref"><a href="#s39">39</a></sup></small></td>
+                </tr>
+
+                <tr class="group"><th colspan="7"><span>AI</span></th></tr>
+                <tr>
+                  <th scope="row">AI drafts / summaries / triage</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Drafts, summaries, triage (queue routing), refine with diff review; per-queue policies</small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Free Znuny-LLM (7.3+): classification, summaries, reply rewrite, FAQ suggestions<sup class="ref"><a href="#s4">4</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>AI ticket summary and classification<sup class="ref"><a href="#s14">14</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Summaries, writing assistant, AI agents for routing, tagging, field extraction (7.0+)<sup class="ref"><a href="#s18">18</a></sup></small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Free official AI module: drafts, summaries, grammar<sup class="ref"><a href="#s33">33</a></sup></small></td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">Autonomous auto-reply</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Opt-in</span><small>Per queue, with human handoff, per-ticket pause, caps and cost budgets</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—<small>Agents approve AI drafts<sup class="ref"><a href="#s18">18</a></sup></small></td>
+                  <td>—<small>Third-party modules exist</small></td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">LLM choice</th>
+                  <td class="col-tiqora">Any OpenAI-compatible endpoint, cloud or self-hosted; per-task model routing</td>
+                  <td>Ollama or any OpenAI-compatible endpoint<sup class="ref"><a href="#s4">4</a></sup></td>
+                  <td>Vendor-operated EU AI service; on-premise systems connect to it<sup class="ref"><a href="#s14">14</a></sup></td>
+                  <td>Zammad AI, OpenAI, Azure, Anthropic, Mistral, Ollama, OpenAI-compatible<sup class="ref"><a href="#s18">18</a></sup></td>
+                  <td>Many providers incl. Ollama / LM Studio<sup class="ref"><a href="#s33">33</a></sup></td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">PII masking before the LLM</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>NER-based masking before every call; full request audit log with PDF export</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">MCP server</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Built in, same permission engine as the UI; also calls external MCP tools</small></td>
+                  <td>Community project (third party)<sup class="ref"><a href="#s8">8</a></sup></td>
+                  <td>—</td>
+                  <td>Community projects (third party)<sup class="ref"><a href="#s29">29</a></sup></td>
+                  <td>—</td>
+                  <td>—</td>
+                </tr>
+
+                <tr class="group"><th colspan="7"><span>Security &amp; privacy</span></th></tr>
+                <tr>
+                  <th scope="row">PGP / S/MIME</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Both</span><small>Inbound verify/decrypt, outbound sign/encrypt, per-queue defaults; key stores shared with Znuny</small></td>
+                  <td><span class="badge badge-ok">Both</span><small>Core admin modules<sup class="ref"><a href="#s6">6</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Encryption and signing<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <td><span class="badge badge-ok">Both</span><small>PGP and S/MIME integrations<sup class="ref"><a href="#s22">22</a></sup></small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Paid module; outbound sign/encrypt, no inbound S/MIME verification<sup class="ref"><a href="#s34">34</a></sup></small></td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">GDPR tooling</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Customer anonymization, retention rules, bulk erasure with preview and 30-day rollback</small></td>
+                  <td>—<small>No dedicated tool in core; manual work or GenericAgent<sup class="ref"><a href="#s10b">10</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Rules to anonymize, pseudonymize or delete<sup class="ref"><a href="#s16">16</a></sup></small></td>
+                  <td><span class="badge badge-partial">Partial</span><small>Deletes users with their tickets, also scheduled; no anonymization<sup class="ref"><a href="#s23">23</a></sup></small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Paid module: delete customers and conversations<sup class="ref"><a href="#s35">35</a></sup></small></td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">SSO &amp; 2FA</th>
+                  <td class="col-tiqora">OIDC, LDAP/AD, Kerberos/SPNEGO, TOTP, passkeys<small>No SAML</small></td>
+                  <td>LDAP, web-server SSO (e.g. Kerberos), native SAML since 7.3, TOTP<sup class="ref"><a href="#s3">3</a></sup><sup class="ref"><a href="#s7">7</a></sup><sup class="ref"><a href="#s6">6</a></sup></td>
+                  <td>LDAP; Keycloak-based identity features<sup class="ref"><a href="#s11">11</a></sup><sup class="ref"><a href="#s13">13</a></sup></td>
+                  <td>SAML, OIDC, Microsoft, Google and more; Kerberos SSO; LDAP; TOTP and security keys<sup class="ref"><a href="#s21">21</a></sup><sup class="ref"><a href="#s22">22</a></sup><sup class="ref"><a href="#s28">28</a></sup></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>LDAP, SAML, OAuth login and 2FA as paid modules<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td><span class="badge badge-addon">Plugins</span><small>LDAP/AD, OAuth2, CAS, 2FA (official plugins)<sup class="ref"><a href="#s37">37</a></sup></small></td>
+                </tr>
+
+                <tr class="group"><th colspan="7"><span>Channels &amp; service desk</span></th></tr>
+                <tr>
+                  <th scope="row">Channels</th>
+                  <td class="col-tiqora">Email, phone with CTI popup, Telegram, SMS, WhatsApp<small>No web chat widget, no Facebook/X</small></td>
+                  <td>Email; phone and web-request tickets<sup class="ref"><a href="#s6">6</a></sup></td>
+                  <td>Email; inter-agent chat; more via web services<sup class="ref"><a href="#s13">13</a></sup></td>
+                  <td>Email (incl. Microsoft 365, Google), web form, chat, phone/CTI, SMS, Telegram, WhatsApp, Facebook<sup class="ref"><a href="#s20">20</a></sup><sup class="ref"><a href="#s22">22</a></sup></td>
+                  <td>Email in core; chat, Telegram, WhatsApp, Facebook, X, SMS as paid modules<sup class="ref"><a href="#s32">32</a></sup></td>
+                  <td>Email, web forms, phone (agent-entered), API<sup class="ref"><a href="#s36">36</a></sup></td>
+                </tr>
+                <tr>
+                  <th scope="row">Customer portal</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Opt-in</small></td>
+                  <td><span class="badge badge-ok">Yes</span></td>
+                  <td><span class="badge badge-ok">Yes</span></td>
+                  <td><span class="badge badge-ok">Yes</span></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>End-User Portal module<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><sup class="ref"><a href="#s40">40</a></sup></td>
+                </tr>
+                <tr>
+                  <th scope="row">Knowledge base</th>
+                  <td class="col-tiqora"><span class="badge badge-ok">Yes</span><small>Markdown KB with review workflow, portal search, used by the AI</small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Free FAQ package<sup class="ref"><a href="#s6b">6</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Knowledge base articles<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><sup class="ref"><a href="#s20">20</a></sup></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Paid module<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>FAQ<sup class="ref"><a href="#s36">36</a></sup></small></td>
+                </tr>
+                <tr>
+                  <th scope="row">Process management / ITSM</th>
+                  <td class="col-tiqora"><span class="badge badge-partial">Partial</span><small>Runs imported Znuny processes (no designer, some conditions/actions missing); no ITSM/CMDB</small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Process designer in core; free ITSM bundle with CMDB, change, incident/problem<sup class="ref"><a href="#s6">6</a></sup><sup class="ref"><a href="#s6c">6</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Process engine, CMDB, ITSM<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <td><span class="badge badge-no">No ITSM</span><small>i-doit CMDB integration<sup class="ref"><a href="#s22">22</a></sup></small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Workflows module; no ITSM<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td><span class="badge badge-partial">Partial</span><small>SLAs, help topics, tasks; no ITSM<sup class="ref"><a href="#s40">40</a></sup></small></td>
+                </tr>
+                <tr>
+                  <th scope="row">Reporting</th>
+                  <td class="col-tiqora"><span class="badge badge-partial">Partial</span><small>Fixed reports (volume, SLA, workload, backlog) + CSV; no configurable stats</small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Configurable stats framework<sup class="ref"><a href="#s6">6</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Extended ticket stats, time accounting<sup class="ref"><a href="#s13">13</a></sup></small></td>
+                  <td><span class="badge badge-ok">Yes</span><small>Elasticsearch-based reporting<sup class="ref"><a href="#s25">25</a></sup></small></td>
+                  <td><span class="badge badge-addon">Add-on</span><small>Reports module<sup class="ref"><a href="#s32">32</a></sup></small></td>
+                  <td>—</td>
+                </tr>
+                <tr>
+                  <th scope="row">UI languages</th>
+                  <td class="col-tiqora">49, incl. RTL (Znuny catalogue + English)</td>
+                  <td>48 translation catalogues + English<sup class="ref"><a href="#s5">5</a></sup></td>
+                  <td>—</td>
+                  <td>“Over forty”<sup class="ref"><a href="#s27">27</a></sup></td>
+                  <td>33<sup class="ref"><a href="#s31">31</a></sup></td>
+                  <td>Community language packs<sup class="ref"><a href="#s36">36</a></sup></td>
+                </tr>
+                <tr>
+                  <th scope="row">Vendor support</th>
+                  <td class="col-tiqora">GitHub issues &amp; Discussions</td>
+                  <td>Support, training, hosting, development from Znuny GmbH<sup class="ref"><a href="#s9">9</a></sup></td>
+                  <td>Included in subscription<sup class="ref"><a href="#s12">12</a></sup></td>
+                  <td>Support contracts for self-hosted; SaaS plans<sup class="ref"><a href="#s26">26</a></sup></td>
+                  <td>Paid modules; community<sup class="ref"><a href="#s32">32</a></sup></td>
+                  <td>Support with the hosted editions<sup class="ref"><a href="#s38">38</a></sup></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="fine">
+            “Add-on” does not mean worse: Znuny's ITSM and FAQ packages are free and
+            mature, and FreeScout's modular model keeps its core small on purpose. Prices and
+            feature tiers change; check the vendor before you decide.
+          </p>
+        </div>
+      </section>
+
+      <section id="stronger">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Where the others are stronger</h2>
+            <p>If one of these points decides it for you, take it seriously.</p>
+          </div>
+          <div class="gaps">
+            <article class="card">
+              <h3>Znuny</h3>
+              <ul>
+                <li>Free ITSM bundle (CMDB, change, incident/problem) and a large OPM add-on ecosystem.</li>
+                <li>Full statistics framework and a graphical process designer.</li>
+                <li>Native SAML (7.3) and a long LTS track record; commercial services from Znuny GmbH.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>OTRS</h3>
+              <ul>
+                <li>Commercial vendor with support included, managed SaaS or on-premise.</li>
+                <li>ITSM, CMDB and process engine from one vendor.</li>
+                <li>Rule-based anonymization, pseudonymization and deletion for data privacy.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Zammad</h3>
+              <ul>
+                <li>Maturity and a large open-source community.</li>
+                <li>Channel breadth: web chat, Facebook, SMS, Telegram, WhatsApp, Microsoft 365/Google mail, several CTI integrations.</li>
+                <li>SAML, many social logins, hosted and self-hosted editions, support contracts.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>FreeScout</h3>
+              <ul>
+                <li>Very light: PHP and a database, no minimum hardware requirements stated.</li>
+                <li>Shared-inbox workflow that small teams pick up in minutes.</li>
+                <li>Pay only for the modules you need; a free official AI module.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>osTicket</h3>
+              <ul>
+                <li>Simple, long-established ticket system that runs on almost any PHP host.</li>
+                <li>SLAs, help topics and a customer portal out of the box.</li>
+                <li>Hosted edition with vendor support if you do not want to run it yourself.</li>
+              </ul>
+            </article>
+            <article class="card">
+              <h3>Tiqora's own gaps</h3>
+              <ul>
+                <li><strong>Missing:</strong> saved searches, configurable dashboards, link overview, several admin screens (sessions, SQL box, maintenance, system log), calendar admin, portal print view.</li>
+                <li><strong>Partial:</strong> statistics, GenericAgent, bulk actions, preferences, GenericInterface edge cases, process conditions/actions.</li>
+                <li><strong>By design:</strong> no OPM Package Manager, process designer, SysConfig editor or webservice editor.</li>
+                <li><strong>Not yet:</strong> SAML, web chat widget, social channels, ITSM/CMDB.</li>
+              </ul>
+              <p class="feature-link" style="margin-top:0.7rem;font-size:0.85rem">
+                <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md#znuny-features-not-implemented">Full parity list ↗</a>
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="znuny">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Why Tiqora if you run Znuny or OTRS today</h2>
+            <p>
+              Most helpdesk switches are big-bang migrations: export, transform, import,
+              retrain, hope. Tiqora skips the data migration entirely.
+            </p>
+          </div>
+          <ol class="steps">
+            <li>
+              <h3>Same database</h3>
+              <p>
+                Point Tiqora at your OTRS&nbsp;6.0.x or Znuny&nbsp;6.0–7.3 database
+                (MariaDB/MySQL or PostgreSQL). It detects the schema version and only
+                adds its own <code>tiqora_*</code> tables.
+              </p>
+            </li>
+            <li>
+              <h3>Run both side by side</h3>
+              <p>
+                Znuny keeps processing mail, escalations, notifications and
+                GenericAgent. Agents can try Tiqora on live tickets while everyone
+                else keeps working in Znuny.
+              </p>
+            </li>
+            <li>
+              <h3>Hand over flag by flag</h3>
+              <p>
+                Move daemons one at a time with feature flags, off by default. Ticket
+                numbers, history and escalation columns stay readable by Znuny the
+                whole time.
+              </p>
+            </li>
+            <li>
+              <h3>Cut over when ready</h3>
+              <p>
+                Retire Znuny only at the end, following the cutover runbook. Until
+                then you can step back at any stage.
+              </p>
+            </li>
+          </ol>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="./znuny-migration.html">Read the migration guide</a>
+            <a class="btn btn-ghost" href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/support-matrix.md">Support matrix</a>
+          </div>
+          <div class="chips" aria-label="Supported peers">
+            <span class="chip">OTRS 6.0.x</span>
+            <span class="chip">Znuny 6.0 – 6.5 LTS</span>
+            <span class="chip">Znuny 7.0 – 7.3</span>
+            <span class="chip">MariaDB / MySQL · PostgreSQL</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="better-choice">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>When another tool is the better choice</h2>
+            <p>We would rather you pick the right tool than the wrong one.</p>
+          </div>
+          <div class="cards">
+            <article class="card">
+              <h3>You need ITSM / CMDB</h3>
+              <p>
+                Configuration items, change management and ITIL processes: stay on
+                <strong>Znuny</strong> with its free ITSM packages, or look at
+                <strong>OTRS</strong>. Tiqora has no CMDB.
+              </p>
+            </article>
+            <article class="card">
+              <h3>You depend on custom OPM add-ons</h3>
+              <p>
+                Tiqora cannot run Perl OPM packages. If your workflows live in add-ons,
+                <strong>Znuny</strong> is the safe home — or run Tiqora alongside and keep
+                those parts in Znuny.
+              </p>
+            </article>
+            <article class="card">
+              <h3>You want a vendor contract and SLA today</h3>
+              <p>
+                <strong>OTRS</strong>, <strong>Zammad</strong> and <strong>Znuny GmbH</strong>
+                sell support and hosting. Tiqora is a young open-source project; support
+                today means GitHub issues and Discussions.
+              </p>
+            </article>
+            <article class="card">
+              <h3>You need web chat or social channels</h3>
+              <p>
+                A website chat widget or Facebook:
+                <strong>Zammad</strong> covers these out of the box. Tiqora has
+                neither today.
+              </p>
+            </article>
+            <article class="card">
+              <h3>You need SAML or deep reporting</h3>
+              <p>
+                SAML-only identity providers or configurable, scheduled statistics:
+                <strong>Znuny 7.3</strong>, <strong>Zammad</strong> or <strong>OTRS</strong>.
+              </p>
+            </article>
+            <article class="card">
+              <h3>You are a three-person team on shared hosting</h3>
+              <p>
+                <strong>FreeScout</strong> or <strong>osTicket</strong> run on any PHP
+                host. Tiqora needs Docker, Redis and Meilisearch.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div class="wrap">
+          <h2>See for yourself</h2>
+          <p>
+            Click through the agent, admin and portal UI in your browser. It runs on mock
+            data, and nothing is saved.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn-primary" href="./demo/">Launch the live demo</a>
+            <a class="btn btn-ghost" href="https://github.com/CygnusNetworks/tiqora">View on GitHub</a>
+            <a class="btn btn-ghost" href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/README.md">Read the docs</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="sources">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Sources</h2>
+            <p>
+              Last reviewed <strong>2026-10-01</strong>. Spotted something wrong or
+              outdated? Please tell us in
+              <a href="https://github.com/CygnusNetworks/tiqora/discussions">GitHub Discussions</a>.
+            </p>
+          </div>
+          <div class="sources">
+            <div>
+              <h3>Znuny</h3>
+              <ol start="1">
+                <li id="s1"><a href="https://www.znuny.org/en/releases">Znuny release overview</a></li>
+                <li id="s2"><a href="https://www.znuny.org/en/roadmap">Znuny roadmap</a></li>
+                <li id="s3"><a href="https://www.znuny.com/en/blog/znuny-built-in-saml-authentication">Znuny 7.3 — built-in SAML authentication</a></li>
+                <li id="s4"><a href="https://www.znuny.com/en/blog/znuny-llm">Znuny-LLM add-on</a></li>
+                <li id="s5"><a href="https://github.com/znuny/Znuny">Znuny on GitHub</a> (license, language, <code>i18n/Znuny</code>)</li>
+                <li id="s6"><a href="https://github.com/znuny/Znuny/tree/dev/Kernel/Modules">Znuny core modules</a> (AdminPGP, AdminSMIME, AdminProcessManagement, AgentStatistics); <span id="s6b"><a href="https://github.com/znuny/FAQ">FAQ package</a></span>; <span id="s6c"><a href="https://github.com/znuny/ITSMCore">ITSM Core</a></span></li>
+                <li id="s7"><a href="https://doc.znuny.org/znuny/admin/usermanagement/user_backends/index.html">Znuny docs — user backends</a></li>
+                <li id="s8"><a href="https://codeberg.org/wolkig-it/znuny_mcp">znuny_mcp (community MCP server)</a></li>
+                <li id="s9"><a href="https://www.znuny.com/en">Znuny GmbH — services</a></li>
+                <li id="s10"><a href="https://doc.znuny.org/znuny_lts/releases/installupdate/update/update-6.5.html">Znuny docs — update to 6.5</a>; <span id="s10b"><a href="https://community.znuny.org/viewtopic.php?t=41010">community forum — GDPR</a></span></li>
+              </ol>
+              <h3>OTRS</h3>
+              <ol start="11">
+                <li id="s11"><a href="https://otrs.com/otrs-software-solutions/otrs/overview-release-notes-security-advisories/release-notes/">OTRS release notes</a></li>
+                <li id="s12"><a href="https://otrs.com/otrs-software-solutions/otrs/otrs-on-premise-managed/">OTRS on-premise &amp; managed</a></li>
+                <li id="s13"><a href="https://otrs.com/otrs-software-solutions/otrs/features/">OTRS features</a></li>
+                <li id="s14"><a href="https://otrs.com/otrs-software-solutions/artificial-intelligence/">OTRS artificial intelligence</a></li>
+                <li id="s15"><a href="https://academy.otrs.com/doc/update/requirements/">OTRS hardware and software requirements</a></li>
+                <li id="s16"><a href="https://academy.otrs.com/doc/admin/tutorials/data-privacy-protection/">OTRS data privacy protection</a></li>
+                <li id="s17"><a href="https://otrs.com/blog/otrs-community-edition/switch-to-otrs/">OTRS — switching from the Community Edition</a></li>
+              </ol>
+            </div>
+            <div>
+              <h3>Zammad</h3>
+              <ol start="18">
+                <li id="s18"><a href="https://zammad.com/en/product/artificial-intelligence">Zammad AI</a></li>
+                <li id="s19"><a href="https://zammad.com/en/product/releases/7-0">Zammad 7.0 release</a></li>
+                <li id="s20"><a href="https://admin-docs.zammad.org/en/latest/">Zammad admin documentation</a> (channels, knowledge base)</li>
+                <li id="s21"><a href="https://admin-docs.zammad.org/en/latest/settings/security/third-party.html">Zammad third-party authentication</a></li>
+                <li id="s22"><a href="https://admin-docs.zammad.org/en/latest/system/integrations.html">Zammad integrations</a></li>
+                <li id="s23"><a href="https://admin-docs.zammad.org/en/latest/system/data-privacy.html">Zammad data privacy</a></li>
+                <li id="s24"><a href="https://docs.zammad.org/en/latest/migration/otrs.html">Zammad — migration from OTRS</a></li>
+                <li id="s25"><a href="https://docs.zammad.org/en/latest/prerequisites/software.html">Zammad software requirements</a></li>
+                <li id="s26"><a href="https://zammad.com/en/pricing">Zammad pricing</a></li>
+                <li id="s27"><a href="https://zammad.com/en/releases/5-1">Zammad 5.1 release (translations)</a></li>
+                <li id="s28"><a href="https://admin-docs.zammad.org/en/latest/settings/security/two-factor.html">Zammad two-factor authentication</a></li>
+                <li id="s29"><a href="https://github.com/Softoft-Orga/zammad-mcp-server">zammad-mcp-server (community)</a></li>
+                <li id="s30"><a href="https://github.com/zammad/zammad">Zammad on GitHub</a></li>
+              </ol>
+              <h3>FreeScout</h3>
+              <ol start="31">
+                <li id="s31"><a href="https://github.com/freescout-help-desk/freescout">FreeScout on GitHub</a></li>
+                <li id="s32"><a href="https://freescout.net/modules/">FreeScout modules</a></li>
+                <li id="s33"><a href="https://freescout.net/module/ai-integration">FreeScout AI Integration module</a></li>
+                <li id="s34"><a href="https://freescout.net/module/mail-signing/">FreeScout Mail Signing &amp; Encryption module</a></li>
+                <li id="s35"><a href="https://freescout.net/module/gdpr/">FreeScout GDPR module</a></li>
+              </ol>
+            </div>
+            <div>
+              <h3>osTicket</h3>
+              <ol start="36">
+                <li id="s36"><a href="https://github.com/osTicket/osTicket">osTicket on GitHub</a></li>
+                <li id="s37"><a href="https://github.com/osTicket/osTicket-plugins">osTicket official plugins</a></li>
+                <li id="s38"><a href="https://osticket.com/editions/">osTicket editions</a></li>
+                <li id="s39"><a href="https://docs.osticket.com/en/latest/Developer%20Documentation/API%20Docs.html">osTicket API documentation</a></li>
+                <li id="s40"><a href="https://osticket.com/features/">osTicket features</a></li>
+              </ol>
+              <h3>Tiqora</h3>
+              <ol start="41">
+                <li id="s41"><a href="https://github.com/CygnusNetworks/tiqora#readme">Tiqora README</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/support-matrix.md">support matrix</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/compatibility.md#znuny-features-not-implemented">parity list</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/ai-integration.md">AI</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/gdpr.md">GDPR</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/crypto.md">PGP &amp; S/MIME</a>, <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/channels.md">channels</a></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <div class="footer-grid">
+          <div>
+            <strong style="color: var(--ink)">Tiqora</strong>
+            · Copyright © 2026 Cygnus Networks GmbH
+          </div>
+          <div class="footer-links">
+            <a href="https://github.com/CygnusNetworks/tiqora">GitHub</a>
+            <a href="https://github.com/CygnusNetworks/tiqora/blob/main/LICENSE">License</a>
+            <a href="https://github.com/CygnusNetworks/tiqora/blob/main/docs/README.md">Documentation</a>
+            <a href="./demo/">Demo</a>
+          </div>
+        </div>
+        <p class="legal">
+          “Znuny” is a trademark of Znuny GmbH; “OTRS” is a registered trademark of
+          OTRS AG. Tiqora is not affiliated with, endorsed by, or sponsored by either
+          company; the names are used solely to describe factual compatibility.
+          Zammad, FreeScout, osTicket and all other product names are trademarks of their
+          respective owners and are used here only to identify those products. The
+          comparison reflects publicly available information as of 2026-10-01 and is not
+          endorsed by any of the vendors named.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
