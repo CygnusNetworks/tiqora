@@ -77,7 +77,7 @@ Implementation: `tiqora.db.legacy.profile.LegacySchemaProfile` / `SchemaProfileI
 All Tiqora-owned state lives in additive `tiqora_*` tables (models in
 `backend/src/tiqora/db/tiqora/models.py`, plus `tiqora/ai/models.py` and
 `tiqora/kb/models.py`). The core ones are listed below; the AI subsystem
-(`tiqora_ai_*`, `tiqora_llm_provider`, `tiqora_mcp_*`), the knowledge base
+(`tiqora_ai_*`, `tiqora_llm_*` providers/models/profiles, `tiqora_mcp_*`), the knowledge base
 (`tiqora_kb_*`), Telegram (`tiqora_telegram_*`) and a few smaller helpers
 (`tiqora_password_setup_token`, `tiqora_queue_customer_link`,
 `tiqora_standard_template_*`) add further tables of the same kind. Znuny never reads or writes them
@@ -86,7 +86,7 @@ except optionally via the TiqoraSync OPM for cache invalidation.
 | Table | Purpose |
 |---|---|
 | `tiqora_api_key` | Bearer API keys (`Authorization: Bearer`) mapped to agent users |
-| `tiqora_settings` | Key/value store: indexer watermarks, daemon feature flags, ownership marker |
+| `tiqora_settings` | Key/value store: indexer watermarks, daemon feature flags, ownership marker, Tiqora-side PGP/S-MIME settings (`crypto.*`; a value set in Znuny's SysConfig wins) and per-queue email security defaults (`queue_security.<id>`) |
 | `tiqora_cache_invalidation` | Queue of ticket/cache-type signals for the Znuny TiqoraSync addon |
 | `tiqora_event_outbox` | Transactional outbox for Meilisearch re-index and webhooks |
 | `tiqora_form_draft` | Agent form drafts (JSON; not Znuny’s Perl-Storable `form_draft`) |

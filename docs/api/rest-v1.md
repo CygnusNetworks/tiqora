@@ -64,7 +64,7 @@ curl "$TIQORA_URL/api/v1/tickets" \
 ```sh
 curl "$TIQORA_URL/api/v1/auth/methods"
 # {"password": true, "oidc": false, "spnego": false, "ldap": false,
-#  "webauthn": false, "portal_enabled": true}
+#  "webauthn": false, "portal_enabled": false}   (true only with TIQORA_PORTAL_ENABLED)
 ```
 
 `POST /api/v1/auth/logout` clears the session. If TOTP 2FA is enrolled for
@@ -151,6 +151,24 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets" \
     "send_auto_response": true
   }'
 ```
+
+**Which queue a new ticket starts in** (the New-ticket form's preselection;
+`screen` is `phone` or `email`):
+
+```sh
+# With a customer: queue of their newest ticket → their company's newest
+# ticket → the screen's QueueDefault → first non-intake queue
+curl -b cookies.txt "$TIQORA_URL/api/v1/customers/jane.doe/suggested-queue?screen=phone"
+# -> {"queue_id": 4, "source": "customer"}   (customer|company|default|fallback)
+
+# Before (or without) a customer
+curl -b cookies.txt "$TIQORA_URL/api/v1/tickets/new/default-queue?screen=email"
+```
+
+Only queues the caller may `create` in are returned; Znuny's intake queues
+(`Junk`, `Raw`, `Postmaster` and their sub-queues) never count as history
+and are never the default. Both fields are `null` when the caller may create
+tickets nowhere.
 
 **Log a phone call on a ticket** (Znuny AgentTicketPhoneInbound/Outbound —
 article, time accounting, dynamic fields, attachments and next state in one
@@ -330,6 +348,10 @@ curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/ai/triage/7/reject"
 # Hand an AI-escalated ticket back to the AI without a customer reply
 curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/ai/resume"
 
+# Pause / resume all automatic AI actions on this ticket (204, idempotent)
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/ai/pause"
+curl -b cookies.txt -X POST "$TIQORA_URL/api/v1/tickets/4711/ai/unpause"
+
 # Tool trace / origin of an AI-written article
 curl -b cookies.txt "$TIQORA_URL/api/v1/tickets/4711/articles/9001/ai-origin"
 ```
@@ -341,6 +363,11 @@ the queue's AI policy (409 otherwise) and allowed by the AI ACL. Triage accept r
 caller's own permissions (403 if they may not move into the target queue)
 and, like reject, is a no-op 204 once the proposal is no longer open.
 `resume` clears the AI hand-off flag and leaves an internal note.
+`pause` stops auto-reply, triage and auto-summary on the ticket until
+`unpause` (Manual Assist, refine and manual summaries stay available); each
+real state change leaves one internal note, `GET …/ai` reports
+`ai_paused_at` / `ai_paused_by_name`. Messages that arrived during the pause
+are not answered retroactively.
 
 **Text refine** (composer "polish my text", not tied to a stored ticket
 field; nothing is persisted):
@@ -381,7 +408,8 @@ generated [OpenAPI schema](openapi.json) and
 | Path | Purpose |
 |---|---|
 | `/admin/ai/settings` | Operation mode, auto-reply kill-switch, disclosure default, global hourly cap, audit retention. |
-| `/admin/ai/providers` (+ `/{id}/test`, `/{id}/duplicate`) | LLM providers, pricing, cost budgets. |
+| `/admin/ai/providers` (+ `/{id}/test`, `/{id}/duplicate`, `/{id}/remote-models`) | LLM providers (access, currency, cost budgets). |
+| `/admin/ai/models` (+ `/{id}/test`), `/admin/ai/profiles`, `/admin/ai/task-defaults` | Model catalog (model@provider, capabilities, prices), fallback profiles, global profile per task; per-queue overrides are `task_profiles` on the queue policy. |
 | `/admin/ai/mcp-clients` (+ `/{id}/discover`, `/{id}/tools/{tool_name}`) | External MCP tool sources and per-tool switches. |
 | `/admin/ai/queue-policies` | Per-queue AI policy (autonomy, features, triage, PII masking, …). |
 | `/admin/ai/queues/{policy_id}/prompt-parts` (+ `/reorder`, `/{part_id}`) | Ordered system-prompt fragments of a policy (path id = policy id). |
@@ -440,7 +468,8 @@ daemons, system info) are `GET`/`PUT` or read-only:
 | Outbound SMTP settings (+ `/test`) | `/api/v1/admin/mail/outbound` |
 | Mail communication log | `/api/v1/admin/mail/log` (read-only) |
 | OAuth2 mail token configs | `/api/v1/admin/oauth2-token-configs` (+ `/{id}/authorize-url`, `/{id}/refresh`) |
-| PGP / S/MIME keys | `/api/v1/admin/crypto-keys` (list, `/pgp-import`, `/smime-register`) |
+| PGP / S/MIME keys | `/api/v1/admin/crypto-keys` (`/status`, `/pgp`, `/smime/…`, `/sign-key-options`; see [`../crypto.md`](../crypto.md#admin-ui-and-api)) |
+| PGP / S/MIME settings (+ PGP passphrases) | `/api/v1/admin/crypto-settings` (`GET`/`PUT`, `/pgp-passphrases/{key}`) |
 | Agent SSO eligibility / 2FA | `/api/v1/admin/auth-config` (+ `/global`, `/{user_id}`, `/{user_id}/reset-2fa`) |
 | API keys | `/api/v1/admin/api-keys` |
 | Webhooks | `/api/v1/admin/webhooks` |
@@ -507,8 +536,23 @@ curl -b cookies.txt "$TIQORA_URL/api/v1/reference/dynamic-fields?screen=AgentTic
 `/reference/customers` and `/reference/customer-search` also match phone and
 mobile numbers once the query contains five or more digits.
 
+## Integrations (external tools)
+
+```sh
+# Tickets of one customer account (login plus #N-suffixed variants), newest
+# first, archived included, only readable queues; tickets:ro key suffices
+curl -H "Authorization: Bearer $KEY" \
+  "$TIQORA_URL/api/v1/integrations/customer-tickets?login=jdoe&limit=50"
+```
+
+Per ticket: number, title (+ a conservative `title_pii_free` flag), queue,
+state, e-mail and message counts, first channel, stored AI summary. Details:
+[`../architecture.md`](../architecture.md#customer-ticket-history-for-external-tools-netadmin).
+
 ## Customer portal API (`/api/portal`)
 
+Only available when the deployment sets `TIQORA_PORTAL_ENABLED=true` (and
+the admin switch is on); otherwise every `/api/portal/*` route answers 404.
 Separate session (`POST /api/portal/auth/login`, `GET /api/portal/auth/me`),
 scoped to a `customer_user` rather than an agent. Ticket endpoints mirror a
 restricted subset of the agent API: `GET/POST /api/portal/tickets`, `GET

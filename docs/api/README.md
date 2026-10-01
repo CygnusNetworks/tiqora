@@ -6,7 +6,7 @@ process (default port `8000`) unless noted otherwise.
 | Surface | Prefix | Audience | Auth |
 |---|---|---|---|
 | **Agent/admin API** | `/api/v1` | The Tiqora agent UI, and any first-party automation | Session cookie or `Authorization: Bearer <api-key>` |
-| **Customer portal API** | `/api/portal` | The customer-facing self-service portal | Separate portal session cookie |
+| **Customer portal API** | `/api/portal` | The customer-facing self-service portal (opt-in: `TIQORA_PORTAL_ENABLED=true`) | Separate portal session cookie |
 | **Compatibility layer** | `/znuny-compat` | Existing Znuny GenericInterface REST clients | Znuny-style `SessionID`, or `Authorization: Bearer <api-key>` |
 | **MCP server** | separate process, default port `8001` | LLM agents / AI automation | `Authorization: Bearer <api-key>` (streamable-HTTP) |
 
@@ -72,7 +72,9 @@ surface is documented by hand in [`mcp.md`](mcp.md) from the tool registry in
 - **Auth method discovery**: `GET /api/v1/auth/methods` tells the login UI
   which of password / OIDC / SPNEGO / LDAP / WebAuthn are enabled for this
   deployment (`TIQORA_OIDC_ENABLED`, `TIQORA_SPNEGO_ENABLED`,
-  `TIQORA_LDAP_ENABLED`, `TIQORA_WEBAUTHN_*`), plus `portal_enabled`.
+  `TIQORA_LDAP_ENABLED`, `TIQORA_WEBAUTHN_*`), plus `portal_enabled`
+  (`false` unless `TIQORA_PORTAL_ENABLED` is set and the admin switch is on;
+  while off, every `/api/portal/*` route answers 404).
 
 ## Conventions
 

@@ -151,13 +151,30 @@ protection, `SendAutoReply` history), gated by SysConfig
 configured. Failures are logged and never fail the ticket creation. Outbound
 phone tickets never auto-reply.
 
-The New-ticket page's phone mode has a **caller number** field with a live
-lookup (`GET /api/v1/reference/caller`): matching customers can be taken over
-as the ticket's customer, and the caller's open tickets offer *Anruf zu diesem
-Ticket erfassen*, which opens that ticket's `PhoneCallDialog` with the typed
-text and the running timer. It also offers owner, responsible, type, service,
-SLA, pending/closed initial states (with callback presets), the booked time
-(timer from page open), dynamic fields and attachments.
+The New-ticket page's phone mode is a compact form:
+
+- a **call strip** on top — direction as a badge when opened from the call
+  popup, otherwise a toggle *Anruf kam rein / Ich habe angerufen*; number,
+  call times and the running call timer;
+- a **caller number** field with a live lookup (`GET
+  /api/v1/reference/caller`): matching customers can be taken over as the
+  ticket's customer, and the caller's open tickets offer *Anruf zu diesem
+  Ticket erfassen*, which opens that ticket's `PhoneCallDialog` with the
+  typed text and the running timer;
+- a **property bar** (Queue · Owner · Priority · State; the e-mail variant
+  has no owner). The queue is suggested from the customer's history (see
+  [rest-v1](api/rest-v1.md#tickets): customer → company → `QueueDefault` →
+  first non-intake queue), never Junk; a queue picked by hand or passed as
+  `?queue_id=` is never replaced. Opened from the call popup, the owner is
+  the agent who answered (`answered_by_user_id`, set when the answering
+  extension maps to exactly one agent) and a call that was answered and has
+  ended defaults the state to `closed successful` (submit then reads
+  *Erfassen und schließen*); missed calls keep the normal default;
+- *Weitere Felder* collapsed with a summary (responsible, type, service,
+  SLA, optional dynamic fields); required dynamic fields stay in the main
+  form and block submit; the pending time sits right under the bar;
+- the call-note footer with *Structure note* (AI refine, `call_note` mode),
+  attachments and the booked time (timer from page open).
 
 ### Caller lookup, phone search, dynamic fields
 
@@ -172,9 +189,9 @@ SLA, pending/closed initial states (with callback presets), the booked time
   also match phone/mobile once the query has five or more digits.
 - `GET /api/v1/reference/dynamic-fields?screen=AgentTicketPhone|AgentTicketPhoneInbound|AgentTicketPhoneOutbound`
   lists the ticket dynamic fields the screen's `###DynamicField` SysConfig
-  enables (`2` = required); when it enables none, every valid, non-internal
-  ticket field of an editable type. Article-level dynamic fields are not
-  supported by the write paths and are not offered.
+  enables (`2` = required); when it enables none, no fields are offered.
+  Article-level dynamic fields are not supported by the write paths and are
+  not offered.
 
 ### Click-to-call
 
@@ -238,7 +255,9 @@ the agent can read.
   2 h (number, extension, direction, agents, ringing/answered/ended times).
   A ring group sends one `ringing` per extension with the same `call_id` —
   the audience grows; `answered` narrows the call to the answering
-  extension's agents (the others' cards disappear); `hangup` ends it (the
+  extension's agents (the others' cards disappear) and records
+  `answered_by_user_id` when that extension maps to exactly one agent;
+  `hangup` ends it (the
   card then reads "missed" and stays loggable for 15 min); `handled` means the
   PBX took the call over itself (secretary / IVR / voicemail): it ends the call
   and dismisses the card for every notified agent, never offered for logging;

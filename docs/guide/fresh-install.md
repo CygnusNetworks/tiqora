@@ -89,6 +89,11 @@ uv run tiqora bootstrap --admin-password '…' --seed
   cookies are `Secure`, and `TIQORA_SESSION_COOKIE_SECURE=0` refuses to start.
 - Rotate `TIQORA_SECRET_KEY` and Meili/DB passwords; never keep the
   `change-me` defaults.
+- The customer portal is off until you set `TIQORA_PORTAL_ENABLED=true`
+  (then the switch on *Admin → Authentication / 2FA* decides).
+- PGP / S/MIME are off by default; mount key directories and switch them on
+  as described in [crypto.md](../crypto.md) and
+  [deploy/docker-compose.md](../deploy/docker-compose.md#pgp--smime-key-stores-shared-with-znuny).
 - See [deploy/docker-compose.md](../deploy/docker-compose.md) for env vars,
   external DB, reverse proxy, and TLS notes.
 

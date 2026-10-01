@@ -108,7 +108,7 @@ falling back to "most recent non-closed ticket for this customer").
 | `channels/email/` | in+out | IMAP/POP fetch, SMTP send (postmaster pipeline) |
 | `channels/sms/` | in+out | Generic HTTP webhook gateway (`SmsGateway` protocol) |
 | `channels/whatsapp/` | in+out | Meta WhatsApp Cloud API (Graph API) |
-| `channels/phone/` | in only | Thin CTI logging API (no gateway) |
+| `channels/phone/` | in only | CTI logging API + call-events webhook for the agent call popup (no gateway; click-to-call via `tel:`/`sip:` links) |
 | `channels/telegram/` | in+out | Telegram Bot API — long-poll (`worker/telegram_poller.py`) or webhook, mutually exclusive |
 
 SMS/WhatsApp/Phone/Telegram are mounted under
@@ -195,11 +195,16 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
 ### AI subsystem (`tiqora.ai.*`)
 
 An optional, admin-configured LLM layer, all under the same permission engine
-as UI/REST. Admin manages **LLM providers** (`tiqora_llm_provider` — OpenAI-
-compatible or Anthropic, credentials encrypted with `TIQORA_SECRET_KEY`),
+as UI/REST. Admin manages **LLM providers** (`tiqora_llm_provider` — access
+to one OpenAI-compatible endpoint, credentials encrypted with
+`TIQORA_SECRET_KEY`, optional cost budget), a **model catalog**
+(`tiqora_llm_model`, one model at one provider with capabilities and
+prices), **profiles** (`tiqora_llm_profile`, ordered fallback chains of
+models) and **task routing** (a profile per task — agent, final answer,
+triage, summary, refine, vision — globally with per-queue overrides),
 **MCP clients** (external MCP servers exposed to the agent as tools), and
 **per-queue policies** (`tiqora_ai_queue_policy`: which features are on, the
-autonomy level, provider/model, PII-masking, budgets) at `/admin/ai/*`. These
+autonomy level, task profiles, PII-masking, budgets) at `/admin/ai/*`. These
 features run off those policies:
 
 - **Drafts / manual assist** — an agent-triggered draft reply the agent must
@@ -215,8 +220,12 @@ features run off those policies:
   automatically above the policy's auto threshold, otherwise offered as a
   suggestion on the ticket. Runs only under `operation_mode=tiqora_primary`.
 - **Refine** (`ai/refine.py`) — agent-triggered polish of text typed in a
-  composer (spelling, grammar, tone); quoted text is never rewritten and
-  nothing is persisted.
+  composer (spelling, grammar, tone), or structuring of phone-call notes
+  (`call_note` mode); the agent reviews a word-level diff before applying
+  it, quoted text is never rewritten and nothing is persisted.
+
+Agents can **pause** all automatic AI actions (auto-reply, triage,
+auto-summary) on a single ticket; only an explicit resume lifts it.
 
 Cross-cutting: sensitive data is **PII-masked (spaCy NER)** before any LLM call;
 every request is written to an **audit log** (`/admin/ai/audit`) with a PII-
@@ -244,6 +253,10 @@ but never raised — webhook delivery must not block Meilisearch re-indexing.
 Mounted at `/api/portal` in the main API process (same `tiqora-api`), parallel
 to `/api/v1`:
 
+- **Opt-in:** `TIQORA_PORTAL_ENABLED` (default `false`) hard-disables the
+  portal — `/api/portal/*` answers 404 and `/` goes to the agent login. Once
+  it is `true`, the admin switch (`tiqora_settings` `portal.enabled`, default
+  on) decides (`domain/portal_gate.py`).
 - **Auth:** separate identity plane from agents. `domain/customer_auth.py`
   (`CustomerAuthService`, `CustomerSessionStore`) verifies `customer_user.pw`
   (`valid_id = 1`) with the same `znuny.password` module used for agents, but
@@ -379,11 +392,17 @@ summaries.
 - Per ticket: `ticket_id`, `ticket_number`, `title`, `title_pii_free`,
   `queue`, `state`, `state_type`, `customer_user_id` (full login with
   suffix), `created`, `changed`, `email_count`, `first_article_time`,
-  `last_article_time`, `summary`, `summary_created_at`. All datetimes are
-  UTC with an explicit offset (`"2026-09-30T08:12:01+00:00"`).
+  `last_article_time`, `message_count`, `channel`, `summary`,
+  `summary_created_at`. All datetimes are UTC with an explicit offset
+  (`"2026-09-30T08:12:01+00:00"`).
 - `email_count` and the first/last article times cover customer-visible
   articles on the `Email` channel only (no internal notes, internal mails,
   phone or chat articles); `null` times when there is none.
+- `message_count` counts customer-visible articles on **every** channel
+  except `Internal` (email, Telegram, chat, phone); `channel` is the
+  communication channel of the first such article (`Email`, `Telegram`, …),
+  `null` when there is none — enough for a consumer to show a chat icon and
+  a message count for Telegram tickets.
 - `summary` is the stored AI summary (`tiqora_ai_ticket_state.summary_body`)
   as is, `null` when none exists.
 - `title_pii_free` is conservative (`domain/integrations/subject_safety.py`):
@@ -542,7 +561,8 @@ layout component (`components/layout/{Agent,Portal,Admin}Shell.tsx`):
 | `/admin` | Configuration | `AdminShell` | CRUD over queues, users, DF, ACL, attribute relations, mail, … |
 
 Code-split per tree. Theming uses CSS variables and `data-theme` (`light` /
-`dark`) via a shared design-token stylesheet (`themes/tokens.css` +
+`dark`; the agent's choice *system*, the default, follows
+`prefers-color-scheme` live) via a shared design-token stylesheet (`themes/tokens.css` +
 `themes/theme.tsx`), consumed by all three shells so agent/portal/admin share
 one visual language. i18n via `react-i18next` with a Znuny-compatible locale
 registry (`i18n/locales.ts`): **49 UI languages** = plain `en` + all **48**
@@ -558,7 +578,19 @@ hand-rolled per resource: `components/admin/DataTable.tsx` (sortable/paginated
 table) plus `components/admin/CrudDrawer.tsx` (create/edit form drawer with
 validation) are composed per resource in `components/admin/AdminResourcePage.tsx`,
 with `DynamicFieldConfigEditor.tsx` handling the dynamic-field-specific
-possible-values editing UI.
+possible-values editing UI. `CrudDrawer` also has an opt-in tabbed
+"settings" appearance (switches, segmented controls, unit inputs, custom
+fields), used by the queue dialog: tabs *General* | *Mail & replies* |
+*Escalation* | *Email security* (the last only while PGP or S/MIME runs);
+the escalation tab shows first response / update / solution as one matrix
+(minutes with a readable duration, warning % only while a stage is set) plus
+the business-hours calendar, and the footer counts the active stages. The
+API payload is the same as before.
+
+The agent sidebar hides Znuny's plumbing queues `Postmaster`, `Raw` and
+`Junk` (by stock name, including sub-queues) behind a remembered *Show
+system queues (n)* toggle; a queue search or the currently open queue still
+shows them. The queue tree is sorted case-insensitively.
 
 ## Observability
 

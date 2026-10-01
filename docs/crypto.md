@@ -20,7 +20,7 @@ notifications) are done.
 
 ## Configuration
 
-Every setting below can be set in the admin UI (section **Settings** on the
+Every setting below can be set in the admin UI (tab **Settings** on the
 PGP and S/MIME pages, `GET/PUT /api/v1/admin/crypto-settings`). Per setting
 the value is resolved in this order:
 
@@ -52,6 +52,7 @@ so a Znuny value locks both fields.
 | `SMIME::NoVerify` | a valid signature counts as `verified` without a trusted chain | — |
 | `SMIME::CacheTTL`, `PGP::Log` | ignored (no effect in Tiqora), not in the UI | — |
 | — | extra CA bundle (`-CAfile`) for inbound signature chain checks, on top of `SMIME::CertPath` (Tiqora only) | `TIQORA_CRYPTO_SMIME_CA_PATH` |
+| — | trust the bundled public e-mail roots for inbound signatures (Tiqora only, default **on**, see *Trust*) | `TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS` |
 
 **Passphrases** are merged per key id: entries set in Znuny win for their
 ids, Tiqora entries fill in the other keys, Znuny's shipped demo entries
@@ -138,18 +139,36 @@ the current openssl hash (Znuny `_ReHashCertificates`) and re-syncs
 
 ## Admin UI and API
 
-Admin pages **PGP keys** (`/admin/pgp`) and **S/MIME certificates**
-(`/admin/smime`), both under *Communication*: list with status/expiry badges,
-upload, details (fingerprint etc.), download, delete with confirmation;
-S/MIME additionally private key upload with secret and a signer-relations
-dialog. Keys can be managed while a backend is switched off (the page says
-so) — signing/encryption only happens once it is enabled.
+Admin pages **PGP** (`/admin/pgp`) and **S/MIME** (`/admin/smime`), both
+under *Communication*, with three tabs:
 
-The queue form's **default sign key** is a select fed by the sign-key
-options; the value is stored in Znuny's format (`PGP::Detached::<id>`,
-`PGP::Inline::<id>`, `SMIME::Detached::<hash>.<n>`) and validated on save
-(format, and the key must exist with its secret part). A stored value Tiqora
-cannot see stays selectable so editing other fields does not drop it.
+- **Overview** — the on/off switch (locked when env or Znuny decide), a
+  readiness checklist from the backend self-check plus keys/passphrases
+  (PGP) or certificates/private keys (S/MIME), with *Fix* links into the
+  right settings section, environment facts and next steps.
+- **Keys** / **Certificates** — cards with state chips (type, validity,
+  passphrase) and inline actions: upload, details (fingerprint etc.),
+  download, delete with confirmation, PGP passphrases; S/MIME additionally
+  private key upload with secret and signer relations.
+- **Settings** — the settings above, grouped (General, Signing / Storage,
+  Environment) and saved per section; locked and Tiqora-changed values show
+  their source.
+
+Keys can be managed while a backend is switched off — signing/encryption
+only happens once it is enabled.
+
+The queue dialog's **Email security** tab (shown only while PGP or S/MIME is
+enabled and usable) has the **sign key**: only keys whose user ids /
+certificate carry the queue's **sender address** (its system address) are
+offered, one entry per key, with a hint when there is none for that address.
+For a PGP key the **signature format** — *Detached (PGP/MIME)* or *Inline* —
+is a separate control; S/MIME always signs detached. The value is stored in
+Znuny's format (`PGP::Detached::<id>`, `PGP::Inline::<id>`,
+`SMIME::Detached::<hash>.<n>`) and validated on save (format, and the key
+must exist with its secret part). A stored key that no longer matches the
+sender address, or that Tiqora cannot see (backend off, key only in Znuny),
+stays selectable and is labelled as such, so editing other fields does not
+drop it.
 
 `/api/v1/admin/crypto-keys` (admin only):
 
@@ -301,7 +320,13 @@ delivery: a layer that cannot be processed stays as it is (e.g. the
 - **S/MIME**: `SMIME::CertPath` is the trust store (`-CApath`; its
   `<subject_hash>.<n>` names are exactly what `-CApath` looks up), plus
   `TIQORA_CRYPTO_SMIME_CA_PATH` and openssl's default store, like Znuny's
-  call. CAs linked through signer relations are in CertPath, so they are
+  call. On top, Tiqora ships Mozilla's e-mail-protection roots
+  (`crypto/data/smime-public-roots.crt`, regenerated with
+  `scripts/update-smime-roots.py`) — the image's `ca-certificates` only
+  carries TLS roots, so signatures from public S/MIME CAs would otherwise
+  all be `signed_untrusted`. The bundle and `CA_PATH` are merged into the one
+  `-CAfile` openssl takes; turn it off with the *Settings* switch or
+  `TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS=false`. CAs linked through signer relations are in CertPath, so they are
   trust anchors automatically; a customer's self-signed certificate
   uploaded to CertPath is trusted too. A signature that is cryptographically
   valid but whose chain does not validate is `signed_untrusted` (Znuny's
@@ -360,6 +385,28 @@ The article header shows a badge — 🔒 encrypted, ✓ signature verified,
 (method, protection, signer, key id, detail): full badge in the reader
 (split view), glyph in the conversation bubble header, a non-interactive
 marker in the timeline's collapsible header.
+
+**Side files in the attachment list.** Signed/encrypted mail often carries
+files that mean nothing as download rows: `signature.asc`, `smime.p7s`, a
+sender's public key, or `PGPexch.htm` (the HTML copy of the body the PGP
+Desktop Outlook plugin attaches, because inline PGP only covers the text
+part). `crypto/attachment_kind.py` classifies attachments by name and MIME
+type, sniffing the armor line of small (< 256 KB) ambiguous files (`.asc`,
+`.pem`, `.key`, `.pub`, `.txt`); the attachment metadata carries the result
+as `crypto_kind` (`pgp_public_key`, `pgp_signature`, `pgp_signed_message`,
+`pgp_message`, `pgp_html_body`, `smime_signature`, `x509_certificate`;
+private key blocks stay plain files). The UI moves these into a quieter
+*Signature & keys* group with readable labels and hints:
+
+- an attached **public key** gets a card (uids, grouped fingerprint,
+  algorithm, dates, whether the keyring already has it) —
+  `GET /tickets/{id}/articles/{aid}/attachments/{att}/pgp-key` (same access
+  as the download; parsed in a throwaway gpg home, never imported; degrades
+  to `available: false` without gpg) — and an **Import** button,
+  `POST …/pgp-key/import` (`rw` in `admin` or `users`, PGP enabled, public
+  keys only, audit row);
+- `PGPexch.htm` gets an in-page preview through the article-body sanitiser,
+  `GET …/attachments/{att}/html` (415 for a non-HTML attachment).
 
 ## Outbound: signed and encrypted sending
 
@@ -447,7 +494,7 @@ backends off: `{"enabled": false}`.
 
 ### Queue security defaults
 
-Per queue (admin queue form, section *E-Mail-Sicherheit*, shown only while
+Per queue (admin queue dialog, tab *Email security*, shown only while
 PGP or S/MIME is enabled and usable; stored in `tiqora_settings` as
 `queue_security.<queue_id>`, see `tiqora.crypto.queue_security`):
 
@@ -625,15 +672,20 @@ limited to ~104 bytes on macOS).
   customer notification PGP sign+encrypt (article clear, raw mail, flags),
   agent notification S/MIME sign+encrypt, `Skip` sends nothing, `Send`
   goes out signed only, checkbox off = plain; admin API rows and 422.
+- `test_crypto_settings_store.py`, `test_crypto_settings_api.py` — the
+  env > Znuny set > Tiqora > Znuny default > code default resolution,
+  locking, passphrase check/encryption, public-roots switch.
+- `test_crypto_queue_security.py`, `test_autoresponse_queue_security.py` —
+  queue security defaults (`decide`), required encryption without keys,
+  skipped auto-responses.
+- `test_crypto_attachment_kind.py`, `test_attachment_crypto_api.py` —
+  side-file classification, attached-key inspection/import, HTML preview.
 - Frontend: `PgpKeysPage.test.tsx`, `SmimePage.test.tsx`,
   `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`,
   `ArticleSecurityBadge.test.tsx`, `EmailSecurityControl.test.tsx`,
+  `CryptoAttachments.test.tsx`, `CustomerDetailPage.test.tsx`,
+  `CustomerUsersPage.test.tsx`, portal `PreferencesPage.test.tsx`,
   `NotificationEventsPage.test.tsx`.
-- Frontend: `PgpKeysPage.test.tsx`, `SmimePage.test.tsx`,
-  `QueuesPage.test.tsx`, `SystemInfoPage.test.tsx`,
-  `ArticleSecurityBadge.test.tsx`, `EmailSecurityControl.test.tsx`,
-  `CustomerDetailPage.test.tsx`, `CustomerUsersPage.test.tsx`, portal
-  `PreferencesPage.test.tsx`, `NotificationEventsPage.test.tsx`.
 
 Fixtures (`tests/_smime_fixtures.py`) build throwaway CA and leaf
 certificates with `cryptography`; `tests/_crypto_mail_fixtures.py` builds

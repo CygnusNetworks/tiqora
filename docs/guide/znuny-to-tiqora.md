@@ -134,7 +134,13 @@ disabled, so agents can start evaluating the UI without any risk to Znuny.
    ```
 5. Start `tiqora-api` and `tiqora-worker` with `TIQORA_SCHEMA_OWNERSHIP`
    unset (or `false`) — this is the default and must stay this way for the
-   whole parallel-operation period.
+   whole parallel-operation period. If Znuny uses PGP or S/MIME, mount
+   Znuny's keyring and certificate directories into both containers — Tiqora
+   reads the same SysConfig switches and shares the key stores
+   ([`../crypto.md`](../crypto.md),
+   [`../deploy/docker-compose.md`](../deploy/docker-compose.md#pgp--smime-key-stores-shared-with-znuny));
+   if you use Znuny's customer interface and want Tiqora's portal too, set
+   `TIQORA_PORTAL_ENABLED=true` (off by default).
 6. Point a subset of agents at the Tiqora UI to evaluate it. At this stage
    Tiqora is read-write-*capable* at the application layer but you should
    treat it as read-only in practice until you are confident in it — nothing
