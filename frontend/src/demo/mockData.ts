@@ -1079,6 +1079,99 @@ const groupUsers: Record<number, unknown[]> = { 3: [ { user_id: 1, login: "aturn
 export const demoPortalUser = { login: CUSTOMERS[0].login, customer_id: "ACME", first_name: "Jane", last_name: "Doe", email: CUSTOMERS[0].login };
 export const demoPortalTickets = { items: ticketItems.slice(0, 4).map((t) => ({ id: t.id, tn: t.tn, title: t.title, state: t.state, state_type: t.state_type, queue_name: t.queue_name, create_time: t.create_time, change_time: t.change_time })), total: 4, offset: 0, limit: 50 };
 
+// PGP / S/MIME admin pages: PGP on with one secret key, S/MIME not set up yet.
+const cryptoField = (
+  name: string,
+  kind: string,
+  value: unknown,
+  extra: Record<string, unknown> = {},
+) => ({
+  name,
+  kind,
+  choices: [] as string[],
+  value,
+  source: "default",
+  locked: false,
+  tiqora_value: null,
+  znuny_setting: null,
+  env_var: null,
+  ...extra,
+});
+const cryptoStatus = [
+  {
+    backend: "pgp",
+    enabled: true,
+    available: true,
+    binary: { available: true, path: "/usr/bin/gpg", version: "gpg (GnuPG) 2.2.40", reason: "" },
+    paths: { homedir: "/var/lib/tiqora/gnupg" },
+    problems: [],
+  },
+  {
+    backend: "smime",
+    enabled: false,
+    available: false,
+    binary: { available: true, path: "/usr/bin/openssl", version: "OpenSSL 3.0.22", reason: "" },
+    paths: { cert_path: "", private_path: "" },
+    problems: ["SMIME::CertPath is not configured", "SMIME::PrivatePath is not configured"],
+  },
+];
+const cryptoSettings = {
+  pgp: [
+    cryptoField("pgp.enabled", "bool", true, { source: "tiqora", tiqora_value: true, znuny_setting: "PGP", env_var: "TIQORA_CRYPTO_PGP_ENABLED" }),
+    cryptoField("pgp.trusted_network", "bool", true, { znuny_setting: "PGP::TrustedNetwork" }),
+    cryptoField("pgp.digest", "choice", "sha256", { choices: ["", "sha1", "sha224", "sha256", "sha384", "sha512"], source: "znuny_default", znuny_setting: "PGP::Options::DigestPreference" }),
+    cryptoField("pgp.method", "choice", "Detached", { choices: ["Detached", "Inline"], source: "znuny_default", znuny_setting: "PGP::Method" }),
+    cryptoField("pgp.homedir", "str", "/var/lib/tiqora/gnupg", { source: "env", locked: true, znuny_setting: "PGP::Options", env_var: "TIQORA_CRYPTO_PGP_GNUPGHOME" }),
+    cryptoField("pgp.gpg_bin", "str", "", { znuny_setting: "PGP::Bin", env_var: "TIQORA_CRYPTO_GPG_BIN" }),
+    cryptoField("pgp.options", "str", "--yes", { source: "znuny_default", znuny_setting: "PGP::Options" }),
+  ],
+  smime: [
+    cryptoField("smime.enabled", "bool", false, { znuny_setting: "SMIME", env_var: "TIQORA_CRYPTO_SMIME_ENABLED" }),
+    cryptoField("smime.fetch_from_customer", "bool", false, { znuny_setting: "SMIME::FetchFromCustomer" }),
+    cryptoField("smime.no_verify", "bool", false, { znuny_setting: "SMIME::NoVerify" }),
+    cryptoField("smime.cert_path", "str", "", { znuny_setting: "SMIME::CertPath", env_var: "TIQORA_CRYPTO_SMIME_CERT_DIR" }),
+    cryptoField("smime.private_path", "str", "", { znuny_setting: "SMIME::PrivatePath", env_var: "TIQORA_CRYPTO_SMIME_PRIVATE_DIR" }),
+    cryptoField("smime.ca_path", "str", "", { env_var: "TIQORA_CRYPTO_SMIME_CA_PATH" }),
+    cryptoField("smime.openssl_bin", "str", "", { znuny_setting: "SMIME::Bin", env_var: "TIQORA_CRYPTO_OPENSSL_BIN" }),
+  ],
+  pgp_passphrases: [
+    { fingerprint: "E87F4A5CADE7AB95FBEEC6173C20A3ED5DF2D6B2", key_id: "B4B9F38C", uids: ["Support Team <support@example.com>"], source: "tiqora" },
+  ],
+  pgp_passphrases_error: null,
+};
+const cryptoPgpKeys = [
+  {
+    fingerprint: "E87F4A5CADE7AB95FBEEC6173C20A3ED5DF2D6B2",
+    key_id: "3C20A3ED5DF2D6B2",
+    short_id: "5DF2D6B2",
+    znuny_key_id: "B4B9F38C",
+    uids: ["Support Team <support@example.com>"],
+    emails: ["support@example.com"],
+    created: "2026-01-19T00:00:00Z",
+    expires: null,
+    status: "good",
+    has_secret: true,
+    bits: 255,
+    algorithm: "EdDSA",
+    subkey_ids: ["A1B2C3D4B4B9F38C"],
+  },
+  {
+    fingerprint: "1F2E3D4C5B6A79881F2E3D4C5B6A798811223344",
+    key_id: "5B6A798811223344",
+    short_id: "11223344",
+    znuny_key_id: "11223344",
+    uids: ["Jane Doe <j.doe@acme.example>"],
+    emails: ["j.doe@acme.example"],
+    created: "2025-11-02T00:00:00Z",
+    expires: "2027-11-02T00:00:00Z",
+    status: "good",
+    has_secret: false,
+    bits: 4096,
+    algorithm: "RSA",
+    subkey_ids: [],
+  },
+];
+
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Auth
@@ -1088,6 +1181,11 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/auth/logout")) return {};
   if (p.endsWith("/auth/totp")) return { enabled: true, confirmed: true };
   if (p.endsWith("/auth/passkey")) return [{ id: 1, name: "MacBook Touch ID", created: t0, last_used_at: "2026-07-19T08:00:00Z" }];
+  // PGP / S/MIME admin
+  if (p.endsWith("/api/v1/admin/crypto-keys/status")) return cryptoStatus;
+  if (p.endsWith("/api/v1/admin/crypto-settings")) return cryptoSettings;
+  if (p.endsWith("/api/v1/admin/crypto-keys/pgp") && method === "GET") return cryptoPgpKeys;
+  if (p.endsWith("/api/v1/admin/crypto-keys/smime") && method === "GET") return [];
   // Agent
   if (p.endsWith("/api/v1/queues")) return agentQueues;
   // Reference lookups (flat lists behind name/id joins — e.g. the queue names

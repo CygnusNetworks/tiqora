@@ -4,7 +4,7 @@ import { toBcp47 } from "@/i18n";
 import { useQuery } from "@tanstack/react-query";
 import { api, type QueueOut, type QueueCreate, type QueueUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
-import { CRYPTO_STATUS_KEY } from "@/components/admin/CryptoStatusBanner";
+import { CRYPTO_STATUS_KEY } from "@/components/admin/cryptoSettingsQuery";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { formatDateTime } from "@/lib/format";

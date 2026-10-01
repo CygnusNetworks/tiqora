@@ -1909,8 +1909,8 @@
       "systemAddresses": "Endereços do sistema",
       "notificationEvents": "Eventos de notificação",
       "ticketAttributeRelations": "Relações de atributos",
-      "pgp": "PGP keys",
-      "smime": "S/MIME certificates",
+      "pgp": "PGP",
+      "smime": "S/MIME",
       "aiModels": "Models"
     },
     "table": {
@@ -3080,8 +3080,8 @@
       "systemAddresses": "Endereços de e-mail usados como From em filas e auto-respostas.",
       "notificationEvents": "Configurar notificações a agentes baseadas em eventos.",
       "ticketAttributeRelations": "Matrizes de dependência compatíveis com Znuny (serviço/fila etc.) em CSV.",
-      "pgp": "Import, inspect and delete the PGP keys used to sign, encrypt and decrypt mail.",
-      "smime": "Manage S/MIME certificates, private keys and signer relations.",
+      "pgp": "Turn PGP on and off, manage keys and passphrases, set signature and storage options.",
+      "smime": "Turn S/MIME on and off, manage certificates, private keys and signer relations, set storage locations.",
       "aiModels": "Models at the providers, profiles with fallback models, and which profile handles which task."
     },
     "types": {
@@ -3166,8 +3166,8 @@
       }
     },
     "pgp": {
-      "title": "PGP keys",
-      "description": "The keyring is shared with Znuny (PGP::Options --homedir). Set passphrases for secret keys from the key's menu.",
+      "title": "PGP",
+      "description": "Signing and encryption with GnuPG. The keyring is shared with Znuny.",
       "upload": "Import key",
       "uploading": "Importing…",
       "uploadTitle": "Import PGP key",
@@ -3216,11 +3216,16 @@
       "passphraseDescription": "Checked with a test signature before it is stored, encrypted. It is never shown again.",
       "passphraseChecking": "Checking …",
       "passphraseSaved": "Passphrase checked and saved.",
-      "passphraseRemoved": "Passphrase removed."
+      "passphraseRemoved": "Passphrase removed.",
+      "keysTab": "Keys",
+      "createdOn": "created {{date}}",
+      "expiresOn": "expires {{date}}",
+      "neverExpires": "never expires",
+      "passphraseChange": "Change passphrase"
     },
     "smime": {
-      "title": "S/MIME certificates",
-      "description": "Certificates and private keys in Znuny's layout (<hash>.<n>, secret in .P) — shared with Znuny.",
+      "title": "S/MIME",
+      "description": "Signing and encryption with X.509 certificates, stored in Znuny's layout.",
       "addCertificate": "Add certificate",
       "addPrivateKey": "Add private key",
       "certTitle": "Add S/MIME certificate",
@@ -3269,7 +3274,9 @@
       "deleted": "Deleted.",
       "renamed": "Renumbered: {{renamed}}.",
       "empty": "No S/MIME certificates stored.",
-      "loadError": "Could not load S/MIME certificates"
+      "loadError": "Could not load S/MIME certificates",
+      "keysTab": "Certificates",
+      "validUntil": "valid until {{date}}"
     },
     "cryptoSettings": {
       "title": "Settings",
@@ -3277,14 +3284,14 @@
       "save": "Save",
       "saving": "Saving …",
       "saved": "Saved.",
-      "reset": "Remove Tiqora value",
-      "shadowed": "The Tiqora value stored here only applies once this value is removed.",
+      "reset": "Reset",
+      "shadowed": "the Tiqora value applies once this value is gone",
       "loadError": "Could not load settings",
       "choiceAuto": "(gpg decides)",
       "source": {
-        "env": "Environment variable {{name}} – takes precedence",
-        "znuny": "Set in Znuny SysConfig ({{name}}) – takes precedence",
-        "tiqora": "Set in Tiqora",
+        "env": "Environment variable {{name}}",
+        "znuny": "Set in Znuny SysConfig ({{name}})",
+        "tiqora": "Changed in Tiqora",
         "znunyDefault": "Znuny default ({{name}})",
         "default": "Default"
       },
@@ -3296,7 +3303,8 @@
           },
           "gpg_bin": {
             "label": "gpg program",
-            "help": "Path or name of the gpg program (Znuny: PGP::Bin). If the path does not exist here, Tiqora looks gpg up on PATH."
+            "help": "Path or name of the gpg program (Znuny: PGP::Bin). If the path does not exist here, Tiqora looks gpg up on PATH.",
+            "placeholder": "gpg"
           },
           "homedir": {
             "label": "Keyring",
@@ -3307,11 +3315,11 @@
             "help": "Extra options for every gpg call, e.g. --trust-model always (Znuny: PGP::Options without --homedir). Tiqora sets --batch and --no-tty itself."
           },
           "digest": {
-            "label": "Signature digest",
+            "label": "Signature hash",
             "help": "Preferred hash for signatures (Znuny: PGP::Options::DigestPreference)."
           },
           "method": {
-            "label": "Method without rich text",
+            "label": "Format without rich text",
             "help": "Detached (PGP/MIME) or inline when notifications are sent as plain text (Znuny: PGP::Method)."
           },
           "trusted_network": {
@@ -3326,19 +3334,23 @@
           },
           "openssl_bin": {
             "label": "openssl program",
-            "help": "Path or name of the openssl program (Znuny: SMIME::Bin). If the path does not exist here, Tiqora looks openssl up on PATH."
+            "help": "Path or name of the openssl program (Znuny: SMIME::Bin). If the path does not exist here, Tiqora looks openssl up on PATH.",
+            "placeholder": "openssl"
           },
           "cert_path": {
             "label": "Certificates",
-            "help": "Certificate directory in Znuny's <hash>.<n> layout, also the trust anchors for signature checks (Znuny: SMIME::CertPath)."
+            "help": "Certificate directory in Znuny's <hash>.<n> layout, also the trust anchors for signature checks (Znuny: SMIME::CertPath).",
+            "placeholder": "/var/lib/tiqora/smime/certs"
           },
           "private_path": {
             "label": "Private keys",
-            "help": "Directory of the private keys, each secret in <file>.P (Znuny: SMIME::PrivatePath)."
+            "help": "Directory of the private keys, each secret in <file>.P (Znuny: SMIME::PrivatePath).",
+            "placeholder": "/var/lib/tiqora/smime/private"
           },
           "ca_path": {
             "label": "CA bundle",
-            "help": "Additional CA bundle file (PEM) for chain validation. Tiqora only, no Znuny setting."
+            "help": "Additional CA bundle file (PEM) for chain validation. Tiqora only, no Znuny setting.",
+            "placeholder": "optional"
           },
           "fetch_from_customer": {
             "label": "Fetch certificates from customer",
@@ -3349,7 +3361,73 @@
             "help": "A cryptographically valid signature counts as verified even if the certificate chain is not trusted (Znuny: SMIME::NoVerify). Only turn on when no CA chain is available."
           }
         }
+      },
+      "unsaved": "Changed, not saved yet",
+      "discard": "Discard",
+      "saveSection": "Save section",
+      "required": "Required; the backend does not work without it.",
+      "choice": {
+        "Detached": "PGP/MIME",
+        "Inline": "Inline"
+      },
+      "sections": {
+        "general": {
+          "title": "General",
+          "description": "Whether the backend is used and how strictly it checks."
+        },
+        "sign": {
+          "title": "Signing",
+          "description": "How signatures are created."
+        },
+        "store": {
+          "title": "Storage",
+          "description": "Directories in Znuny's <hash>.<n> layout, shared with Znuny."
+        },
+        "env": {
+          "title": "Environment",
+          "description": "Program and storage. Rarely changed; what the deployment sets is locked."
+        }
       }
+    },
+    "cryptoPage": {
+      "tabOverview": "Overview",
+      "tabSettings": "Settings",
+      "settingsFlag": "A setting is missing",
+      "notReady": "Not ready",
+      "checkBinaryOk": "Program found",
+      "checkBinaryMissing": "Program not found",
+      "isOn": "{{name}} is on",
+      "isOnHint": "Tiqora signs, encrypts and verifies mail as the queues specify.",
+      "isOff": "{{name}} is off",
+      "isOffHint": "Keys can be managed; outgoing mail stays unchanged.",
+      "isOffBlocked": "Fix the marked items before turning it on.",
+      "fix": "Fix",
+      "environment": "Environment",
+      "program": "Program",
+      "notSet": "not set",
+      "nextSteps": "Next steps",
+      "pgpSecretKeys_one": "{{count}} secret key",
+      "pgpSecretKeys_other": "{{count}} secret keys",
+      "pgpNoSecretKeys": "No secret key yet",
+      "pgpNoSecretKeysHint": "Import a secret key to sign and decrypt.",
+      "passphrasesComplete": "Passphrases complete",
+      "passphrasesMissing": "Passphrase missing",
+      "passphrasesCount": "{{done}} of {{total}} keys",
+      "nextImportKey": "Import a secret key",
+      "nextSetPassphrase": "Set passphrase",
+      "nextQueues": "Queue defaults for signing and encryption",
+      "smimeCertificates_one": "{{count}} certificate",
+      "smimeCertificates_other": "{{count}} certificates",
+      "smimeNoCertificates": "No certificate yet",
+      "smimePrivateKeys_one": "{{count}} private key",
+      "smimePrivateKeys_other": "{{count}} private keys",
+      "smimeNoPrivateKeys": "No private key yet",
+      "smimeNoPrivateKeysHint": "Add your own certificate with its private key to sign and decrypt.",
+      "nextStore": "Set storage locations",
+      "nextAddCertificate": "Add certificate and private key",
+      "problemNotConfigured": "{{name}} is not set",
+      "problemNotWritable": "{{path}} is not writable",
+      "problemCannotCreate": "{{path}} is missing and cannot be created"
     }
   },
   "kb": {
