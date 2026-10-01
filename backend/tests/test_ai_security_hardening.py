@@ -20,6 +20,7 @@ from tiqora.ai.output_guards import (
     MAX_CUSTOMER_BODY_LINKS,
     CustomerMessageGuardError,
     strip_hallucinated_signoff,
+    strip_markdown_bold,
     validate_customer_message,
 )
 from tiqora.ai.pii import PiiMapper
@@ -261,6 +262,12 @@ async def test_propose_customer_message_runs_output_guard() -> None:
             TOOL_PROPOSE_CUSTOMER_MESSAGE,
             {"kind": "reply", "body": "y" * (MAX_CUSTOMER_BODY_CHARS + 1)},
         )
+
+
+def test_strip_markdown_bold_removes_markers_keeps_bullets() -> None:
+    body = "Der **TP-Link Archer AX53** (49 €)\n* Punkt\n2 * 3 * 4 und **fett**"
+    expected = "Der TP-Link Archer AX53 (49 €)\n* Punkt\n2 * 3 * 4 und fett"
+    assert strip_markdown_bold(body) == expected
 
 
 def test_strip_hallucinated_signoff_keeps_english_closing_drops_placeholder() -> None:
