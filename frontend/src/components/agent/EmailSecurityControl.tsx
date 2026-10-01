@@ -1,11 +1,12 @@
 import type { ComponentType, SVGProps } from "react";
 import { useTranslation } from "react-i18next";
 import { SelectField } from "@/components/ui/SelectField";
-import { BanIcon, LockIcon, PencilIcon, ShieldIcon } from "@/components/ui/icons";
+import { BanIcon, KeyIcon, LockIcon, PencilIcon, ShieldIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import {
   signs,
   encrypts,
+  backendUsable,
   offeredModes,
   pickableBackends,
   type EmailSecurity,
@@ -22,26 +23,39 @@ const MODE_ICON: Record<SecurityMode, ComponentType<SVGProps<SVGSVGElement>>> = 
   sign_encrypt: ShieldIcon,
 };
 
-/** One segmented button group (modes, backends). */
+/** One segmented button group (modes, backends). `bare` drops the frame so
+ * the group can sit inside the key rail. An item with `disabled` stays
+ * visible but cannot be picked; `reason` says why, next to the label. */
 function Segmented<T extends string>({
   items,
   value,
   onChange,
   testId,
   label,
+  bare,
 }: {
-  items: { value: T; label: string; icon?: ComponentType<SVGProps<SVGSVGElement>> }[];
+  items: {
+    value: T;
+    label: string;
+    icon?: ComponentType<SVGProps<SVGSVGElement>>;
+    disabled?: boolean;
+    reason?: string;
+  }[];
   value: T;
   onChange: (v: T) => void;
   testId: string;
   label: string;
+  bare?: boolean;
 }) {
   return (
     <div
       role="radiogroup"
       aria-label={label}
       data-testid={testId}
-      className="inline-flex flex-wrap gap-0.5 rounded-md border border-hairline bg-surface-subtle p-0.5"
+      className={cn(
+        "inline-flex flex-wrap items-center gap-0.5 p-0.5",
+        bare ? "bg-transparent" : "rounded-md border border-hairline bg-surface-subtle",
+      )}
     >
       {items.map((item) => {
         const on = item.value === value;
@@ -52,17 +66,27 @@ function Segmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={on}
+            aria-disabled={item.disabled || undefined}
+            title={item.disabled ? item.reason : undefined}
             data-testid={`${testId}-${item.value}`}
-            onClick={() => onChange(item.value)}
+            onClick={() => {
+              if (!item.disabled) onChange(item.value);
+            }}
             className={cn(
-              "inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs",
-              on
-                ? "bg-surface font-semibold text-ink shadow-sm ring-1 ring-hairline"
-                : "text-muted hover:text-ink",
+              "inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors duration-100 motion-reduce:transition-none",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+              item.disabled
+                ? "cursor-not-allowed text-muted opacity-60"
+                : on
+                  ? "bg-surface text-ink shadow-sm ring-1 ring-hairline"
+                  : "text-muted hover:text-ink",
             )}
           >
-            {IconCmp ? <IconCmp className={cn("h-3.5 w-3.5", on && "text-accent")} /> : null}
+            {IconCmp ? <IconCmp className={cn("h-3.5 w-3.5", on && !item.disabled && "text-accent")} /> : null}
             {item.label}
+            {item.disabled && item.reason ? (
+              <span className="text-[11px] font-normal text-escalation">{item.reason}</span>
+            ) : null}
           </button>
         );
       })}
@@ -88,6 +112,12 @@ export function EmailSecurityControl({
   const update = (patch: Partial<EmailSecurityState>) =>
     setState({ ...state, ...patch });
   const backends = pickableBackends(options);
+  const backendList = options.backends ?? [];
+  const usableFor = (b: Backend, mode: SecurityMode) =>
+    backendUsable(
+      backendList.find((x) => x.backend === b),
+      mode,
+    );
   const signKeys = backendOpts?.sign_keys ?? [];
   const queueSign = options.queue_sign ?? null;
   const onBackend = (b: Backend) => {
@@ -116,55 +146,87 @@ export function EmailSecurityControl({
           value={state.mode}
           onChange={(m) => {
             const patch: Partial<EmailSecurityState> = { mode: m };
-            if (signs(m) && !state.signKey) {
-              patch.signKey = signKeys.find((k) => k.usable)?.key ?? "";
+            // The chosen backend may have no sign key for a signing mode:
+            // move to one that has.
+            let be = backendList.find((x) => x.backend === state.backend);
+            if (m !== "none" && !usableFor(state.backend, m)) {
+              const alt = backendList.find((x) => backendUsable(x, m));
+              if (alt) {
+                be = alt;
+                patch.backend = alt.backend;
+                patch.method = "detached";
+                patch.signKey = "";
+              }
+            }
+            if (signs(m) && !(patch.signKey ?? state.signKey)) {
+              patch.signKey = (be?.sign_keys ?? []).find((k) => k.usable)?.key ?? "";
             }
             update(patch);
           }}
           testId={`${testId}-mode`}
           label={t("ticket.emailSecurity.label")}
         />
-        {state.mode !== "none" && backends.length > 1 && (
-          <Segmented
-            items={backends.map((b) => ({
-              value: b.backend,
-              label: b.backend === "smime" ? "S/MIME" : "PGP",
-            }))}
-            value={state.backend}
-            onChange={onBackend}
-            testId={`${testId}-backend`}
-            label={t("ticket.emailSecurity.backend")}
-          />
-        )}
-        {state.mode !== "none" && state.backend === "pgp" && (
-          <SelectField
-            items={(backendOpts?.methods ?? ["detached"]).map((m) => ({
-              value: m,
-              label: t(`ticket.emailSecurity.method.${m}`),
-            }))}
-            value={state.method}
-            onChange={(m) => update({ method: m })}
-            testId={`${testId}-method`}
-            className="w-auto"
-            aria-label={t("ticket.emailSecurity.methodLabel")}
-          />
-        )}
-        {signs(state.mode) && (
-          <SelectField
-            items={signKeys.map((k) => ({
-              value: k.key,
-              label: k.label,
-              hint: k.usable ? undefined : t(`ticket.emailSecurity.keyStatus.${k.status}`, { defaultValue: k.status }),
-            }))}
-            value={state.signKey || null}
-            onChange={(k) => update({ signKey: k })}
-            placeholder={t("ticket.emailSecurity.signKey")}
-            testId={`${testId}-sign-key`}
-            className="w-auto max-w-72"
-            aria-label={t("ticket.emailSecurity.signKey")}
-          />
-        )}
       </div>
+      {state.mode !== "none" && (
+        <div
+          className="flex w-fit max-w-full flex-wrap items-stretch overflow-hidden rounded-md border border-hairline bg-surface"
+          data-testid={`${testId}-rail`}
+        >
+          {backends.length > 1 && (
+            <Segmented
+              bare
+              items={backends.map((b) => {
+                const off = !backendUsable(b, state.mode);
+                return {
+                  value: b.backend,
+                  label: b.backend === "smime" ? "S/MIME" : "PGP",
+                  disabled: off,
+                  reason: off ? t("ticket.emailSecurity.keyStatus.missing") : undefined,
+                };
+              })}
+              value={state.backend}
+              onChange={onBackend}
+              testId={`${testId}-backend`}
+              label={t("ticket.emailSecurity.backend")}
+            />
+          )}
+          {state.backend === "pgp" && (
+            <div className="flex items-stretch border-l border-hairline first:border-l-0">
+              <SelectField
+                items={(backendOpts?.methods ?? ["detached"]).map((m) => ({
+                  value: m,
+                  label: t(`ticket.emailSecurity.method.${m}`),
+                }))}
+                value={state.method}
+                onChange={(m) => update({ method: m })}
+                testId={`${testId}-method`}
+                bare
+                className="w-auto"
+                aria-label={t("ticket.emailSecurity.methodLabel")}
+              />
+            </div>
+          )}
+          {signs(state.mode) && (
+            <div className="flex items-center border-l border-hairline pl-2.5 first:border-l-0 first:pl-0">
+              <KeyIcon className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+              <SelectField
+                items={signKeys.map((k) => ({
+                  value: k.key,
+                  label: k.label,
+                  hint: k.usable ? undefined : t(`ticket.emailSecurity.keyStatus.${k.status}`, { defaultValue: k.status }),
+                }))}
+                value={state.signKey || null}
+                onChange={(k) => update({ signKey: k })}
+                placeholder={t("ticket.emailSecurity.signKey")}
+                testId={`${testId}-sign-key`}
+                bare
+                className="w-auto max-w-72"
+                aria-label={t("ticket.emailSecurity.signKey")}
+              />
+            </div>
+          )}
+        </div>
+      )}
       {encrypts(state.mode) && backendOpts && (backendOpts.recipients ?? []).length > 0 && (
         <ul className="flex flex-wrap gap-1" data-testid={`${testId}-recipients`}>
           {(backendOpts.recipients ?? []).map((r) => (

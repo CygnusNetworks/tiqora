@@ -197,4 +197,45 @@ describe("EmailSecurityControl", () => {
     expect(screen.getByTestId("sec-required")).toBeInTheDocument();
     await waitFor(() => expect(payload()).toMatchObject({ backend: "smime", encrypt: true, sign_key: null }));
   });
+
+  it("locks a backend without a usable sign key and says why", async () => {
+    const noSmimeKey = {
+      ...OPTIONS,
+      backends: [
+        OPTIONS.backends![0],
+        { ...OPTIONS.backends![1], sign_keys: [] },
+      ],
+    };
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue(noSmimeKey);
+    wrap();
+    await screen.findByTestId("sec");
+    const smime = screen.getByTestId("sec-backend-smime");
+    expect(smime).toHaveAttribute("aria-disabled", "true");
+    expect(smime).toHaveTextContent("no key");
+    fireEvent.click(smime);
+    expect(screen.getByTestId("sec-backend-pgp")).toHaveAttribute("aria-checked", "true");
+    expect(payload()).toMatchObject({ backend: "pgp" });
+
+    // Encrypt-only needs no sign key: S/MIME is selectable again.
+    fireEvent.click(screen.getByTestId("sec-mode-encrypt"));
+    expect(screen.getByTestId("sec-backend-smime")).not.toHaveAttribute("aria-disabled");
+  });
+
+  it("moves to the backend that has a sign key when the mode starts signing", async () => {
+    const pgpNoKey = {
+      ...OPTIONS,
+      default: null,
+      queue_sign: null,
+      backends: [
+        { ...OPTIONS.backends![0], sign_keys: [] },
+        OPTIONS.backends![1],
+      ],
+    };
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue(pgpNoKey);
+    wrap();
+    await screen.findByTestId("sec");
+    fireEvent.click(screen.getByTestId("sec-mode-sign"));
+    expect(screen.getByTestId("sec-backend-smime")).toHaveAttribute("aria-checked", "true");
+    expect(payload()).toMatchObject({ backend: "smime", sign_key: "abcdef01.0" });
+  });
 });
