@@ -1909,8 +1909,8 @@
       "systemAddresses": "Systemadressen",
       "notificationEvents": "Benachrichtigungen",
       "ticketAttributeRelations": "Attribut­beziehungen",
-      "pgp": "PGP-Schlüssel",
-      "smime": "S/MIME-Zertifikate",
+      "pgp": "PGP",
+      "smime": "S/MIME",
       "aiModels": "Modelle"
     },
     "table": {
@@ -3088,8 +3088,8 @@
       "systemAddresses": "Absenderadressen für Queues und Auto-Antworten.",
       "notificationEvents": "Ereignisbasierte Agenten-Benachrichtigungen konfigurieren.",
       "ticketAttributeRelations": "Znuny-kompatible Abhängigkeitsmatrizen (z. B. Service → Queue) im CSV-Format.",
-      "pgp": "PGP-Schlüssel zum Signieren, Verschlüsseln und Entschlüsseln importieren, prüfen und löschen.",
-      "smime": "S/MIME-Zertifikate, private Schlüssel und Signer-Beziehungen verwalten.",
+      "pgp": "PGP ein- und ausschalten, Schlüssel und Passphrasen verwalten, Signatur und Speicherort einstellen.",
+      "smime": "S/MIME ein- und ausschalten, Zertifikate, private Schlüssel und Signer-Beziehungen verwalten, Speicherorte einstellen.",
       "aiModels": "Modelle bei den Providern, Profile mit Ausweichmodellen und welches Profil welche Aufgabe übernimmt."
     },
     "types": {
@@ -3174,8 +3174,8 @@
       }
     },
     "pgp": {
-      "title": "PGP-Schlüssel",
-      "description": "Der Schlüsselbund wird mit Znuny geteilt (PGP::Options --homedir). Passphrasen für geheime Schlüssel setzt du über das Menü des Schlüssels.",
+      "title": "PGP",
+      "description": "Signieren und Verschlüsseln mit GnuPG. Der Schlüsselbund wird mit Znuny geteilt.",
       "upload": "Schlüssel importieren",
       "uploading": "Importiere …",
       "uploadTitle": "PGP-Schlüssel importieren",
@@ -3224,11 +3224,16 @@
       "passphraseDescription": "Wird vor dem Speichern mit einer Probesignatur geprüft und verschlüsselt abgelegt. Sie wird nie wieder angezeigt.",
       "passphraseChecking": "Prüfe …",
       "passphraseSaved": "Passphrase geprüft und gespeichert.",
-      "passphraseRemoved": "Passphrase entfernt."
+      "passphraseRemoved": "Passphrase entfernt.",
+      "keysTab": "Schlüssel",
+      "createdOn": "erstellt {{date}}",
+      "expiresOn": "läuft ab {{date}}",
+      "neverExpires": "läuft nie ab",
+      "passphraseChange": "Passphrase ändern"
     },
     "smime": {
-      "title": "S/MIME-Zertifikate",
-      "description": "Zertifikate und private Schlüssel im Znuny-Layout (<Hash>.<n>, Secret in .P) — gemeinsam mit Znuny genutzt.",
+      "title": "S/MIME",
+      "description": "Signieren und Verschlüsseln mit X.509-Zertifikaten, abgelegt im Znuny-Format.",
       "addCertificate": "Zertifikat hinzufügen",
       "addPrivateKey": "Privaten Schlüssel hinzufügen",
       "certTitle": "S/MIME-Zertifikat hinzufügen",
@@ -3277,7 +3282,9 @@
       "deleted": "Gelöscht.",
       "renamed": "Neu nummeriert: {{renamed}}.",
       "empty": "Keine S/MIME-Zertifikate gespeichert.",
-      "loadError": "S/MIME-Zertifikate konnten nicht geladen werden"
+      "loadError": "S/MIME-Zertifikate konnten nicht geladen werden",
+      "keysTab": "Zertifikate",
+      "validUntil": "gültig bis {{date}}"
     },
     "cryptoSettings": {
       "title": "Einstellungen",
@@ -3285,14 +3292,14 @@
       "save": "Speichern",
       "saving": "Speichere …",
       "saved": "Gespeichert.",
-      "reset": "Tiqora-Wert entfernen",
-      "shadowed": "Der hier gespeicherte Tiqora-Wert greift erst, wenn dieser Wert entfernt wird.",
+      "reset": "Zurücksetzen",
+      "shadowed": "der Tiqora-Wert gilt erst, wenn dieser Wert entfällt",
       "loadError": "Einstellungen konnten nicht geladen werden",
       "choiceAuto": "(gpg entscheidet)",
       "source": {
-        "env": "Umgebungsvariable {{name}} – hat Vorrang",
-        "znuny": "In Znuny-SysConfig gesetzt ({{name}}) – hat Vorrang",
-        "tiqora": "In Tiqora gesetzt",
+        "env": "Umgebungsvariable {{name}}",
+        "znuny": "In Znuny-SysConfig gesetzt ({{name}})",
+        "tiqora": "In Tiqora geändert",
         "znunyDefault": "Znuny-Standard ({{name}})",
         "default": "Standard"
       },
@@ -3304,7 +3311,8 @@
           },
           "gpg_bin": {
             "label": "gpg-Programm",
-            "help": "Pfad oder Name des gpg-Programms (Znuny: PGP::Bin). Gibt es den Pfad hier nicht, sucht Tiqora gpg im PATH."
+            "help": "Pfad oder Name des gpg-Programms (Znuny: PGP::Bin). Gibt es den Pfad hier nicht, sucht Tiqora gpg im PATH.",
+            "placeholder": "gpg"
           },
           "homedir": {
             "label": "Schlüsselbund",
@@ -3315,11 +3323,11 @@
             "help": "Zusätzliche Optionen für jeden gpg-Aufruf, z. B. --trust-model always (Znuny: PGP::Options ohne --homedir). --batch und --no-tty setzt Tiqora selbst."
           },
           "digest": {
-            "label": "Signatur-Digest",
+            "label": "Signatur-Hash",
             "help": "Bevorzugter Hash für Signaturen (Znuny: PGP::Options::DigestPreference)."
           },
           "method": {
-            "label": "Methode ohne Rich-Text",
+            "label": "Format ohne Rich-Text",
             "help": "Detached (PGP/MIME) oder Inline, wenn Benachrichtigungen als reiner Text gehen (Znuny: PGP::Method)."
           },
           "trusted_network": {
@@ -3334,19 +3342,23 @@
           },
           "openssl_bin": {
             "label": "openssl-Programm",
-            "help": "Pfad oder Name des openssl-Programms (Znuny: SMIME::Bin). Gibt es den Pfad hier nicht, sucht Tiqora openssl im PATH."
+            "help": "Pfad oder Name des openssl-Programms (Znuny: SMIME::Bin). Gibt es den Pfad hier nicht, sucht Tiqora openssl im PATH.",
+            "placeholder": "openssl"
           },
           "cert_path": {
             "label": "Zertifikate",
-            "help": "Verzeichnis der Zertifikate im Znuny-Layout <Hash>.<n>, zugleich Vertrauensanker für Signaturprüfungen (Znuny: SMIME::CertPath)."
+            "help": "Verzeichnis der Zertifikate im Znuny-Layout <Hash>.<n>, zugleich Vertrauensanker für Signaturprüfungen (Znuny: SMIME::CertPath).",
+            "placeholder": "/var/lib/tiqora/smime/certs"
           },
           "private_path": {
             "label": "Private Schlüssel",
-            "help": "Verzeichnis der privaten Schlüssel, Secret jeweils in <Datei>.P (Znuny: SMIME::PrivatePath)."
+            "help": "Verzeichnis der privaten Schlüssel, Secret jeweils in <Datei>.P (Znuny: SMIME::PrivatePath).",
+            "placeholder": "/var/lib/tiqora/smime/private"
           },
           "ca_path": {
             "label": "CA-Datei",
-            "help": "Zusätzliche CA-Bundle-Datei (PEM) für die Kettenprüfung. Nur in Tiqora, kein Znuny-Setting."
+            "help": "Zusätzliche CA-Bundle-Datei (PEM) für die Kettenprüfung. Nur in Tiqora, kein Znuny-Setting.",
+            "placeholder": "optional"
           },
           "fetch_from_customer": {
             "label": "Zertifikate vom Kunden holen",
@@ -3357,7 +3369,73 @@
             "help": "Eine kryptografisch gültige Signatur gilt als geprüft, auch wenn die Zertifikatskette nicht vertrauenswürdig ist (Znuny: SMIME::NoVerify). Nur einschalten, wenn keine CA-Kette verfügbar ist."
           }
         }
+      },
+      "unsaved": "Geändert, noch nicht gespeichert",
+      "discard": "Verwerfen",
+      "saveSection": "Abschnitt speichern",
+      "required": "Pflichtangabe, ohne sie arbeitet das Verfahren nicht.",
+      "choice": {
+        "Detached": "PGP/MIME",
+        "Inline": "Inline"
+      },
+      "sections": {
+        "general": {
+          "title": "Allgemein",
+          "description": "Ob das Verfahren benutzt wird und wie streng es prüft."
+        },
+        "sign": {
+          "title": "Signieren",
+          "description": "Wie Signaturen erzeugt werden."
+        },
+        "store": {
+          "title": "Speicherorte",
+          "description": "Verzeichnisse im Znuny-Layout <Hash>.<n>, gemeinsam mit Znuny genutzt."
+        },
+        "env": {
+          "title": "Umgebung",
+          "description": "Programm und Speicherort. Selten zu ändern; was der Betrieb festlegt, ist gesperrt."
+        }
       }
+    },
+    "cryptoPage": {
+      "tabOverview": "Übersicht",
+      "tabSettings": "Einstellungen",
+      "settingsFlag": "Eine Einstellung fehlt",
+      "notReady": "Nicht einsatzbereit",
+      "checkBinaryOk": "Programm gefunden",
+      "checkBinaryMissing": "Programm nicht gefunden",
+      "isOn": "{{name}} ist aktiv",
+      "isOnHint": "Tiqora signiert, verschlüsselt und prüft Mails nach den Vorgaben der Queues.",
+      "isOff": "{{name}} ist aus",
+      "isOffHint": "Schlüssel lassen sich verwalten, ausgehende Mails bleiben unverändert.",
+      "isOffBlocked": "Vor dem Einschalten fehlen noch die markierten Punkte.",
+      "fix": "Beheben",
+      "environment": "Umgebung",
+      "program": "Programm",
+      "notSet": "nicht festgelegt",
+      "nextSteps": "Nächste Schritte",
+      "pgpSecretKeys_one": "{{count}} geheimer Schlüssel",
+      "pgpSecretKeys_other": "{{count}} geheime Schlüssel",
+      "pgpNoSecretKeys": "Noch kein geheimer Schlüssel",
+      "pgpNoSecretKeysHint": "Zum Signieren und Entschlüsseln einen geheimen Schlüssel importieren.",
+      "passphrasesComplete": "Passphrasen vollständig",
+      "passphrasesMissing": "Passphrase fehlt",
+      "passphrasesCount": "{{done}} von {{total}} Schlüsseln",
+      "nextImportKey": "Geheimen Schlüssel importieren",
+      "nextSetPassphrase": "Passphrase setzen",
+      "nextQueues": "Queue-Vorgaben für Signieren und Verschlüsseln",
+      "smimeCertificates_one": "{{count}} Zertifikat",
+      "smimeCertificates_other": "{{count}} Zertifikate",
+      "smimeNoCertificates": "Noch kein Zertifikat",
+      "smimePrivateKeys_one": "{{count}} privater Schlüssel",
+      "smimePrivateKeys_other": "{{count}} private Schlüssel",
+      "smimeNoPrivateKeys": "Noch kein privater Schlüssel",
+      "smimeNoPrivateKeysHint": "Zum Signieren und Entschlüsseln das eigene Zertifikat samt privatem Schlüssel hinzufügen.",
+      "nextStore": "Speicherorte festlegen",
+      "nextAddCertificate": "Zertifikat und privaten Schlüssel hinzufügen",
+      "problemNotConfigured": "{{name}} ist nicht festgelegt",
+      "problemNotWritable": "{{path}} ist nicht beschreibbar",
+      "problemCannotCreate": "{{path}} fehlt und lässt sich nicht anlegen"
     }
   },
   "kb": {
