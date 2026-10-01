@@ -31,7 +31,7 @@
 | [api/openapi.json](api/openapi.json) | Generated OpenAPI schema (exhaustive; also served live at `GET /openapi.json`) |
 | [api/compat.md](api/compat.md) | `/znuny-compat` GenericInterface emulation — quick pointer into [compatibility.md](compatibility.md) |
 | [api/mcp.md](api/mcp.md) | MCP server: transport, auth, tool list, prompt-injection warning |
-| [ai-integration.md](ai-integration.md) | Webhook schema, MCP interface, external agent patterns, and the **built-in AI subsystem** (§5: providers, cost/tool-round budgets, per-queue policies, drafts, summaries, auto-reply, human handoff, origin traces, PII masking, audit) |
+| [ai-integration.md](ai-integration.md) | Webhook schema, MCP interface, external agent patterns, and the **built-in AI subsystem** (§5: providers, model catalog/profiles/task routing, cost/tool-round budgets, per-queue policies, drafts, summaries, triage, refine, auto-reply, human handoff, per-ticket pause, origin traces, PII masking, audit) |
 
 ## Znuny parallel operation and migration
 
@@ -48,8 +48,8 @@
 | Document | Content |
 |---|---|
 | [i18n.md](i18n.md) | UI languages: **49** locales vs Znuny’s **48** `.po` files, RTL, tooling |
-| [channels.md](channels.md) | SMS, WhatsApp Business, Telegram, and Phone/CTI channel plugins |
-| [crypto.md](crypto.md) | PGP and S/MIME: key stores shared with Znuny, key admin, verify/decrypt inbound, sign/encrypt outbound (off by default) |
+| [channels.md](channels.md) | SMS, WhatsApp Business, Telegram (chat composer), and Phone/CTI (phone tickets, call logging, incoming-call popup) channel plugins |
+| [crypto.md](crypto.md) | PGP and S/MIME: key stores shared with Znuny, settings with Znuny precedence, key admin, verify/decrypt inbound, sign/encrypt outbound with per-queue defaults, customer keys, signed/encrypted notifications (off by default) |
 | [gdpr.md](gdpr.md) | Customer anonymization and retention-policy tooling, ownership write-gate |
 | [process-management.md](process-management.md) | BPM ticket processes: reused `pm_*` tables, engine flow, agent + portal CustomerInterface, REST API, supported/deferred scope |
 

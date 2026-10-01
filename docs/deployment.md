@@ -55,14 +55,16 @@ and never commit real credentials.
 | `TIQORA_PUBLIC_BASE_URL` | `https://helpdesk.example.com` | Public browser URL (no trailing slash) for links in notifications, password-setup mails and the OAuth2 mail callback. Set on API **and** worker. |
 | `TIQORA_CSP_ENFORCE` | `false` (dev) / **`true` (production)** | Enforce the SPA Content-Security-Policy. Auto-enabled in production; set `0` to keep report-only. |
 | `TIQORA_METRICS_ENABLED` | `true` (dev) / **`false` (production)** | Expose unauthenticated `GET /metrics` on the app port. Off by default in production; set `1` to scrape it (keep it off the public vhost). |
-| `TIQORA_CRYPTO_SMIME_CA_PATH` | *(empty)* | CA bundle for S/MIME chain validation. Without it, inbound S/MIME signatures are reported `signed_untrusted` (valid signature, untrusted signer) rather than `verified`. |
+| `TIQORA_PORTAL_ENABLED` | `false` | The customer portal is opt-in: unset/`false` hard-disables it (`/api/portal/*` → 404, `/` → agent login); `true` lets the admin switch decide. |
+| `TIQORA_CRYPTO_SMIME_CA_PATH` | *(empty)* | Extra CA bundle for S/MIME chain validation, e.g. a private CA. Signers whose chain validates against neither this, `SMIME::CertPath`, the bundled public roots nor openssl's store are reported `signed_untrusted` (valid signature, untrusted signer) rather than `verified`. |
+| `TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS` | *(admin setting, default `true`)* | Trust the bundled Mozilla e-mail roots for inbound S/MIME signatures. See [crypto.md](crypto.md#trust). |
 | `TIQORA_CUSTOMER_SMIME_CERT_COLUMN` | *(empty)* | `SMIME::FetchFromCustomer`: `customer_user` column holding the customer's certificate (Znuny `UserSMIMECertificate` map entry). See [crypto.md](crypto.md#smimefetchfromcustomer). |
 | `TIQORA_CUSTOMER_LDAP_SMIME_ATTR` / `TIQORA_CUSTOMER_LDAP_EMAIL_ATTR` | `userSMIMECertificate` / `mail` | `SMIME::FetchFromCustomer` from the customer LDAP directory (`TIQORA_CUSTOMER_LDAP_*`): certificate attribute and the attribute matched against the sender address. |
 | `TIQORA_STEP_UP_MAX_AGE` | `900` | "Sudo mode" window (seconds): how long after logging in a session may still register or delete a passkey. Past this the agent must sign in again. Only enforced once the account already has a second factor, so first-time and forced enrollment stay frictionless. |
 | `TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP` | `false` | Bind Znuny session ids presented to the compat GenericInterface to the client IP Znuny recorded (its `SessionCheckRemoteIP`). Off by default: Znuny stored the address **its own** webserver saw, which differs from Tiqora's socket peer behind a reverse proxy, so enabling it there rejects valid sessions. Turn on only when both peers observe the same client address. Idle/absolute session expiry is always enforced regardless of this flag. |
 | `TIQORA_TOTP_PENDING_TTL` | `300` | Seconds a pending-2FA session stays valid |
 | `TIQORA_TOTP_ISSUER` | `Tiqora` | Shown in authenticator apps |
-| `TIQORA_LLM_TIMEOUT` | `180.0` | Per-request HTTP timeout for one LLM chat completion (seconds). Detailed multi-document summaries can run long; raise if you see `LlmTimeoutError`. |
+| `TIQORA_LLM_TIMEOUT` | `180.0` | Per-request HTTP timeout for one LLM chat completion (seconds). Detailed multi-document summaries can run long; raise if you see `LlmTimeoutError`. Default for LLM profiles without their own timeout (Admin → AI → Models). |
 | `TIQORA_WEBHOOK_MAX_ATTEMPTS` | `3` | Delivery retries with exponential backoff |
 | `TIQORA_WEBHOOK_TIMEOUT` | `10.0` | Per-attempt HTTP timeout (seconds) |
 

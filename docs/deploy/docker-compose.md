@@ -214,9 +214,12 @@ instead of `TIQORA_LDAP_*` (`ENABLED`, `HOST`, `PORT`, `USE_SSL`,
 The production image ships `gnupg`, `openssl` and the backend `crypto` extra
 (`python-gnupg`). Both backends follow Znuny's SysConfig switches (`PGP`,
 `SMIME`, default off) and read the key locations from Znuny's settings
-(`PGP::Options --homedir`, `SMIME::CertPath`, `SMIME::PrivatePath`). Inside a
-container those host paths usually do not exist, so mount the directories and
-point the env overrides at them:
+(`PGP::Options --homedir`, `SMIME::CertPath`, `SMIME::PrivatePath`). Every
+setting can also be set in Tiqora's admin UI (PGP / S/MIME → *Settings*);
+precedence is env var > Znuny value that is set > Tiqora value > Znuny
+default ([crypto.md](../crypto.md#configuration)). Inside a container the
+Znuny host paths usually do not exist, so mount the directories and point the
+env overrides at them:
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -252,7 +255,7 @@ agent socket and lock files into the keyring directory, and the private key
 directory must stay unreadable for others (Tiqora creates keys `0600`). When
 sharing with Znuny, give both users access via a common group (and `chmod
 g+rwX`) or run Tiqora with Znuny's uid (`user: "<otrs-uid>:<gid>"`). The
-admin pages **PGP keys** / **S/MIME certificates** and **System info** show
+admin pages **PGP** / **S/MIME** (tab *Overview*) and **System info** show
 whether the binaries run and the directories are writable (also logged at
 startup as `crypto_backend_ready` / `crypto_backend_unusable`).
 
