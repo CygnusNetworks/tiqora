@@ -106,6 +106,7 @@ build:
 compose-check:
     docker compose -f docker-compose.dev.yml config -q
     docker compose -f docker-compose.example.yml config -q
+    docker compose -f docker-compose.quickstart.yml config -q
 
 # --- Golden-master (real peer container vs Tiqora) — manual multi-peer ---
 # Select peer via GOLDEN_PEER (default znuny-6.5). See tests/golden/peers.yaml.

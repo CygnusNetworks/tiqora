@@ -103,6 +103,14 @@ img {
 .nav-links a {
   color: var(--muted);
   text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Section anchors of the landing page give way first when the bar gets tight. */
+@media (max-width: 1100px) {
+  .nav-links .nav-anchor {
+    display: none;
+  }
 }
 
 .nav-links a:hover {
@@ -798,6 +806,41 @@ footer {
   font-size: 0.8rem;
   line-height: 1.5;
   max-width: 70ch;
+}
+
+/* ── Quickstart (Get started section) ───────────────────── */
+.quickstart {
+  margin-top: 1.5rem;
+  padding: 1.4rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+
+.quickstart h3 {
+  margin: 0 0 0.85rem;
+  font-size: 1.05rem;
+}
+
+.quickstart pre {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  overflow-x: auto;
+  background: var(--bg);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.quickstart p {
+  margin: 0.85rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.quickstart p code {
+  white-space: nowrap;
 }
 
 @media (max-width: 720px) {

@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Use made-up data only** — no real ticket content,
+        customer names or mail addresses (use example.org).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a ticket in queue "Raw"
+        2. Click "Reply"
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Tiqora version
+      description: Image tag, or Admin → System info.
+      placeholder: v0.16.1
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How do you run Tiqora?
+      options:
+        - Quickstart (docker-compose.quickstart.yml)
+        - Standalone (fresh install)
+        - In parallel with Znuny/OTRS on the same database
+        - After cutover (schema ownership)
+        - Development setup
+    validations:
+      required: true
+  - type: input
+    id: peer
+    attributes:
+      label: Znuny/OTRS version (if any) and database
+      placeholder: Znuny 6.5.x on MariaDB 10.11
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Relevant lines from `docker compose logs tiqora-api` (remove anything personal).
+      render: text
