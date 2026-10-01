@@ -3,8 +3,6 @@
 **Product site & live demo:** [cygnusnetworks.github.io/tiqora](https://cygnusnetworks.github.io/tiqora/)
 ([interactive demo](https://cygnusnetworks.github.io/tiqora/demo/)).
 
-> Still under active development. Production use is not yet recommended.
-
 ## Getting started — three ways to run
 
 | Path | When | Doc |
