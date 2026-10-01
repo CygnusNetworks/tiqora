@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { resolveData, demoPortalUser, demoPortalTickets } from "./mockData";
+import { resolveData, demoPortalUser, demoPortalTickets, demoRefine } from "./mockData";
 
 /**
  * MSW request handlers for the public demo build. Delegates to the shared pure
@@ -20,6 +20,10 @@ function respond(pathname: string, method: string): unknown {
 }
 
 export const handlers = [
+  // AI refine needs the request body (the segments to rewrite).
+  http.post("*/api/v1/ai/refine", async ({ request }) =>
+    HttpResponse.json(demoRefine((await request.json()) as Parameters<typeof demoRefine>[0])),
+  ),
   http.all("*/api/*", ({ request }) => {
     const url = new URL(request.url);
     if (url.pathname.endsWith("/events/stream")) {
