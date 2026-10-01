@@ -57,16 +57,17 @@ Registrierungen, Daemon-Cron-Tasks (Tiqora hat eigene Daemons) und die Prefilter
 Registrierungen (`PostMaster::PreFilterModule###…`, deren Gültigkeit wird weiter wie
 bisher berücksichtigt).
 
-Verhaltensänderung durch `PGP::TrustedNetwork`: Bisher hat Tiqora beim Verschlüsseln
-immer `always_trust` gesetzt. Jetzt gilt der Setting-Wert, und der Znuny-Default ist `0`.
-Ohne das Häkchen verschlüsselt gpg nur an beglaubigte Schlüssel, wie in Znuny. Die UI
-weist darauf hin. Auf Prod ist PGP noch aus, es bricht also nichts. `PgpEngine` direkt
-konstruiert (Tests, CLI ohne Config) behält `always_trust=True`.
+`PGP::TrustedNetwork` steuert jetzt `always_trust` beim Ver- und Entschlüsseln. Bisher
+hat Tiqora immer `always_trust` gesetzt. Znunys ausgelieferter Default `0` würde das kippen
+und jedes Verschlüsseln an importierte (unbeglaubigte) Kundenschlüssel scheitern lassen.
+Deshalb wird für dieses Setting nur der Znuny-*Default* übersprungen: Code-Default ist
+„an“, ein in Znuny oder Tiqora ausdrücklich gesetzter Wert greift normal.
 
 ## Speicherung
 
 `tiqora_settings`, ein Schlüssel pro Feld, Präfix `crypto.` (z. B. `crypto.pgp.enabled`,
-`crypto.smime.cert_path`). Leerer Wert oder gelöscht = nicht gesetzt.
+`crypto.smime.cert_path`). Keine Zeile = nicht gesetzt; ein leerer String ist ein bewusst
+leerer Wert (z. B. Digest „gpg entscheidet“ gegen Znunys Default `sha256`).
 
 Passphrasen: `crypto.pgp.key_passwords` als JSON `{key_id: fernet_token}`, verschlüsselt mit
 `tiqora.crypto.secret` (Schlüssel aus `settings.secret_key`, wie SMTP-Passwörter). Die API

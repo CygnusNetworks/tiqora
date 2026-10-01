@@ -221,7 +221,9 @@ async def load_tiqora_values(session: AsyncSession) -> dict[str, str]:
             select(TiqoraSettings).where(TiqoraSettings.key.like(KEY_PREFIX + "%"))
         )
     ).scalars()
-    return {r.key: r.value for r in rows if r.value not in (None, "")}
+    # "" is an explicit empty value (e.g. digest left to gpg); a cleared
+    # field has no row at all.
+    return {r.key: r.value for r in rows if r.value is not None}
 
 
 async def _layers(sysconfig: SysConfig | None, name: str) -> tuple[Any, Any]:

@@ -5,6 +5,7 @@ import { toBcp47 } from "@/i18n";
 import { api, ApiError, type SmimeCertOut } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CryptoStatusBanner } from "@/components/admin/CryptoStatusBanner";
+import { CryptoSettingsForm } from "@/components/admin/CryptoSettingsForm";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -193,6 +194,8 @@ export function SmimePage() {
       </div>
 
       <CryptoStatusBanner backend="smime" />
+
+      <CryptoSettingsForm backend="smime" />
 
       {notice ? (
         <p

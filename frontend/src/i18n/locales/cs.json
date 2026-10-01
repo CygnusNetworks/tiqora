@@ -3148,7 +3148,7 @@
       "disabled": "Disabled",
       "usable": "Ready",
       "unusable": "Not usable",
-      "disabledHint": "Keys can be managed, but Tiqora does not sign, encrypt, decrypt or verify until the backend is enabled (SysConfig “{{setting}}” or TIQORA_CRYPTO_{{setting}}_ENABLED).",
+      "disabledHint": "Keys can be managed, but Tiqora only signs, encrypts, decrypts and verifies once the backend is enabled in the settings below ({{setting}}).",
       "path": {
         "homedir": "Keyring (--homedir)",
         "cert_path": "Certificates (SMIME::CertPath)",
@@ -3157,7 +3157,7 @@
     },
     "pgp": {
       "title": "PGP keys",
-      "description": "The keyring is shared with Znuny (PGP::Options --homedir). Passphrases come from the SysConfig setting PGP::Key::Password.",
+      "description": "The keyring is shared with Znuny (PGP::Options --homedir). Set passphrases for secret keys from the key's menu.",
       "upload": "Import key",
       "uploading": "Importing…",
       "uploadTitle": "Import PGP key",
@@ -3192,7 +3192,21 @@
       "deleteConfirm": "Delete key {{key}} including its secret part from the shared keyring?",
       "deleted": "Key deleted.",
       "empty": "No PGP keys in the keyring.",
-      "loadError": "Could not load PGP keys"
+      "loadError": "Could not load PGP keys",
+      "passphrase": "Passphrase",
+      "passphraseSource": {
+        "none": "missing",
+        "tiqora": "set",
+        "znuny": "from Znuny",
+        "znuny_default": "Znuny default"
+      },
+      "passphraseSet": "Set passphrase",
+      "passphraseRemove": "Remove passphrase",
+      "passphraseTitle": "Passphrase for {{key}}",
+      "passphraseDescription": "Checked with a test signature before it is stored, encrypted. It is never shown again.",
+      "passphraseChecking": "Checking …",
+      "passphraseSaved": "Passphrase checked and saved.",
+      "passphraseRemoved": "Passphrase removed."
     },
     "smime": {
       "title": "S/MIME certificates",
@@ -3246,6 +3260,86 @@
       "renamed": "Renumbered: {{renamed}}.",
       "empty": "No S/MIME certificates stored.",
       "loadError": "Could not load S/MIME certificates"
+    },
+    "cryptoSettings": {
+      "title": "Settings",
+      "description": "Like Znuny's SysConfig. A value from an environment variable or from Znuny's SysConfig takes precedence and is locked here.",
+      "save": "Save",
+      "saving": "Saving …",
+      "saved": "Saved.",
+      "reset": "Remove Tiqora value",
+      "shadowed": "The Tiqora value stored here only applies once this value is removed.",
+      "loadError": "Could not load settings",
+      "choiceAuto": "(gpg decides)",
+      "source": {
+        "env": "Environment variable {{name}} – takes precedence",
+        "znuny": "Set in Znuny SysConfig ({{name}}) – takes precedence",
+        "tiqora": "Set in Tiqora",
+        "znunyDefault": "Znuny default ({{name}})",
+        "default": "Default"
+      },
+      "fields": {
+        "pgp": {
+          "enabled": {
+            "label": "PGP enabled",
+            "help": "Turns PGP signing, encryption, decryption and verification on (Znuny: PGP). Keys can be managed while it is off."
+          },
+          "gpg_bin": {
+            "label": "gpg program",
+            "help": "Path or name of the gpg program (Znuny: PGP::Bin). If the path does not exist here, Tiqora looks gpg up on PATH."
+          },
+          "homedir": {
+            "label": "Keyring",
+            "help": "Directory of the gpg keyring (Znuny: --homedir in PGP::Options). Must be writable for Tiqora and survive restarts."
+          },
+          "options": {
+            "label": "Extra gpg options",
+            "help": "Extra options for every gpg call, e.g. --trust-model always (Znuny: PGP::Options without --homedir). Tiqora sets --batch and --no-tty itself."
+          },
+          "digest": {
+            "label": "Signature digest",
+            "help": "Preferred hash for signatures (Znuny: PGP::Options::DigestPreference)."
+          },
+          "method": {
+            "label": "Method without rich text",
+            "help": "Detached (PGP/MIME) or inline when notifications are sent as plain text (Znuny: PGP::Method)."
+          },
+          "trusted_network": {
+            "label": "Trust all keys",
+            "help": "Also encrypts to keys that are not certified (Znuny: PGP::TrustedNetwork). Imported customer keys are practically never certified; with this off, encrypting to them fails."
+          }
+        },
+        "smime": {
+          "enabled": {
+            "label": "S/MIME enabled",
+            "help": "Turns S/MIME signing, encryption, decryption and verification on (Znuny: SMIME)."
+          },
+          "openssl_bin": {
+            "label": "openssl program",
+            "help": "Path or name of the openssl program (Znuny: SMIME::Bin). If the path does not exist here, Tiqora looks openssl up on PATH."
+          },
+          "cert_path": {
+            "label": "Certificates",
+            "help": "Certificate directory in Znuny's <hash>.<n> layout, also the trust anchors for signature checks (Znuny: SMIME::CertPath)."
+          },
+          "private_path": {
+            "label": "Private keys",
+            "help": "Directory of the private keys, each secret in <file>.P (Znuny: SMIME::PrivatePath)."
+          },
+          "ca_path": {
+            "label": "CA bundle",
+            "help": "Additional CA bundle file (PEM) for chain validation. Tiqora only, no Znuny setting."
+          },
+          "fetch_from_customer": {
+            "label": "Fetch certificates from customer",
+            "help": "Imports S/MIME certificates from the customer user attribute UserSMIMECertificate (Znuny: SMIME::FetchFromCustomer)."
+          },
+          "no_verify": {
+            "label": "Do not verify signer",
+            "help": "A cryptographically valid signature counts as verified even if the certificate chain is not trusted (Znuny: SMIME::NoVerify). Only turn on when no CA chain is available."
+          }
+        }
+      }
     }
   },
   "kb": {

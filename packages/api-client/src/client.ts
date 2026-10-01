@@ -300,6 +300,9 @@ export type WebhookUpdate = Schemas["WebhookUpdate"];
 export type CryptoBackendStatusOut = Schemas["CryptoBackendStatusOut"];
 export type CryptoKeyOut = Schemas["CryptoKeyOut"];
 export type PgpKeyOut = Schemas["PgpKeyOut"];
+export type CryptoSettingsOut = Schemas["CryptoSettingsOut"];
+export type CryptoSettingOut = Schemas["CryptoSettingOut"];
+export type PgpPassphraseOut = Schemas["PgpPassphraseOut"];
 export type PgpUploadOut = Schemas["PgpUploadOut"];
 export type SmimeCertOut = Schemas["SmimeCertOut"];
 export type SmimePrivateKeyOut = Schemas["SmimePrivateKeyOut"];
@@ -2487,6 +2490,28 @@ export class ApiClient {
           query: { ca_fingerprint: caFingerprint },
           signal,
         }),
+      /** PGP / S-MIME settings: effective value + source per field (Znuny SysConfig parity). */
+      settings: (signal?: AbortSignal) =>
+        this.request<CryptoSettingsOut>("GET", "/api/v1/admin/crypto-settings", { signal }),
+      /** Tiqora values by field name; `null` clears (falls back to Znuny / default). */
+      settingsUpdate: (values: Record<string, boolean | string | null>, signal?: AbortSignal) =>
+        this.request<CryptoSettingsOut>("PUT", "/api/v1/admin/crypto-settings", {
+          body: { values },
+          signal,
+        }),
+      /** Checked with a test signature before it is stored; never returned. */
+      pgpPassphraseSet: (keyRef: string, passphrase: string, signal?: AbortSignal) =>
+        this.request<CryptoSettingsOut>(
+          "PUT",
+          `/api/v1/admin/crypto-settings/pgp-passphrases/${enc(keyRef)}`,
+          { body: { passphrase }, signal },
+        ),
+      pgpPassphraseDelete: (keyRef: string, signal?: AbortSignal) =>
+        this.request<CryptoSettingsOut>(
+          "DELETE",
+          `/api/v1/admin/crypto-settings/pgp-passphrases/${enc(keyRef)}`,
+          { signal },
+        ),
       signKeyOptions: (
         params: { queueId?: number; email?: string } = {},
         signal?: AbortSignal,
