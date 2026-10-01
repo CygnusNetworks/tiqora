@@ -1,18 +1,29 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import { api, ApiError, type PgpKeyOut } from "@/lib/api";
-import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
-import { CryptoStatusBanner } from "@/components/admin/CryptoStatusBanner";
+import { CryptoPageShell, type CryptoTab } from "@/components/admin/crypto/CryptoPageShell";
+import {
+  CryptoOverview,
+  type NextStep,
+  type OverviewCheck,
+} from "@/components/admin/crypto/CryptoOverview";
+import { KeyCard } from "@/components/admin/crypto/KeyCard";
 import { CryptoSettingsForm } from "@/components/admin/CryptoSettingsForm";
-import { CRYPTO_SETTINGS_KEY, useCryptoSettings } from "@/components/admin/cryptoSettingsQuery";
+import {
+  CRYPTO_SETTINGS_KEY,
+  missingRequired,
+  useCryptoSettings,
+  useCryptoStatus,
+} from "@/components/admin/cryptoSettingsQuery";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { MenuItem } from "@/components/ui/Menu";
-import { PlusIcon } from "@/components/ui/icons";
+import { InboxIcon, KeyIcon, LockIcon, PlusIcon } from "@/components/ui/icons";
 import { formatDateOnly } from "@/lib/format";
 import { downloadText, readFileText } from "@/lib/cryptoFiles";
 
@@ -29,12 +40,15 @@ function pgpStatusTone(status: string): "success" | "warn" | "danger" | "muted" 
   return "muted";
 }
 
-/** Znuny AdminPGP: keyring shared with Znuny (PGP::Options --homedir). */
+/** Znuny AdminPGP + PGP SysConfig: overview, keyring (shared with Znuny), settings. */
 export function PgpKeysPage() {
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
   const qc = useQueryClient();
+  const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const [tab, setTab] = useState<CryptoTab>("overview");
+  const [section, setSection] = useState("general");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [armor, setArmor] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -52,6 +66,8 @@ export function PgpKeysPage() {
     queryKey: QUERY_KEY,
     queryFn: ({ signal }) => api.adminCrypto.pgpList(signal),
   });
+  const keys = listQ.data ?? [];
+  const secretKeys = keys.filter((k) => k.has_secret);
 
   const refresh = () => qc.invalidateQueries({ queryKey: QUERY_KEY });
 
@@ -63,6 +79,7 @@ export function PgpKeysPage() {
       setUploadError(null);
       setNotice({ ok: true, text: t("admin.pgp.uploaded", { count: res.fingerprints.length }) });
       await refresh();
+      await qc.invalidateQueries({ queryKey: CRYPTO_SETTINGS_KEY });
     },
     onError: (err) => setUploadError(errText(err)),
   });
@@ -73,6 +90,7 @@ export function PgpKeysPage() {
     onSuccess: async () => {
       setNotice({ ok: true, text: t("admin.pgp.deleted") });
       await refresh();
+      await qc.invalidateQueries({ queryKey: CRYPTO_SETTINGS_KEY });
     },
     onError: (err) => setNotice({ ok: false, text: errText(err) }),
   });
@@ -116,148 +134,227 @@ export function PgpKeysPage() {
     }
   };
 
+  const openPassphrase = (key: PgpKeyOut) => {
+    setPassphrase("");
+    setPassphraseError(null);
+    setPassphraseKey(key);
+  };
+
   const statusLabel = (s: string) => t(`admin.pgp.status.${s}`, { defaultValue: s });
 
-  const columns: DataTableColumn<PgpKeyOut>[] = [
-    {
-      key: "type",
-      header: t("admin.pgp.type"),
-      render: (r) => (
-        <Badge tone={r.has_secret ? "accent" : "default"}>
-          {r.has_secret ? t("admin.pgp.typeSecret") : t("admin.pgp.typePublic")}
-        </Badge>
-      ),
+  // ------------------------------------------------------------ overview data
+  const withPassphrase = secretKeys.filter((k) => passphraseSource(k) !== "none").length;
+  const checks: OverviewCheck[] = listQ.isSuccess
+    ? [
+        {
+          id: "secret-keys",
+          state: secretKeys.length > 0 ? "ok" : "warn",
+          title:
+            secretKeys.length > 0
+              ? t("admin.cryptoPage.pgpSecretKeys", { count: secretKeys.length })
+              : t("admin.cryptoPage.pgpNoSecretKeys"),
+          detail:
+            secretKeys.length > 0
+              ? secretKeys.map((k) => k.emails.join(", ") || k.znuny_key_id).join(" · ")
+              : t("admin.cryptoPage.pgpNoSecretKeysHint"),
+        },
+        ...(secretKeys.length > 0
+          ? [
+              {
+                id: "passphrases",
+                state: (withPassphrase === secretKeys.length ? "ok" : "warn") as OverviewCheck["state"],
+                title:
+                  withPassphrase === secretKeys.length
+                    ? t("admin.cryptoPage.passphrasesComplete")
+                    : t("admin.cryptoPage.passphrasesMissing"),
+                detail: t("admin.cryptoPage.passphrasesCount", {
+                  done: withPassphrase,
+                  total: secretKeys.length,
+                }),
+              },
+            ]
+          : []),
+      ]
+    : [];
+  const nextSteps: NextStep[] = [];
+  if (secretKeys.length === 0 || withPassphrase < secretKeys.length) {
+    nextSteps.push({
+      id: "keys",
+      label:
+        secretKeys.length === 0
+          ? t("admin.cryptoPage.nextImportKey")
+          : t("admin.cryptoPage.nextSetPassphrase"),
+      icon: KeyIcon,
+      onSelect: () => setTab("keys"),
+    });
+  }
+  nextSteps.push({
+    id: "queues",
+    label: t("admin.cryptoPage.nextQueues"),
+    icon: InboxIcon,
+    onSelect: () => {
+      if (router) void router.navigate({ to: "/admin/queues" });
     },
-    { key: "key", header: t("admin.pgp.keyId"), mono: true, render: (r) => r.znuny_key_id },
-    {
-      key: "identity",
-      header: t("admin.pgp.identity"),
-      render: (r) => <span className="break-all">{r.uids.join(", ")}</span>,
-    },
-    {
-      key: "created",
-      header: t("admin.pgp.created"),
-      render: (r) => formatDateOnly(r.created, locale),
-    },
-    {
-      key: "expires",
-      header: t("admin.pgp.expires"),
-      render: (r) => (r.expires ? formatDateOnly(r.expires, locale) : t("admin.pgp.never")),
-    },
-    {
-      key: "passphrase",
-      header: t("admin.pgp.passphrase"),
-      render: (r) => {
-        if (!r.has_secret) return null;
-        const source = passphraseSource(r);
-        return (
-          <Badge
-            tone={source === "none" ? "warn" : "success"}
-            data-testid={`pgp-passphrase-${r.fingerprint}`}
-          >
-            {t(`admin.pgp.passphraseSource.${source}`, { defaultValue: source })}
-          </Badge>
-        );
-      },
-    },
-    {
-      key: "status",
-      header: t("admin.table.status"),
-      render: (r) => (
-        <Badge tone={pgpStatusTone(r.status)} data-testid={`pgp-status-${r.fingerprint}`}>
-          {statusLabel(r.status)}
-        </Badge>
-      ),
-    },
-  ];
+  });
+
+  const status = settingsQ.data?.pgp.find((f) => f.name === "pgp.enabled");
+  const backendStatus = useCryptoStatus("pgp");
+  const flagged =
+    missingRequired(settingsQ.data, "pgp").length > 0 || backendStatus?.available === false;
 
   return (
-    <div className="space-y-3 p-4" data-testid="admin-pgp-page">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="font-display text-xl font-semibold text-ink">{t("admin.pgp.title")}</h1>
-          <p className="mt-1 text-sm text-muted">{t("admin.pgp.description")}</p>
-        </div>
-        <Button
-          variant="primary"
-          onClick={() => {
-            setUploadError(null);
-            setUploadOpen(true);
-          }}
-          data-testid="pgp-upload-open"
-        >
-          <PlusIcon className="h-4 w-4" />
-          {t("admin.pgp.upload")}
-        </Button>
-      </div>
-
-      <CryptoStatusBanner backend="pgp" />
-
-      <CryptoSettingsForm backend="pgp" />
-
+    <CryptoPageShell
+      backend="pgp"
+      title={t("admin.pgp.title")}
+      lede={t("admin.pgp.description")}
+      icon={KeyIcon}
+      enabled={status ? status.value === true : null}
+      ready={backendStatus ? backendStatus.available : null}
+      tab={tab}
+      onTab={setTab}
+      keysLabel={t("admin.pgp.keysTab")}
+      keyCount={listQ.isSuccess ? keys.length : null}
+      settingsFlag={flagged}
+    >
       {notice ? (
-        <p
-          className={`text-sm ${notice.ok ? "text-green" : "text-danger"}`}
-          data-testid="pgp-notice"
-        >
+        <p className={`mb-3 text-sm ${notice.ok ? "text-green" : "text-danger"}`} data-testid="pgp-notice">
           {notice.text}
         </p>
       ) : null}
 
-      {listQ.isError ? (
-        <p className="text-sm text-danger" data-testid="pgp-load-error">
-          {t("admin.pgp.loadError")}: {errText(listQ.error)}
-        </p>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={listQ.data ?? []}
-          rowKey={(r) => r.fingerprint}
-          isLoading={listQ.isLoading}
-          emptyLabel={t("admin.pgp.empty")}
-          onDelete={(r) => void onDelete(r, false)}
-          extraRowActions={(r) => (
-            <>
-              <MenuItem testId={`pgp-details-${r.fingerprint}`} onSelect={() => setDetails(r)}>
-                {t("admin.pgp.details")}
-              </MenuItem>
-              <MenuItem testId={`pgp-download-${r.fingerprint}`} onSelect={() => void onDownload(r)}>
-                {t("admin.pgp.download")}
-              </MenuItem>
-              {r.has_secret && passphraseSource(r) !== "znuny" ? (
-                <MenuItem
-                  testId={`pgp-passphrase-set-${r.fingerprint}`}
-                  onSelect={() => {
-                    setPassphrase("");
-                    setPassphraseError(null);
-                    setPassphraseKey(r);
-                  }}
-                >
-                  {t("admin.pgp.passphraseSet")}
-                </MenuItem>
-              ) : null}
-              {r.has_secret && passphraseSource(r) === "tiqora" ? (
-                <MenuItem
-                  testId={`pgp-passphrase-remove-${r.fingerprint}`}
-                  onSelect={() => passphraseM.mutate({ key: r, value: null })}
-                >
-                  {t("admin.pgp.passphraseRemove")}
-                </MenuItem>
-              ) : null}
-              {r.has_secret ? (
-                <MenuItem
-                  danger
-                  testId={`pgp-delete-secret-${r.fingerprint}`}
-                  onSelect={() => void onDelete(r, true)}
-                >
-                  {t("admin.pgp.deleteSecret")}
-                </MenuItem>
-              ) : null}
-            </>
-          )}
-          testId="pgp-table"
+      {tab === "overview" ? (
+        <CryptoOverview
+          backend="pgp"
+          name="PGP"
+          checks={checks}
+          nextSteps={nextSteps}
+          onFix={(s) => {
+            setSection(s);
+            setTab("settings");
+          }}
         />
-      )}
+      ) : null}
+
+      {tab === "settings" ? (
+        <CryptoSettingsForm backend="pgp" section={section} onSection={setSection} />
+      ) : null}
+
+      {tab === "keys" ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              onClick={() => {
+                setUploadError(null);
+                setUploadOpen(true);
+              }}
+              data-testid="pgp-upload-open"
+            >
+              <PlusIcon className="h-4 w-4" />
+              {t("admin.pgp.upload")}
+            </Button>
+          </div>
+          {listQ.isError ? (
+            <p className="text-sm text-danger" data-testid="pgp-load-error">
+              {t("admin.pgp.loadError")}: {errText(listQ.error)}
+            </p>
+          ) : listQ.isLoading ? null : keys.length === 0 ? (
+            <div className="grid justify-items-center gap-2 rounded-xl border border-dashed border-hairline p-8 text-center text-sm text-muted" data-testid="pgp-empty">
+              <KeyIcon className="h-6 w-6" />
+              {t("admin.pgp.empty")}
+            </div>
+          ) : (
+            <div className="grid gap-3" data-testid="pgp-keys">
+              {keys.map((r) => {
+                const source = passphraseSource(r);
+                return (
+                  <KeyCard
+                    key={r.fingerprint}
+                    icon={r.has_secret ? LockIcon : KeyIcon}
+                    testId={`pgp-key-${r.fingerprint}`}
+                    menuLabel={t("admin.table.actions")}
+                    title={r.uids.join(", ") || r.znuny_key_id}
+                    meta={[
+                      <span key="id" className="font-mono">{r.znuny_key_id}</span>,
+                      `${r.algorithm}${r.bits ? ` ${r.bits}` : ""}`,
+                      t("admin.pgp.createdOn", { date: formatDateOnly(r.created, locale) }),
+                      r.expires
+                        ? t("admin.pgp.expiresOn", { date: formatDateOnly(r.expires, locale) })
+                        : t("admin.pgp.neverExpires"),
+                    ]}
+                    chips={
+                      <>
+                        <Badge tone={r.has_secret ? "accent" : "default"}>
+                          {r.has_secret ? t("admin.pgp.typeSecret") : t("admin.pgp.typePublic")}
+                        </Badge>
+                        <Badge tone={pgpStatusTone(r.status)} data-testid={`pgp-status-${r.fingerprint}`}>
+                          {statusLabel(r.status)}
+                        </Badge>
+                        {r.has_secret ? (
+                          <Badge
+                            tone={source === "none" ? "warn" : "success"}
+                            data-testid={`pgp-passphrase-${r.fingerprint}`}
+                          >
+                            {t("admin.pgp.passphrase")}:{" "}
+                            {t(`admin.pgp.passphraseSource.${source}`, { defaultValue: source })}
+                          </Badge>
+                        ) : null}
+                      </>
+                    }
+                    actions={
+                      <>
+                        {r.has_secret && source !== "znuny" ? (
+                          <Button
+                            size="sm"
+                            onClick={() => openPassphrase(r)}
+                            data-testid={`pgp-passphrase-set-${r.fingerprint}`}
+                          >
+                            {source === "none" ? t("admin.pgp.passphraseSet") : t("admin.pgp.passphraseChange")}
+                          </Button>
+                        ) : null}
+                        <Button size="sm" onClick={() => void onDownload(r)} data-testid={`pgp-download-${r.fingerprint}`}>
+                          {t("admin.pgp.download")}
+                        </Button>
+                      </>
+                    }
+                    menu={
+                      <>
+                        <MenuItem testId={`pgp-details-${r.fingerprint}`} onSelect={() => setDetails(r)}>
+                          {t("admin.pgp.details")}
+                        </MenuItem>
+                        {r.has_secret && source === "tiqora" ? (
+                          <MenuItem
+                            testId={`pgp-passphrase-remove-${r.fingerprint}`}
+                            onSelect={() => passphraseM.mutate({ key: r, value: null })}
+                          >
+                            {t("admin.pgp.passphraseRemove")}
+                          </MenuItem>
+                        ) : null}
+                        {r.has_secret ? (
+                          <MenuItem
+                            danger
+                            testId={`pgp-delete-secret-${r.fingerprint}`}
+                            onSelect={() => void onDelete(r, true)}
+                          >
+                            {t("admin.pgp.deleteSecret")}
+                          </MenuItem>
+                        ) : null}
+                        <MenuItem
+                          danger
+                          testId={`pgp-delete-${r.fingerprint}`}
+                          onSelect={() => void onDelete(r, false)}
+                        >
+                          {t("admin.pgp.delete")}
+                        </MenuItem>
+                      </>
+                    }
+                  />
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <Dialog
         open={uploadOpen}
@@ -346,6 +443,7 @@ export function PgpKeysPage() {
           </dl>
         ) : null}
       </Dialog>
+
       <Dialog
         open={passphraseKey !== null}
         onClose={() => setPassphraseKey(null)}
@@ -394,6 +492,6 @@ export function PgpKeysPage() {
         </form>
       </Dialog>
       {confirmDialog}
-    </div>
+    </CryptoPageShell>
   );
 }

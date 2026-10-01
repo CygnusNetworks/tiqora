@@ -95,6 +95,11 @@ function settingsOut(passphraseSource: string) {
   };
 }
 
+async function openKeys() {
+  fireEvent.click(await screen.findByTestId("crypto-tab-keys"));
+  await screen.findByText("FB862437");
+}
+
 function renderPage() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -146,25 +151,47 @@ describe("PgpKeysPage", () => {
     ]);
   });
 
-  it("lists keys with Znuny id, type and status badges plus the backend state", async () => {
+  it("opens on the overview with readiness checks and a master switch", async () => {
+    settingsUpdate.mockResolvedValue({
+      ...settingsOut("tiqora"),
+      pgp: settingsOut("tiqora").pgp.map((f) => (f.name === "pgp.enabled" ? { ...f, value: true, source: "tiqora" } : f)),
+    });
     renderPage();
-    expect(await screen.findByText("FB862437")).toBeInTheDocument();
+    expect(await screen.findByTestId("crypto-headline-pgp")).toHaveTextContent(
+      i18n.t("admin.cryptoPage.isOff", { name: "PGP" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("crypto-checks-pgp")).toHaveTextContent(
+        i18n.t("admin.cryptoPage.pgpSecretKeys", { count: 1 }),
+      ),
+    );
+    expect(screen.getByTestId("crypto-checks-pgp")).toHaveTextContent(
+      i18n.t("admin.cryptoPage.passphrasesMissing"),
+    );
+    fireEvent.click(screen.getByTestId("crypto-master-pgp"));
+    await waitFor(() => expect(settingsUpdate).toHaveBeenCalledWith({ "pgp.enabled": true }));
+    expect(await screen.findByTestId("crypto-headline-pgp")).toHaveTextContent(
+      i18n.t("admin.cryptoPage.isOn", { name: "PGP" }),
+    );
+  });
+
+  it("lists keys as cards with Znuny id, type, status and passphrase", async () => {
+    renderPage();
+    await openKeys();
     expect(screen.getByText("Erika Beispiel <queue@example.org>")).toBeInTheDocument();
     expect(screen.getByTestId(`pgp-status-${FP}`)).toHaveTextContent(i18n.t("admin.pgp.status.good"));
     expect(screen.getByTestId(`pgp-status-AAAA${FP.slice(4)}`)).toHaveTextContent(
       i18n.t("admin.pgp.status.expired"),
     );
-    const banner = await screen.findByTestId("crypto-status-pgp");
-    expect(banner).toHaveTextContent("/keys/gnupg");
-    expect(screen.getByTestId("crypto-status-enabled-pgp")).toHaveTextContent(
-      i18n.t("admin.crypto.disabled"),
+    expect(screen.getByTestId(`pgp-passphrase-${FP}`)).toHaveTextContent(
+      i18n.t("admin.pgp.passphraseSource.none"),
     );
   });
 
   it("uploads a pasted armored key", async () => {
     pgpUpload.mockResolvedValue({ fingerprints: [FP], keys: [secretKey] });
     renderPage();
-    await screen.findByText("FB862437");
+    await openKeys();
     fireEvent.click(screen.getByTestId("pgp-upload-open"));
     const armor = "-----BEGIN PGP PUBLIC KEY BLOCK-----\nabc\n-----END PGP PUBLIC KEY BLOCK-----";
     fireEvent.change(screen.getByTestId("pgp-upload-armor"), { target: { value: armor } });
@@ -179,8 +206,8 @@ describe("PgpKeysPage", () => {
   it("deletes only the secret key after confirmation", async () => {
     pgpDelete.mockResolvedValue(undefined);
     renderPage();
-    await screen.findByText("FB862437");
-    fireEvent.click(screen.getByTestId(`admin-row-menu-trigger-${FP}`));
+    await openKeys();
+    fireEvent.click(screen.getByTestId(`pgp-key-${FP}-menu`));
     fireEvent.click(await screen.findByTestId(`pgp-delete-secret-${FP}`));
     fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
     await waitFor(() => expect(pgpDelete).toHaveBeenCalledWith(FP, true));
@@ -188,28 +215,32 @@ describe("PgpKeysPage", () => {
 
   it("shows details including the full fingerprint", async () => {
     renderPage();
-    await screen.findByText("FB862437");
-    fireEvent.click(screen.getByTestId(`admin-row-menu-trigger-${FP}`));
+    await openKeys();
+    fireEvent.click(screen.getByTestId(`pgp-key-${FP}-menu`));
     fireEvent.click(await screen.findByTestId(`pgp-details-${FP}`));
     expect(await screen.findByTestId("pgp-details")).toHaveTextContent(FP);
   });
 
-  it("shows sources, locks env/Znuny fields and saves only changed Tiqora values", async () => {
+  it("groups settings into sections, locks env values and saves one section", async () => {
     settingsUpdate.mockResolvedValue(settingsOut("none"));
     renderPage();
+    fireEvent.click(await screen.findByTestId("crypto-tab-settings"));
     const enabled = await screen.findByTestId("crypto-setting-pgp-enabled");
-    expect(screen.getByTestId("crypto-setting-pgp-homedir")).toBeDisabled();
+    expect(screen.queryByTestId("crypto-setting-pgp-homedir")).toBeNull(); // other section
+    fireEvent.click(screen.getByTestId("crypto-section-pgp-env"));
+    expect(await screen.findByTestId("crypto-setting-pgp-homedir")).toBeDisabled();
     expect(screen.getByTestId("crypto-setting-pgp-homedir-source")).toHaveTextContent(
       "TIQORA_CRYPTO_PGP_GNUPGHOME",
     );
-    expect(screen.getByTestId("crypto-setting-pgp-method-source")).toHaveTextContent(
-      i18n.t("admin.cryptoSettings.source.znuny", { name: "PGP::Method" }),
-    );
-    expect(screen.getByTestId("crypto-setting-pgp-method-row")).toHaveTextContent(
+    fireEvent.click(screen.getByTestId("crypto-section-pgp-sign"));
+    expect(await screen.findByTestId("crypto-setting-pgp-method-row")).toHaveTextContent(
       i18n.t("admin.cryptoSettings.shadowed"),
     );
+    expect(screen.getByTestId("crypto-setting-pgp-method-Detached")).toHaveTextContent("PGP/MIME");
+    fireEvent.click(screen.getByTestId("crypto-section-pgp-general"));
     expect(screen.getByTestId("crypto-settings-save-pgp")).toBeDisabled();
-    fireEvent.click(enabled);
+    fireEvent.click(await screen.findByTestId("crypto-setting-pgp-enabled"));
+    expect(enabled).toBeDefined();
     fireEvent.click(screen.getByTestId("crypto-settings-save-pgp"));
     await waitFor(() => expect(settingsUpdate).toHaveBeenCalledWith({ "pgp.enabled": true }));
   });
@@ -218,11 +249,11 @@ describe("PgpKeysPage", () => {
     pgpPassphraseSet.mockRejectedValueOnce(new Error("wrong passphrase for this PGP key"));
     pgpPassphraseSet.mockResolvedValueOnce(settingsOut("tiqora"));
     renderPage();
-    expect(await screen.findByTestId(`pgp-passphrase-${FP}`)).toHaveTextContent(
+    await openKeys();
+    expect(screen.getByTestId(`pgp-passphrase-${FP}`)).toHaveTextContent(
       i18n.t("admin.pgp.passphraseSource.none"),
     );
-    fireEvent.click(screen.getByTestId(`admin-row-menu-trigger-${FP}`));
-    fireEvent.click(await screen.findByTestId(`pgp-passphrase-set-${FP}`));
+    fireEvent.click(screen.getByTestId(`pgp-passphrase-set-${FP}`));
     fireEvent.change(await screen.findByTestId("pgp-passphrase-input"), {
       target: { value: "nope" },
     });

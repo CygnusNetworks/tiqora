@@ -3,16 +3,33 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import { api, ApiError, type SmimeCertOut } from "@/lib/api";
-import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
-import { CryptoStatusBanner } from "@/components/admin/CryptoStatusBanner";
+import { useRouter } from "@tanstack/react-router";
+import { CryptoPageShell, type CryptoTab } from "@/components/admin/crypto/CryptoPageShell";
+import {
+  CryptoOverview,
+  type NextStep,
+  type OverviewCheck,
+} from "@/components/admin/crypto/CryptoOverview";
+import { KeyCard } from "@/components/admin/crypto/KeyCard";
 import { CryptoSettingsForm } from "@/components/admin/CryptoSettingsForm";
+import {
+  missingRequired,
+  useCryptoSettings,
+  useCryptoStatus,
+} from "@/components/admin/cryptoSettingsQuery";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { MenuItem } from "@/components/ui/Menu";
 import { SelectField } from "@/components/ui/SelectField";
-import { PlusIcon } from "@/components/ui/icons";
+import {
+  CertificateIcon,
+  FolderIcon,
+  InboxIcon,
+  LockIcon,
+  PlusIcon,
+} from "@/components/ui/icons";
 import { formatDateOnly } from "@/lib/format";
 import { downloadText, readCertificateFile, readFileText } from "@/lib/cryptoFiles";
 
@@ -33,12 +50,17 @@ function statusTone(status: string): "success" | "warn" | "danger" {
   return "danger";
 }
 
-/** Znuny AdminSMIME: certificates / private keys in SMIME::CertPath / SMIME::PrivatePath. */
+/** Znuny AdminSMIME + S/MIME SysConfig: overview, certificates / private keys in
+ * SMIME::CertPath / SMIME::PrivatePath, settings. */
 export function SmimePage() {
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
   const qc = useQueryClient();
   const { confirm, dialog: confirmDialog } = useConfirm();
+  const router = useRouter({ warn: false }) as ReturnType<typeof useRouter> | undefined;
+  const settingsQ = useCryptoSettings();
+  const [tab, setTab] = useState<CryptoTab>("overview");
+  const [section, setSection] = useState("general");
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
   const [certOpen, setCertOpen] = useState(false);
   const [certText, setCertText] = useState("");
@@ -123,133 +145,216 @@ export function SmimePage() {
 
   const statusLabel = (s: string) => t(`admin.smime.status.${s}`, { defaultValue: s });
 
-  const columns: DataTableColumn<SmimeCertOut>[] = [
-    { key: "filename", header: t("admin.smime.filename"), mono: true, render: (r) => r.filename },
-    {
-      key: "subject",
-      header: t("admin.smime.subject"),
-      render: (r) => (
-        <span className="flex flex-wrap items-center gap-1.5">
-          <span className="break-all">{r.subject}</span>
-          {r.is_ca ? <Badge tone="default">{t("admin.smime.ca")}</Badge> : null}
-          {r.has_private ? (
-            <Badge tone="accent" data-testid={`smime-has-private-${r.filename}`}>
-              {t("admin.smime.privateKey")}
-            </Badge>
-          ) : null}
-        </span>
-      ),
+  // ------------------------------------------------------------ overview data
+  const enabledField = settingsQ.data?.smime.find((f) => f.name === "smime.enabled");
+  const backendStatus = useCryptoStatus("smime");
+  const missingPaths = missingRequired(settingsQ.data, "smime");
+  const flagged = missingPaths.length > 0 || backendStatus?.available === false;
+  const withPrivate = certs.filter((c) => c.has_private).length;
+  const checks: OverviewCheck[] = listQ.isSuccess
+    ? [
+        {
+          id: "certificates",
+          state: certs.length > 0 ? "ok" : "warn",
+          title:
+            certs.length > 0
+              ? t("admin.cryptoPage.smimeCertificates", { count: certs.length })
+              : t("admin.cryptoPage.smimeNoCertificates"),
+        },
+        {
+          id: "private-keys",
+          state: withPrivate > 0 ? "ok" : "warn",
+          title:
+            withPrivate > 0
+              ? t("admin.cryptoPage.smimePrivateKeys", { count: withPrivate })
+              : t("admin.cryptoPage.smimeNoPrivateKeys"),
+          detail: withPrivate > 0 ? undefined : t("admin.cryptoPage.smimeNoPrivateKeysHint"),
+        },
+      ]
+    : [];
+  const nextSteps: NextStep[] = [];
+  if (missingPaths.length > 0) {
+    nextSteps.push({
+      id: "store",
+      label: t("admin.cryptoPage.nextStore"),
+      icon: FolderIcon,
+      onSelect: () => {
+        setSection("store");
+        setTab("settings");
+      },
+    });
+  }
+  if (missingPaths.length === 0 && (certs.length === 0 || withPrivate === 0)) {
+    nextSteps.push({
+      id: "certificates",
+      label: t("admin.cryptoPage.nextAddCertificate"),
+      icon: CertificateIcon,
+      onSelect: () => setTab("keys"),
+    });
+  }
+  nextSteps.push({
+    id: "queues",
+    label: t("admin.cryptoPage.nextQueues"),
+    icon: InboxIcon,
+    onSelect: () => {
+      if (router) void router.navigate({ to: "/admin/queues" });
     },
-    {
-      key: "emails",
-      header: t("admin.smime.emails"),
-      render: (r) => <span className="break-all">{r.emails.join(", ") || "—"}</span>,
-    },
-    {
-      key: "not_after",
-      header: t("admin.smime.expires"),
-      render: (r) => formatDateOnly(r.not_after, locale),
-    },
-    {
-      key: "status",
-      header: t("admin.table.status"),
-      render: (r) => (
-        <Badge tone={statusTone(r.status)} data-testid={`smime-status-${r.filename}`}>
-          {statusLabel(r.status)}
-        </Badge>
-      ),
-    },
-  ];
+  });
 
   return (
-    <div className="space-y-3 p-4" data-testid="admin-smime-page">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="font-display text-xl font-semibold text-ink">{t("admin.smime.title")}</h1>
-          <p className="mt-1 text-sm text-muted">{t("admin.smime.description")}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => {
-              setDialogError(null);
-              setKeyOpen(true);
-            }}
-            data-testid="smime-key-open"
-          >
-            <PlusIcon className="h-4 w-4" />
-            {t("admin.smime.addPrivateKey")}
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setDialogError(null);
-              setCertOpen(true);
-            }}
-            data-testid="smime-cert-open"
-          >
-            <PlusIcon className="h-4 w-4" />
-            {t("admin.smime.addCertificate")}
-          </Button>
-        </div>
-      </div>
-
-      <CryptoStatusBanner backend="smime" />
-
-      <CryptoSettingsForm backend="smime" />
-
+    <CryptoPageShell
+      backend="smime"
+      title={t("admin.smime.title")}
+      lede={t("admin.smime.description")}
+      icon={CertificateIcon}
+      enabled={enabledField ? enabledField.value === true : null}
+      ready={backendStatus ? backendStatus.available : null}
+      tab={tab}
+      onTab={setTab}
+      keysLabel={t("admin.smime.keysTab")}
+      keyCount={listQ.isSuccess ? certs.length : null}
+      settingsFlag={flagged}
+    >
       {notice ? (
         <p
-          className={`text-sm ${notice.ok ? "text-green" : "text-danger"}`}
+          className={`mb-3 text-sm ${notice.ok ? "text-green" : "text-danger"}`}
           data-testid="smime-notice"
         >
           {notice.text}
         </p>
       ) : null}
 
-      {listQ.isError ? (
-        <p className="text-sm text-danger" data-testid="smime-load-error">
-          {t("admin.smime.loadError")}: {errText(listQ.error)}
-        </p>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={certs}
-          rowKey={(r) => r.filename}
-          isLoading={listQ.isLoading}
-          emptyLabel={t("admin.smime.empty")}
-          onDelete={(r) => void onDelete(r, false)}
-          extraRowActions={(r) => (
-            <>
-              <MenuItem testId={`smime-details-${r.filename}`} onSelect={() => setDetails(r)}>
-                {t("admin.smime.details")}
-              </MenuItem>
-              {r.valid ? (
-                <MenuItem testId={`smime-download-${r.filename}`} onSelect={() => void onDownload(r)}>
-                  {t("admin.smime.download")}
-                </MenuItem>
-              ) : null}
-              {r.has_private ? (
-                <MenuItem
-                  testId={`smime-relations-${r.filename}`}
-                  onSelect={() => setRelationsFor(r)}
-                >
-                  {t("admin.smime.relations")}
-                </MenuItem>
-              ) : null}
-              {r.has_private ? (
-                <MenuItem
-                  danger
-                  testId={`smime-delete-private-${r.filename}`}
-                  onSelect={() => void onDelete(r, true)}
-                >
-                  {t("admin.smime.deletePrivate")}
-                </MenuItem>
-              ) : null}
-            </>
-          )}
-          testId="smime-table"
+      {tab === "overview" ? (
+        <CryptoOverview
+          backend="smime"
+          name="S/MIME"
+          checks={checks}
+          nextSteps={nextSteps}
+          onFix={(s) => {
+            setSection(s);
+            setTab("settings");
+          }}
         />
-      )}
+      ) : null}
+
+      {tab === "settings" ? (
+        <CryptoSettingsForm backend="smime" section={section} onSection={setSection} />
+      ) : null}
+
+      {tab === "keys" ? (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="primary"
+              onClick={() => {
+                setDialogError(null);
+                setCertOpen(true);
+              }}
+              data-testid="smime-cert-open"
+            >
+              <PlusIcon className="h-4 w-4" />
+              {t("admin.smime.addCertificate")}
+            </Button>
+            <Button
+              onClick={() => {
+                setDialogError(null);
+                setKeyOpen(true);
+              }}
+              data-testid="smime-key-open"
+            >
+              <PlusIcon className="h-4 w-4" />
+              {t("admin.smime.addPrivateKey")}
+            </Button>
+          </div>
+          {listQ.isError ? (
+            <p className="text-sm text-danger" data-testid="smime-load-error">
+              {t("admin.smime.loadError")}: {errText(listQ.error)}
+            </p>
+          ) : listQ.isLoading ? null : certs.length === 0 ? (
+            <div
+              className="grid justify-items-center gap-2 rounded-xl border border-dashed border-hairline p-8 text-center text-sm text-muted"
+              data-testid="smime-empty"
+            >
+              <CertificateIcon className="h-6 w-6" />
+              {t("admin.smime.empty")}
+            </div>
+          ) : (
+            <div className="grid gap-3" data-testid="smime-certs">
+              {certs.map((r) => (
+                <KeyCard
+                  key={r.filename}
+                  icon={r.has_private ? LockIcon : CertificateIcon}
+                  testId={`smime-cert-${r.filename}`}
+                  menuLabel={t("admin.table.actions")}
+                  title={r.subject}
+                  meta={[
+                    <span key="file" className="font-mono">
+                      {r.filename}
+                    </span>,
+                    r.emails.join(", ") || "—",
+                    t("admin.smime.validUntil", { date: formatDateOnly(r.not_after, locale) }),
+                  ]}
+                  chips={
+                    <>
+                      {r.is_ca ? <Badge tone="default">{t("admin.smime.ca")}</Badge> : null}
+                      {r.has_private ? (
+                        <Badge tone="accent" data-testid={`smime-has-private-${r.filename}`}>
+                          {t("admin.smime.privateKey")}
+                        </Badge>
+                      ) : null}
+                      <Badge tone={statusTone(r.status)} data-testid={`smime-status-${r.filename}`}>
+                        {statusLabel(r.status)}
+                      </Badge>
+                    </>
+                  }
+                  actions={
+                    r.valid ? (
+                      <Button
+                        size="sm"
+                        onClick={() => void onDownload(r)}
+                        data-testid={`smime-download-${r.filename}`}
+                      >
+                        {t("admin.smime.download")}
+                      </Button>
+                    ) : null
+                  }
+                  menu={
+                    <>
+                      <MenuItem testId={`smime-details-${r.filename}`} onSelect={() => setDetails(r)}>
+                        {t("admin.smime.details")}
+                      </MenuItem>
+                      {r.has_private ? (
+                        <MenuItem
+                          testId={`smime-relations-${r.filename}`}
+                          onSelect={() => setRelationsFor(r)}
+                        >
+                          {t("admin.smime.relations")}
+                        </MenuItem>
+                      ) : null}
+                      {r.has_private ? (
+                        <MenuItem
+                          danger
+                          testId={`smime-delete-private-${r.filename}`}
+                          onSelect={() => void onDelete(r, true)}
+                        >
+                          {t("admin.smime.deletePrivate")}
+                        </MenuItem>
+                      ) : null}
+                      <MenuItem
+                        danger
+                        testId={`smime-delete-${r.filename}`}
+                        onSelect={() => void onDelete(r, false)}
+                      >
+                        {t("admin.smime.delete")}
+                      </MenuItem>
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <Dialog
         open={certOpen}
@@ -415,7 +520,7 @@ export function SmimePage() {
         />
       ) : null}
       {confirmDialog}
-    </div>
+    </CryptoPageShell>
   );
 }
 

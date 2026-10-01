@@ -430,3 +430,24 @@ export function KeyIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Folder — storage locations. */
+export function FolderIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+    </Icon>
+  );
+}
+
+/** Certificate with seal — S/MIME. */
+export function CertificateIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="3.5" width="16" height="12" rx="2" />
+      <path d="M8 8h8M8 11h5" />
+      <circle cx="15.5" cy="17.5" r="2.5" />
+      <path d="m14 19.5-1 2.5 2.5-1 2.5 1-1-2.5" />
+    </Icon>
+  );
+}
