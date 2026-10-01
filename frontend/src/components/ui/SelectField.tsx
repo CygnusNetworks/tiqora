@@ -36,6 +36,7 @@ export function SelectField<T extends string | number>({
   placeholder,
   className,
   disabled,
+  bare,
   "aria-label": ariaLabel,
 }: {
   items: SelectMenuItem<T>[];
@@ -47,6 +48,8 @@ export function SelectField<T extends string | number>({
   /** Extra classes for the trigger button (sizing/width overrides). */
   className?: string;
   disabled?: boolean;
+  /** No frame of its own, for a trigger that sits inside a bordered group. */
+  bare?: boolean;
   "aria-label"?: string;
 }) {
   const selected = items.find((i) => i.value === value);
@@ -66,8 +69,11 @@ export function SelectField<T extends string | number>({
           disabled={disabled}
           {...toggleProps}
           className={cn(
-            "flex w-full items-center justify-between gap-2 rounded border border-hairline bg-surface px-2 py-1.5 text-left text-sm text-ink",
-            "focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-60",
+            "flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-sm text-ink",
+            bare
+              ? "bg-transparent hover:bg-surface-subtle focus:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent"
+              : "rounded border border-hairline bg-surface focus:outline-none focus:ring-1 focus:ring-accent",
+            "disabled:cursor-not-allowed disabled:opacity-60",
             className,
           )}
         >
