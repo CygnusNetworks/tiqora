@@ -505,9 +505,7 @@ Full index: **[docs/README.md](./docs/README.md)**
 
 Contributions are welcome. Read **[CONTRIBUTING.md](./CONTRIBUTING.md)** first, especially
 the clean-room rule (never copy Znuny/OTRS source) and the rule about test data
-(no real tickets, names or addresses). Good starting points are issues labelled
-[`good first issue`](https://github.com/CygnusNetworks/tiqora/labels/good%20first%20issue).
-Questions go to [GitHub Discussions](https://github.com/CygnusNetworks/tiqora/discussions);
+(no real tickets, names or addresses). Questions go to [GitHub Discussions](https://github.com/CygnusNetworks/tiqora/discussions);
 security problems go through [SECURITY.md](./SECURITY.md), not public issues.
 
 ## License

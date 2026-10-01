@@ -7,18 +7,17 @@ so feedback from people who actually run OTRS or Znuny is worth as much as code.
 
 - **Try it and tell us what broke.** The [quickstart](./README.md#try-it) runs in two
   minutes. Bug reports with steps to reproduce are the most useful contribution of all.
-- **Translate.** The UI ships in 49 languages, but apart from English and German
-  roughly 900 of the ~3,200 strings in each language are still English placeholders.
-  `pnpm --filter tiqora-frontend i18n:untranslated fr` lists them for French (any
-  locale code works; without a code you get the overview). Look for issues labelled
-  [`translation`](https://github.com/CygnusNetworks/tiqora/labels/translation).
+- **Review a translation.** The UI ships in 49 languages. Apart from English and
+  German, the translations are not written by native speakers, so corrections in
+  `frontend/src/i18n/locales/<code>.json` are very welcome.
+  `pnpm --filter tiqora-frontend i18n:untranslated <code>` lists strings that are
+  still English.
 - **Report a Znuny/OTRS compatibility gap.** If Tiqora reads or writes something
   differently from your Znuny/OTRS version, open an issue with the version and the
   table or screen involved.
-- **Code and docs.** Start with [`good first issue`](https://github.com/CygnusNetworks/tiqora/labels/good%20first%20issue)
-  or [`help wanted`](https://github.com/CygnusNetworks/tiqora/labels/help%20wanted).
-  For anything larger, open a discussion or issue first so we can agree on the
-  approach before you invest the time.
+- **Code and docs.** Small fixes can go straight into a pull request. For anything
+  larger, open a discussion or issue first so we can agree on the approach before you
+  invest the time.
 
 Questions and ideas go to [GitHub Discussions](https://github.com/CygnusNetworks/tiqora/discussions).
 Security problems go through [SECURITY.md](./SECURITY.md), never a public issue.
