@@ -12,6 +12,8 @@ import { postComposerExtras } from "@/lib/composerExtras";
 import type { PickedMention } from "@/lib/mentions";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { AttachmentLightbox } from "./AttachmentLightbox";
+import { isCryptoAttachment } from "@/lib/cryptoAttachment";
+import { CryptoAttachmentGroup } from "./CryptoAttachments";
 import { ComposerTimeChip } from "./ComposerTimeChip";
 import { AiOriginMarker } from "./AiOriginBadge";
 import { ArticleSecurityMarker } from "./ArticleSecurityBadge";
@@ -578,7 +580,10 @@ export function AttachmentList({
   // Embedded cid: parts (signature logos etc.) are noise next to real
   // attachments — tuck them behind a small disclosure instead. They keep the
   // plain-row treatment too: a signature logo is not evidence worth previewing.
-  const real = items.filter((a) => !a.inline);
+  // PGP/S-MIME side files (signature.asc, smime.p7s, public keys,
+  // PGPexch.htm) get their own quieter block below the real attachments.
+  const crypto = items.filter((a) => !a.inline && isCryptoAttachment(a));
+  const real = items.filter((a) => !a.inline && !isCryptoAttachment(a));
   const inline = items.filter((a) => a.inline);
   const images = real.filter((a) => isPreviewable(a) && !broken.includes(a.id));
   const files = real.filter((a) => !images.includes(a));
@@ -611,7 +616,7 @@ export function AttachmentList({
     );
   };
 
-  if (real.length === 0 && inline.length === 0) return null;
+  if (real.length === 0 && inline.length === 0 && crypto.length === 0) return null;
 
   const shown = images.slice(0, STRIP_LIMIT);
   const overflow = images.length - shown.length;
@@ -664,6 +669,11 @@ export function AttachmentList({
           )}
           {files.length > 0 && <ul className="space-y-1">{files.map(renderItem)}</ul>}
         </>
+      )}
+      {crypto.length > 0 && (
+        <div className={real.length > 0 ? "mt-2 border-t border-hairline pt-2" : undefined}>
+          <CryptoAttachmentGroup ticketId={ticketId} articleId={articleId} items={crypto} />
+        </div>
       )}
       {inline.length > 0 && (
         <details className="mt-1" data-testid="attachment-inline-group">

@@ -4948,6 +4948,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/customer-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer Tickets
+         * @description Tickets of one customer account, newest first (``create_time`` desc,
+         *     then id desc), archived tickets included. Tickets in queues the caller
+         *     cannot read (``ro``) are silently omitted. ``email_count`` and the
+         *     first/last article times cover customer-visible ``Email`` articles only;
+         *     ``summary`` is the stored AI summary (never generated here).
+         */
+        get: operations["customer_tickets_api_v1_integrations_customer_tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/kb/articles": {
         parameters: {
             query?: never;
@@ -6510,6 +6534,75 @@ export interface paths {
         get: operations["get_attachment_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/{attachment_id}/html": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attachment Html Preview
+         * @description An HTML attachment sanitised like an article body (e.g. ``PGPexch.htm``).
+         *
+         *     Same pipeline as ``/body`` (nh3, cid: rewrite, external images gated), so
+         *     the sandboxed body renderer can show it in-page instead of a raw download.
+         */
+        get: operations["attachment_html_preview_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__html_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/{attachment_id}/pgp-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Attachment Pgp Key
+         * @description Parse the PGP public key(s) in an attachment (same access as downloading it).
+         *
+         *     Read-only: the key is scanned in a throwaway gpg home, never imported.
+         *     ``in_keyring`` tells whether the shared keyring already has it.
+         */
+        get: operations["attachment_pgp_key_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__pgp_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/{attachment_id}/pgp-key/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Attachment Pgp Key
+         * @description Import the attached public key into the keyring (``rw`` in admin or users).
+         *
+         *     Same permission as the agent customer-key module; writes the usual
+         *     ``tiqora_crypto_key`` audit row. Private key blocks are refused.
+         */
+        post: operations["import_attachment_pgp_key_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__pgp_key_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9119,6 +9212,8 @@ export interface components {
             content_size?: string | null;
             /** Content Type */
             content_type?: string | null;
+            /** Crypto Kind */
+            crypto_kind?: ("pgp_public_key" | "pgp_signature" | "pgp_signed_message" | "pgp_message" | "pgp_html_body" | "smime_signature" | "x509_certificate") | null;
             /** Disposition */
             disposition?: string | null;
             /** Filename */
@@ -9146,6 +9241,49 @@ export interface components {
             id: number;
             /** Size */
             size: number;
+        };
+        /**
+         * AttachmentPgpKeyOut
+         * @description One public key found in an attachment (parsed, not imported).
+         */
+        AttachmentPgpKeyOut: {
+            /** Algorithm */
+            algorithm: string;
+            /** Bits */
+            bits?: number | null;
+            /** Created */
+            created?: string | null;
+            /** Emails */
+            emails: string[];
+            /** Expires */
+            expires?: string | null;
+            /** Fingerprint */
+            fingerprint: string;
+            /**
+             * In Keyring
+             * @default false
+             */
+            in_keyring: boolean;
+            /** Key Id */
+            key_id: string;
+            /** Status */
+            status: string;
+            /** Uids */
+            uids: string[];
+        };
+        /** AttachmentPgpKeysOut */
+        AttachmentPgpKeysOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Can Import
+             * @default false
+             */
+            can_import: boolean;
+            /** Keys */
+            keys?: components["schemas"]["AttachmentPgpKeyOut"][];
+            /** Problem */
+            problem?: string | null;
         };
         /**
          * AttachmentRefOut
@@ -10063,6 +10201,59 @@ export interface components {
         CustomerSmimeCertificateIn: {
             /** Certificate */
             certificate: string;
+        };
+        /**
+         * CustomerTicketItem
+         * @description One ticket of a customer, for an external per-account history view.
+         */
+        CustomerTicketItem: {
+            /**
+             * Changed
+             * Format: date-time
+             */
+            changed: string;
+            /** Channel */
+            channel: string | null;
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /** Customer User Id */
+            customer_user_id: string | null;
+            /** Email Count */
+            email_count: number;
+            /** First Article Time */
+            first_article_time: string | null;
+            /** Last Article Time */
+            last_article_time: string | null;
+            /** Message Count */
+            message_count: number;
+            /** Queue */
+            queue: string | null;
+            /** State */
+            state: string | null;
+            /** State Type */
+            state_type: string | null;
+            /** Summary */
+            summary: string | null;
+            /** Summary Created At */
+            summary_created_at: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket Number */
+            ticket_number: string;
+            /** Title */
+            title: string | null;
+            /** Title Pii Free */
+            title_pii_free: boolean;
+        };
+        /** CustomerTicketsOut */
+        CustomerTicketsOut: {
+            /** Login */
+            login: string;
+            /** Tickets */
+            tickets: components["schemas"]["CustomerTicketItem"][];
         };
         /** CustomerUserAdminCreate */
         CustomerUserAdminCreate: {
@@ -29188,6 +29379,43 @@ export interface operations {
             };
         };
     };
+    customer_tickets_api_v1_integrations_customer_tickets_get: {
+        parameters: {
+            query: {
+                /** @description Customer login WITHOUT the contract suffix (e.g. z50test). Matches tickets whose customer_user_id equals it or starts with it plus a configured customer-link login_suffix_separator (z50test#1, z50test#3). Must not contain a separator, whitespace or control characters. */
+                login: string;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerTicketsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_articles_api_v1_kb_articles_get: {
         parameters: {
             query?: {
@@ -32452,6 +32680,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attachment_html_preview_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__html_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+                attachment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ArticleBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    attachment_pgp_key_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__pgp_key_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+                attachment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPgpKeysOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_attachment_pgp_key_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__pgp_key_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                article_id: number;
+                attachment_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentPgpKeysOut"];
                 };
             };
             /** @description Validation Error */

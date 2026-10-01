@@ -147,6 +147,64 @@ _MICALG = {
 _ALGOS = {"1": "RSA", "16": "ElGamal", "17": "DSA", "18": "ECDH", "19": "ECDSA", "22": "EdDSA"}
 
 
+def _key_info(raw: Any, secret_fps: set[str], now: datetime) -> PgpKeyInfo:
+    """One python-gnupg key dict (``list_keys`` / ``scan_keys_mem``) → :class:`PgpKeyInfo`."""
+    uids = [str(u) for u in raw.get("uids") or []]
+    expires = _epoch(raw.get("expires"))
+    trust = str(raw.get("trust") or "")
+    if trust == "r":
+        status = "revoked"
+    elif trust == "e" or (expires is not None and expires <= now):
+        status = "expired"
+    else:
+        status = "good"
+    try:
+        bits: int | None = int(str(raw.get("length")))
+    except (TypeError, ValueError):
+        bits = None
+    key_id = str(raw.get("keyid") or "").upper()
+    fp = str(raw.get("fingerprint") or "").upper()
+    return PgpKeyInfo(
+        fingerprint=fp,
+        key_id=key_id,
+        short_id=key_id[-8:],
+        uids=uids,
+        emails=_emails(uids),
+        created=_epoch(raw.get("date")),
+        expires=expires,
+        status=status,
+        has_secret=fp in secret_fps,
+        bits=bits,
+        algorithm=_ALGOS.get(str(raw.get("algo") or ""), str(raw.get("algo") or "")),
+        subkey_ids=[str(s[0]).upper() for s in raw.get("subkeys") or [] if s],
+    )
+
+
+def scan_armored_keys(armored: str, *, gpg_bin: str = "gpg") -> list[PgpKeyInfo]:
+    """Parse the keys in an ASCII-armored block without touching any keyring.
+
+    Runs gpg against a throwaway ``--homedir`` (``--import-options show-only``
+    via python-gnupg's ``scan_keys_mem``), so it works even when no Tiqora
+    keyring is configured and never writes to the shared one. Raises
+    :class:`CryptoUnavailableError` when python-gnupg or the binary is missing.
+    """
+    gnupg = _require_gnupg()
+    # Directly under /tmp when possible: gpg's socket dir must stay short on macOS.
+    base = "/tmp" if Path("/tmp").is_dir() else None  # noqa: S108
+    with tempfile.TemporaryDirectory(prefix="tq-scan-", dir=base) as home:
+        try:
+            gpg = gnupg.GPG(
+                gpgbinary=gpg_bin or "gpg",
+                gnupghome=home,
+                env={**os.environ, "LC_MESSAGES": "POSIX"},
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise CryptoUnavailableError(f"gpg not usable ({gpg_bin!r}): {exc}") from exc
+        gpg.encoding = "utf-8"
+        now = datetime.now(UTC)
+        return [_key_info(raw, set(), now) for raw in gpg.scan_keys_mem(armored)]
+
+
 class PgpEngine:
     """Thin, testable wrapper around a ``python-gnupg`` GPG instance.
 
@@ -234,40 +292,7 @@ class PgpEngine:
         gpg = self._gpg()
         secret_fps = {str(k["fingerprint"]).upper() for k in gpg.list_keys(True)}
         now = datetime.now(UTC)
-        out: list[PgpKeyInfo] = []
-        for raw in gpg.list_keys(False):
-            uids = [str(u) for u in raw.get("uids") or []]
-            expires = _epoch(raw.get("expires"))
-            trust = str(raw.get("trust") or "")
-            if trust == "r":
-                status = "revoked"
-            elif trust == "e" or (expires is not None and expires <= now):
-                status = "expired"
-            else:
-                status = "good"
-            try:
-                bits: int | None = int(str(raw.get("length")))
-            except (TypeError, ValueError):
-                bits = None
-            key_id = str(raw.get("keyid") or "").upper()
-            fp = str(raw.get("fingerprint") or "").upper()
-            out.append(
-                PgpKeyInfo(
-                    fingerprint=fp,
-                    key_id=key_id,
-                    short_id=key_id[-8:],
-                    uids=uids,
-                    emails=_emails(uids),
-                    created=_epoch(raw.get("date")),
-                    expires=expires,
-                    status=status,
-                    has_secret=fp in secret_fps,
-                    bits=bits,
-                    algorithm=_ALGOS.get(str(raw.get("algo") or ""), str(raw.get("algo") or "")),
-                    subkey_ids=[str(s[0]).upper() for s in raw.get("subkeys") or [] if s],
-                )
-            )
-        return out
+        return [_key_info(raw, secret_fps, now) for raw in gpg.list_keys(False)]
 
     def find_key(self, key_ref: str) -> PgpKeyInfo | None:
         for key in self.list_keys():

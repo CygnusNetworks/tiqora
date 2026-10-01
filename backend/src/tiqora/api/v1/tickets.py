@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import csv
+import re
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from html import escape as html_escape
@@ -26,6 +27,7 @@ from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.crypto.compose import EmailSecurityIn
 from tiqora.db.engine import get_session_factory
+from tiqora.domain.article_html import render_article_body
 from tiqora.domain.customer_link import ResolvedCustomerLink, resolve_customer_link
 from tiqora.domain.new_ticket_queue import (
     NewTicketScreen,
@@ -1272,6 +1274,73 @@ async def get_attachment(
         att.meta.filename,
         att.meta.disposition,
         force_download=download,
+    )
+
+
+#: HTML attachments above this size are not rendered in-page (download only).
+_HTML_PREVIEW_MAX_BYTES = 5 * 1024 * 1024
+_CHARSET_RE = re.compile(rb"""charset\s*=\s*["']?([A-Za-z0-9_.:-]+)""", re.IGNORECASE)
+
+
+def _decode_html_attachment(content: bytes, content_type: str | None) -> str:
+    """Decode with the MIME charset, else a ``<meta charset>``, else UTF-8."""
+    candidates: list[str] = []
+    for source in ((content_type or "").encode("latin-1", "replace"), content[:4096]):
+        m = _CHARSET_RE.search(source)
+        if m:
+            candidates.append(m.group(1).decode("ascii", "replace"))
+    for charset in [*candidates, "utf-8"]:
+        try:
+            return content.decode(charset)
+        except (LookupError, UnicodeDecodeError):
+            continue
+    return content.decode("utf-8", errors="replace")
+
+
+@router.get(
+    "/{ticket_id}/articles/{article_id}/attachments/{attachment_id}/html",
+    response_model=ArticleBody,
+)
+async def attachment_html_preview(
+    ticket_id: int,
+    article_id: int,
+    attachment_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> ArticleBody:
+    """An HTML attachment sanitised like an article body (e.g. ``PGPexch.htm``).
+
+    Same pipeline as ``/body`` (nh3, cid: rewrite, external images gated), so
+    the sandboxed body renderer can show it in-page instead of a raw download.
+    """
+    try:
+        att = await TicketService(session).get_attachment(
+            user.id, ticket_id, article_id, attachment_id
+        )
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+    ct = (att.meta.content_type or "").split(";", 1)[0].strip().lower()
+    name = (att.meta.filename or "").lower()
+    if ct not in {"text/html", "application/xhtml+xml"} and not name.endswith((".htm", ".html")):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Not an HTML attachment"
+        )
+    if len(att.content) > _HTML_PREVIEW_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail="HTML attachment too large to preview",
+        )
+    rendered = render_article_body(
+        body=_decode_html_attachment(att.content, att.meta.content_type),
+        content_type="text/html",
+        ticket_id=ticket_id,
+        article_id=article_id,
+    )
+    return ArticleBody(
+        article_id=article_id,
+        content_type=rendered.content_type,
+        is_html=rendered.is_html,
+        body=rendered.body,
     )
 
 
