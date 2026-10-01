@@ -14,6 +14,7 @@ function page<T>(items: T[]) {
 }
 
 const t0 = "2026-06-01T00:00:00Z";
+const NOW_S = Math.floor(Date.now() / 1000);
 
 export const demoUser = {
   id: 1,
@@ -98,12 +99,41 @@ const ticketItems = SUBJECTS.map((title, i) => {
     customer_id: c.cid, customer_user_id: c.login,
     create_time: `2026-07-${String(day).padStart(2, "0")}T09:12:00Z`,
     change_time: `2026-07-${String(Math.min(day + 2, 21)).padStart(2, "0")}T14:30:00Z`,
-    age_seconds: (22 - day) * 86400, escalation_time: i % 5 === 0 ? 3600 : 0,
+    age_seconds: (22 - day) * 86400,
+    // Unix epoch of the SLA deadline, relative to now so the inbox reads
+    // "overdue · 2 h" / "due in 40 min" rather than decades: every fifth
+    // ticket is overdue, one is about to be.
+    escalation_time:
+      i % 5 === 0 ? NOW_S - (i + 2) * 3600 : i === 3 ? NOW_S + 40 * 60 : 0,
     escalation_response_time: 0, escalation_update_time: 0, escalation_solution_time: 0, until_time: 0,
     attachment_count: ATTACHMENT_TICKET_IDS.has(id) ? (id === 100 || id === 113 ? 2 : 1) : 0,
     has_ai_summary: AI_SUMMARY_TICKET_IDS.has(id),
+    channel: "email",
+    chat_display_name: null as string | null,
+    chat_username: null as string | null,
   };
 });
+// Two non-email tickets so the channel pills, the chat identity and the
+// channel filter chips show: a Telegram chat (114) and a logged phone call
+// (115). Both reuse the generated row shape and override what differs.
+ticketItems.push(
+  {
+    ...ticketItems[0], id: 114, tn: "20260701014", title: "Wi-Fi drops every few minutes",
+    ...QROUTE[0], ...STATES[1], ...PRIOS[1], ...OWNERS[1],
+    customer_id: "NORTHWIND", customer_user_id: "l.gomez@northwind.example",
+    create_time: "2026-07-21T08:41:00Z", change_time: "2026-07-21T09:06:00Z",
+    age_seconds: 3600, escalation_time: 0, attachment_count: 1, has_ai_summary: false,
+    channel: "telegram", chat_display_name: "Luis Gomez", chat_username: "luis_gomez",
+  },
+  {
+    ...ticketItems[0], id: 115, tn: "20260701015", title: "Callback: duplicate charge on invoice",
+    ...QROUTE[4], ...STATES[1], ...PRIOS[2], ...OWNERS[0],
+    customer_id: "GLOBEX", customer_user_id: "k.wu@globex.example",
+    create_time: "2026-07-21T10:15:00Z", change_time: "2026-07-21T10:22:00Z",
+    age_seconds: 1800, escalation_time: 0, attachment_count: 0, has_ai_summary: false,
+    channel: "phone",
+  },
+);
 /** Built on demand rather than eagerly: `ai_reply_source` is only known once
  * the article threads below have registered their AI-written articles. */
 function ticketListPage() {
@@ -114,6 +144,8 @@ function ticketListPage() {
     last_article_time: t.change_time,
     last_sender_type: senders[i % senders.length],
   }));
+  // The inbox sorts by last activity, newest first.
+  items.sort((a, b) => b.last_article_time.localeCompare(a.last_article_time));
   return { items, total: items.length, offset: 0, limit: 50 };
 }
 /** Segment / chip counts for the inbox toolbar, derived from the demo tickets
@@ -139,8 +171,12 @@ function ticketFacets() {
       locked: ticketItems.filter((t) => t.lock === "lock").length,
       unassigned: ticketItems.filter((t) => t.owner_id === 1).length,
     },
-    // Demo tickets are all e-mail, so the channel chips stay hidden.
-    channels: { email: ticketItems.length, telegram: 0, webchat: 0, phone: 0 },
+    channels: {
+      email: ticketItems.filter((t) => t.channel === "email").length,
+      telegram: ticketItems.filter((t) => t.channel === "telegram").length,
+      webchat: 0,
+      phone: ticketItems.filter((t) => t.channel === "phone").length,
+    },
   };
 }
 const ticketById = new Map(ticketItems.map((t) => [t.id, t]));
@@ -150,6 +186,9 @@ function ticketDetailFor(id: number) {
   return {
     ...item, type_id: 1, service_id: null, sla_id: null, responsible_user_id: 2,
     archive_flag: 0, create_by: 10, change_by: 1,
+    // The demo agent is an admin: every action (reply, note, chat composer) is open.
+    can_write: true,
+    permissions: { ro: true, rw: true, note: true, owner: true, priority: true, move_into: true, create: true },
     dynamic_fields: [
       { name: "Category", label: "Category", field_type: "Dropdown", values: ["Hardware"] },
       { name: "Impact", label: "Impact", field_type: "Dropdown", values: ["High"] },
@@ -165,6 +204,13 @@ type ArticleSpec = {
   day: number; hm: string; sender: "customer" | "agent";
   visible?: boolean; subject: string; from: string; to: string;
   body: string; isHtml?: boolean; channel?: number;
+  /** Channels without a fixed Znuny id (Telegram) are told apart by name. */
+  channelName?: string;
+  /** PGP / S/MIME result behind the article's security badge. */
+  security?: {
+    method: "pgp" | "smime"; signed: boolean; encrypted: boolean; status: string;
+    signer?: string; key_id?: string; detail?: string;
+  };
   attachments?: { filename: string; content_type: string; content_size: string; crypto_kind?: string }[];
   /** Written by the built-in AI agent — drives the 🤖 badge/marker in the
    * reader, both article lists, and the `/ai-origin` trace endpoint.
@@ -215,6 +261,8 @@ function registerThread(ticketId: number, specs: ArticleSpec[]) {
       id, ticket_id: ticketId, ai_origin: a.aiOrigin !== undefined,
       sender_type: a.sender, sender_type_id: a.sender === "customer" ? 3 : 1,
       communication_channel_id: a.channel ?? 1, is_visible_for_customer: a.visible ?? true,
+      ...(a.channelName ? { communication_channel_name: a.channelName } : {}),
+      security: a.security ?? null,
       create_time, create_by: a.sender === "customer" ? 10 : 1,
       subject: a.subject, from_address: a.from, to_address: a.to,
       content_type: isHtml ? "text/html" : "text/plain",
@@ -225,6 +273,53 @@ function registerThread(ticketId: number, specs: ArticleSpec[]) {
 }
 
 const html = (...paragraphs: string[]) => paragraphs.map((p) => `<p>${p}</p>`).join("");
+
+/**
+ * `POST /ai/refine` without an LLM: tidies each own section (shorthand spelled
+ * out, sentences capitalised and closed, a courteous opener) so the editor's
+ * word-level diff review has something real to show. Needs the request body,
+ * so the demo handler and the screenshot fixture call it — not `resolveData`.
+ */
+export function demoRefine(request: { segments?: { kind: string; text: string }[] }) {
+  const words: [RegExp, string][] = [
+    [/\bpls\b/gi, "please"], [/\bthx\b/gi, "thank you"], [/\basap\b/gi, "as soon as possible"],
+    [/\bu\b/g, "you"], [/\bur\b/g, "your"], [/\bi\b/g, "I"], [/\bcant\b/gi, "can't"],
+    [/\bdont\b/gi, "don't"], [/\bim\b/gi, "I'm"], [/\btmrw\b/gi, "tomorrow"],
+  ];
+  const polish = (text: string) => {
+    let out = text.trim();
+    for (const [re, to] of words) out = out.replace(re, to);
+    out = out.replace(/(^|[.!?]\s+)([a-z])/g, (_m, pre: string, c: string) => pre + c.toUpperCase());
+    if (!/[.!?:]$/.test(out)) out += ".";
+    return /^(hi|hello|dear)\b/i.test(out) ? out : `Thanks for your patience. ${out}`;
+  };
+  const sections = (request.segments ?? []).flatMap((s, id) =>
+    s.kind === "own" && s.text.trim() ? [{ id, text: polish(s.text) }] : [],
+  );
+  return { sections };
+}
+
+/** `GET …/articles/{id}/reply-draft`: To/Subject/quote the reply dialog opens with. */
+function replyDraftFor(articleId: number) {
+  const article = Object.values(articlesByTicket).flat()
+    .find((a) => (a as { id: number }).id === articleId) as
+    | { subject: string; from_address: string; to_address: string } | undefined;
+  const body = bodiesById[articleId] as { body: string } | undefined;
+  const subject = article?.subject ?? "";
+  // Our own article → answer its recipient (the customer), like the backend.
+  const ours = article?.from_address === "support@example.com";
+  const plain = (body?.body ?? "")
+    .replace(/<br\s*\/?>/g, "\n").replace(/<\/p>/g, "\n\n").replace(/<[^>]+>/g, "").trim();
+  return {
+    to_address: (ours ? article?.to_address : article?.from_address) ?? "",
+    subject: subject.startsWith("Re:") ? subject : `Re: ${subject}`,
+    body: `\n\n${plain.split("\n").map((l) => `> ${l}`).join("\n")}`,
+    is_html: false,
+    signature: "Best regards,\nIT Support",
+    signature_is_html: false,
+    cc: null, in_reply_to: null, references: null,
+  };
+}
 
 let demoKeyImported = false;
 /** `GET|POST …/attachments/{id}/pgp-key[/import]` for the demo's signed mail. */
@@ -271,6 +366,11 @@ registerThread(101, [
       "Hi team, I'm working from home this week and need VPN access to reach the internal file server and our ticketing system. My manager approved this by email (forwarding separately) — I should be added to the 'Engineering' VPN group. I'm on a company-issued MacBook.",
       "Thanks,<br>Marcus",
     ),
+    security: {
+      method: "pgp", signed: true, encrypted: false, status: "verified",
+      signer: "Marcus Reed <m.reed@acme.example>", key_id: "3F7B2A6410E8C5D2",
+      detail: "Good signature from the key in the shared keyring.",
+    },
     // Sent PGP-signed from Outlook: the plugin's HTML copy, the sender's
     // public key and the detached signature land in "Signature & keys".
     attachments: [
@@ -315,6 +415,12 @@ registerThread(103, [
       "Hello, I'm reviewing our March invoice (INV-2026-0317) and the line item for \"Additional user licenses\" shows 12 seats, but per our contract we only added 8 additional seats in March. Could someone check billing on this? I've attached a copy of the invoice with the discrepancy highlighted.",
       "Regards,<br>Luis Gomez<br>Northwind Traders",
     ),
+    // Arrived S/MIME-encrypted and signed; stored decrypted, badge shows both.
+    security: {
+      method: "smime", signed: true, encrypted: true, status: "decrypted",
+      signer: "CN=Luis Gomez, E=l.gomez@northwind.example", key_id: "4F:2A:9C:11:D0:7E",
+      detail: "Decrypted with the queue certificate for support@example.com; signature verified against a public CA.",
+    },
     attachments: [{ filename: "invoice-march-2026.pdf", content_type: "application/pdf", content_size: "98304" }] },
   { day: 13, hm: "11:40", sender: "agent", subject: "Re: Invoice discrepancy for March",
     from: "support@example.com", to: "l.gomez@northwind.example",
@@ -511,6 +617,66 @@ registerThread(113, [
       "Best,<br>Bianca — IT Support",
     ),
     attachments: [{ filename: "backup-job-log.txt", content_type: "text/plain", content_size: "12288" }] },
+]);
+
+// Telegram chat (ticket 114). The channel is created lazily by the gateway, so
+// its id is installation-specific — the UI keys on the name "Telegram".
+const TELEGRAM_CHANNEL_ID = 5;
+const tg = (spec: Omit<ArticleSpec, "subject" | "channel" | "channelName" | "isHtml" | "from" | "to">): ArticleSpec => ({
+  ...spec, subject: "Telegram", channel: TELEGRAM_CHANNEL_ID, channelName: "Telegram", isHtml: false,
+  from: spec.sender === "customer" ? "Luis Gomez" : "Bianca Shah", to: "",
+});
+registerThread(114, [
+  tg({ day: 21, hm: "08:41", sender: "customer",
+    body: "Hi! Our office Wi-Fi drops every few minutes since yesterday. Laptops and phones both lose the connection, the cable connection is fine." }),
+  tg({ day: 21, hm: "08:42", sender: "customer", body: "This is how the router looks right now",
+    attachments: [{ filename: "router-leds.jpg", content_type: "image/jpeg", content_size: "148220" }] }),
+  tg({ day: 21, hm: "08:50", sender: "agent",
+    body: "Hi Luis, thanks for the photo — the orange WLAN LED means the 5 GHz radio keeps restarting. Which channel is it on? You'll find it under Wi-Fi › Advanced in the router menu." }),
+  tg({ day: 21, hm: "08:56", sender: "customer", body: "It says channel 100, set to automatic." }),
+  tg({ day: 21, hm: "09:02", sender: "agent",
+    body: "Channel 100 is a DFS channel: when the router detects radar it has to leave it for a minute, which looks exactly like a dropout. Please pin it to channel 36 and save. Is the connection stable now?" }),
+  tg({ day: 21, hm: "09:06", sender: "customer", body: "Yes, it's stable 👍" }),
+]);
+const telegramChat114 = {
+  chat_id: 700123456, username: "luis_gomez", display_name: "Luis Gomez",
+  customer_user_login: "l.gomez@northwind.example", identity_verified: true,
+  consent_time: "2026-07-21T08:40:00Z", ai_escalated_at: null,
+  messages: [
+    { article_id: baseArticleId(114) + 2, direction: "out", buttons: [], answered_button: null,
+      reply_to_article_id: baseArticleId(114) + 1, editable: false, edited_at: null, retracted_at: null },
+    { article_id: baseArticleId(114) + 3, direction: "in", buttons: [], answered_button: null,
+      reply_to_article_id: baseArticleId(114) + 2, editable: false, edited_at: null, retracted_at: null },
+    { article_id: baseArticleId(114) + 4, direction: "out", answered_button: 0,
+      buttons: [{ label: "Yes, it's stable", action: "resolve_yes" }, { label: "Still dropping", action: "resolve_no" }],
+      reply_to_article_id: null, editable: true, edited_at: "2026-07-21T09:03:00Z", retracted_at: null },
+  ],
+};
+
+/** `GET /reference/caller?number=…` — the CTI popup and phone form resolve
+ * the caller to this customer and their open ticket. */
+export const demoCallerLookup = {
+  number_normalized: "+15550142",
+  customers: [{ login: "k.wu@globex.example", customer_id: "GLOBEX", name: "Karen Wu", company: "Globex",
+    email: "k.wu@globex.example", phone: "+1 555 0142", mobile: null }],
+  open_tickets: [{ id: 115, tn: "20260701015", title: "Callback: duplicate charge on invoice", queue: "Billing",
+    state: "open", customer_user_id: "k.wu@globex.example", changed: "2026-07-21T10:22:00Z" }],
+};
+
+const chatSnippets = [
+  { id: 41, name: "Greeting", template_type: "Chat", content_type: "text/plain", text: "Hi <OTRS_CUSTOMER_REALNAME>, thanks for reaching out — I'm on it." },
+  { id: 42, name: "Restart router", template_type: "Chat", content_type: "text/plain", text: "Please unplug the router for 30 seconds, plug it back in and wait until the LEDs are steady." },
+  { id: 43, name: "Anything else?", template_type: "Chat", content_type: "text/plain", text: "Glad it works again! Anything else I can help with?" },
+];
+
+// Phone ticket (115): the inbound call the agent logged, then the callback.
+registerThread(115, [
+  { day: 21, hm: "10:15", sender: "customer", channel: 2, isHtml: false,
+    subject: "Callback: duplicate charge on invoice", from: "Karen Wu <k.wu@globex.example>", to: "Billing",
+    body: "Inbound call, 4 min. Karen sees the July subscription charged twice on the company card (two identical amounts on the 3rd). Asked for a refund of the duplicate and a corrected invoice. Promised a callback once billing has checked the payment run." },
+  { day: 21, hm: "10:22", sender: "agent", channel: 2, isHtml: false,
+    subject: "Outbound call", from: "Alex Turner", to: "Karen Wu <k.wu@globex.example>",
+    body: "Outbound call, 2 min. Confirmed the double capture from the payment provider's retry. Refund of the duplicate triggered, 3–5 business days. Corrected invoice follows by email." },
 ]);
 
 // AI subsystem (state-only summary + drafts) for the demo ticket. Static,
@@ -755,8 +921,8 @@ function llmModel(
 const aiModels = [
   llmModel(1, 1, "gpt-4o", "GPT-4o", true, true, 2.5, 10, ["Agent"]),
   llmModel(2, 2, "claude-sonnet-4", "Claude Sonnet 4", true, true, 3, 15, ["Agent"]),
-  llmModel(3, 3, "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen3 235B", true, false, 0.2, 0.6, ["Schnell"]),
-  llmModel(4, 3, "Qwen/Qwen2.5-VL-72B-Instruct", "Qwen2.5-VL 72B", false, true, 0.25, 0.75, ["Bilder"]),
+  llmModel(3, 3, "Qwen/Qwen3-235B-A22B-Instruct-2507", "Qwen3 235B", true, false, 0.2, 0.6, ["Fast"]),
+  llmModel(4, 3, "Qwen/Qwen2.5-VL-72B-Instruct", "Qwen2.5-VL 72B", false, true, 0.25, 0.75, ["Vision"]),
 ];
 function profileEntry(modelId: number) {
   const m = aiModels[modelId - 1];
@@ -767,15 +933,15 @@ function profileEntry(modelId: number) {
   };
 }
 const aiProfiles = [
-  { id: 1, name: "Agent", description: "Hauptmodell mit Ausweichmodell bei Ausfall",
+  { id: 1, name: "Agent", description: "Main model with a fallback if it fails",
     timeout_seconds: 60, valid_id: 1, entries: [profileEntry(1), profileEntry(2)],
     used_by: [{ task: "agent", queue_policy_id: null, queue_name: null }],
     create_time: t0, change_time: t0 },
-  { id: 2, name: "Bilder", description: null, timeout_seconds: 45, valid_id: 1,
+  { id: 2, name: "Vision", description: null, timeout_seconds: 45, valid_id: 1,
     entries: [profileEntry(4)],
     used_by: [{ task: "vision", queue_policy_id: null, queue_name: null }],
     create_time: t0, change_time: t0 },
-  { id: 3, name: "Schnell", description: "Günstig, für Zusammenfassungen", timeout_seconds: null,
+  { id: 3, name: "Fast", description: "Cheap, for summaries", timeout_seconds: null,
     valid_id: 1, entries: [profileEntry(3)],
     used_by: [
       { task: "summary", queue_policy_id: null, queue_name: null },
@@ -1067,7 +1233,11 @@ const adminRoles = [
 const adminQueuesFull = agentQueues.flatMap((q) => [q, ...q.children]).map((q) => ({
   id: q.id, name: q.name, group_id: q.group_id, unlock_timeout: 1440, first_response_time: 60,
   first_response_notify: 80, update_time: null, update_notify: null, solution_time: 480, solution_notify: 90,
-  system_address_id: 1, calendar_name: null, default_sign_key: null, salutation_id: 1, signature_id: 1,
+  system_address_id: 1, salutation_id: 1, signature_id: 1, calendar_name: null,
+  // Support queues sign with the shared PGP key and encrypt when they can.
+  default_sign_key: q.group_id === 2 ? "PGP::Detached::B4B9F38C" : null,
+  email_sign_default: q.group_id === 2 ? true : null,
+  email_encrypt: q.group_id === 2 ? "auto" : null,
   follow_up_id: 1, follow_up_lock: 0, comments: null, valid_id: 1, create_time: t0, change_time: t0,
 }));
 const adminDynFields = [
@@ -1133,11 +1303,11 @@ const cryptoStatus = [
   },
   {
     backend: "smime",
-    enabled: false,
-    available: false,
+    enabled: true,
+    available: true,
     binary: { available: true, path: "/usr/bin/openssl", version: "OpenSSL 3.0.22", reason: "" },
-    paths: { cert_path: "", private_path: "" },
-    problems: ["SMIME::CertPath is not configured", "SMIME::PrivatePath is not configured"],
+    paths: { cert_path: "/var/lib/tiqora/smime/certs", private_path: "/var/lib/tiqora/smime/private" },
+    problems: [],
   },
 ];
 const cryptoSettings = {
@@ -1151,11 +1321,11 @@ const cryptoSettings = {
     cryptoField("pgp.options", "str", "--yes", { source: "znuny_default", znuny_setting: "PGP::Options" }),
   ],
   smime: [
-    cryptoField("smime.enabled", "bool", false, { znuny_setting: "SMIME", env_var: "TIQORA_CRYPTO_SMIME_ENABLED" }),
-    cryptoField("smime.fetch_from_customer", "bool", false, { znuny_setting: "SMIME::FetchFromCustomer" }),
+    cryptoField("smime.enabled", "bool", true, { source: "znuny", znuny_setting: "SMIME", env_var: "TIQORA_CRYPTO_SMIME_ENABLED" }),
+    cryptoField("smime.fetch_from_customer", "bool", true, { source: "tiqora", tiqora_value: true, znuny_setting: "SMIME::FetchFromCustomer" }),
     cryptoField("smime.no_verify", "bool", false, { znuny_setting: "SMIME::NoVerify" }),
-    cryptoField("smime.cert_path", "str", "", { znuny_setting: "SMIME::CertPath", env_var: "TIQORA_CRYPTO_SMIME_CERT_DIR" }),
-    cryptoField("smime.private_path", "str", "", { znuny_setting: "SMIME::PrivatePath", env_var: "TIQORA_CRYPTO_SMIME_PRIVATE_DIR" }),
+    cryptoField("smime.cert_path", "str", "/var/lib/tiqora/smime/certs", { source: "znuny", znuny_setting: "SMIME::CertPath", env_var: "TIQORA_CRYPTO_SMIME_CERT_DIR" }),
+    cryptoField("smime.private_path", "str", "/var/lib/tiqora/smime/private", { source: "znuny", znuny_setting: "SMIME::PrivatePath", env_var: "TIQORA_CRYPTO_SMIME_PRIVATE_DIR" }),
     cryptoField("smime.ca_path", "str", "", { env_var: "TIQORA_CRYPTO_SMIME_CA_PATH" }),
     cryptoField("smime.public_roots", "bool", true, { env_var: "TIQORA_CRYPTO_SMIME_PUBLIC_ROOTS" }),
     cryptoField("smime.openssl_bin", "str", "", { znuny_setting: "SMIME::Bin", env_var: "TIQORA_CRYPTO_OPENSSL_BIN" }),
@@ -1197,6 +1367,75 @@ const cryptoPgpKeys = [
     subkey_ids: [],
   },
 ];
+const smimeCert = (
+  subject: string,
+  emails: string[],
+  extra: Partial<{ has_private: boolean; is_ca: boolean; issuer: string; not_after: string; status: string; valid: boolean }> = {},
+) => {
+  const hash = (subject.length * 2654435761 >>> 0).toString(16).padStart(8, "0").slice(0, 8);
+  return {
+    subject, emails, hash, filename: `${hash}.0`,
+    fingerprint: `${hash.toUpperCase()}:9C:11:D0:7E:42:AB:3F:60:E1:5D:88:0B:C4:27:91:6A`,
+    serial: `0x${hash}1F`, issuer: "CN=Example Issuing CA, O=Example Trust",
+    not_before: "2026-01-15T00:00:00Z", not_after: "2028-01-15T00:00:00Z",
+    has_private: false, is_ca: false, status: "valid", valid: true, ...extra,
+  };
+};
+const smimeCerts = [
+  smimeCert("CN=Support Team, E=support@example.com, O=Example Corp", ["support@example.com"], { has_private: true }),
+  smimeCert("CN=Billing, E=billing@example.com, O=Example Corp", ["billing@example.com"], { has_private: true }),
+  smimeCert("CN=Luis Gomez, E=l.gomez@northwind.example, O=Northwind Traders", ["l.gomez@northwind.example"]),
+  smimeCert("CN=Karen Wu, E=k.wu@globex.example, O=Globex", ["k.wu@globex.example"], {
+    not_after: "2026-06-30T00:00:00Z", status: "expired", valid: false,
+  }),
+  smimeCert("CN=Example Issuing CA, O=Example Trust", [], { is_ca: true, issuer: "CN=Example Root CA, O=Example Trust", not_after: "2034-01-01T00:00:00Z" }),
+];
+
+/** `GET /admin/crypto-keys/sign-key-options`: the queue dialog's signing keys. */
+const signKeyOptions = [
+  ...["Detached", "Inline"].map((method) => ({
+    value: `PGP::${method}::B4B9F38C`, backend: "PGP", method, key: "B4B9F38C",
+    label: `PGP-${method}: [good] B4B9F38C Support Team <support@example.com>`,
+    status: "good", expires: null, emails: ["support@example.com"],
+  })),
+  ...smimeCerts.filter((c) => c.has_private).map((c) => ({
+    value: `SMIME::Detached::${c.filename}`, backend: "SMIME", method: "Detached", key: c.filename,
+    label: `SMIME-Detached: [valid] ${c.filename} [2028-01-15] ${c.emails.join(", ")}`,
+    status: "valid", expires: c.not_after, emails: c.emails,
+  })),
+];
+
+/** `GET /tickets/{id}/crypto-options`: the composer's Security control. Sign
+ * with the queue key by default; encrypt when the customer has a usable key. */
+function cryptoOptionsFor(ticketId: number | null) {
+  const to = (ticketId != null ? ticketById.get(ticketId)?.customer_user_id : null) ?? null;
+  const pgpKey = to ? cryptoPgpKeys.find((k) => k.emails.includes(to)) : undefined;
+  const smime = to ? smimeCerts.find((c) => c.emails.includes(to)) : undefined;
+  const signKey = { key: "B4B9F38C", label: "B4B9F38C Support Team <support@example.com>", status: "good", usable: true, expires: null, emails: ["support@example.com"] };
+  const recipient = (backend: "pgp" | "smime") => {
+    if (!to) return [];
+    const k = backend === "pgp"
+      ? pgpKey && { key: pgpKey.fingerprint, label: `${pgpKey.short_id} ${pgpKey.uids[0]}`, status: "good", usable: true, expires: pgpKey.expires, emails: pgpKey.emails }
+      : smime && { key: smime.filename, label: smime.subject, status: smime.valid ? "valid" : "expired", usable: smime.valid, expires: smime.not_after, emails: smime.emails };
+    return [{ address: to, status: !k ? "missing" : k.usable ? "ok" : "expired", keys: k ? [k] : [], selected: k?.usable ? [k.key] : [] }];
+  };
+  const pgpRcpts = recipient("pgp");
+  const smimeRcpts = recipient("smime");
+  const canEncrypt = pgpRcpts.length > 0 && pgpRcpts.every((r) => r.status === "ok");
+  return {
+    enabled: true, from_address: "support@example.com",
+    backends: [
+      { backend: "pgp", available: true, methods: ["detached", "inline"], sign_keys: [signKey], recipients: pgpRcpts, can_encrypt: canEncrypt },
+      { backend: "smime", available: true, methods: ["detached"],
+        sign_keys: [{ key: smimeCerts[0].filename, label: smimeCerts[0].subject, status: "valid", usable: true, expires: smimeCerts[0].not_after, emails: smimeCerts[0].emails }],
+        recipients: smimeRcpts, can_encrypt: smimeRcpts.length > 0 && smimeRcpts.every((r) => r.status === "ok") },
+    ],
+    default: { backend: "pgp", method: "detached", sign_key: "B4B9F38C", encrypt: canEncrypt, encrypt_keys: canEncrypt ? pgpRcpts[0].selected : null },
+    queue_sign: { backend: "pgp", method: "detached", sign_key: "B4B9F38C", encrypt: false },
+    modes: ["none", "sign", "encrypt", "sign_encrypt"],
+    sign_default: true, encrypt_policy: "auto", blocked: null, warnings: [],
+  };
+}
 
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
@@ -1211,7 +1450,22 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/admin/crypto-keys/status")) return cryptoStatus;
   if (p.endsWith("/api/v1/admin/crypto-settings")) return cryptoSettings;
   if (p.endsWith("/api/v1/admin/crypto-keys/pgp") && method === "GET") return cryptoPgpKeys;
-  if (p.endsWith("/api/v1/admin/crypto-keys/smime") && method === "GET") return [];
+  if (p.endsWith("/api/v1/admin/crypto-keys/smime") && method === "GET") return smimeCerts;
+  if (p.endsWith("/api/v1/admin/crypto-keys/sign-key-options")) return signKeyOptions;
+  // AI refine in the composers (the POST itself is answered by demoRefine()).
+  if (p.endsWith("/api/v1/ai/refine/availability")) return { available: true };
+  if (p.endsWith("/api/v1/tickets/crypto-options")) return cryptoOptionsFor(null);
+  if (p.match(/\/api\/v1\/tickets\/\d+\/crypto-options$/)) return cryptoOptionsFor(Number(p.split("/").slice(-2)[0]));
+  // Telegram chat meta (ticket 114 only; null = "no chat", like the API's 404).
+  if (p.match(/\/api\/v1\/tickets\/\d+\/telegram$/) && method === "GET")
+    return Number(p.split("/").slice(-2)[0]) === 114 ? telegramChat114 : null;
+  if (p.match(/\/telegram(\/typing)?$/) && method === "POST") return {};
+  // Chat snippets (template type "Chat") for the Telegram composer's / picker.
+  if (p.endsWith("/api/v1/tickets/114/templates")) return chatSnippets;
+  // Phone / CTI: no live call in the demo; caller lookup resolves the sample customer.
+  if (p.endsWith("/api/v1/reference/phone-config")) return { dial_scheme: "tel" };
+  if (p.endsWith("/api/v1/phone/calls/active")) return [];
+  if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;
   // Agent
   if (p.endsWith("/api/v1/queues")) return agentQueues;
   // Reference lookups (flat lists behind name/id joins — e.g. the queue names
@@ -1225,6 +1479,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/tickets") && method === "GET") return ticketListPage();
   if (p.endsWith("/api/v1/tickets/facets")) return ticketFacets();
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/ai-origin$/)) { const id = Number(p.split("/").slice(-2)[0]); return aiOriginByArticle[id] ?? null; }
+  if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/reply-draft$/)) return replyDraftFor(Number(p.split("/").slice(-2)[0]));
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) { const id = Number(p.split("/").slice(-2)[0]); return bodiesById[id] ?? bodiesById[500]; }
   // PGP side files (demo ticket 101): the parsed sender key + PGPexch.htm preview.
   if (p.match(/\/attachments\/\d+\/pgp-key(\/import)?$/)) return demoPgpKey(method === "POST");
