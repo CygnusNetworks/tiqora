@@ -38,8 +38,20 @@ def test_locked_by_env_is_true_only_when_env_disables_the_portal() -> None:
     assert portal_locked_by_env(_settings(portal=True)) is False
 
 
+def test_portal_is_opt_in_at_deployment_level(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TIQORA_PORTAL_ENABLED", raising=False)
+    assert Settings(environment="test").portal_enabled is False
+    monkeypatch.setenv("TIQORA_PORTAL_ENABLED", "true")
+    assert Settings(environment="test").portal_enabled is True
+
+
 @pytest.mark.asyncio
-async def test_enabled_by_default_when_neither_env_nor_db_say_otherwise() -> None:
+async def test_off_without_the_env_opt_in_even_with_no_db_row() -> None:
+    assert await portal_enabled(_FakeSession(None), Settings(environment="test")) is False
+
+
+@pytest.mark.asyncio
+async def test_env_opt_in_alone_enables_the_portal() -> None:
     assert await portal_enabled(_FakeSession(None), _settings(portal=True)) is True
 
 

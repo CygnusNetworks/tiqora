@@ -2866,7 +2866,7 @@
       "enforceAll": "ต้องมี 2FA สำหรับตัวแทนทั้งหมด",
       "enforceGroups": "ต้องมี 2FA สำหรับสมาชิกของกลุ่มเหล่านี้",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "ไม่พบกลุ่มที่ถูกต้อง",
       "saveGlobal": "บันทึกนโยบายสากล",
       "globalSaved": "บันทึกนโยบายสากลแล้ว",

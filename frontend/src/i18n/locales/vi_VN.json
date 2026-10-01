@@ -2866,7 +2866,7 @@
       "enforceAll": "Yêu cầu 2FA cho tất cả các đại lý",
       "enforceGroups": "Yêu cầu 2FA đối với thành viên của các nhóm này",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Không tìm thấy nhóm hợp lệ.",
       "saveGlobal": "Lưu chính sách toàn cầu",
       "globalSaved": "Đã lưu chính sách toàn cầu.",

@@ -2866,7 +2866,7 @@
       "enforceAll": "דרוש 2FA עבור כל הסוכנים",
       "enforceGroups": "דרוש 2FA עבור חברים בקבוצות אלה",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "לא נמצאו קבוצות חוקיות.",
       "saveGlobal": "שמור מדיניות גלובלית",
       "globalSaved": "המדיניות העולמית נשמרה.",

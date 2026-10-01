@@ -2866,7 +2866,7 @@
       "enforceAll": "Tüm temsilciler için 2FA'yı zorunlu kılın",
       "enforceGroups": "Bu grupların üyeleri için 2FA'yı zorunlu kılın",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Geçerli grup bulunamadı.",
       "saveGlobal": "Genel politikayı kaydet",
       "globalSaved": "Genel politika kaydedildi.",

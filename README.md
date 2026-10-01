@@ -343,14 +343,16 @@ make lint
 
 ### Toggling the customer portal
 
-The customer portal is on by default. There are two ways to turn it off:
+The customer portal is **off by default**: `/api/portal/*` answers 404 and `/`, `/portal`,
+and `/portal/login` all redirect to the agent login. Two switches control it:
 
-- **In the admin UI**, on the *Authentication / 2FA* page → "Customer portal available".
-  Takes effect immediately: `/api/portal/*` starts answering 404, running customer sessions
-  stop working, and `/`, `/portal`, and `/portal/login` all redirect to the agent login.
-- **At deployment level**, with `TIQORA_PORTAL_ENABLED=false`. This is a hard-off that the
-  admin switch cannot override; the UI control is disabled while it's active, and a write
-  attempt against the API returns 409.
+- **At deployment level**, `TIQORA_PORTAL_ENABLED=true` enables it. Without it the portal is
+  hard-off and the admin switch cannot override that; the UI control is disabled, and a
+  write attempt against the API returns 409.
+- **In the admin UI** (only once the env var is set), on the *Authentication / 2FA* page →
+  "Customer portal available". Takes effect immediately: turning it off makes the portal
+  API answer 404, stops running customer sessions, and sends the start page to the agent
+  login.
 
 Customer records, customer companies, and email tickets are unaffected either way. The
 Znuny-compat GenericInterface (`/znuny-compat/*`) is also unaffected — it's an integration

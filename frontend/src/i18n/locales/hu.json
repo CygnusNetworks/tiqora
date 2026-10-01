@@ -2866,7 +2866,7 @@
       "enforceAll": "2FA megkövetelése minden ügyintézőnek",
       "enforceGroups": "2FA szükséges ezeknek a csoportoknak a tagjaitól",
       "portalEnabled": "Customer portal available",
-      "portalLockedByEnv": "Disabled by this deployment (TIQORA_PORTAL_ENABLED).",
+      "portalLockedByEnv": "Disabled by this deployment (set TIQORA_PORTAL_ENABLED=true to enable).",
       "noGroups": "Nem található érvényes csoport.",
       "saveGlobal": "Mentse el a globális politikát",
       "globalSaved": "Globális szabályzat mentve.",
