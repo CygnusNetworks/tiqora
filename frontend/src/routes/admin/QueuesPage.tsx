@@ -5,6 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type QueueOut, type QueueCreate, type QueueUpdate } from "@/lib/api";
 import { AdminResourcePage } from "@/components/admin/AdminResourcePage";
 import { CRYPTO_STATUS_KEY } from "@/components/admin/cryptoSettingsQuery";
+import { EscalationMatrix } from "@/components/admin/EscalationMatrix";
+import { activeEscalationStages } from "@/components/admin/escalation";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { formatDateTime } from "@/lib/format";
@@ -24,6 +26,18 @@ function emptyToNullStr(v: unknown): string | null {
 function encryptMode(v: unknown): "off" | "auto" | "required" {
   return v === "auto" || v === "required" ? v : "off";
 }
+
+/** Znuny's seeded `follow_up_possible` names → dialog label keys. Unknown
+ * (custom) rows keep their raw name. */
+const FOLLOW_UP_LABEL_KEY: Record<string, string> = {
+  possible: "admin.queues.dialog.followUpReopen",
+  reject: "admin.queues.dialog.followUpReject",
+  "new ticket": "admin.queues.dialog.followUpNewTicket",
+};
+
+/** Znuny business-hour calendars are numbered slots (TimeZone::Calendar1–9);
+ * empty means the default calendar. */
+const CALENDAR_SLOTS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export function QueuesPage() {
   const { t, i18n } = useTranslation();
@@ -64,7 +78,9 @@ export function QueuesPage() {
     staleTime: 60 * 1000,
   });
   const cryptoActive = (cryptoStatusQ.data ?? []).some((b) => b.enabled && b.available);
-  const queueSignKeysQ = useQuery({
+  // Every queue (valid or not) — stored sign keys / calendars Tiqora cannot
+  // offer itself must stay selectable.
+  const allQueuesQ = useQuery({
     queryKey: ["admin", "queues", "sign-keys"],
     queryFn: () => api.adminQueues.list({ valid: "all", pageSize: 500 }),
     staleTime: 60 * 1000,
@@ -113,7 +129,7 @@ export function QueuesPage() {
     // Keep a value Tiqora cannot see (backend off here, key only in Znuny)
     // selectable so editing other fields does not silently drop it.
     const known = new Set(opts.map((o) => o.value));
-    for (const q of queueSignKeysQ.data?.items ?? []) {
+    for (const q of allQueuesQ.data?.items ?? []) {
       const v = q.default_sign_key;
       if (v && !known.has(v)) {
         opts.push({ value: v, label: t("admin.queues.defaultSignKeyUnknown", { value: v }) });
@@ -121,11 +137,31 @@ export function QueuesPage() {
       }
     }
     return opts;
-  }, [signKeysQ.data, queueSignKeysQ.data, t]);
+  }, [signKeysQ.data, allQueuesQ.data, t]);
   const followUpOptions = useMemo(
-    () => (followUpQ.data ?? []).map((f) => ({ value: f.id, label: f.name })),
-    [followUpQ.data],
+    () =>
+      (followUpQ.data ?? []).map((f) => {
+        const key = FOLLOW_UP_LABEL_KEY[f.name.trim().toLowerCase()];
+        return { value: f.id, label: key ? t(key) : f.name };
+      }),
+    [followUpQ.data, t],
   );
+  const calendarOptions = useMemo(() => {
+    const opts = [
+      { value: "", label: t("admin.queues.dialog.calendarDefault") },
+      ...CALENDAR_SLOTS.map((n) => ({ value: n, label: t("admin.queues.dialog.calendarN", { n }) })),
+    ];
+    // A stored value outside 1–9 (hand-edited in Znuny) must survive a save.
+    const known = new Set(opts.map((o) => o.value));
+    for (const q of allQueuesQ.data?.items ?? []) {
+      const v = q.calendar_name?.trim();
+      if (v && !known.has(v)) {
+        opts.push({ value: v, label: v });
+        known.add(v);
+      }
+    }
+    return opts;
+  }, [allQueuesQ.data, t]);
 
   const columns: DataTableColumn<QueueOut>[] = [
     { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
@@ -148,24 +184,79 @@ export function QueuesPage() {
     },
   ];
 
+  const tabGeneral = t("admin.queues.dialog.tabGeneral");
+  const tabMail = t("admin.queues.dialog.tabMail");
+  const tabEscalation = t("admin.queues.dialog.tabEscalation");
+  const tabSecurity = t("admin.queues.dialog.tabSecurity");
+  const yesNo = { on: t("admin.queues.yes"), off: t("admin.queues.no") };
+  const encryptHint: Record<string, string> = {
+    off: t("admin.queues.dialog.encryptOffHint"),
+    auto: t("admin.queues.dialog.encryptAutoHint"),
+    required: t("admin.queues.dialog.encryptRequiredHint"),
+  };
+
   const fields: FieldDef[] = [
-    { name: "name", label: t("admin.queues.name"), type: "text", required: true },
+    // --- Allgemein ---
+    {
+      name: "general_intro",
+      label: "",
+      type: "section",
+      tab: tabGeneral,
+      helpText: t("admin.queues.dialog.introGeneral"),
+    },
+    { name: "name", label: t("admin.queues.name"), type: "text", required: true, tab: tabGeneral },
     {
       name: "group_id",
       label: t("admin.queues.group"),
       type: "select",
       required: true,
       options: groupOptions,
+      tab: tabGeneral,
+      helpText: t("admin.queues.dialog.groupHint"),
       help: { title: t("admin.queues.group"), description: t("admin.help.queues.group") },
     },
     {
+      name: "unlock_timeout",
+      label: t("admin.queues.dialog.unlockTimeout"),
+      type: "number",
+      unit: t("admin.queues.dialog.unitMinutesShort"),
+      tab: tabGeneral,
+      helpText: t("admin.queues.dialog.unlockTimeoutHint"),
+    },
+    {
+      name: "valid_id",
+      label: t("admin.table.status"),
+      type: "switch",
+      switchValues: { on: 1, off: 2 },
+      switchLabels: { on: t("admin.table.valid"), off: t("admin.table.invalid") },
+      tab: tabGeneral,
+      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
+    },
+    {
+      name: "comments",
+      label: t("admin.queues.dialog.comment"),
+      type: "textarea",
+      rows: 2,
+      tab: tabGeneral,
+    },
+
+    // --- Mails & Antworten ---
+    {
+      name: "mail_intro",
+      label: "",
+      type: "section",
+      tab: tabMail,
+      helpText: t("admin.queues.dialog.introMail"),
+    },
+    {
       name: "system_address_id",
-      label: t("admin.queues.systemAddress"),
+      label: t("admin.queues.dialog.sender"),
       type: "select",
       required: true,
       options: systemAddressOptions,
+      tab: tabMail,
       help: {
-        title: t("admin.queues.systemAddress"),
+        title: t("admin.queues.dialog.sender"),
         description: t("admin.help.queues.systemAddress"),
       },
     },
@@ -175,6 +266,8 @@ export function QueuesPage() {
       type: "select",
       required: true,
       options: salutationOptions,
+      width: "half",
+      tab: tabMail,
     },
     {
       name: "signature_id",
@@ -182,101 +275,100 @@ export function QueuesPage() {
       type: "select",
       required: true,
       options: signatureOptions,
+      width: "half",
+      tab: tabMail,
+    },
+    {
+      name: "follow_up_section",
+      label: t("admin.queues.dialog.followUpSection"),
+      type: "section",
+      tab: tabMail,
+      helpText: t("admin.queues.dialog.followUpIntro"),
     },
     {
       name: "follow_up_id",
-      label: t("admin.queues.followUp"),
-      type: "select",
+      label: t("admin.queues.dialog.followUp"),
+      type: "segmented",
       required: true,
       options: followUpOptions,
+      tab: tabMail,
       help: { title: t("admin.queues.followUp"), description: t("admin.help.queues.followUp") },
     },
     {
       name: "follow_up_lock",
-      label: t("admin.queues.followUpLock"),
-      type: "select",
-      options: [
-        { value: 0, label: t("admin.queues.no") },
-        { value: 1, label: t("admin.queues.yes") },
-      ],
+      label: t("admin.queues.dialog.followUpLock"),
+      type: "switch",
+      switchValues: { on: 1, off: 0 },
+      switchLabels: yesNo,
+      tab: tabMail,
+      helpText: t("admin.queues.dialog.followUpLockHint"),
       help: {
-        title: t("admin.queues.followUpLock"),
+        title: t("admin.queues.dialog.followUpLock"),
         description: t("admin.help.queues.followUpLock"),
       },
     },
+
+    // --- Eskalation ---
     {
-      name: "unlock_timeout",
-      label: t("admin.queues.unlockTimeout"),
-      type: "number",
-      helpText: t("admin.queues.unlockTimeoutHelp"),
+      name: "escalation_intro",
+      label: "",
+      type: "section",
+      tab: tabEscalation,
+      helpText: t("admin.queues.dialog.introEscalation"),
     },
     {
-      name: "first_response_time",
-      label: t("admin.queues.firstResponseTime"),
-      type: "number",
-      helpText: t("admin.queues.escalationTimeHelp"),
-    },
-    {
-      name: "first_response_notify",
-      label: t("admin.queues.firstResponseNotify"),
-      type: "number",
-      helpText: t("admin.queues.notifyHelp"),
-    },
-    {
-      name: "update_time",
-      label: t("admin.queues.updateTime"),
-      type: "number",
-      helpText: t("admin.queues.escalationTimeHelp"),
-    },
-    {
-      name: "update_notify",
-      label: t("admin.queues.updateNotify"),
-      type: "number",
-      helpText: t("admin.queues.notifyHelp"),
-    },
-    {
-      name: "solution_time",
-      label: t("admin.queues.solutionTime"),
-      type: "number",
-      helpText: t("admin.queues.escalationTimeHelp"),
-    },
-    {
-      name: "solution_notify",
-      label: t("admin.queues.solutionNotify"),
-      type: "number",
-      helpText: t("admin.queues.notifyHelp"),
+      // Edits the six first_response/update/solution _time/_notify fields;
+      // its own value is never sent.
+      name: "escalation_matrix",
+      label: "",
+      type: "custom",
+      layout: "block",
+      tab: tabEscalation,
+      render: (_value, _onChange, values, ctx) => (
+        <EscalationMatrix values={values} onChange={ctx.setValue} idFor={ctx.idFor} />
+      ),
     },
     {
       name: "calendar_name",
-      label: t("admin.queues.calendarName"),
-      type: "text",
+      label: t("admin.queues.dialog.calendar"),
+      type: "select",
+      options: calendarOptions,
+      rowTone: "subtle",
+      tab: tabEscalation,
+      helpText: t("admin.queues.dialog.calendarHint"),
       help: {
-        title: t("admin.queues.calendarName"),
+        title: t("admin.queues.dialog.calendar"),
         description: t("admin.help.queues.calendarName"),
       },
     },
+
+    // --- E-Mail-Sicherheit (only while PGP or S/MIME runs) ---
     {
       name: "email_security_section",
-      label: t("admin.queues.emailSecurity"),
+      label: "",
       type: "section",
+      tab: tabSecurity,
       helpText: t("admin.queues.emailSecurityHint"),
       showIf: () => cryptoActive,
     },
     {
       name: "default_sign_key",
-      label: t("admin.queues.defaultSignKey"),
+      label: t("admin.queues.dialog.signKey"),
       type: "select",
       options: signKeyOptions,
+      tab: tabSecurity,
       showIf: () => cryptoActive,
       help: {
-        title: t("admin.queues.defaultSignKey"),
+        title: t("admin.queues.dialog.signKey"),
         description: t("admin.help.queues.defaultSignKey"),
       },
     },
     {
       name: "email_sign_default",
       label: t("admin.queues.emailSignDefault"),
-      type: "checkbox",
+      type: "switch",
+      switchLabels: yesNo,
+      tab: tabSecurity,
       showIf: (v) => cryptoActive && Boolean(v.default_sign_key),
       help: {
         title: t("admin.queues.emailSignDefault"),
@@ -285,29 +377,20 @@ export function QueuesPage() {
     },
     {
       name: "email_encrypt",
-      label: t("admin.queues.emailEncrypt"),
-      type: "select",
+      label: t("admin.queues.dialog.encrypt"),
+      type: "segmented",
       options: [
-        { value: "off", label: t("admin.queues.emailEncryptOff") },
-        { value: "auto", label: t("admin.queues.emailEncryptAuto") },
-        { value: "required", label: t("admin.queues.emailEncryptRequired") },
+        { value: "off", label: t("admin.queues.dialog.encryptOff") },
+        { value: "auto", label: t("admin.queues.dialog.encryptAuto") },
+        { value: "required", label: t("admin.queues.dialog.encryptRequired") },
       ],
+      tab: tabSecurity,
+      helpText: (v) => encryptHint[encryptMode(v.email_encrypt)],
       showIf: () => cryptoActive,
       help: {
-        title: t("admin.queues.emailEncrypt"),
+        title: t("admin.queues.dialog.encrypt"),
         description: t("admin.help.queues.emailEncrypt"),
       },
-    },
-    { name: "comments", label: t("admin.table.comments"), type: "textarea" },
-    {
-      name: "valid_id",
-      label: t("admin.table.status"),
-      type: "select",
-      options: [
-        { value: 1, label: t("admin.table.valid") },
-        { value: 2, label: t("admin.table.invalid") },
-      ],
-      help: { title: t("admin.table.status"), description: t("admin.help.common.validId") },
     },
   ];
 
@@ -316,10 +399,22 @@ export function QueuesPage() {
       resourceKey="queues"
       title={t("admin.queues.title_plural")}
       newLabel={t("admin.queues.new")}
+      editTitle={(row) => t("admin.queues.dialog.editTitle", { name: row.name })}
       api={api.adminQueues}
       idOf={(r) => r.id}
       columns={columns}
       fields={fields}
+      drawer={{
+        size: "xl",
+        appearance: "settings",
+        stableTabHeight: true,
+        footerStatus: (v) => {
+          const count = activeEscalationStages(v);
+          return count > 0
+            ? t("admin.queues.dialog.escalationActive", { count })
+            : t("admin.queues.dialog.escalationNone");
+        },
+      }}
       toFormValues={(row) =>
         row
           ? {

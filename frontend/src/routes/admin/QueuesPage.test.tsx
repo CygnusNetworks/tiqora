@@ -186,9 +186,7 @@ describe("QueuesPage", () => {
       "system_address_id",
       "salutation_id",
       "signature_id",
-      "follow_up_id",
-      "follow_up_lock",
-      "valid_id",
+      "calendar_name",
     ] as const;
 
     // CrudDrawer renders selects as SelectMenu trigger buttons now (no
@@ -197,6 +195,20 @@ describe("QueuesPage", () => {
       const el = screen.getByTestId(`admin-form-${name}`);
       expect(el.tagName).toBe("BUTTON");
     }
+
+    // Yes/no and valid/invalid are switches, the follow-up option a
+    // radiogroup with translated labels mapped from the API's raw names.
+    expect(screen.getByTestId("admin-form-follow_up_lock")).toHaveAttribute("role", "switch");
+    expect(screen.getByTestId("admin-form-valid_id")).toHaveAttribute("role", "switch");
+    expect(screen.getByTestId("admin-form-valid_id")).toBeChecked();
+    const followUp = screen.getByTestId("admin-form-follow_up_id");
+    expect(followUp).toHaveAttribute("role", "radiogroup");
+    expect(within(followUp).getAllByRole("radio", { hidden: true }).map((r) => r.textContent)).toEqual([
+      "Reopen",
+      "Reject",
+      "New ticket",
+    ]);
+    expect(screen.getByTestId("admin-form-follow_up_id-1")).toHaveAttribute("aria-checked", "true");
 
     // Options show human names, not bare numeric labels alone — open each
     // menu and look inside its portal panel.
@@ -212,7 +224,7 @@ describe("QueuesPage", () => {
     };
     openAndExpect("admin-form-group_id", ["users"]);
     openAndExpect("admin-form-system_address_id", ["Znuny System <znuny@localhost>"]);
-    openAndExpect("admin-form-follow_up_id", ["possible", "reject"]);
+    openAndExpect("admin-form-calendar_name", ["Default (around the clock)", "Calendar 1"]);
 
     // Escalation notify fields are number inputs labelled as % notify.
     for (const name of ["first_response_notify", "update_notify", "solution_notify"] as const) {
@@ -276,6 +288,121 @@ describe("QueuesPage", () => {
     await screen.findByTestId("admin-form-group_id");
     expect(screen.queryByTestId("admin-form-email_encrypt")).toBeNull();
     expect(screen.queryByTestId("admin-form-default_sign_key")).toBeNull();
+    // …and with it the whole "Email security" tab.
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "General",
+      "Mail & replies",
+      "Escalation",
+    ]);
+  });
+
+  async function openEdit() {
+    await waitFor(() => expect(screen.getByText("Support")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("admin-row-menu-trigger-7"));
+    fireEvent.click(await screen.findByTestId("admin-row-edit-7"));
+    await screen.findByTestId("admin-form-group_id");
+  }
+
+  it("splits the dialog into four tabs with sentence-case labels", async () => {
+    renderPage();
+    await openEdit();
+    await waitFor(() =>
+      expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+        "General",
+        "Mail & replies",
+        "Escalation",
+        "Email security",
+      ]),
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent('Edit queue “Support”');
+    const label = document.getElementById("admin-form-unlock_timeout-label");
+    expect(label).toHaveTextContent("Unlock locked tickets after");
+    expect(label?.className).not.toContain("uppercase");
+    // Footer summarises the escalation setup.
+    expect(screen.getByTestId("admin-form-status")).toHaveTextContent("No escalation set");
+  });
+
+  it("escalation matrix humanizes minutes and gates the warning %", async () => {
+    renderPage();
+    await openEdit();
+    fireEvent.click(screen.getByRole("tab", { name: "Escalation" }));
+
+    const minutes = screen.getByTestId("admin-form-first_response_time");
+    const pct = screen.getByTestId("admin-form-first_response_notify");
+    expect(pct).toBeDisabled();
+    expect(screen.getByTestId("admin-form-escalation-firstResponse-state")).toHaveTextContent("off");
+
+    fireEvent.change(minutes, { target: { value: "150" } });
+    expect(pct).toBeEnabled();
+    expect(screen.getByTestId("admin-form-first_response_time-human")).toHaveTextContent(
+      "= 2 h 30 min",
+    );
+    expect(screen.getByTestId("admin-form-escalation-firstResponse-state")).toHaveTextContent(
+      "active",
+    );
+    fireEvent.change(pct, { target: { value: "80" } });
+    expect(screen.getByTestId("admin-form-first_response_notify-human")).toHaveTextContent(
+      "after 2 h",
+    );
+    expect(screen.getByTestId("admin-form-status")).toHaveTextContent(
+      "1 escalation stage active",
+    );
+
+    fireEvent.change(minutes, { target: { value: "0" } });
+    expect(pct).toBeDisabled();
+    expect(screen.getByTestId("admin-form-first_response_time-human")).toHaveTextContent("");
+  });
+
+  it("saves the same API payload as before the redesign", async () => {
+    update.mockResolvedValue({ ...sampleQueue });
+    list.mockResolvedValue({
+      items: [{ ...sampleQueue, calendar_name: "2", update_notify: 50 }],
+      total: 1,
+      page: 1,
+      page_size: 25,
+    });
+    renderPage();
+    await openEdit();
+
+    fireEvent.change(screen.getByTestId("admin-form-unlock_timeout"), { target: { value: "20" } });
+    fireEvent.click(screen.getByTestId("admin-form-valid_id"));
+    fireEvent.click(screen.getByTestId("admin-form-follow_up_id-3"));
+    fireEvent.click(screen.getByTestId("admin-form-follow_up_lock"));
+    fireEvent.change(screen.getByTestId("admin-form-first_response_time"), {
+      target: { value: "150" },
+    });
+    fireEvent.change(screen.getByTestId("admin-form-first_response_notify"), {
+      target: { value: "80" },
+    });
+    fireEvent.change(screen.getByTestId("admin-form-solution_time"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("admin-form-email_encrypt-required"));
+    fireEvent.click(screen.getByTestId("admin-form-submit"));
+
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+    expect(update.mock.calls[0][0]).toBe(7);
+    expect(update.mock.calls[0][1]).toEqual({
+      name: "Support",
+      group_id: 1,
+      system_address_id: 1,
+      salutation_id: 1,
+      signature_id: 1,
+      follow_up_id: 3,
+      follow_up_lock: 1,
+      unlock_timeout: 20,
+      first_response_time: 150,
+      first_response_notify: 80,
+      update_time: null,
+      // A % kept while its stage is off is passed through untouched.
+      update_notify: 50,
+      solution_time: null,
+      solution_notify: null,
+      calendar_name: "2",
+      default_sign_key: null,
+      email_sign_default: true,
+      email_encrypt: "required",
+      comments: null,
+      valid_id: 2,
+    });
   });
 });
 
