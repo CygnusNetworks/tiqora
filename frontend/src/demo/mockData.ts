@@ -1119,6 +1119,23 @@ const aiUsageItems = aiAuditItems.slice(0, 8).map((e, i) => ({
   prompt_tokens: e.prompt_tokens, completion_tokens: e.completion_tokens,
   cost_hint: e.cost, success: e.error === null, error: e.error,
 }));
+// Budget status: queue 2 has used up its daily token budget (bell entry,
+// red figure in the queue list), queue 4 is well within it.
+const aiLimits = {
+  items: [
+    {
+      kind: "queue_tokens_day", subject_id: 2, subject_name: "Support::Level 1", window: "day",
+      used: 3_120_000, limit: 3_000_000, currency: null, exhausted: true,
+      window_start: "2026-10-01T00:00:00Z", resets_at: "2026-10-02T00:00:00Z",
+    },
+    {
+      kind: "queue_tokens_day", subject_id: 4, subject_name: "Incidents", window: "day",
+      used: 41_000, limit: 200_000, currency: null, exhausted: false,
+      window_start: "2026-10-01T00:00:00Z", resets_at: "2026-10-02T00:00:00Z",
+    },
+  ],
+};
+
 const aiUsagePage = {
   items: aiUsageItems,
   total: aiUsageItems.length,
@@ -1581,6 +1598,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/admin\/ai\/audit\/\d+$/) && method === "GET") return aiAuditDetail;
   if (p.endsWith("/admin/ai/audit") && method === "GET") return aiAuditPage;
   if (p.endsWith("/admin/ai/usage") && method === "GET") return aiUsagePage;
+  if (p.endsWith("/admin/ai/limits") && method === "GET") return aiLimits;
   // Everything else under /admin (aux lookups: system-addresses, salutations,
   // signatures, states, priorities, …) → bare array so `.map` consumers work.
   if (p.includes("/admin/") && method === "GET") return [];

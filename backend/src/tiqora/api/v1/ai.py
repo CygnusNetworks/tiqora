@@ -198,6 +198,10 @@ class AiStateOut(BaseModel):
     ai_escalated_at: UtcDateTime | None = None
     ai_paused_at: UtcDateTime | None = None
     ai_paused_by_name: str | None = None
+    # Why the auto worker last skipped a customer article (cap or model
+    # unavailable) — see tiqora.ai.auto_worker._record_skip.
+    auto_skip_reason: str | None = None
+    auto_skip_at: UtcDateTime | None = None
     triage: AiTriageOut | None = None
 
 
@@ -611,6 +615,8 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         ai_escalated_at=state.ai_escalated_at if state else None,
         ai_paused_at=state.ai_paused_at if state else None,
         ai_paused_by_name=await _paused_by_name(session, state),
+        auto_skip_reason=state.auto_skip_reason if state else None,
+        auto_skip_at=state.auto_skip_at if state else None,
         triage=await _open_triage_out(session, ticket_id),
     )
 

@@ -10,6 +10,7 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { addNotification } from "@/lib/notificationStore";
 import { receiveCallEvent, type CallEventMessage } from "@/lib/callPopup";
+import { AI_LIMITS_QUERY_KEY } from "@/lib/aiLimits";
 
 type TicketChangedMessage = {
   type: "ticket_changed";
@@ -31,11 +32,18 @@ type TicketNewInQueueMessage = {
   queue_name: string;
 };
 
+/** Admin-only: an AI budget limit was reached. Carries no details — the
+ * admin bell re-reads `GET /api/v1/admin/ai/limits`. */
+type AiLimitChangedMessage = {
+  type: "ai_limit_changed";
+};
+
 export type SSEMessage =
   | TicketChangedMessage
   | PresenceChangedMessage
   | TicketNewInQueueMessage
-  | CallEventMessage;
+  | CallEventMessage
+  | AiLimitChangedMessage;
 
 /** Cache key used by TicketZoomPage's presence poll — kept here so useSSE's
  * invalidation and the query that reads it never drift apart. */
@@ -73,6 +81,11 @@ export function handleSSEMessage(queryClient: QueryClient, raw: string): void {
     // presence state itself is never pushed over SSE, only this marker —
     // clients react by refetching GET .../presence instead.
     void queryClient.invalidateQueries({ queryKey: presenceQueryKey(message.ticket_id) });
+    return;
+  }
+
+  if (message.type === "ai_limit_changed") {
+    void queryClient.invalidateQueries({ queryKey: AI_LIMITS_QUERY_KEY });
     return;
   }
 

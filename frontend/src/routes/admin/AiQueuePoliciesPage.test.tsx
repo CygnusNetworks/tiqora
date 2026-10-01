@@ -27,6 +27,7 @@ const listProfiles = vi.fn();
 const getTaskDefaults = vi.fn();
 const listMcpClients = vi.fn();
 const listUsage = vi.fn();
+const listLimits = vi.fn();
 
 vi.mock("@/lib/aiApi", () => ({
   aiApi: {
@@ -36,6 +37,7 @@ vi.mock("@/lib/aiApi", () => ({
     getTaskDefaults: (...args: unknown[]) => getTaskDefaults(...args),
     listMcpClients: (...args: unknown[]) => listMcpClients(...args),
     listUsage: (...args: unknown[]) => listUsage(...args),
+    listLimits: (...args: unknown[]) => listLimits(...args),
   },
 }));
 
@@ -98,6 +100,8 @@ describe("AiQueuePoliciesPage", () => {
     getTaskDefaults.mockReset();
     listMcpClients.mockReset();
     listUsage.mockReset();
+    listLimits.mockReset();
+    listLimits.mockResolvedValue({ items: [] });
 
     listReferenceQueues.mockResolvedValue([
       { id: 10, name: "Support" },
@@ -134,6 +138,28 @@ describe("AiQueuePoliciesPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("admin-ai-queues-table")).toHaveTextContent("Support");
     });
+  });
+
+  it("shows today's spend against the daily token budget", async () => {
+    const budget = {
+      kind: "queue_tokens_day",
+      subject_id: 10,
+      subject_name: "Support",
+      window: "day",
+      used: 3_250_000,
+      limit: 3_000_000,
+      currency: null,
+      exhausted: true,
+      window_start: "2026-10-01T00:00:00Z",
+      resets_at: "2026-10-02T00:00:00Z",
+    };
+    listLimits.mockResolvedValue({ items: [budget] });
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("admin-ai-queue-budget-1")).toHaveTextContent(
+        i18n.t("admin.ai.queues.list.budgetExhausted", { amount: "3.25 / 3" }),
+      ),
+    );
   });
 
   it("shows the profile “Recherche und Werkzeuge” runs on in each queue", async () => {

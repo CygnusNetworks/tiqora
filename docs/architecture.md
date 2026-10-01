@@ -598,6 +598,7 @@ shows them. The queue tree is sorted case-insensitively.
 |---|---|
 | `GET /health` | Liveness (process up) |
 | `GET /ready` | Readiness (DB/Redis connectivity) |
+| `GET /health/ai` | AI budget caps: `status` `ok` / `limit_reached` plus the exhausted caps (kind, id, window; always HTTP 200) — see [ai-integration.md](ai-integration.md) |
 | `GET /metrics` | Prometheus metrics (latencies, queue depth, poller lag) |
 | structlog JSON | Request and worker logs |
 | `deploy/zabbix/` | Zabbix template placeholder (planned: HTTP agent on metrics/JSON; not yet authored) |

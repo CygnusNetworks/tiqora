@@ -598,6 +598,13 @@ async def test_budget_tokens_day_exceeded_blocks_run(
         _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
         totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
         assert totals["auto_replies"] == 0
+
+        # The skip is recorded on the ticket for the AI panel, not only logged.
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.auto_skip_reason == "budget_tokens_day"
+            assert state.auto_skip_at is not None
     finally:
         await engine.dispose()
 

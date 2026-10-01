@@ -53,6 +53,7 @@ from tiqora.ai.context import (
 )
 from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
+from tiqora.ai.limits import queue_tokens_used_today
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm_routing import (
     TASK_AGENT,
@@ -63,7 +64,6 @@ from tiqora.ai.llm_routing import (
 )
 from tiqora.ai.models import (
     FEATURE_AUTO_REPLY,
-    FEATURE_TRIAGE,
     TRIAGE_STATUS_OPEN,
     TiqoraAiQueuePolicy,
     TiqoraAiTicketState,
@@ -135,32 +135,24 @@ async def _auto_replies_last_hour(session: AsyncSession, *, queue_id: int | None
 
 
 async def _tokens_used_today(session: AsyncSession, queue_id: int) -> int:
-    """Tokens this queue has spent today, across every feature that
-    ``budget_tokens_day`` is meant to cap.
-
-    Triage is counted here even though it is not an auto-reply: it runs from
-    the same worker, on the same queue's policy and provider, and costs
-    ``triage_samples`` calls per new ticket. Filtering on auto-reply alone
-    would let a queue quietly spend several times its daily budget.
+    """Tokens this queue has spent today against ``budget_tokens_day`` —
+    auto-reply and triage (see :func:`tiqora.ai.limits.queue_tokens_used_today`).
     ``_auto_replies_last_hour`` deliberately stays auto-reply-only — that one
     rate-limits *messages to customers*, which triage never sends.
     """
-    now = datetime.now(UTC).replace(tzinfo=None)
-    day_start = datetime(now.year, now.month, now.day)
-    total = (
-        await session.execute(
-            select(
-                func.coalesce(
-                    func.sum(TiqoraAiUsage.prompt_tokens + TiqoraAiUsage.completion_tokens), 0
-                )
-            ).where(
-                TiqoraAiUsage.feature.in_((FEATURE_AUTO_REPLY, FEATURE_TRIAGE)),
-                TiqoraAiUsage.queue_id == queue_id,
-                TiqoraAiUsage.ts >= day_start,
-            )
-        )
-    ).scalar_one()
-    return int(total)
+    return await queue_tokens_used_today(session, queue_id)
+
+
+async def _record_skip(
+    session: AsyncSession, state: TiqoraAiTicketState, reason: str | None
+) -> None:
+    """Remember (or clear, ``None``) why the auto worker skipped this ticket,
+    so the ticket's AI panel can say so instead of showing nothing."""
+    if reason is None and getattr(state, "auto_skip_reason", None) is None:
+        return
+    state.auto_skip_reason = reason
+    state.auto_skip_at = datetime.now(UTC).replace(tzinfo=None) if reason else None
+    await session.commit()
 
 
 async def _cap_reason(
@@ -333,6 +325,7 @@ async def _process_customer_article_event(
         logger.info(
             "ai_auto_worker_cap_skip", ticket_id=ticket_id, queue_id=ticket.queue_id, reason=reason
         )
+        await _record_skip(session, state, reason)
         return None
 
     # Resolving the agent chain is also the provider-budget pre-check: an
@@ -351,10 +344,12 @@ async def _process_customer_article_event(
             profile=exc.profile_name,
             details=exc.reasons,
         )
+        await _record_skip(session, state, "llm_unavailable")
         return None
     if task_llm is None:
         # No agent profile at all: an error, as before (no provider).
         raise no_profile_error(TASK_AGENT)
+    await _record_skip(session, state, None)
     bundle = await kb_bundle(session, settings, policy.service_user_id, policy)
 
     return await run_ticket_agent(

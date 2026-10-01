@@ -127,6 +127,8 @@ export type AiUsageOut = {
   error: string | null;
 };
 
+export type AiLimitOut = Schemas["AiLimitOut"];
+
 export type AiUsagePageOut = {
   items: AiUsageOut[];
   total: number;
@@ -616,6 +618,10 @@ export const aiApi = {
       },
       signal,
     });
+  },
+
+  listLimits(signal?: AbortSignal) {
+    return api.request<Schemas["AiLimitsOut"]>("GET", "/api/v1/admin/ai/limits", { signal });
   },
 
   listAcl(signal?: AbortSignal) {

@@ -262,7 +262,8 @@ describe("AiQueuePolicyEditorPage", () => {
 
     fireEvent.click(screen.getByText("Auto replies"));
     expect(screen.getByTestId("admin-ai-queue-form-max_replies_per_hour")).toHaveValue(20);
-    expect(screen.getByTestId("admin-ai-queue-form-budget_tokens_day")).toHaveValue(500000);
+    // Entered in millions of tokens: 3 = 3,000,000.
+    expect(screen.getByTestId("admin-ai-queue-form-budget_tokens_day")).toHaveValue(3);
 
     fireEvent.click(screen.getByText("Basics"));
     await waitFor(() =>
@@ -304,7 +305,37 @@ describe("AiQueuePolicyEditorPage", () => {
 
     await waitFor(() => {
       expect(createQueuePolicy).toHaveBeenCalledWith(
-        expect.objectContaining({ queue_id: 11, autonomy: "off", max_replies_per_hour: 20 }),
+        expect.objectContaining({
+          queue_id: 11,
+          autonomy: "off",
+          max_replies_per_hour: 20,
+          budget_tokens_day: 3_000_000,
+        }),
+      );
+    });
+  });
+
+  it("loads the daily token budget in millions and saves it back in tokens", async () => {
+    updateQueuePolicy.mockResolvedValue({ ...samplePolicy, budget_tokens_day: 500_000 });
+    listQueuePolicies.mockResolvedValue({
+      items: [{ ...samplePolicy, budget_tokens_day: 2_500_000 }],
+      total: 1,
+      page: 1,
+      page_size: 1,
+    });
+    renderEdit();
+    await waitFor(() => expect(screen.getByTestId("admin-ai-queue-form-system_prompt")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText("Auto replies"));
+    const field = screen.getByTestId("admin-ai-queue-form-budget_tokens_day");
+    expect(field).toHaveValue(2.5);
+    fireEvent.change(field, { target: { value: "0.5" } });
+    fireEvent.click(screen.getByTestId("admin-ai-queue-editor-save"));
+
+    await waitFor(() => {
+      expect(updateQueuePolicy).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ budget_tokens_day: 500_000 }),
       );
     });
   });

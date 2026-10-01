@@ -31,6 +31,9 @@ of two shapes:
   popup update (see :mod:`tiqora.channels.phone.cti`). Addressed: the SSE
   endpoint forwards it only to the listed agents; ``call`` is the
   ``ActiveCall`` document (id, state, number, owners, timestamps).
+* ``{"type": "ai_limit_changed"}`` — an AI budget limit was reached (see
+  :mod:`tiqora.ai.limits`). Admin-scoped: the SSE endpoint forwards it only
+  to members of the ``admin`` group, who re-read the limit status.
 
 Publishing is always best-effort: this module never raises out of its
 publish functions, so callers (outbox drain, poller, presence writes) don't
@@ -168,6 +171,15 @@ async def publish_call_event(
         "call": call,
     }
     await _publish(redis_client, payload)
+
+
+async def publish_ai_limit_changed(redis_client: redis.Redis) -> None:
+    """Publish an ``ai_limit_changed`` notice to admins. Best-effort — never raises.
+
+    Carries no limit details: the admin bell reacts by re-reading
+    ``GET /api/v1/admin/ai/limits`` (poll-via-invalidation, like presence).
+    """
+    await _publish(redis_client, {"type": "ai_limit_changed"})
 
 
 async def _publish(redis_client: redis.Redis, payload: dict[str, Any]) -> None:

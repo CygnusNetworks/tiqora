@@ -8,7 +8,17 @@
     "title": "Benachrichtigungen",
     "empty": "Keine neuen Benachrichtigungen.",
     "newTicket": "Neu in Ihrer Queue",
-    "noSubject": "(kein Betreff)"
+    "noSubject": "(kein Betreff)",
+    "aiLimits": "KI-Limit erreicht",
+    "aiLimitQueue": "Tages-Token-Budget der Queue {{name}}",
+    "aiLimitProvider": "Kostenbudget ({{window}}) von {{name}}",
+    "aiLimitWindow": {
+      "day": "Tag",
+      "week": "Woche",
+      "month": "Monat"
+    },
+    "aiLimitDetail": "{{amount}} · wieder frei ab {{time}}",
+    "aiLimitTokensUnit": "Mio. Tokens"
   },
   "onlineAgents": {
     "title": "Agenten online",
@@ -635,7 +645,17 @@
       "more": "mehr",
       "less": "weniger",
       "scopeAndInstruction": "Umfang & eigene Anweisung …",
-      "pinOpen": "Anheften (bleibt aufgeklappt)"
+      "pinOpen": "Anheften (bleibt aufgeklappt)",
+      "autoSkip": {
+        "budget_tokens_day": "Nicht automatisch beantwortet ({{dateTime}}): Das Tages-Token-Budget dieser Queue ist aufgebraucht.",
+        "queue_rate_limit": "Nicht automatisch beantwortet ({{dateTime}}): Die Queue hat ihr Limit an Auto-Antworten pro Stunde erreicht.",
+        "global_rate_limit": "Nicht automatisch beantwortet ({{dateTime}}): Das globale Limit an Auto-Antworten pro Stunde ist erreicht.",
+        "max_auto_replies": "Nicht automatisch beantwortet ({{dateTime}}): Die Höchstzahl an Auto-Antworten für dieses Ticket ist erreicht.",
+        "max_clarifications": "Nicht automatisch beantwortet ({{dateTime}}): Die Höchstzahl an Rückfragen für dieses Ticket ist erreicht.",
+        "llm_unavailable": "Nicht automatisch beantwortet ({{dateTime}}): Kein KI-Modell verfügbar (Provider deaktiviert oder Kostenbudget aufgebraucht).",
+        "other": "Nicht automatisch beantwortet ({{dateTime}}).",
+        "manualHint": "Ein KI-Entwurf lässt sich trotzdem manuell erstellen."
+      }
     },
     "toolbar": {
       "print": "Drucken",
@@ -1416,7 +1436,7 @@
         "maxClarifications": "Max. Rückfragen/Ticket",
         "maxAutoReplies": "Max. Auto-Antworten/Ticket",
         "maxRepliesPerHour": "Max. Antworten/Stunde",
-        "budgetTokensDay": "Token-Budget/Tag",
+        "budgetTokensDay": "Token-Budget/Tag (Mio.)",
         "escalationRules": "Eskalationsregeln (JSON)",
         "escalationRulesHint": "JSON-Array mit Matching-Regeln auf MCP-Tool-Ergebnisse, die eine Eskalation an einen Menschen auslösen.",
         "escalationRulesPlaceholder": "leer = keine Regeln, z. B. [{\"tool\":\"client:*\",\"match\":\"substring\",\"values\":[\"ESCALATE\"]}]",
@@ -1434,7 +1454,9 @@
           "tabUsage": "Nutzung",
           "agentProfile": "Profil: {{name}}",
           "noAgentProfile": "Kein Modellprofil ({{fallback}})",
-          "agentProfileError": "Modellprofile konnten nicht geladen werden"
+          "agentProfileError": "Modellprofile konnten nicht geladen werden",
+          "budgetToday": "heute {{amount}} Mio. Tokens",
+          "budgetExhausted": "Budget erreicht: {{amount}} Mio. Tokens"
         },
         "tab": {
           "basics": "Basis",
@@ -1762,7 +1784,7 @@
         "maxClarifications": "Maximale Anzahl automatischer Rückfragen pro Ticket, bevor eskaliert wird.",
         "maxAutoReplies": "Maximale Anzahl automatischer Antworten pro Ticket.",
         "maxRepliesPerHour": "Maximale Anzahl automatischer Antworten dieser Queue pro Stunde — Kostenbremse.",
-        "budgetTokensDay": "Tägliches Token-Budget für den Auto-Antwort-Pfad dieser Queue. Bei Überschreitung pausiert der Auto-Worker bis zum nächsten Tag.",
+        "budgetTokensDay": "Tägliches Token-Budget dieser Queue in Millionen Tokens (z. B. 3 = 3.000.000). Es zählen Auto-Antworten und Triage. Ist es aufgebraucht, beantwortet die Queue bis Mitternacht (UTC) nichts mehr automatisch; Admins werden benachrichtigt. KI-Entwürfe und Zusammenfassungen bleiben möglich.",
         "disclosureEnabled": "Hängt bei autonom gesendeten Kundenantworten einen KI-Kennzeichnungs-Footer an. Von einem Agenten übernommene und gesendete Entwürfe gelten als menschliche Antwort und erhalten keinen Footer.",
         "disclosureText": "Queue-spezifischer Kennzeichnungstext. Leer = globaler Standardtext aus den KI-Einstellungen wird verwendet.",
         "escalationRules": "JSON-Regeln, die MCP-Tool-Ergebnisse vor dem PII-Masking prüfen; jeder Treffer stoppt das automatische Senden hart und eskaliert an einen Menschen (reine ODER-Verknüpfung, keine Priorität zwischen Regeln).",

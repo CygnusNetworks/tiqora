@@ -8,10 +8,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.models import TiqoraAiUsage, TiqoraLlmModel, TiqoraLlmProvider
+
+logger = structlog.get_logger(__name__)
 
 ModelPrice = tuple[float | None, float | None]
 # (llm_model_id, model_id, price_input_per_1m, price_output_per_1m)
@@ -208,6 +211,21 @@ async def record_usage(
     session.add(row)
     await session.commit()
     await session.refresh(row)
+    # This call may just have pushed a queue or provider over its budget —
+    # tell the admins now rather than when the next run gets skipped.
+    try:
+        from tiqora.ai.limits import announce_exhausted_limits
+
+        await announce_exhausted_limits(session, ticket_id=ticket_id)
+    except Exception:  # noqa: BLE001 — a failed notice must never fail the metered call
+        logger.exception("ai_limit_announce_failed")
+        # Leave the caller a usable session: drop the failed transaction and
+        # reload the (already committed) row the rollback expired.
+        try:
+            await session.rollback()
+            await session.refresh(row)
+        except Exception:  # noqa: BLE001
+            logger.warning("ai_limit_announce_cleanup_failed")
     return row
 
 

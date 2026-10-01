@@ -622,6 +622,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/ai/limits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Ai Limits
+         * @description Every configured budget cap with today's/this window's spend — queue
+         *     token budgets and provider cost budgets. Drives the admin bell (exhausted
+         *     entries) and the usage column of the queue policy list.
+         */
+        get: operations["list_ai_limits_api_v1_admin_ai_limits_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/ai/mcp-clients": {
         parameters: {
             query?: never;
@@ -7260,6 +7282,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/health/ai": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Ai
+         * @description AI budget probe for external monitoring (Zabbix, Checkmk, …).
+         *
+         *     ``status`` is ``ok`` or ``limit_reached``; the list names each
+         *     exhausted cap by kind, id and window only — no queue/provider names or
+         *     amounts, since this endpoint is unauthenticated like ``/health``.
+         *     Always HTTP 200: a spent budget is a state to alert on, not an outage.
+         */
+        get: operations["health_ai_health_ai_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/metrics": {
         parameters: {
             query?: never;
@@ -7901,6 +7948,53 @@ export interface components {
             status: string;
         };
         /**
+         * AiLimitOut
+         * @description One budget cap with its current spend (see :mod:`tiqora.ai.limits`).
+         *
+         *     ``kind`` ``queue_tokens_day``: ``subject_id`` is a queue id, ``used`` /
+         *     ``limit`` are tokens. ``provider_cost``: a provider id, amounts in
+         *     ``currency``.
+         */
+        AiLimitOut: {
+            /** Currency */
+            currency?: string | null;
+            /** Exhausted */
+            exhausted: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "queue_tokens_day" | "provider_cost";
+            /** Limit */
+            limit: number;
+            /**
+             * Resets At
+             * Format: date-time
+             */
+            resets_at: string;
+            /** Subject Id */
+            subject_id: number;
+            /** Subject Name */
+            subject_name: string;
+            /** Used */
+            used: number;
+            /**
+             * Window
+             * @enum {string}
+             */
+            window: "day" | "week" | "month";
+            /**
+             * Window Start
+             * Format: date-time
+             */
+            window_start: string;
+        };
+        /** AiLimitsOut */
+        AiLimitsOut: {
+            /** Items */
+            items: components["schemas"]["AiLimitOut"][];
+        };
+        /**
          * AiOriginOut
          * @description AI-origin marker for an auto-sent article, with its tool trace — same
          *     wire shape as ``AiDraftOut.tool_trace`` (see ``tiqora.api.v1.ai``) so the
@@ -8461,6 +8555,10 @@ export interface components {
             ai_paused_at?: string | null;
             /** Ai Paused By Name */
             ai_paused_by_name?: string | null;
+            /** Auto Skip At */
+            auto_skip_at?: string | null;
+            /** Auto Skip Reason */
+            auto_skip_reason?: string | null;
             /** Can Summarize */
             can_summarize: boolean;
             /** Drafts */
@@ -17006,6 +17104,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EscalationTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_ai_limits_api_v1_admin_ai_limits_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiLimitsOut"];
                 };
             };
             /** @description Validation Error */
@@ -34087,6 +34218,28 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
+    health_ai_health_ai_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
                     };
                 };
             };

@@ -84,8 +84,9 @@ export function QueueTaskProfilesTable({
     // Static hint: entries carry only the model's validity, not its provider's
     // (a disabled provider is skipped by the backend but not visible here).
     const first = profile.entries.find((e) => e.valid_id === 1) ?? profile.entries[0];
+    const model = first ? `${first.model_label} @ ${first.provider_name}` : null;
     return (
-      <div className="min-w-0">
+      <div className="min-w-0" title={model ?? undefined}>
         <div className="truncate text-ink">
           {profile.name}
           {!own && (
@@ -94,10 +95,9 @@ export function QueueTaskProfilesTable({
             </span>
           )}
         </div>
-        {first && (
-          <div className="truncate text-xs text-muted">
-            {first.model_label} @ {first.provider_name}
-          </div>
+        {/* Profiles named after their model would repeat the same text. */}
+        {model && model !== profile.name && (
+          <div className="truncate text-xs text-muted">{model}</div>
         )}
       </div>
     );
@@ -115,7 +115,18 @@ export function QueueTaskProfilesTable({
       </div>
       <p className="text-xs text-muted">{t("admin.ai.queues.models.intro")}</p>
       <div className="overflow-x-auto rounded-lg border border-hairline">
-        <table className="w-full text-sm" data-testid="admin-ai-queue-models-table">
+        {/* Fixed layout: with `auto` the long "Global: <profile>" select labels
+            set the column width and pushed "Antwortet gerade" out of view.
+            Fixed columns make the select and the effective model truncate. */}
+        <table
+          className="w-full min-w-[40rem] table-fixed text-sm"
+          data-testid="admin-ai-queue-models-table"
+        >
+          <colgroup>
+            <col className="w-[30%]" />
+            <col />
+            <col className="w-[28%]" />
+          </colgroup>
           <thead>
             <tr className="border-b border-hairline bg-surface-subtle text-left text-[11px] uppercase tracking-wide text-muted">
               <th className="px-3 py-2 font-semibold">{t("admin.ai.queues.models.colTask")}</th>
@@ -137,7 +148,7 @@ export function QueueTaskProfilesTable({
                     <div className="font-medium text-ink">{t(aiTaskNameKey(task))}</div>
                     <div className="text-xs text-muted">{t(aiTaskDescriptionKey(task))}</div>
                   </td>
-                  <td className="min-w-[15rem] px-3 py-2 align-top">
+                  <td className="px-3 py-2 align-top">
                     <div className="flex items-center gap-2">
                       <div className="min-w-0 flex-1">
                         <SelectField<string>

@@ -89,6 +89,26 @@ const MAX_COVERAGE_DOTS = 12;
 type SummaryView = SummaryDetail | "custom";
 const SUMMARY_VIEWS: SummaryView[] = ["standard", "detailed", "custom"];
 
+/** Skip reasons with a banner of their own (pause, hand-over). */
+const AUTO_SKIP_SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
+  "ai_paused",
+  "escalated_to_human",
+]);
+
+const AUTO_SKIP_REASONS: ReadonlySet<string> = new Set([
+  "budget_tokens_day",
+  "queue_rate_limit",
+  "global_rate_limit",
+  "max_auto_replies",
+  "max_clarifications",
+  "llm_unavailable",
+]);
+
+/** i18n key for an auto-skip reason; unknown reasons get the generic text. */
+function autoSkipKey(reason: string): string {
+  return AUTO_SKIP_REASONS.has(reason) ? `ticket.ai.autoSkip.${reason}` : "ticket.ai.autoSkip.other";
+}
+
 /** Manual Assist draft POST returns immediately (nginx-90s-timeout fix) and
  * this panel polls `GET /tickets/{id}/ai` for the background run's outcome
  * at this interval while `manual_run_status === "running"`. */
@@ -1203,9 +1223,21 @@ export function AiPanel({
       </div>
     ) : null;
 
+  // Why the auto worker last skipped this ticket. Pause and hand-over have
+  // their own banners above; everything else (a spent budget, a rate limit,
+  // no usable model) was invisible before — the ticket simply got no answer.
+  const autoSkipReason =
+    state.auto_skip_reason &&
+    !state.ai_paused_at &&
+    !state.ai_escalated_at &&
+    !AUTO_SKIP_SHOWN_ELSEWHERE.has(state.auto_skip_reason)
+      ? state.auto_skip_reason
+      : null;
+
   const banners =
     state.ai_paused_at ||
     state.ai_escalated_at ||
+    autoSkipReason ||
     state.triage ||
     pauseLink ||
     pauseMutation.isError ? (
@@ -1280,6 +1312,22 @@ export function AiPanel({
                 )}
               </Button>
             </span>
+          </div>
+        )}
+        {autoSkipReason && (
+          <div
+            className="space-y-0.5 rounded-md border border-escalation/35 bg-escalation/10 px-2.5 py-1.5 text-xs text-ink"
+            data-testid="ai-panel-auto-skip-banner"
+          >
+            <p>
+              <span className="mr-1.5 font-semibold text-escalation">!</span>
+              {t(autoSkipKey(autoSkipReason), {
+                dateTime: state.auto_skip_at ? formatDateTime(state.auto_skip_at, locale) : "",
+              })}
+            </p>
+            {autoSkipReason !== "llm_unavailable" && state.manual_assist_available && (
+              <p className="text-muted">{t("ticket.ai.autoSkip.manualHint")}</p>
+            )}
           </div>
         )}
         {state.triage && (
