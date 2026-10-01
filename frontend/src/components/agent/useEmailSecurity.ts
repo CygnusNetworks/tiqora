@@ -22,22 +22,35 @@ export type EmailSecurityState = {
 export const signs = (m: SecurityMode) => m === "sign" || m === "sign_encrypt";
 export const encrypts = (m: SecurityMode) => m === "encrypt" || m === "sign_encrypt";
 
+function modeOf(d: EmailSecurityIn): SecurityMode {
+  if (d.encrypt) return d.sign_key ? "sign_encrypt" : "encrypt";
+  return d.sign_key ? "sign" : "none";
+}
+
+/** Modes the composer offers (queue policy, server-side); [] = no control. */
+export function offeredModes(options: CryptoOptionsOut | null): SecurityMode[] {
+  if (!options?.enabled) return [];
+  const modes = (options.modes ?? []) as SecurityMode[];
+  return modes.some((m) => m !== "none") ? modes : [];
+}
+
+/** Backends the agent may pick between: only when both are enabled and set up. */
+export function pickableBackends(options: CryptoOptionsOut | null) {
+  const available = (options?.backends ?? []).filter((b) => b.available);
+  return available.length > 1 ? available : [];
+}
+
 function initialState(options: CryptoOptionsOut): EmailSecurityState {
+  const modes = offeredModes(options);
   const d = options.default;
-  if (d) {
-    return {
-      mode: "sign",
-      backend: d.backend,
-      method: d.method ?? "detached",
-      signKey: d.sign_key ?? "",
-    };
-  }
+  const sign = options.queue_sign ?? null;
   const first = (options.backends ?? []).find((b) => b.available);
+  const mode = d ? modeOf(d) : "none";
   return {
-    mode: "none",
-    backend: first?.backend ?? "pgp",
-    method: "detached",
-    signKey: "",
+    mode: modes.includes(mode) ? mode : (modes[0] ?? "none"),
+    backend: d?.backend ?? sign?.backend ?? first?.backend ?? "pgp",
+    method: d?.method ?? sign?.method ?? "detached",
+    signKey: d?.sign_key ?? sign?.sign_key ?? "",
   };
 }
 
@@ -45,7 +58,9 @@ function initialState(options: CryptoOptionsOut): EmailSecurityState {
  * State + validation of the compose "Sicherheit" control (PGP / S/MIME).
  *
  * Loads `GET /tickets/{id}/crypto-options` (or the queue variant for a new
- * ticket), preselects the queue's default sign key (else no security) and
+ * ticket), offers the modes the queue allows (`options.modes`: encryption
+ * off / auto / required, sign key and sign default per queue), preselects
+ * the queue default (`options.default`, may already encrypt) and
  * derives `payload` (the `email_security` request field) and `blocked` —
  * a reason why sending must not happen (encryption with a recipient that
  * has no usable key, signing without a key). With both backends disabled
@@ -106,7 +121,7 @@ export function useEmailSecurity({
     setSeededFor(scope);
   }, [options, scope, seededFor]);
 
-  const active = options?.enabled && state ? state : null;
+  const active = offeredModes(options).length > 0 && state ? state : null;
   const backendOpts: CryptoComposeBackendOut | null =
     (active && (options?.backends ?? []).find((b) => b.backend === active.backend)) ||
     null;

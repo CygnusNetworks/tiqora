@@ -7569,6 +7569,17 @@
             "title": "Backends",
             "type": "array"
           },
+          "blocked": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked"
+          },
           "default": {
             "anyOf": [
               {
@@ -7583,6 +7594,11 @@
             "title": "Enabled",
             "type": "boolean"
           },
+          "encrypt_policy": {
+            "default": "off",
+            "title": "Encrypt Policy",
+            "type": "string"
+          },
           "from_address": {
             "anyOf": [
               {
@@ -7593,6 +7609,28 @@
               }
             ],
             "title": "From Address"
+          },
+          "modes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Modes",
+            "type": "array"
+          },
+          "queue_sign": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailSecurityIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sign_default": {
+            "default": true,
+            "title": "Sign Default",
+            "type": "boolean"
           },
           "warnings": {
             "items": {
@@ -16972,6 +17010,33 @@
             ],
             "title": "Default Sign Key"
           },
+          "email_encrypt": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "auto",
+                  "required"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Encrypt"
+          },
+          "email_sign_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Sign Default"
+          },
           "first_response_notify": {
             "anyOf": [
               {
@@ -17407,6 +17472,28 @@
             ],
             "title": "Default Sign Key"
           },
+          "email_encrypt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Encrypt"
+          },
+          "email_sign_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Sign Default"
+          },
           "first_response_notify": {
             "anyOf": [
               {
@@ -17651,6 +17738,33 @@
               }
             ],
             "title": "Default Sign Key"
+          },
+          "email_encrypt": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "auto",
+                  "required"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Encrypt"
+          },
+          "email_sign_default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Sign Default"
           },
           "first_response_notify": {
             "anyOf": [

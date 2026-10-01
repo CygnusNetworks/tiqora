@@ -371,9 +371,21 @@ class CryptoOptionsOut(BaseModel):
     enabled: bool
     from_address: str | None = None
     backends: list[CryptoComposeBackendOut] = Field(default_factory=list)
-    #: preselection: the queue's default sign key, else ``None`` (no security)
+    #: preselection: the queue's default sign key, else ``None`` (no security);
+    #: with the queue policy applied (tiqora.crypto.queue_security) it also
+    #: carries ``encrypt`` when the queue encrypts this mail
     default: EmailSecurityIn | None = None
     warnings: list[str] = Field(default_factory=list)
+    #: the queue's usable sign key as such (independent of the sign default)
+    queue_sign: EmailSecurityIn | None = None
+    #: modes the composer offers: none | sign | encrypt | sign_encrypt
+    #: (empty = no security control at all)
+    modes: list[str] = Field(default_factory=list)
+    #: queue policy: sign by default, encryption off | auto | required
+    sign_default: bool = True
+    encrypt_policy: str = "off"
+    #: set when the queue requires encryption and this mail cannot be encrypted
+    blocked: str | None = None
 
 
 def _pgp_options(

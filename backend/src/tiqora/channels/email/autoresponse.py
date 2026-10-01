@@ -22,12 +22,15 @@ after a new ticket / follow-up has been created. Behaviour ported:
 
 from __future__ import annotations
 
+from email.message import EmailMessage
+from typing import TYPE_CHECKING, Literal
+
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.channels.email import loop_protection
-from tiqora.channels.email.outbound_reply import generate_message_id
+from tiqora.channels.email.outbound_reply import OutboundMailError, generate_message_id
 from tiqora.channels.email.parser import get_email_address, split_address_line
 from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.channels.email.smtp import MailSender, build_message, message_id_domain
@@ -36,6 +39,9 @@ from tiqora.domain.subject_hook import load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
 from tiqora.znuny.history import history_add
 from tiqora.znuny.sysconfig import SysConfig
+
+if TYPE_CHECKING:
+    from tiqora.crypto.mime_build import SecuredMessage
 
 logger = structlog.get_logger(__name__)
 
@@ -46,6 +52,78 @@ _HISTORY_TYPE_BY_RESPONSE_TYPE = {
     "auto reject": "SendAutoReject",
     "auto remove": "SendAutoReply",
 }
+
+
+async def _secure_auto_response(
+    session: AsyncSession,
+    message: EmailMessage,
+    *,
+    ticket_id: int,
+    queue_id: int,
+    from_line: str,
+    to_line: str,
+    recipients: list[str],
+    subject: str,
+    message_id: str,
+    queue_name: str,
+    user_id: int,
+) -> SecuredMessage | Literal[False] | None:
+    """Apply the queue's security defaults; ``False`` = must not be sent."""
+    from tiqora.channels.email.outbound_reply import secure_agent_email
+    from tiqora.crypto.queue_security import QueueSecurityRequiredError, resolve_mail_security
+    from tiqora.domain.mail_log import write_mail_log
+    from tiqora.domain.ticket_write_service import InvalidInput
+
+    reason: str | None = None
+    secured: SecuredMessage | None = None
+    try:
+        security = await resolve_mail_security(
+            session,
+            queue_id=queue_id,
+            from_address=from_line,
+            recipients=recipients,
+            requested=None,
+            explicit=False,
+        )
+        if security is not None:
+            secured = await secure_agent_email(
+                session,
+                ArticleIn(
+                    sender_type="system",
+                    is_visible_for_customer=True,
+                    subject=subject,
+                    body="",
+                    from_address=from_line,
+                    to_address=to_line,
+                    channel="email",
+                    email_security=security,
+                ),
+                message,
+            )
+    except (QueueSecurityRequiredError, InvalidInput, OutboundMailError) as exc:
+        reason = str(exc)
+    if reason is None:
+        return secured
+    logger.warning("autoresponse_security_blocked", ticket_id=ticket_id, reason=reason)
+    await history_add(
+        session,
+        ticket_id=ticket_id,
+        history_type="Misc",
+        name=f"Sent no auto-response: {reason}"[:200],
+        user_id=user_id,
+    )
+    await write_mail_log(
+        direction="out",
+        status="failed",
+        from_addr=from_line,
+        to_addr=to_line,
+        subject=subject,
+        message_id=message_id,
+        ticket_id=ticket_id,
+        queue=queue_name,
+        detail=f"auto-response not sent: {reason}",
+    )
+    return False
 
 
 async def send_auto_response(
@@ -207,6 +285,25 @@ async def send_auto_response(
         message_id=message_id,
         extra_headers=await sysconfig.mail_banner_headers(),
     )
+    # Queue security defaults (crypto.queue_security): sign / encrypt like any
+    # other mail nobody chose for; "encryption required" without keys → skip.
+    secured = await _secure_auto_response(
+        session,
+        message,
+        ticket_id=ticket_id,
+        queue_id=queue_id,
+        from_line=from_line,
+        to_line=to_line,
+        recipients=allowed,
+        subject=subject,
+        message_id=message_id,
+        queue_name=str(queue_name),
+        user_id=user_id,
+    )
+    if secured is False:
+        return None
+    if secured is not None:
+        message = secured.message
     # Znuny's SendAutoResponse sends with Loop => 1: null envelope sender, so a
     # bounce from the auto-response cannot open a ticket of its own.
     await mail_sender.send(
@@ -234,6 +331,10 @@ async def send_auto_response(
     article_id = await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
     )
+    if secured is not None:
+        from tiqora.channels.email.outbound_reply import store_security
+
+        await store_security(session, article_id, secured, user_id)
     logger.info(
         "autoresponse_sent",
         ticket_id=ticket_id,

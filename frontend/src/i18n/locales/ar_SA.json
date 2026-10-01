@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "ماذا يحدث عندما يرد العميل على تذكرة مغلقة بالفعل في قائمة الانتظار هذه: اعتمادًا على الخيار، يُعاد فتح التذكرة، أو يتم رفض الرد، أو يتم إنشاء تذكرة جديدة تمامًا بدلاً من ذلك.",
         "followUpLock": "يفتح التذكرة المقفلة تلقائيًا لمالكها بمجرد وصول متابعة العميل.",
         "calendarName": "يشير إلى تقويم ساعات العمل (العطلات وأوقات العمل) المستخدم عند حساب عمليات التصعيد. فارغ = التقويم الافتراضي على مدار الساعة.",
-        "defaultSignKey": "اسم مفتاح PGP/S-MIME المستخدم لتسجيل البريد الصادر تلقائيًا من قائمة الانتظار هذه. فارغ = لا يوجد توقيع تلقائي."
+        "defaultSignKey": "اسم مفتاح PGP/S-MIME المستخدم لتسجيل البريد الصادر تلقائيًا من قائمة الانتظار هذه. فارغ = لا يوجد توقيع تلقائي.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "النوع - وليس الاسم - هو الذي يحرك السلوك: تعتبر الأنواع \"الجديدة\"/\"المفتوحة\"/\"المعلقة\" بمثابة تذاكر مفتوحة، في حين أن \"المدمجة\" تخفي التذكرة من البحث العادي (يتم الاحتفاظ بالسجل نفسه). يمكن لأسماء حالات متعددة مشاركة نفس النوع."
@@ -2108,7 +2111,14 @@
       "yes": "نعم",
       "no": "لا",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "الدول",

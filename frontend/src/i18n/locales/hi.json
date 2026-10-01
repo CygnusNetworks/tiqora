@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "क्या होता है जब कोई ग्राहक इस कतार में पहले से बंद टिकट का उत्तर देता है: विकल्प के आधार पर, टिकट फिर से खुल जाता है, उत्तर अस्वीकार कर दिया जाता है, या इसके बजाय एक नया टिकट बनाया जाता है।",
         "followUpLock": "जैसे ही कोई ग्राहक अनुवर्ती आता है, स्वचालित रूप से बंद टिकट को अनलॉक करके उसके मालिक को वापस भेज दिया जाता है।",
         "calendarName": "वृद्धि की गणना करते समय उपयोग किए जाने वाले व्यावसायिक-घंटे कैलेंडर (छुट्टियां, खुलने का समय) का संदर्भ देता है। खाली = चौबीसों घंटे चलने वाला डिफ़ॉल्ट कैलेंडर।",
-        "defaultSignKey": "इस कतार से आउटगोइंग मेल पर स्वचालित रूप से हस्ताक्षर करने के लिए उपयोग की जाने वाली PGP/S-MIME कुंजी का नाम। खाली = कोई स्वचालित हस्ताक्षर नहीं।"
+        "defaultSignKey": "इस कतार से आउटगोइंग मेल पर स्वचालित रूप से हस्ताक्षर करने के लिए उपयोग की जाने वाली PGP/S-MIME कुंजी का नाम। खाली = कोई स्वचालित हस्ताक्षर नहीं।",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "प्रकार - नाम नहीं - व्यवहार को संचालित करता है: \"नया\"/\"खुला\"/\"लंबित\" प्रकार खुले टिकटों के रूप में गिना जाता है, जबकि \"मर्ज\" टिकट को सामान्य खोज से छुपाता है (रिकॉर्ड स्वयं रखा जाता है)। एकाधिक राज्य नाम एक ही प्रकार साझा कर सकते हैं।"
@@ -2108,7 +2111,14 @@
       "yes": "हाँ",
       "no": "नहीं",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "राज्य",

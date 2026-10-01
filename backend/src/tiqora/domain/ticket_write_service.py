@@ -151,6 +151,10 @@ class ArticleIn:
     # Only read by the outgoing agent email path (channels.email.outbound_reply):
     # PGP / S/MIME signing and encryption of the sent mail.
     email_security: EmailSecurityIn | None = None
+    # True: ``email_security`` is the sender's choice (``None`` = plain mail).
+    # False: nobody chose (AI reply, process/MCP send, API call without the
+    # field) — the queue's security defaults apply (crypto.queue_security).
+    email_security_explicit: bool = False
 
 
 @dataclass
@@ -2619,6 +2623,7 @@ class TicketWriteService:
         to_address: str,
         cc: str | None = None,
         email_security: EmailSecurityIn | None = None,
+        email_security_explicit: bool = False,
     ) -> int:
         """Forward by email: SMTP send-then-store like a reply (history 'Forward').
 
@@ -2648,6 +2653,7 @@ class TicketWriteService:
                 channel="email",
                 history_type_override="Forward",
                 email_security=email_security,
+                email_security_explicit=email_security_explicit,
             ),
         )
 

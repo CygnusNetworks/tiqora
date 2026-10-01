@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "מה קורה כאשר לקוח משיב לכרטיס שכבר סגור בתור זה: בהתאם לאפשרות, הכרטיס נפתח מחדש, התשובה נדחית או במקום זאת נוצר כרטיס חדש לגמרי.",
         "followUpLock": "פותח אוטומטית כרטיס נעול בחזרה לבעליו ברגע שמגיע מעקב אחר לקוח.",
         "calendarName": "מפנה ללוח שעות עבודה (חגים, זמני פתיחה) המשמש בעת מחשוב הסלמות. ריק = לוח השנה המוגדר כברירת מחדל מסביב לשעון.",
-        "defaultSignKey": "שם של מפתח PGP/S-MIME המשמש לחתימה אוטומטית של דואר יוצא מהתור הזה. ריק = אין חתימה אוטומטית."
+        "defaultSignKey": "שם של מפתח PGP/S-MIME המשמש לחתימה אוטומטית של דואר יוצא מהתור הזה. ריק = אין חתימה אוטומטית.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "הסוג - לא השם - מניע את התנהגות הכוננים: סוגי \"חדשים\"/\"פתוחים\"/\"ממתינים\" נחשבים ככרטיסים פתוחים, בעוד \"מוזג\" מסתיר את הכרטיס מחיפוש רגיל (הרשומה עצמה נשמרת). שמות מדינות מרובים יכולים לחלוק את אותו סוג."
@@ -2108,7 +2111,14 @@
       "yes": "כן",
       "no": "לא",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "מדינות",

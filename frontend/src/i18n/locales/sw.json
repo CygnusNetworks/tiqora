@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Nini kinatokea mteja anapojibu tikiti ambayo tayari imefungwa katika foleni hii: kulingana na chaguo, tikiti itafunguliwa tena, jibu limekataliwa, au tikiti mpya kabisa inaundwa badala yake.",
         "followUpLock": "Hufungua kiotomatiki tiketi iliyofungwa kurudi kwa mmiliki wake mara tu ufuatiliaji wa mteja unapofika.",
         "calendarName": "Hurejelea kalenda ya saa za kazi (likizo, saa za kufungua) inayotumiwa wakati wa kukokotoa viwango. Tupu = kalenda chaguo-msingi ya saa-saa.",
-        "defaultSignKey": "Jina la kitufe cha PGP/S-MIME kinachotumika kutia sahihi kiotomatiki barua zinazotoka kutoka kwenye foleni hii. Tupu = hakuna kutia sahihi kiotomatiki."
+        "defaultSignKey": "Jina la kitufe cha PGP/S-MIME kinachotumika kutia sahihi kiotomatiki barua zinazotoka kutoka kwenye foleni hii. Tupu = hakuna kutia sahihi kiotomatiki.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Aina - sio jina - huendesha tabia: aina \"mpya\"/\"wazi\"/\"inasubiri\" huhesabiwa kama tikiti zilizofunguliwa, wakati \"kuunganishwa\" huficha tikiti kutoka kwa utafutaji wa kawaida (rekodi yenyewe inatunzwa). Majina ya majimbo mengi yanaweza kushiriki aina moja."
@@ -2108,7 +2111,14 @@
       "yes": "Ndiyo",
       "no": "Hapana",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "Mataifa",

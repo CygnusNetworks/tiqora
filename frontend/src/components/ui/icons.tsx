@@ -410,3 +410,23 @@ export function ChatBubbleIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Circle with a slash — "none" / disabled choice. */
+export function BanIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <path d="m6.4 6.4 11.2 11.2" />
+    </Icon>
+  );
+}
+
+/** Key — PGP / S/MIME keys. */
+export function KeyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="8" cy="14" r="4" />
+      <path d="M11 11.5 19.5 3M16.5 6 19 8.5M14.5 8l2 2" />
+    </Icon>
+  );
+}

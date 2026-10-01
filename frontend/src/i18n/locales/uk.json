@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "Що відбувається, коли клієнт відповідає на вже закриту заявку в цій черзі: залежно від варіанту заявка відкривається знову, відповідь відхиляється або натомість створюється абсолютно нова заявка.",
         "followUpLock": "Автоматично розблоковує заблокований квиток назад його власнику, щойно надійде відповідь від клієнта.",
         "calendarName": "Посилається на календар робочих годин (свята, час роботи), який використовується під час обчислення ескалацій. Порожній = цілодобовий календар за замовчуванням.",
-        "defaultSignKey": "Назва ключа PGP/S-MIME, який використовується для автоматичного підпису вихідної пошти з цієї черги. Порожньо = немає автоматичного підпису."
+        "defaultSignKey": "Назва ключа PGP/S-MIME, який використовується для автоматичного підпису вихідної пошти з цієї черги. Порожньо = немає автоматичного підпису.",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "Тип, а не ім’я, керує поведінкою: типи «новий»/«відкритий»/«очікуваний» вважаються відкритими заявками, а «об’єднані» приховують заявку від звичайного пошуку (зберігається сам запис). Кілька назв штатів можуть мати один і той же тип."
@@ -2108,7 +2111,14 @@
       "yes": "так",
       "no": "немає",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "держави",

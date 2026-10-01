@@ -18,6 +18,17 @@ const OPTIONS: CryptoOptionsOut = {
     encrypt_keys: null,
   },
   warnings: [],
+  queue_sign: {
+    backend: "pgp",
+    method: "detached",
+    sign_key: "AB12CD34",
+    encrypt: false,
+    encrypt_keys: null,
+  },
+  modes: ["none", "sign", "encrypt", "sign_encrypt"],
+  sign_default: true,
+  encrypt_policy: "auto",
+  blocked: null,
   backends: [
     {
       backend: "pgp",
@@ -110,8 +121,7 @@ describe("EmailSecurityControl", () => {
     vi.spyOn(api, "getCryptoOptions").mockResolvedValue(OPTIONS);
     wrap();
     await screen.findByTestId("sec");
-    fireEvent.click(screen.getByTestId("sec-mode"));
-    fireEvent.click(await screen.findByTestId("sec-mode-menu-option-sign_encrypt"));
+    fireEvent.click(screen.getByTestId("sec-mode-sign_encrypt"));
     await waitFor(() =>
       expect(screen.getByTestId("blocked")).toHaveTextContent("nokey@example.net"),
     );
@@ -122,8 +132,7 @@ describe("EmailSecurityControl", () => {
     expect(payload()).toMatchObject({ encrypt: true, sign_key: "AB12CD34" });
 
     // S/MIME has certificates for everybody → not blocked any more.
-    fireEvent.click(screen.getByTestId("sec-backend"));
-    fireEvent.click(await screen.findByTestId("sec-backend-menu-option-smime"));
+    fireEvent.click(screen.getByTestId("sec-backend-smime"));
     await waitFor(() => expect(screen.getByTestId("blocked")).toHaveTextContent(""));
     expect(payload()).toEqual({
       backend: "smime",
@@ -138,10 +147,54 @@ describe("EmailSecurityControl", () => {
       enabled: false,
       backends: [],
       warnings: [],
+      modes: [],
+      sign_default: true,
+      encrypt_policy: "off",
     });
     wrap();
     await waitFor(() => expect(api.getCryptoOptions).toHaveBeenCalled());
     expect(screen.queryByTestId("sec")).toBeNull();
     expect(payload()).toBeNull();
+  });
+
+  it("offers only the modes the queue allows, with icons", async () => {
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue({ ...OPTIONS, modes: ["none", "sign"], encrypt_policy: "off" });
+    wrap();
+    await screen.findByTestId("sec");
+    expect(screen.getByTestId("sec-mode-sign")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("sec-mode-sign").querySelector("svg")).not.toBeNull();
+    expect(screen.queryByTestId("sec-mode-encrypt")).toBeNull();
+    expect(screen.queryByTestId("sec-mode-sign_encrypt")).toBeNull();
+  });
+
+  it("hides the control when the queue allows nothing but plain mail", async () => {
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue({ ...OPTIONS, modes: ["none"], default: null });
+    wrap();
+    await waitFor(() => expect(api.getCryptoOptions).toHaveBeenCalled());
+    expect(screen.queryByTestId("sec")).toBeNull();
+    expect(payload()).toBeNull();
+  });
+
+  it("shows the backend choice only when both backends are usable", async () => {
+    const pgpOnly = { ...OPTIONS, backends: [OPTIONS.backends![0], { ...OPTIONS.backends![1], available: false }] };
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue(pgpOnly);
+    wrap();
+    await screen.findByTestId("sec");
+    expect(screen.queryByTestId("sec-backend")).toBeNull();
+  });
+
+  it("preselects encryption from the queue default and locks plain modes when required", async () => {
+    vi.spyOn(api, "getCryptoOptions").mockResolvedValue({
+      ...OPTIONS,
+      modes: ["encrypt", "sign_encrypt"],
+      encrypt_policy: "required",
+      default: { backend: "smime", method: "detached", sign_key: null, encrypt: true, encrypt_keys: null },
+    });
+    wrap();
+    await screen.findByTestId("sec");
+    expect(screen.getByTestId("sec-mode-encrypt")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByTestId("sec-mode-none")).toBeNull();
+    expect(screen.getByTestId("sec-required")).toBeInTheDocument();
+    await waitFor(() => expect(payload()).toMatchObject({ backend: "smime", encrypt: true, sign_key: null }));
   });
 });

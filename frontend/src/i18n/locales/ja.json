@@ -940,7 +940,8 @@
       "noSignKey": "Choose a signing key.",
       "missingKeys": "Cannot encrypt — no usable key for: {{addresses}}",
       "noRecipients": "Add a recipient to encrypt.",
-      "checking": "Checking recipient keys…"
+      "checking": "Checking recipient keys…",
+      "required": "This queue requires encryption."
     }
   },
   "search": {
@@ -1779,7 +1780,9 @@
         "followUp": "顧客がこのキュー内のすでに終了したチケットに返信するとどうなりますか。オプションに応じて、チケットが再度オープンされるか、返信が拒否されるか、代わりに新しいチケットが作成されます。",
         "followUpLock": "顧客からのフォローアップが到着するとすぐに、ロックされたチケットのロックが自動的に解除され、所有者に返されます。",
         "calendarName": "エスカレーションを計算するときに使用される営業時間カレンダー (休日、営業時間) を参照します。空 = デフォルトの24時間カレンダー。",
-        "defaultSignKey": "このキューからの送信メールに自動的に署名するために使用されるPGP/S-MIMEキーの名前。空 = 自動署名なし。"
+        "defaultSignKey": "このキューからの送信メールに自動的に署名するために使用されるPGP/S-MIMEキーの名前。空 = 自動署名なし。",
+        "emailSignDefault": "Mails of this queue are signed with the sign key unless the agent turns it off in the composer. Also applies to AI replies and auto-responses.",
+        "emailEncrypt": "Off: encryption is not offered. When keys are available: encrypted once every recipient has a valid key, otherwise unencrypted. Required: without a valid key for every recipient nothing is sent; AI replies stay as drafts, auto-responses are skipped."
       },
       "states": {
         "typeId": "名前ではなくタイプによって動作が決まります。「新規」/「オープン」/「保留中」タイプはオープン チケットとしてカウントされますが、「マージ」では通常の検索からチケットが非表示になります (レコード自体は保持されます)。複数の状態名が同じタイプを共有できます。"
@@ -2108,7 +2111,14 @@
       "yes": "はい",
       "no": "いいえ",
       "defaultSignKeyNone": "No automatic signing",
-      "defaultSignKeyUnknown": "{{value}} (not available)"
+      "defaultSignKeyUnknown": "{{value}} (not available)",
+      "emailSecurity": "Email security",
+      "emailSecurityHint": "Applies to every mail of this queue: composer, AI replies, auto-responses and API calls without their own choice.",
+      "emailSignDefault": "Sign by default",
+      "emailEncrypt": "Encryption",
+      "emailEncryptOff": "Off",
+      "emailEncryptAuto": "When keys are available",
+      "emailEncryptRequired": "Required"
     },
     "states": {
       "title_plural": "ステータス",
