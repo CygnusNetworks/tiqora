@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
 
+from tiqora.crypto.attachment_kind import CryptoKind
 from tiqora.crypto.compose import EmailSecurityIn
 
 
@@ -357,6 +358,9 @@ class AttachmentMetaOut(BaseModel):
     # Referenced from the HTML body via cid: (embedded signature logos etc.) —
     # UIs group these separately instead of listing them as real attachments.
     inline: bool = False
+    # PGP/S-MIME side file (signature, public key, PGPexch.htm …) — see
+    # tiqora.crypto.attachment_kind. None for an ordinary attachment.
+    crypto_kind: CryptoKind | None = None
 
 
 class HistoryEntry(BaseModel):

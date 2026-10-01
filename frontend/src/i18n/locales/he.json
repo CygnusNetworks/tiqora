@@ -912,6 +912,43 @@
         "error": "Checking the signature or encryption failed."
       }
     },
+    "cryptoAttachment": {
+      "group": "Signature & keys",
+      "show": "Show",
+      "kind": {
+        "pgp_public_key": "PGP key",
+        "pgp_signature": "PGP signature",
+        "pgp_signed_message": "PGP-signed text",
+        "pgp_message": "Encrypted PGP message",
+        "pgp_html_body": "HTML version of the message",
+        "smime_signature": "S/MIME signature",
+        "x509_certificate": "Certificate"
+      },
+      "hint": {
+        "pgp_public_key": "The sender's public key — once imported, replies to them can be encrypted and their signatures checked.",
+        "pgp_signature": "Digital signature of this message; the check result is shown in the article header.",
+        "pgp_signed_message": "Text signed with PGP; the check result is shown in the article header.",
+        "pgp_message": "Encrypted content — readable only with the matching private key.",
+        "pgp_html_body": "Added by PGP for Outlook; same content as the message above.",
+        "smime_signature": "Digital signature of this message; the check result is shown in the article header.",
+        "x509_certificate": "X.509 certificate, e.g. for encrypting replies to the sender."
+      },
+      "key": {
+        "fingerprint": "Fingerprint",
+        "created": "Created",
+        "expires": "Expires",
+        "never": "never",
+        "inKeyring": "In keyring",
+        "notInKeyring": "Not in keyring",
+        "import": "Import into keyring",
+        "importFailed": "Import failed: {{error}}",
+        "unavailable": "Key details could not be read.",
+        "status": {
+          "expired": "Expired",
+          "revoked": "Revoked"
+        }
+      }
+    },
     "emailSecurity": {
       "label": "Security",
       "backend": "Method",

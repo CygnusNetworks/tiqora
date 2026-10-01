@@ -435,7 +435,6 @@ class EmailSecurityBlocked(InvalidInput):
 async def _apply_queue_security(
     session: AsyncSession, article: ArticleIn, queue_id: int
 ) -> ArticleIn:
-
     from tiqora.crypto.compose import split_addresses
     from tiqora.crypto.queue_security import QueueSecurityRequiredError, resolve_mail_security
 

@@ -44,6 +44,8 @@ export type {
   AiOriginOut,
   ArticleSecurity,
   AttachmentMetaOut,
+  AttachmentPgpKeyOut,
+  AttachmentPgpKeysOut,
   HistoryEntry,
   PresenceIn,
   PresenceEntry,

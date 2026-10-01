@@ -49,6 +49,8 @@ export type TelegramWebhookRegisterRequest = Schemas["TelegramWebhookRegisterReq
 export type TelegramWebhookRegisterResponse = Schemas["TelegramWebhookRegisterResponse"];
 export type TelegramWebhookResponse = Schemas["TelegramWebhookResponse"];
 export type AttachmentMetaOut = Schemas["AttachmentMetaOut"];
+export type AttachmentPgpKeyOut = Schemas["AttachmentPgpKeyOut"];
+export type AttachmentPgpKeysOut = Schemas["AttachmentPgpKeysOut"];
 export type HistoryEntry = Schemas["HistoryEntry"];
 export type CustomerUserOut = Schemas["CustomerUserOut"];
 export type SearchHit = Schemas["SearchHit"];
@@ -1337,6 +1339,42 @@ export class ApiClient {
       "GET",
       `/api/v1/tickets/${ticketId}/articles/${articleId}/attachments`,
       { signal },
+    );
+  }
+
+  /** An HTML attachment (e.g. PGPexch.htm) sanitised like an article body. */
+  getAttachmentHtml(
+    ticketId: number,
+    articleId: number,
+    attachmentId: number,
+    signal?: AbortSignal,
+  ) {
+    return this.request<ArticleBody>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/attachments/${attachmentId}/html`,
+      { signal },
+    );
+  }
+
+  /** Parsed PGP public key(s) in an attachment — read-only, nothing imported. */
+  getAttachmentPgpKey(
+    ticketId: number,
+    articleId: number,
+    attachmentId: number,
+    signal?: AbortSignal,
+  ) {
+    return this.request<AttachmentPgpKeysOut>(
+      "GET",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/attachments/${attachmentId}/pgp-key`,
+      { signal },
+    );
+  }
+
+  /** Import the attached public key into the keyring (rw in admin or users). */
+  importAttachmentPgpKey(ticketId: number, articleId: number, attachmentId: number) {
+    return this.request<AttachmentPgpKeysOut>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/articles/${articleId}/attachments/${attachmentId}/pgp-key/import`,
     );
   }
 

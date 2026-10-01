@@ -5458,6 +5458,26 @@
             ],
             "title": "Content Type"
           },
+          "crypto_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pgp_public_key",
+                  "pgp_signature",
+                  "pgp_signed_message",
+                  "pgp_message",
+                  "pgp_html_body",
+                  "smime_signature",
+                  "x509_certificate"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crypto Kind"
+          },
           "disposition": {
             "anyOf": [
               {
@@ -5535,6 +5555,127 @@
           "size"
         ],
         "title": "AttachmentOut",
+        "type": "object"
+      },
+      "AttachmentPgpKeyOut": {
+        "description": "One public key found in an attachment (parsed, not imported).",
+        "properties": {
+          "algorithm": {
+            "title": "Algorithm",
+            "type": "string"
+          },
+          "bits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bits"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Emails",
+            "type": "array"
+          },
+          "expires": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "in_keyring": {
+            "default": false,
+            "title": "In Keyring",
+            "type": "boolean"
+          },
+          "key_id": {
+            "title": "Key Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "uids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fingerprint",
+          "key_id",
+          "uids",
+          "emails",
+          "algorithm",
+          "status"
+        ],
+        "title": "AttachmentPgpKeyOut",
+        "type": "object"
+      },
+      "AttachmentPgpKeysOut": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "can_import": {
+            "default": false,
+            "title": "Can Import",
+            "type": "boolean"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/AttachmentPgpKeyOut"
+            },
+            "title": "Keys",
+            "type": "array"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "AttachmentPgpKeysOut",
         "type": "object"
       },
       "AttachmentRefOut": {
@@ -63982,6 +64123,285 @@
           }
         },
         "summary": "Get Attachment",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/{attachment_id}/html": {
+      "get": {
+        "description": "An HTML attachment sanitised like an article body (e.g. ``PGPexch.htm``).\n\nSame pipeline as ``/body`` (nh3, cid: rewrite, external images gated), so\nthe sandboxed body renderer can show it in-page instead of a raw download.",
+        "operationId": "attachment_html_preview_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__html_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleBody"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attachment Html Preview",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/{attachment_id}/pgp-key": {
+      "get": {
+        "description": "Parse the PGP public key(s) in an attachment (same access as downloading it).\n\nRead-only: the key is scanned in a throwaway gpg home, never imported.\n``in_keyring`` tells whether the shared keyring already has it.",
+        "operationId": "attachment_pgp_key_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__pgp_key_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentPgpKeysOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attachment Pgp Key",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/articles/{article_id}/attachments/{attachment_id}/pgp-key/import": {
+      "post": {
+        "description": "Import the attached public key into the keyring (``rw`` in admin or users).\n\nSame permission as the agent customer-key module; writes the usual\n``tiqora_crypto_key`` audit row. Private key blocks are refused.",
+        "operationId": "import_attachment_pgp_key_api_v1_tickets__ticket_id__articles__article_id__attachments__attachment_id__pgp_key_import_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "title": "Article Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "attachment_id",
+            "required": true,
+            "schema": {
+              "title": "Attachment Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentPgpKeysOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Attachment Pgp Key",
         "tags": [
           "tickets"
         ]

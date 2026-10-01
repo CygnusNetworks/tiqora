@@ -165,7 +165,7 @@ type ArticleSpec = {
   day: number; hm: string; sender: "customer" | "agent";
   visible?: boolean; subject: string; from: string; to: string;
   body: string; isHtml?: boolean; channel?: number;
-  attachments?: { filename: string; content_type: string; content_size: string }[];
+  attachments?: { filename: string; content_type: string; content_size: string; crypto_kind?: string }[];
   /** Written by the built-in AI agent — drives the 🤖 badge/marker in the
    * reader, both article lists, and the `/ai-origin` trace endpoint.
    * `auto` = the agent sent it itself, `manual_accept` = a human accepted a
@@ -200,6 +200,7 @@ function registerThread(ticketId: number, specs: ArticleSpec[]) {
       attachmentsByArticle[id] = a.attachments.map((att, ai) => ({
         id: id * 10 + ai, article_id: id, filename: att.filename, content_type: att.content_type,
         content_size: att.content_size, content_id: null, disposition: "attachment", inline: false,
+        crypto_kind: att.crypto_kind ?? null,
       }));
     }
     if (a.aiOrigin) {
@@ -224,6 +225,23 @@ function registerThread(ticketId: number, specs: ArticleSpec[]) {
 }
 
 const html = (...paragraphs: string[]) => paragraphs.map((p) => `<p>${p}</p>`).join("");
+
+let demoKeyImported = false;
+/** `GET|POST …/attachments/{id}/pgp-key[/import]` for the demo's signed mail. */
+function demoPgpKey(importNow: boolean) {
+  if (importNow) demoKeyImported = true;
+  return {
+    available: true,
+    can_import: true,
+    problem: null,
+    keys: [{
+      fingerprint: "3A1F9C0E7B2D44A85E61C0D93F7B2A6410E8C5D2", key_id: "3F7B2A6410E8C5D2",
+      uids: ["Marcus Reed <m.reed@acme.example>"], emails: ["m.reed@acme.example"],
+      algorithm: "RSA", bits: 4096, created: "2024-03-12T08:00:00Z", expires: "2027-03-12T08:00:00Z",
+      status: "good", in_keyring: demoKeyImported,
+    }],
+  };
+}
 
 registerThread(100, [
   { day: 10, hm: "09:12", sender: "customer", subject: "Printer offline in building A",
@@ -252,7 +270,14 @@ registerThread(101, [
     body: html(
       "Hi team, I'm working from home this week and need VPN access to reach the internal file server and our ticketing system. My manager approved this by email (forwarding separately) — I should be added to the 'Engineering' VPN group. I'm on a company-issued MacBook.",
       "Thanks,<br>Marcus",
-    ) },
+    ),
+    // Sent PGP-signed from Outlook: the plugin's HTML copy, the sender's
+    // public key and the detached signature land in "Signature & keys".
+    attachments: [
+      { filename: "PGPexch.htm", content_type: "text/html", content_size: "65126", crypto_kind: "pgp_html_body" },
+      { filename: "public_key_m.reed@acme.example.asc", content_type: "application/pgp-keys", content_size: "7884", crypto_kind: "pgp_public_key" },
+      { filename: "signature.asc", content_type: "application/pgp-signature", content_size: "833", crypto_kind: "pgp_signature" },
+    ] },
   { day: 11, hm: "10:30", sender: "agent", subject: "Re: VPN access request",
     from: "support@example.com", to: "m.reed@acme.example",
     body: html(
@@ -1201,6 +1226,10 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/tickets/facets")) return ticketFacets();
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/ai-origin$/)) { const id = Number(p.split("/").slice(-2)[0]); return aiOriginByArticle[id] ?? null; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/body$/)) { const id = Number(p.split("/").slice(-2)[0]); return bodiesById[id] ?? bodiesById[500]; }
+  // PGP side files (demo ticket 101): the parsed sender key + PGPexch.htm preview.
+  if (p.match(/\/attachments\/\d+\/pgp-key(\/import)?$/)) return demoPgpKey(method === "POST");
+  if (p.match(/\/attachments\/\d+\/html$/))
+    return { article_id: 0, content_type: "text/html", is_html: true, body: html("Hi team, I'm working from home this week and need VPN access …", "Thanks,<br>Marcus") };
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles\/\d+\/attachments/)) { const aid = Number(p.split("/").slice(-2)[0]); return attachmentsByArticle[aid] ?? []; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/articles$/)) { const tid = Number(p.split("/").slice(-2)[0]); return articlesByTicket[tid] ?? []; }
   if (p.match(/\/api\/v1\/tickets\/\d+\/history$/)) return historyEntries;
