@@ -1638,7 +1638,7 @@
       "escalationTester": {
         "title": "Kural test cihazı",
         "toolPlaceholder": "Araç adı, ör. netadmin:diagnose_connection",
-        "samplePlaceholder": "JSON olarak örnek araç sonucu, ör. {\"kilit_kodu\": \"KOPYALA\"}",
+        "samplePlaceholder": "JSON olarak örnek araç sonucu, ör. {\"lock_code\": \"COPYR\"}",
         "run": "testi",
         "invalid": "Kurallar geçersiz",
         "hit": "Vuruş – tırmanma",
@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Yapılandırılmış kuyruk değişkeni ({name})"
       },
       "notes": {
-        "customerAnyColumn": "Herhangi bir müşteri_kullanıcı sütunu: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Herhangi bir customer_user sütunu: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Yapılandırılmış değişkenler <OTRS_QUEUE_Name> olarak görünür. <TIQORA_QUEUE_Name> eşdeğer bir takma addır. Standart olmayan alanlar yalnızca bir veri kaynağı mevcut olduğunda değiştirilir.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name>, <OTRS_QUEUE_Name>'nin eşdeğer bir takma adıdır."
       }
@@ -2958,7 +2958,7 @@
       "new": "Yeni alan",
       "sourceTable": "Kaynak tablosu",
       "columnName": "Sütun adı",
-      "columnNameHelp": "Customer_user / customer_company'den sütun (DB'den öneriler).",
+      "columnNameHelp": "customer_user / customer_company'den sütun (DB'den öneriler).",
       "tagName": "Etiket adı",
       "tagNameHelp": "Yer tutucu: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Etiket",
@@ -3025,10 +3025,10 @@
         "customerSearch": "Müşteri kullanıcısını ara",
         "customerSearchPh": "Giriş, e-posta veya ad…",
         "loginManualPh": "Giriş yapmayı manuel olarak ekle",
-        "companyId": "Şirket (müşteri_id)",
+        "companyId": "Şirket (customer_id)",
         "companyIdPh": "örneğin ACME",
         "loginRegex": "Giriş normal ifadesi",
-        "customerIdRegex": "müşteri_id normal ifadesi",
+        "customerIdRegex": "customer_id normal ifadesi",
         "emailRegex": "E-posta normal ifadesi",
         "changedAfter": "Şu tarihten sonra değiştirildi:",
         "changedBefore": "Daha önce değiştirildi",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Giriş yap",
         "email": "E-posta",
-        "customerId": "müşteri_kimliği",
+        "customerId": "customer_id",
         "mode": "Mod",
         "status": "Durum",
         "resolved": "Sayım",

@@ -2958,7 +2958,7 @@
       "new": "Új mező",
       "sourceTable": "Forrás táblázat",
       "columnName": "Oszlop neve",
-      "columnNameHelp": "Az ügyfél_felhasználó / ügyfél_vállalat oszlopa (javaslatok a DB-ből).",
+      "columnNameHelp": "Az customer_user / customer_company oszlopa (javaslatok a DB-ből).",
       "tagName": "Címke neve",
       "tagNameHelp": "Helyőrző: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Címke",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Bejelentkezés",
         "email": "E-mail",
-        "customerId": "ügyfél_azonosító",
+        "customerId": "customer_id",
         "mode": "mód",
         "status": "Állapot",
         "resolved": "Gróf",

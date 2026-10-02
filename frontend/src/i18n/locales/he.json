@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "משתנה תור מוגדר ({name})"
       },
       "notes": {
-        "customerAnyColumn": "כל עמודת משתמש_לקוח: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "כל עמודת customer_user: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "משתנים מוגדרים מופיעים בתור <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> הוא כינוי שווה ערך. שדות לא סטנדרטיים מוחלפים רק כאשר קיים מקור נתונים.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> הוא כינוי שווה ערך של <OTRS_QUEUE_Name>."
       }
@@ -2639,7 +2639,7 @@
       "clientSecret": "סוד הלקוח",
       "clientSecretHelp": "השאר ריק בעת העריכה כדי לשמור את הסוד המאוחסן.",
       "scope": "היקף",
-      "scopeHelp": "היקפי OAuth מופרדים מרווחים (כוללים גישה לא מקוונת עבור אסימוני רענון).",
+      "scopeHelp": "היקפי OAuth מופרדים מרווחים (כוללים offline_access עבור אסימוני רענון).",
       "redirectUri": "כתובת URL להפניה מחדש",
       "redirectUriHelp": "רשום את ה-URI המדויק הזה ב-Azure/Google. הגדר את TIQORA_PUBLIC_BASE_URL בייצור.",
       "tokenStatus": "מצב אסימון",
@@ -2958,7 +2958,7 @@
       "new": "תחום חדש",
       "sourceTable": "טבלת מקור",
       "columnName": "שם עמודה",
-      "columnNameHelp": "עמודה מ-custom_user / customer_company (הצעות מה-DB).",
+      "columnNameHelp": "עמודה מ-customer_user / customer_company (הצעות מה-DB).",
       "tagName": "שם תג",
       "tagNameHelp": "מציין מיקום: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "תווית",
@@ -3025,10 +3025,10 @@
         "customerSearch": "חפש משתמש לקוח",
         "customerSearchPh": "כניסה, אימייל או שם...",
         "loginManualPh": "הוסף כניסה ידנית",
-        "companyId": "חברה (מזהה_לקוח)",
+        "companyId": "חברה (customer_id)",
         "companyIdPh": "למשל ACME",
         "loginRegex": "התחברות רגולרית",
-        "customerIdRegex": "קוד רגולרי של מזהה_לקוח",
+        "customerIdRegex": "קוד רגולרי של customer_id",
         "emailRegex": "אימייל רגולרי",
         "changedAfter": "השתנה לאחר",
         "changedBefore": "השתנה לפני",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "התחבר",
         "email": "דוא\"ל",
-        "customerId": "מזהה_לקוח",
+        "customerId": "customer_id",
         "mode": "מצב",
         "status": "סטטוס",
         "resolved": "לספור",

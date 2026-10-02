@@ -3028,7 +3028,7 @@
         "companyId": "Uzņēmums (customer_id)",
         "companyIdPh": "piem. ACME",
         "loginRegex": "Pieteikties regulārajā izteiksmē",
-        "customerIdRegex": "klienta_id regex",
+        "customerIdRegex": "customer_id regex",
         "emailRegex": "E-pasta regulārais formulējums",
         "changedAfter": "Mainīts pēc",
         "changedBefore": "Iepriekš mainīts",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Pieteikties",
         "email": "E-pasts",
-        "customerId": "klienta_id",
+        "customerId": "customer_id",
         "mode": "Režīms",
         "status": "Statuss",
         "resolved": "Skaitīt",

@@ -1637,7 +1637,7 @@
       },
       "escalationTester": {
         "title": "Regel tester",
-        "toolPlaceholder": "Verktøynavn, f.eks. netadmin:diagnose_tilkobling",
+        "toolPlaceholder": "Verktøynavn, f.eks. netadmin:diagnose_connection",
         "samplePlaceholder": "Eksempel på verktøyresultat som JSON, f.eks. {\"lock_code\": \"COPYR\"}",
         "run": "Test",
         "invalid": "Ugyldige regler",
@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Konfigurert køvariabel ({name})"
       },
       "notes": {
-        "customerAnyColumn": "Enhver kunde_bruker-kolonne: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Enhver customer_user-kolonne: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Konfigurerte variabler vises som <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> er et ekvivalent alias. Ikke-standardfelt erstattes bare når det finnes en datakilde.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> er et ekvivalent alias for <OTRS_QUEUE_Name>."
       }
@@ -2958,7 +2958,7 @@
       "new": "Nytt felt",
       "sourceTable": "Kildetabell",
       "columnName": "Kolonnenavn",
-      "columnNameHelp": "Kolonne fra kunde_bruker / kunde_bedrift (forslag fra DB).",
+      "columnNameHelp": "Kolonne fra customer_user / customer_company (forslag fra DB).",
       "tagName": "Tag navn",
       "tagNameHelp": "Plassholder: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Etikett",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Logg inn",
         "email": "E-post",
-        "customerId": "kunde_id",
+        "customerId": "customer_id",
         "mode": "Modus",
         "status": "Status",
         "resolved": "Telle",

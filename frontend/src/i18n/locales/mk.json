@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Конфигурирана променлива на редица ({name})"
       },
       "notes": {
-        "customerAnyColumn": "Колона клиент_корисник: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Колона customer_user: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Конфигурираните променливи се појавуваат како <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> е еквивалентен алијас. Нестандардните полиња се заменуваат само кога постои извор на податоци.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> е еквивалентен алијас на <OTRS_QUEUE_Name>."
       }
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Најавете се",
         "email": "Е-пошта",
-        "customerId": "клиент_ид",
+        "customerId": "customer_id",
         "mode": "Режим",
         "status": "Статус",
         "resolved": "брои",

@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "متغیر صف پیکربندی شده ({name})"
       },
       "notes": {
-        "customerAnyColumn": "هر ستون مشتری_کاربر: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "هر ستون customer_user: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "متغیرهای پیکربندی شده به صورت <OTRS_QUEUE_Name> ظاهر می شوند. <TIQORA_QUEUE_Name> یک نام مستعار معادل است. فیلدهای غیر استاندارد تنها زمانی جایگزین می شوند که منبع داده وجود داشته باشد.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> نام مستعار معادل <OTRS_QUEUE_Name> است."
       }
@@ -3025,7 +3025,7 @@
         "customerSearch": "جستجوی کاربر مشتری",
         "customerSearchPh": "ورود، ایمیل یا نام…",
         "loginManualPh": "ورود به سیستم را به صورت دستی اضافه کنید",
-        "companyId": "شرکت (شناسه_مشتری)",
+        "companyId": "شرکت (customer_id)",
         "companyIdPh": "به عنوان مثال ACME",
         "loginRegex": "Regex وارد شوید",
         "customerIdRegex": "regex customer_id",
