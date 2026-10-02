@@ -1637,7 +1637,7 @@
       },
       "escalationTester": {
         "title": "Penguji aturan",
-        "toolPlaceholder": "Nama alat, mis. netadmin:diagnosis_koneksi",
+        "toolPlaceholder": "Nama alat, mis. netadmin:diagnose_connection",
         "samplePlaceholder": "Contoh hasil alat sebagai JSON, mis. {\"lock_code\": \"SALINAN\"}",
         "run": "Tes",
         "invalid": "Aturan tidak valid",
@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Variabel antrian yang dikonfigurasi ({name})"
       },
       "notes": {
-        "customerAnyColumn": "Kolom pelanggan_pengguna mana saja: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Kolom customer_user mana saja: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Variabel yang dikonfigurasi muncul sebagai <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> adalah alias yang setara. Bidang non-standar hanya diganti jika sumber data ada.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> adalah alias yang setara dengan <OTRS_QUEUE_Name>."
       }
@@ -3025,10 +3025,10 @@
         "customerSearch": "Cari pengguna pelanggan",
         "customerSearchPh": "Login, email, atau nama…",
         "loginManualPh": "Tambahkan login secara manual",
-        "companyId": "Perusahaan (id_pelanggan)",
+        "companyId": "Perusahaan (customer_id)",
         "companyIdPh": "misalnya ACME",
         "loginRegex": "Regex masuk",
-        "customerIdRegex": "ekspresi reguler_id_pelanggan",
+        "customerIdRegex": "ekspresi reguler customer_id",
         "emailRegex": "Regex email",
         "changedAfter": "Berubah setelahnya",
         "changedBefore": "Berubah sebelumnya",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Masuk",
         "email": "Surel",
-        "customerId": "id_pelanggan",
+        "customerId": "customer_id",
         "mode": "Modus",
         "status": "Status",
         "resolved": "Hitung",

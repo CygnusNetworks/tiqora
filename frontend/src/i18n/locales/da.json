@@ -1637,7 +1637,7 @@
       },
       "escalationTester": {
         "title": "Regel tester",
-        "toolPlaceholder": "Værktøjsnavn, f.eks. netadmin:diagnose_forbindelse",
+        "toolPlaceholder": "Værktøjsnavn, f.eks. netadmin:diagnose_connection",
         "samplePlaceholder": "Eksempel på værktøjsresultat som JSON, f.eks. {\"lock_code\": \"COPYR\"}",
         "run": "Test",
         "invalid": "Reglerne er ugyldige",
@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Konfigureret køvariabel ({name})"
       },
       "notes": {
-        "customerAnyColumn": "Enhver kunde_bruger kolonne: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Enhver customer_user kolonne: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Konfigurerede variabler vises som <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> er et tilsvarende alias. Ikke-standardfelter erstattes kun, når der findes en datakilde.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> er et tilsvarende alias for <OTRS_QUEUE_Name>."
       }
@@ -2639,7 +2639,7 @@
       "clientSecret": "Klientens hemmelighed",
       "clientSecretHelp": "Lad stå tomt ved redigering for at holde den gemte hemmelighed.",
       "scope": "Omfang",
-      "scopeHelp": "Mellemrumsseparerede OAuth-omfang (inkluderer offline_adgang til opdateringstokens).",
+      "scopeHelp": "Mellemrumsseparerede OAuth-omfang (inkluderer offline_access til opdateringstokens).",
       "redirectUri": "Omdiriger URI",
       "redirectUriHelp": "Registrer denne nøjagtige URI i Azure/Google. Indstil TIQORA_PUBLIC_BASE_URL i produktion.",
       "tokenStatus": "Tokenstatus",
@@ -2958,7 +2958,7 @@
       "new": "Nyt felt",
       "sourceTable": "Kilde tabel",
       "columnName": "Kolonnenavn",
-      "columnNameHelp": "Kolonne fra kunde_bruger / kunde_virksomhed (forslag fra DB).",
+      "columnNameHelp": "Kolonne fra customer_user / customer_company (forslag fra DB).",
       "tagName": "Tag navn",
       "tagNameHelp": "Pladsholder: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Etiket",
@@ -3028,7 +3028,7 @@
         "companyId": "Virksomhed (customer_id)",
         "companyIdPh": "f.eks. ACME",
         "loginRegex": "Log ind regulært udtryk",
-        "customerIdRegex": "kunde_id regulært udtryk",
+        "customerIdRegex": "customer_id regulært udtryk",
         "emailRegex": "E-mail regulært udtryk",
         "changedAfter": "Ændret efter",
         "changedBefore": "Ændret før",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Log ind",
         "email": "E-mail",
-        "customerId": "kunde_id",
+        "customerId": "customer_id",
         "mode": "tilstand",
         "status": "Status",
         "resolved": "Tæl",

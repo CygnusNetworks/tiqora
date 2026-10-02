@@ -1638,7 +1638,7 @@
       "escalationTester": {
         "title": "ルールテスター",
         "toolPlaceholder": "ツール名、例: netadmin:diagnose_connection",
-        "samplePlaceholder": "JSONとしてのツール結果のサンプル。例: {\"ロックコード\": \"コピー\"}",
+        "samplePlaceholder": "JSONとしてのツール結果のサンプル。例: {\"lock_code\": \"COPYR\"}",
         "run": "テスト",
         "invalid": "ルールが無効です",
         "hit": "ヒット - エスカレーション",
@@ -3123,7 +3123,7 @@
       "col": {
         "login": "ログイン",
         "email": "メール",
-        "customerId": "顧客ID",
+        "customerId": "customer_id",
         "mode": "モード",
         "status": "ステータス",
         "resolved": "カウント",

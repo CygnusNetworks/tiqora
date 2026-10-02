@@ -3025,7 +3025,7 @@
         "customerSearch": "Cerca utente cliente",
         "customerSearchPh": "Accesso, e-mail o nome…",
         "loginManualPh": "Aggiungi l'accesso manualmente",
-        "companyId": "Azienda (ID_cliente)",
+        "companyId": "Azienda (customer_id)",
         "companyIdPh": "ad es. ACME",
         "loginRegex": "Regex di accesso",
         "customerIdRegex": "espressione regolare customer_id",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Accedi",
         "email": "E-mail",
-        "customerId": "cliente_id",
+        "customerId": "customer_id",
         "mode": "Modalità",
         "status": "Stato",
         "resolved": "Conte",
