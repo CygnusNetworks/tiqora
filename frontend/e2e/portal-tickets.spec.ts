@@ -32,7 +32,12 @@ test.describe("portal ticket list and detail", () => {
     await page.getByTestId("portal-reply-body").fill("Thanks, still broken though.");
     await page.getByTestId("portal-reply-submit").click();
 
-    await expect(page.getByText("Thanks, still broken though.")).toBeVisible();
+    // Scoped to the thread: page-wide getByText also matched the textarea
+    // before it was cleared, so the test passed without a rendered reply.
+    await expect(page.getByTestId("portal-reply-body")).toHaveValue("");
+    await expect(
+      page.getByTestId("portal-article-thread").getByText("Thanks, still broken though."),
+    ).toBeVisible();
   });
 
   test("creates a new ticket", async ({ page }) => {
