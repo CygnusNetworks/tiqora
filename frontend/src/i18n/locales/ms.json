@@ -1784,7 +1784,7 @@
         "maxClarifications": "Bilangan maksimum soalan penjelasan automatik setiap tiket sebelum meningkat.",
         "maxAutoReplies": "Bilangan maksimum balasan automatik bagi setiap tiket.",
         "maxRepliesPerHour": "Bilangan maksimum balasan automatik untuk baris gilir ini setiap jam — brek kos.",
-        "budgetTokensDay": "Belanjawan token harian untuk laluan autobalas baris gilir ini. Setelah melebihi, pekerja automatik berhenti seketika sehingga keesokan harinya.",
+        "budgetTokensDay": "Belanjawan token harian bagi baris gilir ini dalam jutaan token (cth. 3 = 3,000,000). Balasan automatik dan triaj dikira dalamnya. Setelah habis, baris gilir tidak menjawab apa-apa secara automatik sehingga tengah malam (UTC) dan pentadbir dimaklumkan. Draf dan ringkasan AI terus berfungsi.",
         "disclosureEnabled": "Menambahkan pengaki pendedahan AI kepada balasan pelanggan yang dihantar secara autonomi. Draf yang diterima dan dihantar oleh ejen dikira sebagai balasan manusia dan tidak mendapat pengaki.",
         "disclosureText": "Teks pendedahan khusus baris gilir. Kosong = teks lalai global daripada tetapan AI digunakan.",
         "escalationRules": "Peraturan JSON yang menyemak hasil alat MCP sebelum menyembunyikan PII; apa-apa perlawanan yang sukar dihentikan penghantaran automatik dan meningkat kepada manusia (tulen ATAU logik, tiada keutamaan antara peraturan).",
@@ -1796,7 +1796,7 @@
         "replyLanguageMode": "Mengawal sama ada model diberikan bahasa balasan yang mengikat: \"Mati\" = tingkah laku hari ini (tiada arahan), \"Tetap\" = sentiasa bahasa yang dikonfigurasikan, \"Auto\" = dikesan daripada subjek + artikel pelanggan terkini, kembali kepada lalai yang dikonfigurasikan apabila teks terlalu pendek/kabur.",
         "replyLanguageFixed": "Kod bahasa BCP-47 (cth. \"de\", \"en\") sentiasa digunakan sebagai bahasa balasan yang mengikat dalam mod \"Tetap\".",
         "replyLanguageDefault": "Kod bahasa BCP-47 digunakan dalam mod \"Auto\" apabila teks tidak boleh dipadankan dengan penuh yakin dengan profil bahasa yang diketahui.",
-        "allowedStateTypes": "Senarai yang dipisahkan koma bagi jenis keadaan Znuny yang dibenarkan (cth. \"terbuka\" atau \"terbuka, peringatan belum selesai\") AI boleh menetapkan tiket melalui update_ticket_fields — dikuatkuasakan untuk kedua-dua nama negeri dan id keadaan angka. Kosong = lalai \"terbuka\" sahaja (pembukaan semula dibenarkan, tidak pernah ditutup); senarai kosong eksplisit \"[]\" melumpuhkan perubahan keadaan sepenuhnya.",
+        "allowedStateTypes": "Senarai dipisahkan koma bagi jenis status Znuny yang dibenarkan (cth. \"open\" atau \"open,closed\"). Ia mengawal dua perkara: status yang boleh ditetapkan oleh AI melalui update_ticket_fields (dikuatkuasakan sama rata untuk nama status dan ID status berangka) dan status yang diletakkan Tiqora pada tiket selepas ia sendiri menghantar balasan automatik: balasan berkandungan menutup tiket apabila \"closed\" dibenarkan (jika tidak, \"open\"), manakala soalan penjelasan hanya membukanya. Kosong = lalai \"open\" sahaja (buka semula dibenarkan, tidak pernah menutup); senarai kosong yang jelas \"[]\" melumpuhkan perubahan status sepenuhnya, jadi tiket yang dibalas secara automatik kekal pada status asalnya.",
         "piiNer": "Mengesan nama orang dalam teks melalui spaCy NER (Jerman + Inggeris) dan menyembunyikannya sebagai [NAME_n] sebelum kandungan sampai ke penyedia LLM — selain nama pelanggan dan pengirim. Hanya aktif apabila topeng PII dihidupkan. Positif palsu tidak berbahaya (hanya lebih menutupi).",
         "summaryDetail": "Standard: perenggan padat, 1–2 ayat setiap dokumen yang dilampirkan. Terperinci: perenggan yang lebih teliti dan 3–5 ayat setiap dokumen — berguna untuk baris gilir dengan banyak lampiran PDF.",
         "enabledRefine": "Menunjukkan butang “Perhalus teks” dalam editor balasan dan tiket baharu. Model hanya menulis semula apa yang ditaip ejen; petikan dibiarkan. Tiada apa yang disimpan dan tiada apa yang dihantar — ejen melihat hasil dalam editor dan boleh membuat asal. Tidak terjejas oleh kawalan mod operasi.",
@@ -2792,7 +2792,7 @@
         },
         "outbox": {
           "name": "Longkang peti keluar",
-          "description": "tiqora_event_outbox: indeks carian, webhooks, kemas kini langsung."
+          "description": "Mengosongkan tiqora_event_outbox: indeks carian, webhook, kemas kini langsung."
         },
         "postmaster": {
           "name": "Guru pos",
