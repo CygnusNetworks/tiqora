@@ -824,11 +824,13 @@
       "label": "Then",
       "keep": "Keep state",
       "pending": "Pending",
+      "autoclose": "Auto-close",
       "closed": "Close successfully",
       "until": "until",
       "send": {
         "pending": "Send · pending",
-        "closed": "Send & close"
+        "closed": "Send & close",
+        "autoclose": "Send · auto-close"
       }
     },
     "telegram": {
@@ -896,6 +898,8 @@
         "sendKeepHint": "Ticket stays as it is",
         "sendPending": "Send and wait",
         "sendPendingHint": "Ticket waits for a reply until the date",
+        "sendAutoClose": "Send, else auto-close",
+        "sendAutoCloseHint": "Closed successfully on the date unless the customer answers",
         "sendClosed": "Send and close",
         "sendClosedHint": "Ticket is closed successfully",
         "snippetsEmptyTitle": "No chat snippets for this queue",
@@ -2630,6 +2634,8 @@
       "consentRequiredHelp": "While required, incoming messages from a new Telegram contact are not processed until they confirm consent.",
       "consentText": "Consent request text",
       "consentConfirmedText": "Consent confirmation text",
+      "followupReopenDays": "Reopen after closing (days)",
+      "followupReopenDaysHelp": "If the customer writes within this period after closing, the ticket is reopened instead of a new one being created. Empty = 7, 0 = always a new ticket.",
       "textsTitle": "Bot texts",
       "textsHelp": "Leave empty to use the built-in default in the customer's language (German, otherwise English). A text entered here is used for every customer, whatever their language.",
       "startText": "Greeting on /start",

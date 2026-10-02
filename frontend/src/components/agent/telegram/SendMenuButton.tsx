@@ -1,23 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import { todayIso, type NextState } from "../replyNextState";
+import { needsDate, todayIso, type NextState } from "../replyNextState";
 
 const LABEL_KEY: Record<NextState, string> = {
   keep: "ticket.telegram.composer.sendKeep",
   pending: "ticket.telegram.composer.sendPending",
+  autoclose: "ticket.telegram.composer.sendAutoClose",
   closed: "ticket.telegram.composer.sendClosed",
 };
 const HINT_KEY: Record<NextState, string> = {
   keep: "ticket.telegram.composer.sendKeepHint",
   pending: "ticket.telegram.composer.sendPendingHint",
+  autoclose: "ticket.telegram.composer.sendAutoCloseHint",
   closed: "ticket.telegram.composer.sendClosedHint",
 };
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 /** Shown in the menu; the composer's textarea handles the actual keys
  * (Alt+Enter = pending, Cmd/Ctrl+Enter = closed). */
-const SEND_SHORTCUT: Record<NextState, string> = {
+const SEND_SHORTCUT: Record<NextState, string | null> = {
   keep: "Enter",
+  autoclose: null,
   pending: IS_MAC ? "⌥ Enter" : "Alt+Enter",
   closed: IS_MAC ? "⌘ Enter" : "Ctrl+Enter",
 };
@@ -127,7 +130,7 @@ export function SendMenuButton({
                 type="button"
                 role="menuitem"
                 data-testid={`tg-composer-send-${o}`}
-                disabled={disabled || (o === "pending" && pendingInvalid)}
+                disabled={disabled || (needsDate(o) && pendingInvalid)}
                 onClick={() => pick(o)}
                 className="grid grid-cols-[1fr_auto] gap-x-3 rounded-md px-2.5 py-1.5 text-left text-sm text-ink hover:bg-surface-subtle disabled:opacity-50"
               >
@@ -141,7 +144,7 @@ export function SendMenuButton({
                 )}
                 <span className="col-span-2 text-[11px] text-muted">{t(HINT_KEY[o])}</span>
               </button>
-              {o === "pending" && (
+              {needsDate(o) && (
                 <label className="flex items-center gap-2 px-2.5 pb-1.5 text-[11px] text-muted">
                   {t("ticket.replyNext.until")}
                   <input

@@ -824,11 +824,13 @@
       "label": "Danach",
       "keep": "Status lassen",
       "pending": "Wartend",
+      "autoclose": "Auto-Schließen",
       "closed": "Erfolgreich schließen",
       "until": "bis",
       "send": {
         "pending": "Senden · wartend",
-        "closed": "Senden & schließen"
+        "closed": "Senden & schließen",
+        "autoclose": "Senden · auto-schließen"
       }
     },
     "telegram": {
@@ -896,6 +898,8 @@
         "sendKeepHint": "Ticket bleibt, wie es ist",
         "sendPending": "Senden und warten",
         "sendPendingHint": "Ticket wartet bis zum Datum auf eine Antwort",
+        "sendAutoClose": "Senden, sonst auto-schließen",
+        "sendAutoCloseHint": "Ohne Antwort bis zum Datum wird das Ticket erfolgreich geschlossen",
         "sendClosed": "Senden und schließen",
         "sendClosedHint": "Ticket wird erfolgreich geschlossen",
         "snippetsEmptyTitle": "Keine Chat-Textbausteine für diese Queue",
@@ -2630,6 +2634,8 @@
       "consentRequiredHelp": "Solange erforderlich, werden eingehende Nachrichten eines neuen Telegram-Kontakts erst verarbeitet, nachdem die Zustimmung bestätigt wurde.",
       "consentText": "Zustimmungstext",
       "consentConfirmedText": "Bestätigungstext",
+      "followupReopenDays": "Wiedereröffnen nach Abschluss (Tage)",
+      "followupReopenDaysHelp": "Schreibt der Kunde innerhalb dieser Frist nach dem Schließen, wird das Ticket wieder geöffnet statt ein neues angelegt. Leer = 7, 0 = immer neues Ticket.",
       "textsTitle": "Bot-Texte",
       "textsHelp": "Leer lassen = eingebauter Standardtext in der Sprache des Kunden (Deutsch, sonst Englisch). Ein eingetragener Text gilt für alle Kunden, unabhängig von ihrer Sprache.",
       "startText": "Begrüßung bei /start",
