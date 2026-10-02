@@ -36,6 +36,7 @@ from tiqora.channels.telegram.messages import (
     get_by_message,
     record_message,
 )
+from tiqora.channels.telegram.texts import customer_language, normalize_language, telegram_text
 from tiqora.db.tiqora.models import TiqoraTelegramContact
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
@@ -77,34 +78,14 @@ _BUTTON_RESOLVE_STATE_NAME: dict[ButtonAction, str] = {
 # the stripped message text verbatim — no other command is understood yet.
 START_COMMAND = "/start"
 
-DEFAULT_START_TEXT = (
-    "Hallo {first_name}! 👋 Schildere mir bitte kurz dein Anliegen – ich lege "
-    "dafür einen neuen Vorgang an."
-)
+# Customer-facing default texts (greeting, consent prompt) and the tone
+# addendum live in tiqora.channels.telegram.texts — English/German built-ins
+# picked by the customer's language, overridable per channel setting.
 
-# System-prompt addendum for AI replies triggered from this channel (Task:
-# Telegram-Chat-UX) — a Telegram chat reads as a conversation, not a letter,
-# so the model is told to duze and drop formal-mail conventions. Read by
-# ``tiqora.ai.runtime`` via the ``channel.telegram.tone_prompt`` setting.
-DEFAULT_TONE_PROMPT = (
-    "Dies ist ein Telegram-Chat: Duze die Nutzerin/den Nutzer konsequent und "
-    "sprich sie/ihn mit Vornamen an. Schreibe kurz, freundlich und "
-    "chat-gerecht – keine förmlichen Brief-Floskeln, keine Grußformeln wie "
-    "'Sehr geehrte…'."
-)
 
-_DEFAULT_CONSENT_TEXT = (
-    "Bevor wir Ihr Anliegen bearbeiten können, benötigen wir Ihre Zustimmung zur "
-    "Verarbeitung Ihrer Daten (Chat-ID, Name, Nachrichteninhalt) zur Bearbeitung "
-    "Ihrer Anfrage. Bitte bestätigen Sie über den Button unten. Senden Sie Ihr "
-    "Anliegen danach bitte erneut.\n\n✅ Zustimmen"
-)
-_DEFAULT_CONSENT_CONFIRMED_TEXT = (
-    "Vielen Dank! Ihre Zustimmung wurde gespeichert. Bitte senden Sie jetzt Ihr Anliegen."
-)
-_CONSENT_KEYBOARD = {
-    "inline_keyboard": [[{"text": "✅ Zustimmen", "callback_data": CONSENT_ACCEPT_CALLBACK_DATA}]]
-}
+def _consent_keyboard(label: str) -> dict[str, Any]:
+    return {"inline_keyboard": [[{"text": label, "callback_data": CONSENT_ACCEPT_CALLBACK_DATA}]]}
+
 
 # Telegram media message keys that carry a downloadable attachment, in the
 # order they're checked (a message has at most one of these).
@@ -196,6 +177,9 @@ async def _upsert_contact_fields(
     first_name = str(frm.get("first_name") or "").strip()
     last_name = str(frm.get("last_name") or "").strip()
     display_name = " ".join(part for part in (first_name, last_name) if part) or None
+    # The Telegram client's UI language — a fallback for picking the default
+    # texts' language when the customer's own words don't tell (see texts.py).
+    language_code = str(frm.get("language_code") or "").strip()[:16] or None
 
     row = (
         await session.execute(
@@ -208,6 +192,7 @@ async def _upsert_contact_fields(
             telegram_user_id=telegram_user_id,
             username=username,
             display_name=display_name,
+            language_code=language_code,
         )
         session.add(row)
     else:
@@ -215,6 +200,8 @@ async def _upsert_contact_fields(
             row.telegram_user_id = telegram_user_id
         row.username = username
         row.display_name = display_name
+        if language_code is not None:
+            row.language_code = language_code
         row.change_time = datetime.now(UTC).replace(tzinfo=None)
     await session.flush()
     return row
@@ -246,9 +233,9 @@ async def _handle_start_command(
 
     if gateway is not None:
         first_name = str(frm.get("first_name") or "").strip()
-        template = (
-            await channel_setting(session, CHANNEL_NAME, "start_text", DEFAULT_START_TEXT)
-        ) or DEFAULT_START_TEXT
+        template = await telegram_text(
+            session, "start_text", normalize_language(contact.language_code)
+        )
         greeting = _render_start_text(template, first_name)
         try:
             await gateway.send_message(contact.chat_id, greeting)
@@ -395,11 +382,8 @@ async def _handle_consent_callback(
     await session.flush()
 
     callback_query_id = str(callback_query.get("id") or "")
-    confirmed_text = (
-        await channel_setting(
-            session, CHANNEL_NAME, "consent_confirmed_text", _DEFAULT_CONSENT_CONFIRMED_TEXT
-        )
-        or _DEFAULT_CONSENT_CONFIRMED_TEXT
+    confirmed_text = await telegram_text(
+        session, "consent_confirmed_text", normalize_language(contact.language_code)
     )
     if gateway is not None:
         await gateway.answer_callback_query(callback_query_id, confirmed_text)
@@ -555,7 +539,11 @@ async def _handle_button_callback(
 
 
 async def _maybe_prompt_consent(
-    session: AsyncSession, gateway: TelegramGateway | None, contact: TiqoraTelegramContact
+    session: AsyncSession,
+    gateway: TelegramGateway | None,
+    contact: TiqoraTelegramContact,
+    *,
+    text: str | None = None,
 ) -> None:
     """Send the consent prompt to *contact*, unless one was already sent
     within :data:`CONSENT_REPROMPT_SECONDS` (spam guard)."""
@@ -570,12 +558,13 @@ async def _maybe_prompt_consent(
 
     if gateway is None:
         return
-    consent_text = (
-        await channel_setting(session, CHANNEL_NAME, "consent_text", _DEFAULT_CONSENT_TEXT)
-        or _DEFAULT_CONSENT_TEXT
-    )
+    language = customer_language(text, contact.language_code)
+    consent_text = await telegram_text(session, "consent_text", language)
+    button_label = await telegram_text(session, "consent_button_label", language)
     try:
-        await gateway.send_message(contact.chat_id, consent_text, reply_markup=_CONSENT_KEYBOARD)
+        await gateway.send_message(
+            contact.chat_id, consent_text, reply_markup=_consent_keyboard(button_label)
+        )
     except TelegramApiError as exc:
         logger.warning(
             "telegram_consent_prompt_send_failed", chat_id=contact.chat_id, error=str(exc)
@@ -625,7 +614,7 @@ async def process_update(
     contact = await _upsert_contact(session, message)
 
     if await _consent_required(session) and contact.consent_time is None:
-        await _maybe_prompt_consent(session, gateway, contact)
+        await _maybe_prompt_consent(session, gateway, contact, text=message.get("text"))
         return {"skipped": "no_consent"}
 
     if (message.get("text") or "").strip() == START_COMMAND:

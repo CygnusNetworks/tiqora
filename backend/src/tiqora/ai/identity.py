@@ -31,38 +31,6 @@ from tiqora.db.tiqora.models import TiqoraTelegramContact
 # asking a third time only delays the handoff.
 MAX_IDENTITY_ATTEMPTS = 2
 
-# Sent verbatim instead of the model's acknowledgement once a claim has been
-# checked. The channel is Telegram only (see the module docstring), where the
-# configured tone is informal German. ``{fields}`` lists the field labels.
-IDENTITY_NO_MATCH_TEXT = (
-    "Mit diesen Angaben ({fields}) konnte ich dich leider nicht finden. "
-    "Bitte prüf sie noch einmal und schick sie mir erneut."
-)
-IDENTITY_HANDOFF_TEXT = (
-    "Ich konnte dich leider nicht zuordnen. Ich gebe dein Anliegen an unser Team "
-    "weiter, jemand meldet sich bei dir."
-)
-# English variants for a customer who wrote English (the resolved reply
-# language, see tiqora.ai.reply_language). German stays the fallback: any other
-# or unresolved language gets the German text, as before.
-IDENTITY_NO_MATCH_TEXT_EN = (
-    "I couldn't find you with these details ({fields}). Please check them and send them again."
-)
-IDENTITY_HANDOFF_TEXT_EN = (
-    "I'm sorry, I couldn't match you to an account. I'm passing your request on "
-    "to our team and someone will get back to you."
-)
-
-
-def identity_no_match_text(language: str | None, fields_label: str) -> str:
-    template = IDENTITY_NO_MATCH_TEXT_EN if language == "en" else IDENTITY_NO_MATCH_TEXT
-    return template.format(fields=fields_label)
-
-
-def identity_handoff_text(language: str | None) -> str:
-    return IDENTITY_HANDOFF_TEXT_EN if language == "en" else IDENTITY_HANDOFF_TEXT
-
-
 _COLUMN_NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
 # Characters people add or drop when typing an identifier ("123-45-67-89-0"
@@ -218,12 +186,6 @@ async def record_identity_attempt(session: AsyncSession, ticket_state: TiqoraAiT
 
 
 __all__ = [
-    "identity_handoff_text",
-    "identity_no_match_text",
-    "IDENTITY_HANDOFF_TEXT",
-    "IDENTITY_HANDOFF_TEXT_EN",
-    "IDENTITY_NO_MATCH_TEXT",
-    "IDENTITY_NO_MATCH_TEXT_EN",
     "MAX_IDENTITY_ATTEMPTS",
     "MIN_CLAIM_VALUE_LENGTH",
     "ClarifySchemaField",

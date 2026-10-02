@@ -50,8 +50,6 @@ from tiqora.ai.handoff import mark_ai_escalated
 from tiqora.ai.identity import (
     MAX_IDENTITY_ATTEMPTS,
     get_customer_id_for_login,
-    identity_handoff_text,
-    identity_no_match_text,
     is_identified,
     parse_clarify_schema,
     record_identity_attempt,
@@ -460,12 +458,9 @@ async def _resolve_telegram_tone_prompt(
     ).strip().lower() == _TELEGRAM_CHANNEL
     if not is_telegram:
         return None
-    from tiqora.channels.common import channel_setting
-    from tiqora.channels.telegram.service import DEFAULT_TONE_PROMPT
+    from tiqora.channels.telegram.texts import telegram_tone_prompt
 
-    return (
-        await channel_setting(session, _TELEGRAM_CHANNEL, "tone_prompt", DEFAULT_TONE_PROMPT)
-    ) or DEFAULT_TONE_PROMPT
+    return await telegram_tone_prompt(session)
 
 
 def _build_system_prompt(
@@ -806,6 +801,30 @@ def _identity_tool_schema() -> list[dict[str, Any]]:
     ]
 
 
+def _field_labels(fields: list[Any]) -> str:
+    return ", ".join(f.label for f in fields)
+
+
+async def _telegram_contact_language(session: AsyncSession, ticket_id: int) -> str | None:
+    """The Telegram client language of this ticket's chat, normalized — the
+    fallback when the reply language can't be resolved from the policy/text."""
+    from tiqora.channels.telegram.outbound import resolve_chat_id
+    from tiqora.channels.telegram.texts import normalize_language
+
+    try:
+        chat_id = await resolve_chat_id(session, ticket_id)
+    except Exception:  # noqa: BLE001 — no chat → no fallback, never fatal
+        return None
+    code = (
+        await session.execute(
+            select(TiqoraTelegramContact.language_code).where(
+                TiqoraTelegramContact.chat_id == chat_id
+            )
+        )
+    ).scalar_one_or_none()
+    return normalize_language(code)
+
+
 async def _dispatch_identity_message(
     session: AsyncSession,
     sysconfig: SysConfig,
@@ -821,12 +840,20 @@ async def _dispatch_identity_message(
     created_by_user_id: int | None,
     prompt_tokens: int,
     completion_tokens: int,
+    trace_note: str | None = None,
 ) -> AgentRunResult:
     """Draft or send the identity-flow's proposed message via Telegram (the
     identity block only ever runs for a Telegram-sourced run — see the guard
     in :func:`run_ticket_agent`)."""
     destination = _map_customer_message(trigger=trigger, autonomy=autonomy, kind=kind)
     source = SOURCE_MANUAL if trigger == TRIGGER_MANUAL else SOURCE_AUTO
+    # The identity exchange calls no tools, so without this the 🤖 trace of
+    # its messages was empty and agents could not tell why the bot asked.
+    tool_trace_json = (
+        encode_tool_trace([{"role": "tool", "name": "identity_check", "content": trace_note}])
+        if trace_note
+        else None
+    )
 
     if destination == "draft":
         draft = await draft_service.create_draft(
@@ -837,7 +864,7 @@ async def _dispatch_identity_message(
             body=body,
             subject=subject or None,
             based_on_article_id=based_on_article_id,
-            tool_trace_json=None,
+            tool_trace_json=tool_trace_json,
             created_by_user_id=created_by_user_id,
             source=source,
             actor_user_id=actor_user_id,
@@ -870,6 +897,7 @@ async def _dispatch_identity_message(
             source=SOURCE_AUTO,
             queue_id=ticket.queue_id,
             service_user_id=actor_user_id,
+            tool_trace_json=tool_trace_json,
         )
     )
     return AgentRunResult(
@@ -939,6 +967,7 @@ async def _run_identity_exchange(
     or ``None`` when identity was just confirmed and the caller should
     continue into the normal run (re-loading the ticket snapshot first)."""
     from tiqora.channels.telegram.outbound import resolve_chat_id
+    from tiqora.channels.telegram.texts import telegram_text
 
     ticket_id = ticket.ticket_id
     source = SOURCE_MANUAL if trigger == TRIGGER_MANUAL else SOURCE_AUTO
@@ -974,7 +1003,7 @@ async def _run_identity_exchange(
     )
     language = _resolve_reply_language(
         policy, ticket, [a for a in articles if a.sender_type == "customer"]
-    )
+    ) or await _telegram_contact_language(session, ticket_id)
     system_prompt = _build_identity_system_prompt(
         fields,
         tone_prompt=identity_tone_prompt,
@@ -1037,6 +1066,10 @@ async def _run_identity_exchange(
             completion_tokens=completion_tokens,
         )
 
+    trace_note = (
+        f"Identity check: identity not confirmed yet; asked the customer for "
+        f"{_field_labels(fields)}."
+    )
     identity_claim_raw = args.get("identity_claim")
     claim_values: dict[str, str] = {}
     if isinstance(identity_claim_raw, dict):
@@ -1087,7 +1120,13 @@ async def _run_identity_exchange(
                 completion_tokens=completion_tokens,
                 language=language,
             )
-        body = identity_no_match_text(language, ", ".join(f.label for f in fields))
+        body = (await telegram_text(session, "identity_no_match_text", language)).replace(
+            "{fields}", ", ".join(f.label for f in fields)
+        )
+        trace_note = (
+            f"Identity check: the values given for {_field_labels(fields)} matched no "
+            f"customer record (attempt {attempts} of {MAX_IDENTITY_ATTEMPTS})."
+        )
 
     result = await _dispatch_identity_message(
         session,
@@ -1103,6 +1142,7 @@ async def _run_identity_exchange(
         created_by_user_id=created_by_user_id,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
+        trace_note=trace_note,
     )
     state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
     await session.commit()
@@ -1129,6 +1169,8 @@ async def _hand_off_unidentified(
     """Identity failed :data:`MAX_IDENTITY_ATTEMPTS` times: tell the customer
     a human takes over, leave the agents a note, and set the handoff flag so
     the auto worker stops answering until an agent replies."""
+    from tiqora.channels.telegram.texts import telegram_text
+
     sent = await _dispatch_identity_message(
         session,
         sysconfig,
@@ -1138,7 +1180,11 @@ async def _hand_off_unidentified(
         autonomy=autonomy,
         kind=DRAFT_KIND_CLARIFY,
         subject="",
-        body=identity_handoff_text(language),
+        body=await telegram_text(session, "identity_handoff_text", language),
+        trace_note=(
+            f"Identity check: no customer record matched {_field_labels(fields)} after "
+            f"{attempts} attempts — handed over to a human."
+        ),
         based_on_article_id=based_on_article_id,
         created_by_user_id=created_by_user_id,
         prompt_tokens=prompt_tokens,

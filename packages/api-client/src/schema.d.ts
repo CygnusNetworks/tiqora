@@ -14671,6 +14671,8 @@ export interface components {
             chat_id: number;
             /** Consent Time */
             consent_time: string | null;
+            /** Customer Language */
+            customer_language?: string | null;
             /** Customer User Login */
             customer_user_login: string | null;
             /** Display Name */

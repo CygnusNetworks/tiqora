@@ -60,6 +60,9 @@ class TelegramChatOut(BaseModel):
     customer_user_login: str | None
     consent_time: datetime | None
     ai_escalated_at: datetime | None
+    # Language of the customer's latest message, else their Telegram client
+    # language ("de", "en", ...); None = unknown. The reply-button preset uses it.
+    customer_language: str | None = None
     messages: list[TelegramMessageMeta]
 
 
@@ -130,6 +133,7 @@ async def get_telegram_chat(
         customer_user_login=info.contact.customer_user_login,
         consent_time=info.contact.consent_time,
         ai_escalated_at=info.ai_escalated_at,
+        customer_language=info.customer_language,
         messages=[
             _message_meta(m, editable=m.article_id in info.editable_article_ids)
             for m in info.messages

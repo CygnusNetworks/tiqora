@@ -731,19 +731,27 @@ async def test_contact_upsert_updates_display_name_keeps_login(mariadb_znuny_url
 
 
 def _callback_update(
-    update_id: int, chat_id: int, user_id: int, *, data: str = "tiqora_consent_accept"
+    update_id: int,
+    chat_id: int,
+    user_id: int,
+    *,
+    data: str = "tiqora_consent_accept",
+    language_code: str | None = None,
 ) -> dict:
+    frm: dict = {
+        "id": user_id,
+        "is_bot": False,
+        "first_name": "Ada",
+        "last_name": "Lovelace",
+        "username": "ada",
+    }
+    if language_code is not None:
+        frm["language_code"] = language_code
     return {
         "update_id": update_id,
         "callback_query": {
             "id": f"cbq{update_id}",
-            "from": {
-                "id": user_id,
-                "is_bot": False,
-                "first_name": "Ada",
-                "last_name": "Lovelace",
-                "username": "ada",
-            },
+            "from": frm,
             "message": {
                 "message_id": update_id,
                 "chat": {"id": chat_id, "type": "private"},
@@ -895,7 +903,7 @@ async def test_consent_callback_accept_sets_consent_no_ticket(mariadb_znuny_url:
                     factory,
                     sysconfig,
                     gateway,
-                    _callback_update(504, 9504, 19504),
+                    _callback_update(504, 9504, 19504, language_code="de"),
                     user_id=1,
                 )
                 await session.commit()
