@@ -48,10 +48,10 @@ from tiqora.ai.context import (
 from tiqora.ai.gate import AiGateError, require_feature_allowed
 from tiqora.ai.handoff import mark_ai_escalated
 from tiqora.ai.identity import (
-    IDENTITY_HANDOFF_TEXT,
-    IDENTITY_NO_MATCH_TEXT,
     MAX_IDENTITY_ATTEMPTS,
     get_customer_id_for_login,
+    identity_handoff_text,
+    identity_no_match_text,
     is_identified,
     parse_clarify_schema,
     record_identity_attempt,
@@ -548,26 +548,23 @@ def _build_system_prompt(
     return "\n\n".join(p for p in parts if p)
 
 
-def _resolve_reply_language_line(
+def _resolve_reply_language(
     policy: TiqoraAiQueuePolicy, ticket: TicketSnapshot, customer_articles: list[ArticleSnapshot]
 ) -> str | None:
-    """Plan block 3: at most one binding reply-language line, resolved once
-    per run — never per article. ``off`` (default) reproduces today's
-    behaviour exactly (no line at all)."""
+    """Plan block 3: the binding reply language, resolved once per run — never
+    per article. ``None`` for ``off`` (default: today's behaviour, no line at
+    all) and for ``auto`` without a trustworthy detection."""
     if policy.reply_language_mode == REPLY_LANGUAGE_FIXED:
-        if not policy.reply_language_fixed:
-            return None
-        return f"Reply language (binding): {policy.reply_language_fixed}"
+        return policy.reply_language_fixed or None
     if policy.reply_language_mode == REPLY_LANGUAGE_AUTO:
         latest_body = customer_articles[-1].body if customer_articles else None
         if policy.reply_language_default:
-            lang = detect_reply_language(
+            return detect_reply_language(
                 ticket.title,
                 latest_body,
                 candidates=list(LANGUAGE_PROFILES),
                 default=policy.reply_language_default,
             )
-            return f"Reply language (binding): {lang}"
         # No configured default: only trust the detector when it actually
         # reached the minimum stopword-match score — otherwise emit no line
         # at all rather than silently defaulting to some language the
@@ -577,8 +574,18 @@ def _resolve_reply_language_line(
         )
         if detection.used_fallback:
             return None
-        return f"Reply language (binding): {detection.language}"
+        return detection.language
     return None
+
+
+def _reply_language_line(language: str | None) -> str | None:
+    return f"Reply language (binding): {language}" if language else None
+
+
+def _resolve_reply_language_line(
+    policy: TiqoraAiQueuePolicy, ticket: TicketSnapshot, customer_articles: list[ArticleSnapshot]
+) -> str | None:
+    return _reply_language_line(_resolve_reply_language(policy, ticket, customer_articles))
 
 
 def _strip_known_footer(body: str, footer: str | None) -> str:
@@ -694,7 +701,11 @@ async def _resolve_auto_state_id(
 
 
 def _build_identity_system_prompt(
-    fields: list[Any], *, tone_prompt: str | None = None, failed_attempts: int = 0
+    fields: list[Any],
+    *,
+    tone_prompt: str | None = None,
+    failed_attempts: int = 0,
+    reply_language_line: str | None = None,
 ) -> str:
     """System prompt for the identity-check mini-exchange (Task 6). Replaces
     the normal system prompt entirely — the model must not see the queue's
@@ -732,6 +743,14 @@ def _build_identity_system_prompt(
         )
     if tone_prompt:
         parts.append(tone_prompt)
+    if reply_language_line:
+        # Without it the model follows the (German) Telegram tone addendum
+        # and asks an English-writing customer in German (prod ticket 43132).
+        # Last, so it wins over the tone, which only describes style.
+        parts.append(
+            f"{reply_language_line}\nWrite the message in this language; the tone "
+            "instructions above only describe style, not language."
+        )
     return "\n\n".join(parts)
 
 
@@ -953,10 +972,14 @@ async def _run_identity_exchange(
     identity_tone_prompt = await _resolve_telegram_tone_prompt(
         session, source_channel=_TELEGRAM_CHANNEL, based_on_channel=None
     )
+    language = _resolve_reply_language(
+        policy, ticket, [a for a in articles if a.sender_type == "customer"]
+    )
     system_prompt = _build_identity_system_prompt(
         fields,
         tone_prompt=identity_tone_prompt,
         failed_attempts=state.identity_attempts or 0,
+        reply_language_line=_reply_language_line(language),
     )
     user_message = _build_identity_user_message(articles)
     messages: list[LlmMessage] = [
@@ -1062,8 +1085,9 @@ async def _run_identity_exchange(
                 created_by_user_id=created_by_user_id,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
+                language=language,
             )
-        body = IDENTITY_NO_MATCH_TEXT.format(fields=", ".join(f.label for f in fields))
+        body = identity_no_match_text(language, ", ".join(f.label for f in fields))
 
     result = await _dispatch_identity_message(
         session,
@@ -1100,6 +1124,7 @@ async def _hand_off_unidentified(
     created_by_user_id: int | None,
     prompt_tokens: int,
     completion_tokens: int,
+    language: str | None = None,
 ) -> AgentRunResult:
     """Identity failed :data:`MAX_IDENTITY_ATTEMPTS` times: tell the customer
     a human takes over, leave the agents a note, and set the handoff flag so
@@ -1113,7 +1138,7 @@ async def _hand_off_unidentified(
         autonomy=autonomy,
         kind=DRAFT_KIND_CLARIFY,
         subject="",
-        body=IDENTITY_HANDOFF_TEXT,
+        body=identity_handoff_text(language),
         based_on_article_id=based_on_article_id,
         created_by_user_id=created_by_user_id,
         prompt_tokens=prompt_tokens,
