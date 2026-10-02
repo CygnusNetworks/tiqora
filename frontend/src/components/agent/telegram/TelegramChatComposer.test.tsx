@@ -91,6 +91,7 @@ beforeEach(() => {
     identity_verified: true,
     consent_time: null,
     ai_escalated_at: null,
+    customer_language: "de",
     messages: [],
   });
   getArticleBody.mockReset().mockResolvedValue({ body: "Mein Router blinkt rot", is_html: false });
@@ -494,6 +495,44 @@ describe("TelegramChatComposer: quote, buttons, AI", () => {
     fireEvent.click(screen.getByTestId("tg-buttons-remove-0"));
     fireEvent.click(screen.getByTestId("tg-buttons-remove-0"));
     expect(screen.getByTestId("tg-buttons-preset")).toBeInTheDocument();
+  });
+
+  it("writes the preset in the customer's language, not the agent's", async () => {
+    getTelegramChat.mockResolvedValue({
+      chat_id: 1,
+      display_name: "Alex",
+      username: null,
+      customer_user_login: null,
+      identity_verified: true,
+      consent_time: null,
+      ai_escalated_at: null,
+      customer_language: "en",
+      messages: [],
+    });
+    const input = await mount();
+    await waitFor(() => expect(input.placeholder).toContain("Alex"));
+    fireEvent.click(screen.getByTestId("tg-composer-buttons-toggle"));
+    fireEvent.click(screen.getByTestId("tg-buttons-preset"));
+    expect(input.value).toBe("Is your problem solved now?");
+    fireEvent.click(screen.getByTestId("tg-composer-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(lastPayload().telegram_buttons).toEqual([
+      { label: "Yes", action: "resolve_yes" },
+      { label: "No", action: "resolve_no" },
+    ]);
+  });
+
+  it("on a closed ticket plain Enter sends and sets the ticket to waiting", async () => {
+    getTicket.mockResolvedValue({ id: 1, permissions: perms(true), state_type: "closed" });
+    const input = await mount();
+    await waitFor(() =>
+      expect(screen.getByTestId("tg-composer-send")).not.toHaveTextContent(/^Send(en)?$/),
+    );
+    type(input, "Is your problem solved now?");
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(lastPayload()).toMatchObject({ state_id: 6 });
+    expect(lastPayload().pending_time).toBeTruthy();
   });
 
   it("turning the Buttons toggle off discards the buttons", async () => {
