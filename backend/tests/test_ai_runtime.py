@@ -2461,9 +2461,38 @@ def _no_match(fields: str, language: str | None) -> str:
     return default_text("identity_no_match_text", language).replace("{fields}", fields)
 
 
+async def _add_chat_message(
+    session: AsyncSession, seed: dict[str, Any], *, chat_id: int, body: str
+) -> None:
+    await add_article(
+        session,
+        ticket_id=seed["ticket_id"],
+        article=ArticleIn(
+            sender_type="customer",
+            is_visible_for_customer=True,
+            subject="Re",
+            body=body,
+            from_address=f"Tester <{chat_id}@telegram.invalid>",
+            channel="telegram",
+        ),
+        user_id=seed["agent_id"],
+        sysconfig=SysConfig(session),
+    )
+    await session.commit()
+
+
 async def _run_wrong_identity_claim(
-    factory: async_sessionmaker[AsyncSession], seed: dict[str, Any], *, run_id: str
+    factory: async_sessionmaker[AsyncSession],
+    seed: dict[str, Any],
+    *,
+    run_id: str,
+    chat_id: int,
 ) -> tuple[AgentRunResult, ScriptedLlm]:
+    # Each attempt answers a fresh customer message carrying the claimed
+    # value, as in a real chat: a claim the latest message does not contain
+    # is not counted as a new attempt.
+    async with factory() as session:
+        await _add_chat_message(session, seed, chat_id=chat_id, body="+49wrong")
     llm = ScriptedLlm(
         [
             _identity_response(
@@ -2503,7 +2532,7 @@ async def test_identity_wrong_claim_tells_the_customer_it_did_not_match(
         sent: list[str] = []
         _install_recording_telegram_deliver(monkeypatch, sent)
 
-        result, _ = await _run_wrong_identity_claim(factory, seed, run_id="run-28")
+        result, _ = await _run_wrong_identity_claim(factory, seed, run_id="run-28", chat_id=900028)
 
         assert result.status == "sent"
         assert sent == [_no_match("Phone number", None)]
@@ -2535,7 +2564,7 @@ async def test_identity_exchange_follows_the_reply_language(
         sent: list[str] = []
         _install_recording_telegram_deliver(monkeypatch, sent)
 
-        _, llm = await _run_wrong_identity_claim(factory, seed, run_id="run-85")
+        _, llm = await _run_wrong_identity_claim(factory, seed, run_id="run-85", chat_id=900085)
 
         prompt = next(str(m.content) for m in llm.last_messages if m.role == "system")
         assert "Reply language (binding): en" in prompt
@@ -2569,7 +2598,7 @@ async def test_identity_texts_fall_back_to_the_telegram_client_language(
         sent: list[str] = []
         _install_recording_telegram_deliver(monkeypatch, sent)
 
-        result, _ = await _run_wrong_identity_claim(factory, seed, run_id="run-86")
+        result, _ = await _run_wrong_identity_claim(factory, seed, run_id="run-86", chat_id=900086)
 
         assert sent == [_no_match("Phone number", "de")]
         async with factory() as session:
@@ -2584,9 +2613,10 @@ async def test_identity_texts_fall_back_to_the_telegram_client_language(
 async def test_identity_prompt_mentions_earlier_failed_attempts(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The exchange only ever sees the latest message (see the security test
-    below), so without this the model greets the customer from scratch and
-    asks for data they just sent. It learns the count, never the values."""
+    """The exchange sees only the chat's own recent messages, never its own
+    replies (see the security test below), so without this the model greets
+    the customer from scratch and asks for data they just sent. It learns the
+    count, never the values."""
     seed = _seed_ticket(mariadb_znuny_url, ns=29)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -2598,8 +2628,12 @@ async def test_identity_prompt_mentions_earlier_failed_attempts(
             )
         _install_recording_telegram_deliver(monkeypatch, [])
 
-        _, first_llm = await _run_wrong_identity_claim(factory, seed, run_id="run-29-0")
-        _, second_llm = await _run_wrong_identity_claim(factory, seed, run_id="run-29-1")
+        _, first_llm = await _run_wrong_identity_claim(
+            factory, seed, run_id="run-29-0", chat_id=900029
+        )
+        _, second_llm = await _run_wrong_identity_claim(
+            factory, seed, run_id="run-29-1", chat_id=900029
+        )
 
         def system_prompt(llm: ScriptedLlm) -> str:
             return next(str(m.content) for m in llm.last_messages if m.role == "system")
@@ -2631,7 +2665,9 @@ async def test_identity_wrong_claims_hand_off_to_a_human(
         _install_recording_telegram_deliver(monkeypatch, sent)
 
         results = [
-            (await _run_wrong_identity_claim(factory, seed, run_id=f"run-24-{i}"))[0]
+            (await _run_wrong_identity_claim(factory, seed, run_id=f"run-24-{i}", chat_id=900024))[
+                0
+            ]
             for i in range(MAX_IDENTITY_ATTEMPTS)
         ]
 
@@ -2784,7 +2820,7 @@ async def test_identity_exchange_context_excludes_ticket_content_and_customer_id
     notes, other prior articles, or the ticket's current CustomerID/
     CustomerUser (render_ticket_header), since an unidentified Telegram user
     is one prompt injection away from exfiltrating anything present there.
-    Only the latest customer message may be present."""
+    Only messages this chat itself sent may be present."""
     seed = _seed_ticket(mariadb_znuny_url, ns=27)
     engine = create_async_engine(_mysql_async(mariadb_znuny_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -2798,6 +2834,13 @@ async def test_identity_exchange_context_excludes_ticket_content_and_customer_id
             await _seed_telegram_article(
                 session, article_id=seed["customer_article_id"], chat_id=chat_id
             )
+            # The seeded customer article now comes from someone else (e.g. an
+            # e-mail on the same ticket): not this chat's own words.
+            await session.execute(
+                text("UPDATE article_data_mime SET a_from = :a_from WHERE article_id = :aid"),
+                {"a_from": "Other <other@example.com>", "aid": seed["customer_article_id"]},
+            )
+            await session.commit()
             sysconfig = SysConfig(session)
             # Internal, agent-only note — must never reach an unidentified user.
             await add_article(
@@ -2869,7 +2912,7 @@ async def test_identity_exchange_context_excludes_ticket_content_and_customer_id
         # (c) the latest customer message IS present.
         assert newest_customer_body in sent_user_message
 
-        # (a) internal note bodies and other prior articles' content are NOT
+        # (a) internal note bodies and articles from other senders are NOT
         # present.
         assert secret_note_body not in sent_user_message
         assert "I need help with X" not in sent_user_message  # the seeded first article
@@ -2879,6 +2922,104 @@ async def test_identity_exchange_context_excludes_ticket_content_and_customer_id
         assert "customer9627@example.com" not in sent_user_message
         assert "CustomerID" not in sent_user_message
         assert "CustomerUser" not in sent_user_message
+    finally:
+        await engine.dispose()
+
+
+_CLARIFY_SCHEMA_PHONE_ZIP = (
+    '{"fields": [{"column": "phone", "label": "Phone number"}, {"column": "zip", "label": "ZIP"}]}'
+)
+
+
+async def test_identity_exchange_sees_values_split_over_several_messages(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Prod ticket 43142: a Telegram customer sent the WP number and the PKZ as
+    two messages. The exchange only saw the latest one, so it asked for both
+    again after each message; only "<wpn> and <pkz>" in one message passed."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=87)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    chat_id = 900087
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(
+                session, seed=seed, clarify_schema_json=_CLARIFY_SCHEMA_PHONE_ZIP
+            )
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+            await _add_chat_message(session, seed, chat_id=chat_id, body="+491112287")
+            await _add_chat_message(session, seed, chat_id=chat_id, body="53111")
+        _install_recording_telegram_deliver(monkeypatch, [])
+
+        llm = ScriptedLlm([_identity_response("clarify", "Thanks.")])
+        async with factory() as session:
+            await run_ticket_agent(
+                session,
+                settings=get_settings(),
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-87",
+                source_channel="telegram",
+            )
+
+        user_message = llm.last_user_message or ""
+        assert "+491112287" in user_message
+        assert "53111" in user_message
+        # Oldest first, so "latest" still means the newest message.
+        assert user_message.index("+491112287") < user_message.index("53111")
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_claim_of_already_failed_values_is_not_a_new_attempt(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With earlier messages in view the model may re-extract values that
+    already failed when the customer only writes "hello?". That must not use
+    up the last attempt and hand the chat over: after a failed attempt, a
+    claim counts only if the latest message contains one of its values."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=88)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    chat_id = 900088
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=chat_id
+            )
+        sent: list[str] = []
+        _install_recording_telegram_deliver(monkeypatch, sent)
+        await _run_wrong_identity_claim(factory, seed, run_id="run-88-0", chat_id=chat_id)
+
+        async with factory() as session:
+            await _add_chat_message(session, seed, chat_id=chat_id, body="hello??")
+        llm = ScriptedLlm(
+            [_identity_response("clarify", "Checking.", identity_claim={"phone": "+49wrong"})]
+        )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=get_settings(),
+                llm=llm,
+                ticket_id=seed["ticket_id"],
+                trigger=TRIGGER_AUTO,
+                acting_user_id=None,
+                run_id="run-88-1",
+                source_channel="telegram",
+            )
+
+        assert result.status == "sent"
+        assert sent == [_no_match("Phone number", None)] * 2
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.identity_attempts == 1
+            assert state.ai_escalated_at is None
     finally:
         await engine.dispose()
 
