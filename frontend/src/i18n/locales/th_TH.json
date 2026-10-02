@@ -3028,7 +3028,7 @@
         "companyId": "บริษัท (customer_id)",
         "companyIdPh": "เช่น จุดสุดยอด",
         "loginRegex": "เข้าสู่ระบบ Regex",
-        "customerIdRegex": "ลูกค้า_id regex",
+        "customerIdRegex": "customer_id regex",
         "emailRegex": "ส่งอีเมลนิพจน์ทั่วไป",
         "changedAfter": "เปลี่ยนหลังแล้ว",
         "changedBefore": "เปลี่ยนมาก่อน",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "เข้าสู่ระบบ",
         "email": "อีเมล",
-        "customerId": "ลูกค้า_id",
+        "customerId": "customer_id",
         "mode": "โหมด",
         "status": "สถานะ",
         "resolved": "นับ",

@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Variable de cua configurada ({nom})"
       },
       "notes": {
-        "customerAnyColumn": "Qualsevol columna client_usuari: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Qualsevol columna customer_user: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Les variables configurades apareixen com a <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> és un àlies equivalent. Els camps no estàndard només es substitueixen quan existeix una font de dades.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> és un àlies equivalent de <OTRS_QUEUE_Name>."
       }
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Inicieu sessió",
         "email": "Correu electrònic",
-        "customerId": "client_id",
+        "customerId": "customer_id",
         "mode": "Mode",
         "status": "Estat",
         "resolved": "Compte",

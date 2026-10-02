@@ -3028,7 +3028,7 @@
         "companyId": "Công ty (customer_id)",
         "companyIdPh": "ví dụ: ACME",
         "loginRegex": "Đăng nhập biểu thức chính quy",
-        "customerIdRegex": "khách hàng_id biểu thức chính quy",
+        "customerIdRegex": "customer_id biểu thức chính quy",
         "emailRegex": "Biểu thức chính quy email",
         "changedAfter": "Thay đổi sau",
         "changedBefore": "Đã thay đổi trước đó",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Đăng nhập",
         "email": "Email",
-        "customerId": "id khách hàng",
+        "customerId": "customer_id",
         "mode": "Chế độ",
         "status": "Trạng thái",
         "resolved": "Đếm",

@@ -1797,7 +1797,7 @@
         "replyLanguageFixed": "Kod języka BCP-47 (np. „de”, „en”) zawsze używany jako wiążący język odpowiedzi w trybie „Stały”.",
         "replyLanguageDefault": "Kod języka BCP-47 używany w trybie „Auto”, gdy nie można z całą pewnością dopasować tekstu do znanego profilu językowego.",
         "allowedStateTypes": "Rozdzielana przecinkami lista dozwolonych typów stanów Znuny (np. „otwarty” lub „otwarty, oczekujący przypomnienie”), na który AI może ustawić ticket za pośrednictwem pól update_ticket_fields — egzekwowane zarówno dla nazwy stanu, jak i numerycznego identyfikatora stanu. Pusty = domyślnie tylko „otwieraj” (ponowne otwieranie dozwolone, nigdy zamykanie); wyraźna pusta lista „[]” całkowicie wyłącza zmiany stanu.",
-        "piiNer": "Wykrywa nazwiska osób w tekście za pośrednictwem spaCy NER (niemiecki + angielski) i maskuje je jako [IMIĘ_n], zanim treść dotrze do dostawcy LLM — oprócz nazwy klienta i nadawców. Aktywne tylko wtedy, gdy włączone jest maskowanie PII. Fałszywe alarmy są nieszkodliwe (tylko bardziej maskują).",
+        "piiNer": "Wykrywa nazwiska osób w tekście za pośrednictwem spaCy NER (niemiecki + angielski) i maskuje je jako [NAME_n], zanim treść dotrze do dostawcy LLM — oprócz nazwy klienta i nadawców. Aktywne tylko wtedy, gdy włączone jest maskowanie PII. Fałszywe alarmy są nieszkodliwe (tylko bardziej maskują).",
         "summaryDetail": "Standardowo: akapity zwięzłe, 1–2 zdania w załączonym dokumencie. Szczegółowy: bardziej szczegółowe akapity i 3–5 zdań w dokumencie — przydatne w przypadku kolejek z wieloma załącznikami PDF.",
         "enabledRefine": "Pokazuje przycisk „Dopracuj tekst” w edytorze odpowiedzi i nowego ticketu. Model przerabia tylko to, co wpisał agent; cytowane fragmenty zostają bez zmian. Nic nie jest zapisywane ani wysyłane — agent widzi wynik w edytorze i może go cofnąć. Nie podlega bramce trybu pracy.",
         "enabledTriage": "Uruchamia się raz przy pierwszym artykule klienta, przed agentem odpowiedzi, i proponuje trafniejszą kolejkę. Wymaga użytkownika serwisowego, dostawcy i co najmniej jednej kolejki docelowej. Dostępne tylko w trybie pracy tiqora_primary.",
@@ -1883,7 +1883,7 @@
         "set": "X-OTRS-* pseudo-nagłówki zapisywane na tickecie po spełnieniu wszystkich powyższych zasad meczu — np.: X-OTRS-Queue, aby skierować do określonej kolejki."
       },
       "autoResponses": {
-        "typeId": "Numeryczne ID z tabeli typu auto_odpowiedzi Znuny, a nie selektora tutaj: zazwyczaj 1 = automatyczna odpowiedź, 2 = automatyczne odrzucanie, 3 = automatyczne śledzenie, 4 = automatyczna odpowiedź/nowe zgłoszenie, 5 = automatyczne usuwanie.",
+        "typeId": "Numeryczne ID z tabeli auto_response_type Znuny, a nie selektora tutaj: zazwyczaj 1 = automatyczna odpowiedź, 2 = automatyczne odrzucanie, 3 = automatyczne śledzenie, 4 = automatyczna odpowiedź/nowe zgłoszenie, 5 = automatyczne usuwanie.",
         "systemAddressId": "Numeryczne ID adresu systemowego (Od: nadawcy) użytego do wysłania tej automatycznej odpowiedzi — zobacz jego ID w Administrator → Selektor adresów systemowych kolejek."
       },
       "apiKeys": {
@@ -2639,7 +2639,7 @@
       "clientSecret": "Sekret klienta",
       "clientSecretHelp": "Pozostaw puste przy edycji, aby zachować przechowywany sekret.",
       "scope": "Zakres",
-      "scopeHelp": "Oddzielone spacjami zakresy OAuth (w tym dostęp offline dla tokenów odświeżania).",
+      "scopeHelp": "Oddzielone spacjami zakresy OAuth (w tym offline_access dla tokenów odświeżania).",
       "redirectUri": "URI przekierowania",
       "redirectUriHelp": "Zarejestruj ten dokładny identyfikator URI w Azure/Google. Ustaw TIQORA_PUBLIC_BASE_URL w środowisku produkcyjnym.",
       "tokenStatus": "Stan tokena",
@@ -3025,10 +3025,10 @@
         "customerSearch": "Wyszukaj użytkownika klienta",
         "customerSearchPh": "Login, adres e-mail lub imię…",
         "loginManualPh": "Dodaj login ręcznie",
-        "companyId": "Firma (identyfikator_klienta)",
+        "companyId": "Firma (customer_id)",
         "companyIdPh": "np. ACME",
         "loginRegex": "Wyrażenie regularne logowania",
-        "customerIdRegex": "wyrażenie regularne identyfikator_klienta",
+        "customerIdRegex": "wyrażenie regularne customer_id",
         "emailRegex": "Wyrażenie regularne e-mailem",
         "changedAfter": "Zmieniono po",
         "changedBefore": "Zmieniono wcześniej",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Zaloguj się",
         "email": "E-mail",
-        "customerId": "identyfikator_klienta",
+        "customerId": "customer_id",
         "mode": "Tryb",
         "status": "Stan",
         "resolved": "Policz",

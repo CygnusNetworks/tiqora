@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Variabila de coadă configurată ({name})"
       },
       "notes": {
-        "customerAnyColumn": "Orice coloană client_user: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Orice coloană customer_user: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Variabilele configurate apar ca <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> este un alias echivalent. Câmpurile non-standard sunt înlocuite numai atunci când există o sursă de date.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> este un alias echivalent cu <OTRS_QUEUE_Name>."
       }
@@ -2639,7 +2639,7 @@
       "clientSecret": "Secretul clientului",
       "clientSecretHelp": "Lăsați necompletat la editare pentru a păstra secretul stocat.",
       "scope": "Domeniul de aplicare",
-      "scopeHelp": "Domenii OAuth separate prin spațiu (include accesul offline pentru tokenurile de reîmprospătare).",
+      "scopeHelp": "Domenii OAuth separate prin spațiu (include offline_access pentru tokenurile de reîmprospătare).",
       "redirectUri": "URI de redirecționare",
       "redirectUriHelp": "Înregistrați acest URI exact în Azure/Google. Setați TIQORA_PUBLIC_BASE_URL în producție.",
       "tokenStatus": "Starea simbolului",
@@ -3028,7 +3028,7 @@
         "companyId": "Companie (customer_id)",
         "companyIdPh": "de ex. ACME",
         "loginRegex": "Autentificare regex",
-        "customerIdRegex": "regex client_id",
+        "customerIdRegex": "regex customer_id",
         "emailRegex": "E-mail regex",
         "changedAfter": "Schimbat după",
         "changedBefore": "Schimbat înainte",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Autentificare",
         "email": "E-mail",
-        "customerId": "client_id",
+        "customerId": "customer_id",
         "mode": "Modul",
         "status": "Stare",
         "resolved": "numără",

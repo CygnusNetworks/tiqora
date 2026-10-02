@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Pembolehubah baris gilir dikonfigurasikan ({name})"
       },
       "notes": {
-        "customerAnyColumn": "Mana-mana lajur pengguna_pelanggan: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Mana-mana lajur customer_user: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Pembolehubah yang dikonfigurasikan muncul sebagai <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> ialah alias yang setara. Medan bukan standard hanya digantikan apabila sumber data wujud.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> ialah alias yang setara dengan <OTRS_QUEUE_Name>."
       }
@@ -2792,7 +2792,7 @@
         },
         "outbox": {
           "name": "Longkang peti keluar",
-          "description": "Tiqora_event_outbox: indeks carian, webhooks, kemas kini langsung."
+          "description": "tiqora_event_outbox: indeks carian, webhooks, kemas kini langsung."
         },
         "postmaster": {
           "name": "Guru pos",
@@ -2958,7 +2958,7 @@
       "new": "Medan baharu",
       "sourceTable": "Jadual sumber",
       "columnName": "Nama lajur",
-      "columnNameHelp": "Lajur daripada pelanggan_pengguna / pelanggan_syarikat (cadangan daripada DB).",
+      "columnNameHelp": "Lajur daripada customer_user / customer_company (cadangan daripada DB).",
       "tagName": "Tag nama",
       "tagNameHelp": "Pemegang tempat: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Label",
@@ -3028,7 +3028,7 @@
         "companyId": "Syarikat (customer_id)",
         "companyIdPh": "cth. ACME",
         "loginRegex": "Log masuk regex",
-        "customerIdRegex": "pelanggan_id regex",
+        "customerIdRegex": "customer_id regex",
         "emailRegex": "E-mel regex",
         "changedAfter": "Berubah selepas",
         "changedBefore": "Berubah sebelum ini",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Log masuk",
         "email": "E-mel",
-        "customerId": "id_pelanggan",
+        "customerId": "customer_id",
         "mode": "Mod",
         "status": "Status",
         "resolved": "Kira",

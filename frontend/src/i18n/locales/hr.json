@@ -1637,7 +1637,7 @@
       },
       "escalationTester": {
         "title": "Ispitivač pravila",
-        "toolPlaceholder": "Naziv alata, npr. netadmin:dijagnosticirati_vezu",
+        "toolPlaceholder": "Naziv alata, npr. netadmin:diagnose_connection",
         "samplePlaceholder": "Ogledni rezultat alata kao JSON, npr. {\"lock_code\": \"COPYR\"}",
         "run": "test",
         "invalid": "Pravila nisu važeća",

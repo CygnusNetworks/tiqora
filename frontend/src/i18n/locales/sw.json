@@ -1257,7 +1257,7 @@
         "loadError": "Mipangilio haikuweza kupakiwa.",
         "saved": "Imehifadhiwa.",
         "saveError": "Imeshindwa kuhifadhi.",
-        "parallelBanner": "Uendeshaji sambamba: vipengele vya AI vinavyojiendesha (k.m. majibu ya kiotomatiki) vimefungwa - muhtasari na rasimu zilizoidhinishwa na binadamu hufanya kazi kawaida. Uhuru kamili unahitaji hali ya \"Tiqora pekee\" (tiqora_msingi).",
+        "parallelBanner": "Uendeshaji sambamba: vipengele vya AI vinavyojiendesha (k.m. majibu ya kiotomatiki) vimefungwa - muhtasari na rasimu zilizoidhinishwa na binadamu hufanya kazi kawaida. Uhuru kamili unahitaji hali ya \"Tiqora pekee\" (tiqora_primary).",
         "statProviders": "Mtoaji wa LLM",
         "statMcp": "Wateja wa MCP",
         "statActivePolicies": "Sera zinazotumika za foleni",
@@ -1380,7 +1380,7 @@
         "noFeatures": "hakuna",
         "queueRequired": "Tafadhali chagua foleni.",
         "deleteConfirm": "Je, ungependa kufuta sera hii kweli?",
-        "gateError": "Haiwezekani katika utendakazi sambamba — badilisha hali ya uendeshaji hadi \"Tiqora pekee\" (tiqora_msingi) kwanza.",
+        "gateError": "Haiwezekani katika utendakazi sambamba — badilisha hali ya uendeshaji hadi \"Tiqora pekee\" (tiqora_primary) kwanza.",
         "invalidJson": "{{field}}: JSON batili.",
         "autonomy": {
           "label": "Kujitegemea",
@@ -1471,7 +1471,7 @@
           "loadError": "Sera haikuweza kupakiwa.",
           "queueLocked": "Foleni haiwezi kubadilishwa tena baada ya kuunda."
         },
-        "autoGateWarning": "Majibu ya kiotomatiki yanahitaji hali ya \"Tiqora pekee\" (tiqora_msingi). Hivi sasa: operesheni sambamba - swichi inabaki imefungwa.",
+        "autoGateWarning": "Majibu ya kiotomatiki yanahitaji hali ya \"Tiqora pekee\" (tiqora_primary). Hivi sasa: operesheni sambamba - swichi inabaki imefungwa.",
         "triageGateWarning": "Upangaji wa awali unahitaji hali ya \"Tiqora pekee\" (tiqora_primary). Kwa sasa: uendeshaji sambamba — swichi inabaki imefungwa.",
         "ignoredSenders": "Watumaji waliopuuzwa",
         "ignoredSendersPlaceholder": "anwani moja kwa kila mstari, k.m. noreply@example.com au *@internal.example",
@@ -1796,7 +1796,7 @@
         "replyLanguageMode": "Hudhibiti kama kielelezo kimepewa lugha ya kujibu yenye kushurutisha: \"Zima\" = tabia ya leo (hakuna maagizo), \"Isiyobadilika\" = kila mara lugha iliyosanidiwa, \"Otomatiki\" = imetambuliwa kutoka kwa mada + makala ya hivi punde ya mteja, ikirejea kwa chaguomsingi iliyosanidiwa wakati maandishi ni mafupi/yasiyoeleweka sana.",
         "replyLanguageFixed": "Msimbo wa lugha wa BCP-47 (k.m. \"de\", \"en\") hutumika kila mara kama lugha ya kujibu inayoshurutisha katika hali ya \"Isiyobadilika\".",
         "replyLanguageDefault": "Msimbo wa lugha wa BCP-47 unatumika katika hali ya \"Otomatiki\" wakati maandishi hayawezi kulinganishwa kwa ujasiri na wasifu wa lugha unaojulikana.",
-        "allowedStateTypes": "Orodha iliyotenganishwa kwa koma ya aina zinazoruhusiwa za jimbo la Znuny (k.m. \"wazi\" au \"kikumbusho kilichofunguliwa, kinachosubiri\") AI inaweza kuweka tikiti kupitia sehemu_ya_tiketi - kutekelezwa kwa jina la jimbo na kitambulisho cha hali ya nambari. Tupu = chaguo-msingi \"fungua\" pekee (kufungua upya kunaruhusiwa, kutofunga kamwe); orodha ya wazi tupu \"[]\" huzima mabadiliko ya hali kabisa.",
+        "allowedStateTypes": "Orodha iliyotenganishwa kwa koma ya aina zinazoruhusiwa za jimbo la Znuny (k.m. \"wazi\" au \"kikumbusho kilichofunguliwa, kinachosubiri\") AI inaweza kuweka tikiti kupitia update_ticket_fields - kutekelezwa kwa jina la jimbo na kitambulisho cha hali ya nambari. Tupu = chaguo-msingi \"fungua\" pekee (kufungua upya kunaruhusiwa, kutofunga kamwe); orodha ya wazi tupu \"[]\" huzima mabadiliko ya hali kabisa.",
         "piiNer": "Hutambua majina ya watu katika maandishi kupitia spaCy NER (Kijerumani + Kiingereza) na kuyafunika kama [NAME_n] kabla ya maudhui kumfikia mtoa huduma wa LLM — pamoja na jina la mteja na watumaji. Inatumika tu wakati ufunikaji wa PII umewashwa. Chanya za uwongo hazina madhara (masking zaidi tu).",
         "summaryDetail": "Kawaida: aya kompakt, sentensi 1-2 kwa kila hati iliyoambatishwa. Kina: aya za kina zaidi na sentensi 3-5 kwa kila hati - muhimu kwa foleni zilizo na viambatisho vingi vya PDF.",
         "enabledRefine": "Huonyesha kitufe cha “Boresha maandishi” kwenye vihariri vya jibu na tikiti mpya. Modeli huandika upya tu alichoandika wakala; vifungu vilivyonukuliwa havigusiwi. Hakuna kinachohifadhiwa wala kutumwa — wakala huona matokeo kwenye kihariri na anaweza kuyatendua. Haiathiriwi na lango la hali ya uendeshaji.",
@@ -1883,7 +1883,7 @@
         "set": "X-OTRS-* Vichwa vya uwongo vilivyoandikwa kwenye tikiti mara baada ya kila kanuni ya mechi iliyo hapo juu kuridhika - k.m. Foleni ya X-OTRS ya kuelekeza kwenye foleni maalum."
       },
       "autoResponses": {
-        "typeId": "Kitambulisho cha Nambari kutoka kwa jedwali la aina_ya_jibu_auto_ya_ya_Znuny, si kiteua hapa: kwa kawaida 1 = jibu la kiotomatiki, 2 = kataa kiotomatiki, 3 = ufuatiliaji otomatiki, 4 = jibu otomatiki/tiketi mpya, 5 = ondoa kiotomatiki.",
+        "typeId": "Kitambulisho cha Nambari kutoka kwa jedwali la auto_response_type la Znuny, si kiteua hapa: kwa kawaida 1 = jibu la kiotomatiki, 2 = kataa kiotomatiki, 3 = ufuatiliaji otomatiki, 4 = jibu otomatiki/tiketi mpya, 5 = ondoa kiotomatiki.",
         "systemAddressId": "Nambari ya kitambulisho cha anwani ya mfumo (Kutoka kwa: mtumaji) inayotumiwa kutuma jibu hili otomatiki - angalia kitambulisho chake katika Msimamizi → Kiteua anwani cha mfumo cha Foleni."
       },
       "apiKeys": {
@@ -1907,7 +1907,7 @@
         "mode": "\"Ficha utambulisho\" husafisha data ya kibinafsi lakini huhifadhi rekodi za tikiti na historia yao (uadilifu wa marejeleo). \"Futa\" huondoa rekodi ya mteja kabisa; data ya tikiti inaondolewa tu ikiwa kisanduku cha kuteua hapa chini kimewekwa.",
         "filters": "Viteuzi vya ziada hupunguza mteja zaidi - kila kichujio kilichoongezwa HUTOLEWA na maingizi/kampuni hapo juu na kila moja.",
         "negate": "Geuza kati ya \"zinazolingana\" (wateja ambapo ruwaza inalingana) na \"hailingani\" (≠, wateja ambapo HAIfanani).",
-        "validId": "\"Temp\" (id_id 3) ni hali ya tatu ya uhalali ya Znuny - kwa kawaida akaunti inasubiri uthibitisho (k.m. kujiandikisha bila kuthibitishwa), tofauti na halali au batili."
+        "validId": "\"Temp\" (valid_id 3) ni hali ya tatu ya uhalali ya Znuny - kwa kawaida akaunti inasubiri uthibitisho (k.m. kujiandikisha bila kuthibitishwa), tofauti na halali au batili."
       },
       "systemAddresses": {
         "email": "Anwani inayotumika kama From kwa foleni na majibu otomatiki.",
@@ -2334,7 +2334,7 @@
         "configuredQueueVar": "Tofauti ya foleni iliyosanidiwa ({jina})"
       },
       "notes": {
-        "customerAnyColumn": "Safu wima ya mteja_mtumiaji yeyote: <OTRS_CUSTOMER_DATA_{Column}>",
+        "customerAnyColumn": "Safu wima ya customer_user yeyote: <OTRS_CUSTOMER_DATA_{Column}>",
         "queueCustomFields": "Vigeu vilivyosanidiwa vinaonekana kama <OTRS_QUEUE_Name>. <TIQORA_QUEUE_Name> ni lakabu sawa. Sehemu zisizo za kawaida hubadilishwa tu wakati chanzo cha data kipo.",
         "tiqoraQueueAlias": "<TIQORA_QUEUE_Name> ni lakabu sawa la <OTRS_QUEUE_Name>."
       }
@@ -2639,7 +2639,7 @@
       "clientSecret": "Siri ya mteja",
       "clientSecretHelp": "Acha wazi wakati wa kuhariri ili kuweka siri iliyohifadhiwa.",
       "scope": "Upeo",
-      "scopeHelp": "Mawanda ya OAuth yaliyotenganishwa na nafasi (inajumuisha ufikiaji_wa_offline kwa tokeni za kuonyesha upya).",
+      "scopeHelp": "Mawanda ya OAuth yaliyotenganishwa na nafasi (inajumuisha offline_access kwa tokeni za kuonyesha upya).",
       "redirectUri": "Elekeza URI kwingine",
       "redirectUriHelp": "Sajili URI hii kamili katika Azure/Google. Weka TIQORA_PUBLIC_BASE_URL katika toleo la umma.",
       "tokenStatus": "Hali ya ishara",
@@ -2792,7 +2792,7 @@
         },
         "outbox": {
           "name": "Utoaji wa kisanduku toezi",
-          "description": "Inafuta kisanduku towe cha tiqora_event: faharasa ya utafutaji, viboreshaji vya wavuti, masasisho ya moja kwa moja."
+          "description": "Inafuta tiqora_event_outbox: faharasa ya utafutaji, viboreshaji vya wavuti, masasisho ya moja kwa moja."
         },
         "postmaster": {
           "name": "Mkuu wa posta",
@@ -2958,7 +2958,7 @@
       "new": "Uga mpya",
       "sourceTable": "Jedwali la chanzo",
       "columnName": "Jina la safu",
-      "columnNameHelp": "Safu wima kutoka kwa mteja_mtumiaji / mteja_kampuni (mapendekezo kutoka kwa DB).",
+      "columnNameHelp": "Safu wima kutoka kwa customer_user / customer_company (mapendekezo kutoka kwa DB).",
       "tagName": "Jina la lebo",
       "tagNameHelp": "Kishika nafasi: <OTRS_CUSTOMER_DATA_{Tag}>",
       "label": "Lebo",
@@ -3028,7 +3028,7 @@
         "companyId": "Kampuni (customer_id)",
         "companyIdPh": "k.m. ACME",
         "loginRegex": "Ingia regex",
-        "customerIdRegex": "mteja_id regex",
+        "customerIdRegex": "customer_id regex",
         "emailRegex": "Barua pepe regex",
         "changedAfter": "Ilibadilishwa baada ya",
         "changedBefore": "Ilibadilishwa hapo awali",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Ingia",
         "email": "Barua pepe",
-        "customerId": "kitambulisho_cha_mteja",
+        "customerId": "customer_id",
         "mode": "Hali",
         "status": "Hali",
         "resolved": "Hesabu",

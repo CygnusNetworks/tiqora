@@ -1637,7 +1637,7 @@
       },
       "escalationTester": {
         "title": "Testeur de règles",
-        "toolPlaceholder": "Nom de l'outil, par ex. netadmin: diagnostic_connexion",
+        "toolPlaceholder": "Nom de l'outil, par ex. netadmin:diagnose_connection",
         "samplePlaceholder": "Exemple de résultat d'outil au format JSON, par ex. {\"lock_code\": \"COPYR\"}",
         "run": "Tester",
         "invalid": "Règles invalides",
@@ -3025,7 +3025,7 @@
         "customerSearch": "Rechercher un utilisateur client",
         "customerSearchPh": "Identifiant, email ou nom…",
         "loginManualPh": "Ajouter une connexion manuellement",
-        "companyId": "Entreprise (id_client)",
+        "companyId": "Entreprise (customer_id)",
         "companyIdPh": "par ex. ACME",
         "loginRegex": "Expression régulière de connexion",
         "customerIdRegex": "expression régulière customer_id",
@@ -3115,7 +3115,7 @@
       "col": {
         "login": "Se connecter",
         "email": "E-mail",
-        "customerId": "identifiant_client",
+        "customerId": "customer_id",
         "mode": "Mode",
         "status": "Statut",
         "resolved": "Compter",
