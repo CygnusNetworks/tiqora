@@ -20,7 +20,7 @@ to the customer_user-based lookup once a contact has a *real* mapped login.
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -45,7 +45,7 @@ from tiqora.domain.ticket_write_service import (
     change_state,
     create_ticket,
 )
-from tiqora.znuny.followup import detect_followup
+from tiqora.znuny.followup import detect_followup, followup_state_name
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -247,6 +247,97 @@ async def _handle_start_command(
     return {"command": "start"}
 
 
+# Stage (b2): a customer answering in the chat shortly after their ticket was
+# closed (the AI closes after a factual reply; "Ja" on "Problem gelöst?"
+# closes too) continues that ticket, which the follow-up then reopens — as
+# Znuny does for an e-mail answer to a closed ticket. Telegram has no ticket
+# number to match, so a time window stands in for it.
+DEFAULT_FOLLOWUP_REOPEN_DAYS = 7
+
+
+async def _followup_reopen_days(session: AsyncSession) -> int:
+    raw = await channel_setting(session, CHANNEL_NAME, "followup_reopen_days")
+    try:
+        return max(0, int(raw)) if raw not in (None, "") else DEFAULT_FOLLOWUP_REOPEN_DAYS
+    except ValueError:
+        return DEFAULT_FOLLOWUP_REOPEN_DAYS
+
+
+async def _recently_closed_chat_ticket(
+    session: AsyncSession, chat_pattern: str, new_dialog_since: datetime | None
+) -> int | None:
+    """The chat's most recent closed ticket, if its newest article is younger
+    than ``followup_reopen_days`` and its queue accepts follow-ups
+    (``follow_up_possible`` "possible"; "reject"/"new ticket" → new ticket).
+    ``/start`` (``new_dialog_since``) cuts it off like stage (b)."""
+    days = await _followup_reopen_days(session)
+    if days == 0:
+        return None
+    sql = (
+        "SELECT t.id, fup.name FROM ticket t"
+        " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+        " JOIN queue q ON q.id = t.queue_id"
+        " LEFT JOIN follow_up_possible fup ON fup.id = q.follow_up_id"
+        " JOIN article a ON a.ticket_id = t.id"
+        " JOIN article_data_mime adm ON adm.article_id = a.id"
+        " WHERE adm.a_from LIKE :pat AND tst.name = 'closed'"
+    )
+    params: dict[str, Any] = {"pat": chat_pattern}
+    if new_dialog_since is not None:
+        sql += " AND a.create_time > :nds"
+        params["nds"] = new_dialog_since
+    sql += " ORDER BY t.id DESC LIMIT 1"
+    row = (await session.execute(text(sql), params)).first()
+    if row is None or str(row[1] or "possible").lower() != "possible":
+        return None
+    ticket_id = int(row[0])
+    last_article = (
+        await session.execute(
+            text("SELECT MAX(create_time) FROM article WHERE ticket_id = :tid"),
+            {"tid": ticket_id},
+        )
+    ).scalar_one_or_none()
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+    if last_article is None or last_article < cutoff:
+        return None
+    return ticket_id
+
+
+async def _apply_followup_state(
+    session: AsyncSession, sysconfig: SysConfig, *, ticket_id: int, user_id: int
+) -> None:
+    """Znuny's follow-up state rule for a customer message on an existing
+    ticket: reopen a closed one, wake a pending one, leave a new one alone
+    (tiqora.znuny.followup.followup_state_name)."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT t.ticket_state_id, tst.name FROM ticket t"
+                " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+                " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                " WHERE t.id = :tid"
+            ),
+            {"tid": ticket_id},
+        )
+    ).first()
+    if row is None:
+        return
+    state_name = await followup_state_name(sysconfig, state_type=str(row[1]))
+    if not state_name:
+        return
+    new_state_id = await _lookup_id(session, "ticket_state", "name", state_name)
+    if new_state_id is None or new_state_id == int(row[0]):
+        return
+    await change_state(
+        session,
+        ticket_id=ticket_id,
+        new_state_id=new_state_id,
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+
+
 async def _resolve_ticket(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
@@ -315,6 +406,10 @@ async def _resolve_ticket(
     row = (await session.execute(text(stage_b_sql), stage_b_params)).first()
     if row is not None:
         return int(row[0]), False
+
+    reopen_id = await _recently_closed_chat_ticket(session, chat_pattern, new_dialog_since)
+    if reopen_id is not None:
+        return reopen_id, False
 
     if new_dialog_since is None and is_mapped_customer and customer_user_id:
         row = (
@@ -680,6 +775,8 @@ async def process_update(
         channel=CHANNEL_NAME,
         attachments=attachments,
     )
+    if not created:
+        await _apply_followup_state(session, sysconfig, ticket_id=ticket_id, user_id=user_id)
     article_id = await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
     )

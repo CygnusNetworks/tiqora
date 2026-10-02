@@ -3308,3 +3308,107 @@ async def test_agent_reply_photo_refused_falls_back_to_document(mariadb_znuny_ur
                 await _cleanup_new_rows(session, before)
     finally:
         await engine.dispose()
+
+
+# ---------------------------------------------------------------------------
+# Follow-ups on closed / pending chat tickets (Znuny FollowUp.pm semantics)
+# ---------------------------------------------------------------------------
+
+
+async def _second_message(
+    session: AsyncSession, factory: async_sessionmaker[AsyncSession], chat_id: int, body: str
+) -> dict:
+    result = await process_update(
+        session,
+        factory,
+        SysConfig(session),
+        None,
+        _text_message(chat_id, body, message_id=2),
+        user_id=1,
+    )
+    await session.commit()
+    return result
+
+
+@pytest.mark.db
+async def test_answer_after_recent_close_reopens_the_same_ticket(mariadb_znuny_url: str) -> None:
+    """The AI closes after a factual reply; the customer writing "still no
+    internet" an hour later belongs to that ticket, not to a new one without
+    any context. Znuny reopens a closed ticket on an e-mail answer, too."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                first = await _telegram_ticket(session, factory, 4791, "Kein Internet")
+                ticket_id = first["ticket_id"]
+                await _set_ticket_state(session, ticket_id, "closed successful")
+
+                second = await _second_message(session, factory, 4791, "Geht immer noch nicht")
+
+                assert second["ticket_id"] == ticket_id
+                assert second["created_ticket"] is False
+                assert await _ticket_state_name(session, ticket_id) == "open"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_answer_long_after_close_opens_a_new_ticket(mariadb_znuny_url: str) -> None:
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                first = await _telegram_ticket(session, factory, 4792, "Kein Internet")
+                ticket_id = first["ticket_id"]
+                await _set_ticket_state(session, ticket_id, "closed successful")
+                await session.execute(
+                    text(
+                        "UPDATE article SET create_time = create_time - INTERVAL 30 DAY"
+                        " WHERE ticket_id = :tid"
+                    ),
+                    {"tid": ticket_id},
+                )
+                await session.commit()
+
+                second = await _second_message(session, factory, 4792, "Neues Problem")
+
+                assert second["ticket_id"] != ticket_id
+                assert second["created_ticket"] is True
+                assert await _ticket_state_name(session, ticket_id) == "closed successful"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_answer_wakes_a_pending_ticket(mariadb_znuny_url: str) -> None:
+    """Replying to a closed ticket now defaults to "Wartend"; the customer's
+    answer must put it back to open, or nobody sees it until the reminder."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            before = await _snapshot_max_ids(session)
+            try:
+                first = await _telegram_ticket(session, factory, 4793, "Kein Internet")
+                ticket_id = first["ticket_id"]
+                await _set_ticket_state(session, ticket_id, "pending reminder")
+
+                second = await _second_message(session, factory, 4793, "Jetzt geht es wieder")
+
+                assert second["ticket_id"] == ticket_id
+                assert await _ticket_state_name(session, ticket_id) == "open"
+            finally:
+                await _cleanup_new_rows(session, before)
+    finally:
+        await engine.dispose()
