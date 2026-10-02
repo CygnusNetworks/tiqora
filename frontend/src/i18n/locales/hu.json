@@ -2074,7 +2074,7 @@
       "new": "Új felhasználó",
       "login": "Bejelentkezés",
       "password": "Jelszó",
-      "passwordHelp": "Hagyja üresen a jelenlegi jelszó megtartásához.",
+      "passwordHelp": "Hagyja üresen a jelenlegi jelszó megtartásához. Egyébként {{min}}–{{max}} karakter.",
       "passwordMode": "Jelszó kiosztása",
       "passwordModeManual": "Kézi megadás",
       "passwordModeAuto": "Meghívó: beállító hivatkozás e-mailben",

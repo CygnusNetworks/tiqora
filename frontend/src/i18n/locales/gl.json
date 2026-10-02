@@ -2074,7 +2074,7 @@
       "new": "Novo usuario",
       "login": "Iniciar sesión",
       "password": "Contrasinal",
-      "passwordHelp": "Deixa en branco para manter o contrasinal actual.",
+      "passwordHelp": "Deixa en branco para manter o contrasinal actual. Se non, {{min}}–{{max}} caracteres.",
       "passwordMode": "Asignación de contrasinal",
       "passwordModeManual": "Establecer manualmente",
       "passwordModeAuto": "Invitar: enviar unha ligazón por correo",

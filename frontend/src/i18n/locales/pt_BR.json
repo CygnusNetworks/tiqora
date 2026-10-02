@@ -2074,7 +2074,7 @@
       "new": "Novo usuário",
       "login": "Login",
       "password": "Senha",
-      "passwordHelp": "Deixe em branco para manter a senha atual.",
+      "passwordHelp": "Deixe em branco para manter a senha atual. Caso contrário, {{min}}–{{max}} caracteres.",
       "passwordMode": "Atribuição de senha",
       "passwordModeManual": "Definir manualmente",
       "passwordModeAuto": "Convidar: enviar link por e-mail",

@@ -2074,7 +2074,7 @@
       "new": "Nuevo usuario",
       "login": "Inicio de sesión",
       "password": "Contraseña",
-      "passwordHelp": "Deje en blanco para conservar la contraseña actual.",
+      "passwordHelp": "Deje en blanco para conservar la contraseña actual. De lo contrario, {{min}}–{{max}} caracteres.",
       "passwordMode": "Asignación de contraseña",
       "passwordModeManual": "Establecer manualmente",
       "passwordModeAuto": "Invitar: enviar un enlace por correo",
