@@ -215,6 +215,9 @@ class TicketListItem(BaseModel):
     """True when the AI handed this ticket to a human (``escalate_to_human``
     or an escalation-rule hit) and a human has not yet taken over. Distinct
     from Znuny SLA ``escalation_*`` timestamps."""
+    ai_paused: bool = False
+    """True when an agent stopped the AI autopilot on this ticket — the list
+    shows it, so a forgotten stop does not go unnoticed."""
     ai_reply_source: str | None = None
     """How the ticket's most recent AI-written article got sent: ``"auto"``
     (the agent sent it itself) or ``"manual_accept"`` (a human accepted an AI

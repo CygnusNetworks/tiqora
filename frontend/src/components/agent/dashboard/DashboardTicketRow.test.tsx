@@ -37,6 +37,7 @@ const ticket: TicketListItem = {
   channel: "email",
   has_ai_summary: false,
   ai_escalated: false,
+  ai_paused: false,
   archive_flag: 0,
 };
 

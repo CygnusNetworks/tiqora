@@ -424,11 +424,25 @@ async def test_escalated_filter_includes_ai_handoffs(
             assert counts["flags"]["escalated"] == 3
             todo = await ts.facet_counts(AGENT_ID, queue_id=QUEUE_ID, state_type="todo")
             assert todo["flags"]["escalated"] == 2
+
+            # A stopped autopilot is a list flag of its own, not an escalation.
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_ai_ticket_state (ticket_id, ai_paused_at) VALUES (:tid, :t)"
+                ),
+                {"tid": T_NEW_ROOT, "t": _t(12)},
+            )
+            await session.commit()
+            page = await ts.list_tickets(AGENT_ID, queue_id=QUEUE_ID, limit=50)
+            flags = {i.id: (i.ai_escalated, i.ai_paused) for i in page.items}
+            assert flags[T_OPEN_LOCKED] == (True, False)
+            assert flags[T_NEW_ROOT] == (False, True)
+            assert await _ids(ts, escalated=True) == {T_CLOSED, T_OPEN_OVERDUE, T_OPEN_LOCKED}
     finally:
         async with factory() as session:
             await session.execute(
-                text("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id = :tid"),
-                {"tid": T_OPEN_LOCKED},
+                text("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id IN (:a, :b)"),
+                {"a": T_OPEN_LOCKED, "b": T_NEW_ROOT},
             )
             await session.commit()
         await engine.dispose()

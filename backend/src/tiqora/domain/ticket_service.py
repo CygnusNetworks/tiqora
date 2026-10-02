@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from tiqora.ai.handoff import ai_escalated_ticket_ids as _ai_escalated_ticket_ids
+from tiqora.ai.handoff import ai_paused_ticket_ids as _ai_paused_ticket_ids
 from tiqora.ai.models import TiqoraAiArticleOrigin, TiqoraAiTicketState
 from tiqora.channels.email.parser import get_email_address, split_address_line
 from tiqora.crypto.attachment_kind import (
@@ -333,6 +334,7 @@ class TicketService:
         last_article_by_ticket: dict[int, tuple[datetime, str | None]] | None = None,
         channel_by_ticket: dict[int, str] | None = None,
         chat_contact_by_ticket: dict[int, tuple[str | None, str | None]] | None = None,
+        ai_paused_ticket_ids: set[int] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         last_article = (last_article_by_ticket or {}).get(t.id)
@@ -368,6 +370,7 @@ class TicketService:
             attachment_count=(attachment_count_by_ticket or {}).get(t.id, 0),
             has_ai_summary=t.id in (ai_summary_ticket_ids or set()),
             ai_escalated=t.id in (ai_escalated_ticket_ids or set()),
+            ai_paused=t.id in (ai_paused_ticket_ids or set()),
             ai_reply_source=(ai_reply_source_by_ticket or {}).get(t.id),
             last_article_time=last_article[0] if last_article else None,
             last_sender_type=last_article[1] if last_article else None,
@@ -604,6 +607,7 @@ class TicketService:
         attachment_count_by_ticket = await self._attachment_counts_by_ticket(ticket_ids)
         ai_summary_ticket_ids = await self._ai_summary_ticket_ids(ticket_ids)
         ai_escalated_ids = await _ai_escalated_ticket_ids(self._session, ticket_ids)
+        ai_paused_ids = await _ai_paused_ticket_ids(self._session, ticket_ids)
         ai_reply_source_by_ticket = await self._ai_reply_source_by_ticket(ticket_ids)
         last_article_by_ticket = await self._last_article_by_ticket(ticket_ids)
         channel_by_ticket = await self._channel_by_ticket(ticket_ids)
@@ -624,6 +628,7 @@ class TicketService:
                 last_article_by_ticket,
                 channel_by_ticket,
                 chat_contact_by_ticket,
+                ai_paused_ids,
             )
             for t in tickets
         ]

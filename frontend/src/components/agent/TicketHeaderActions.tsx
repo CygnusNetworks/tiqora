@@ -8,6 +8,7 @@ import type { TicketDetail } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { AutopilotSwitch } from "./AutopilotSwitch";
 import { Button } from "@/components/ui/Button";
 import { ExternalLinkIcon, MoreIcon, PhoneIcon, UserIcon } from "@/components/ui/icons";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "@/components/ui/Menu";
@@ -261,6 +262,7 @@ export function TicketHeaderActions({
           {ai?.summaryLine}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <AutopilotSwitch ticketId={ticketId} canNote={canNote} />
           <span title={!canNote ? noPerm : undefined} className="inline-flex items-stretch">
             <Button
               variant="primary"

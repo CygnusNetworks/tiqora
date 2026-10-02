@@ -1039,6 +1039,122 @@
         "title": "AiAclUpdate",
         "type": "object"
       },
+      "AiAutopilotIn": {
+        "properties": {
+          "action": {
+            "enum": [
+              "stop",
+              "start"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "answer_latest": {
+            "default": false,
+            "title": "Answer Latest",
+            "type": "boolean"
+          },
+          "runs": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runs"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "AiAutopilotIn",
+        "type": "object"
+      },
+      "AiAutopilotOut": {
+        "description": "The per-ticket AI autopilot as the ticket header's switch shows it.\n\n``mode`` is derived: no auto-reply in the queue \u2192 ``unavailable``; else a\npause \u2192 ``stopped``; else a handoff \u2192 ``handed_over`` (``reason`` says\nwhy); else ``active``, with ``grant_*`` set while a release of N replies\nruns. ``by_name``/``since``: who stopped it or granted the release, and\nwhen (for a handoff only ``since``).",
+        "properties": {
+          "by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By Name"
+          },
+          "grant_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Remaining"
+          },
+          "grant_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grant Total"
+          },
+          "mode": {
+            "enum": [
+              "active",
+              "stopped",
+              "handed_over",
+              "unavailable"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "unanswered_customer_message": {
+            "default": false,
+            "title": "Unanswered Customer Message",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "AiAutopilotOut",
+        "type": "object"
+      },
       "AiCustomSummaryIn": {
         "description": "The agent's own summary instruction (\"f\u00fcr eine Mitarbeiterin der\nHausverwaltung, inkl. Timeline\").",
         "properties": {
@@ -3161,6 +3277,16 @@
               }
             ],
             "title": "Auto Skip Reason"
+          },
+          "autopilot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiAutopilotOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "can_summarize": {
             "title": "Can Summarize",
@@ -22536,6 +22662,11 @@
             "title": "Ai Escalated",
             "type": "boolean"
           },
+          "ai_paused": {
+            "default": false,
+            "title": "Ai Paused",
+            "type": "boolean"
+          },
           "ai_reply_source": {
             "anyOf": [
               {
@@ -23227,6 +23358,11 @@
           "ai_escalated": {
             "default": false,
             "title": "Ai Escalated",
+            "type": "boolean"
+          },
+          "ai_paused": {
+            "default": false,
+            "title": "Ai Paused",
             "type": "boolean"
           },
           "ai_reply_source": {
@@ -62997,6 +63133,91 @@
           }
         },
         "summary": "Get Ai State",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/ai/autopilot": {
+      "post": {
+        "description": "Stop the AI autopilot on this ticket, or start it again for ``runs``\nautomatic replies (optionally answering the open customer message now).\n\nSame access rule as pause/resume. Starting needs auto-reply enabled in the\nticket's queue (409 otherwise). See\n:func:`tiqora.domain.ticket_write_service.start_ai_autopilot`.",
+        "operationId": "autopilot_route_api_v1_tickets__ticket_id__ai_autopilot_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiAutopilotIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiAutopilotOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Autopilot Route",
         "tags": [
           "ai"
         ]

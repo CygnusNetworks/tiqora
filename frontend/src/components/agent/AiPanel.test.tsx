@@ -121,12 +121,6 @@ async function openCards() {
   }
 }
 
-/** The pause switch lives in the summary line's ⋯ menu. */
-async function clickPauseInMenu() {
-  fireEvent.click(await screen.findByTestId("ai-summary-line-menu-trigger"));
-  fireEvent.click(await screen.findByTestId("ai-panel-pause-button"));
-}
-
 const baseState = {
   manual_assist_available: false,
   summary_available: false,
@@ -212,55 +206,20 @@ describe("AiPanel", () => {
     expect(screen.queryByTestId("ai-panel-auto-skip-banner")).not.toBeInTheDocument();
   });
 
-  it("shows the escalated banner and resumes AI when clicked", async () => {
-    getState
-      .mockResolvedValueOnce({
-        ...baseState,
-        summary_available: true,
-        ai_escalated_at: "2026-09-14T07:34:59",
-      })
-      .mockResolvedValueOnce({
-        ...baseState,
-        summary_available: true,
-        ai_escalated_at: null,
-      });
-    resume.mockResolvedValue(undefined);
+  it("explains a handoff with its reason and leaves restarting to the header switch", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      summary_available: true,
+      ai_escalated_at: "2026-09-14T07:34:59",
+      autopilot: { mode: "handed_over", reason: "max_clarifications" },
+    });
 
     wrap(<AiPanel ticketId={1} canNote />);
 
     const banner = await screen.findByTestId("ai-panel-escalated-banner");
-    expect(banner.textContent).toContain("AI handed off to a human");
-
-    fireEvent.click(screen.getByTestId("ai-panel-resume-button"));
-
-    await waitFor(() => expect(resume).toHaveBeenCalledWith(1));
-    await waitFor(() =>
-      expect(
-        screen.queryByTestId("ai-panel-escalated-banner"),
-      ).not.toBeInTheDocument(),
-    );
-  });
-
-  it("pauses AI automation and refreshes state", async () => {
-    getState
-      .mockResolvedValueOnce({ ...baseState, summary_available: true })
-      .mockResolvedValueOnce({
-        ...baseState,
-        summary_available: true,
-        ai_paused_at: "2026-09-30T08:00:00",
-        ai_paused_by_name: "Erika",
-      });
-    pause.mockResolvedValue(undefined);
-
-    wrap(<AiPanel ticketId={1} canNote />);
-
-    await clickPauseInMenu();
-
-    await waitFor(() => expect(pause).toHaveBeenCalledWith(1));
-    const banner = await screen.findByTestId("ai-panel-paused-banner");
-    expect(banner.textContent).toContain("Erika");
-    expect(screen.queryByTestId("ai-panel-pause-button")).not.toBeInTheDocument();
-    expect(screen.getByTestId("ai-banners")).toBeInTheDocument();
+    expect(banner.textContent).toContain("AI handed off to the team");
+    expect(banner.textContent).toContain("Clarification limit reached");
+    expect(banner.querySelector("button")).toBeNull();
   });
 
   it("keeps the banners row empty while nothing applies", async () => {
@@ -283,43 +242,27 @@ describe("AiPanel", () => {
     expect(banner.textContent).not.toContain("?");
   });
 
-  it("shows the pause banner and unpause even without any AI feature access", async () => {
+  it("shows the pause banner even without any AI feature access", async () => {
     getState.mockResolvedValue({
       ...baseState,
       ai_paused_at: "2026-09-30T08:00:00",
       ai_paused_by_name: "Erika",
     });
-    unpause.mockResolvedValue(undefined);
     wrap(<AiPanel ticketId={1} canNote />);
-    fireEvent.click(await screen.findByTestId("ai-panel-unpause-button"));
-    await waitFor(() => expect(unpause).toHaveBeenCalledWith(1));
+    const banner = await screen.findByTestId("ai-panel-paused-banner");
+    expect(banner.textContent).toContain("Erika");
+    expect(banner.querySelector("button")).toBeNull();
   });
 
-  it("offers a standalone pause link when there is no summary line", async () => {
-    getState.mockResolvedValue({ ...baseState, manual_assist_available: true });
-    pause.mockResolvedValue(undefined);
-    wrap(<AiPanel ticketId={1} canNote />);
-    fireEvent.click(await screen.findByTestId("ai-panel-pause-button"));
-    await waitFor(() => expect(pause).toHaveBeenCalledWith(1));
-  });
-
-  it("shows the paused banner, keeps manual AI enabled, and unpauses", async () => {
-    getState
-      .mockResolvedValueOnce({
-        ...baseState,
-        summary_available: true,
-        can_summarize: true,
-        manual_assist_available: true,
-        ai_paused_at: "2026-09-30T08:00:00",
-        ai_paused_by_name: "Erika",
-      })
-      .mockResolvedValueOnce({
-        ...baseState,
-        summary_available: true,
-        can_summarize: true,
-        manual_assist_available: true,
-      });
-    unpause.mockResolvedValue(undefined);
+  it("shows the paused banner and keeps manual AI enabled", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      summary_available: true,
+      can_summarize: true,
+      manual_assist_available: true,
+      ai_paused_at: "2026-09-30T08:00:00",
+      ai_paused_by_name: "Erika",
+    });
 
     wrap(<AiPanel ticketId={1} canNote />);
 
@@ -331,41 +274,14 @@ describe("AiPanel", () => {
     expect(await screen.findByTestId("ai-panel-summarize-button")).not.toBeDisabled();
     const draftsChip = await screen.findByTestId("ai-chip-drafts");
     expect(draftsChip).not.toBeDisabled();
-
-    fireEvent.click(screen.getByTestId("ai-panel-unpause-button"));
-    await waitFor(() => expect(unpause).toHaveBeenCalledWith(1));
-    await waitFor(() =>
-      expect(screen.queryByTestId("ai-panel-paused-banner")).not.toBeInTheDocument(),
-    );
   });
 
-  it("shows an error when pausing fails", async () => {
+  it("has no pause item in the summary menu any more", async () => {
     getState.mockResolvedValue({ ...baseState, summary_available: true });
-    pause.mockRejectedValue(new Error("boom"));
     wrap(<AiPanel ticketId={1} canNote />);
-    await clickPauseInMenu();
-    expect(await screen.findByTestId("ai-panel-pause-error")).toBeInTheDocument();
-  });
-
-  it("offers no pause item without note permission", async () => {
-    getState.mockResolvedValue({ ...baseState, summary_available: true });
-    wrap(<AiPanel ticketId={1} canNote={false} />);
     fireEvent.click(await screen.findByTestId("ai-summary-line-menu-trigger"));
     await screen.findByTestId("ai-summary-line-pin");
     expect(screen.queryByTestId("ai-panel-pause-button")).not.toBeInTheDocument();
-  });
-
-  it("disables the resume button without note permission", async () => {
-    getState.mockResolvedValue({
-      ...baseState,
-      summary_available: true,
-      ai_escalated_at: "2026-09-14T07:34:59",
-    });
-
-    wrap(<AiPanel ticketId={1} canNote={false} />);
-
-    const button = await screen.findByTestId("ai-panel-resume-button");
-    expect(button).toBeDisabled();
   });
 
   it("renders the summary section, calls summarize, and shows the up_to_date message", async () => {

@@ -52,7 +52,7 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
-from tiqora.ai.handoff import mark_ai_escalated
+from tiqora.ai.handoff import consume_ai_grant, mark_ai_escalated
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.limits import queue_tokens_used_today
 from tiqora.ai.listfields import parse_str_list
@@ -79,7 +79,9 @@ from tiqora.ai.outbox import (
 )
 from tiqora.ai.policies import get_queue_policy_by_queue
 from tiqora.ai.runtime import (
+    STATUS_DRAFTED,
     STATUS_NO_REPLY,
+    STATUS_SENT,
     TRIGGER_AUTO,
     AgentRunError,
     AgentRunResult,
@@ -96,7 +98,7 @@ from tiqora.domain.settings_store import (
     get_setting_int,
     set_setting,
 )
-from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.domain.ticket_write_service import AI_REPLY_REQUEST_EVENT, ArticleIn, add_article
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -109,9 +111,13 @@ _OutboxEvent = OutboxEvent
 _next_outbox_batch = next_outbox_batch
 _article_sender_type = article_sender_type
 
+# ArticleCreate, plus the internal "answer this article now" request an agent
+# triggers when switching the autopilot back on (start_ai_autopilot).
+_CUSTOMER_ARTICLE_EVENTS = frozenset({"ArticleCreate", AI_REPLY_REQUEST_EVENT})
+
 # Caps that end automation for one ticket for good (unlike rate limits and
 # budgets, which lift again on their own) — hitting one is a handoff.
-_TICKET_CAP_REASONS = frozenset({"max_clarifications", "max_auto_replies"})
+_TICKET_CAP_REASONS = frozenset({"max_clarifications", "max_auto_replies", "grant_used"})
 
 
 async def _global_replies_per_hour_cap(session: AsyncSession) -> int | None:
@@ -169,12 +175,16 @@ async def _hand_off_capped_ticket(
     still waits for an answer: flag the handoff (so the ticket shows up as
     escalated in the lists) and tell the agents why. Before, the AI just went
     silent (prod ticket 43142). Later messages skip as ``escalated_to_human``
-    until an agent replies, so this runs once per handoff."""
-    limit = (
-        f"{policy.max_clarifications} clarifying questions"
-        if reason == "max_clarifications"
-        else f"{policy.max_auto_replies} automatic replies"
-    )
+    until someone switches the autopilot back on, so this runs once per
+    handoff. ``grant_used``: the release an agent granted is spent."""
+    if reason == "grant_used":
+        state = await session.get(TiqoraAiTicketState, ticket_id)
+        total = state.ai_grant_total if state is not None else None
+        limit = f"{total} automatic replies released by hand" if total else "released replies"
+    elif reason == "max_clarifications":
+        limit = f"{policy.max_clarifications} clarifying questions"
+    else:
+        limit = f"{policy.max_auto_replies} automatic replies"
     assert policy.service_user_id is not None  # checked by the caller
     await add_article(
         session,
@@ -192,7 +202,17 @@ async def _hand_off_capped_ticket(
         user_id=policy.service_user_id,
         sysconfig=SysConfig(session),
     )
-    await mark_ai_escalated(session, ticket_id)
+    await mark_ai_escalated(session, ticket_id, reason=reason)
+    await session.commit()
+
+
+async def _consume_grant(session: AsyncSession, ticket_id: int, result: AgentRunResult) -> None:
+    """A run that wrote to the customer (sent, or drafted for an agent) uses
+    one reply of a running release. Identity-check questions do not: a release
+    of 1 would otherwise be spent on asking for the WP number."""
+    if result.status not in (STATUS_SENT, STATUS_DRAFTED) or result.identity_check:
+        return
+    await consume_ai_grant(session, ticket_id)
     await session.commit()
 
 
@@ -205,9 +225,9 @@ async def _cap_reason(
     # existed nothing consumed the flag: the next customer message started a
     # fresh run, and under `full` autonomy that answer went straight back to
     # the customer -- right after the AI had said a human would take over.
-    # The flag is cleared again when an agent replies to the customer or the
-    # ticket is closed/merged/removed (see domain.ticket_write_service), so a
-    # ticket resumes automation exactly when a human has picked it up.
+    # The flag stays until someone switches the autopilot back on (or the
+    # ticket is closed/merged/removed, see domain.ticket_write_service); an
+    # agent's reply does not lift it.
     # Manual Assist is unaffected: it never runs through this worker.
     if getattr(state, "ai_escalated_at", None) is not None:
         return "escalated_to_human"
@@ -215,9 +235,15 @@ async def _cap_reason(
     # handoff flag above, nothing clears this on its own.
     if getattr(state, "ai_paused_at", None) is not None:
         return "ai_paused"
-    if state.auto_reply_count >= policy.max_auto_replies:
+    # A release an agent granted by hand replaces the per-ticket caps until
+    # it is used up; rate limits and budgets below still apply.
+    grant = getattr(state, "ai_grant_remaining", None)
+    if grant is not None:
+        if grant <= 0:
+            return "grant_used"
+    elif state.auto_reply_count >= policy.max_auto_replies:
         return "max_auto_replies"
-    if state.clarification_count >= policy.max_clarifications:
+    elif state.clarification_count >= policy.max_clarifications:
         return "max_clarifications"
     if policy.max_replies_per_hour is not None:
         recent = await _auto_replies_last_hour(session, queue_id=queue_id)
@@ -397,7 +423,7 @@ async def _process_customer_article_event(
     await _record_skip(session, state, None)
     bundle = await kb_bundle(session, settings, policy.service_user_id, policy)
 
-    return await run_ticket_agent(
+    result = await run_ticket_agent(
         session,
         settings=settings,
         llm=task_llm.client,
@@ -412,6 +438,8 @@ async def _process_customer_article_event(
         kb_get_article_fn=kb_get_article_fn(session, settings, policy.service_user_id),
         source_channel=source_channel,
     )
+    await _consume_grant(session, ticket_id, result)
+    return result
 
 
 async def _maybe_auto_summarize(session: AsyncSession, settings: Settings, ticket_id: int) -> bool:
@@ -549,7 +577,7 @@ async def run_auto_tick(
     for event in batch:
         last_id = event.id
         totals["events"] += 1
-        if event.event_type != "ArticleCreate":
+        if event.event_type not in _CUSTOMER_ARTICLE_EVENTS:
             continue
         touched_ticket_ids.add(event.ticket_id)
         source_channel = event.payload.get("channel")

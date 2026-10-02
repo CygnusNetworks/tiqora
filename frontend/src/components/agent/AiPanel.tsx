@@ -42,8 +42,8 @@ import { CustomSummaryPanel } from "./CustomSummaryPanel";
  * places where each belongs (see `TicketAiSlots`): the summary as a one-line
  * subtitle under the title that expands into the full summary controls, the
  * drafts trigger next to "Antworten", and the pause / triage / hand-over
- * banners that need attention (the pause switch itself is in the summary
- * line's ⋯ menu). Without a `children` render function the pieces are
+ * banners that need attention (stopping and restarting the AI lives in
+ * the header's `AutopilotSwitch`; the banners only say who, when and why). Without a `children` render function the pieces are
  * stacked in a compact default layout. Agents without ACL access get empty
  * slots (only the `trailing` chips in the default layout).
  */
@@ -355,25 +355,6 @@ export function AiPanel({
       void queryClient.invalidateQueries({
         queryKey: ["tickets", ticketId, "ai"],
       });
-    },
-  });
-
-  const resumeMutation = useMutation({
-    mutationFn: () => ticketAiApi.resume(ticketId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ["tickets", ticketId, "ai"],
-      });
-    },
-  });
-
-  // Pausing/unpausing writes an internal note, so refresh the whole ticket
-  // (articles, history, AI state) rather than only the ai key.
-  const pauseMutation = useMutation({
-    mutationFn: (pause: boolean) =>
-      pause ? ticketAiApi.pause(ticketId) : ticketAiApi.unpause(ticketId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
     },
   });
 
@@ -1112,14 +1093,6 @@ export function AiPanel({
         <MenuItem testId="ai-summary-line-pin" onSelect={() => setPinned(!pinned)}>
           {pinned ? t("ticket.ai.unpin") : t("ticket.ai.pinOpen")}
         </MenuItem>
-        {!state.ai_paused_at && canNote && (
-          <MenuItem
-            testId="ai-panel-pause-button"
-            onSelect={() => pauseMutation.mutate(true)}
-          >
-            {t("ticket.ai.pause.pause")}
-          </MenuItem>
-        )}
         {hasSummary && (
           <MenuItem
             testId="ai-summary-line-copy"
@@ -1204,25 +1177,6 @@ export function AiPanel({
       </HoverCard>
     ) : null;
 
-  // The pause control lives in the summary line's ⋯ menu. Only viewers
-  // without a summary line (manual assist only) get a standalone link.
-  const pauseLink =
-    !state.ai_paused_at && !state.summary_available ? (
-      <div className="flex justify-end">
-        <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
-          <button
-            type="button"
-            className="text-[11px] text-muted underline-offset-2 transition-colors hover:text-ink hover:underline disabled:opacity-60"
-            data-testid="ai-panel-pause-button"
-            disabled={!canNote || pauseMutation.isPending}
-            onClick={() => pauseMutation.mutate(true)}
-          >
-            {t("ticket.ai.pause.pause")}
-          </button>
-        </span>
-      </div>
-    ) : null;
-
   // Why the auto worker last skipped this ticket. Pause and hand-over have
   // their own banners above; everything else (a spent budget, a rate limit,
   // no usable model) was invisible before — the ticket simply got no answer.
@@ -1238,9 +1192,7 @@ export function AiPanel({
     state.ai_paused_at ||
     state.ai_escalated_at ||
     autoSkipReason ||
-    state.triage ||
-    pauseLink ||
-    pauseMutation.isError ? (
+    state.triage ? (
       <div className="space-y-2" data-testid="ai-banners">
         {state.ai_paused_at ? (
           <div
@@ -1260,32 +1212,10 @@ export function AiPanel({
                   },
                 )}
               </span>
-              <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  data-testid="ai-panel-unpause-button"
-                  disabled={!canNote || pauseMutation.isPending}
-                  onClick={() => pauseMutation.mutate(false)}
-                >
-                  {pauseMutation.isPending ? (
-                    <Spinner className="h-3.5 w-3.5" />
-                  ) : (
-                    t("ticket.ai.pause.unpause")
-                  )}
-                </Button>
-              </span>
             </div>
             <p>{t("ticket.ai.pause.hint")}</p>
           </div>
-        ) : (
-          pauseLink
-        )}
-        {pauseMutation.isError && (
-          <p className="text-xs text-danger" role="alert" data-testid="ai-panel-pause-error">
-            {t("ticket.ai.pause.error")}
-          </p>
-        )}
+        ) : null}
         {state.ai_escalated_at && (
           <div
             className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-amber/35 bg-amber/10 px-2.5 py-1.5 text-xs text-ink"
@@ -1293,24 +1223,13 @@ export function AiPanel({
           >
             <span className="font-semibold text-amber">⚑</span>
             <span className="min-w-0 flex-1">
-              {t("ticket.ai.escalatedBanner", {
+              {t("ticket.autopilot.escalatedInfo", {
                 dateTime: formatDateTime(state.ai_escalated_at, locale),
+                reason: t(
+                  `ticket.autopilot.reason.${state.autopilot?.reason ?? "unknown"}`,
+                  { defaultValue: t("ticket.autopilot.reason.unknown") },
+                ),
               })}
-            </span>
-            <span title={!canNote ? t("ticket.toolbar.noPermission") : undefined}>
-              <Button
-                size="sm"
-                variant="secondary"
-                data-testid="ai-panel-resume-button"
-                disabled={!canNote || resumeMutation.isPending}
-                onClick={() => resumeMutation.mutate()}
-              >
-                {resumeMutation.isPending ? (
-                  <Spinner className="h-3.5 w-3.5" />
-                ) : (
-                  t("ticket.ai.resumeButton")
-                )}
-              </Button>
             </span>
           </div>
         )}
