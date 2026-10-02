@@ -417,9 +417,15 @@ async def test_incremental_summary_includes_previous_summary_and_only_new_articl
             )
         assert r2.status == STATUS_UPDATED
         assert llm2.last_user_message is not None
-        assert "Summary v1." in llm2.last_user_message  # previous summary carried forward
-        assert "First msg" not in llm2.last_user_message  # old article NOT resent
-        assert "Second msg" in llm2.last_user_message  # only the new one
+        msg = llm2.last_user_message
+        assert "Summary v1." in msg  # previous summary carried forward
+        # Older articles are not resent, except the one right before the new
+        # ones, as context only (a "Ja" needs the question it answers).
+        context, _, new_part = msg.partition("--- new articles since then ---")
+        assert "--- last article before these (already summarized; context only) ---" in context
+        assert "First msg" in context
+        assert "First msg" not in new_part
+        assert "Second msg" in new_part  # only the new one
     finally:
         await engine.dispose()
 
@@ -1033,6 +1039,37 @@ async def test_pii_masking_leaves_generic_words_and_own_sender_readable(
             conn.execute(text("DELETE FROM system_address WHERE id = :id"), {"id": sys_addr_id})
             conn.execute(text("DELETE FROM customer_user WHERE id = :id"), {"id": customer_user_id})
         engine.dispose()
+
+
+def test_length_guidance_counts_the_whole_conversation_on_incremental_runs() -> None:
+    """Prod ticket 43132: a two-character "Ja" as the only new article used to
+    cap the whole summary at three sentences, run after run."""
+    from tiqora.ai.context import ArticleSnapshot
+    from tiqora.ai.summary import _length_guidance
+
+    def art(article_id: int, body: str) -> ArticleSnapshot:
+        return ArticleSnapshot(
+            id=article_id,
+            sender_type="customer",
+            is_visible_for_customer=True,
+            subject=None,
+            body=body,
+            from_address=None,
+            is_ai_origin=False,
+            attachments=(),
+        )
+
+    conversation = [art(1, "x" * 3000), art(2, "Ja")]
+    guidance = _length_guidance(
+        [conversation[-1]],
+        {},
+        detail="standard",
+        conversation_articles=conversation,
+        incremental=True,
+    )
+    assert "AT MOST 3 sentences" not in guidance
+    assert "at most 5 sentences" in guidance
+    assert "Keep every fact of the previous summary" in guidance
 
 
 def test_length_guidance_scales_mail_and_documents() -> None:
