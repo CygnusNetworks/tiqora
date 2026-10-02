@@ -8,7 +8,11 @@ ARG NODE_VERSION=22
 # ---------- Frontend build ----------
 # The frontend lives in a pnpm workspace (root package.json + packages/api-client),
 # so the workspace context is required for the install.
-FROM node:${NODE_VERSION}-bookworm-slim AS frontend-build
+# Pinned to the build host's platform: dist/ is plain static files and
+# identical for every target arch, so a multi-arch build runs pnpm install +
+# vite once natively instead of once more under QEMU (slow, and prone to
+# ECONNRESET against the npm registry when the emulated node is CPU-starved).
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-bookworm-slim AS frontend-build
 WORKDIR /workspace
 # Build provenance surfaced in the UI (see frontend/src/lib/appVersion.ts).
 # Wired from CI git ref/sha via docker build-args; empty in plain local builds.
