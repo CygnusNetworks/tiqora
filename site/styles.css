@@ -843,9 +843,15 @@ footer {
   white-space: nowrap;
 }
 
+/* On phones only the "Live demo" pill stays in the bar, on every page. */
 @media (max-width: 720px) {
-  .nav-links {
+  .nav-links li:not(.nav-cta) {
     display: none;
+  }
+
+  .nav-links .btn {
+    padding: 0.5rem 0.9rem;
+    font-size: 0.85rem;
   }
 
   .stage-caption {
