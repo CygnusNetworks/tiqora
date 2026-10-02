@@ -856,6 +856,17 @@ class TiqoraAiTicketState(TiqoraBase):
     # timestamp. Cleared when an agent sends a customer-visible article or
     # the ticket moves to closed/merged/removed.
     ai_escalated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Why the AI handed over (max_clarifications, max_auto_replies, grant_used,
+    # escalate_to_human, identity); set and cleared together with ai_escalated_at.
+    ai_escalated_reason: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # A release an agent granted by switching the autopilot back on for N
+    # automatic replies. While set it replaces the queue's per-ticket caps
+    # (tiqora.ai.auto_worker._cap_reason); NULL = no release. Ends when used
+    # up, on any handoff, on stop and when the ticket closes.
+    ai_grant_remaining: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ai_grant_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ai_grant_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ai_grant_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Set by an agent to stop all automatic AI actions on this ticket
     # (auto-reply, triage, auto-summary). Unlike ai_escalated_at, never
     # cleared automatically: only the explicit unpause route clears it.

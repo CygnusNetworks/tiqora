@@ -43,6 +43,7 @@ from tiqora.ai.models import (
     TRIAGE_STATUS_ACCEPTED,
     TRIAGE_STATUS_OPEN,
     TRIAGE_STATUS_REJECTED,
+    TiqoraAiQueuePolicy,
     TiqoraAiTicketState,
     TiqoraAiTriage,
 )
@@ -92,16 +93,24 @@ from tiqora.db.engine import get_session_factory
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.domain.ticket_write_service import (
-    TicketAccessDenied as TicketWriteAccessDenied,
+    AUTOPILOT_MAX_RUNS,
+    TicketWriteService,
+    unanswered_customer_article,
 )
 from tiqora.domain.ticket_write_service import (
-    TicketWriteService,
+    TicketAccessDenied as TicketWriteAccessDenied,
 )
 from tiqora.domain.ticket_write_service import (
     pause_ai_automation as _pause_ai_automation,
 )
 from tiqora.domain.ticket_write_service import (
     resume_ai_automation as _resume_ai_automation,
+)
+from tiqora.domain.ticket_write_service import (
+    start_ai_autopilot as _start_ai_autopilot,
+)
+from tiqora.domain.ticket_write_service import (
+    stop_ai_autopilot as _stop_ai_autopilot,
 )
 from tiqora.domain.ticket_write_service import (
     unpause_ai_automation as _unpause_ai_automation,
@@ -182,6 +191,41 @@ class AiTriageRejectIn(BaseModel):
     note: str | None = None
 
 
+AutopilotMode = Literal["active", "stopped", "handed_over", "unavailable"]
+
+
+class AiAutopilotOut(BaseModel):
+    """The per-ticket AI autopilot as the ticket header's switch shows it.
+
+    ``mode`` is derived: no auto-reply in the queue → ``unavailable``; else a
+    pause → ``stopped``; else a handoff → ``handed_over`` (``reason`` says
+    why); else ``active``, with ``grant_*`` set while a release of N replies
+    runs. ``by_name``/``since``: who stopped it or granted the release, and
+    when (for a handoff only ``since``)."""
+
+    mode: AutopilotMode
+    grant_remaining: int | None = None
+    grant_total: int | None = None
+    by_name: str | None = None
+    since: UtcDateTime | None = None
+    reason: str | None = None
+    # The newest customer message has no customer-visible agent answer yet —
+    # the switch then offers to answer it right away when starting.
+    unanswered_customer_message: bool = False
+
+
+class AiAutopilotIn(BaseModel):
+    action: Literal["stop", "start"]
+    runs: int | None = Field(default=None, ge=1, le=AUTOPILOT_MAX_RUNS)
+    answer_latest: bool = False
+
+    @model_validator(mode="after")
+    def _runs_to_start(self) -> AiAutopilotIn:
+        if self.action == "start" and self.runs is None:
+            raise ValueError("runs is required to start the autopilot")
+        return self
+
+
 class AiStateOut(BaseModel):
     manual_assist_available: bool
     summary_available: bool
@@ -203,6 +247,7 @@ class AiStateOut(BaseModel):
     auto_skip_reason: str | None = None
     auto_skip_at: UtcDateTime | None = None
     triage: AiTriageOut | None = None
+    autopilot: AiAutopilotOut | None = None
 
 
 class AiRefineSegmentIn(BaseModel):
@@ -535,11 +580,55 @@ async def _paused_by_name(session: AsyncSession, state: TiqoraAiTicketState | No
     """Full name of the agent who paused the ticket, ``None`` if unknown."""
     if state is None or state.ai_paused_at is None or state.ai_paused_by is None:
         return None
+    return await _user_name(session, state.ai_paused_by)
+
+
+async def _autopilot_out(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    policy: TiqoraAiQueuePolicy | None,
+    state: TiqoraAiTicketState | None,
+) -> AiAutopilotOut:
+    unanswered = await unanswered_customer_article(session, ticket_id) is not None
+    if policy is None or not policy.enabled_auto_reply:
+        return AiAutopilotOut(mode="unavailable", unanswered_customer_message=unanswered)
+    if state is not None and state.ai_paused_at is not None:
+        return AiAutopilotOut(
+            mode="stopped",
+            by_name=await _paused_by_name(session, state),
+            since=state.ai_paused_at,
+            unanswered_customer_message=unanswered,
+        )
+    if state is not None and state.ai_escalated_at is not None:
+        return AiAutopilotOut(
+            mode="handed_over",
+            since=state.ai_escalated_at,
+            reason=state.ai_escalated_reason,
+            unanswered_customer_message=unanswered,
+        )
+    granted = state is not None and state.ai_grant_remaining is not None
+    return AiAutopilotOut(
+        mode="active",
+        grant_remaining=state.ai_grant_remaining if granted and state else None,
+        grant_total=state.ai_grant_total if granted and state else None,
+        by_name=(
+            await _user_name(session, state.ai_grant_by)
+            if granted and state and state.ai_grant_by
+            else None
+        ),
+        since=state.ai_grant_at if granted and state else None,
+        unanswered_customer_message=unanswered,
+    )
+
+
+async def _user_name(session: AsyncSession, user_id: int) -> str | None:
+    """Full name of an agent, falling back to the login; ``None`` if unknown."""
     row = (
         (
             await session.execute(
                 sa_text("SELECT login, first_name, last_name FROM users WHERE id = :uid LIMIT 1"),
-                {"uid": state.ai_paused_by},
+                {"uid": user_id},
             )
         )
         .mappings()
@@ -618,6 +707,7 @@ async def get_ai_state(ticket_id: int, user: CurrentUser, session: DbSession) ->
         auto_skip_reason=state.auto_skip_reason if state else None,
         auto_skip_at=state.auto_skip_at if state else None,
         triage=await _open_triage_out(session, ticket_id),
+        autopilot=await _autopilot_out(session, ticket_id=ticket_id, policy=policy, state=state),
     )
 
 
@@ -1098,6 +1188,42 @@ async def _require_note_access(session: DbSession, user: CurrentUser, ticket_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc
     await _assert_note_permission(session, user.id, ticket.queue_id)
+
+
+@router.post("/autopilot", response_model=AiAutopilotOut)
+async def autopilot_route(
+    ticket_id: int, body: AiAutopilotIn, user: CurrentUser, session: DbSession
+) -> AiAutopilotOut:
+    """Stop the AI autopilot on this ticket, or start it again for ``runs``
+    automatic replies (optionally answering the open customer message now).
+
+    Same access rule as pause/resume. Starting needs auto-reply enabled in the
+    ticket's queue (409 otherwise). See
+    :func:`tiqora.domain.ticket_write_service.start_ai_autopilot`."""
+    await _require_note_access(session, user, ticket_id)
+    ticket = await TicketService(session).get_ticket(user.id, ticket_id)
+    policy = await get_queue_policy_by_queue(session, ticket.queue_id)
+    sysconfig = SysConfig(session)
+    if body.action == "start":
+        if policy is None or not policy.enabled_auto_reply:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Auto-reply is not enabled for this ticket's queue.",
+            )
+        assert body.runs is not None  # enforced by AiAutopilotIn
+        await _start_ai_autopilot(
+            session,
+            ticket_id=ticket_id,
+            user_id=user.id,
+            sysconfig=sysconfig,
+            runs=body.runs,
+            answer_latest=body.answer_latest,
+        )
+    else:
+        await _stop_ai_autopilot(session, ticket_id=ticket_id, user_id=user.id, sysconfig=sysconfig)
+    await session.commit()
+    state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
+    return await _autopilot_out(session, ticket_id=ticket_id, policy=policy, state=state)
 
 
 @router.post("/pause", status_code=status.HTTP_204_NO_CONTENT)
