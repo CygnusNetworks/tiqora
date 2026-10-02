@@ -2074,7 +2074,7 @@
       "new": "Uusi käyttäjä",
       "login": "Kirjaudu sisään",
       "password": "Salasana",
-      "passwordHelp": "Jätä tyhjäksi, jos haluat säilyttää nykyisen salasanan.",
+      "passwordHelp": "Jätä tyhjäksi, jos haluat säilyttää nykyisen salasanan. Muuten {{min}}–{{max}} merkkiä.",
       "passwordMode": "Salasanan määrittely",
       "passwordModeManual": "Aseta manuaalisesti",
       "passwordModeAuto": "Kutsu: lähetä linkki sähköpostitse",

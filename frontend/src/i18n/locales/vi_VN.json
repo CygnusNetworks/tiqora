@@ -21,7 +21,7 @@
     "aiLimitTokensUnit": "triệu token"
   },
   "onlineAgents": {
-    "title": "Đại lý trực tuyến",
+    "title": "Nhân viên trực tuyến",
     "empty": "Không có ai trực tuyến ngay bây giờ."
   },
   "settings": {
@@ -43,7 +43,7 @@
   },
   "nav": {
     "home": "Trang chủ",
-    "agent": "đại lý",
+    "agent": "nhân viên",
     "portal": "Cổng thông tin khách hàng",
     "admin": "Quản trị viên",
     "theme": "chủ đề",
@@ -196,7 +196,7 @@
   "auth": {
     "login": "Đăng nhập",
     "logout": "Đăng xuất",
-    "signIn": "Đăng nhập đại lý",
+    "signIn": "Đăng nhập nhân viên",
     "username": "Tên người dùng",
     "password": "Mật khẩu",
     "invalidCredentials": "Tên người dùng hoặc mật khẩu không hợp lệ",
@@ -430,7 +430,7 @@
     "composerBodyPlaceholder": "Viết tin nhắn…",
     "composerSend": "Gửi",
     "composerCancel": "Hủy bỏ",
-    "composeWarning": "Một đại lý khác đã trả lời kể từ khi bạn bắt đầu sáng tác.",
+    "composeWarning": "Một nhân viên khác đã trả lời kể từ khi bạn bắt đầu sáng tác.",
     "sortNewestFirst": "Mới nhất đầu tiên",
     "sortOldestFirst": "Cũ nhất đầu tiên",
     "moreActions": "Thêm",
@@ -478,7 +478,7 @@
       "sort": "Sắp xếp thứ tự"
     },
     "senderCustomer": "Khách hàng",
-    "senderAgent": "đại lý",
+    "senderAgent": "nhân viên",
     "senderSystem": "Hệ thống",
     "reply": "trả lời",
     "replyAll": "Trả lời tất cả",
@@ -1156,7 +1156,7 @@
     "focusSearch": "Tập trung vào hộp tìm kiếm"
   },
   "agent": {
-    "title": "Không gian làm việc của đại lý",
+    "title": "Không gian làm việc của nhân viên",
     "placeholder": "Chế độ xem hàng đợi, thu phóng vé và soạn thư sẽ xuất hiện ở đây (Giai đoạn 1+)."
   },
   "portal": {
@@ -1416,7 +1416,7 @@
         },
         "clarifySchemaJson": "Các trường lược đồ làm rõ (JSON)",
         "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}",
-        "serviceUser": "Đại lý dịch vụ",
+        "serviceUser": "Nhân viên dịch vụ",
         "kbTags": "Thẻ KB",
         "kbTagsPlaceholder": "thẻ1, thẻ2, …",
         "kbCategoryIds": "ID danh mục KB",
@@ -1780,7 +1780,7 @@
         "summaryIncrementalMinChars": "Số lượng ký tự mới tối thiểu trước khi kích hoạt tính toán lại tăng dần.",
         "enabledAutoReply": "Cho phép nhân viên trả lời tự động tự động cho hàng đợi này - gửi câu trả lời của khách hàng mà không cần sự chấp thuận của con người, theo ma trận quyền tự chủ. Yêu cầu chế độ \"Chỉ Tiqora\" (tiqora_primary).",
         "autonomy": "Kiểm soát những gì AI có thể làm mà không cần sự chấp thuận của con người: \"Tắt\" = chỉ bản nháp, \"Chỉ làm rõ\" = các câu hỏi làm rõ có thể được gửi trực tiếp (các câu trả lời nội dung vẫn là bản nháp), \"Hoàn toàn tự động\" = cả hai đều có thể được gửi tự động, bao gồm cả các công cụ MCP bị biến đổi.",
-        "serviceUser": "Tài khoản đại lý mà trong đó các câu trả lời/làm rõ tự động của hàng đợi này được tạo (kiểm tra và nhận dạng quyền). Bắt buộc khi tính năng trả lời tự động được bật.",
+        "serviceUser": "Tài khoản nhân viên mà trong đó các câu trả lời/làm rõ tự động của hàng đợi này được tạo (kiểm tra và nhận dạng quyền). Bắt buộc khi tính năng trả lời tự động được bật.",
         "maxClarifications": "Số lượng câu hỏi làm rõ tự động tối đa cho mỗi yêu cầu trước khi leo thang.",
         "maxAutoReplies": "Số lượng trả lời tự động tối đa cho mỗi phiếu.",
         "maxRepliesPerHour": "Số lượng trả lời tự động tối đa cho hàng đợi này mỗi giờ — hạn chế chi phí.",
@@ -1831,8 +1831,8 @@
         "enforceGroups": "Ngoài ra, buộc 2FA đối với mọi nhân viên là thành viên của bất kỳ nhóm nào được chọn ở đây — ngay cả khi chế độ \"Thực thi cho tất cả\" bị tắt.",
         "portalEnabled": "Bật hoặc tắt cổng khách hàng cho toàn bộ hệ thống. Khi tắt, API cổng trả về 404, các phiên khách hàng đang chạy ngừng hoạt động, và trang bắt đầu chuyển thẳng đến đăng nhập nhân viên. Hồ sơ khách hàng và ticket email không bị ảnh hưởng.",
         "sso": "Cho phép tác nhân này xác thực thông qua đường dẫn SSO/nhà cung cấp danh tính bên ngoài. Không tự cấu hình nhà cung cấp SSO - chỉ liệu tác nhân này có thể sử dụng nó hay không.",
-        "enforce": "Buộc 2FA cho tài khoản đại lý cá nhân này, độc lập với cài đặt chung ở trên.",
-        "reset": "Xóa vĩnh viễn cả đăng ký TOTP của đại lý và tất cả mật khẩu đã đăng ký. Sau đó, đại lý phải thiết lập 2FA từ đầu - không có trạng thái trung gian mềm."
+        "enforce": "Buộc 2FA cho tài khoản nhân viên cá nhân này, độc lập với cài đặt chung ở trên.",
+        "reset": "Xóa vĩnh viễn cả đăng ký TOTP của nhân viên và tất cả mật khẩu đã đăng ký. Sau đó, nhân viên phải thiết lập 2FA từ đầu - không có trạng thái trung gian mềm."
       },
       "queues": {
         "group": "Xác định ai có thể xem và làm việc với hàng đợi này — quyền truy cập được kiểm soát hoàn toàn thông qua nhóm, không bao giờ được cấp cho mỗi hàng đợi.",
@@ -1933,7 +1933,7 @@
       "autoResponses": "Trả lời tự động",
       "postmasterFilters": "Bộ lọc của người quản lý bưu điện",
       "acl": "ACL",
-      "genericAgentJobs": "Việc làm đại lý tổng hợp",
+      "genericAgentJobs": "Việc làm nhân viên tổng hợp",
       "dynamicFields": "Trường động",
       "webhooks": "Webhook",
       "apiKeys": "Khóa API",
@@ -2022,20 +2022,20 @@
     },
     "roleAssignments": {
       "title": "Phân công vai trò",
-      "subtitle": "Chọn một đại lý và đặt vai trò mà họ nắm giữ.",
-      "agent": "đại lý",
-      "selectAgent": "Chọn đại lý…",
-      "empty": "Chọn một đại lý ở trên để chỉnh sửa vai trò của họ.",
+      "subtitle": "Chọn một nhân viên và đặt vai trò mà họ nắm giữ.",
+      "agent": "nhân viên",
+      "selectAgent": "Chọn nhân viên…",
+      "empty": "Chọn một nhân viên ở trên để chỉnh sửa vai trò của họ.",
       "roles": "Vai trò",
       "assigned": "Đã giao",
       "noRoles": "Chưa có vai trò hợp lệ nào tồn tại."
     },
     "groupAssignments": {
       "title": "Phân công nhóm",
-      "subtitle": "Chọn một đại lý và đặt nhóm nào họ có thể làm việc.",
-      "agent": "đại lý",
-      "selectAgent": "Chọn đại lý…",
-      "empty": "Chọn một đại lý ở trên để chỉnh sửa nhóm của họ.",
+      "subtitle": "Chọn một nhân viên và đặt nhóm nào họ có thể làm việc.",
+      "agent": "nhân viên",
+      "selectAgent": "Chọn nhân viên…",
+      "empty": "Chọn một nhân viên ở trên để chỉnh sửa nhóm của họ.",
       "groups": "Nhóm",
       "assigned": "Toàn quyền truy cập",
       "noGroups": "Chưa có nhóm hợp lệ nào tồn tại."
@@ -2074,7 +2074,7 @@
       "new": "Người dùng mới",
       "login": "Đăng nhập",
       "password": "Mật khẩu",
-      "passwordHelp": "Để trống để giữ mật khẩu hiện tại.",
+      "passwordHelp": "Để trống để giữ mật khẩu hiện tại. Nếu không thì {{min}}–{{max}} ký tự.",
       "passwordMode": "Cách gán mật khẩu",
       "passwordModeManual": "Đặt thủ công",
       "passwordModeAuto": "Mời: gửi liên kết thiết lập qua email",
@@ -2301,10 +2301,10 @@
       "inQueues_other": "trong hàng đợi {{count}}",
       "editors": "biên tập viên",
       "editorsTitle": "Ai có thể chỉnh sửa “{{name}}”",
-      "editorsHint": "Cấp quyền chỉnh sửa cho các nhóm quyền (thành viên có rw) và cho từng đại lý. Không có lựa chọn = chỉ quản trị viên.",
+      "editorsHint": "Cấp quyền chỉnh sửa cho các nhóm quyền (thành viên có rw) và cho từng nhân viên. Không có lựa chọn = chỉ quản trị viên.",
       "editorGroups": "Nhóm (rw)",
       "editorGroupsHint": "Các thành viên nắm giữ rw trên các nhóm này có thể chỉnh sửa.",
-      "editorUsers": "Đại lý cá nhân",
+      "editorUsers": "Nhân viên cá nhân",
       "editorUsersFilter": "Chất lọc…"
     },
     "variables": {
@@ -2313,7 +2313,7 @@
       "groups": {
         "ticket": "Vé",
         "customer": "Khách hàng",
-        "agent": "đại lý",
+        "agent": "nhân viên",
         "queue": "Hàng đợi"
       },
       "items": {
@@ -2326,8 +2326,8 @@
         "customerLastname": "Họ của khách hàng",
         "customerEmail": "Email khách hàng",
         "customerWpnum": "Mã số khách hàng (wpnum)",
-        "currentFirstname": "Tên đại lý đã đăng nhập",
-        "currentLastname": "Họ của đại lý đã đăng nhập",
+        "currentFirstname": "Tên nhân viên đã đăng nhập",
+        "currentLastname": "Họ của nhân viên đã đăng nhập",
         "ownerFirstname": "Họ tên chủ sở hữu vé",
         "ownerLastname": "Họ của chủ vé",
         "queueName": "Tên hàng đợi",
@@ -2422,7 +2422,7 @@
       "confirmDelete": "Xóa ACL “{{name}}”? Không thể hoàn tác."
     },
     "genericAgentJobs": {
-      "title_plural": "Việc làm đại lý tổng hợp",
+      "title_plural": "Việc làm nhân viên tổng hợp",
       "name": "Tên công việc",
       "settings": "Cài đặt",
       "key": "Chìa khóa",
@@ -2527,7 +2527,7 @@
         "process": "Quy trình",
         "channels": "Kênh",
         "events": "Sự kiện / SSE",
-        "agents": "Đại lý",
+        "agents": "Nhân viên",
         "admin": "API quản trị",
         "mcp": "máy chủ MCP",
         "compat": "Giao diện chung của Znuny"
@@ -2804,10 +2804,10 @@
         },
         "notifications": {
           "name": "Thông báo",
-          "description": "Gửi thông báo theo hướng sự kiện cho đại lý và khách hàng."
+          "description": "Gửi thông báo theo hướng sự kiện cho nhân viên và khách hàng."
         },
         "generic_agent": {
-          "name": "Đại lý chung",
+          "name": "Nhân viên chung",
           "description": "Chạy các công việc GenericAgent theo lịch trình."
         },
         "unlock_timeout": {
@@ -2987,7 +2987,7 @@
       "title": "Xác thực / 2FA",
       "description": "Quản lý tính đủ điều kiện của Kerberos SSO và thực thi xác thực hai yếu tố cho mỗi tác nhân.",
       "globalHeading": "Chính sách 2FA toàn cầu",
-      "enforceAll": "Yêu cầu 2FA cho tất cả các đại lý",
+      "enforceAll": "Yêu cầu 2FA cho tất cả các nhân viên",
       "enforceGroups": "Yêu cầu 2FA đối với thành viên của các nhóm này",
       "portalEnabled": "Cổng khách hàng khả dụng",
       "portalLockedByEnv": "Bị tắt bởi bản triển khai này (đặt TIQORA_PORTAL_ENABLED=true để bật).",
@@ -2995,7 +2995,7 @@
       "saveGlobal": "Lưu chính sách toàn cầu",
       "globalSaved": "Đã lưu chính sách toàn cầu.",
       "globalSaveError": "Không thể lưu chính sách chung.",
-      "agentsHeading": "Đại lý",
+      "agentsHeading": "Nhân viên",
       "login": "Đăng nhập",
       "name": "Tên",
       "totpStatus": "trạng thái 2FA",
@@ -3006,7 +3006,7 @@
       "reset2fa": "Đặt lại 2FA",
       "resetConfirmTitle": "Đặt lại xác thực hai yếu tố?",
       "resetConfirmBody": "Điều này vô hiệu hóa 2FA cho {{login}}. Họ sẽ cần phải đăng ký lại nếu việc thực thi vẫn được áp dụng.",
-      "empty": "Không tìm thấy đại lý nào."
+      "empty": "Không tìm thấy nhân viên nào."
     },
     "gdpr": {
       "title": "Quyền riêng tư / GDPR",
@@ -3144,24 +3144,24 @@
       "noResults": "Không có trang phù hợp."
     },
     "dashboard": {
-      "agents": "Đại lý",
+      "agents": "Nhân viên",
       "queues": "Hàng đợi",
       "daemons": "Daemon",
       "daemonsActive": "{{active}}/{{total}} đang hoạt động",
       "daemonsErrors": "{{count}} có lỗi"
     },
     "pageDescriptions": {
-      "users": "Tạo, chỉnh sửa và hủy kích hoạt các đại lý.",
-      "groups": "Quản lý các nhóm quyền cho đại lý và hàng đợi.",
+      "users": "Tạo, chỉnh sửa và hủy kích hoạt các nhân viên.",
+      "groups": "Quản lý các nhóm quyền cho nhân viên và hàng đợi.",
       "roles": "Xác định vai trò và quyền của gói.",
-      "agentRoles": "Phân công vai trò cho các đại lý.",
+      "agentRoles": "Phân công vai trò cho các nhân viên.",
       "agentGroups": "Gán quyền nhóm đọc/ghi cho các tổng đài viên.",
       "roleGroups": "Liên kết vai trò với quyền của nhóm.",
       "customerUsers": "Quản lý tài khoản người dùng của khách hàng.",
       "customerCompanies": "Quản lý các công ty khách hàng và dữ liệu chính của họ.",
       "customerUserCustomers": "Chỉ định người dùng khách hàng cho các công ty.",
       "customerUserGroups": "Chỉ định người dùng khách hàng vào các nhóm.",
-      "authConfig": "Kiểm soát tính đủ điều kiện SSO và thực thi 2FA cho mỗi đại lý.",
+      "authConfig": "Kiểm soát tính đủ điều kiện SSO và thực thi 2FA cho mỗi nhân viên.",
       "queues": "Định cấu hình hàng đợi, quyền sở hữu và thời gian báo cáo.",
       "queueTemplates": "Chỉ định mẫu cho hàng đợi có sẵn chúng.",
       "queueAutoResponses": "Chỉ định phản hồi tự động cho hàng đợi kích hoạt chúng.",
@@ -3175,7 +3175,7 @@
       "templates": "Quản lý mẫu phản hồi và đoạn văn bản.",
       "templateAttachments": "Gán các tệp đính kèm cố định cho các mẫu.",
       "attachments": "Quản lý các tệp đính kèm có thể tái sử dụng.",
-      "signatures": "Quản lý chữ ký đại lý.",
+      "signatures": "Quản lý chữ ký nhân viên.",
       "salutations": "Quản lý lời chào cho các mẫu phản hồi.",
       "autoResponses": "Quản lý phản hồi tự động (ví dụ: xác nhận, vắng mặt).",
       "mailOutbound": "Định cấu hình máy chủ SMTP gửi đi và địa chỉ người gửi.",
@@ -3197,7 +3197,7 @@
       "aiMcp": "Quản lý máy chủ MCP làm nguồn công cụ cho AI và kích hoạt các công cụ.",
       "aiQueues": "Định cấu hình hành vi AI trên mỗi hàng đợi: quyền tự chủ, giới hạn, leo thang.",
       "aiAudit": "Kiểm tra toàn diện mọi yêu cầu/phản hồi LLM, có tiết lộ PII.",
-      "aiAcl": "Quyền và hạn ngạch AI cho mỗi nhóm, vai trò hoặc đại lý.",
+      "aiAcl": "Quyền và hạn ngạch AI cho mỗi nhóm, vai trò hoặc nhân viên.",
       "types": "Quản lý loại ticket dùng để phân loại.",
       "services": "Quản lý dịch vụ và liên kết với SLA.",
       "slas": "Quản lý thỏa thuận mức dịch vụ và thời hạn.",
@@ -3642,7 +3642,7 @@
       "customerVisible": "Hiển thị cho khách hàng",
       "active": "Đang hoạt động",
       "groups": "Nhóm quyền",
-      "groupsHelp": "Hạn chế danh mục này cho các nhóm này. Để trống để hiển thị cho tất cả các đại lý.",
+      "groupsHelp": "Hạn chế danh mục này cho các nhóm này. Để trống để hiển thị cho tất cả các nhân viên.",
       "noGroups": "Bạn không có nhóm nào để chỉ định.",
       "empty": "Chưa có danh mục nào. Tạo một cái để bắt đầu.",
       "saveError": "Không thể lưu danh mục này. Vui lòng thử lại."
@@ -3693,7 +3693,7 @@
       "volume": "Số lượng vé",
       "backlog": "Xu hướng tồn đọng",
       "openSnapshot": "Mở vé",
-      "agentWorkload": "Khối lượng công việc của đại lý"
+      "agentWorkload": "Khối lượng công việc của nhân viên"
     },
     "dimension": {
       "queue": "Hàng đợi",
@@ -3704,7 +3704,7 @@
     "table": {
       "created": "Đã tạo",
       "closed": "Đã đóng",
-      "login": "đại lý",
+      "login": "nhân viên",
       "name": "Tên",
       "ownedOpen": "Mở (sở hữu)",
       "closedInPeriod": "Đóng cửa trong kỳ"

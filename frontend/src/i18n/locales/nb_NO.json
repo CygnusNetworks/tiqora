@@ -2074,7 +2074,7 @@
       "new": "Ny bruker",
       "login": "Logg inn",
       "password": "Passord",
-      "passwordHelp": "La stå tomt for å beholde gjeldende passord.",
+      "passwordHelp": "La stå tomt for å beholde gjeldende passord. Ellers {{min}}–{{max}} tegn.",
       "passwordMode": "Passordtildeling",
       "passwordModeManual": "Angi manuelt",
       "passwordModeAuto": "Invitasjon: send lenke på e-post",

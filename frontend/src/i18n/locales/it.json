@@ -2074,7 +2074,7 @@
       "new": "Nuovo utente",
       "login": "Accedi",
       "password": "Parola d'ordine",
-      "passwordHelp": "Lascia vuoto per mantenere la password attuale.",
+      "passwordHelp": "Lascia vuoto per mantenere la password attuale. Altrimenti {{min}}–{{max}} caratteri.",
       "passwordMode": "Assegnazione password",
       "passwordModeManual": "Imposta manualmente",
       "passwordModeAuto": "Invito: invia un link via e-mail",

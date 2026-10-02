@@ -2074,7 +2074,7 @@
       "new": "Pengguna baru",
       "login": "Masuk",
       "password": "Kata sandi",
-      "passwordHelp": "Biarkan kosong untuk menyimpan kata sandi saat ini.",
+      "passwordHelp": "Biarkan kosong untuk menyimpan kata sandi saat ini. Jika tidak, {{min}}–{{max}} karakter.",
       "passwordMode": "Penetapan kata sandi",
       "passwordModeManual": "Atur manual",
       "passwordModeAuto": "Undang: kirim tautan penyiapan lewat email",

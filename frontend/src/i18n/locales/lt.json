@@ -2074,7 +2074,7 @@
       "new": "Naujas vartotojas",
       "login": "Prisijungti",
       "password": "Slaptažodis",
-      "passwordHelp": "Palikite tuščią, kad išsaugotumėte dabartinį slaptažodį.",
+      "passwordHelp": "Palikite tuščią, kad išsaugotumėte dabartinį slaptažodį. Kitu atveju {{min}}–{{max}} simbolių.",
       "passwordMode": "Slaptažodžio priskyrimas",
       "passwordModeManual": "Nustatyti rankiniu būdu",
       "passwordModeAuto": "Kvietimas: siųsti nuorodą el. paštu",

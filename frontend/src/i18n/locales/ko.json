@@ -2074,7 +2074,7 @@
       "new": "신규 사용자",
       "login": "로그인",
       "password": "비밀번호",
-      "passwordHelp": "현재 비밀번호를 유지하려면 공백으로 남겨두세요.",
+      "passwordHelp": "현재 비밀번호를 유지하려면 공백으로 남겨두세요. 그렇지 않으면 {{min}}–{{max}}자입니다.",
       "passwordMode": "비밀번호 지정",
       "passwordModeManual": "수동 설정",
       "passwordModeAuto": "초대: 설정 링크 이메일 발송",

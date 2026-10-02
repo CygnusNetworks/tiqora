@@ -2074,7 +2074,7 @@
       "new": "Nov uporabnik",
       "login": "Prijava",
       "password": "Geslo",
-      "passwordHelp": "Pustite prazno, če želite ohraniti trenutno geslo.",
+      "passwordHelp": "Pustite prazno, če želite ohraniti trenutno geslo. Sicer {{min}}–{{max}} znakov.",
       "passwordMode": "Dodelitev gesla",
       "passwordModeManual": "Nastavi ročno",
       "passwordModeAuto": "Povabilo: pošlji povezavo po e-pošti",

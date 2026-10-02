@@ -2074,7 +2074,7 @@
       "new": "Nouvel utilisateur",
       "login": "Se connecter",
       "password": "Mot de passe",
-      "passwordHelp": "Laissez vide pour conserver le mot de passe actuel.",
+      "passwordHelp": "Laissez vide pour conserver le mot de passe actuel. Sinon, {{min}}–{{max}} caractères.",
       "passwordMode": "Attribution du mot de passe",
       "passwordModeManual": "Définir manuellement",
       "passwordModeAuto": "Invitation : envoyer un lien par e-mail",

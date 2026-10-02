@@ -2074,7 +2074,7 @@
       "new": "Usuari nou",
       "login": "Inicieu sessió",
       "password": "Contrasenya",
-      "passwordHelp": "Deixa en blanc per mantenir la contrasenya actual.",
+      "passwordHelp": "Deixa en blanc per mantenir la contrasenya actual. Si no, {{min}}–{{max}} caràcters.",
       "passwordMode": "Assignació de contrasenya",
       "passwordModeManual": "Defineix manualment",
       "passwordModeAuto": "Invitació: envia un enllaç per correu",

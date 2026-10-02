@@ -371,7 +371,7 @@
   "ticket": {
     "tn": "Квиток №",
     "title": "Назва",
-    "state": "Держава",
+    "state": "Стан",
     "priority": "Пріоритет",
     "owner": "Власник",
     "customer": "Замовник",
@@ -487,7 +487,7 @@
     "splitAction": "Розділити",
     "split": {
       "priority": "Пріоритет",
-      "state": "Держава",
+      "state": "Стан",
       "customer": "Замовник",
       "changeCustomer": "Зміна",
       "customerSearch": "Пошук клієнтів (логін/ім’я)…",
@@ -660,7 +660,7 @@
     "toolbar": {
       "print": "Роздрукувати",
       "priority": "Пріоритет",
-      "state": "Держава",
+      "state": "Стан",
       "people": "Люди",
       "owner": "Власник",
       "responsible": "Відповідальний",
@@ -1103,7 +1103,7 @@
     "customerHint": "Логін клієнта (необов'язково)",
     "subject": "Тема",
     "priority": "Пріоритет",
-    "state": "Держава",
+    "state": "Стан",
     "message": "повідомлення",
     "validationError": "Введіть чергу, тему, пріоритет, стан і повідомлення.",
     "submitError": "Не вдалося створити квиток. Спробуйте ще раз.",
@@ -2074,7 +2074,7 @@
       "new": "Новий користувач",
       "login": "Логін",
       "password": "Пароль",
-      "passwordHelp": "Залиште поле порожнім, щоб зберегти поточний пароль.",
+      "passwordHelp": "Залиште поле порожнім, щоб зберегти поточний пароль. Інакше {{min}}–{{max}} символів.",
       "passwordMode": "Призначення пароля",
       "passwordModeManual": "Задати вручну",
       "passwordModeAuto": "Запрошення: надіслати посилання ел. поштою",
@@ -2319,7 +2319,7 @@
       "items": {
         "ticketNumber": "Номер квитка",
         "ticketTitle": "Назва",
-        "ticketState": "Держава",
+        "ticketState": "Стан",
         "ticketQueue": "Білетна черга",
         "ticketPriority": "Пріоритет",
         "customerFirstname": "Ім'я клієнта",
@@ -2449,7 +2449,7 @@
       "newerThan": "новіше ніж {{duration}}",
       "weekdaysShort": "[«Нд», «Пн», «Вт», «Ср», «Чт», «Пт», «Сб»]",
       "keyLabel": {
-        "StateIDs": "Держава",
+        "StateIDs": "Стан",
         "QueueIDs": "Черга",
         "PriorityIDs": "Пріоритет",
         "OwnerIDs": "Власник",
@@ -3610,7 +3610,7 @@
       "slug": "Слимак",
       "category": "Категорія",
       "language": "Мова",
-      "state": "Держава",
+      "state": "Стан",
       "tags": "Теги",
       "tagsPlaceholder": "кома, розділені, теги",
       "content": "Вміст (уцінка)",
@@ -3697,7 +3697,7 @@
     },
     "dimension": {
       "queue": "Черга",
-      "state": "Держава",
+      "state": "Стан",
       "priority": "Пріоритет",
       "owner": "Власник"
     },

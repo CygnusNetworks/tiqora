@@ -1289,7 +1289,7 @@
         "subject": "主题",
         "subjectType": {
           "label": "学科类型",
-          "group": "集团",
+          "group": "组",
           "role": "角色",
           "user": "用户"
         },
@@ -2074,7 +2074,7 @@
       "new": "新建用户",
       "login": "登录名",
       "password": "密码",
-      "passwordHelp": "留空以保留当前密码。",
+      "passwordHelp": "留空以保留当前密码。否则为 {{min}}–{{max}} 个字符。",
       "passwordMode": "密码分配",
       "passwordModeManual": "手动设置",
       "passwordModeAuto": "邀请：通过邮件发送设置链接",
@@ -2145,8 +2145,8 @@
       "title_plural": "队列",
       "new": "新建队列",
       "name": "名称",
-      "group": "集团",
-      "groupId": "集团",
+      "group": "组",
+      "groupId": "组",
       "systemAddress": "系统地址",
       "systemAddressId": "系统地址",
       "salutation": "称呼",

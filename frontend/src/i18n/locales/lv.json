@@ -2074,7 +2074,7 @@
       "new": "Jauns lietotājs",
       "login": "Pieteikties",
       "password": "Parole",
-      "passwordHelp": "Atstājiet tukšu, lai saglabātu pašreizējo paroli.",
+      "passwordHelp": "Atstājiet tukšu, lai saglabātu pašreizējo paroli. Citādi {{min}}–{{max}} rakstzīmes.",
       "passwordMode": "Paroles piešķiršana",
       "passwordModeManual": "Iestatīt manuāli",
       "passwordModeAuto": "Ielūgums: sūtīt saiti e-pastā",

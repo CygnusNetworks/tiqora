@@ -371,7 +371,7 @@
   "ticket": {
     "tn": "رقم التذكرة",
     "title": "العنوان",
-    "state": "الدولة",
+    "state": "الحالة",
     "priority": "الأولوية",
     "owner": "مالك",
     "customer": "العميل",
@@ -487,7 +487,7 @@
     "splitAction": "تقسيم",
     "split": {
       "priority": "الأولوية",
-      "state": "الدولة",
+      "state": "الحالة",
       "customer": "العميل",
       "changeCustomer": "التغيير",
       "customerSearch": "البحث عن العميل (تسجيل الدخول/الاسم)...",
@@ -660,7 +660,7 @@
     "toolbar": {
       "print": "طباعة",
       "priority": "الأولوية",
-      "state": "الدولة",
+      "state": "الحالة",
       "people": "الناس",
       "owner": "مالك",
       "responsible": "مسؤول",
@@ -1103,7 +1103,7 @@
     "customerHint": "تسجيل دخول العميل (اختياري)",
     "subject": "الموضوع",
     "priority": "الأولوية",
-    "state": "الدولة",
+    "state": "الحالة",
     "message": "رسالة",
     "validationError": "يُرجى تعبئة الطابور والموضوع والأولوية والحالة والرسالة.",
     "submitError": "تعذر إنشاء التذكرة. يرجى المحاولة مرة أخرى.",
@@ -2074,7 +2074,7 @@
       "new": "مستخدم جديد",
       "login": "تسجيل الدخول",
       "password": "كلمة المرور",
-      "passwordHelp": "اتركه فارغًا للاحتفاظ بكلمة المرور الحالية.",
+      "passwordHelp": "اتركه فارغًا للاحتفاظ بكلمة المرور الحالية. بخلاف ذلك: {{min}}–{{max}} حرفًا.",
       "passwordMode": "تعيين كلمة المرور",
       "passwordModeManual": "تعيين يدويًا",
       "passwordModeAuto": "دعوة: إرسال رابط الإعداد بالبريد",
@@ -2319,7 +2319,7 @@
       "items": {
         "ticketNumber": "رقم التذكرة",
         "ticketTitle": "العنوان",
-        "ticketState": "الدولة",
+        "ticketState": "الحالة",
         "ticketQueue": "طابور التذاكر",
         "ticketPriority": "الأولوية",
         "customerFirstname": "الاسم الأول للعميل",
@@ -2449,7 +2449,7 @@
       "newerThan": "أحدث من {{duration}}",
       "weekdaysShort": "[\"الأحد\"، \"الاثنين\"، \"الثلاثاء\"، \"الأربعاء\"، \"الخميس\"، \"الجمعة\"، \"السبت\"]",
       "keyLabel": {
-        "StateIDs": "الدولة",
+        "StateIDs": "الحالة",
         "QueueIDs": "قائمة الانتظار",
         "PriorityIDs": "الأولوية",
         "OwnerIDs": "مالك",
@@ -3610,7 +3610,7 @@
       "slug": "سبيكة",
       "category": "الفئة",
       "language": "اللغة",
-      "state": "الدولة",
+      "state": "الحالة",
       "tags": "العلامات",
       "tagsPlaceholder": "فاصلة، مفصولة، العلامات",
       "content": "المحتوى (تخفيض السعر)",
@@ -3697,7 +3697,7 @@
     },
     "dimension": {
       "queue": "قائمة الانتظار",
-      "state": "الدولة",
+      "state": "الحالة",
       "priority": "الأولوية",
       "owner": "مالك"
     },

@@ -2074,7 +2074,7 @@
       "new": "Mtumiaji mpya",
       "login": "Ingia",
       "password": "Nenosiri",
-      "passwordHelp": "Acha wazi ili kuweka nenosiri la sasa.",
+      "passwordHelp": "Acha wazi ili kuweka nenosiri la sasa. Vinginevyo herufi {{min}}–{{max}}.",
       "passwordMode": "Utoaji wa nenosiri",
       "passwordModeManual": "Weka kwa mikono",
       "passwordModeAuto": "Mwaliko: tuma kiungo cha usanidi kwa barua pepe",
