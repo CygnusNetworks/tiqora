@@ -35,6 +35,9 @@ from tiqora.ai.identity import (
     IDENTITY_HANDOFF_TEXT,
     IDENTITY_NO_MATCH_TEXT,
     MAX_IDENTITY_ATTEMPTS,
+    identity_handoff_text,
+    identity_no_match_text,
+    parse_clarify_schema,
 )
 from tiqora.ai.llm import LlmEmptyOutputError, LlmMessage, LlmResponse, LlmUsage, ToolCall
 from tiqora.ai.llm_routing import TaskLlm
@@ -59,9 +62,11 @@ from tiqora.ai.runtime import (
     AgentRunResult,
     LockHeldError,
     PolicyDisabledError,
+    _build_identity_system_prompt,
     _build_system_prompt,
     _build_user_message,
     _map_customer_message,
+    _resolve_reply_language,
     _resolve_reply_language_line,
     run_ticket_agent,
 )
@@ -367,6 +372,50 @@ def test_resolve_reply_language_auto_with_default_still_uses_it_as_fallback() ->
     ticket = _snapshot(title="z90002")
     articles = [_customer_article("z90002")]
     assert _resolve_reply_language_line(policy, ticket, articles) == "Reply language (binding): de"
+
+
+def test_resolve_reply_language_returns_the_bare_code_for_the_identity_exchange() -> None:
+    policy = TiqoraAiQueuePolicy(
+        system_prompt="",
+        autonomy=AUTONOMY_OFF,
+        reply_language_mode=REPLY_LANGUAGE_AUTO,
+        reply_language_default="de",
+    )
+    ticket = _snapshot(title="i have activated my internet access via my router")
+    articles = [_customer_article("i have activated my internet access but cannot connect")]
+    assert _resolve_reply_language(policy, ticket, articles) == "en"
+    off = TiqoraAiQueuePolicy(system_prompt="", autonomy=AUTONOMY_OFF)
+    assert _resolve_reply_language(off, ticket, articles) is None
+
+
+def test_identity_system_prompt_carries_the_language_line_after_the_tone() -> None:
+    """Prod ticket 43132: the German Telegram tone addendum alone made the
+    model ask an English-writing customer for their identity in German."""
+    fields = parse_clarify_schema(
+        TiqoraAiQueuePolicy(
+            system_prompt="", autonomy=AUTONOMY_OFF, clarify_schema_json=_CLARIFY_SCHEMA_PHONE
+        )
+    )
+    tone = "Duze die Nutzerin/den Nutzer."
+    prompt = _build_identity_system_prompt(
+        fields, tone_prompt=tone, reply_language_line="Reply language (binding): en"
+    )
+    assert "Reply language (binding): en" in prompt
+    assert prompt.index(tone) < prompt.index("Reply language (binding): en")
+    plain = _build_identity_system_prompt(fields, tone_prompt=tone)
+    assert "Reply language" not in plain
+
+
+def test_identity_texts_follow_the_language_and_fall_back_to_german() -> None:
+    assert (
+        identity_no_match_text("en", "Phone")
+        == "I couldn't find you with these details (Phone). Please check them and send them again."
+    )
+    assert identity_no_match_text("de", "Phone") == IDENTITY_NO_MATCH_TEXT.format(fields="Phone")
+    assert identity_no_match_text(None, "Phone") == IDENTITY_NO_MATCH_TEXT.format(fields="Phone")
+    assert identity_no_match_text("fr", "Phone") == IDENTITY_NO_MATCH_TEXT.format(fields="Phone")
+    assert identity_handoff_text("en") != IDENTITY_HANDOFF_TEXT
+    assert identity_handoff_text(None) == IDENTITY_HANDOFF_TEXT
 
 
 # ---------------------------------------------------------------------------
@@ -1935,7 +1984,7 @@ async def test_system_prompt_auto_trigger_telegram_source_channel_gets_tone(
                 ticket_id=seed["ticket_id"],
                 trigger=TRIGGER_AUTO,
                 acting_user_id=None,
-                run_id="run-30",
+                run_id="run-85",
                 source_channel="telegram",
             )
         assert result.status == "sent"
@@ -2165,6 +2214,8 @@ async def _setup_identity_policy(
     autonomy: str = AUTONOMY_FULL,
     identity_mode: str = IDENTITY_CLARIFY_SCHEMA,
     clarify_schema_json: str | None = _CLARIFY_SCHEMA_PHONE,
+    reply_language_mode: str = "off",
+    reply_language_fixed: str | None = None,
 ) -> None:
     await set_operation_mode(session, OPERATION_MODE_TIQORA_PRIMARY)
     from tiqora.ai import providers as ai_providers
@@ -2193,6 +2244,8 @@ async def _setup_identity_policy(
         pii_masking=False,
         identity_mode=identity_mode,
         clarify_schema_json=clarify_schema_json,
+        reply_language_mode=reply_language_mode,
+        reply_language_fixed=reply_language_fixed,
     )
     await setup_agent_llm(session, _policy, provider)
 
@@ -2468,6 +2521,35 @@ async def test_identity_wrong_claim_tells_the_customer_it_did_not_match(
             state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
             assert state is not None
             assert state.identity_attempts == 1
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_exchange_follows_the_reply_language(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The identity mini-exchange used to get no language line and fixed
+    German texts, so an English-writing Telegram customer was asked and told
+    "not found" in German while the later normal run answered in English."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=85)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(
+                session, seed=seed, reply_language_mode="fixed", reply_language_fixed="en"
+            )
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=900085
+            )
+        sent: list[str] = []
+        _install_recording_telegram_deliver(monkeypatch, sent)
+
+        _, llm = await _run_wrong_identity_claim(factory, seed, run_id="run-85")
+
+        prompt = next(str(m.content) for m in llm.last_messages if m.role == "system")
+        assert "Reply language (binding): en" in prompt
+        assert sent == [identity_no_match_text("en", "Phone number")]
     finally:
         await engine.dispose()
 
