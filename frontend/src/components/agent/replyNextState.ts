@@ -55,6 +55,12 @@ export function useNextStateOptions(ticketId: number, enabled: boolean) {
     states.find((s) => s.name === "closed successful") ??
     states.find((s) => s.type_name.startsWith("closed"));
   const canSetState = Boolean(ticketQ.data && ticketPerms(ticketQ.data).rw);
+  /** Writing to a closed ticket usually means the agent now waits for the
+   * customer (a follow-up question, "is it solved?"). Plain "Senden" would
+   * leave it closed and the answer unnoticed, so the default becomes
+   * "Wartend" there — Znuny reopens on reply too (StateDefault "open"), but
+   * here the ball is with the customer, not the agent. */
+  const ticketClosed = (ticketQ.data?.state_type ?? "").startsWith("closed");
   const options = NEXT_STATES.filter(
     (o) =>
       o.key === "keep" ||
@@ -75,5 +81,8 @@ export function useNextStateOptions(ticketId: number, enabled: boolean) {
     };
   };
 
-  return { canSetState, options, stateIdFor, payloadFor };
+  const defaultNext: NextState =
+    ticketClosed && canSetState && options.some((o) => o.key === "pending") ? "pending" : "keep";
+
+  return { canSetState, options, stateIdFor, payloadFor, defaultNext };
 }

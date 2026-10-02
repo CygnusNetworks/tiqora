@@ -36,13 +36,28 @@ export function filterSnippets(templates: TemplateOut[], query: string): Templat
 export const MAX_BUTTONS = 8;
 export const MAX_BUTTON_LABEL = 64;
 
-/** Customer-facing, so fixed informal German like the rest of the bot's
- * copy — not the agent's UI language. */
-export const RESOLVED_PRESET_BODY = "Ist dein Problem damit gelöst?";
-export const RESOLVED_PRESET_BUTTONS: TelegramButtonIn[] = [
-  { label: "Ja", action: "resolve_yes" },
-  { label: "Nein", action: "resolve_no" },
-];
+/** Customer-facing, so in the customer's language (the chat's
+ * `customer_language`: what they wrote, else their Telegram app language),
+ * not the agent's UI language. German for German, English otherwise — the
+ * same rule as the bot's own texts (backend channels/telegram/texts.py). */
+const RESOLVED_PRESETS: Record<"de" | "en", { body: string; yes: string; no: string }> = {
+  de: { body: "Ist dein Problem damit gelöst?", yes: "Ja", no: "Nein" },
+  en: { body: "Is your problem solved now?", yes: "Yes", no: "No" },
+};
+
+export function resolvedPreset(customerLanguage: string | null | undefined): {
+  body: string;
+  buttons: TelegramButtonIn[];
+} {
+  const p = RESOLVED_PRESETS[customerLanguage === "de" ? "de" : "en"];
+  return {
+    body: p.body,
+    buttons: [
+      { label: p.yes, action: "resolve_yes" },
+      { label: p.no, action: "resolve_no" },
+    ],
+  };
+}
 
 /** What actually goes out: blank labels are dropped rather than refused, so
  * an "add" the agent didn't fill in never blocks the send. */

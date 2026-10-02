@@ -22,15 +22,23 @@ const SEND_SHORTCUT: Record<NextState, string> = {
   closed: IS_MAC ? "⌘ Enter" : "Ctrl+Enter",
 };
 
+/** Plain Enter sends `primary`; "keep" then has no shortcut of its own. */
+function shortcutFor(next: NextState, primary: NextState): string | null {
+  if (next === primary) return "Enter";
+  if (next === "keep") return null;
+  return SEND_SHORTCUT[next];
+}
+
 /**
  * "Senden" plus a menu for what happens to the ticket afterwards. A plain
- * send always leaves the ticket as it is; waiting and closing are explicit
+ * send leaves the ticket as it is (on a closed ticket: sets it to waiting); waiting and closing are explicit
  * menu choices instead of a sticky toggle that has to be reset. Without
  * permission to change the state (`options` only has "keep") there is no
  * menu at all.
  */
 export function SendMenuButton({
   options,
+  primary = "keep",
   disabled,
   sending,
   pendingDate,
@@ -38,6 +46,9 @@ export function SendMenuButton({
   onSend,
 }: {
   options: NextState[];
+  /** What the main button and plain Enter do (see `useNextStateOptions`'s
+   * `defaultNext`): "keep", or "pending" on a closed ticket. */
+  primary?: NextState;
   disabled: boolean;
   sending: boolean;
   pendingDate: string;
@@ -77,13 +88,17 @@ export function SendMenuButton({
         type="button"
         data-testid="tg-composer-send"
         disabled={disabled || sending}
-        onClick={() => onSend("keep")}
+        onClick={() => onSend(primary)}
         className={cn(
           "bg-accent px-3 text-sm font-semibold text-accent-ink hover:bg-accent/90 disabled:opacity-50",
           hasMenu ? "rounded-l-lg" : "rounded-lg",
         )}
       >
-        {sending ? t("ticket.telegram.composer.sending") : t("ticket.telegram.composer.send")}
+        {sending
+          ? t("ticket.telegram.composer.sending")
+          : primary === "keep"
+            ? t("ticket.telegram.composer.send")
+            : t(LABEL_KEY[primary])}
       </button>
       {hasMenu && (
         <button
@@ -117,9 +132,13 @@ export function SendMenuButton({
                 className="grid grid-cols-[1fr_auto] gap-x-3 rounded-md px-2.5 py-1.5 text-left text-sm text-ink hover:bg-surface-subtle disabled:opacity-50"
               >
                 <span>{t(LABEL_KEY[o])}</span>
-                <kbd className="self-center rounded border border-b-2 border-hairline bg-surface-subtle px-1 font-mono text-[10.5px] text-muted">
-                  {SEND_SHORTCUT[o]}
-                </kbd>
+                {shortcutFor(o, primary) ? (
+                  <kbd className="self-center rounded border border-b-2 border-hairline bg-surface-subtle px-1 font-mono text-[10.5px] text-muted">
+                    {shortcutFor(o, primary)}
+                  </kbd>
+                ) : (
+                  <span />
+                )}
                 <span className="col-span-2 text-[11px] text-muted">{t(HINT_KEY[o])}</span>
               </button>
               {o === "pending" && (
