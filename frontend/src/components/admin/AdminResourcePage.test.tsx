@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { render, screen, waitFor, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import {
   AdminResourcePage,
+  type AdminCrudApi,
   type AdminResourcePageProps,
 } from "./AdminResourcePage";
 import type { AdminListParams, AdminPage } from "@/lib/api";
@@ -12,6 +13,7 @@ import type { AdminListParams, AdminPage } from "@/lib/api";
 type Row = { id: number; name: string; valid_id: number };
 type Create = { name: string };
 type Update = { name?: string };
+type ListFn = AdminCrudApi<Row, Create, Update>["list"];
 
 /** Build a paginated list mock that slices a synthetic table of `total` rows. */
 function makeChunkedListMock(total: number) {
@@ -32,11 +34,11 @@ function makeChunkedListMock(total: number) {
 
 function renderPage(
   props: Partial<AdminResourcePageProps<Row, Create, Update>> = {},
-  listImpl?: ReturnType<typeof vi.fn>,
+  listImpl?: Mock<ListFn>,
 ) {
   const list =
     listImpl ??
-    vi.fn().mockResolvedValue({
+    vi.fn<ListFn>().mockResolvedValue({
       items: [
         { id: 1, name: "Alpha", valid_id: 1 },
         { id: 2, name: "Beta", valid_id: 1 },
