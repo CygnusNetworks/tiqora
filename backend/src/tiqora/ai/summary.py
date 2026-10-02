@@ -239,6 +239,8 @@ def _length_guidance(
     attachment_blocks: dict[int, str],
     *,
     detail: str,
+    conversation_articles: list[ArticleSnapshot] | None = None,
+    incremental: bool = False,
 ) -> str:
     """Concrete, computed length instructions appended to the user message.
 
@@ -247,10 +249,23 @@ def _length_guidance(
     sentence, runs 13563f69/49a074d1) — spelling out the actual numbers per
     run steers them far more reliably.
     """
-    mail_chars = sum(len(a.body or "") for a in rendered_articles)
+    # The sentence budget is for the whole summary, so it is measured on the
+    # whole conversation: measured on an incremental run's new articles alone,
+    # a two-character "Ja" squeezed the entire summary into three sentences,
+    # and run by run the customer's original problem dropped out (prod ticket
+    # 43132). Documents still count only for this run's new blocks — earlier
+    # ones are carried over by the system prompt's rule.
+    conversation = conversation_articles if conversation_articles is not None else rendered_articles
+    mail_chars = sum(len(a.body or "") for a in conversation)
     docs = _collect_docs(rendered_articles, attachment_blocks)
 
     lines = ["--- length guidance (computed for this run) ---"]
+    if incremental:
+        lines.append(
+            "Keep every fact of the previous summary that still holds - above all "
+            "what the customer originally asked for or reported - and fold in what "
+            "the new articles change. Do not drop it just to stay short."
+        )
     if mail_chars < 1500:
         lines.append(
             f"The mail text is short (~{mail_chars} characters): cover the "
@@ -572,10 +587,23 @@ async def summarize_ticket(
     has_previous = state.summary_body is not None and state.last_summary_upto_article_id is not None
     if has_previous:
         rendered_articles = new_articles
+        # The article right before the new ones, for context only: a reply
+        # like "Ja" means nothing without the question it answers, and that
+        # question was summarized (and paraphrased away) in an earlier run.
+        first_new = new_articles[0].id if new_articles else None
+        before = [a for a in articles if first_new is not None and a.id < first_new]
+        context_block = (
+            "--- last article before these (already summarized; context only) ---\n"
+            + _render_articles(before[-1:], pii=pii, mask=mask, attachment_blocks={})
+            + "\n\n"
+            if before
+            else ""
+        )
         user_message = (
             f"{header}\n\n"
             f"--- previous summary ---\n{state.summary_body}\n\n"
-            "--- new articles since then ---\n"
+            + context_block
+            + "--- new articles since then ---\n"
             + _render_articles(
                 new_articles, pii=pii, mask=mask, attachment_blocks=attachment_blocks
             )
@@ -588,7 +616,11 @@ async def summarize_ticket(
             f"{_render_articles(articles, pii=pii, mask=mask, attachment_blocks=attachment_blocks)}"
         )
     user_message += "\n\n" + _length_guidance(
-        rendered_articles, attachment_blocks, detail=effective_detail
+        rendered_articles,
+        attachment_blocks,
+        detail=effective_detail,
+        conversation_articles=articles,
+        incremental=has_previous,
     )
 
     system_prompt = _system_prompt_for_detail(effective_detail)
