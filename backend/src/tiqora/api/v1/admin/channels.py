@@ -65,6 +65,7 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
         "consent_button_label",
         "identity_no_match_text",
         "identity_handoff_text",
+        "followup_reopen_days",
     },
 }
 
