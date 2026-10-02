@@ -183,3 +183,32 @@ async def detect_followup(
                 return str(row[0]), ticket_id
 
     return None
+
+
+async def followup_state_name(
+    sysconfig: SysConfig,
+    *,
+    state_type: str,
+    explicit_state: str | None = None,
+    keep_state: bool = False,
+) -> str | None:
+    """The state a follow-up puts its ticket into, or ``None`` to leave it.
+
+    Port of ``Kernel::System::PostMaster::FollowUp`` (Znuny 6.5, lines
+    173-191): ``PostmasterFollowUpState`` (default "open"), or
+    ``PostmasterFollowUpStateClosed`` for a closed ticket, or an explicit
+    ``X-OTRS-FollowUp-State``. It is applied to every ticket that is not
+    "new" (a new ticket stays new unless the state is explicit) and never
+    when ``X-OTRS-FollowUp-State-Keep`` is set. So a customer's answer wakes a
+    pending ticket ("Wartend") up as well, not only a closed one.
+    """
+    if keep_state:
+        return None
+    state_type = state_type.lower()
+    if explicit_state:
+        return explicit_state
+    if state_type.startswith("new"):
+        return None
+    if state_type in ("closed", "removed") or state_type.startswith("close"):
+        return await sysconfig.postmaster_followup_state_closed()
+    return await sysconfig.postmaster_followup_state()

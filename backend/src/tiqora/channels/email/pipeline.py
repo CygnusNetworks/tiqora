@@ -29,6 +29,7 @@ from tiqora.db.legacy.mail_account import MailAccount
 from tiqora.domain.mail_log import write_mail_log
 from tiqora.domain.ticket_write_service import ArticleIn, TicketIn, add_article, create_ticket
 from tiqora.znuny.followup import detect_followup
+from tiqora.znuny.followup import followup_state_name as followup_state_name_for
 from tiqora.znuny.sysconfig import SysConfig
 
 if TYPE_CHECKING:
@@ -408,7 +409,7 @@ async def _process_message_inner(
         ).first()
         if ticket_row is None:
             return PipelineResult(outcome="error", error=f"follow-up ticket {ticket_id} vanished")
-        queue_id, state_type, _state_id = ticket_row
+        queue_id, state_type, current_state_id = ticket_row
         state_type = str(state_type).lower()
 
         follow_up_row = (
@@ -487,21 +488,21 @@ async def _process_message_inner(
                 orig_x_otrs_loop=get_param.get("X-OTRS-Loop"),
             )
 
-        # Normal follow-up: append article, reopen if closed.
-        if is_closed:
-            followup_state_name = await sysconfig.postmaster_followup_state_closed()
-        else:
-            followup_state_name = None
-        if get_param.get("X-OTRS-FollowUp-State"):
-            followup_state_name = get_param["X-OTRS-FollowUp-State"]
-        elif not is_closed and state_type == "new":
-            followup_state_name = await sysconfig.postmaster_followup_state()
+        # Normal follow-up: append article; Znuny's state rule (reopen a
+        # closed ticket, wake a pending/open one, leave a new one alone).
+        followup_state_name = await followup_state_name_for(
+            sysconfig,
+            state_type=state_type,
+            explicit_state=get_param.get("X-OTRS-FollowUp-State") or None,
+            keep_state=bool(get_param.get("X-OTRS-FollowUp-State-Keep")),
+        )
 
         if followup_state_name:
             from tiqora.domain.ticket_write_service import change_state
 
             new_state_id = await _lookup_id(session, "ticket_state", "name", followup_state_name)
-            if new_state_id:
+            # Same state: no StateUpdate (Znuny TicketStateSet returns early).
+            if new_state_id and new_state_id != current_state_id:
                 await change_state(
                     session,
                     ticket_id=ticket_id,
