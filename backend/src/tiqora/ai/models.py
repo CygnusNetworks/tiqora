@@ -45,6 +45,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.tiqora.base import TiqoraBase
 
+AUDIT_PAYLOAD_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
+"""16 MiB on MariaDB; PostgreSQL ``TEXT`` has no practical limit."""
+
+
 # tiqora_llm_provider.kind
 PROVIDER_KIND_OPENAI_COMPAT = "openai_compat"
 PROVIDER_KIND_ANTHROPIC = "anthropic"
@@ -708,7 +712,7 @@ class TiqoraAiDraft(TiqoraBase):
     subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     body: Mapped[str] = mapped_column(Text, nullable=False)
     based_on_article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    tool_trace_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tool_trace_json: Mapped[str | None] = mapped_column(AUDIT_PAYLOAD_TEXT, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default=DRAFT_STATUS_OPEN)
     accepted_article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -741,7 +745,7 @@ class TiqoraAiArticleOrigin(TiqoraBase):
     )
     queue_id: Mapped[int] = mapped_column(Integer, nullable=False)
     service_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    tool_trace_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tool_trace_json: Mapped[str | None] = mapped_column(AUDIT_PAYLOAD_TEXT, nullable=True)
     run_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
@@ -863,10 +867,6 @@ class TiqoraAiTicketState(TiqoraBase):
     # when an auto run actually starts.
     auto_skip_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
     auto_skip_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-
-AUDIT_PAYLOAD_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
-"""16 MiB on MariaDB; PostgreSQL ``TEXT`` has no practical limit."""
 
 
 class TiqoraAiAuditLog(TiqoraBase):

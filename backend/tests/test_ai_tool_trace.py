@@ -149,9 +149,23 @@ def test_encode_tool_trace_leaves_a_small_trace_alone() -> None:
     assert encode_tool_trace(trace) == json.dumps(trace)
 
 
+def test_encode_tool_trace_keeps_real_runs_whole() -> None:
+    """Prod ticket 2026100210000053: the ~18,000-character diagnose_connection
+    result was cut to 4,000 characters for the old 64 KiB TEXT column, so it
+    showed up mid-object and could not be rendered as JSON. Real runs (here:
+    eleven full KB articles plus a big JSON result) are stored unchanged."""
+    diagnose = json.dumps({"logins": [{"hostname": "router", "n": i} for i in range(600)]})
+    trace = [
+        *(_kb_step(n, 20_000) for n in range(11)),
+        {"role": "tool", "name": "Netadmin:diagnose_connection", "content": diagnose},
+    ]
+    encoded = encode_tool_trace(trace)
+    assert encoded == json.dumps(trace)
+    assert json.loads(parse_tool_trace(encoded)[-1].content) == json.loads(diagnose)
+
+
 def test_encode_tool_trace_shortens_results_but_keeps_every_step() -> None:
-    # The prod run: eleven full KB articles.
-    trace = [_kb_step(n, 20_000) for n in range(11)]
+    trace = [_kb_step(n, 100_000) for n in range(11)]
     encoded = encode_tool_trace(trace)
     assert len(encoded.encode()) <= MAX_TOOL_TRACE_BYTES
     steps = parse_tool_trace(encoded)
@@ -161,10 +175,10 @@ def test_encode_tool_trace_shortens_results_but_keeps_every_step() -> None:
 
 
 def test_encode_tool_trace_drops_the_oldest_steps_as_a_last_resort() -> None:
-    trace = [_kb_step(n, 1_000) for n in range(2_000)]
+    trace = [_kb_step(n, 1_000) for n in range(5_000)]
     encoded = encode_tool_trace(trace)
     assert len(encoded.encode()) <= MAX_TOOL_TRACE_BYTES
     steps = parse_tool_trace(encoded)
     assert steps[0].name == "trace"
     assert "frühere Schritte ausgelassen" in steps[0].content
-    assert steps[-1].arguments == json.dumps({"article_id": 1_999})
+    assert steps[-1].arguments == json.dumps({"article_id": 4_999})
