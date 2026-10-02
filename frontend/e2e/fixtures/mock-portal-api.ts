@@ -147,6 +147,10 @@ async function json(route: Route, status: number, body: unknown) {
 /** Intercept all /api/portal/* calls with deterministic fixtures. */
 export async function mockPortalApi(page: Page) {
   authenticated = false;
+  // Per-test copy, so a reply posted in one test does not leak into the next.
+  const articlesByTicket: Record<number, unknown[]> = Object.fromEntries(
+    Object.entries(ticketArticles).map(([id, list]) => [id, [...list]]),
+  );
 
   await page.route("**/api/portal/**", async (route) => {
     const req = route.request();
@@ -207,13 +211,29 @@ export async function mockPortalApi(page: Page) {
       return;
     }
     if (path.match(/\/api\/portal\/tickets\/\d+\/reply$/) && method === "POST") {
+      const id = Number(path.match(/\/tickets\/(\d+)\//)?.[1]);
       const articleId = nextArticleId++;
+      // The real API lists the new article afterwards (metadata only, no body).
+      (articlesByTicket[id] ??= []).push({
+        id: articleId,
+        ticket_id: id,
+        sender_type: "customer",
+        sender_type_id: 3,
+        communication_channel_id: 1,
+        is_visible_for_customer: true,
+        create_time: "2026-07-20T10:00:00Z",
+        create_by: 1,
+        subject: "Re: Cannot log in to the client portal",
+        from_address: "customer@example.com",
+        to_address: "support@example.com",
+        content_type: "text/plain",
+      });
       await json(route, 200, { article_id: articleId, reopened: false });
       return;
     }
     if (path.match(/\/api\/portal\/tickets\/\d+\/articles$/) && method === "GET") {
       const id = Number(path.match(/\/tickets\/(\d+)\//)?.[1]);
-      await json(route, 200, ticketArticles[id] ?? []);
+      await json(route, 200, articlesByTicket[id] ?? []);
       return;
     }
     if (path.match(/\/api\/portal\/tickets\/\d+$/) && method === "GET") {
