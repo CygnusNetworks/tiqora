@@ -2074,7 +2074,7 @@
       "new": "Pengguna baharu",
       "login": "Log masuk",
       "password": "Kata laluan",
-      "passwordHelp": "Biarkan kosong untuk mengekalkan kata laluan semasa.",
+      "passwordHelp": "Biarkan kosong untuk mengekalkan kata laluan semasa. Jika tidak, {{min}}–{{max}} aksara.",
       "passwordMode": "Tugasan kata laluan",
       "passwordModeManual": "Tetapkan secara manual",
       "passwordModeAuto": "Jemput: e-mel pautan persediaan",

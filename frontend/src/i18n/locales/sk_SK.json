@@ -2074,7 +2074,7 @@
       "new": "Nový používateľ",
       "login": "Prihláste sa",
       "password": "heslo",
-      "passwordHelp": "Ak chcete zachovať aktuálne heslo, nechajte pole prázdne.",
+      "passwordHelp": "Ak chcete zachovať aktuálne heslo, nechajte pole prázdne. Inak {{min}}–{{max}} znakov.",
       "passwordMode": "Pridelenie hesla",
       "passwordModeManual": "Nastaviť ručne",
       "passwordModeAuto": "Pozvať: odoslať odkaz e-mailom",

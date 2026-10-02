@@ -2074,7 +2074,7 @@
       "new": "Ny bruger",
       "login": "Log ind",
       "password": "Adgangskode",
-      "passwordHelp": "Lad stå tomt for at beholde den aktuelle adgangskode.",
+      "passwordHelp": "Lad stå tomt for at beholde den aktuelle adgangskode. Ellers {{min}}–{{max}} tegn.",
       "passwordMode": "Adgangskodetildeling",
       "passwordModeManual": "Angiv manuelt",
       "passwordModeAuto": "Invitation: send link pr. e-mail",

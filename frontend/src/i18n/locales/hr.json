@@ -2074,7 +2074,7 @@
       "new": "Novi korisnik",
       "login": "Prijava",
       "password": "Lozinka",
-      "passwordHelp": "Ostavite prazno kako biste zadržali trenutnu lozinku.",
+      "passwordHelp": "Ostavite prazno kako biste zadržali trenutnu lozinku. Inače {{min}}–{{max}} znakova.",
       "passwordMode": "Dodjela lozinke",
       "passwordModeManual": "Postavi ručno",
       "passwordModeAuto": "Pozivnica: pošalji poveznicu e-poštom",

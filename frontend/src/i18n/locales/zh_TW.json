@@ -43,7 +43,7 @@
   },
   "nav": {
     "home": "首頁",
-    "agent": "代理商",
+    "agent": "服務人員",
     "portal": "客戶入口網站",
     "admin": "管理員",
     "theme": "主題",
@@ -478,7 +478,7 @@
       "sort": "排序順序"
     },
     "senderCustomer": "客戶",
-    "senderAgent": "代理商",
+    "senderAgent": "服務人員",
     "senderSystem": "系統",
     "reply": "回覆",
     "replyAll": "全部回覆",
@@ -2022,8 +2022,8 @@
     },
     "roleAssignments": {
       "title": "角色分配",
-      "subtitle": "選擇一個代理商並設定他們所扮演的角色。",
-      "agent": "代理商",
+      "subtitle": "選擇一個服務人員並設定他們所扮演的角色。",
+      "agent": "服務人員",
       "selectAgent": "選擇代理...",
       "empty": "在上面選擇一個代理來編輯他們的角色。",
       "roles": "角色",
@@ -2033,7 +2033,7 @@
     "groupAssignments": {
       "title": "小組作業",
       "subtitle": "選擇一個代理並設定他們可以在哪些群組中工作。",
-      "agent": "代理商",
+      "agent": "服務人員",
       "selectAgent": "選擇代理...",
       "empty": "在上面選擇一個代理來編輯他們的群組。",
       "groups": "團體",
@@ -2074,7 +2074,7 @@
       "new": "新用戶",
       "login": "登入",
       "password": "密碼",
-      "passwordHelp": "留空以保留目前密碼。",
+      "passwordHelp": "留空以保留目前密碼。否則為 {{min}}–{{max}} 個字元。",
       "passwordMode": "密碼指派",
       "passwordModeManual": "手動設定",
       "passwordModeAuto": "邀請：以郵件傳送設定連結",
@@ -2313,7 +2313,7 @@
       "groups": {
         "ticket": "門票",
         "customer": "客戶",
-        "agent": "代理商",
+        "agent": "服務人員",
         "queue": "佇列"
       },
       "items": {
@@ -2527,7 +2527,7 @@
         "process": "流程",
         "channels": "頻道",
         "events": "活動 / 上交所",
-        "agents": "代理商",
+        "agents": "服務人員",
         "admin": "管理介面",
         "mcp": "MCP伺服器",
         "compat": "Zuny 通用介面"
@@ -2804,7 +2804,7 @@
         },
         "notifications": {
           "name": "通知",
-          "description": "向代理商和客戶發送事件驅動的通知。"
+          "description": "向服務人員和客戶發送事件驅動的通知。"
         },
         "generic_agent": {
           "name": "通用代理",
@@ -2995,7 +2995,7 @@
       "saveGlobal": "儲存全域策略",
       "globalSaved": "全域策略已儲存。",
       "globalSaveError": "無法儲存全域策略。",
-      "agentsHeading": "代理商",
+      "agentsHeading": "服務人員",
       "login": "登入",
       "name": "名稱",
       "totpStatus": "2FA 狀態",
@@ -3144,7 +3144,7 @@
       "noResults": "沒有符合的頁面。"
     },
     "dashboard": {
-      "agents": "代理商",
+      "agents": "服務人員",
       "queues": "佇列",
       "daemons": "守護程式",
       "daemonsActive": "{{active}}/{{total}} 活躍",
@@ -3704,7 +3704,7 @@
     "table": {
       "created": "已創建",
       "closed": "關閉",
-      "login": "代理商",
+      "login": "服務人員",
       "name": "名稱",
       "ownedOpen": "開放（擁有）",
       "closedInPeriod": "期間關閉"

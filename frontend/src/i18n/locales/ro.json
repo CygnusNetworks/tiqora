@@ -2074,7 +2074,7 @@
       "new": "Utilizator nou",
       "login": "Autentificare",
       "password": "Parolă",
-      "passwordHelp": "Lăsați necompletat pentru a păstra parola curentă.",
+      "passwordHelp": "Lăsați necompletat pentru a păstra parola curentă. Altfel, {{min}}–{{max}} caractere.",
       "passwordMode": "Atribuire parolă",
       "passwordModeManual": "Setare manuală",
       "passwordModeAuto": "Invitație: trimite un link pe e-mail",

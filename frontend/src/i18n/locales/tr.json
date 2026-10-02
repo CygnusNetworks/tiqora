@@ -2074,7 +2074,7 @@
       "new": "Yeni kullanıcı",
       "login": "Giriş yap",
       "password": "Parola",
-      "passwordHelp": "Mevcut şifreyi korumak için boş bırakın.",
+      "passwordHelp": "Mevcut şifreyi korumak için boş bırakın. Aksi halde {{min}}–{{max}} karakter.",
       "passwordMode": "Parola atama",
       "passwordModeManual": "Elle ayarla",
       "passwordModeAuto": "Davet: e-posta ile kurulum bağlantısı",

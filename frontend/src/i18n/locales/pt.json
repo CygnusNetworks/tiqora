@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Tiqora",
-    "tagline": "Bilhetes auto-hospedados com assistência de IA integrada",
+    "tagline": "Tickets auto-hospedados com assistência de IA integrada",
     "beta": "Beta"
   },
   "notifications": {
@@ -55,7 +55,7 @@
   "sidebar": {
     "workspace": "Espaço de trabalho",
     "inbox": "Caixa de entrada",
-    "myTickets": "Meus ingressos",
+    "myTickets": "Meus tickets",
     "watched": "Assistido",
     "responsible": "Responsável",
     "services": "Serviços",
@@ -288,7 +288,7 @@
     "escalatedEmpty": "Não há tickets escalados.",
     "newLabel": "novo",
     "viewAll": "Ver tudo",
-    "toPickUpEmpty": "Não há novos ingressos para retirar.",
+    "toPickUpEmpty": "Não há novos tickets para retirar.",
     "remindersDue": "Lembretes devidos",
     "remindersDueEmpty": "Nenhum lembrete devido.",
     "queueShortcutsEmpty": "Não há filas com tickets abertos ou novos no momento.",
@@ -320,7 +320,7 @@
       "selectAllOnPage": "Selecione tudo nesta página",
       "selectedOnPage": "{{count}} selecionado nesta página",
       "selectAllMatches": "Selecione todos os {{count}} em \"{{queue}}\"",
-      "selectAllMatchesLoading": "Carregando ingressos…",
+      "selectAllMatchesLoading": "Carregando tickets…",
       "allSelected": "Todos {{count}} selecionados",
       "allSelectedCapped": "Todos {{count}} selecionados (limitado a {{cap}})",
       "clearSelection": "Limpar seleção",
@@ -328,15 +328,15 @@
       "fieldPriority": "Prioridade",
       "fieldOwner": "Proprietário",
       "confirmTitle": "Alterar {{field}}?",
-      "confirmText": "Alterar {{field}} para \"{{value}}\" para {{count}} ingressos?",
+      "confirmText": "Alterar {{field}} para \"{{value}}\" para {{count}} tickets?",
       "confirmApply": "Mudança",
       "confirmCancel": "Cancelar",
       "progress": "{{done}}/{{total}} alterado…",
       "updated": "{{count}} atualizado",
       "partialFail": "{{done}} atualizado, {{failed}} falhou: {{ids}}"
     },
-    "countBadge_one": "1 bilhete",
-    "countBadge_other": "{{count}} bilhetes",
+    "countBadge_one": "1 ticket",
+    "countBadge_other": "{{count}} tickets",
     "byActivity": "por atividade mais recente",
     "stateFilter": "Status",
     "moreActions": "Mais ações",
@@ -369,7 +369,7 @@
     }
   },
   "ticket": {
-    "tn": "Bilhete#",
+    "tn": "Ticket#",
     "title": "Título",
     "state": "Estado",
     "priority": "Prioridade",
@@ -399,7 +399,7 @@
     "dynamicFields": "Campos dinâmicos",
     "noTitle": "(sem título)",
     "articles": "Artigos",
-    "history": "História",
+    "history": "Histórico",
     "noArticles": "Não há artigos neste ticket.",
     "noHistory": "Nenhuma entrada no histórico.",
     "noSubject": "(sem assunto)",
@@ -420,7 +420,7 @@
     "historyType": "Tipo",
     "historyName": "Entrada",
     "historyBy": "Por",
-    "invalidId": "ID do bilhete inválido",
+    "invalidId": "ID do ticket inválido",
     "loadError": "Não foi possível carregar este ticket.",
     "presenceViewing": "vendo",
     "presenceComposing": "compondo",
@@ -472,7 +472,7 @@
     "overflow": {
       "menu": "Mais ações",
       "articles": "Artigos",
-      "history": "História",
+      "history": "Histórico",
       "startProcess": "Iniciar processo",
       "internalNote": "Nota interna",
       "sort": "Ordem de classificação"
@@ -575,11 +575,11 @@
       "originTraceEmpty": "Não foram registadas chamadas de ferramentas para esta resposta.",
       "escalatedBanner": "A IA passou para uma pessoa às {{dateTime}} — a resposta automática fica desligada até um agente enviar uma resposta visível para o cliente ou a retomar aqui.",
       "pause": {
-        "pause": "Pausar a IA neste bilhete",
+        "pause": "Pausar a IA neste ticket",
         "unpause": "Retomar",
         "banner": "Automatização de IA pausada por {{name}} em {{date}}",
         "bannerNoName": "Automatização de IA pausada desde {{date}}",
-        "hint": "A resposta automática, a triagem e os resumos automáticos estão desligados neste bilhete. As funções manuais de IA continuam a funcionar.",
+        "hint": "A resposta automática, a triagem e os resumos automáticos estão desligados neste ticket. As funções manuais de IA continuam a funcionar.",
         "error": "Não foi possível alterar a pausa da IA. Tente novamente."
       },
       "resumeButton": "Retomar a IA",
@@ -630,12 +630,12 @@
         "savedLabel": "Instruções guardadas",
         "removeSaved": "Remover instrução guardada",
         "instructionLabel": "A sua instrução para o resumo",
-        "placeholder": "p. ex. Resuma este bilhete para um funcionário da administração, explique o bloqueio sem jargão e inclua uma cronologia.",
+        "placeholder": "p. ex. Resuma este ticket para um funcionário da administração, explique o bloqueio sem jargão e inclua uma cronologia.",
         "run": "Resumir",
         "save": "Guardar como modelo",
         "saved": "Guardado",
         "hint": "Não é guardado · ⌘/Ctrl+Enter",
-        "running": "A criar o resumo – isto pode demorar um minuto em bilhetes longos.",
+        "running": "A criar o resumo – isto pode demorar um minuto em tickets longos.",
         "resultLabel": "Resumo personalizado",
         "copy": "Copiar",
         "copied": "Copiado"
@@ -650,8 +650,8 @@
         "budget_tokens_day": "Não respondido automaticamente ({{dateTime}}): o orçamento diário de tokens desta fila está esgotado.",
         "queue_rate_limit": "Não respondido automaticamente ({{dateTime}}): a fila atingiu o limite horário de respostas automáticas.",
         "global_rate_limit": "Não respondido automaticamente ({{dateTime}}): o limite horário global de respostas automáticas foi atingido.",
-        "max_auto_replies": "Não respondido automaticamente ({{dateTime}}): foi atingido o número máximo de respostas automáticas deste bilhete.",
-        "max_clarifications": "Não respondido automaticamente ({{dateTime}}): foi atingido o número máximo de perguntas de esclarecimento deste bilhete.",
+        "max_auto_replies": "Não respondido automaticamente ({{dateTime}}): foi atingido o número máximo de respostas automáticas deste ticket.",
+        "max_clarifications": "Não respondido automaticamente ({{dateTime}}): foi atingido o número máximo de perguntas de esclarecimento deste ticket.",
         "llm_unavailable": "Não respondido automaticamente ({{dateTime}}): nenhum modelo de IA disponível (fornecedor desativado ou orçamento de custos esgotado).",
         "other": "Não respondido automaticamente ({{dateTime}}).",
         "manualHint": "Ainda pode criar um rascunho de IA manualmente."
@@ -679,7 +679,7 @@
       "lock": "Bloquear",
       "unlock": "Desbloquear",
       "fields": "Campos livres",
-      "historyView": "História",
+      "historyView": "Histórico",
       "link": "Ligação",
       "merge": "Mesclar",
       "appointment": "Novo compromisso",
@@ -725,7 +725,7 @@
       }
     },
     "similar": {
-      "title": "Ingressos semelhantes",
+      "title": "Tickets semelhantes",
       "empty": "Nenhum ticket fechado semelhante foi encontrado.",
       "loadError": "Não foi possível carregar tickets semelhantes.",
       "short": "Semelhantes"
@@ -812,8 +812,8 @@
       "label": "Origem",
       "search": "Pesquisa «{{query}}»",
       "position": "{{index}} / {{total}}",
-      "prev": "Bilhete anterior na lista",
-      "next": "Bilhete seguinte na lista"
+      "prev": "Ticket anterior na lista",
+      "next": "Ticket seguinte na lista"
     },
     "stateGroup": {
       "pending": "Pendente",
@@ -888,18 +888,18 @@
         "buttonsPresetInsert": "Modelo: Problema resolvido? Sim / Não",
         "buttonActionResolveYes": "fecha",
         "buttonActionResolveNo": "reabre",
-        "buttonsHintResolve": "Se o cliente tocar em «Sim», o bilhete é fechado; «Não» mantém-no aberto. Não precisa de o fechar.",
+        "buttonsHintResolve": "Se o cliente tocar em «Sim», o ticket é fechado; «Não» mantém-no aberto. Não precisa de o fechar.",
         "buttonsHintFree": "Os botões livres voltam como uma resposta normal do cliente.",
         "buttonsHintEmpty": "Ainda sem botões – sem botões a mensagem sai normalmente.",
         "sendOptions": "Opções de envio",
         "sendKeep": "Enviar",
-        "sendKeepHint": "O bilhete mantém-se como está",
+        "sendKeepHint": "O ticket mantém-se como está",
         "sendPending": "Enviar e aguardar",
-        "sendPendingHint": "O bilhete aguarda uma resposta até à data",
+        "sendPendingHint": "O ticket aguarda uma resposta até à data",
         "sendClosed": "Enviar e fechar",
-        "sendClosedHint": "O bilhete é fechado com sucesso",
+        "sendClosedHint": "O ticket é fechado com sucesso",
         "snippetsEmptyTitle": "Não há modelos de chat para esta fila",
-        "snippetsEmptyBody": "Os modelos são respostas pré-definidas do tipo «Chat» atribuídas à fila do bilhete.",
+        "snippetsEmptyBody": "Os modelos são respostas pré-definidas do tipo «Chat» atribuídas à fila do ticket.",
         "snippetsEmptyLink": "Gerir modelos"
       }
     },
@@ -1005,13 +1005,13 @@
   "search": {
     "title": "Pesquisar",
     "archivedBadge": "Arquivado",
-    "placeholder": "Pesquisar ingressos…",
+    "placeholder": "Pesquisar tickets…",
     "commandHint": "Pesquise ou comande…",
     "submit": "Pesquisar",
     "hint": "Insira um número de ticket, assunto ou corpo do texto.",
     "results": "{{total}} resultados para “{{query}}”",
-    "noResults": "Não há ingressos correspondentes.",
-    "groupTickets": "Ingressos",
+    "noResults": "Não há tickets correspondentes.",
+    "groupTickets": "Tickets",
     "groupKb": "Base de conhecimento",
     "smart": {
       "placeholder": "Pesquisa – ou fila:, proprietário:, status:, cliente:, de:, para: …",
@@ -1030,13 +1030,13 @@
     },
     "detect": {
       "kind": {
-        "ticket": "Número do bilhete",
+        "ticket": "Número do ticket",
         "email": "E-mail",
         "date": "Data"
       },
       "hint": {
-        "ticket": "Número de bilhete exato – a correspondência direta aparece primeiro.",
-        "email": "Pesquisa o endereço de contacto do bilhete.",
+        "ticket": "Número de ticket exato – a correspondência direta aparece primeiro.",
+        "email": "Pesquisa o endereço de contacto do ticket.",
         "date": "Pesquisado como texto."
       },
       "offersLabel": "Também possível",
@@ -1095,7 +1095,7 @@
   "newTicket": {
     "new": "Novo",
     "chooseQueue": "Escolha a fila",
-    "title": "Novo ingresso",
+    "title": "Novo ticket",
     "intro": "Abra um ticket em nome de um cliente.",
     "queue": "Fila",
     "noQueues": "Nenhuma fila disponível",
@@ -1107,10 +1107,10 @@
     "message": "Mensagem",
     "validationError": "Preencha fila, assunto, prioridade, estado e mensagem.",
     "submitError": "Não foi possível criar o ticket. Por favor, tente novamente.",
-    "submit": "Criar ingresso",
+    "submit": "Criar ticket",
     "cancel": "Cancelar",
-    "typeEmail": "Bilhete por e-mail",
-    "typePhone": "Bilhete telefônico",
+    "typeEmail": "Ticket por e-mail",
+    "typePhone": "Ticket telefônico",
     "customerSearch": "Pesquisar cliente…",
     "customerSearchHint": "Nome, login ou e-mail — min. 2 caracteres",
     "customerSelected": "Cliente selecionado",
@@ -1121,11 +1121,11 @@
     "directionLabel": "Direção",
     "submitSend": "Criar e enviar",
     "sendError": "O e-mail não pôde ser enviado. O ticket já foi criado. Tente enviar a resposta novamente a partir daí.",
-    "goToTicket": "Ir para o ingresso",
+    "goToTicket": "Ir para o ticket",
     "note": "Nota de chamada",
-    "propsLabel": "Detalhes do bilhete",
-    "queueSourceCustomer": "como o último bilhete de {{name}}",
-    "queueSourceCompany": "como o último bilhete da empresa",
+    "propsLabel": "Detalhes do ticket",
+    "queueSourceCustomer": "como o último ticket de {{name}}",
+    "queueSourceCompany": "como o último ticket da empresa",
     "submitClose": "Registar e fechar",
     "ownerSourceCall": "atendeu a chamada",
     "moreFields": "Mais campos",
@@ -1163,8 +1163,8 @@
     "title": "Portal do cliente",
     "subtitle": "Suporte",
     "nav": {
-      "myTickets": "Meus ingressos",
-      "newTicket": "Novo ingresso",
+      "myTickets": "Meus tickets",
+      "newTicket": "Novo ticket",
       "kb": "Artigos de ajuda",
       "preferences": "Definições"
     },
@@ -1173,7 +1173,7 @@
       "email": "E-mail ou nome de usuário"
     },
     "tickets": {
-      "title": "Meus ingressos",
+      "title": "Meus tickets",
       "unknownState": "desconhecido",
       "updated": "Atualizado {{date}}",
       "stateTabs": {
@@ -1187,7 +1187,7 @@
       "emptyHint": "Precisa de ajuda com alguma coisa? Inicie um novo ticket e entraremos em contato com você."
     },
     "newTicket": {
-      "title": "Novo ingresso",
+      "title": "Novo ticket",
       "intro": "Conte-nos o que está acontecendo e entraremos em contato com você assim que possível.",
       "subject": "Assunto",
       "message": "Mensagem",
@@ -1312,7 +1312,7 @@
         "manual_assist": "Assistência manual",
         "mcp": "MCP",
         "refine": "Refinar texto",
-        "triage": "Encaminhar bilhetes novos para a fila certa"
+        "triage": "Encaminhar tickets novos para a fila certa"
       },
       "providers": {
         "title": "Provedores de LLM",
@@ -1445,7 +1445,7 @@
         "disclosureTextPlaceholder": "Vazio = use o texto padrão global",
         "piiMasking": "Mascaramento de PII",
         "identityMode": {
-          "ticket_customer_id": "Cliente de ingresso",
+          "ticket_customer_id": "Cliente de ticket",
           "clarify_schema": "Esclareça o esquema",
           "off": "Desligado"
         },
@@ -1500,7 +1500,7 @@
         "kbCategoriesEmpty": "Nenhuma categoria disponível.",
         "routingDescription": "O que pertence a esta fila",
         "routingDescriptionPlaceholder": "p. ex. Apoio técnico: ligação, router, bloqueios, conta, Wi-Fi, IPTV, diagnóstico, ativação.",
-        "routingDescriptionHint": "Este texto descreve ESTA fila. É mostrado a OUTRAS filas que a indicam como destino de encaminhamento e, na triagem desta própria fila, como motivo para deixar o bilhete onde está.",
+        "routingDescriptionHint": "Este texto descreve ESTA fila. É mostrado a OUTRAS filas que a indicam como destino de encaminhamento e, na triagem desta própria fila, como motivo para deixar o ticket onde está.",
         "triageTargets": "Filas para as quais esta fila pode encaminhar",
         "triageTargetsNoDescription": "Sem descrição de encaminhamento para: {{queues}}. O modelo só vê o nome da fila, o que torna o encaminhamento muito menos fiável.",
         "triageAutoThreshold": "Mover automaticamente a partir de",
@@ -1558,14 +1558,14 @@
         "allStatuses": "Todos os status",
         "statusOk": "OK",
         "error": "Erro",
-        "ticketSearch": "Bilhete",
-        "ticketSearchPlaceholder": "Número do bilhete ou ID…",
+        "ticketSearch": "Ticket",
+        "ticketSearchPlaceholder": "Número do ticket ou ID…",
         "empty": "Nenhuma solicitação corresponde a esses filtros.",
         "table": {
           "time": "Hora",
           "provider": "Provedor/modelo",
           "feature": "Recurso",
-          "ticket": "Bilhete",
+          "ticket": "Ticket",
           "tokens": "Tokens (entrada/saída)",
           "duration": "Duração",
           "pii": "Informações de identificação pessoal",
@@ -1744,9 +1744,9 @@
           "vision": "Descrever imagens"
         },
         "description": {
-          "agent": "Lê o bilhete e a base de conhecimento e chama ferramentas",
+          "agent": "Lê o ticket e a base de conhecimento e chama ferramentas",
           "final_answer": "Escreve o texto para o cliente a partir do resultado da pesquisa",
-          "triage": "Fila, cliente e nota interna para bilhetes novos",
+          "triage": "Fila, cliente e nota interna para tickets novos",
           "summary": "Resumos automáticos e manuais",
           "refine": "Reformula o rascunho no editor de resposta",
           "vision": "Descreve os anexos de imagem antes das outras tarefas"
@@ -1799,15 +1799,15 @@
         "allowedStateTypes": "Lista separada por vírgula de tipos de estado Znuny permitidos (por exemplo, \"aberto\" ou \"aberto, lembrete pendente\") para a qual a IA pode definir um ticket por meio de update_ticket_fields - aplicado tanto para o nome do estado quanto para o ID numérico do estado. Vazio = padrão apenas \"aberto\" (reabertura permitida, nunca fechamento); uma lista vazia explícita \"[]\" desativa totalmente as alterações de estado.",
         "piiNer": "Detecta nomes de pessoas em texto via spaCy NER (alemão + inglês) e os mascara como [NAME_n] antes que o conteúdo chegue ao provedor LLM — além do nome do cliente e dos remetentes. Ativo somente quando o mascaramento de PII está ativado. Os falsos positivos são inofensivos (apenas mais mascaramento).",
         "summaryDetail": "Padrão: parágrafos compactos, 1–2 frases por documento anexado. Detalhado: parágrafos mais completos e de 3 a 5 frases por documento — útil para filas com muitos anexos em PDF.",
-        "enabledRefine": "Mostra o botão «Refinar texto» nos editores de resposta e de novo bilhete. O modelo reescreve apenas o que o agente escreveu; as passagens citadas ficam inalteradas. Nada é guardado nem enviado — o agente vê o resultado no editor e pode anulá-lo. Não é afetado pelo modo de funcionamento.",
-        "enabledTriage": "Corre uma vez na primeira mensagem do bilhete, antes do agente de resposta, e propõe uma fila melhor. Exige um utilizador de serviço, um fornecedor e pelo menos uma fila de destino. Só está disponível no modo de funcionamento tiqora_primary.",
+        "enabledRefine": "Mostra o botão «Refinar texto» nos editores de resposta e de novo ticket. O modelo reescreve apenas o que o agente escreveu; as passagens citadas ficam inalteradas. Nada é guardado nem enviado — o agente vê o resultado no editor e pode anulá-lo. Não é afetado pelo modo de funcionamento.",
+        "enabledTriage": "Corre uma vez na primeira mensagem do ticket, antes do agente de resposta, e propõe uma fila melhor. Exige um utilizador de serviço, um fornecedor e pelo menos uma fila de destino. Só está disponível no modo de funcionamento tiqora_primary.",
         "routingDescription": "A definição mais importante para a qualidade do encaminhamento. Sem ela, uma fila de destino é apresentada ao modelo apenas pelo nome.",
-        "triageTargets": "A lista de permissão é também a autorização: o worker move bilhetes sem verificar a permissão move_into, por isso indique apenas filas a que ele deve chegar.",
-        "triageAutoThreshold": "Confiança necessária para mover o bilhete sem perguntar. 100 significa nunca mover sozinho, apenas propor. Baixe o valor quando os agentes aceitarem propostas suficientes nesse nível de confiança.",
+        "triageTargets": "A lista de permissão é também a autorização: o worker move tickets sem verificar a permissão move_into, por isso indique apenas filas a que ele deve chegar.",
+        "triageAutoThreshold": "Confiança necessária para mover o ticket sem perguntar. 100 significa nunca mover sozinho, apenas propor. Baixe o valor quando os agentes aceitarem propostas suficientes nesse nível de confiança.",
         "triageSuggestThreshold": "Confiança necessária para mostrar uma proposta que um agente pode aceitar. Abaixo disto, não é mostrado nada.",
-        "triageSamples": "Quantas vezes o modelo é consultado por bilhete. A concordância entre amostras é o principal sinal de confiança, por isso 1 desativa-o. Cada amostra é uma chamada LLM separada em cada bilhete novo.",
+        "triageSamples": "Quantas vezes o modelo é consultado por ticket. A concordância entre amostras é o principal sinal de confiança, por isso 1 desativa-o. Cada amostra é uma chamada LLM separada em cada ticket novo.",
         "triageDelayReply": "Definido na fila de DESTINO. Evita que um erro de encaminhamento se torne uma resposta errada, à custa de o cliente não receber resposta de IA ao primeiro e-mail.",
-        "triageCustomerFix": "Quando um e-mail foi encaminhado, usar o remetente original como cliente do bilhete. Só se aplica quando o endereço aparece literalmente na mensagem e corresponde exatamente a um registo de cliente.",
+        "triageCustomerFix": "Quando um e-mail foi encaminhado, usar o remetente original como cliente do ticket. Só se aplica quando o endereço aparece literalmente na mensagem e corresponde exatamente a um registo de cliente.",
         "triageCustomerFixThreshold": "100 significa apenas propor. Um e-mail encaminhado mais do que uma vez fica com 70, porque o remetente original é menos certo."
       },
       "common": {
@@ -1829,7 +1829,7 @@
       "authConfig": {
         "enforceAll": "Força a autenticação de dois fatores (TOTP) para cada conta de agente, independentemente da seleção do grupo e das caixas de seleção por agente abaixo.",
         "enforceGroups": "Além disso, força 2FA para cada agente que seja membro de qualquer grupo marcado aqui — mesmo quando \"Aplicar para todos\" estiver desativado.",
-        "portalEnabled": "Liga ou desliga o portal do cliente para toda a instalação. Quando desligado, a API do portal responde 404, as sessões de cliente em curso deixam de funcionar e a página inicial vai diretamente para o início de sessão do agente. Os registos de clientes e os bilhetes por e-mail não são afetados.",
+        "portalEnabled": "Liga ou desliga o portal do cliente para toda a instalação. Quando desligado, a API do portal responde 404, as sessões de cliente em curso deixam de funcionar e a página inicial vai diretamente para o início de sessão do agente. Os registos de clientes e os tickets por e-mail não são afetados.",
         "sso": "Permite que este agente se autentique por meio do caminho SSO externo/provedor de identidade. Não configura o próprio provedor de SSO — apenas se este agente pode usá-lo.",
         "enforce": "Força 2FA para esta conta de agente individual, independente das configurações globais acima.",
         "reset": "Exclui irreversivelmente a inscrição TOTP do agente e todas as chaves de acesso registradas. O agente deve configurar o 2FA do zero posteriormente – não há estado intermediário suave."
@@ -1874,8 +1874,8 @@
         "timeoutSeconds": "Tempo limite de conexão e resposta em segundos antes que uma tentativa de envio seja abortada e registrada como falha."
       },
       "subjectConfig": {
-        "hook": "A etiqueta que prefixa o número do bilhete no assunto (por exemplo, \"Ticket#\"). Deixado em branco, o gancho configurado pelo próprio Znuny é usado.",
-        "divider": "Caractere(s) entre o gancho e o número do bilhete entre colchetes, por ex. \"Ticket#123\" versus \"Ticket#123\".",
+        "hook": "A etiqueta que prefixa o número do ticket no assunto (por exemplo, \"Ticket#\"). Deixado em branco, o gancho configurado pelo próprio Znuny é usado.",
+        "divider": "Caractere(s) entre o gancho e o número do ticket entre colchetes, por ex. \"Ticket#123\" versus \"Ticket#123\".",
         "subjectFormat": "Onde a tag [Hook#Number] é colocada no assunto: \"Left\" o prefixa, \"Right\" o anexa, \"None\" o omite (as referências de ticket dependem apenas do encadeamento de ID de mensagem)."
       },
       "postmasterFilters": {
@@ -2074,7 +2074,7 @@
       "new": "Novo usuário",
       "login": "Entrar",
       "password": "Senha",
-      "passwordHelp": "Deixe em branco para manter a senha atual.",
+      "passwordHelp": "Deixe em branco para manter a senha atual. Caso contrário, {{min}}–{{max}} caracteres.",
       "passwordMode": "Atribuição de palavra-passe",
       "passwordModeManual": "Definir manualmente",
       "passwordModeAuto": "Convite: enviar ligação por e-mail",
@@ -2187,21 +2187,21 @@
         "tabSecurity": "Segurança de e-mail",
         "introGeneral": "Quem vê a fila e como se chama.",
         "introMail": "Remetente, saudação e assinatura das respostas desta fila.",
-        "introEscalation": "Um bilhete escala quando o tempo acaba sem uma resposta adequada. Vazio ou 0 desliga uma fase. Só contam as horas de expediente.",
-        "groupHint": "Só os agentes deste grupo veem os bilhetes.",
-        "unlockTimeout": "Desbloquear bilhetes bloqueados após",
+        "introEscalation": "Um ticket escala quando o tempo acaba sem uma resposta adequada. Vazio ou 0 desliga uma fase. Só contam as horas de expediente.",
+        "groupHint": "Só os agentes deste grupo veem os tickets.",
+        "unlockTimeout": "Desbloquear tickets bloqueados após",
         "unlockTimeoutHint": "O bloqueio é libertado após este tempo sem atividade. 0 = nunca. Só contam as horas de expediente.",
         "unitMinutesShort": "min",
         "comment": "Comentário",
         "sender": "Remetente",
-        "followUpSection": "Respostas do cliente a bilhetes fechados",
-        "followUpIntro": "O que acontece quando um cliente responde a um bilhete que já está fechado.",
+        "followUpSection": "Respostas do cliente a tickets fechados",
+        "followUpIntro": "O que acontece quando um cliente responde a um ticket que já está fechado.",
         "followUp": "Ao responder",
         "followUpReopen": "Reabrir",
         "followUpReject": "Rejeitar",
-        "followUpNewTicket": "Novo bilhete",
-        "followUpLock": "Bloquear o bilhete para o proprietário",
-        "followUpLockHint": "O bilhete reaberto fica com o proprietário anterior.",
+        "followUpNewTicket": "Novo ticket",
+        "followUpLock": "Bloquear o ticket para o proprietário",
+        "followUpLockHint": "O ticket reaberto fica com o proprietário anterior.",
         "stage": "Fase",
         "stages": {
           "firstResponse": "Primeira resposta",
@@ -2223,7 +2223,7 @@
         "escalationActive_other": "{{count}} fases de escalada ativas",
         "escalationNone": "Nenhuma escalada definida",
         "calendar": "Horário de expediente",
-        "calendarHint": "Calendário para a escalada e o desbloqueio de bilhetes.",
+        "calendarHint": "Calendário para a escalada e o desbloqueio de tickets.",
         "calendarDefault": "Predefinição (24 horas)",
         "calendarN": "Calendário {{n}}",
         "signKey": "Chave de assinatura",
@@ -2311,16 +2311,16 @@
       "title": "Variáveis disponíveis",
       "insertHint": "Clique para inserir na posição do cursor",
       "groups": {
-        "ticket": "Bilhete",
+        "ticket": "Ticket",
         "customer": "Cliente",
         "agent": "Agente",
         "queue": "Fila"
       },
       "items": {
-        "ticketNumber": "Número do bilhete",
+        "ticketNumber": "Número do ticket",
         "ticketTitle": "Título",
         "ticketState": "Estado",
-        "ticketQueue": "Fila de ingressos",
+        "ticketQueue": "Fila de tickets",
         "ticketPriority": "Prioridade",
         "customerFirstname": "Nome do cliente",
         "customerLastname": "Sobrenome do cliente",
@@ -2328,8 +2328,8 @@
         "customerWpnum": "Número do cliente (wpnum)",
         "currentFirstname": "Nome do agente conectado",
         "currentLastname": "Sobrenome do agente conectado",
-        "ownerFirstname": "Nome do proprietário do ingresso",
-        "ownerLastname": "Sobrenome do proprietário do ingresso",
+        "ownerFirstname": "Nome do proprietário do ticket",
+        "ownerLastname": "Sobrenome do proprietário do ticket",
         "queueName": "Nome da fila",
         "configuredQueueVar": "Variável de fila configurada ({name})"
       },
@@ -2518,7 +2518,7 @@
       "scopesRw": "RW",
       "scopesCustomEmpty": "Selecione pelo menos uma área ou mude para irrestrita.",
       "areas": {
-        "tickets": "Ingressos/filas/pesquisa",
+        "tickets": "Tickets/filas/pesquisa",
         "customers": "Clientes",
         "kb": "Base de conhecimento",
         "calendar": "Calendário",
@@ -2599,7 +2599,7 @@
     },
     "telegram": {
       "title": "Telegram",
-      "description": "Ligue um bot Telegram como canal de bilhetes de entrada e saída.",
+      "description": "Ligue um bot Telegram como canal de tickets de entrada e saída.",
       "enabled": "Canal ativo",
       "mode": "Modo",
       "modePolling": "Polling",
@@ -2655,7 +2655,7 @@
       "refreshSuccess": "Token atualizado."
     },
     "subjectConfig": {
-      "title": "Número do bilhete no assunto",
+      "title": "Número do ticket no assunto",
       "description": "Prefixo e posição do número do ticket nos assuntos dos e-mails enviados. Limpar um campo herda novamente o valor Znuny SysConfig ativo.",
       "enabled": "Adicionar gancho aos assuntos de saída",
       "hook": "Prefixo de gancho",
@@ -2735,7 +2735,7 @@
       },
       "search": {
         "available": "disponível",
-        "tickets": "Ingressos",
+        "tickets": "Tickets",
         "kb": "Base de conhecimento",
         "indexSize": "Tamanho do índice",
         "unavailable": "inacessível"
@@ -2856,7 +2856,7 @@
       "time": "Hora",
       "fromTo": "De → Para",
       "subject": "Assunto",
-      "ticket": "Bilhete",
+      "ticket": "Ticket",
       "queue": "Fila",
       "duration": "Duração",
       "detail": "Detalhe",
@@ -2966,7 +2966,7 @@
     },
     "customerLinks": {
       "title_plural": "Ligações externas de cliente",
-      "intro": "Configure um segundo botão no cabeçalho do bilhete, definido por fila, que liga a uma ferramenta externa de gestão de clientes.",
+      "intro": "Configure um segundo botão no cabeçalho do ticket, definido por fila, que liga a uma ferramenta externa de gestão de clientes.",
       "new": "Nova ligação",
       "queue": "Queue",
       "label": "Etiqueta do botão",
@@ -3038,8 +3038,8 @@
       },
       "activity": {
         "all": "Todos",
-        "noTickets": "Sem ingressos",
-        "noOpenTickets": "Apenas fechado (sem ingressos abertos)",
+        "noTickets": "Sem tickets",
+        "noOpenTickets": "Apenas fechado (sem tickets abertos)",
         "inactiveSince": "Inativo desde…"
       },
       "validity": {
@@ -3100,7 +3100,7 @@
       "impact": {
         "anonymizeTitle": "Colunas que serão anonimizadas:",
         "deleteTitle": "O que será excluído:",
-        "deleteBody": "Tabelas: {{tables}}. O conteúdo do ingresso/artigo é anonimizado e não removido."
+        "deleteBody": "Tabelas: {{tables}}. O conteúdo do ticket/artigo é anonimizado e não removido."
       },
       "confirmTitle": "Confirmar trabalho do GDPR",
       "confirmAnonymizeBody": "Anonimizar {{count}} usuários clientes? Um backup será criado.",
@@ -3166,7 +3166,7 @@
       "queueTemplates": "Atribua modelos às filas em que estão disponíveis.",
       "queueAutoResponses": "Atribua respostas automáticas às filas que as acionam.",
       "queueVariables": "Mantenha variáveis de espaço reservado para filas.",
-      "queueCustomerLinks": "Configurar, por fila, o botão da ferramenta externa de cliente mostrado no cabeçalho do bilhete.",
+      "queueCustomerLinks": "Configurar, por fila, o botão da ferramenta externa de cliente mostrado no cabeçalho do ticket.",
       "states": "Gerencie os estados dos tickets e sua lógica de estado.",
       "priorities": "Gerencie as prioridades dos tickets.",
       "dynamicFields": "Gerencie campos personalizados de tickets e artigos.",
@@ -3180,12 +3180,12 @@
       "autoResponses": "Gerencie respostas automáticas (por exemplo, confirmação, ausência do escritório).",
       "mailOutbound": "Configure o servidor SMTP de saída e o endereço do remetente.",
       "mailAccounts": "Caixas de correio IMAP/POP de entrada (senha ou OAuth2).",
-      "telegram": "Ligar um bot Telegram como canal de bilhetes.",
+      "telegram": "Ligar um bot Telegram como canal de tickets.",
       "oauth2Tokens": "Configurações de token OAuth2 para correio da Microsoft/Google (compatível com Znuny).",
       "subjectConfig": "Configure o formato do assunto e o gancho do número do ticket.",
       "postmasterFilters": "Manter regras para processamento de correspondência recebida.",
       "genericAgentJobs": "Gerencie trabalhos de automação agendados do GenericAgent.",
-      "webhooks": "Gerencie webhooks de saída para eventos de ingressos.",
+      "webhooks": "Gerencie webhooks de saída para eventos de tickets.",
       "apiKeys": "Gerencie chaves de API para integrações externas.",
       "daemons": "Controle o status e os intervalos dos daemons em segundo plano.",
       "systemInfo": "Visão geral de toda a instalação: versão, serviços, datastores, contêineres e carga.",
@@ -3683,16 +3683,16 @@
       "reset": "Redefinir"
     },
     "tiles": {
-      "total": "Ingressos",
+      "total": "Tickets",
       "escalated": "Escalado",
       "firstResponseBreached": "Primeira resposta atrasada",
       "avgFirstResponse": "Média primeira resposta",
       "avgSolution": "Média tempo de solução"
     },
     "sections": {
-      "volume": "Volume de ingressos",
+      "volume": "Volume de tickets",
       "backlog": "Tendência de pendências",
-      "openSnapshot": "Abrir ingressos",
+      "openSnapshot": "Abrir tickets",
       "agentWorkload": "Carga de trabalho do agente"
     },
     "dimension": {
@@ -3760,7 +3760,7 @@
     },
     "subscribe": "Assine (ICS)",
     "exportIcs": "Exportar .ics",
-    "linkedTickets": "Ingressos vinculados"
+    "linkedTickets": "Tickets vinculados"
   },
   "process": {
     "widget": {
@@ -3858,7 +3858,7 @@
     "saving": "A guardar…",
     "discard": "Descartar chamada",
     "discardConfirm": "Descartar estas notas da chamada? O texto não pode ser recuperado.",
-    "lockedBy": "O bilhete está bloqueado por {{name}} — assuma-o ou peça para o libertar.",
+    "lockedBy": "O ticket está bloqueado por {{name}} — assuma-o ou peça para o libertar.",
     "error": "Não foi possível guardar a chamada.",
     "refineNote": "Estruturar nota",
     "refineNoteHint": "Organiza as notas em assunto, acordado e próximos passos — sem acrescentar factos.",
@@ -3866,12 +3866,12 @@
     "dfNone": "—",
     "dfRequired": "Campos obrigatórios em falta: {{fields}}",
     "callerNumber": "Número de quem liga",
-    "callerHint": "Número de quem liga — os clientes correspondentes e os seus bilhetes abertos aparecem abaixo.",
+    "callerHint": "Número de quem liga — os clientes correspondentes e os seus tickets abertos aparecem abaixo.",
     "callerNoMatch": "Nenhum cliente com este número.",
     "callerMatches": "Clientes correspondentes",
     "useCustomer": "Usar",
-    "openTickets": "Bilhetes abertos deste interlocutor",
-    "logOnTicket": "Registar a chamada neste bilhete",
+    "openTickets": "Tickets abertos deste interlocutor",
+    "logOnTicket": "Registar a chamada neste ticket",
     "pendingUntil": "Pendente até",
     "noCustomerNumber": "Sem número"
   },
@@ -3884,8 +3884,8 @@
     "missed": "Chamada perdida",
     "severalCustomers": "{{count}} clientes correspondentes",
     "unknownNumber": "Número desconhecido",
-    "logOnTicket": "Registar no bilhete",
-    "newTicket": "Novo bilhete telefónico",
+    "logOnTicket": "Registar no ticket",
+    "newTicket": "Novo ticket telefónico",
     "ignore": "Ignorar",
     "close": "Fechar"
   }

@@ -2074,7 +2074,7 @@
       "new": "新規ユーザー",
       "login": "ログイン",
       "password": "パスワード",
-      "passwordHelp": "現在のパスワードを保持するには、空白のままにします。",
+      "passwordHelp": "現在のパスワードを保持するには、空白のままにします。それ以外の場合は{{min}}–{{max}}文字です。",
       "passwordMode": "パスワード設定方法",
       "passwordModeManual": "手動で設定",
       "passwordModeAuto": "招待：セットアップリンクをメール送信",
