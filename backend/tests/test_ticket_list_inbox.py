@@ -395,6 +395,46 @@ async def test_facet_counts(url_fixture: str, request: pytest.FixtureRequest) ->
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_escalated_filter_includes_ai_handoffs(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Prod ticket 43142: the AI handed a Telegram chat to a human, but the
+    queue's "Escalated" chip only knew SLA deadlines and showed 0. A ticket
+    the AI handed over needs a human just as much, so the chip and its
+    filter count it too."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    _seed(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await session.execute(
+                text(
+                    "INSERT INTO tiqora_ai_ticket_state (ticket_id, ai_escalated_at)"
+                    " VALUES (:tid, :t)"
+                ),
+                {"tid": T_OPEN_LOCKED, "t": _t(12)},
+            )
+            await session.commit()
+            ts = TicketService(session)
+
+            assert await _ids(ts, escalated=True) == {T_CLOSED, T_OPEN_OVERDUE, T_OPEN_LOCKED}
+            counts = await ts.facet_counts(AGENT_ID, queue_id=QUEUE_ID)
+            assert counts["flags"]["escalated"] == 3
+            todo = await ts.facet_counts(AGENT_ID, queue_id=QUEUE_ID, state_type="todo")
+            assert todo["flags"]["escalated"] == 2
+    finally:
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM tiqora_ai_ticket_state WHERE ticket_id = :tid"),
+                {"tid": T_OPEN_LOCKED},
+            )
+            await session.commit()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_facets_and_list_routes(mariadb_znuny_url: str) -> None:
     from httpx import ASGITransport, AsyncClient
 

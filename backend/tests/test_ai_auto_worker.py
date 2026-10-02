@@ -497,6 +497,66 @@ async def test_max_auto_replies_cap_blocks_run(
         await engine.dispose()
 
 
+@pytest.mark.parametrize(
+    ("ns", "state_kwargs"),
+    [(81, {"clarification_count": 2}), (82, {"auto_reply_count": 5})],
+)
+async def test_ticket_cap_hands_the_waiting_customer_to_a_human(
+    mariadb_znuny_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    ns: int,
+    state_kwargs: dict[str, int],
+) -> None:
+    """Prod ticket 43142: after two clarifying questions the AI stopped
+    answering ("max_clarifications"), but nothing marked the ticket, so the
+    customer's next messages sat unanswered while the queue's "Escalated"
+    filter showed 0. A per-ticket cap is a handoff: flag it and leave a note."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=ns)
+    article_id = _add_article(
+        mariadb_znuny_url, ticket_id=seed["ticket_id"], sender_type="customer", body="I'm lost"
+    )
+    _insert_outbox_event(
+        mariadb_znuny_url,
+        ticket_id=seed["ticket_id"],
+        event_type="ArticleCreate",
+        article_id=article_id,
+    )
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(session, seed=seed)
+            session.add(TiqoraAiTicketState(ticket_id=seed["ticket_id"], **state_kwargs))
+            await session.commit()
+
+        _patch_llm(monkeypatch, ScriptedLlm([_propose_response("reply", "Should not run.")]))
+        totals = await run_auto_tick(settings=get_settings(), session_factory=factory)
+        assert totals["auto_replies"] == 0
+
+        async with factory() as session:
+            state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
+            assert state is not None
+            assert state.ai_escalated_at is not None
+            notes = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT m.a_body FROM article a"
+                            " JOIN article_data_mime m ON m.article_id = a.id"
+                            " WHERE a.ticket_id = :t AND a.is_visible_for_customer = 0"
+                        ),
+                        {"t": seed["ticket_id"]},
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(notes) == 1
+            assert notes[0].startswith("Escalated to human:")
+    finally:
+        await engine.dispose()
+
+
 async def test_queue_rate_limit_blocks_run(
     mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

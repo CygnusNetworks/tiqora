@@ -49,6 +49,7 @@ from tiqora.ai.gate import AiGateError, require_feature_allowed
 from tiqora.ai.handoff import mark_ai_escalated
 from tiqora.ai.identity import (
     MAX_IDENTITY_ATTEMPTS,
+    claim_mentioned_in,
     get_customer_id_for_login,
     is_identified,
     parse_clarify_schema,
@@ -218,6 +219,9 @@ def _tool_trace_wire(messages: list[LlmMessage]) -> list[dict[str, Any]]:
 
 _TELEGRAM_CHANNEL = "telegram"
 _TYPING_INTERVAL_SECONDS = 4.0
+# Earlier messages of the same chat shown to the identity exchange next to the
+# latest one — enough for one field per message plus some small talk.
+_IDENTITY_EARLIER_MESSAGES = 5
 
 TRIGGER_MANUAL = "manual"
 TRIGGER_AUTO = "auto"
@@ -717,17 +721,20 @@ def _build_identity_system_prompt(
             "support question, and you may NOT reveal any ticket, account, or "
             "personal information. Your only job right now is identity "
             "verification via propose_customer_message:\n"
-            "- If the customer's latest message does not (yet) contain all of the "
-            "fields below, propose kind='clarify' politely asking for them.\n"
-            "- If the customer's latest message already states them, extract the "
+            "- If the customer's messages do not (yet) contain all of the fields "
+            "below, propose kind='clarify' politely asking for the missing ones.\n"
+            "- If the customer's messages already state them, extract the "
             "values into 'identity_claim' (an object keyed by the internal key "
             "below) AND still propose kind='clarify' with a short acknowledgement "
-            "body (e.g. 'Thank you, checking that now.') — never a factual answer.\n\n"
+            "body (e.g. 'Thank you, checking that now.') — never a factual answer.\n"
+            "- Customers often send the fields in separate messages. Combine values "
+            "from the earlier customer messages with the latest one; when a field "
+            "appears more than once, the newer value wins.\n\n"
             f"Required fields:\n{field_lines}"
         ),
     ]
     if failed_attempts:
-        # Only the count: the exchange never sees earlier messages (see
+        # Only the count: the exchange never sees its own earlier replies (see
         # _build_identity_user_message), so it would otherwise greet the
         # customer afresh and ask for values they have just sent.
         parts.append(
@@ -749,22 +756,31 @@ def _build_identity_system_prompt(
     return "\n\n".join(parts)
 
 
-def _build_identity_user_message(articles: list[ArticleSnapshot]) -> str:
+def _build_identity_user_message(articles: list[ArticleSnapshot], chat_id: int | None) -> str:
     """Minimal, structurally-safe context for the identity mini-exchange.
 
     Deliberately NOT :func:`_build_user_message` / ``render_ticket_header`` —
     those include the full article history (incl. internal, agent-only
     notes) and the ticket's current CustomerID/CustomerUser. An unidentified
     Telegram user must not be able to get any of that echoed back via
-    prompt injection; the only thing the model needs to do its job (ask for
-    the configured fields, or extract them from what the customer just
-    wrote) is the latest customer message — nothing else is included, so
-    there is nothing else for a compromised model to leak."""
-    latest_customer_body = next(
-        (a.body or "" for a in reversed(articles) if a.sender_type == "customer"),
-        "",
-    )
-    return f"--- latest customer message ---\n{latest_customer_body}"
+    prompt injection, so the model sees only what this chat itself wrote:
+    the latest customer message plus up to
+    :data:`_IDENTITY_EARLIER_MESSAGES` earlier ones from the same chat
+    (``<chat_id>@telegram.invalid`` sender). The earlier ones are there
+    because customers send the fields one per message (prod ticket 43142)."""
+    customer = [a for a in articles if a.sender_type == "customer"]
+    latest = customer[-1] if customer else None
+    parts: list[str] = []
+    if latest is not None and chat_id is not None:
+        sender = f"<{chat_id}@telegram.invalid>"
+        earlier = [a for a in customer[:-1] if sender in (a.from_address or "")]
+        earlier = earlier[-_IDENTITY_EARLIER_MESSAGES:]
+        if earlier:
+            lines = "\n".join(f"- {a.body or ''}" for a in earlier)
+            parts.append(f"--- earlier customer messages (oldest first) ---\n{lines}")
+    latest_body = (latest.body or "") if latest is not None else ""
+    parts.append(f"--- latest customer message ---\n{latest_body}")
+    return "\n\n".join(parts)
 
 
 def _identity_tool_schema() -> list[dict[str, Any]]:
@@ -966,7 +982,7 @@ async def _run_identity_exchange(
     :class:`AgentRunResult` when the run ends here (drafted/sent/skipped),
     or ``None`` when identity was just confirmed and the caller should
     continue into the normal run (re-loading the ticket snapshot first)."""
-    from tiqora.channels.telegram.outbound import resolve_chat_id
+    from tiqora.channels.telegram.outbound import TelegramDeliveryError, resolve_chat_id
     from tiqora.channels.telegram.texts import telegram_text
 
     ticket_id = ticket.ticket_id
@@ -1010,7 +1026,11 @@ async def _run_identity_exchange(
         failed_attempts=state.identity_attempts or 0,
         reply_language_line=_reply_language_line(language),
     )
-    user_message = _build_identity_user_message(articles)
+    try:
+        chat_id: int | None = await resolve_chat_id(session, ticket_id)
+    except TelegramDeliveryError:
+        chat_id = None  # no chat to attribute earlier messages to: latest only
+    user_message = _build_identity_user_message(articles, chat_id)
     messages: list[LlmMessage] = [
         LlmMessage(role="system", content=system_prompt),
         LlmMessage(role="user", content=user_message),
@@ -1074,6 +1094,25 @@ async def _run_identity_exchange(
     claim_values: dict[str, str] = {}
     if isinstance(identity_claim_raw, dict):
         claim_values = {k: v for k, v in identity_claim_raw.items() if isinstance(v, str)}
+
+    if claim_values and state.identity_attempts:
+        latest_body = next(
+            (a.body or "" for a in reversed(articles) if a.sender_type == "customer"), ""
+        )
+        if not claim_mentioned_in(claim_values, latest_body):
+            # The model sees earlier messages too, so after a failed attempt it
+            # can re-extract the very values that just failed although the
+            # customer only wrote "hello?". Not a new attempt: repeat the
+            # no-match notice instead of burning the last try.
+            claim_values = {}
+            kind = DRAFT_KIND_CLARIFY
+            body = (await telegram_text(session, "identity_no_match_text", language)).replace(
+                "{fields}", ", ".join(f.label for f in fields)
+            )
+            trace_note = (
+                f"Identity check: the latest message added no new value for "
+                f"{_field_labels(fields)}; asked the customer to re-check them."
+            )
 
     if claim_values:
         login = await verify_identity_claim(session, fields, claim_values)

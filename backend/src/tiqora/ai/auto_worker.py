@@ -52,6 +52,7 @@ from tiqora.ai.context import (
     ticket_snapshot,
 )
 from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
+from tiqora.ai.handoff import mark_ai_escalated
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.limits import queue_tokens_used_today
 from tiqora.ai.listfields import parse_str_list
@@ -95,6 +96,8 @@ from tiqora.domain.settings_store import (
     get_setting_int,
     set_setting,
 )
+from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -105,6 +108,10 @@ _BATCH_SIZE = OUTBOX_BATCH_SIZE
 _OutboxEvent = OutboxEvent
 _next_outbox_batch = next_outbox_batch
 _article_sender_type = article_sender_type
+
+# Caps that end automation for one ticket for good (unlike rate limits and
+# budgets, which lift again on their own) — hitting one is a handoff.
+_TICKET_CAP_REASONS = frozenset({"max_clarifications", "max_auto_replies"})
 
 
 async def _global_replies_per_hour_cap(session: AsyncSession) -> int | None:
@@ -152,6 +159,40 @@ async def _record_skip(
         return
     state.auto_skip_reason = reason
     state.auto_skip_at = datetime.now(UTC).replace(tzinfo=None) if reason else None
+    await session.commit()
+
+
+async def _hand_off_capped_ticket(
+    session: AsyncSession, *, ticket_id: int, policy: TiqoraAiQueuePolicy, reason: str
+) -> None:
+    """A per-ticket cap ends automation for this ticket while the customer
+    still waits for an answer: flag the handoff (so the ticket shows up as
+    escalated in the lists) and tell the agents why. Before, the AI just went
+    silent (prod ticket 43142). Later messages skip as ``escalated_to_human``
+    until an agent replies, so this runs once per handoff."""
+    limit = (
+        f"{policy.max_clarifications} clarifying questions"
+        if reason == "max_clarifications"
+        else f"{policy.max_auto_replies} automatic replies"
+    )
+    assert policy.service_user_id is not None  # checked by the caller
+    await add_article(
+        session,
+        ticket_id=ticket_id,
+        article=ArticleIn(
+            sender_type="agent",
+            is_visible_for_customer=False,
+            subject="AI agent escalation",
+            body=(
+                f"Escalated to human: the AI has reached its limit of {limit} on this "
+                "ticket and stops answering. The customer's latest message is unanswered."
+            ),
+            channel="note",
+        ),
+        user_id=policy.service_user_id,
+        sysconfig=SysConfig(session),
+    )
+    await mark_ai_escalated(session, ticket_id)
     await session.commit()
 
 
@@ -326,6 +367,10 @@ async def _process_customer_article_event(
             "ai_auto_worker_cap_skip", ticket_id=ticket_id, queue_id=ticket.queue_id, reason=reason
         )
         await _record_skip(session, state, reason)
+        if reason in _TICKET_CAP_REASONS:
+            await _hand_off_capped_ticket(
+                session, ticket_id=ticket_id, policy=policy, reason=reason
+            )
         return None
 
     # Resolving the agent chain is also the provider-budget pre-check: an
