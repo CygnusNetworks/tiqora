@@ -184,6 +184,16 @@ def _escalation_due_before(deadline: int, cols: Sequence[Any] | None = None) -> 
     return or_(*(and_(col > 0, col < deadline) for col in cols))
 
 
+def _escalated_condition(
+    id_col: Any, ai_escalated_ids: set[int], cols: Sequence[Any] | None = None
+) -> ColumnElement[bool]:
+    """The inbox's "escalated" flag: an SLA deadline has passed, or the AI
+    handed the ticket to a human (``ai_escalated_ids``) — both mean a human
+    has to act now."""
+    sla = _escalation_due_before(int(time.time()), cols)
+    return or_(sla, id_col.in_(ai_escalated_ids)) if ai_escalated_ids else sla
+
+
 #: Last activity of a ticket: its newest article's ``create_time``, or the
 #: ticket's own ``create_time`` when it has no article yet. A correlated
 #: scalar subquery (served by the ``article.ticket_id`` index) rather than a
@@ -382,6 +392,24 @@ class TicketService:
         "deadline": _NEAREST_DEADLINE,
     }
 
+    async def _ai_escalated_ids(self) -> set[int]:
+        """Tickets currently carrying the AI→human handoff flag; empty when
+        the Tiqora-owned table is missing (Znuny-only fixtures)."""
+        try:
+            rows = await self._session.execute(
+                select(TiqoraAiTicketState.ticket_id).where(
+                    TiqoraAiTicketState.ai_escalated_at.is_not(None)
+                )
+            )
+            return set(rows.scalars().all())
+        except DBAPIError:
+            logger.debug(
+                "tiqora_ai_ticket_state query failed (table missing?) — treating as no AI handoffs",
+                exc_info=True,
+            )
+            await self._session.rollback()
+            return set()
+
     async def _filtered_ticket_stmt(
         self,
         user_id: int,
@@ -477,34 +505,15 @@ class TicketService:
                 if unassigned
                 else Ticket.user_id != UNASSIGNED_OWNER_ID
             )
+        ai_ticket_ids = await self._ai_escalated_ids() if escalated or ai_escalated else set()
         if escalated:
-            stmt = stmt.where(_escalation_due_before(int(time.time())))
+            stmt = stmt.where(_escalated_condition(Ticket.id, ai_ticket_ids))
         if escalating_within is not None:
             stmt = stmt.where(_escalation_due_before(int(time.time()) + escalating_within))
         if ai_escalated:
-            try:
-                ai_ticket_ids = (
-                    (
-                        await self._session.execute(
-                            select(TiqoraAiTicketState.ticket_id).where(
-                                TiqoraAiTicketState.ai_escalated_at.is_not(None)
-                            )
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-            except DBAPIError:
-                logger.debug(
-                    "tiqora_ai_ticket_state query failed (table missing?) — treating as no"
-                    " AI handoffs",
-                    exc_info=True,
-                )
-                await self._session.rollback()
-                ai_ticket_ids = []
             if not ai_ticket_ids:
                 return None
-            stmt = stmt.where(Ticket.id.in_(set(ai_ticket_ids)))
+            stmt = stmt.where(Ticket.id.in_(ai_ticket_ids))
         if channel:
             stmt = stmt.where(or_(*(_channel_condition(Ticket.id, c) for c in channel)))
         if state_type is not None:
@@ -1161,8 +1170,9 @@ class TicketService:
                 .all()
             )
             sub = flag_base.subquery()
-            esc = _escalation_due_before(
-                int(time.time()),
+            esc = _escalated_condition(
+                sub.c.id,
+                await self._ai_escalated_ids(),
                 (
                     sub.c.escalation_time,
                     sub.c.escalation_response_time,

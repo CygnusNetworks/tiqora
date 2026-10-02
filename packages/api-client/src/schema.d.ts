@@ -31687,7 +31687,7 @@ export interface operations {
                 locked?: boolean | null;
                 /** @description Tickets watched by this agent user id. */
                 watcher_user_id?: number | null;
-                /** @description True = any escalation_* epoch already in the past. */
+                /** @description True = any escalation_* epoch already in the past, or the AI handed the ticket to a human. */
                 escalated?: boolean | null;
                 /** @description True = AI handed the ticket to a human and a human has not yet taken over. */
                 ai_escalated?: boolean | null;
@@ -31913,7 +31913,7 @@ export interface operations {
                 locked?: boolean | null;
                 /** @description Tickets watched by this agent user id. */
                 watcher_user_id?: number | null;
-                /** @description True = any escalation_* epoch already in the past. */
+                /** @description True = any escalation_* epoch already in the past, or the AI handed the ticket to a human. */
                 escalated?: boolean | null;
                 /** @description True = AI handed the ticket to a human and a human has not yet taken over. */
                 ai_escalated?: boolean | null;

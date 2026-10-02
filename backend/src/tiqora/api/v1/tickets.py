@@ -371,7 +371,11 @@ async def list_tickets(
     ),
     watcher_user_id: int | None = Query(None, description="Tickets watched by this agent user id."),
     escalated: bool | None = Query(
-        None, description="True = any escalation_* epoch already in the past."
+        None,
+        description=(
+            "True = any escalation_* epoch already in the past, or the AI handed the"
+            " ticket to a human."
+        ),
     ),
     ai_escalated: bool | None = Query(
         None,
@@ -522,7 +526,11 @@ async def ticket_facets(
     ),
     watcher_user_id: int | None = Query(None, description="Tickets watched by this agent user id."),
     escalated: bool | None = Query(
-        None, description="True = any escalation_* epoch already in the past."
+        None,
+        description=(
+            "True = any escalation_* epoch already in the past, or the AI handed the"
+            " ticket to a human."
+        ),
     ),
     ai_escalated: bool | None = Query(
         None,

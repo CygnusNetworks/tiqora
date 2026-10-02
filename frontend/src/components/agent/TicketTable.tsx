@@ -433,11 +433,16 @@ function TicketRow({
     escalationEpochs(ticket),
     ESCALATION_SOON_SECONDS,
   );
+  // An AI handoff waits for a human just like a breached SLA, and the
+  // "Escalated" chip counts both — so the edge marks it the same way.
+  const spineLevel: EscalationLevel = ticket.ai_escalated ? "breached" : escLevel;
   const channel = asTicketChannel(ticket.channel);
   // The edge shows the chat channel (Telegram, web chat) instead of the state
   // colour — the state is in its own column; an escalation still wins.
   const spineColor =
-    escLevel === "none" ? (TICKET_CHANNELS[channel].spineVar ?? stateColorVar(ticket.state)) : undefined;
+    spineLevel === "none"
+      ? (TICKET_CHANNELS[channel].spineVar ?? stateColorVar(ticket.state))
+      : undefined;
   const nearest = nearestEscalation(ticket);
   const isSelected = selection?.selected.has(ticket.id) ?? false;
   const attachmentCount = ticket.attachment_count ?? 0;
@@ -489,6 +494,15 @@ function TicketRow({
     </span>
   );
 
+  const aiEscalatedBadge = ticket.ai_escalated && (
+    <span
+      className="flex-none whitespace-nowrap rounded bg-danger/15 px-1.5 py-px text-[10.5px] font-semibold text-danger"
+      data-testid={`ticket-ai-escalated-badge-${ticket.id}`}
+    >
+      {t("ticket.telegram.aiEscalated")}
+    </span>
+  );
+
   const priorityChip = ticket.priority_id !== NORMAL_PRIORITY_ID && (
     <PriorityChip
       priority={ticket.priority}
@@ -515,7 +529,7 @@ function TicketRow({
       data-testid={`ticket-row-${ticket.id}`}
       className={cn(
         "group relative flex cursor-pointer flex-col gap-1.5 border-b border-hairline py-2.5 pr-4 pl-4 transition-colors duration-100 last:border-b-0 hover:bg-surface-subtle md:grid md:items-center md:gap-3 md:py-2",
-        spineClassName(escLevel),
+        spineClassName(spineLevel),
         isSelected && "bg-accent-dim hover:bg-accent-dim",
         focused && !isSelected && "bg-surface-subtle ring-1 ring-inset ring-accent/40",
       )}
@@ -589,6 +603,7 @@ function TicketRow({
             {ticket.title || "—"}
           </span>
           {escalationBadge}
+          {aiEscalatedBadge}
           {priorityChip}
           {locked && (
             <span

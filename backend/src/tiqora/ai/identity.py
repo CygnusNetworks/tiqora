@@ -161,6 +161,16 @@ async def verify_identity_claim(
     return None
 
 
+def claim_mentioned_in(values: dict[str, str], message: str) -> bool:
+    """True if ``message`` contains at least one claimed value, compared like
+    :func:`verify_identity_claim` (case and :data:`_CLAIM_SEPARATORS` ignored)."""
+    haystack = _normalize_claim_value(message)
+    return any(
+        len(needle) >= MIN_CLAIM_VALUE_LENGTH and needle in haystack
+        for needle in (_normalize_claim_value(v) for v in values.values())
+    )
+
+
 def _normalize_claim_value(value: str) -> str:
     normalized = value.lower()
     for sep in _CLAIM_SEPARATORS:
@@ -189,6 +199,7 @@ __all__ = [
     "MAX_IDENTITY_ATTEMPTS",
     "MIN_CLAIM_VALUE_LENGTH",
     "ClarifySchemaField",
+    "claim_mentioned_in",
     "get_customer_id_for_login",
     "get_customer_user_columns",
     "is_identified",

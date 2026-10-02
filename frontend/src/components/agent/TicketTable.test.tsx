@@ -93,6 +93,14 @@ describe("TicketTable state display", () => {
     expect(screen.queryByTestId("ticket-new-badge-11")).toBeNull();
   });
 
+  it("marks a ticket the AI handed to a human", async () => {
+    await renderTable([makeItem(), makeItem({ id: 12, ai_escalated: true })]);
+    expect(await screen.findByTestId("ticket-ai-escalated-badge-12")).toHaveTextContent(
+      "AI handed over to team",
+    );
+    expect(screen.queryByTestId("ticket-ai-escalated-badge-11")).toBeNull();
+  });
+
   it("shows a soft-chip for non-new states with the same chip markup", async () => {
     await renderTable([
       makeItem({

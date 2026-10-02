@@ -61152,7 +61152,7 @@
             }
           },
           {
-            "description": "True = any escalation_* epoch already in the past.",
+            "description": "True = any escalation_* epoch already in the past, or the AI handed the ticket to a human.",
             "in": "query",
             "name": "escalated",
             "required": false,
@@ -61165,7 +61165,7 @@
                   "type": "null"
                 }
               ],
-              "description": "True = any escalation_* epoch already in the past.",
+              "description": "True = any escalation_* epoch already in the past, or the AI handed the ticket to a human.",
               "title": "Escalated"
             }
           },
@@ -62124,7 +62124,7 @@
             }
           },
           {
-            "description": "True = any escalation_* epoch already in the past.",
+            "description": "True = any escalation_* epoch already in the past, or the AI handed the ticket to a human.",
             "in": "query",
             "name": "escalated",
             "required": false,
@@ -62137,7 +62137,7 @@
                   "type": "null"
                 }
               ],
-              "description": "True = any escalation_* epoch already in the past.",
+              "description": "True = any escalation_* epoch already in the past, or the AI handed the ticket to a human.",
               "title": "Escalated"
             }
           },
