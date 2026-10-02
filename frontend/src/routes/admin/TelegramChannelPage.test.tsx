@@ -121,6 +121,23 @@ describe("TelegramChannelPage", () => {
     expect(config.consent_required).toBe("1");
   });
 
+  it("saves the bot texts, empty ones as empty (= built-in default)", async () => {
+    getChannel.mockResolvedValue(pollingConfig());
+    updateChannel.mockResolvedValue(pollingConfig());
+    renderPage();
+
+    const handoff = await screen.findByTestId("telegram-text-identity_handoff_text");
+    fireEvent.change(handoff, { target: { value: "Ich gebe dich ans Team weiter." } });
+    fireEvent.click(screen.getByTestId("telegram-save"));
+
+    await waitFor(() => expect(updateChannel).toHaveBeenCalled());
+    const config = (updateChannel.mock.calls[0] as [string, { config: Record<string, string> }])[1]
+      .config;
+    expect(config.identity_handoff_text).toBe("Ich gebe dich ans Team weiter.");
+    expect(config.tone_prompt).toBe("");
+    expect(config.identity_no_match_text).toBe("");
+  });
+
   it("calls telegramWebhookRegister when the register button is clicked", async () => {
     getChannel.mockResolvedValue(pollingConfig({ mode: "webhook" }));
     telegramWebhookRegister.mockResolvedValue({ ok: true, url: "https://example.com/hook" });

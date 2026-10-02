@@ -1033,6 +1033,20 @@ describe("ReplyDialog: state after sending (Danach)", () => {
     expect(createArticle.mock.calls[0][1]).not.toHaveProperty("state_id");
   });
 
+  it("defaults to waiting on a closed ticket, and the agent's own pick sticks", async () => {
+    getTicket.mockResolvedValue({ id: 1, permissions: perms(true), state_type: "closed" });
+    open();
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-next-pending")).toHaveAttribute("aria-pressed", "true"),
+    );
+    fireEvent.click(screen.getByTestId("reply-next-keep"));
+    expect(screen.getByTestId("reply-next-keep")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByTestId("reply-next-pending"));
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(createArticle.mock.calls[0][1]).toMatchObject({ state_id: 6 });
+  });
+
   it("closes successfully in the same request and says so on the button", async () => {
     open();
     fireEvent.click(await screen.findByTestId("reply-next-closed"));

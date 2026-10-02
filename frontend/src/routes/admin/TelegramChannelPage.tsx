@@ -12,6 +12,29 @@ const CHANNEL = "telegram";
 
 type TelegramMode = "polling" | "webhook";
 
+/** Bot texts that fall back to a built-in English/German default (picked by
+ * the customer's language, backend channels/telegram/texts.py) when empty. */
+const TEXT_FIELDS = [
+  { key: "start_text", label: "admin.telegram.startText", help: "admin.telegram.startTextHelp", rows: 2 },
+  { key: "tone_prompt", label: "admin.telegram.tonePrompt", help: "admin.telegram.tonePromptHelp", rows: 3 },
+  { key: "consent_button_label", label: "admin.telegram.consentButtonLabel", help: null, rows: 1 },
+  {
+    key: "identity_no_match_text",
+    label: "admin.telegram.identityNoMatchText",
+    help: "admin.telegram.identityNoMatchTextHelp",
+    rows: 2,
+  },
+  { key: "identity_handoff_text", label: "admin.telegram.identityHandoffText", help: null, rows: 2 },
+] as const;
+type TextKey = (typeof TEXT_FIELDS)[number]["key"];
+const emptyTexts = (): Record<TextKey, string> => ({
+  start_text: "",
+  tone_prompt: "",
+  consent_button_label: "",
+  identity_no_match_text: "",
+  identity_handoff_text: "",
+});
+
 type FormState = {
   enabled: boolean;
   mode: TelegramMode;
@@ -23,6 +46,7 @@ type FormState = {
   consent_required: boolean;
   consent_text: string;
   consent_confirmed_text: string;
+  texts: Record<TextKey, string>;
 };
 
 const emptyForm: FormState = {
@@ -36,6 +60,7 @@ const emptyForm: FormState = {
   consent_required: true,
   consent_text: "",
   consent_confirmed_text: "",
+  texts: emptyTexts(),
 };
 
 function toForm(row: ChannelConfigOut): FormState {
@@ -51,6 +76,10 @@ function toForm(row: ChannelConfigOut): FormState {
     consent_required: (c.consent_required ?? "1") !== "0",
     consent_text: c.consent_text ?? "",
     consent_confirmed_text: c.consent_confirmed_text ?? "",
+    texts: Object.fromEntries(TEXT_FIELDS.map((f) => [f.key, c[f.key] ?? ""])) as Record<
+      TextKey,
+      string
+    >,
   };
 }
 
@@ -138,6 +167,7 @@ export function TelegramChannelPage() {
         consent_required: form.consent_required ? "1" : "0",
         consent_text: form.consent_text,
         consent_confirmed_text: form.consent_confirmed_text,
+        ...form.texts,
       },
     };
     saveM.mutate(body);
@@ -332,6 +362,26 @@ export function TelegramChannelPage() {
               className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink"
             />
           </label>
+        </div>
+
+        <div className="space-y-3 rounded-md border border-hairline bg-surface-subtle p-3">
+          <h2 className="text-sm font-semibold text-ink">{t("admin.telegram.textsTitle")}</h2>
+          <p className="text-xs text-muted">{t("admin.telegram.textsHelp")}</p>
+          {TEXT_FIELDS.map((field) => (
+            <label key={field.key} className="block text-sm">
+              <span className="mb-1 block text-muted">{t(field.label)}</span>
+              <textarea
+                data-testid={`telegram-text-${field.key}`}
+                value={form.texts[field.key]}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, texts: { ...f.texts, [field.key]: e.target.value } }))
+                }
+                rows={field.rows}
+                className="w-full rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink"
+              />
+              {field.help ? <span className="mt-1 block text-xs text-muted">{t(field.help)}</span> : null}
+            </label>
+          ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

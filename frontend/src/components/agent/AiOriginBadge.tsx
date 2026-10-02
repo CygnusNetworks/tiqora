@@ -29,8 +29,13 @@ export function AiOriginToggle({
       className="inline-flex"
     >
       {compact ? (
-        <span aria-hidden className="text-[11px]">
-          🤖
+        // A bare 11px 🤖 in the bubble's meta row went unnoticed (agents
+        // assumed Telegram replies had no trace), so it reads as a control:
+        // labelled pill with an open/closed caret.
+        <span className="inline-flex items-center gap-0.5 rounded-full border border-accent/40 bg-accent/10 px-1.5 text-[10.5px] font-semibold leading-4 text-accent hover:bg-accent/20">
+          <span aria-hidden>🤖</span>
+          {t("ticket.ai.originBadge")}
+          <span aria-hidden>{open ? "▴" : "▾"}</span>
         </span>
       ) : (
         <Badge tone="accent">🤖 {t("ticket.ai.originBadge")}</Badge>

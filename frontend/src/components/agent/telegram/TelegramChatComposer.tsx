@@ -16,8 +16,7 @@ import {
   filterSnippets,
   findSlashQuery,
   MAX_MESSAGE_LENGTH,
-  RESOLVED_PRESET_BODY,
-  RESOLVED_PRESET_BUTTONS,
+  resolvedPreset,
   snippetText,
 } from "./chatComposerHelpers";
 import { AttachmentChips, QuoteChip } from "./ComposerChips";
@@ -245,7 +244,7 @@ export function TelegramChatComposer({
 
   // "keep" for a plain send; waiting/closing come from the send menu (or its
   // shortcuts) and apply to this one message only.
-  const submit = (nextState: NextState = "keep") => {
+  const submit = (nextState: NextState = next.defaultNext) => {
     if (!canSend || send.isPending) return;
     if (nextState === "pending" && !pendingDate) return;
     const telegramButtons = buttonsOn ? cleanButtons(buttons) : [];
@@ -313,7 +312,8 @@ export function TelegramChatComposer({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      const wanted: NextState = e.metaKey || e.ctrlKey ? "closed" : e.altKey ? "pending" : "keep";
+      const wanted: NextState =
+        e.metaKey || e.ctrlKey ? "closed" : e.altKey ? "pending" : next.defaultNext;
       // A shortcut for a state the agent may not set sends nothing rather
       // than silently sending with a different outcome.
       if (!nextOptions.includes(wanted)) return;
@@ -341,8 +341,9 @@ export function TelegramChatComposer({
   };
 
   const applyPreset = () => {
-    setButtons(RESOLVED_PRESET_BUTTONS.map((b) => ({ ...b })));
-    if (!body.trim()) setBody(RESOLVED_PRESET_BODY);
+    const preset = resolvedPreset(chat?.customer_language);
+    setButtons(preset.buttons);
+    if (!body.trim()) setBody(preset.body);
   };
 
   const name = chat?.display_name || chat?.username || t("ticket.telegram.composer.customer");
@@ -472,6 +473,7 @@ export function TelegramChatComposer({
         />
         <SendMenuButton
           options={nextOptions}
+          primary={next.defaultNext}
           disabled={!canSend}
           sending={send.isPending}
           pendingDate={pendingDate}
@@ -500,7 +502,7 @@ export function TelegramChatComposer({
               type="button"
               data-testid="tg-composer-retry"
               disabled={!canSend || send.isPending}
-              onClick={() => submit(send.variables?.nextState ?? "keep")}
+              onClick={() => submit(send.variables?.nextState ?? next.defaultNext)}
               className="font-semibold underline disabled:opacity-50"
             >
               {t("ticket.telegram.composer.retry")}

@@ -337,6 +337,7 @@ export function ReplyDialog({
     setMentions([]);
     setTimeUnits("");
     setExtrasFailed([]);
+    nextStateTouched.current = false;
     setNextState("keep");
     onClose();
   };
@@ -349,8 +350,15 @@ export function ReplyDialog({
     options: nextOptions,
     stateIdFor,
     payloadFor: nextStatePayload,
+    defaultNext,
   } = useNextStateOptions(ticketId, open);
   const nextStateId = stateIdFor(nextState);
+  // Follow the default ("Wartend" on a closed ticket) until the agent picks
+  // something themselves; the ticket loads after the dialog opens.
+  const nextStateTouched = useRef(false);
+  useEffect(() => {
+    if (open && !nextStateTouched.current) setNextState(defaultNext);
+  }, [open, defaultNext]);
 
   // PGP / S/MIME for the outgoing mail (nothing shown when both are off).
   const security = useEmailSecurity({
@@ -530,7 +538,10 @@ export function ReplyDialog({
                       type="button"
                       data-testid={`reply-next-${o.key}`}
                       aria-pressed={nextState === o.key}
-                      onClick={() => setNextState(o.key)}
+                      onClick={() => {
+                        nextStateTouched.current = true;
+                        setNextState(o.key);
+                      }}
                       style={{ "--seg": o.color } as React.CSSProperties}
                       className={cn(
                         "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
