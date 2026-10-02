@@ -573,16 +573,11 @@
       "originMarkerTooltip": "Automatisch von der KI gesendet",
       "toolArguments": "Aufgerufen mit",
       "originTraceEmpty": "Für diese Antwort wurden keine Tool-Aufrufe erfasst.",
-      "escalatedBanner": "KI hat um {{dateTime}} an einen Menschen übergeben — die automatische Antwort bleibt aus, bis ein Agent eine kundensichtbare Antwort sendet oder sie hier reaktiviert.",
       "pause": {
-        "pause": "KI für dieses Ticket pausieren",
-        "unpause": "Fortsetzen",
         "banner": "KI-Automatik pausiert von {{name}} am {{date}}",
         "bannerNoName": "KI-Automatik pausiert seit {{date}}",
-        "hint": "Auto-Antwort, Triage und automatische Zusammenfassung sind für dieses Ticket aus. Manuelle KI-Funktionen gehen weiter.",
-        "error": "Die KI-Pause konnte nicht geändert werden. Bitte erneut versuchen."
+        "hint": "Auto-Antwort, Triage und automatische Zusammenfassung sind für dieses Ticket aus. Manuelle KI-Funktionen gehen weiter."
       },
-      "resumeButton": "KI reaktivieren",
       "expand": "Aufklappen",
       "collapse": "Zuklappen",
       "useDraft": "Als Antwort übernehmen",
@@ -1004,6 +999,46 @@
       "noRecipients": "Zum Verschlüsseln einen Empfänger angeben.",
       "checking": "Schlüssel der Empfänger werden geprüft …",
       "required": "Die Queue verlangt Verschlüsselung."
+    },
+    "autopilot": {
+      "title": "KI-Autopilot für dieses Ticket",
+      "pill": {
+        "active": "KI-Autopilot aktiv",
+        "stopped": "KI-Autopilot gestoppt",
+        "handedOver": "An Team übergeben"
+      },
+      "sub": {
+        "queueLimits": "nach Queue-Limits",
+        "grant": "noch {{remaining}} von {{total}} Antworten",
+        "stoppedBy": "von {{name}}"
+      },
+      "reason": {
+        "max_clarifications": "Rückfragen-Limit erreicht",
+        "max_auto_replies": "Antworten-Limit erreicht",
+        "grant_used": "Freigabe aufgebraucht",
+        "escalate_to_human": "KI hat einen Menschen angefordert",
+        "identity": "Identität nicht bestätigt",
+        "unknown": "KI antwortet nicht mehr"
+      },
+      "explain": {
+        "active": "Die KI beantwortet neue Kundennachrichten automatisch.",
+        "stopped": "Die KI reagiert auf diesem Ticket nicht mehr automatisch, bis du sie wieder einschaltest.",
+        "handedOver": "Die KI hat das Ticket an das Team übergeben und antwortet nicht mehr automatisch."
+      },
+      "remaining": "Verbleibend",
+      "remainingOf": "{{remaining}} von {{total}}",
+      "remainingQueue": "Queue-Limits",
+      "stop": "Autopilot stoppen",
+      "stopHint": "Keine automatischen Antworten, keine Triage, keine automatische Zusammenfassung. Entwürfe auf Knopfdruck bleiben möglich.",
+      "startFor": "Wieder einschalten für",
+      "startUnit": "automatische Antworten an den Kunden (Antworten und Rückfragen zählen gleich)",
+      "answerNow": "Sofort auf die offene Kundennachricht antworten",
+      "start_one": "Für {{count}} Antwort einschalten",
+      "start_other": "Für {{count}} Antworten einschalten",
+      "startHint": "Danach übergibt die KI wieder an das Team. Die Queue-Limits gelten in dieser Zeit nicht.",
+      "error": "Der Autopilot konnte nicht geändert werden. Bitte erneut versuchen.",
+      "listStopped": "KI gestoppt",
+      "escalatedInfo": "KI hat um {{dateTime}} an das Team übergeben: {{reason}}. Über den Schalter „KI-Autopilot“ oben lässt sie sich wieder einschalten."
     }
   },
   "search": {

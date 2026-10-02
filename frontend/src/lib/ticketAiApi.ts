@@ -78,7 +78,36 @@ export type AiStateOut = {
   auto_skip_at?: string | null;
   /** Pending triage proposal, only present while its status is "open". */
   triage?: AiTriageOut | null;
+  /** The per-ticket autopilot switch in the ticket header. */
+  autopilot?: AiAutopilotOut | null;
 };
+
+/**
+ * `unavailable`: auto-reply is off in the queue. `stopped`: an agent stopped
+ * it. `handed_over`: the AI gave the ticket to the team (`reason` says why).
+ * `active`: answering, with `grant_*` set while a release of N replies runs.
+ */
+export type AutopilotMode = "active" | "stopped" | "handed_over" | "unavailable";
+
+export type AiAutopilotOut = {
+  mode: AutopilotMode;
+  grant_remaining?: number | null;
+  grant_total?: number | null;
+  by_name?: string | null;
+  since?: string | null;
+  /** `max_clarifications`, `max_auto_replies`, `grant_used`,
+   * `escalate_to_human`, `identity` — only for `handed_over`. */
+  reason?: string | null;
+  /** The newest customer message has no answer yet. */
+  unanswered_customer_message?: boolean;
+};
+
+export type AiAutopilotIn =
+  | { action: "stop" }
+  | { action: "start"; runs: number; answer_latest?: boolean };
+
+/** Largest release one start may grant (backend AUTOPILOT_MAX_RUNS). */
+export const AUTOPILOT_MAX_RUNS = 20;
 
 /**
  * A pending triage proposal. The queue half and the customer half are
@@ -165,6 +194,13 @@ export const ticketAiApi = {
     return api.request<void>("POST", `/api/v1/tickets/${ticketId}/ai/resume`, {
       signal,
     });
+  },
+  autopilot(ticketId: number, body: AiAutopilotIn, signal?: AbortSignal) {
+    return api.request<AiAutopilotOut>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/autopilot`,
+      { body, signal },
+    );
   },
   pause(ticketId: number, signal?: AbortSignal) {
     return api.request<void>("POST", `/api/v1/tickets/${ticketId}/ai/pause`, {

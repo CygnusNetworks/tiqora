@@ -573,16 +573,11 @@
       "originMarkerTooltip": "由 AI 代理自動傳送",
       "toolArguments": "呼叫參數",
       "originTraceEmpty": "此回覆沒有記錄任何工具呼叫。",
-      "escalatedBanner": "AI 已於 {{dateTime}} 轉交給真人，自動回覆將保持關閉，直到服務人員發送客戶可見的回覆，或在此處恢復。",
       "pause": {
-        "pause": "暫停此工單的 AI",
-        "unpause": "恢復",
         "banner": "{{name}} 已於 {{date}} 暫停 AI 自動化",
         "bannerNoName": "AI 自動化自 {{date}} 起暫停",
-        "hint": "此工單的自動回覆、分流和自動摘要已關閉，手動 AI 功能仍可使用。",
-        "error": "無法變更 AI 暫停狀態，請再試一次。"
+        "hint": "此工單的自動回覆、分流和自動摘要已關閉，手動 AI 功能仍可使用。"
       },
-      "resumeButton": "恢復 AI",
       "expand": "展開",
       "collapse": "崩潰",
       "useDraft": "用作回覆",
@@ -1004,6 +999,46 @@
       "noRecipients": "請新增收件者以進行加密。",
       "checking": "正在檢查收件者金鑰…",
       "required": "此佇列要求加密。"
+    },
+    "autopilot": {
+      "title": "AI autopilot for this ticket",
+      "pill": {
+        "active": "AI autopilot on",
+        "stopped": "AI autopilot stopped",
+        "handedOver": "Handed to team"
+      },
+      "sub": {
+        "queueLimits": "within queue limits",
+        "grant": "{{remaining}} of {{total}} replies left",
+        "stoppedBy": "by {{name}}"
+      },
+      "reason": {
+        "max_clarifications": "Clarification limit reached",
+        "max_auto_replies": "Reply limit reached",
+        "grant_used": "Released replies used up",
+        "escalate_to_human": "AI asked for a human",
+        "identity": "Identity not confirmed",
+        "unknown": "AI stopped answering"
+      },
+      "explain": {
+        "active": "The AI answers new customer messages automatically.",
+        "stopped": "The AI no longer acts automatically on this ticket until you switch it back on.",
+        "handedOver": "The AI handed this ticket to the team and no longer answers automatically."
+      },
+      "remaining": "Remaining",
+      "remainingOf": "{{remaining}} of {{total}}",
+      "remainingQueue": "Queue limits",
+      "stop": "Stop autopilot",
+      "stopHint": "No automatic replies, triage or automatic summaries. Drafts on request keep working.",
+      "startFor": "Switch back on for",
+      "startUnit": "automatic replies to the customer (answers and clarifying questions count the same)",
+      "answerNow": "Answer the open customer message right away",
+      "start_one": "Switch on for {{count}} reply",
+      "start_other": "Switch on for {{count}} replies",
+      "startHint": "Afterwards the AI hands the ticket back to the team. Queue limits don't apply meanwhile.",
+      "error": "Could not change the autopilot. Please try again.",
+      "listStopped": "AI stopped",
+      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top."
     }
   },
   "search": {

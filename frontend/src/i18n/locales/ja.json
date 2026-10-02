@@ -573,16 +573,11 @@
       "originMarkerTooltip": "AI エージェントが自動送信",
       "toolArguments": "呼び出し引数",
       "originTraceEmpty": "この返信にはツール呼び出しが記録されていません。",
-      "escalatedBanner": "{{dateTime}} にAIが人へ引き継ぎました。エージェントが顧客に見える返信を送るか、ここで再開するまで自動返信はオフのままです。",
       "pause": {
-        "pause": "このチケットのAIを一時停止",
-        "unpause": "再開",
         "banner": "{{date}} に {{name}} がAI自動化を一時停止しました",
         "bannerNoName": "{{date}} からAI自動化を一時停止中",
-        "hint": "このチケットでは自動返信、トリアージ、自動要約がオフです。手動のAI機能は引き続き使えます。",
-        "error": "AIの一時停止を変更できませんでした。もう一度お試しください。"
+        "hint": "このチケットでは自動返信、トリアージ、自動要約がオフです。手動のAI機能は引き続き使えます。"
       },
-      "resumeButton": "AIを再開",
       "expand": "展開する",
       "collapse": "崩壊する",
       "useDraft": "返信として使用",
@@ -1004,6 +999,46 @@
       "noRecipients": "暗号化するには宛先を追加してください。",
       "checking": "宛先の鍵を確認しています…",
       "required": "このキューでは暗号化が必須です。"
+    },
+    "autopilot": {
+      "title": "AI autopilot for this ticket",
+      "pill": {
+        "active": "AI autopilot on",
+        "stopped": "AI autopilot stopped",
+        "handedOver": "Handed to team"
+      },
+      "sub": {
+        "queueLimits": "within queue limits",
+        "grant": "{{remaining}} of {{total}} replies left",
+        "stoppedBy": "by {{name}}"
+      },
+      "reason": {
+        "max_clarifications": "Clarification limit reached",
+        "max_auto_replies": "Reply limit reached",
+        "grant_used": "Released replies used up",
+        "escalate_to_human": "AI asked for a human",
+        "identity": "Identity not confirmed",
+        "unknown": "AI stopped answering"
+      },
+      "explain": {
+        "active": "The AI answers new customer messages automatically.",
+        "stopped": "The AI no longer acts automatically on this ticket until you switch it back on.",
+        "handedOver": "The AI handed this ticket to the team and no longer answers automatically."
+      },
+      "remaining": "Remaining",
+      "remainingOf": "{{remaining}} of {{total}}",
+      "remainingQueue": "Queue limits",
+      "stop": "Stop autopilot",
+      "stopHint": "No automatic replies, triage or automatic summaries. Drafts on request keep working.",
+      "startFor": "Switch back on for",
+      "startUnit": "automatic replies to the customer (answers and clarifying questions count the same)",
+      "answerNow": "Answer the open customer message right away",
+      "start_one": "Switch on for {{count}} reply",
+      "start_other": "Switch on for {{count}} replies",
+      "startHint": "Afterwards the AI hands the ticket back to the team. Queue limits don't apply meanwhile.",
+      "error": "Could not change the autopilot. Please try again.",
+      "listStopped": "AI stopped",
+      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top."
     }
   },
   "search": {

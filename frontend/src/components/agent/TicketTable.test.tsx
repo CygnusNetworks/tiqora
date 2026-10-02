@@ -101,6 +101,12 @@ describe("TicketTable state display", () => {
     expect(screen.queryByTestId("ticket-ai-escalated-badge-11")).toBeNull();
   });
 
+  it("marks a ticket whose AI autopilot an agent stopped", async () => {
+    await renderTable([makeItem(), makeItem({ id: 12, ai_paused: true })]);
+    expect(await screen.findByTestId("ticket-ai-stopped-badge-12")).toHaveTextContent("AI stopped");
+    expect(screen.queryByTestId("ticket-ai-stopped-badge-11")).toBeNull();
+  });
+
   it("shows a soft-chip for non-new states with the same chip markup", async () => {
     await renderTable([
       makeItem({

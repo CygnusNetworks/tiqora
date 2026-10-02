@@ -6225,6 +6225,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/autopilot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Autopilot Route
+         * @description Stop the AI autopilot on this ticket, or start it again for ``runs``
+         *     automatic replies (optionally answering the open customer message now).
+         *
+         *     Same access rule as pause/resume. Starting needs auto-reply enabled in the
+         *     ticket's queue (409 otherwise). See
+         *     :func:`tiqora.domain.ticket_write_service.start_ai_autopilot`.
+         */
+        post: operations["autopilot_route_api_v1_tickets__ticket_id__ai_autopilot_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/draft": {
         parameters: {
             query?: never;
@@ -7889,6 +7914,53 @@ export interface components {
             /** Subject Type */
             subject_type?: ("group" | "role" | "user") | null;
         };
+        /** AiAutopilotIn */
+        AiAutopilotIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "stop" | "start";
+            /**
+             * Answer Latest
+             * @default false
+             */
+            answer_latest: boolean;
+            /** Runs */
+            runs?: number | null;
+        };
+        /**
+         * AiAutopilotOut
+         * @description The per-ticket AI autopilot as the ticket header's switch shows it.
+         *
+         *     ``mode`` is derived: no auto-reply in the queue → ``unavailable``; else a
+         *     pause → ``stopped``; else a handoff → ``handed_over`` (``reason`` says
+         *     why); else ``active``, with ``grant_*`` set while a release of N replies
+         *     runs. ``by_name``/``since``: who stopped it or granted the release, and
+         *     when (for a handoff only ``since``).
+         */
+        AiAutopilotOut: {
+            /** By Name */
+            by_name?: string | null;
+            /** Grant Remaining */
+            grant_remaining?: number | null;
+            /** Grant Total */
+            grant_total?: number | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "active" | "stopped" | "handed_over" | "unavailable";
+            /** Reason */
+            reason?: string | null;
+            /** Since */
+            since?: string | null;
+            /**
+             * Unanswered Customer Message
+             * @default false
+             */
+            unanswered_customer_message: boolean;
+        };
         /**
          * AiCustomSummaryIn
          * @description The agent's own summary instruction ("für eine Mitarbeiterin der
@@ -8559,6 +8631,7 @@ export interface components {
             auto_skip_at?: string | null;
             /** Auto Skip Reason */
             auto_skip_reason?: string | null;
+            autopilot?: components["schemas"]["AiAutopilotOut"] | null;
             /** Can Summarize */
             can_summarize: boolean;
             /** Drafts */
@@ -14881,6 +14954,11 @@ export interface components {
              * @default false
              */
             ai_escalated: boolean;
+            /**
+             * Ai Paused
+             * @default false
+             */
+            ai_paused: boolean;
             /** Ai Reply Source */
             ai_reply_source?: string | null;
             /**
@@ -15166,6 +15244,11 @@ export interface components {
              * @default false
              */
             ai_escalated: boolean;
+            /**
+             * Ai Paused
+             * @default false
+             */
+            ai_paused: boolean;
             /** Ai Reply Source */
             ai_reply_source?: string | null;
             /**
@@ -32235,6 +32318,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    autopilot_route_api_v1_tickets__ticket_id__ai_autopilot_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiAutopilotIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAutopilotOut"];
                 };
             };
             /** @description Validation Error */

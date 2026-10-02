@@ -336,9 +336,11 @@ async def test_auto_summary_not_due_for_paused_ticket(mariadb_znuny_url: str) ->
 # ---------------------------------------------------------------------------
 
 
-async def test_visible_agent_reply_clears_escalation_but_not_pause(
+async def test_visible_agent_reply_keeps_escalation_and_pause(
     mariadb_znuny_url: str,
 ) -> None:
+    """Neither flag is lifted by an agent's reply any more: both stay until
+    someone switches the autopilot back on (see test_ai_autopilot)."""
     ns = 94
     seed = aw._seed_ticket(mariadb_znuny_url, ns=ns)
     engine = create_async_engine(aw._mysql_async(mariadb_znuny_url))
@@ -369,7 +371,7 @@ async def test_visible_agent_reply_clears_escalation_but_not_pause(
         async with factory() as session:
             state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
             assert state is not None
-            assert state.ai_escalated_at is None
+            assert state.ai_escalated_at is not None
             assert state.ai_paused_at is not None
     finally:
         await engine.dispose()

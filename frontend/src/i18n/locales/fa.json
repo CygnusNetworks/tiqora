@@ -573,16 +573,11 @@
       "originMarkerTooltip": "به‌طور خودکار توسط عامل هوش مصنوعی ارسال شد",
       "toolArguments": "فراخوانی‌شده با",
       "originTraceEmpty": "برای این پاسخ هیچ فراخوانی ابزاری ثبت نشده است.",
-      "escalatedBanner": "هوش مصنوعی در {{dateTime}} کار را به انسان سپرد — پاسخ خودکار خاموش می‌ماند تا کارشناسی پاسخی نمایان برای مشتری بفرستد، یا همین‌جا دوباره روشن شود.",
       "pause": {
-        "pause": "توقف هوش مصنوعی برای این تیکت",
-        "unpause": "ادامه",
         "banner": "خودکارسازی هوش مصنوعی را {{name}} در {{date}} متوقف کرد",
         "bannerNoName": "خودکارسازی هوش مصنوعی از {{date}} متوقف است",
-        "hint": "پاسخ خودکار، تریاژ و خلاصه‌های خودکار برای این تیکت خاموش‌اند. قاتیکت‌های دستی هوش مصنوعی همچنان کار می‌کنند.",
-        "error": "تغییر توقف هوش مصنوعی ممکن نشد. لطفاً دوباره تلاش کنید."
+        "hint": "پاسخ خودکار، تریاژ و خلاصه‌های خودکار برای این تیکت خاموش‌اند. قاتیکت‌های دستی هوش مصنوعی همچنان کار می‌کنند."
       },
-      "resumeButton": "ازسرگیری هوش مصنوعی",
       "expand": "گسترش دهید",
       "collapse": "فرو ریختن",
       "useDraft": "به عنوان پاسخ استفاده کنید",
@@ -1004,6 +999,46 @@
       "noRecipients": "برای رمزنگاری یک گیرنده اضافه کنید.",
       "checking": "در حال بررسی کلیدهای گیرنده…",
       "required": "این صف رمزنگاری را الزامی می‌داند."
+    },
+    "autopilot": {
+      "title": "AI autopilot for this ticket",
+      "pill": {
+        "active": "AI autopilot on",
+        "stopped": "AI autopilot stopped",
+        "handedOver": "Handed to team"
+      },
+      "sub": {
+        "queueLimits": "within queue limits",
+        "grant": "{{remaining}} of {{total}} replies left",
+        "stoppedBy": "by {{name}}"
+      },
+      "reason": {
+        "max_clarifications": "Clarification limit reached",
+        "max_auto_replies": "Reply limit reached",
+        "grant_used": "Released replies used up",
+        "escalate_to_human": "AI asked for a human",
+        "identity": "Identity not confirmed",
+        "unknown": "AI stopped answering"
+      },
+      "explain": {
+        "active": "The AI answers new customer messages automatically.",
+        "stopped": "The AI no longer acts automatically on this ticket until you switch it back on.",
+        "handedOver": "The AI handed this ticket to the team and no longer answers automatically."
+      },
+      "remaining": "Remaining",
+      "remainingOf": "{{remaining}} of {{total}}",
+      "remainingQueue": "Queue limits",
+      "stop": "Stop autopilot",
+      "stopHint": "No automatic replies, triage or automatic summaries. Drafts on request keep working.",
+      "startFor": "Switch back on for",
+      "startUnit": "automatic replies to the customer (answers and clarifying questions count the same)",
+      "answerNow": "Answer the open customer message right away",
+      "start_one": "Switch on for {{count}} reply",
+      "start_other": "Switch on for {{count}} replies",
+      "startHint": "Afterwards the AI hands the ticket back to the team. Queue limits don't apply meanwhile.",
+      "error": "Could not change the autopilot. Please try again.",
+      "listStopped": "AI stopped",
+      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top."
     }
   },
   "search": {

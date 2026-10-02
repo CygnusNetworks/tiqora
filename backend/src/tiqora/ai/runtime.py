@@ -264,6 +264,9 @@ class AgentRunResult:
     notes: str | None = None
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    # The run only asked for identity data (clarify_schema exchange); it does
+    # not use a reply of an autopilot release (tiqora.ai.auto_worker).
+    identity_check: bool = False
 
 
 def _map_customer_message(*, trigger: str, autonomy: str, kind: str) -> str:
@@ -890,6 +893,7 @@ async def _dispatch_identity_message(
             draft_id=draft.id,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
+            identity_check=True,
         )
 
     from tiqora.channels.telegram.outbound import deliver_agent_telegram_reply
@@ -921,6 +925,7 @@ async def _dispatch_identity_message(
         article_id=article_id,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
+        identity_check=True,
     )
 
 
@@ -1007,7 +1012,7 @@ async def _run_identity_exchange(
         )
         state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
         await session.commit()
-        return AgentRunResult(status=STATUS_DRAFTED, draft_id=draft.id)
+        return AgentRunResult(status=STATUS_DRAFTED, draft_id=draft.id, identity_check=True)
 
     identity_llm = AuditingLlmClient(
         llm, settings=settings, context=audit_context, session=session, pii_mapper=PiiMapper()
@@ -1247,7 +1252,7 @@ async def _hand_off_unidentified(
         user_id=actor_user_id,
         sysconfig=sysconfig,
     )
-    await mark_ai_escalated(session, ticket.ticket_id)
+    await mark_ai_escalated(session, ticket.ticket_id, reason="identity")
     state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
     await session.commit()
     return AgentRunResult(
@@ -1870,7 +1875,7 @@ async def run_ticket_agent(
             )
 
         if outcome.escalate_reason is not None:
-            await mark_ai_escalated(session, ticket_id)
+            await mark_ai_escalated(session, ticket_id, reason="escalate_to_human")
             state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
             await session.commit()
             return AgentRunResult(

@@ -502,6 +502,15 @@ function TicketRow({
       {t("ticket.telegram.aiEscalated")}
     </span>
   );
+  // A stopped autopilot is easy to forget; the list keeps it visible.
+  const aiStoppedBadge = ticket.ai_paused && !ticket.ai_escalated && (
+    <span
+      className="flex-none whitespace-nowrap rounded bg-surface-subtle px-1.5 py-px text-[10.5px] font-semibold text-muted"
+      data-testid={`ticket-ai-stopped-badge-${ticket.id}`}
+    >
+      {t("ticket.autopilot.listStopped")}
+    </span>
+  );
 
   const priorityChip = ticket.priority_id !== NORMAL_PRIORITY_ID && (
     <PriorityChip
@@ -604,6 +613,7 @@ function TicketRow({
           </span>
           {escalationBadge}
           {aiEscalatedBadge}
+          {aiStoppedBadge}
           {priorityChip}
           {locked && (
             <span

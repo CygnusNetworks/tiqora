@@ -20,8 +20,12 @@ from tiqora.ai.models import TiqoraAiTicketState, TiqoraAiTriage
 logger = structlog.get_logger(__name__)
 
 
-async def mark_ai_escalated(session: AsyncSession, ticket_id: int) -> None:
-    """Set ``ai_escalated_at`` if it is not already set. Does not commit.
+async def mark_ai_escalated(
+    session: AsyncSession, ticket_id: int, *, reason: str | None = None
+) -> None:
+    """Set ``ai_escalated_at`` (and ``reason``) if it is not already set, and
+    end any autopilot release: a handoff hands the ticket to the team, so N
+    remaining automatic replies must not resume after it. Does not commit.
 
     Creates the per-ticket state row when missing, but unlike
     :func:`tiqora.ai.context.get_or_create_state` this never commits
@@ -42,11 +46,87 @@ async def mark_ai_escalated(session: AsyncSession, ticket_id: int) -> None:
                 await session.flush()
             if state.ai_escalated_at is None:
                 state.ai_escalated_at = datetime.now(UTC).replace(tzinfo=None)
+                state.ai_escalated_reason = reason
+            _clear_grant_fields(state)
     except DBAPIError:
         logger.debug(
             "tiqora_ai_ticket_state write failed (table missing?) — skipping AI handoff mark",
             exc_info=True,
         )
+
+
+def _clear_grant_fields(state: TiqoraAiTicketState) -> None:
+    state.ai_grant_remaining = None
+    state.ai_grant_total = None
+    state.ai_grant_by = None
+    state.ai_grant_at = None
+
+
+_NO_GRANT = {
+    "ai_grant_remaining": None,
+    "ai_grant_total": None,
+    "ai_grant_by": None,
+    "ai_grant_at": None,
+}
+
+
+async def clear_ai_grant(session: AsyncSession, ticket_id: int) -> None:
+    """End an autopilot release (stop, ticket closed). No-op without a row.
+    Does not commit. Also called from the core state-change path, so — like
+    :func:`clear_ai_escalated` — a missing table only undoes this write."""
+    try:
+        async with session.begin_nested():
+            await session.execute(
+                update(TiqoraAiTicketState)
+                .where(TiqoraAiTicketState.ticket_id == ticket_id)
+                .values(**_NO_GRANT)
+                .execution_options(synchronize_session=False)
+            )
+    except DBAPIError:
+        logger.debug(
+            "tiqora_ai_ticket_state write failed (table missing?) — skipping grant clear",
+            exc_info=True,
+        )
+
+
+async def set_ai_grant(session: AsyncSession, ticket_id: int, user_id: int, runs: int) -> None:
+    """Grant ``runs`` automatic replies (replacing any earlier release).
+    Creates the state row when missing, race-safe like :func:`set_ai_paused`.
+    Does not commit."""
+    values = {
+        "ai_grant_remaining": runs,
+        "ai_grant_total": runs,
+        "ai_grant_by": user_id,
+        "ai_grant_at": datetime.now(UTC).replace(tzinfo=None),
+    }
+    stmt = (
+        update(TiqoraAiTicketState)
+        .where(TiqoraAiTicketState.ticket_id == ticket_id)
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+    if (await session.execute(stmt)).rowcount:  # type: ignore[attr-defined]
+        return
+    try:
+        async with session.begin_nested():
+            session.add(TiqoraAiTicketState(ticket_id=ticket_id, **values))
+            await session.flush()
+    except IntegrityError:
+        # The row appeared between our update and the insert.
+        await session.execute(stmt)
+
+
+async def consume_ai_grant(session: AsyncSession, ticket_id: int) -> None:
+    """Use one reply of a running release (never below 0). Does not commit."""
+    await session.execute(
+        update(TiqoraAiTicketState)
+        .where(
+            TiqoraAiTicketState.ticket_id == ticket_id,
+            TiqoraAiTicketState.ai_grant_remaining > 0,
+        )
+        .values(ai_grant_remaining=TiqoraAiTicketState.ai_grant_remaining - 1)
+        .execution_options(synchronize_session=False)
+    )
 
 
 async def clear_ai_escalated(session: AsyncSession, ticket_id: int) -> None:
@@ -61,7 +141,7 @@ async def clear_ai_escalated(session: AsyncSession, ticket_id: int) -> None:
             await session.execute(
                 update(TiqoraAiTicketState)
                 .where(TiqoraAiTicketState.ticket_id == ticket_id)
-                .values(ai_escalated_at=None)
+                .values(ai_escalated_at=None, ai_escalated_reason=None)
             )
     except DBAPIError:
         logger.debug(
@@ -176,10 +256,36 @@ async def ai_escalated_ticket_ids(session: AsyncSession, ticket_ids: list[int]) 
         return set()
 
 
+async def ai_paused_ticket_ids(session: AsyncSession, ticket_ids: list[int]) -> set[int]:
+    """Ids (of ``ticket_ids``) whose AI autopilot an agent stopped — the list
+    shows them, so a forgotten stop does not go unnoticed."""
+    if not ticket_ids:
+        return set()
+    try:
+        rows = await session.execute(
+            select(TiqoraAiTicketState.ticket_id).where(
+                TiqoraAiTicketState.ticket_id.in_(ticket_ids),
+                TiqoraAiTicketState.ai_paused_at.is_not(None),
+            )
+        )
+        return set(rows.scalars().all())
+    except DBAPIError:
+        logger.debug(
+            "tiqora_ai_ticket_state query failed (table missing?) — treating as no pauses",
+            exc_info=True,
+        )
+        await session.rollback()
+        return set()
+
+
 __all__ = [
     "ai_escalated_ticket_ids",
+    "ai_paused_ticket_ids",
     "clear_ai_escalated",
+    "clear_ai_grant",
     "clear_ai_paused",
+    "consume_ai_grant",
     "mark_ai_escalated",
+    "set_ai_grant",
     "set_ai_paused",
 ]

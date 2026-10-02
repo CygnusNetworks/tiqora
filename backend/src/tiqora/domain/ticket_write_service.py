@@ -34,7 +34,13 @@ from typing import TYPE_CHECKING, Any, Final
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.ai.handoff import clear_ai_escalated, clear_ai_paused, set_ai_paused
+from tiqora.ai.handoff import (
+    clear_ai_escalated,
+    clear_ai_grant,
+    clear_ai_paused,
+    set_ai_grant,
+    set_ai_paused,
+)
 from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.db.utf8mb3 import replace_non_bmp
 from tiqora.permissions.engine import PermissionEngine
@@ -217,6 +223,12 @@ async def _emit_event(
 # erasure and its rollback. Not a Znuny event: no notification rule can bind
 # to it, and the outbox drain keeps it away from webhooks and SSE.
 SEARCH_REINDEX_EVENT: Final = "TiqoraSearchReindex"
+
+# Internal outbox event: "answer this customer article now", written when an
+# agent switches the autopilot back on with answer_latest. The AI auto worker
+# treats it like an ArticleCreate for that article; it is not a second
+# ArticleCreate because that would fan out to webhooks and SSE again.
+AI_REPLY_REQUEST_EVENT: Final = "TiqoraAiReplyRequest"
 
 
 # ---------------------------------------------------------------------------
@@ -876,10 +888,9 @@ async def add_article(
     # Without this, field changes propagate but externally-added articles do not.
     await invalidate_ticket_cache(session, ticket_id)
 
-    # A human agent sending a customer-visible reply is the human taking the
-    # ticket back over — clear the AI handoff flag (see tiqora.ai.handoff).
-    if article.sender_type == "agent" and article.is_visible_for_customer:
-        await clear_ai_escalated(session, ticket_id)
+    # A human agent's reply no longer lifts an AI handoff: it stays until
+    # someone switches the autopilot back on (start_ai_autopilot), so the AI
+    # does not quietly pick the conversation up again after a human answered.
 
     return article_id
 
@@ -1023,6 +1034,112 @@ async def unpause_ai_automation(
     )
 
 
+AUTOPILOT_MAX_RUNS: Final = 20
+"""Upper bound for one release (``start_ai_autopilot(runs=…)``)."""
+
+
+async def unanswered_customer_article(
+    session: AsyncSession, ticket_id: int
+) -> tuple[int, str] | None:
+    """``(article_id, channel)`` of the newest customer article when no
+    customer-visible agent article followed it, else ``None``. ``channel`` is
+    the lower-cased communication channel, as the ArticleCreate payload has it."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT a.id, LOWER(cc.name) FROM article a"
+                " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                " LEFT JOIN communication_channel cc ON cc.id = a.communication_channel_id"
+                " WHERE a.ticket_id = :tid AND st.name = 'customer'"
+                " ORDER BY a.id DESC LIMIT 1"
+            ),
+            {"tid": ticket_id},
+        )
+    ).first()
+    if row is None:
+        return None
+    answered = (
+        await session.execute(
+            text(
+                "SELECT 1 FROM article a"
+                " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                " WHERE a.ticket_id = :tid AND a.id > :aid"
+                " AND st.name = 'agent' AND a.is_visible_for_customer = 1 LIMIT 1"
+            ),
+            {"tid": ticket_id, "aid": int(row[0])},
+        )
+    ).first()
+    return None if answered is not None else (int(row[0]), str(row[1] or ""))
+
+
+async def stop_ai_autopilot(
+    session: AsyncSession, *, ticket_id: int, user_id: int, sysconfig: SysConfig
+) -> None:
+    """Stop the AI autopilot on one ticket: the pause of
+    :func:`pause_ai_automation` (one note, idempotent) plus the end of any
+    running release, so a later start begins from a fresh N."""
+    await pause_ai_automation(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+    await clear_ai_grant(session, ticket_id)
+
+
+async def start_ai_autopilot(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+    runs: int,
+    answer_latest: bool = False,
+) -> None:
+    """Switch the AI autopilot back on for ``runs`` automatic replies.
+
+    Lifts a pause and a handoff and grants a release that replaces the
+    queue's per-ticket caps until it is used up (tiqora.ai.auto_worker). With
+    ``answer_latest`` the newest customer article gets one run right away,
+    unless an agent already answered it: its outbox event was consumed while
+    the AI was off, so an internal event asks the worker again and the loop
+    guard is reset for it. Writes one internal note. Does not commit.
+    """
+    if not 1 <= runs <= AUTOPILOT_MAX_RUNS:
+        raise ValueError(f"runs must be between 1 and {AUTOPILOT_MAX_RUNS}")
+    await clear_ai_paused(session, ticket_id)
+    await clear_ai_escalated(session, ticket_id)
+    await set_ai_grant(session, ticket_id, user_id, runs)
+    await add_article(
+        session,
+        ticket_id=ticket_id,
+        article=ArticleIn(
+            sender_type="agent",
+            is_visible_for_customer=False,
+            subject="KI-Autopilot eingeschaltet",
+            body=(
+                f"Der KI-Autopilot wurde für {runs} automatische "
+                f"{'Antwort' if runs == 1 else 'Antworten'} eingeschaltet. "
+                "Danach übergibt die KI wieder an das Team."
+            ),
+            channel="note",
+        ),
+        user_id=user_id,
+        sysconfig=sysconfig,
+    )
+    if not answer_latest:
+        return
+    pending = await unanswered_customer_article(session, ticket_id)
+    if pending is None:
+        return
+    article_id, channel = pending
+    await session.execute(
+        text(
+            "UPDATE tiqora_ai_ticket_state SET last_customer_article_id = NULL"
+            " WHERE ticket_id = :tid AND last_customer_article_id >= :aid"
+        ),
+        {"tid": ticket_id, "aid": article_id},
+    )
+    await _emit_event(
+        session, AI_REPLY_REQUEST_EVENT, ticket_id, {"article_id": article_id, "channel": channel}
+    )
+
+
 # ---------------------------------------------------------------------------
 # Sub-task 3: field mutations
 # ---------------------------------------------------------------------------
@@ -1139,6 +1256,7 @@ async def change_state(
     # — clear the AI handoff flag (see tiqora.ai.handoff).
     if new_state_type.lower() in ("closed", "merged", "removed"):
         await clear_ai_escalated(session, ticket_id)
+        await clear_ai_grant(session, ticket_id)
 
 
 async def change_priority(

@@ -736,6 +736,14 @@ const ticketAiState = {
   summary_body: ticketAiSummary,
   last_summary_upto_article_id: 502,
   summary_created_at: "2026-07-10T10:06:00Z",
+  autopilot: {
+    mode: "active",
+    grant_remaining: 2,
+    grant_total: 3,
+    by_name: "Alex Morgan",
+    since: "2026-07-10T10:07:00Z",
+    unanswered_customer_message: false,
+  },
 };
 
 // A second AI scenario (ticket 108, "Slow database queries") showcasing MCP

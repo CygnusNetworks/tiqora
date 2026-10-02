@@ -129,6 +129,7 @@ function makeTicket(overrides: Partial<TicketListItem> & { id: number }): Ticket
     channel: "email",
     has_ai_summary: false,
     ai_escalated: false,
+    ai_paused: false,
     archive_flag: 0,
     ...overrides,
   };

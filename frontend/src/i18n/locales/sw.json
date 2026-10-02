@@ -573,16 +573,11 @@
       "originMarkerTooltip": "Imetumwa kiotomatiki na wakala wa AI",
       "toolArguments": "Imeitwa na",
       "originTraceEmpty": "Hakuna miito ya zana iliyorekodiwa kwa jibu hili.",
-      "escalatedBanner": "AI ilikabidhi kwa binadamu {{dateTime}} — jibu otomatiki hubaki limezimwa hadi wakala atume jibu linaloonekana kwa mteja, au kulirejesha hapa.",
       "pause": {
-        "pause": "Sitisha AI kwa tikiti hii",
-        "unpause": "Endelea",
         "banner": "Uendeshaji otomatiki wa AI umesitishwa na {{name}} tarehe {{date}}",
         "bannerNoName": "Uendeshaji otomatiki wa AI umesitishwa tangu {{date}}",
-        "hint": "Jibu otomatiki, upangaji wa awali na muhtasari otomatiki vimezimwa kwa tikiti hii. Vipengele vya AI vya mkono vinaendelea kufanya kazi.",
-        "error": "Imeshindikana kubadilisha usitishaji wa AI. Tafadhali jaribu tena."
+        "hint": "Jibu otomatiki, upangaji wa awali na muhtasari otomatiki vimezimwa kwa tikiti hii. Vipengele vya AI vya mkono vinaendelea kufanya kazi."
       },
-      "resumeButton": "Rejesha AI",
       "expand": "Panua",
       "collapse": "Kunja",
       "useDraft": "Tumia kama jibu",
@@ -1004,6 +999,46 @@
       "noRecipients": "Ongeza mpokeaji ili kusimba fiche.",
       "checking": "Inakagua funguo za wapokeaji…",
       "required": "Foleni hii inahitaji usimbaji fiche."
+    },
+    "autopilot": {
+      "title": "AI autopilot for this ticket",
+      "pill": {
+        "active": "AI autopilot on",
+        "stopped": "AI autopilot stopped",
+        "handedOver": "Handed to team"
+      },
+      "sub": {
+        "queueLimits": "within queue limits",
+        "grant": "{{remaining}} of {{total}} replies left",
+        "stoppedBy": "by {{name}}"
+      },
+      "reason": {
+        "max_clarifications": "Clarification limit reached",
+        "max_auto_replies": "Reply limit reached",
+        "grant_used": "Released replies used up",
+        "escalate_to_human": "AI asked for a human",
+        "identity": "Identity not confirmed",
+        "unknown": "AI stopped answering"
+      },
+      "explain": {
+        "active": "The AI answers new customer messages automatically.",
+        "stopped": "The AI no longer acts automatically on this ticket until you switch it back on.",
+        "handedOver": "The AI handed this ticket to the team and no longer answers automatically."
+      },
+      "remaining": "Remaining",
+      "remainingOf": "{{remaining}} of {{total}}",
+      "remainingQueue": "Queue limits",
+      "stop": "Stop autopilot",
+      "stopHint": "No automatic replies, triage or automatic summaries. Drafts on request keep working.",
+      "startFor": "Switch back on for",
+      "startUnit": "automatic replies to the customer (answers and clarifying questions count the same)",
+      "answerNow": "Answer the open customer message right away",
+      "start_one": "Switch on for {{count}} reply",
+      "start_other": "Switch on for {{count}} replies",
+      "startHint": "Afterwards the AI hands the ticket back to the team. Queue limits don't apply meanwhile.",
+      "error": "Could not change the autopilot. Please try again.",
+      "listStopped": "AI stopped",
+      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top."
     }
   },
   "search": {
