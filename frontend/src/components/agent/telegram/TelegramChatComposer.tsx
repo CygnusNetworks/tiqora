@@ -8,7 +8,12 @@ import { useComposerLock } from "@/lib/composerLock";
 import { telegramChatKey, useTelegramChat } from "@/lib/telegramChatApi";
 import { ticketAiApi } from "@/lib/ticketAiApi";
 import { ComposerLockBanner } from "../ComposerLock";
-import { defaultPendingDate, useNextStateOptions, type NextState } from "../replyNextState";
+import {
+  defaultPendingDate,
+  needsDate,
+  useNextStateOptions,
+  type NextState,
+} from "../replyNextState";
 import { ButtonEditor } from "./ButtonEditor";
 import { ChatSnippetPicker } from "./ChatSnippetPicker";
 import {
@@ -75,6 +80,11 @@ export function TelegramChatComposer({
   const ticketLock = useComposerLock(ticketId, "compose", hasContent);
   const next = useNextStateOptions(ticketId, true);
   const nextOptions: NextState[] = next.canSetState ? next.options.map((o) => o.key) : ["keep"];
+  // With "Problem gelöst? Ja/Nein" attached, no answer means solved: the
+  // default becomes auto-close on the date ("Ja" closes, "Nein" reopens).
+  const hasResolveButtons = buttons.some((b) => b.action === "resolve_yes");
+  const primaryNext: NextState =
+    hasResolveButtons && nextOptions.includes("autoclose") ? "autoclose" : next.defaultNext;
   const chat = useTelegramChat(ticketId, true).data ?? null;
   const aiQ = useQuery({
     queryKey: ["tickets", ticketId, "ai"],
@@ -237,16 +247,16 @@ export function TelegramChatComposer({
         setButtons([]);
         setButtonsOn(false);
       }
-      if (sent.nextState === "pending") setPendingDate(defaultPendingDate());
+      if (needsDate(sent.nextState)) setPendingDate(defaultPendingDate());
       inputRef.current?.focus();
     },
   });
 
   // "keep" for a plain send; waiting/closing come from the send menu (or its
   // shortcuts) and apply to this one message only.
-  const submit = (nextState: NextState = next.defaultNext) => {
+  const submit = (nextState: NextState = primaryNext) => {
     if (!canSend || send.isPending) return;
-    if (nextState === "pending" && !pendingDate) return;
+    if (needsDate(nextState) && !pendingDate) return;
     const telegramButtons = buttonsOn ? cleanButtons(buttons) : [];
     send.mutate({
       payload: {
@@ -313,7 +323,7 @@ export function TelegramChatComposer({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       const wanted: NextState =
-        e.metaKey || e.ctrlKey ? "closed" : e.altKey ? "pending" : next.defaultNext;
+        e.metaKey || e.ctrlKey ? "closed" : e.altKey ? "pending" : primaryNext;
       // A shortcut for a state the agent may not set sends nothing rather
       // than silently sending with a different outcome.
       if (!nextOptions.includes(wanted)) return;
@@ -473,7 +483,7 @@ export function TelegramChatComposer({
         />
         <SendMenuButton
           options={nextOptions}
-          primary={next.defaultNext}
+          primary={primaryNext}
           disabled={!canSend}
           sending={send.isPending}
           pendingDate={pendingDate}
@@ -502,7 +512,7 @@ export function TelegramChatComposer({
               type="button"
               data-testid="tg-composer-retry"
               disabled={!canSend || send.isPending}
-              onClick={() => submit(send.variables?.nextState ?? next.defaultNext)}
+              onClick={() => submit(send.variables?.nextState ?? primaryNext)}
               className="font-semibold underline disabled:opacity-50"
             >
               {t("ticket.telegram.composer.retry")}

@@ -7,13 +7,22 @@ import { ticketPerms } from "@/lib/ticket";
  * reply dialog and the Telegram chat composer so both send the same
  * `state_id`/`pending_time` pair.
  */
-export type NextState = "keep" | "pending" | "closed";
+export type NextState = "keep" | "pending" | "autoclose" | "closed";
+
+/** States that take a date: the reminder ("Wartend") or the auto-close day. */
+export function needsDate(next: NextState): boolean {
+  return next === "pending" || next === "autoclose";
+}
 
 /** Choices for the ticket after the reply is sent. `color` is the state colour
  * the segment takes when picked. */
 export const NEXT_STATES: { key: NextState; color: string }[] = [
   { key: "keep", color: "var(--color-state-open)" },
   { key: "pending", color: "var(--color-state-pending)" },
+  // Znuny "pending auto close+": closed successfully on the date unless the
+  // customer answers first (their follow-up reopens it). The natural fit for
+  // "Problem gelöst? Ja/Nein": no answer means it is solved.
+  { key: "autoclose", color: "var(--color-state-pending)" },
   { key: "closed", color: "var(--color-state-new)" },
 ];
 
@@ -51,6 +60,9 @@ export function useNextStateOptions(ticketId: number, enabled: boolean) {
   const pendingState =
     states.find((s) => s.name === "pending reminder") ??
     states.find((s) => s.type_name === "pending reminder");
+  const autoCloseState =
+    states.find((s) => s.name === "pending auto close+") ??
+    states.find((s) => s.type_name === "pending auto");
   const closedState =
     states.find((s) => s.name === "closed successful") ??
     states.find((s) => s.type_name.startsWith("closed"));
@@ -65,10 +77,17 @@ export function useNextStateOptions(ticketId: number, enabled: boolean) {
     (o) =>
       o.key === "keep" ||
       (o.key === "pending" && pendingState) ||
+      (o.key === "autoclose" && autoCloseState) ||
       (o.key === "closed" && closedState),
   );
   const stateIdFor = (next: NextState): number | undefined =>
-    next === "pending" ? pendingState?.id : next === "closed" ? closedState?.id : undefined;
+    next === "pending"
+      ? pendingState?.id
+      : next === "autoclose"
+        ? autoCloseState?.id
+        : next === "closed"
+          ? closedState?.id
+          : undefined;
 
   /** The `state_id`/`pending_time` part of the create-article payload. */
   const payloadFor = (next: NextState, pendingDate: string) => {
@@ -77,7 +96,7 @@ export function useNextStateOptions(ticketId: number, enabled: boolean) {
     return {
       state_id: stateId,
       // 08:00 local on the chosen day — a reminder for the morning.
-      pending_time: next === "pending" ? new Date(`${pendingDate}T08:00`).toISOString() : null,
+      pending_time: needsDate(next) ? new Date(`${pendingDate}T08:00`).toISOString() : null,
     };
   };
 

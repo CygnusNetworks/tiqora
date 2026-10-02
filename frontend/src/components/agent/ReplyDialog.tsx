@@ -31,6 +31,7 @@ import { useRefineReview } from "./useRefineReview";
 import {
   defaultPendingDate,
   todayIso,
+  needsDate,
   useNextStateOptions,
   type NextState,
 } from "./replyNextState";
@@ -555,7 +556,7 @@ export function ReplyDialog({
                     </button>
                   ))}
                 </span>
-                {nextState === "pending" && (
+                {needsDate(nextState) && (
                   <label className="inline-flex items-center gap-1.5 rounded-md bg-[color-mix(in_srgb,var(--color-state-pending)_12%,transparent)] px-2 py-1 text-xs text-[var(--color-state-pending)]">
                     {t("ticket.replyNext.until")}
                     <input
@@ -600,7 +601,7 @@ export function ReplyDialog({
                 variant="primary"
                 size="sm"
                 data-testid="reply-send"
-                disabled={!canSend || (nextState === "pending" && !pendingDate)}
+                disabled={!canSend || (needsDate(nextState) && !pendingDate)}
                 onClick={send}
               >
                 {sendMutation.isPending

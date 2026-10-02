@@ -522,6 +522,21 @@ describe("TelegramChatComposer: quote, buttons, AI", () => {
     ]);
   });
 
+  it("with the resolve preset attached, Enter sends with auto-close on the date", async () => {
+    listReferenceStates.mockResolvedValue([
+      ...STATES,
+      { id: 9, name: "pending auto close+", type_name: "pending auto" },
+    ]);
+    const input = await mount();
+    await waitFor(() => expect(screen.getByTestId("tg-composer-send-menu")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("tg-composer-buttons-toggle"));
+    fireEvent.click(screen.getByTestId("tg-buttons-preset"));
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(lastPayload()).toMatchObject({ state_id: 9 });
+    expect(lastPayload().pending_time).toBeTruthy();
+  });
+
   it("on a closed ticket plain Enter sends and sets the ticket to waiting", async () => {
     getTicket.mockResolvedValue({ id: 1, permissions: perms(true), state_type: "closed" });
     const input = await mount();

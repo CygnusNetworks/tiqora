@@ -46,6 +46,7 @@ type FormState = {
   consent_required: boolean;
   consent_text: string;
   consent_confirmed_text: string;
+  followup_reopen_days: string;
   texts: Record<TextKey, string>;
 };
 
@@ -60,6 +61,7 @@ const emptyForm: FormState = {
   consent_required: true,
   consent_text: "",
   consent_confirmed_text: "",
+  followup_reopen_days: "",
   texts: emptyTexts(),
 };
 
@@ -76,6 +78,7 @@ function toForm(row: ChannelConfigOut): FormState {
     consent_required: (c.consent_required ?? "1") !== "0",
     consent_text: c.consent_text ?? "",
     consent_confirmed_text: c.consent_confirmed_text ?? "",
+    followup_reopen_days: c.followup_reopen_days ?? "",
     texts: Object.fromEntries(TEXT_FIELDS.map((f) => [f.key, c[f.key] ?? ""])) as Record<
       TextKey,
       string
@@ -167,6 +170,7 @@ export function TelegramChannelPage() {
         consent_required: form.consent_required ? "1" : "0",
         consent_text: form.consent_text,
         consent_confirmed_text: form.consent_confirmed_text,
+        followup_reopen_days: form.followup_reopen_days.trim(),
         ...form.texts,
       },
     };
@@ -363,6 +367,20 @@ export function TelegramChannelPage() {
             />
           </label>
         </div>
+
+        <label className="block text-sm">
+          <span className="mb-1 block text-muted">{t("admin.telegram.followupReopenDays")}</span>
+          <input
+            data-testid="telegram-followup-reopen-days"
+            type="number"
+            min={0}
+            placeholder="7"
+            value={form.followup_reopen_days}
+            onChange={(e) => setForm((f) => ({ ...f, followup_reopen_days: e.target.value }))}
+            className="w-28 rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm text-ink"
+          />
+          <span className="mt-1 block text-xs text-muted">{t("admin.telegram.followupReopenDaysHelp")}</span>
+        </label>
 
         <div className="space-y-3 rounded-md border border-hairline bg-surface-subtle p-3">
           <h2 className="text-sm font-semibold text-ink">{t("admin.telegram.textsTitle")}</h2>
