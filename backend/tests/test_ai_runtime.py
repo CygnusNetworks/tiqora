@@ -1772,6 +1772,12 @@ async def test_auto_send_keeps_the_article_when_the_origin_row_fails(
                 enabled_auto_reply=True,
                 allowed_state_types='["open", "closed"]',
             )
+        # The column is MEDIUMTEXT now; narrow it back to TEXT for this run so
+        # the origin INSERT still fails at commit the way it did in production.
+        async with factory() as session:
+            await session.execute(
+                text("ALTER TABLE tiqora_ai_article_origin MODIFY tool_trace_json TEXT NULL")
+            )
         monkeypatch.setattr("tiqora.ai.runtime.encode_tool_trace", lambda trace: "x" * 70_000)
 
         llm = ScriptedLlm([_propose_response("reply", "Antwort trotz kaputtem Trace.")])
@@ -1810,6 +1816,10 @@ async def test_auto_send_keeps_the_article_when_the_origin_row_fails(
         # The auto-state change shared the failed transaction, so it is gone too.
         assert await _ticket_state_id(factory, seed["ticket_id"]) == STATE_NEW_ID
     finally:
+        async with factory() as session:
+            await session.execute(
+                text("ALTER TABLE tiqora_ai_article_origin MODIFY tool_trace_json MEDIUMTEXT NULL")
+            )
         await engine.dispose()
 
 

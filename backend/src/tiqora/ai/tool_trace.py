@@ -1,16 +1,16 @@
 """Encode a run's tool trace for ``tool_trace_json`` within the column limit.
 
 ``tiqora_ai_draft.tool_trace_json`` and ``tiqora_ai_article_origin.tool_trace_json``
-are plain ``TEXT`` — 65,535 bytes on MariaDB, which rejects a longer value
-in strict mode instead of truncating it. A run that read eleven KB articles
-in production produced a trace over that limit; the INSERT
-failed at commit, after the reply mail had already left, and rolled the
-sent article back with it.
+are ``MEDIUMTEXT`` on MariaDB (16 MiB, migration 20261002_0056). Until then
+they were plain ``TEXT`` (64 KiB): a run that read eleven KB articles failed
+the INSERT at commit, after the reply mail had left, and every result was
+later cut to 4,000 characters to fit, which broke JSON results such as a
+netadmin ``diagnose_connection`` mid-object.
 
-The trace is there so an agent can follow what the run looked at. The first
-few thousand characters of each result carry that; full KB article bodies do
-not need to be in it. So results are shortened until the encoded trace fits,
-and only when even that is not enough are the oldest steps dropped.
+Agents read the trace to follow what the run looked at, so it is stored
+whole. Only a pathological trace over :data:`MAX_TOOL_TRACE_BYTES` gets its
+results shortened, and only when even that is not enough are the oldest
+steps dropped.
 """
 
 from __future__ import annotations
@@ -18,8 +18,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-MAX_TOOL_TRACE_BYTES = 60_000
-"""Encoded budget, below MariaDB ``TEXT`` (65,535 bytes) with headroom.
+MAX_TOOL_TRACE_BYTES = 4_000_000
+"""Encoded budget, well below ``MEDIUMTEXT`` because the whole INSERT has to
+fit into one MariaDB packet (``max_allowed_packet``, 16 MiB by default) —
+the same reasoning as ``tiqora.ai.audit.MAX_AUDIT_PAYLOAD_BYTES``.
 
 ``json.dumps`` escapes non-ASCII by default, so the encoded string's length
 is its byte length."""
