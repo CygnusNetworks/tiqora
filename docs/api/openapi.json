@@ -21895,6 +21895,17 @@
             ],
             "title": "Consent Time"
           },
+          "customer_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Language"
+          },
           "customer_user_login": {
             "anyOf": [
               {

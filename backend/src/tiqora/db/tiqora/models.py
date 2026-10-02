@@ -657,6 +657,9 @@ class TiqoraTelegramContact(TiqoraBase):
     customer_user_login: Mapped[str | None] = mapped_column(String(200), nullable=True)
     consent_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     consent_prompt_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Telegram ``from.language_code`` (client UI language, e.g. "de", "en-US")
+    # — fallback for the language of the bot's own texts (channels.telegram.texts).
+    language_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # Set by ``/start`` (Task: Telegram-Chat-UX); marks the beginning of a
     # fresh dialog so ``_resolve_ticket`` stops reusing older per-chat
     # tickets that predate it. Explicitly set in code — deliberately no

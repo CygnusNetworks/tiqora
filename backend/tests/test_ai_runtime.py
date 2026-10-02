@@ -32,11 +32,7 @@ from tiqora.ai.gate import (
     set_operation_mode,
 )
 from tiqora.ai.identity import (
-    IDENTITY_HANDOFF_TEXT,
-    IDENTITY_NO_MATCH_TEXT,
     MAX_IDENTITY_ATTEMPTS,
-    identity_handoff_text,
-    identity_no_match_text,
     parse_clarify_schema,
 )
 from tiqora.ai.llm import LlmEmptyOutputError, LlmMessage, LlmResponse, LlmUsage, ToolCall
@@ -47,6 +43,7 @@ from tiqora.ai.models import (
     AUTONOMY_OFF,
     IDENTITY_CLARIFY_SCHEMA,
     REPLY_LANGUAGE_AUTO,
+    TiqoraAiArticleOrigin,
     TiqoraAiPromptPart,
     TiqoraAiQueuePolicy,
     TiqoraAiTicketState,
@@ -71,6 +68,7 @@ from tiqora.ai.runtime import (
     run_ticket_agent,
 )
 from tiqora.channels.common import ensure_channel_row
+from tiqora.channels.telegram.texts import default_text
 from tiqora.config import get_settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraTelegramContact
@@ -404,18 +402,6 @@ def test_identity_system_prompt_carries_the_language_line_after_the_tone() -> No
     assert prompt.index(tone) < prompt.index("Reply language (binding): en")
     plain = _build_identity_system_prompt(fields, tone_prompt=tone)
     assert "Reply language" not in plain
-
-
-def test_identity_texts_follow_the_language_and_fall_back_to_german() -> None:
-    assert (
-        identity_no_match_text("en", "Phone")
-        == "I couldn't find you with these details (Phone). Please check them and send them again."
-    )
-    assert identity_no_match_text("de", "Phone") == IDENTITY_NO_MATCH_TEXT.format(fields="Phone")
-    assert identity_no_match_text(None, "Phone") == IDENTITY_NO_MATCH_TEXT.format(fields="Phone")
-    assert identity_no_match_text("fr", "Phone") == IDENTITY_NO_MATCH_TEXT.format(fields="Phone")
-    assert identity_handoff_text("en") != IDENTITY_HANDOFF_TEXT
-    assert identity_handoff_text(None) == IDENTITY_HANDOFF_TEXT
 
 
 # ---------------------------------------------------------------------------
@@ -1989,7 +1975,7 @@ async def test_system_prompt_auto_trigger_telegram_source_channel_gets_tone(
             )
         assert result.status == "sent"
         system_prompt = llm.last_messages[0].content
-        assert system_prompt is not None and "Duze" in system_prompt
+        assert system_prompt is not None and "This is a Telegram chat" in system_prompt
     finally:
         await engine.dispose()
 
@@ -2019,7 +2005,7 @@ async def test_system_prompt_email_source_no_tone(mariadb_znuny_url: str) -> Non
             )
         assert result.status == "sent"
         system_prompt = llm.last_messages[0].content
-        assert system_prompt is not None and "Duze" not in system_prompt
+        assert system_prompt is not None and "This is a Telegram chat" not in system_prompt
     finally:
         await engine.dispose()
 
@@ -2054,7 +2040,7 @@ async def test_system_prompt_manual_trigger_telegram_ticket_gets_tone(
             )
         assert result.status == "drafted"
         system_prompt = llm.last_messages[0].content
-        assert system_prompt is not None and "Duze" in system_prompt
+        assert system_prompt is not None and "This is a Telegram chat" in system_prompt
     finally:
         await engine.dispose()
 
@@ -2108,7 +2094,7 @@ async def test_identity_prompt_contains_tone(
             )
         assert result.status == "sent"
         system_prompt = llm.last_messages[0].content
-        assert system_prompt is not None and "Duze" in system_prompt
+        assert system_prompt is not None and "This is a Telegram chat" in system_prompt
     finally:
         await engine.dispose()
 
@@ -2471,6 +2457,10 @@ def _install_recording_telegram_deliver(monkeypatch: pytest.MonkeyPatch, sent: l
     )
 
 
+def _no_match(fields: str, language: str | None) -> str:
+    return default_text("identity_no_match_text", language).replace("{fields}", fields)
+
+
 async def _run_wrong_identity_claim(
     factory: async_sessionmaker[AsyncSession], seed: dict[str, Any], *, run_id: str
 ) -> tuple[AgentRunResult, ScriptedLlm]:
@@ -2516,7 +2506,7 @@ async def test_identity_wrong_claim_tells_the_customer_it_did_not_match(
         result, _ = await _run_wrong_identity_claim(factory, seed, run_id="run-28")
 
         assert result.status == "sent"
-        assert sent == [IDENTITY_NO_MATCH_TEXT.format(fields="Phone number")]
+        assert sent == [_no_match("Phone number", None)]
         async with factory() as session:
             state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
             assert state is not None
@@ -2549,7 +2539,44 @@ async def test_identity_exchange_follows_the_reply_language(
 
         prompt = next(str(m.content) for m in llm.last_messages if m.role == "system")
         assert "Reply language (binding): en" in prompt
-        assert sent == [identity_no_match_text("en", "Phone number")]
+        assert sent == [_no_match("Phone number", "en")]
+    finally:
+        await engine.dispose()
+
+
+async def test_identity_texts_fall_back_to_the_telegram_client_language(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reply language off and nothing to detect: the contact's Telegram
+    client language picks the built-in text, and the sent message carries an
+    identity_check trace so agents see why the bot wrote it."""
+    seed = _seed_ticket(mariadb_znuny_url, ns=86)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_identity_policy(session, seed=seed)
+            await _seed_telegram_article(
+                session, article_id=seed["customer_article_id"], chat_id=900086
+            )
+            await session.execute(
+                text(
+                    "UPDATE tiqora_telegram_contact SET language_code = 'de-DE'"
+                    " WHERE chat_id = 900086"
+                )
+            )
+            await session.commit()
+        sent: list[str] = []
+        _install_recording_telegram_deliver(monkeypatch, sent)
+
+        result, _ = await _run_wrong_identity_claim(factory, seed, run_id="run-86")
+
+        assert sent == [_no_match("Phone number", "de")]
+        async with factory() as session:
+            origin = await session.get(TiqoraAiArticleOrigin, result.article_id)
+            assert origin is not None
+            assert "identity_check" in (origin.tool_trace_json or "")
+            assert "attempt 1 of" in (origin.tool_trace_json or "")
     finally:
         await engine.dispose()
 
@@ -2610,7 +2637,7 @@ async def test_identity_wrong_claims_hand_off_to_a_human(
 
         assert [r.status for r in results[:-1]] == ["sent"] * (MAX_IDENTITY_ATTEMPTS - 1)
         assert results[-1].status == "escalated"
-        assert sent[-1] == IDENTITY_HANDOFF_TEXT
+        assert sent[-1] == default_text("identity_handoff_text", None)
         async with factory() as session:
             state = await session.get(TiqoraAiTicketState, seed["ticket_id"])
             assert state is not None

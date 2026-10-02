@@ -28,6 +28,7 @@ from tiqora.channels.telegram.messages import (
     keyboard_for,
     list_for_ticket,
 )
+from tiqora.channels.telegram.texts import customer_language
 from tiqora.db.tiqora.models import TiqoraTelegramMessage
 from tiqora.znuny.history import TYPE_MISC, history_add
 
@@ -52,6 +53,7 @@ class ChatContact:
     display_name: str | None
     customer_user_login: str | None
     consent_time: datetime | None
+    language_code: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +63,9 @@ class ChatInfo:
     messages: list[TiqoraTelegramMessage]
     # Articles whose text an agent can still edit (see _is_editable).
     editable_article_ids: frozenset[int]
+    # What the customer most likely reads (texts.customer_language): drives
+    # the language of the agent's reply-button preset. None = unknown.
+    customer_language: str | None = None
 
 
 _NOT_EDITABLE_ATTACHMENT_ONLY = (
@@ -106,8 +111,8 @@ async def get_chat_info(session: AsyncSession, ticket_id: int) -> ChatInfo:
         (
             await session.execute(
                 text(
-                    "SELECT chat_id, username, display_name, customer_user_login, consent_time"
-                    " FROM tiqora_telegram_contact WHERE chat_id = :chat LIMIT 1"
+                    "SELECT chat_id, username, display_name, customer_user_login, consent_time,"
+                    " language_code FROM tiqora_telegram_contact WHERE chat_id = :chat LIMIT 1"
                 ),
                 {"chat": chat_id},
             )
@@ -122,6 +127,7 @@ async def get_chat_info(session: AsyncSession, ticket_id: int) -> ChatInfo:
             display_name=contact_row["display_name"],
             customer_user_login=contact_row["customer_user_login"],
             consent_time=contact_row["consent_time"],
+            language_code=contact_row["language_code"],
         )
     else:
         # resolve_chat_id's fallback (parsing a_from off the newest inbound
@@ -142,11 +148,24 @@ async def get_chat_info(session: AsyncSession, ticket_id: int) -> ChatInfo:
     messages = await list_for_ticket(session, ticket_id)
     live_out = [m.article_id for m in messages if _is_live_out(m)]
     attachment_only = await _attachment_only_article_ids(session, live_out)
+    latest_customer_body = (
+        await session.execute(
+            text(
+                "SELECT d.a_body FROM article a"
+                " JOIN article_data_mime d ON d.article_id = a.id"
+                " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                " WHERE a.ticket_id = :tid AND st.name = 'customer'"
+                " ORDER BY a.id DESC LIMIT 1"
+            ),
+            {"tid": ticket_id},
+        )
+    ).scalar_one_or_none()
     return ChatInfo(
         contact=contact,
         ai_escalated_at=ai_row[0] if ai_row is not None else None,
         messages=messages,
         editable_article_ids=frozenset(set(live_out) - attachment_only),
+        customer_language=customer_language(latest_customer_body, contact.language_code),
     )
 
 
