@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(제목 없음)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "대기열",
     "allQueues": "모든 대기열",
     "empty": "사용 가능한 대기열이 없습니다.",

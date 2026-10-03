@@ -296,6 +296,12 @@
     "lastViewsUntitled": "（無主旨）"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "佇列",
     "allQueues": "所有隊列",
     "empty": "沒有可用的隊列。",

@@ -15045,10 +15045,16 @@ export interface components {
             last_article_time?: string | null;
             /** Last Sender Type */
             last_sender_type?: string | null;
+            /** Links */
+            links?: components["schemas"]["TicketListLink"][];
             /** Lock */
             lock?: string | null;
             /** Lock Id */
             lock_id: number;
+            /** Merged Into Id */
+            merged_into_id?: number | null;
+            /** Merged Into Tn */
+            merged_into_tn?: string | null;
             /** Owner Id */
             owner_id: number;
             /** Owner Login */
@@ -15325,10 +15331,16 @@ export interface components {
             last_article_time?: string | null;
             /** Last Sender Type */
             last_sender_type?: string | null;
+            /** Links */
+            links?: components["schemas"]["TicketListLink"][];
             /** Lock */
             lock?: string | null;
             /** Lock Id */
             lock_id: number;
+            /** Merged Into Id */
+            merged_into_id?: number | null;
+            /** Merged Into Tn */
+            merged_into_tn?: string | null;
             /** Owner Id */
             owner_id: number;
             /** Owner Login */
@@ -15358,6 +15370,20 @@ export interface components {
              * @default 0
              */
             until_time: number;
+        };
+        /**
+         * TicketListLink
+         * @description A ticket↔ticket link as shown in the queue list (the *other* ticket).
+         */
+        TicketListLink: {
+            /** Link Type */
+            link_type: string;
+            /** Role */
+            role?: string | null;
+            /** Ticket Id */
+            ticket_id: number;
+            /** Tn */
+            tn: string;
         };
         /**
          * TicketPermissions

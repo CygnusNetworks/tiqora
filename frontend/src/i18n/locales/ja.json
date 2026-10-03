@@ -296,6 +296,12 @@
     "lastViewsUntitled": "（件名なし）"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "キュー",
     "allQueues": "すべてのキュー",
     "empty": "利用可能なキューがありません。",

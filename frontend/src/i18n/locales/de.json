@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(kein Betreff)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "In {{tn}} zusammengeführt",
+      "merged": "zusammengeführt",
+      "count": "Verknüpfte Tickets ({{count}})",
+      "group": "Verknüpfte gruppieren"
+    },
     "sidebar": "Queues",
     "allQueues": "Alle Queues",
     "empty": "Keine Queues verfügbar.",

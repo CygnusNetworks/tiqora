@@ -465,4 +465,61 @@ describe("TicketTable inbox layout", () => {
     await renderTable([makeItem({ lock: "lock" })]);
     expect(screen.getByTestId("ticket-lock-indicator-11")).toBeInTheDocument();
   });
+
+  describe("linked tickets", () => {
+    const a = () =>
+      makeItem({
+        id: 21,
+        tn: "2026092610000029",
+        links: [{ ticket_id: 23, tn: "2026092610000038", link_type: "Normal", role: null }],
+      });
+    const mid = () => makeItem({ id: 22, tn: "2026092610000030" });
+    const b = () =>
+      makeItem({
+        id: 23,
+        tn: "2026092610000038",
+        links: [{ ticket_id: 21, tn: "2026092610000029", link_type: "Normal", role: null }],
+      });
+
+    it("shows a link chip and highlights the partner row on hover", async () => {
+      localStorage.removeItem("tiqora.queue.groupLinked");
+      await renderTable([a(), mid(), b()]);
+      expect(screen.queryByTestId("ticket-links-chip-22")).toBeNull();
+      fireEvent.mouseEnter(screen.getByTestId("ticket-links-chip-21"));
+      expect(screen.getByTestId("ticket-row-23").className).toContain("ring-accent");
+      expect(screen.getByTestId("ticket-row-22").className).not.toContain("ring-accent ");
+      fireEvent.mouseLeave(screen.getByTestId("ticket-links-chip-21"));
+      expect(screen.getByTestId("ticket-row-23").className).not.toContain("bg-accent-dim");
+    });
+
+    it("groups linked tickets on demand and remembers the choice", async () => {
+      localStorage.removeItem("tiqora.queue.groupLinked");
+      await renderTable([a(), mid(), b()]);
+      const order = () =>
+        screen.getAllByTestId(/^ticket-row-\d+$/).map((r) => r.dataset.testid);
+      expect(order()).toEqual(["ticket-row-21", "ticket-row-22", "ticket-row-23"]);
+      fireEvent.click(screen.getByTestId("ticket-table-group-linked"));
+      expect(order()).toEqual(["ticket-row-21", "ticket-row-23", "ticket-row-22"]);
+      expect(localStorage.getItem("tiqora.queue.groupLinked")).toBe("1");
+      localStorage.removeItem("tiqora.queue.groupLinked");
+    });
+
+    it("marks a merged ticket with a chip to its main ticket", async () => {
+      await renderTable([
+        makeItem({
+          id: 31,
+          state: "merged",
+          state_type: "merged",
+          merged_into_id: 32,
+          merged_into_tn: "2026092610000038",
+        }),
+      ]);
+      expect(screen.getByTestId("ticket-merged-chip-31")).toHaveTextContent("038");
+    });
+
+    it("offers no grouping toggle when nothing is linked", async () => {
+      await renderTable([makeItem()]);
+      expect(screen.queryByTestId("ticket-table-group-linked")).toBeNull();
+    });
+  });
 });

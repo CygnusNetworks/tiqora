@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(brak tematu)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Kolejki",
     "allQueues": "Wszystkie kolejki",
     "empty": "Brak dostępnych kolejek.",

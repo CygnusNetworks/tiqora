@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(không có tiêu đề)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Hàng đợi",
     "allQueues": "Tất cả hàng đợi",
     "empty": "Không có hàng đợi có sẵn.",

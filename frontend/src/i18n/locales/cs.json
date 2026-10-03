@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(bez předmětu)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Fronty",
     "allQueues": "Všechny fronty",
     "empty": "Žádné fronty nejsou k dispozici.",

@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(sense assumpte)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Cues",
     "allQueues": "Totes les cues",
     "empty": "No hi ha cues disponibles.",

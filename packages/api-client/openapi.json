@@ -22860,6 +22860,13 @@
             ],
             "title": "Last Sender Type"
           },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/TicketListLink"
+            },
+            "title": "Links",
+            "type": "array"
+          },
           "lock": {
             "anyOf": [
               {
@@ -22874,6 +22881,28 @@
           "lock_id": {
             "title": "Lock Id",
             "type": "integer"
+          },
+          "merged_into_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Id"
+          },
+          "merged_into_tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Tn"
           },
           "owner_id": {
             "title": "Owner Id",
@@ -23552,6 +23581,13 @@
             ],
             "title": "Last Sender Type"
           },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/TicketListLink"
+            },
+            "title": "Links",
+            "type": "array"
+          },
           "lock": {
             "anyOf": [
               {
@@ -23566,6 +23602,28 @@
           "lock_id": {
             "title": "Lock Id",
             "type": "integer"
+          },
+          "merged_into_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Id"
+          },
+          "merged_into_tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Tn"
           },
           "owner_id": {
             "title": "Owner Id",
@@ -23683,6 +23741,41 @@
           "change_time"
         ],
         "title": "TicketListItem",
+        "type": "object"
+      },
+      "TicketListLink": {
+        "description": "A ticket\u2194ticket link as shown in the queue list (the *other* ticket).",
+        "properties": {
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "link_type"
+        ],
+        "title": "TicketListLink",
         "type": "object"
       },
       "TicketPermissions": {

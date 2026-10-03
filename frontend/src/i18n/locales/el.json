@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(χωρίς θέμα)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Ουρές",
     "allQueues": "Όλες οι ουρές",
     "empty": "Δεν υπάρχουν διαθέσιμες ουρές.",

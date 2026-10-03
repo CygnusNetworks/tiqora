@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(sans objet)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Files d'attente",
     "allQueues": "Toutes les files d'attente",
     "empty": "Aucune file d'attente disponible.",

@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(без темы)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Очереди",
     "allQueues": "Все очереди",
     "empty": "Нет доступных очередей.",
