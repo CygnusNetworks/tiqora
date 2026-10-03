@@ -52,6 +52,7 @@ from tiqora.ai.identity import (
     claim_mentioned_in,
     get_customer_id_for_login,
     is_identified,
+    parse_clarify_intro,
     parse_clarify_schema,
     record_identity_attempt,
     verify_identity_claim,
@@ -708,6 +709,7 @@ def _build_identity_system_prompt(
     tone_prompt: str | None = None,
     failed_attempts: int = 0,
     reply_language_line: str | None = None,
+    intro: str = "",
 ) -> str:
     """System prompt for the identity-check mini-exchange (Task 6). Replaces
     the normal system prompt entirely — the model must not see the queue's
@@ -742,6 +744,11 @@ def _build_identity_system_prompt(
             f"Required fields:\n{field_lines}"
         ),
     ]
+    if intro:
+        parts.append(
+            "General note for the customer — include it (in the reply language) "
+            f"whenever you ask for the fields:\n{intro}"
+        )
     if failed_attempts:
         # Only the count: the exchange never sees its own earlier replies (see
         # _build_identity_user_message), so it would otherwise greet the
@@ -1036,6 +1043,7 @@ async def _run_identity_exchange(
         tone_prompt=identity_tone_prompt,
         failed_attempts=state.identity_attempts or 0,
         reply_language_line=_reply_language_line(language),
+        intro=parse_clarify_intro(policy),
     )
     try:
         chat_id: int | None = await resolve_chat_id(session, ticket_id)

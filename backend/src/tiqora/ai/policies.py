@@ -336,7 +336,7 @@ async def _validate_triage_targets(
 
 
 async def _validate_clarify_schema_json(session: AsyncSession, raw: str | None) -> None:
-    """``clarify_schema_json``, when set, must be ``{"fields": [{"column":
+    """``clarify_schema_json``, when set, must be ``{"intro"?: str, "fields": [{"column":
     str, "label": str, "hint"?: str}, ...]}`` with at least one field; each ``column`` must
     match ``^[a-z0-9_]+$`` AND exist as a real ``customer_user`` column
     (same error class/422 shape as the other queue-policy validations)."""
@@ -352,6 +352,8 @@ async def _validate_clarify_schema_json(session: AsyncSession, raw: str | None) 
         raise QueuePolicyValidationError(
             'clarify_schema_json must be a JSON object: {"fields": [...]}'
         )
+    if not isinstance(parsed.get("intro", ""), str):
+        raise QueuePolicyValidationError("clarify_schema_json.intro must be a string")
     fields = parsed.get("fields")
     if not isinstance(fields, list) or not fields:
         raise QueuePolicyValidationError("clarify_schema_json.fields must be a non-empty array")

@@ -102,6 +102,18 @@ def parse_clarify_schema(policy: TiqoraAiQueuePolicy) -> list[ClarifySchemaField
     return fields or None
 
 
+def parse_clarify_intro(policy: TiqoraAiQueuePolicy) -> str:
+    """Optional general note (top-level ``intro`` of ``clarify_schema_json``)
+    the model weaves into every identity question, e.g. where the customer
+    finds the numbers. Empty when unset or malformed."""
+    try:
+        parsed = json.loads((policy.clarify_schema_json or "").strip() or "null")
+    except (TypeError, ValueError):
+        return ""
+    intro = parsed.get("intro") if isinstance(parsed, dict) else None
+    return intro.strip() if isinstance(intro, str) else ""
+
+
 async def is_identified(
     session: AsyncSession,
     ticket_id: int,
@@ -213,6 +225,7 @@ __all__ = [
     "get_customer_id_for_login",
     "get_customer_user_columns",
     "is_identified",
+    "parse_clarify_intro",
     "parse_clarify_schema",
     "record_identity_attempt",
     "valid_column_name",

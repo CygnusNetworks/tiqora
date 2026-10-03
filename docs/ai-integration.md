@@ -476,7 +476,8 @@ falls straight through unchanged:
   `customer_user` columns the customer must confirm (e.g. email + postal
   code), each optionally with a `hint` (format and where to find the value,
   e.g. `"6-digit, on your rental contract"`) that the model must pass on when
-  asking for it, validated at policy-save time against the table's *real* columns
+  asking for it, plus an optional top-level `intro` (a general note for every
+  identity question, e.g. where the numbers are found), validated at policy-save time against the table's *real* columns
   (introspected via `SELECT * ... LIMIT 0`, not a hardcoded list) so a typo'd
   column can't be saved. Until the ticket's `tiqora_telegram_contact` has a
   `customer_user_login` mapped, the run diverts into a dedicated

@@ -19,6 +19,7 @@ from tiqora.ai import policies as ai_policies
 from tiqora.ai.identity import (
     ClarifySchemaField,
     get_customer_user_columns,
+    parse_clarify_intro,
     parse_clarify_schema,
     valid_column_name,
     verify_identity_claim,
@@ -82,6 +83,14 @@ def test_parse_clarify_schema_reads_optional_hint() -> None:
         ClarifySchemaField(column="pkz", label="PKZ", hint="6-stellig"),
         ClarifySchemaField(column="wpn", label="WPN"),
     ]
+
+
+def test_parse_clarify_intro() -> None:
+    raw = '{"intro": " Steht im Portal unter Vertrag. ", "fields": []}'
+    assert parse_clarify_intro(_policy(raw)) == "Steht im Portal unter Vertrag."
+    assert parse_clarify_intro(_policy('{"fields": []}')) == ""
+    assert parse_clarify_intro(_policy("not json")) == ""
+    assert parse_clarify_intro(_policy(None)) == ""
 
 
 def test_parse_clarify_schema_none_when_malformed() -> None:
