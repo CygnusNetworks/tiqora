@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(nessun oggetto)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Code",
     "allQueues": "Tutte le code",
     "empty": "Nessuna coda disponibile.",

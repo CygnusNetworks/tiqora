@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(nincs tárgy)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Várólisták",
     "allQueues": "Összes várólista",
     "empty": "Nincs jegy ebben a várólistában.",

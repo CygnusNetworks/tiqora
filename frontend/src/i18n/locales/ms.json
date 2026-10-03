@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(tiada subjek)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Beratur",
     "allQueues": "Semua beratur",
     "empty": "Tiada baris gilir tersedia.",

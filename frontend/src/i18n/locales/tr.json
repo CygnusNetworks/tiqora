@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(konu yok)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Kuyruklar",
     "allQueues": "Tüm kuyruklar",
     "empty": "Kullanılabilir kuyruk yok.",

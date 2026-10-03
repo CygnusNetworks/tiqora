@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
-from sqlalchemy import ColumnElement, Select, and_, case, func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, bindparam, case, func, or_, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -74,6 +74,7 @@ from tiqora.domain.schemas import (
     TemplateOut,
     TicketDetail,
     TicketListItem,
+    TicketListLink,
     TicketPermissions,
 )
 from tiqora.domain.subject_hook import load_subject_config
@@ -335,10 +336,13 @@ class TicketService:
         channel_by_ticket: dict[int, str] | None = None,
         chat_contact_by_ticket: dict[int, tuple[str | None, str | None]] | None = None,
         ai_paused_ticket_ids: set[int] | None = None,
+        links_by_ticket: dict[int, list[TicketListLink]] | None = None,
+        merged_into_by_ticket: dict[int, tuple[int, str]] | None = None,
     ) -> TicketListItem:
         owner = maps["user"].get(t.user_id)
         last_article = (last_article_by_ticket or {}).get(t.id)
         chat_contact = (chat_contact_by_ticket or {}).get(t.id)
+        merged_into = (merged_into_by_ticket or {}).get(t.id)
         return TicketListItem(
             id=t.id,
             tn=t.tn,
@@ -358,6 +362,9 @@ class TicketService:
             customer_id=t.customer_id,
             customer_user_id=t.customer_user_id,
             archive_flag=t.archive_flag,
+            links=(links_by_ticket or {}).get(t.id, []),
+            merged_into_id=merged_into[0] if merged_into else None,
+            merged_into_tn=merged_into[1] if merged_into else None,
             customer_email=(
                 (customer_email_by_login or {}).get(t.customer_user_id)
                 if t.customer_user_id
@@ -615,6 +622,10 @@ class TicketService:
         customer_email_by_login = await self._customer_emails_by_login(
             [t.customer_user_id for t in tickets if t.customer_user_id]
         )
+        links_by_ticket = await self._links_by_ticket(user_id, ticket_ids)
+        merged_into_by_ticket = await self._merged_into_by_ticket(
+            [t.id for t in tickets if maps["state_type"].get(t.ticket_state_id) == "merged"]
+        )
         items = [
             self._to_list_item(
                 t,
@@ -629,10 +640,107 @@ class TicketService:
                 channel_by_ticket,
                 chat_contact_by_ticket,
                 ai_paused_ids,
+                links_by_ticket,
+                merged_into_by_ticket,
             )
             for t in tickets
         ]
         return PaginatedTickets(items=items, total=total, offset=offset, limit=limit)
+
+    async def _links_by_ticket(
+        self, user_id: int, ticket_ids: list[int]
+    ) -> dict[int, list[TicketListLink]]:
+        """Valid ticket↔ticket links of the page's tickets, one bulk query.
+
+        Links to tickets in queues the agent cannot read are dropped (their
+        number must not leak). Empty when the link tables are missing.
+        """
+        if not ticket_ids:
+            return {}
+        keys = [str(i) for i in ticket_ids]
+        try:
+            rows = (
+                (
+                    await self._session.execute(
+                        text(
+                            "SELECT lr.source_key, lr.target_key, lt.name AS ltype"
+                            " FROM link_relation lr"
+                            " JOIN link_object lo ON lo.id = lr.source_object_id"
+                            " AND lr.target_object_id = lr.source_object_id"
+                            " AND lo.name = 'Ticket'"
+                            " JOIN link_type lt ON lt.id = lr.type_id"
+                            " JOIN link_state ls ON ls.id = lr.state_id AND ls.name = 'Valid'"
+                            " WHERE lr.source_key IN :keys OR lr.target_key IN :keys"
+                        ).bindparams(bindparam("keys", expanding=True)),
+                        {"keys": keys},
+                    )
+                )
+                .mappings()
+                .all()
+            )
+        except DBAPIError:
+            logger.debug("link query failed (tables missing?)", exc_info=True)
+            await self._session.rollback()
+            return {}
+        if not rows:
+            return {}
+        page = set(ticket_ids)
+        pairs: list[tuple[int, int, str, int, int]] = []  # here, other, type, src, tgt
+        for r in rows:
+            src, tgt = int(r["source_key"]), int(r["target_key"])
+            if src in page:
+                pairs.append((src, tgt, r["ltype"], src, tgt))
+            if tgt in page:
+                pairs.append((tgt, src, r["ltype"], src, tgt))
+        other_ids = sorted({p[1] for p in pairs})
+        info = {
+            int(i): (str(tn), int(qid))
+            for i, tn, qid in (
+                await self._session.execute(
+                    select(Ticket.id, Ticket.tn, Ticket.queue_id).where(Ticket.id.in_(other_ids))
+                )
+            ).all()
+        }
+        readable: dict[int, bool] = {}
+        out: dict[int, list[TicketListLink]] = {}
+        seen: set[tuple[int, int, str]] = set()
+        for here, other, ltype, src, _tgt in pairs:
+            if other not in info or (here, other, ltype) in seen:
+                continue
+            tn, queue_id = info[other]
+            if queue_id not in readable:
+                readable[queue_id] = await self._perms.check(user_id, queue_id, "ro")
+            if not readable[queue_id]:
+                continue
+            seen.add((here, other, ltype))
+            # Znuny ParentChild: source = parent, target = child.
+            role = ("parent" if other == src else "child") if ltype == "ParentChild" else None
+            out.setdefault(here, []).append(
+                TicketListLink(ticket_id=other, tn=tn, link_type=ltype, role=role)
+            )
+        return out
+
+    async def _merged_into_by_ticket(self, ticket_ids: list[int]) -> dict[int, tuple[int, str]]:
+        """Main ticket (id, tn) of tickets in a ``merged`` state, from their
+        ``Merged`` history row (``%%MergeTN%%MergeID%%MainTN%%MainID``)."""
+        if not ticket_ids:
+            return {}
+        rows = (
+            await self._session.execute(
+                text(
+                    "SELECT h.ticket_id, h.name FROM ticket_history h"
+                    " JOIN ticket_history_type ht ON ht.id = h.history_type_id"
+                    " WHERE ht.name = 'Merged' AND h.ticket_id IN :ids ORDER BY h.id"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": ticket_ids},
+            )
+        ).all()
+        out: dict[int, tuple[int, str]] = {}
+        for tid, name in rows:
+            parts = (name or "").split("%%")[1:]  # [mergeTN, mergeID, mainTN, mainID]
+            if len(parts) >= 4 and parts[1] == str(tid) and parts[3].isdigit():
+                out[int(tid)] = (int(parts[3]), parts[2])
+        return out
 
     async def _channel_by_ticket(self, ticket_ids: list[int]) -> dict[int, str]:
         """List channel key per ticket (see :data:`LIST_CHANNELS`); tickets

@@ -388,6 +388,15 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
         assert split_link["other_role"] == "child"
         assert split_link["other_state"] and split_link["other_state_type"]
 
+        # Queue list carries the link in both directions (ParentChild roles).
+        listed = await TicketService(session).list_tickets(ids["agent"], queue_id=ids["queue"])
+        by_id = {it.id: it for it in listed.items}
+        parent_links = [lk for lk in by_id[ids["ticket"]].links if lk.ticket_id == new_ticket_id]
+        assert parent_links and parent_links[0].role == "child"
+        child_links = [lk for lk in by_id[new_ticket_id].links if lk.ticket_id == ids["ticket"]]
+        assert child_links and child_links[0].role == "parent"
+        assert child_links[0].tn
+
         # Split with priority/state overrides → applied to the new ticket
         # (priority 1 / state 1 differ from the seeded source values).
         override_id = await svc.split_article(
@@ -406,6 +415,14 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
             )
         ).first()
         assert ov is not None and int(ov[0]) == 1 and int(ov[1]) == 1
+
+        # A merged ticket points at its main ticket in the queue list.
+        await svc.merge_tickets(ids["agent"], ids["ticket"], override_id)
+        listed = await TicketService(session).list_tickets(ids["agent"], queue_id=ids["queue"])
+        merged = next(it for it in listed.items if it.id == override_id)
+        assert merged.state_type == "merged"
+        assert merged.merged_into_id == ids["ticket"]
+        assert merged.merged_into_tn
 
     async with factory() as session:
         # Forward/Bounce history types present.

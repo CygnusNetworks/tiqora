@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(ללא נושא)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "תורים",
     "allQueues": "כל התורים",
     "empty": "אין תורים זמינים.",

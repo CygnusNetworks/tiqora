@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(brez zadeve)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Čakalne vrste",
     "allQueues": "Vse čakalne vrste",
     "empty": "Čakalne vrste niso na voljo.",

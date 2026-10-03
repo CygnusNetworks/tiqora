@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(inget ämne)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Köer",
     "allQueues": "Alla köer",
     "empty": "Inga köer tillgängliga.",

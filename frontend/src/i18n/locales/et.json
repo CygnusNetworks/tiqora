@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(teema puudub)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Järjekorrad",
     "allQueues": "Kõik järjekorrad",
     "empty": "Järjekorrad pole saadaval.",

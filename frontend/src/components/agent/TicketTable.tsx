@@ -9,6 +9,8 @@ import { cn } from "@/lib/cn";
 import { setTicketNavContext, type TicketNavContext } from "@/lib/ticketNavContext";
 import { Button } from "@/components/ui/Button";
 import { CopyTn } from "./CopyTn";
+import { TicketLinkChip } from "./TicketLinkChip";
+import { groupLinkedTickets } from "@/lib/groupLinkedTickets";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
@@ -142,7 +144,19 @@ function nearestEscalation(ticket: TicketListItem): number | null {
   return set.length ? Math.min(...set) : null;
 }
 
-type Row = { kind: "row"; ticket: TicketListItem } | { kind: "head"; key: string; node: ReactNode };
+type Row =
+  | { kind: "row"; ticket: TicketListItem; child?: boolean; midChild?: boolean }
+  | { kind: "head"; key: string; node: ReactNode };
+
+const GROUP_LINKED_KEY = "tiqora.queue.groupLinked";
+
+function readGroupLinked(): boolean {
+  try {
+    return localStorage.getItem(GROUP_LINKED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 export function TicketTable({
   items,
@@ -165,6 +179,8 @@ export function TicketTable({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [focusIdx, setFocusIdx] = useState(0);
+  const [hoverIds, setHoverIds] = useState<number[] | null>(null);
+  const [groupLinked, setGroupLinked] = useState(readGroupLinked);
   const rootRef = useRef<HTMLDivElement>(null);
   const locale = toBcp47(i18n.language);
   const gridCols = selection ? SELECT_GRID_COLS : GRID_COLS;
@@ -183,6 +199,19 @@ export function TicketTable({
   useEffect(() => {
     setFocusIdx(0);
   }, [items]);
+
+  const hasLinks = useMemo(
+    () => ordered.some((it) => (it.links ?? []).length > 0 || it.merged_into_id != null),
+    [ordered],
+  );
+  const toggleGroupLinked = (on: boolean) => {
+    setGroupLinked(on);
+    try {
+      localStorage.setItem(GROUP_LINKED_KEY, on ? "1" : "0");
+    } catch {
+      /* storage unavailable: the choice just won't persist */
+    }
+  };
 
   const openTicket = (id: number) => {
     if (navContext) setTicketNavContext({ ...navContext, ids: ordered.map((it) => it.id) });
@@ -259,7 +288,15 @@ export function TicketTable({
     for (const ticket of pinnedItems) rows.push({ kind: "row", ticket });
   }
   let lastBucket: DayBucket | null = null;
-  for (const ticket of listItems) {
+  const entries =
+    groupLinked && hasLinks
+      ? groupLinkedTickets(listItems)
+      : listItems.map((ticket) => ({ ticket, child: false, midChild: false }));
+  for (const { ticket, child, midChild } of entries) {
+    if (child) {
+      rows.push({ kind: "row", ticket, child, midChild });
+      continue;
+    }
     if (groupByDay) {
       const bucket = dayBucket(activityTime(ticket));
       if (bucket !== lastBucket) {
@@ -294,6 +331,18 @@ export function TicketTable({
 
   return (
     <div className="flex flex-col gap-2" data-testid="ticket-table" ref={rootRef}>
+      {hasLinks && (
+        <label className="flex cursor-pointer items-center gap-2 self-end text-xs text-muted">
+          <input
+            type="checkbox"
+            checked={groupLinked}
+            onChange={(e) => toggleGroupLinked(e.target.checked)}
+            className="h-3.5 w-3.5 accent-accent"
+            data-testid="ticket-table-group-linked"
+          />
+          {t("queue.links.group")}
+        </label>
+      )}
       <div
         className="overflow-hidden rounded-lg border border-hairline bg-surface"
         role="table"
@@ -364,6 +413,11 @@ export function TicketTable({
               quickEdit={quickEdit}
               onCustomerClick={onCustomerClick}
               hideQueue={hideQueue}
+              child={row.child}
+              midChild={row.midChild}
+              highlighted={hoverIds?.includes(ticket.id) ?? false}
+              onLinkHover={setHoverIds}
+              onOpenTicket={openTicket}
               onHover={() => setFocusIdx(idx)}
               onOpen={() => openTicket(ticket.id)}
             />
@@ -414,6 +468,11 @@ function TicketRow({
   quickEdit,
   onCustomerClick,
   hideQueue,
+  child,
+  midChild,
+  highlighted,
+  onLinkHover,
+  onOpenTicket,
   onHover,
   onOpen,
 }: {
@@ -426,6 +485,13 @@ function TicketRow({
   quickEdit?: TicketQuickEdit;
   onCustomerClick?: (customerId: string) => void;
   hideQueue?: boolean;
+  /** Grouped view: this ticket hangs under a linked / main ticket. */
+  child?: boolean;
+  midChild?: boolean;
+  /** A hovered link chip elsewhere points at this row. */
+  highlighted: boolean;
+  onLinkHover: (ids: number[] | null) => void;
+  onOpenTicket: (id: number) => void;
   onHover: () => void;
   onOpen: () => void;
 }) {
@@ -542,6 +608,9 @@ function TicketRow({
         spineClassName(spineLevel),
         isSelected && "bg-accent-dim hover:bg-accent-dim",
         focused && !isSelected && "bg-surface-subtle ring-1 ring-inset ring-accent/40",
+        highlighted && "bg-accent-dim ring-1 ring-inset ring-accent",
+        ticket.state_type === "merged" && "opacity-70",
+        child && "pl-9",
       )}
       style={
         {
@@ -552,6 +621,18 @@ function TicketRow({
       onClick={onOpen}
       onMouseEnter={onHover}
     >
+      {child && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-0 left-5 h-1/2 w-3 rounded-bl-md border-b border-l border-hairline"
+        />
+      )}
+      {child && midChild && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 bottom-0 left-5 border-l border-hairline"
+        />
+      )}
       {selection && (
         <span className="hidden items-center md:inline-flex">
           <input
@@ -699,6 +780,7 @@ function TicketRow({
             className="flex-none text-[11px] text-accent hover:underline"
             testId={`ticket-tn-copy-${ticket.id}`}
           />
+          <TicketLinkChip ticket={ticket} onHover={onLinkHover} onOpenTicket={onOpenTicket} />
           <span aria-hidden>·</span>
           <ChannelPill channel={channel} testId={`ticket-channel-${ticket.id}`} />
           <span className="min-w-0 truncate" data-testid={`ticket-customer-cell-${ticket.id}`}>

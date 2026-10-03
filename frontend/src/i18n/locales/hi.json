@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(कोई विषय नहीं)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "कतारें",
     "allQueues": "सभी कतारें",
     "empty": "कोई कतार उपलब्ध नहीं.",

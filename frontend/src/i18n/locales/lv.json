@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(nav temata)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Rindas",
     "allQueues": "Visas rindas",
     "empty": "Rindas nav pieejamas.",

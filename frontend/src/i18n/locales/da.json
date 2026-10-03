@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(intet emne)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Køer",
     "allQueues": "Alle køer",
     "empty": "Ingen tilgængelige køer.",

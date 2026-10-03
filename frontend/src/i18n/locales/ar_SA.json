@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(بدون موضوع)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "قوائم الانتظار",
     "allQueues": "جميع قوائم الانتظار",
     "empty": "لا توجد طوابير متاحة.",

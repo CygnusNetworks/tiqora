@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(без тема)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Опашки",
     "allQueues": "Всички опашки",
     "empty": "Няма налични опашки.",

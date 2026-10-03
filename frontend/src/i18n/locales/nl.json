@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(geen onderwerp)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Wachtrijen",
     "allQueues": "Alle wachtrijen",
     "empty": "Geen wachtrijen beschikbaar.",

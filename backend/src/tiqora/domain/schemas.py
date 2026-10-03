@@ -168,6 +168,17 @@ class QueueNode(BaseModel):
     children: list[QueueNode] = Field(default_factory=list)
 
 
+class TicketListLink(BaseModel):
+    """A ticket↔ticket link as shown in the queue list (the *other* ticket)."""
+
+    ticket_id: int
+    tn: str
+    link_type: str
+    role: str | None = None
+    """ParentChild only: what the other ticket is relative to this one
+    (``"parent"`` or ``"child"``); ``None`` for a plain (Normal) link."""
+
+
 class TicketListItem(BaseModel):
     id: int
     tn: str
@@ -222,6 +233,11 @@ class TicketListItem(BaseModel):
     """How the ticket's most recent AI-written article got sent: ``"auto"``
     (the agent sent it itself) or ``"manual_accept"`` (a human accepted an AI
     draft). ``None`` when the AI has written nothing on this ticket."""
+    links: list[TicketListLink] = Field(default_factory=list)
+    """Valid links to tickets the agent may read — list chips / grouping."""
+    merged_into_id: int | None = None
+    merged_into_tn: str | None = None
+    """For a ticket in a ``merged`` state: the main ticket it went into."""
     archive_flag: int = 0
     """1 when the ticket is archived — only ever non-zero in admin listings
     with ``include_archived`` (used to show an "Archiviert" badge)."""

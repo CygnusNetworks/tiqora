@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(ei aihetta)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Jonot",
     "allQueues": "Kaikki jonot",
     "empty": "Ei jonoja käytettävissä.",

@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(sin asunto)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Colas",
     "allQueues": "Todas las colas",
     "empty": "No hay colas disponibles.",

@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(ไม่มีหัวเรื่อง)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "คิว",
     "allQueues": "ทุกคิว",
     "empty": "ไม่มีคิวว่าง",

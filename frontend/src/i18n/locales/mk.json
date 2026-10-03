@@ -296,6 +296,12 @@
     "lastViewsUntitled": "(без наслов)"
   },
   "queue": {
+    "links": {
+      "mergedInto": "Merged into {{tn}}",
+      "merged": "merged",
+      "count": "Linked tickets ({{count}})",
+      "group": "Group linked tickets"
+    },
     "sidebar": "Редици",
     "allQueues": "Сите редици",
     "empty": "Нема достапни редици.",
