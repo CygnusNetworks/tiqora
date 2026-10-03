@@ -373,4 +373,25 @@ describe("LinkDialog", () => {
       }),
     );
   });
+
+  it("explains an unknown ticket number instead of a generic error", async () => {
+    searchTickets.mockReset().mockResolvedValue([]);
+    createTicketLink.mockReset();
+    wrap(<LinkDialog ticketId={7} onClose={() => {}} />);
+    const input = screen.getByTestId("link-dialog").querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026092610000099" } });
+    fireEvent.click(screen.getByRole("button", { name: /speichern|save/i }));
+    const err = await screen.findByTestId("link-error");
+    expect(err.textContent).toContain("2026092610000099");
+    expect(createTicketLink).not.toHaveBeenCalled();
+  });
+
+  it("rejects linking a ticket with itself", async () => {
+    searchTickets.mockReset().mockResolvedValue([{ ticket_id: 7, tn: "2026092610000029", title: "x" }]);
+    wrap(<LinkDialog ticketId={7} onClose={() => {}} />);
+    const input = screen.getByTestId("link-dialog").querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026092610000029" } });
+    fireEvent.click(screen.getByRole("button", { name: /speichern|save/i }));
+    expect((await screen.findByTestId("link-error")).textContent).toMatch(/itself|sich selbst/);
+  });
 });

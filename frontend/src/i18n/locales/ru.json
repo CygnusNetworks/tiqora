@@ -688,6 +688,9 @@
       "selectPlaceholder": "Выбирать…",
       "mergeTargetId": "Объединить с идентификатором заявки",
       "linkTargetId": "Ссылка на идентификатор тикета",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Тип ссылки",
       "apptTitle": "Тема",
       "apptStart": "Начало",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Источник",
       "search": "Поиск «{{query}}»",
       "position": "{{index}} / {{total}}",

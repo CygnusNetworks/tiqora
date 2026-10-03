@@ -688,6 +688,9 @@
       "selectPlaceholder": "Selecione…",
       "mergeTargetId": "Mesclar no ID do ticket",
       "linkTargetId": "Link para ID do ticket",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Tipo de link",
       "apptTitle": "Título",
       "apptStart": "Começar",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Origem",
       "search": "Pesquisar “{{query}}”",
       "position": "{{index}} / {{total}}",

@@ -688,6 +688,9 @@
       "selectPlaceholder": "選択してください…",
       "mergeTargetId": "チケットIDに結合",
       "linkTargetId": "チケットIDへのリンク",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "リンクタイプ",
       "apptTitle": "タイトル",
       "apptStart": "スタート",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "移動元",
       "search": "「{{query}}」を検索",
       "position": "{{index}} / {{total}}",

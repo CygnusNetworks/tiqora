@@ -688,6 +688,9 @@
       "selectPlaceholder": "เลือก...",
       "mergeTargetId": "รวมเข้ากับรหัสตั๋ว",
       "linkTargetId": "ลิงก์ไปยังรหัสตั๋ว",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "ประเภทลิงค์",
       "apptTitle": "ชื่อเรื่อง",
       "apptStart": "เริ่ม",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "ต้นทาง",
       "search": "ค้นหา “{{query}}”",
       "position": "{{index}} / {{total}}",

@@ -688,6 +688,9 @@
       "selectPlaceholder": "選擇…",
       "mergeTargetId": "合併到票證 ID",
       "linkTargetId": "票證 ID 連結",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "連結類型",
       "apptTitle": "標題",
       "apptStart": "開始",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "來源",
       "search": "搜尋「{{query}}」",
       "position": "{{index}} / {{total}}",

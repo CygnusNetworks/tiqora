@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import type { TicketDetail } from "@/lib/api";
@@ -877,18 +878,41 @@ export function PendingDialog({
   );
 }
 
+/** Why a link/merge target could not be used; mapped to a dialog message. */
+class TicketRefError extends Error {
+  constructor(readonly kind: "notFound" | "self") {
+    super(kind);
+  }
+}
+
 /**
  * Resolve what the agent typed into a ticket picker to an internal ticket id.
  * Agents type the ticket number (``tn``, 16 digits); the write endpoints take
  * the internal id. Short numeric input is still accepted as a raw id.
  */
-async function resolveTicketRef(raw: string): Promise<number> {
+async function resolveTicketRef(raw: string, selfId: number): Promise<number> {
   const ref = raw.trim().replace(/^#/, "");
   const hits = await api.searchTickets({ q: ref, limit: 10 });
   const exact = hits.find((h) => h.tn === ref);
-  if (exact) return exact.ticket_id;
-  if (/^\d{1,9}$/.test(ref)) return Number(ref);
-  throw new Error(`ticket ${ref} not found`);
+  const id = exact ? exact.ticket_id : /^\d{1,9}$/.test(ref) ? Number(ref) : null;
+  if (id === null) throw new TicketRefError("notFound");
+  if (id === selfId) throw new TicketRefError("self");
+  return id;
+}
+
+/** Specific, actionable message for a failed link/merge instead of the generic one. */
+function ticketRefErrorMessage(err: unknown, ref: string, t: TFunction): string {
+  if (err instanceof TicketRefError) {
+    return t(err.kind === "self" ? "ticket.dialog.errorSelf" : "ticket.dialog.errorNotFound", {
+      ref: ref.trim(),
+    });
+  }
+  if (err instanceof ApiError) {
+    if (err.status === 404) return t("ticket.dialog.errorNotFound", { ref: ref.trim() });
+    if (err.status === 403) return t("ticket.dialog.errorForbidden");
+    if (err.status === 422 && err.message) return err.message;
+  }
+  return t("ticket.dialog.genericError");
 }
 
 const LINK_TYPES = ["Normal", "ParentChild"] as const;
@@ -913,7 +937,7 @@ export function LinkDialog({
   const create = useMutation({
     mutationFn: async () =>
       api.createTicketLink(ticketId, {
-        target_ticket_id: await resolveTicketRef(targetId),
+        target_ticket_id: await resolveTicketRef(targetId, ticketId),
         link_type: linkType,
       }),
     onSuccess: () => {
@@ -958,7 +982,11 @@ export function LinkDialog({
             testId="link-type-select"
           />
         </label>
-        {create.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
+        {create.isError && (
+          <p className="text-xs text-danger" role="alert" data-testid="link-error">
+            {ticketRefErrorMessage(create.error, targetId, t)}
+          </p>
+        )}
         <DialogActions
           onCancel={onClose}
           onSave={() => create.mutate()}
@@ -982,7 +1010,7 @@ export function MergeDialog({
 
   const merge = useMutation({
     mutationFn: async () =>
-      api.mergeTicket(ticketId, { main_ticket_id: await resolveTicketRef(mainId) }),
+      api.mergeTicket(ticketId, { main_ticket_id: await resolveTicketRef(mainId, ticketId) }),
     onSuccess: () => {
       // Merging closes the source ticket, which moves it out of the queue's
       // open count — same broad invalidation usePatchTicket uses.
@@ -1005,7 +1033,11 @@ export function MergeDialog({
             onChange={(e) => setMainId(e.target.value)}
           />
         </label>
-        {merge.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
+        {merge.isError && (
+          <p className="text-xs text-danger" role="alert" data-testid="merge-error">
+            {ticketRefErrorMessage(merge.error, mainId, t)}
+          </p>
+        )}
         <DialogActions
           onCancel={onClose}
           onSave={() => merge.mutate()}

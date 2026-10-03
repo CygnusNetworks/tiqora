@@ -688,6 +688,9 @@
       "selectPlaceholder": "בחר…",
       "mergeTargetId": "התמזג לתוך מזהה כרטיס",
       "linkTargetId": "קישור לזיהוי כרטיס",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "סוג קישור",
       "apptTitle": "כותרת",
       "apptStart": "התחל",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "מקור",
       "search": "חיפוש ”{{query}}”",
       "position": "{{index}} / {{total}}",

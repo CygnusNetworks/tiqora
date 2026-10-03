@@ -688,6 +688,9 @@
       "selectPlaceholder": "Válasszon…",
       "mergeTargetId": "Egyesítse a jegyazonosítóba",
       "linkTargetId": "Link a jegyazonosítóhoz",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Link típusa",
       "apptTitle": "Cím",
       "apptStart": "Kezdés",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Eredet",
       "search": "Keresés „{{query}}”",
       "position": "{{index}} / {{total}}",

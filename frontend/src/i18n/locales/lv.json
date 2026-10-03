@@ -688,6 +688,9 @@
       "selectPlaceholder": "Izvēlieties…",
       "mergeTargetId": "Apvienot biļetes ID",
       "linkTargetId": "Saite uz biļetes ID",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Saites veids",
       "apptTitle": "Nosaukums",
       "apptStart": "Sākt",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Izcelsme",
       "search": "Meklēt „{{query}}“",
       "position": "{{index}} / {{total}}",

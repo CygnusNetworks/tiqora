@@ -688,6 +688,9 @@
       "selectPlaceholder": "Pilih…",
       "mergeTargetId": "Gabungkan ke dalam ID tiket",
       "linkTargetId": "Tautan ke ID tiket",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Jenis tautan",
       "apptTitle": "Judul",
       "apptStart": "Mulai",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Asal",
       "search": "Cari “{{query}}”",
       "position": "{{index}} / {{total}}",
