@@ -9,6 +9,7 @@ import {
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { PopoverContext } from "./popoverContext";
+import { triggerMoved } from "./triggerMoved";
 
 /** Rough panel height budget used only to decide whether to flip the panel
  * above the trigger when there isn't room below (mirrors `Menu`). */
@@ -60,6 +61,7 @@ export function Popover({
   const [pos, setPos] = useState<PanelPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const openRectRef = useRef<DOMRect | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
 
@@ -71,6 +73,7 @@ export function Popover({
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    openRectRef.current = rect;
     const spaceBelow = window.innerHeight - rect.bottom;
     const flip = spaceBelow < PANEL_MAX_H && rect.top > spaceBelow;
     setPos({
@@ -108,6 +111,9 @@ export function Popover({
       const el =
         target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
       if (el?.closest("[data-portal-menu]")) return;
+      // A scroll from before opening arrives a frame late; only a moved
+      // trigger strands the panel.
+      if (!triggerMoved(triggerRef.current, openRectRef.current)) return;
       setOpen(false);
     };
     const onResize = () => setOpen(false);
