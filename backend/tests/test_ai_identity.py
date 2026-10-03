@@ -72,6 +72,18 @@ def test_parse_clarify_schema_returns_fields() -> None:
     ]
 
 
+def test_parse_clarify_schema_reads_optional_hint() -> None:
+    raw = (
+        '{"fields": [{"column": "pkz", "label": "PKZ", "hint": " 6-stellig "},'
+        ' {"column": "wpn", "label": "WPN", "hint": 5}]}'
+    )
+    fields = parse_clarify_schema(_policy(raw))
+    assert fields == [
+        ClarifySchemaField(column="pkz", label="PKZ", hint="6-stellig"),
+        ClarifySchemaField(column="wpn", label="WPN"),
+    ]
+
+
 def test_parse_clarify_schema_none_when_malformed() -> None:
     assert parse_clarify_schema(_policy("not json")) is None
     assert parse_clarify_schema(_policy("[]")) is None

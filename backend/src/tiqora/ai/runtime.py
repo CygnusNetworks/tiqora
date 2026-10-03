@@ -716,7 +716,10 @@ def _build_identity_system_prompt(
     ``tone_prompt`` (Task: Telegram-Chat-UX) is always passed by the caller —
     this exchange only ever runs for a Telegram-sourced run (see the guard in
     :func:`run_ticket_agent`)."""
-    field_lines = "\n".join(f"- {f.label} (internal key: {f.column})" for f in fields)
+    field_lines = "\n".join(
+        f"- {f.label} (internal key: {f.column})" + (f" — {f.hint}" if f.hint else "")
+        for f in fields
+    )
     parts = [
         UNTRUSTED_CONTENT_SYSTEM_BLOCK,
         (
@@ -730,6 +733,9 @@ def _build_identity_system_prompt(
             "values into 'identity_claim' (an object keyed by the internal key "
             "below) AND still propose kind='clarify' with a short acknowledgement "
             "body (e.g. 'Thank you, checking that now.') — never a factual answer.\n"
+            "- When asking for a field, always add its format and where to find it, "
+            "if a note follows the field below (translate the note into the reply "
+            "language, keep numbers and formats exact).\n"
             "- Customers often send the fields in separate messages. Combine values "
             "from the earlier customer messages with the latest one; when a field "
             "appears more than once, the newer value wins.\n\n"

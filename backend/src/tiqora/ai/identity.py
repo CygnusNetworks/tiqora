@@ -48,6 +48,9 @@ _TELEGRAM_CHANNEL = "telegram"
 class ClarifySchemaField:
     column: str
     label: str
+    # Optional note for the customer-facing question: the value's format and
+    # where to find it. The label alone gives the model neither.
+    hint: str = ""
 
 
 def valid_column_name(column: str) -> bool:
@@ -82,13 +85,20 @@ def parse_clarify_schema(policy: TiqoraAiQueuePolicy) -> list[ClarifySchemaField
             continue
         column = item.get("column")
         label = item.get("label")
+        hint = item.get("hint")
         if (
             isinstance(column, str)
             and valid_column_name(column)
             and isinstance(label, str)
             and label
         ):
-            fields.append(ClarifySchemaField(column=column, label=label))
+            fields.append(
+                ClarifySchemaField(
+                    column=column,
+                    label=label,
+                    hint=hint.strip() if isinstance(hint, str) else "",
+                )
+            )
     return fields or None
 
 
