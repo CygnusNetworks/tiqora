@@ -2926,8 +2926,13 @@ class TicketWriteService:
         )
 
     async def list_links(self, user_id: int, ticket_id: int) -> list[dict[str, Any]]:
+        """Tickets linked to *ticket_id*, as shown in the ticket header.
+
+        Viewing needs ``ro`` on this ticket; linked tickets in queues the agent
+        cannot read are left out (their number/title must not leak).
+        """
         src = await _ticket_must_exist(self._session, ticket_id)
-        await self._assert_rw(user_id, int(src["queue_id"]))
+        await self._assert(user_id, int(src["queue_id"]), "ro")
         obj_id = await _link_object_id(self._session, "Ticket")
         rows = (
             (
@@ -2939,6 +2944,7 @@ class TicketWriteService:
                         " JOIN link_state ls ON ls.id = lr.state_id"
                         " WHERE lr.source_object_id = :o AND lr.target_object_id = :o"
                         " AND (lr.source_key = :k OR lr.target_key = :k)"
+                        " AND ls.name = 'Valid'"
                     ),
                     {"o": obj_id, "k": str(ticket_id)},
                 )
@@ -2948,14 +2954,30 @@ class TicketWriteService:
         )
         out: list[dict[str, Any]] = []
         for r in rows:
-            other = r["target_key"] if r["source_key"] == str(ticket_id) else r["source_key"]
-            other_id = int(other)
+            other_is_source = r["target_key"] == str(ticket_id)
+            other_id = int(r["source_key"] if other_is_source else r["target_key"])
             trow = (
-                await self._session.execute(
-                    text("SELECT tn, title FROM ticket WHERE id = :id LIMIT 1"),
-                    {"id": other_id},
+                (
+                    await self._session.execute(
+                        text(
+                            "SELECT t.tn, t.title, t.queue_id, ts.name AS state, tst.name AS stype"
+                            " FROM ticket t"
+                            " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
+                            " JOIN ticket_state_type tst ON tst.id = ts.type_id"
+                            " WHERE t.id = :id LIMIT 1"
+                        ),
+                        {"id": other_id},
+                    )
                 )
-            ).first()
+                .mappings()
+                .first()
+            )
+            if trow is None or not await self._perms.check(user_id, int(trow["queue_id"]), "ro"):
+                continue
+            # Znuny ParentChild: source = parent, target = child.
+            role = None
+            if r["ltype"] == "ParentChild":
+                role = "parent" if other_is_source else "child"
             out.append(
                 {
                     "source_key": r["source_key"],
@@ -2963,8 +2985,11 @@ class TicketWriteService:
                     "link_type": r["ltype"],
                     "state": r["lstate"],
                     "other_ticket_id": other_id,
-                    "other_tn": trow[0] if trow else None,
-                    "other_title": trow[1] if trow else None,
+                    "other_tn": trow["tn"],
+                    "other_title": trow["title"],
+                    "other_state": trow["state"],
+                    "other_state_type": trow["stype"],
+                    "other_role": role,
                 }
             )
         return out

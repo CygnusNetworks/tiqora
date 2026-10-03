@@ -412,6 +412,10 @@ class TicketLinkTargetOut(BaseModel):
     other_ticket_id: int
     other_tn: str | None = None
     other_title: str | None = None
+    other_state: str | None = None
+    other_state_type: str | None = None
+    # ParentChild only: what the *other* ticket is relative to this one.
+    other_role: str | None = None
 
 
 class TicketLinkCreateRequest(BaseModel):

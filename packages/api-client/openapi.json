@@ -23293,6 +23293,39 @@
             "title": "Link Type",
             "type": "string"
           },
+          "other_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Role"
+          },
+          "other_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other State"
+          },
+          "other_state_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other State Type"
+          },
           "other_ticket_id": {
             "title": "Other Ticket Id",
             "type": "integer"

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { TicketDetail } from "@/lib/api";
+import { LinkedTickets } from "./LinkedTickets";
 import { TicketHeaderActions } from "./TicketHeaderActions";
 import type { TicketAiSlots } from "./AiPanel";
 import { combinedEscalationLevel, spineClassName, stateColorVar } from "@/lib/status";
@@ -56,6 +57,7 @@ export function TicketHeader({
         ai={ai}
         similar={similar}
       />
+      <LinkedTickets ticketId={ticket.id} />
       {ticket.dynamic_fields && ticket.dynamic_fields.length > 0 && (
         <details className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm">
           <summary className="cursor-pointer font-medium text-muted">
