@@ -1454,7 +1454,7 @@
           "viaAgent": "like {{task}}"
         },
         "clarifySchemaJson": "Clarify schema fields (JSON)",
-        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WPN\", \"hint\": \"10-digit number, on the rental contract\"}]}",
+        "clarifySchemaJsonPlaceholder": "{\"intro\": \"Both are on the rental contract.\", \"fields\": [{\"column\": \"wpn\", \"label\": \"WPN\", \"hint\": \"10-digit number\"}, {\"column\": \"pkz\", \"label\": \"PKZ\", \"hint\": \"6 digits\"}]}",
         "serviceUser": "Service agent",
         "kbTags": "KB tags",
         "kbTagsPlaceholder": "tag1, tag2, …",
@@ -1829,7 +1829,7 @@
         "escalationRules": "JSON rules that check MCP tool results before PII masking; any match hard-stops automatic sending and escalates to a human (pure OR logic, no priority between rules).",
         "piiMasking": "Masks recognized customer identifiers (email, phone, MAC, IP) in ticket text and MCP tool results before they reach the model, and unmasks them again before the actual tool call or send. Complements, but does not replace, provider choice (EU hosting/DPA) as the primary privacy control.",
         "identityMode": "How customer identity is resolved for tool calls: \"Ticket customer\" uses the customer ID on the ticket, \"Clarify schema\" lets the AI actively ask for missing information, \"Off\" disables identity resolution.",
-        "clarifySchemaJson": "JSON description of the fields the AI may actively collect under the clarify schema (field name, label and an optional hint on format and where to find it, which the AI passes on when asking).",
+        "clarifySchemaJson": "JSON description of the fields the AI may actively collect under the clarify schema (field name, label and an optional hint on format and where to find it, plus a general `intro` text, which the AI passes on when asking).",
         "ignoredSenders": "Senders that are never auto-replied to — an exact address or a \"*@domain\" glob, case-insensitive. A match is a silent skip (no run, no draft). Examples: noreply@example.com, *@internal.example.",
         "ignoreSendersManual": "On a match, also blocks the manual \"AI draft\" button (409 error) — by default only the auto-reply path is affected, Manual Assist still runs for debugging.",
         "replyLanguageMode": "Controls whether the model is given a binding reply language: \"Off\" = today's behaviour (no directive), \"Fixed\" = always the configured language, \"Auto\" = detected from the subject + latest customer article, falling back to the configured default when the text is too short/ambiguous.",

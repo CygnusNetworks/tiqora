@@ -402,6 +402,9 @@ def test_identity_system_prompt_carries_the_language_line_after_the_tone() -> No
     assert prompt.index(tone) < prompt.index("Reply language (binding): en")
     plain = _build_identity_system_prompt(fields, tone_prompt=tone)
     assert "Reply language" not in plain
+    assert "General note" not in plain
+    with_intro = _build_identity_system_prompt(fields, intro="WPN und PKZ stehen im Mietvertrag.")
+    assert "WPN und PKZ stehen im Mietvertrag." in with_intro
 
 
 # ---------------------------------------------------------------------------
