@@ -806,6 +806,12 @@
         "show": "Änderungen anzeigen"
       }
     },
+    "links": {
+      "label": "Verknüpfte Tickets",
+      "parent": "Eltern",
+      "child": "Kind",
+      "related": "Verknüpft"
+    },
     "nav": {
       "copyTn": "Ticketnummer kopieren",
       "tnCopied": "Kopiert",

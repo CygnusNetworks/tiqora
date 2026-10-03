@@ -8,6 +8,7 @@ import { senderDisplayName } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { setTicketNavContext, type TicketNavContext } from "@/lib/ticketNavContext";
 import { Button } from "@/components/ui/Button";
+import { CopyTn } from "./CopyTn";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
@@ -692,7 +693,12 @@ function TicketRow({
             handler sits on a shrink-to-fit inline block, NOT a full-width
             cell, so clicks right of the customer name still open the ticket. */}
         <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-muted">
-          <span className="flex-none font-mono text-[11px] tabular-nums text-accent">{ticket.tn}</span>
+          <CopyTn
+            tn={ticket.tn}
+            iconOnHover
+            className="flex-none text-[11px] text-accent hover:underline"
+            testId={`ticket-tn-copy-${ticket.id}`}
+          />
           <span aria-hidden>·</span>
           <ChannelPill channel={channel} testId={`ticket-channel-${ticket.id}`} />
           <span className="min-w-0 truncate" data-testid={`ticket-customer-cell-${ticket.id}`}>

@@ -384,7 +384,9 @@ async def test_ticket_zoom(url_fixture: str, request: pytest.FixtureRequest) -> 
 
         # Link listing shows the split-created link.
         links = await svc.list_links(ids["agent"], ids["ticket"])
-        assert any(link["other_ticket_id"] == new_ticket_id for link in links)
+        split_link = next(link for link in links if link["other_ticket_id"] == new_ticket_id)
+        assert split_link["other_role"] == "child"
+        assert split_link["other_state"] and split_link["other_state_type"]
 
         # Split with priority/state overrides → applied to the new ticket
         # (priority 1 / state 1 differ from the seeded source values).

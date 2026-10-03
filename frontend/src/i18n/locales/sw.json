@@ -806,6 +806,12 @@
         "show": "Onyesha mabadiliko"
       }
     },
+    "links": {
+      "label": "Linked tickets",
+      "parent": "Parent",
+      "child": "Child",
+      "related": "Related"
+    },
     "nav": {
       "copyTn": "Copy ticket number",
       "tnCopied": "Copied",

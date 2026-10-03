@@ -15222,6 +15222,12 @@ export interface components {
         TicketLinkTargetOut: {
             /** Link Type */
             link_type: string;
+            /** Other Role */
+            other_role?: string | null;
+            /** Other State */
+            other_state?: string | null;
+            /** Other State Type */
+            other_state_type?: string | null;
             /** Other Ticket Id */
             other_ticket_id: number;
             /** Other Title */
