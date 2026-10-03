@@ -688,6 +688,9 @@
       "selectPlaceholder": "انتخاب…",
       "mergeTargetId": "ادغام در شناسه بلیط",
       "linkTargetId": "لینک شناسه بلیط",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "نوع پیوند",
       "apptTitle": "عنوان",
       "apptStart": "شروع کنید",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "خاستگاه",
       "search": "جستجوی «{{query}}»",
       "position": "{{index}} / {{total}}",

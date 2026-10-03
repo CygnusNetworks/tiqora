@@ -688,6 +688,9 @@
       "selectPlaceholder": "اختر…",
       "mergeTargetId": "دمج في معرف التذكرة",
       "linkTargetId": "رابط معرف التذكرة",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "نوع الرابط",
       "apptTitle": "العنوان",
       "apptStart": "ابدأ",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "المصدر",
       "search": "بحث «{{query}}»",
       "position": "{{index}} / {{total}}",

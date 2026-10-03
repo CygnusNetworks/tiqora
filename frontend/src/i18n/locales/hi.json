@@ -688,6 +688,9 @@
       "selectPlaceholder": "चुनें…",
       "mergeTargetId": "टिकट आईडी में मर्ज करें",
       "linkTargetId": "टिकट आईडी से लिंक करें",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "लिंक प्रकार",
       "apptTitle": "शीर्षक",
       "apptStart": "प्रारंभ करें",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "मूल",
       "search": "«{{query}}» खोजें",
       "position": "{{index}} / {{total}}",

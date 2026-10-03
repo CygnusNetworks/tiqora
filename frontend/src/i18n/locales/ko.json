@@ -688,6 +688,9 @@
       "selectPlaceholder": "선택…",
       "mergeTargetId": "티켓 ID로 병합",
       "linkTargetId": "티켓 ID 링크",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "링크 유형",
       "apptTitle": "제목",
       "apptStart": "시작",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "출처",
       "search": "“{{query}}” 검색",
       "position": "{{index}} / {{total}}",

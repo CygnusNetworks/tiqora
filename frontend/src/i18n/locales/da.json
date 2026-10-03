@@ -688,6 +688,9 @@
       "selectPlaceholder": "Vælg...",
       "mergeTargetId": "Flet ind i billet-id",
       "linkTargetId": "Link til billet-id",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Linktype",
       "apptTitle": "Titel",
       "apptStart": "Start",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Oprindelse",
       "search": "Søg \"{{query}}\"",
       "position": "{{index}} / {{total}}",

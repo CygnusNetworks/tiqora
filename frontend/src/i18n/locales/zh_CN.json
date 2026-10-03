@@ -688,6 +688,9 @@
       "selectPlaceholder": "选择…",
       "mergeTargetId": "合并到工单 ID",
       "linkTargetId": "工单 ID 链接",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "链接类型",
       "apptTitle": "标题",
       "apptStart": "开始",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "来源",
       "search": "搜索“{{query}}”",
       "position": "{{index}} / {{total}}",

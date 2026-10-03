@@ -688,6 +688,9 @@
       "selectPlaceholder": "Vali…",
       "mergeTargetId": "Ühendage pileti ID-ga",
       "linkTargetId": "Link pileti ID-le",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Lingi tüüp",
       "apptTitle": "Pealkiri",
       "apptStart": "Alusta",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Päritolu",
       "search": "Otsi „{{query}}“",
       "position": "{{index}} / {{total}}",

@@ -688,6 +688,9 @@
       "selectPlaceholder": "Vybrať…",
       "mergeTargetId": "Zlúčiť do ID lístka",
       "linkTargetId": "Odkaz na ID lístka",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Typ odkazu",
       "apptTitle": "Názov",
       "apptStart": "Štart",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Pôvod",
       "search": "Hľadať „{{query}}“",
       "position": "{{index}} / {{total}}",

@@ -688,6 +688,9 @@
       "selectPlaceholder": "Izberite ...",
       "mergeTargetId": "Spojite se v ID vstopnice",
       "linkTargetId": "Povezava do ID vstopnice",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Vrsta povezave",
       "apptTitle": "Naslov",
       "apptStart": "Začetek",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Izvor",
       "search": "Iskanje »{{query}}«",
       "position": "{{index}} / {{total}}",

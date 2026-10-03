@@ -688,6 +688,9 @@
       "selectPlaceholder": "Chọn…",
       "mergeTargetId": "Hợp nhất vào ID vé",
       "linkTargetId": "Liên kết đến ID vé",
+      "errorNotFound": "Ticket {{ref}} not found. Please check the ticket number.",
+      "errorSelf": "A ticket cannot be linked or merged with itself.",
+      "errorForbidden": "You need write access to both tickets.",
       "linkType": "Kiểu liên kết",
       "apptTitle": "Tiêu đề",
       "apptStart": "Bắt đầu",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Copy ticket number",
+      "tnCopied": "Copied",
       "label": "Nguồn",
       "search": "Tìm kiếm “{{query}}”",
       "position": "{{index}} / {{total}}",

@@ -688,6 +688,9 @@
       "selectPlaceholder": "Auswählen…",
       "mergeTargetId": "In Ticketnummer zusammenfassen",
       "linkTargetId": "Mit Ticketnummer verknüpfen",
+      "errorNotFound": "Ticket {{ref}} nicht gefunden. Bitte die Ticketnummer prüfen.",
+      "errorSelf": "Ein Ticket kann nicht mit sich selbst verknüpft oder zusammengeführt werden.",
+      "errorForbidden": "Du brauchst Schreibrechte auf beide Tickets.",
       "linkType": "Verknüpfungstyp",
       "apptTitle": "Titel",
       "apptStart": "Beginn",
@@ -804,6 +807,8 @@
       }
     },
     "nav": {
+      "copyTn": "Ticketnummer kopieren",
+      "tnCopied": "Kopiert",
       "label": "Herkunft",
       "search": "Suche „{{query}}“",
       "position": "{{index}} / {{total}}",
