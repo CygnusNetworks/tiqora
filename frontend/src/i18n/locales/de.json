@@ -1454,7 +1454,7 @@
           "viaAgent": "wie {{task}}"
         },
         "clarifySchemaJson": "Clarify-Schema-Felder (JSON)",
-        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WP-Nummer\"}]}",
+        "clarifySchemaJsonPlaceholder": "{\"fields\": [{\"column\": \"wpnum\", \"label\": \"WPN\", \"hint\": \"zehnstellige Nummer, steht im Mietvertrag\"}]}",
         "serviceUser": "Service-Agent",
         "kbTags": "KB-Tags",
         "kbTagsPlaceholder": "tag1, tag2, …",
@@ -1829,7 +1829,7 @@
         "escalationRules": "JSON-Regeln, die MCP-Tool-Ergebnisse vor dem PII-Masking prüfen; jeder Treffer stoppt das automatische Senden hart und eskaliert an einen Menschen (reine ODER-Verknüpfung, keine Priorität zwischen Regeln).",
         "piiMasking": "Maskiert erkannte Kunden-Identifikatoren (E-Mail, Telefon, MAC, IP) im Ticket-Text und in MCP-Tool-Ergebnissen, bevor sie an das Modell gehen, und löst sie vor dem eigentlichen Tool-Aufruf bzw. vor dem Senden wieder auf. Ergänzt, ersetzt aber nicht die Provider-Wahl (EU-Hosting/AVV) als primäre Datenschutzmaßnahme.",
         "identityMode": "Wie die Kundenidentität für Tool-Aufrufe aufgelöst wird: „Ticket-Kunde“ nutzt die am Ticket hinterlegte Kunden-ID, „Rückfrage-Schema“ lässt die KI fehlende Angaben aktiv erfragen, „Aus“ deaktiviert die Identitätsauflösung.",
-        "clarifySchemaJson": "JSON-Beschreibung der Felder, die die KI beim Rückfrage-Schema aktiv erheben darf (Feldname + optionales MCP-Match-Tool).",
+        "clarifySchemaJson": "JSON-Beschreibung der Felder, die die KI beim Rückfrage-Schema aktiv erheben darf (Feldname, Label und optionaler Hinweis zu Format und Fundort, den die KI beim Nachfragen nennt).",
         "ignoredSenders": "Absender, für die niemals automatisch geantwortet wird — exakte Adresse oder \"*@domain\"-Muster, Groß-/Kleinschreibung egal. Ein Treffer führt zu einem stillen Skip (kein Lauf, kein Entwurf). Beispiele: noreply@example.com, *@internal.example.",
         "ignoreSendersManual": "Blockiert bei Treffer auch den manuellen „KI-Entwurf“-Button (409-Fehler) — Standard: nur der Auto-Antwort-Pfad ist betroffen, Manual Assist läuft zu Debug-Zwecken weiter.",
         "replyLanguageMode": "Steuert, ob dem Modell eine verbindliche Antwortsprache vorgegeben wird: „Aus“ = heutiges Verhalten (keine Vorgabe), „Fest“ = immer die angegebene Sprache, „Automatisch“ = Erkennung aus Betreff + letztem Kundenartikel, mit konfigurierter Rückfallsprache bei zu kurzem/uneindeutigem Text.",
