@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
-import { ActionToolbar } from "./ActionToolbar";
+import { ActionToolbar, LinkDialog } from "./ActionToolbar";
 import type { TicketDetail } from "@/lib/api";
 
 const {
@@ -12,7 +12,11 @@ const {
   listReferenceStates,
   searchReferenceCustomers,
   createCustomer,
+  searchTickets,
+  createTicketLink,
 } = vi.hoisted(() => ({
+  searchTickets: vi.fn(),
+  createTicketLink: vi.fn(),
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
   listReferenceStates: vi.fn(),
@@ -40,6 +44,8 @@ vi.mock("@/lib/api", async () => {
       createCustomer,
       listQueues: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
+      searchTickets,
+      createTicketLink,
     },
   };
 });
@@ -347,5 +353,24 @@ describe("ActionToolbar", () => {
 
     expect(await screen.findByTestId("customer-create-conflict")).toBeInTheDocument();
     expect(patchTicket).not.toHaveBeenCalled();
+  });
+});
+
+describe("LinkDialog", () => {
+  it("resolves a typed ticket number to the internal id before linking", async () => {
+    searchTickets.mockReset().mockResolvedValue([
+      { ticket_id: 4711, tn: "2026092610000038", title: "x" },
+    ]);
+    createTicketLink.mockReset().mockResolvedValue(undefined);
+    wrap(<LinkDialog ticketId={7} onClose={() => {}} />);
+    const input = screen.getByTestId("link-dialog").querySelector("input") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "2026092610000038" } });
+    fireEvent.click(screen.getByRole("button", { name: /speichern|save/i }));
+    await waitFor(() =>
+      expect(createTicketLink).toHaveBeenCalledWith(7, {
+        target_ticket_id: 4711,
+        link_type: "Normal",
+      }),
+    );
   });
 });

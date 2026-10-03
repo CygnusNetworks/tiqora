@@ -877,6 +877,20 @@ export function PendingDialog({
   );
 }
 
+/**
+ * Resolve what the agent typed into a ticket picker to an internal ticket id.
+ * Agents type the ticket number (``tn``, 16 digits); the write endpoints take
+ * the internal id. Short numeric input is still accepted as a raw id.
+ */
+async function resolveTicketRef(raw: string): Promise<number> {
+  const ref = raw.trim().replace(/^#/, "");
+  const hits = await api.searchTickets({ q: ref, limit: 10 });
+  const exact = hits.find((h) => h.tn === ref);
+  if (exact) return exact.ticket_id;
+  if (/^\d{1,9}$/.test(ref)) return Number(ref);
+  throw new Error(`ticket ${ref} not found`);
+}
+
 const LINK_TYPES = ["Normal", "ParentChild"] as const;
 
 export function LinkDialog({
@@ -897,9 +911,9 @@ export function LinkDialog({
   });
 
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: async () =>
       api.createTicketLink(ticketId, {
-        target_ticket_id: Number(targetId),
+        target_ticket_id: await resolveTicketRef(targetId),
         link_type: linkType,
       }),
     onSuccess: () => {
@@ -931,6 +945,7 @@ export function LinkDialog({
             className={inputCls}
             value={targetId}
             inputMode="numeric"
+            autoFocus
             onChange={(e) => setTargetId(e.target.value)}
           />
         </label>
@@ -966,7 +981,8 @@ export function MergeDialog({
   const [mainId, setMainId] = useState("");
 
   const merge = useMutation({
-    mutationFn: () => api.mergeTicket(ticketId, { main_ticket_id: Number(mainId) }),
+    mutationFn: async () =>
+      api.mergeTicket(ticketId, { main_ticket_id: await resolveTicketRef(mainId) }),
     onSuccess: () => {
       // Merging closes the source ticket, which moves it out of the queue's
       // open count — same broad invalidation usePatchTicket uses.
