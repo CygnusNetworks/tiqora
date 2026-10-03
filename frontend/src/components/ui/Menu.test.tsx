@@ -95,10 +95,23 @@ describe("Menu", () => {
     }
   });
 
-  it("still closes when the page (non-portal) is scrolled", () => {
+  it("still closes when the page scroll moved the trigger", () => {
+    renderMenu();
+    const trigger = screen.getByTestId("trigger");
+    fireEvent.click(trigger);
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, -40, 32, 32),
+    );
+    fireEvent.scroll(document.body);
+    expect(screen.queryByTestId("menu")).toBeNull();
+  });
+
+  it("stays open for a late scroll event when the trigger did not move", () => {
+    // Scroll events arrive a frame late: a scroll-into-view right before the
+    // click used to close the freshly opened menu (flaky process e2e).
     renderMenu();
     fireEvent.click(screen.getByTestId("trigger"));
     fireEvent.scroll(document.body);
-    expect(screen.queryByTestId("menu")).toBeNull();
+    expect(screen.getByTestId("menu")).toBeInTheDocument();
   });
 });

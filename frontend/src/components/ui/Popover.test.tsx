@@ -95,8 +95,19 @@ describe("Popover", () => {
     wrap();
     fireEvent.click(screen.getByTestId("pop-trigger"));
     await screen.findByTestId("pop-panel");
+    vi.spyOn(screen.getByTestId("pop-trigger"), "getBoundingClientRect").mockReturnValue(
+      new DOMRect(0, -40, 32, 32),
+    );
     fireEvent.scroll(document.body);
     await waitFor(() => expect(screen.queryByTestId("pop-panel")).not.toBeInTheDocument());
+  });
+
+  it("stays open for a late scroll event when the trigger did not move", async () => {
+    wrap();
+    fireEvent.click(screen.getByTestId("pop-trigger"));
+    await screen.findByTestId("pop-panel");
+    fireEvent.scroll(document.body);
+    expect(screen.getByTestId("pop-panel")).toBeInTheDocument();
   });
 
   it("renders the panel outside the trigger's subtree so it cannot be clipped", async () => {

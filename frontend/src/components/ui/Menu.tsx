@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+import { triggerMoved } from "./triggerMoved";
 
 /** Rough panel height budget used only to decide whether to flip the panel
  * above the trigger when there isn't room below (mirrors `SelectMenu`). */
@@ -82,6 +83,7 @@ export function Menu({
   const [pos, setPos] = useState<PanelPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const openRectRef = useRef<DOMRect | null>(null);
   const menuId = useId();
 
   const close = useCallback(() => setOpen(false), []);
@@ -99,6 +101,7 @@ export function Menu({
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    openRectRef.current = rect;
     const spaceBelow = window.innerHeight - rect.bottom;
     const flip = spaceBelow < PANEL_MAX_H && rect.top > spaceBelow;
     const room = (flip ? rect.top : spaceBelow) - 6 - VIEWPORT_MARGIN;
@@ -134,7 +137,8 @@ export function Menu({
       }
     };
     // The panel is fixed-positioned from the trigger rect on open; page scroll
-    // or resize would leave it stranded, so close rather than re-track.
+    // or resize would leave it stranded, so close rather than re-track — but
+    // only once the trigger really moved (see `triggerMoved`).
     // Scrolling *inside* this panel (long menus) must not close it, and neither
     // may scrolling a nested portal listbox such as the account language
     // `SelectMenu` — those render into `document.body` under
@@ -145,6 +149,7 @@ export function Menu({
       const el =
         target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
       if (el?.closest("[data-portal-menu]")) return;
+      if (!triggerMoved(triggerRef.current, openRectRef.current)) return;
       setOpen(false);
     };
     const onResize = () => setOpen(false);

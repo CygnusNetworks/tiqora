@@ -10,6 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { CheckMark } from "./Menu";
+import { triggerMoved } from "./triggerMoved";
 
 /** Rough panel height budget used only to decide whether to flip above the
  * trigger — the panel itself still scrolls past this via `max-h`. */
@@ -79,6 +80,7 @@ export function SelectMenu<T extends string | number>({
   const [pos, setPos] = useState<Position | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const openRectRef = useRef<DOMRect | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   const showSearch = items.length > searchThreshold;
@@ -104,6 +106,7 @@ export function SelectMenu<T extends string | number>({
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    openRectRef.current = rect;
     const spaceBelow = window.innerHeight - rect.bottom;
     const flip = spaceBelow < PANEL_MAX_H && rect.top > spaceBelow;
     setPos({
@@ -139,6 +142,9 @@ export function SelectMenu<T extends string | number>({
     // the fold — closing there made entries below it unselectable).
     const onScroll = (e: Event) => {
       if (e.target instanceof Node && panelRef.current?.contains(e.target)) return;
+      // A scroll from before opening arrives a frame late; close only once
+      // the trigger actually moved.
+      if (!triggerMoved(triggerRef.current, openRectRef.current)) return;
       close();
     };
     const onResize = () => close();
