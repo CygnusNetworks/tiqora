@@ -62,6 +62,8 @@ def _cleanup(sync_url: str) -> None:
         conn.execute(
             text("DELETE FROM customer_company WHERE customer_id LIKE :p"), {"p": "CUSTSYNC%"}
         )
+        # Customer writes queue a Znuny cache invalidation row (tiqora table).
+        conn.execute(text("DELETE FROM tiqora_cache_invalidation"))
         conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": _UID})
     engine.dispose()
 
