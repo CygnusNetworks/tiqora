@@ -7559,6 +7559,46 @@
         "title": "ChannelConfigUpdate",
         "type": "object"
       },
+      "CompanyCreateOut": {
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CompanyCreateOut",
+        "type": "object"
+      },
+      "CompanyCreateRequest": {
+        "properties": {
+          "customer_id": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CompanyCreateRequest",
+        "type": "object"
+      },
       "ComposeContextOut": {
         "properties": {
           "from_address": {
@@ -54641,6 +54681,82 @@
           }
         },
         "summary": "Create Customer",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/companies": {
+      "post": {
+        "description": "Create a customer company as any authenticated agent (the AI\nsecretary files a caller's organisation that Tiqora does not know).",
+        "operationId": "create_company_api_v1_customers_companies_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyCreateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Company",
         "tags": [
           "customers"
         ]

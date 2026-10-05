@@ -14,7 +14,7 @@ from tiqora.api.v1.admin.common import (
     invalidate_znuny_cache_types,
     now,
 )
-from tiqora.db.legacy.customer import CustomerUser
+from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.domain.customer_service import CustomerService
 from tiqora.domain.new_ticket_queue import (
     NewTicketScreen,
@@ -130,6 +130,54 @@ async def create_customer(
         first_name=cu.first_name,
         last_name=cu.last_name,
     )
+
+
+class CompanyCreateRequest(BaseModel):
+    customer_id: str = Field(..., min_length=1, max_length=150)
+    name: str = Field(..., min_length=1, max_length=200)
+
+
+class CompanyCreateOut(BaseModel):
+    customer_id: str
+    name: str
+
+
+@router.post(
+    "/companies",
+    response_model=CompanyCreateOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_company(
+    body: CompanyCreateRequest,
+    user: CurrentUser,
+    session: DbSession,
+) -> CompanyCreateOut:
+    """Create a customer company as any authenticated agent (the AI
+    secretary files a caller's organisation that Tiqora does not know)."""
+    customer_id = body.customer_id.strip()
+    name = body.name.strip()
+    if not customer_id or not name:
+        raise HTTPException(status_code=422, detail="customer_id and name are required")
+    existing = await session.get(CustomerCompany, customer_id)
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Customer company already exists"
+        )
+    ts = now()
+    session.add(
+        CustomerCompany(
+            customer_id=customer_id,
+            name=name,
+            valid_id=1,
+            create_time=ts,
+            create_by=user.id,
+            change_time=ts,
+            change_by=user.id,
+        )
+    )
+    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    await session.commit()
+    return CompanyCreateOut(customer_id=customer_id, name=name)
 
 
 @router.get("/{login}", response_model=CustomerUserOut)
