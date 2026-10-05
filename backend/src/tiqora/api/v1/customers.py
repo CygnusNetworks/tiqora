@@ -277,8 +277,11 @@ async def fill_customer(
         setattr(cu, name, value)
         changed.append(name)
     if body.comments_append is not None and not _blank(body.comments_append):
-        cu.comments = _append_comment(cu.comments, body.comments_append.strip())
-        changed.append("comments")
+        line = body.comments_append.strip()
+        existing = [part.strip() for part in (cu.comments or "").split("\n")]
+        if line not in existing:
+            cu.comments = _append_comment(cu.comments, line)
+            changed.append("comments")
     if changed:
         cu.change_time = now()
         cu.change_by = user.id
