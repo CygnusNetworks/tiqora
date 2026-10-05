@@ -13,13 +13,27 @@ from typing import Annotated
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
 
-from tiqora.api.deps import CurrentUser, get_redis
-from tiqora.channels.phone.cti import ActiveCall, dismiss_call, list_active_calls
+from tiqora.api.deps import CurrentUser, DbSession, get_redis
+from tiqora.channels.phone.cti import (
+    ActiveCall,
+    dismiss_call,
+    extensions_for_user,
+    list_active_calls,
+)
+from tiqora.channels.phone.originate import (
+    OriginateError,
+    load_originate_config,
+    normalize_dial_number,
+    originate,
+)
 
 router = APIRouter(prefix="/phone", tags=["phone"])
 
 RedisDep = Annotated[redis.Redis, Depends(get_redis)]
+
+DIAL_RATE_SECONDS = 5
 
 
 def _unavailable(exc: Exception) -> HTTPException:
@@ -45,3 +59,48 @@ async def dismiss(call_id: str, user: CurrentUser, redis_client: RedisDep) -> No
         raise _unavailable(exc) from exc
     if not found:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call not found")
+
+
+class DialRequest(BaseModel):
+    number: str = Field(..., min_length=1, max_length=64)
+    ticket_id: int | None = None
+    #: shown on the desk phone while it rings (customer name)
+    name: str = Field("", max_length=100)
+
+
+class DialOut(BaseModel):
+    extension: str
+    number: str
+
+
+@router.post("/dial", response_model=DialOut, status_code=status.HTTP_202_ACCEPTED)
+async def dial(
+    body: DialRequest, user: CurrentUser, session: DbSession, redis_client: RedisDep
+) -> DialOut:
+    """Click-to-dial: ring the agent's desk phone, then dial ``number``.
+
+    Session only: an API key (whatever its scopes) must not ring desk phones
+    and dial out over the trunk."""
+    if user.auth_method == "api_key":
+        raise HTTPException(status_code=403, detail="click-to-dial needs an agent session")
+    config = await load_originate_config(session)
+    if config is None:
+        raise HTTPException(status_code=404, detail="click-to-dial is not configured")
+    extensions = await extensions_for_user(session, user.id)
+    if not extensions:
+        raise HTTPException(status_code=409, detail="no phone extension set for this agent")
+    try:
+        number = normalize_dial_number(body.number, config.internal)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    try:
+        fresh = await redis_client.set(f"tiqora:dial:{user.id}", "1", ex=DIAL_RATE_SECONDS, nx=True)
+    except (redis.RedisError, ConnectionError, OSError) as exc:
+        raise _unavailable(exc) from exc
+    if not fresh:
+        raise HTTPException(status_code=429, detail="dial request already running")
+    try:
+        await originate(config, extensions[0], number, body.name)
+    except OriginateError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return DialOut(extension=extensions[0], number=number)
