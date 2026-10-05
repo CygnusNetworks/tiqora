@@ -3890,6 +3890,8 @@
     "toLogin": "Przejdź do logowania"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Połączenie",
     "menuLabel": "Zarejestruj połączenie",
     "inbound": "Przychodzące",

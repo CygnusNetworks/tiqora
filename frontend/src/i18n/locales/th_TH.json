@@ -3890,6 +3890,8 @@
     "toLogin": "ไปหน้าเข้าสู่ระบบ"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "โทร",
     "menuLabel": "บันทึกการโทร",
     "inbound": "สายเข้า",

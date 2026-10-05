@@ -3890,6 +3890,8 @@
     "toLogin": "Ves a l'inici de sessió"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Trucada",
     "menuLabel": "Registra una trucada",
     "inbound": "Entrant",

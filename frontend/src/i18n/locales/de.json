@@ -3898,6 +3898,8 @@
     "toLogin": "Zur Anmeldung"
   },
   "phone": {
+    "dialRinging": "Telefon {{extension}} klingelt – abheben, dann wird gewählt",
+    "dialFailed": "Wählen fehlgeschlagen",
     "button": "Anruf",
     "menuLabel": "Anruf erfassen",
     "inbound": "Eingehend",

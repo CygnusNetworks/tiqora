@@ -3890,6 +3890,8 @@
     "toLogin": "Bejelentkezéshez"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Hívás",
     "menuLabel": "Hívás rögzítése",
     "inbound": "Bejövő",

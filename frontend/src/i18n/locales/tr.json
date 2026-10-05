@@ -3890,6 +3890,8 @@
     "toLogin": "Oturum açmaya git"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Ara",
     "menuLabel": "Aramayı kaydet",
     "inbound": "Gelen",

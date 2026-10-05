@@ -3890,6 +3890,8 @@
     "toLogin": "Uz pierakstīšanos"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Zvanīt",
     "menuLabel": "Reģistrēt zvanu",
     "inbound": "Ienākošs",

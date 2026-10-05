@@ -3890,6 +3890,8 @@
     "toLogin": "前往登录"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "通话",
     "menuLabel": "登记通话",
     "inbound": "呼入",

@@ -3890,6 +3890,8 @@
     "toLogin": "Siirry kirjautumiseen"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Puhelu",
     "menuLabel": "Kirjaa puhelu",
     "inbound": "Saapuva",

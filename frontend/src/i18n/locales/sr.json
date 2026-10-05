@@ -3890,6 +3890,8 @@
     "toLogin": "На пријаву"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Позив",
     "menuLabel": "Евидентирај позив",
     "inbound": "Долазни",
