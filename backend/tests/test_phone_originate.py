@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from tiqora.channels.phone import originate as originate_mod
 from tiqora.channels.phone.originate import (
     OriginateConfig,
     OriginateError,
@@ -62,6 +63,38 @@ def test_normalize_with_phonenumbers(raw: str, expected: str) -> None:
 def test_normalize_rejects_invalid_and_premium(raw: str) -> None:
     with pytest.raises(ValueError):
         normalize_dial_number(raw, INTERNAL)
+
+
+def test_normalize_region_without_trunk_prefix_dials_international() -> None:
+    assert normalize_dial_number("650 253 0000", INTERNAL, "US") == "0016502530000"
+    assert normalize_dial_number("0171 7630944", INTERNAL, "DE") == "01717630944"
+
+
+@pytest.mark.parametrize(
+    ("setting", "expected"),
+    [(None, "DE"), ("at", "AT"), (" AT ", "AT"), ("xyz", "DE"), ("1A", "DE"), ("", "DE")],
+)
+async def test_load_config_region(
+    monkeypatch: pytest.MonkeyPatch, setting: str | None, expected: str
+) -> None:
+    values = {
+        "originate_enabled": "1",
+        "originate_ari_url": "http://x/ari",
+        "originate_ari_user": "u",
+        "originate_ari_secret": "s",
+    }
+    if setting is not None:
+        values["originate_region"] = setting
+
+    async def fake(
+        _session: object, _channel: str, key: str, default: str | None = None
+    ) -> str | None:
+        return values.get(key, default)
+
+    monkeypatch.setattr(originate_mod, "channel_setting", fake)
+    config = await originate_mod.load_originate_config(None)  # type: ignore[arg-type]
+    assert config is not None
+    assert config.region == expected
 
 
 def test_normalize_region_switches_domestic_format() -> None:
