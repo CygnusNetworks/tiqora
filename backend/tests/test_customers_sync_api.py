@@ -160,6 +160,13 @@ async def test_create_company_and_conflict(mariadb_znuny_url: str) -> None:
             "/api/v1/reference/customer-search", params={"q": "CUSTSYNC Studierendenwerk"}
         )
     await engine.dispose()
+    sync = create_engine(mariadb_znuny_url)
+    with sync.connect() as conn:
+        types = {
+            r[0] for r in conn.execute(text("SELECT cache_type FROM tiqora_cache_invalidation"))
+        }
+    sync.dispose()
+    assert "CustomerCompany" in types
     assert first.status_code == 201, first.text
     assert first.json() == body
     assert second.status_code == 409

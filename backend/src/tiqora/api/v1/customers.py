@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.api.v1.admin.common import (
+    CUSTOMER_COMPANY_CACHE_TYPES,
     CUSTOMER_USER_CACHE_TYPES,
     invalidate_znuny_cache_types,
     now,
@@ -175,7 +176,7 @@ async def create_company(
             change_by=user.id,
         )
     )
-    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    await invalidate_znuny_cache_types(session, CUSTOMER_COMPANY_CACHE_TYPES)
     await session.commit()
     return CompanyCreateOut(customer_id=customer_id, name=name)
 
