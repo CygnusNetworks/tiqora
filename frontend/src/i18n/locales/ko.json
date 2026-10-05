@@ -3890,6 +3890,8 @@
     "toLogin": "로그인으로"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "통화",
     "menuLabel": "통화 기록",
     "inbound": "수신",

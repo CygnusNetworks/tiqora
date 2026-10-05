@@ -14,6 +14,8 @@ export type CallerLookup = Schemas["CallerLookupOut"];
 export type CallerCustomer = Schemas["CallerCustomerOut"];
 export type CallerTicket = Schemas["CallerTicketOut"];
 export type PhoneConfig = Schemas["PhoneConfigOut"];
+export type DialRequest = Schemas["DialRequest"];
+export type DialOut = Schemas["DialOut"];
 export type DialScheme = PhoneConfig["dial_scheme"];
 export type DynamicFieldDef = Schemas["DynamicFieldDefOut"];
 export type ActiveCall = Schemas["ActiveCall"];
@@ -41,6 +43,10 @@ export const phoneApi = {
   },
   phoneConfig(signal?: AbortSignal) {
     return api.request<PhoneConfig>("GET", "/api/v1/reference/phone-config", { signal });
+  },
+  /** Click-to-dial: rings the agent's desk phone, then dials the number. */
+  dial(body: DialRequest) {
+    return api.request<DialOut>("POST", "/api/v1/phone/dial", { body });
   },
   /** CTI popup: running calls + those ended ≤ 15 min ago (reload restore). */
   activeCalls(signal?: AbortSignal) {

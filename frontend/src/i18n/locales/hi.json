@@ -3890,6 +3890,8 @@
     "toLogin": "साइन इन पर जाएँ"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "कॉल",
     "menuLabel": "कॉल दर्ज करें",
     "inbound": "आवक",

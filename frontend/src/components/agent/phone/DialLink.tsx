@@ -1,40 +1,57 @@
-import { useQuery } from "@tanstack/react-query";
-import { phoneApi } from "@/lib/phoneApi";
+import { useTranslation } from "react-i18next";
 import { dialHref } from "@/lib/phoneCall";
-
-/** Hook form of the click-to-call scheme (`tel` unless the admin chose `sip`). */
-function useDialScheme() {
-  const q = useQuery({
-    queryKey: ["reference", "phone-config"],
-    queryFn: () => phoneApi.phoneConfig(),
-    staleTime: 10 * 60 * 1000,
-  });
-  return q.data?.dial_scheme ?? "tel";
-}
+import { useOriginate } from "./useOriginate";
 
 /**
- * A phone number as a click-to-call link (`tel:`/`sip:` per
- * `channel.phone.dial_scheme`). The link dials through the OS/softphone
- * handler; `onDial` runs alongside, e.g. to open the call form.
+ * A phone number as a click-to-call link. With click-to-dial configured
+ * (`originate`), a click rings the agent's desk phone and then dials;
+ * Ctrl/Cmd-click still follows the `tel:`/`sip:` link. `onDial` runs in
+ * both cases (e.g. to open the call form).
  */
 export function DialLink({
   number,
   onDial,
   testId,
+  ticketId,
+  name,
 }: {
   number: string;
   onDial?: () => void;
   testId?: string;
+  ticketId?: number;
+  name?: string;
 }) {
-  const scheme = useDialScheme();
+  const { t } = useTranslation();
+  const { enabled, scheme, status, dial } = useOriginate();
   return (
-    <a
-      href={dialHref(number, scheme)}
-      onClick={onDial}
-      data-testid={testId}
-      className="font-mono text-accent hover:underline"
-    >
-      {number}
-    </a>
+    <span className="inline-flex items-center gap-2">
+      <a
+        href={dialHref(number, scheme)}
+        onClick={(e) => {
+          if (enabled && !e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            void dial(number, { ticketId, name });
+          }
+          onDial?.();
+        }}
+        data-testid={testId}
+        className="font-mono text-accent hover:underline"
+      >
+        {number}
+      </a>
+      {status.kind === "ringing" && (
+        <span
+          className="text-xs text-muted"
+          data-testid={testId ? `${testId}-status` : undefined}
+        >
+          {t("phone.dialRinging", { extension: status.extension })}
+        </span>
+      )}
+      {status.kind === "error" && (
+        <span className="text-xs text-danger" role="alert">
+          {status.message}
+        </span>
+      )}
+    </span>
   );
 }

@@ -4802,6 +4802,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Company
+         * @description Create a customer company as any authenticated agent (the AI
+         *     secretary files a caller's organisation that Tiqora does not know).
+         */
+        post: operations["create_company_api_v1_customers_companies_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{login}": {
         parameters: {
             query?: never;
@@ -4816,7 +4837,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Fill Customer */
+        patch: operations["fill_customer_api_v1_customers__login__patch"];
         trace?: never;
     };
     "/api/v1/customers/{login}/crypto-keys": {
@@ -5270,6 +5292,29 @@ export interface paths {
         put?: never;
         /** Dismiss */
         post: operations["dismiss_api_v1_phone_calls__call_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/phone/dial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dial
+         * @description Click-to-dial: ring the agent's desk phone, then dial ``number``.
+         *
+         *     Session only: an API key (whatever its scopes) must not ring desk phones
+         *     and dial out over the trunk.
+         */
+        post: operations["dial_api_v1_phone_dial_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7809,18 +7854,31 @@ export interface components {
          * @description Body for agent-side customer-user creation (Znuny AgentTicketCustomer).
          *
          *     No password — agents create the contact record; portal auth is separate.
+         *     ``email`` and ``first_name`` may be empty: the AI secretary creates
+         *     callers it only knows by surname and number (the columns are NOT NULL,
+         *     so empty means ``""``).
          */
         AgentCustomerCreateRequest: {
+            /** Comments */
+            comments?: string | null;
             /** Customer Id */
             customer_id: string;
-            /** Email */
+            /**
+             * Email
+             * @default
+             */
             email: string;
-            /** First Name */
+            /**
+             * First Name
+             * @default
+             */
             first_name: string;
             /** Last Name */
             last_name: string;
             /** Login */
             login: string;
+            /** Mobile */
+            mobile?: string | null;
             /** Phone */
             phone?: string | null;
         };
@@ -9983,6 +10041,20 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
         };
+        /** CompanyCreateOut */
+        CompanyCreateOut: {
+            /** Customer Id */
+            customer_id: string;
+            /** Name */
+            name: string;
+        };
+        /** CompanyCreateRequest */
+        CompanyCreateRequest: {
+            /** Customer Id */
+            customer_id: string;
+            /** Name */
+            name: string;
+        };
         /** ComposeContextOut */
         ComposeContextOut: {
             /** From Address */
@@ -10325,6 +10397,46 @@ export interface components {
             smime_enabled: boolean;
             /** Smime Filename */
             smime_filename?: string | null;
+        };
+        /** CustomerFillOut */
+        CustomerFillOut: {
+            /** Changed */
+            changed: string[];
+            /** Comments */
+            comments: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /** Mobile */
+            mobile: string | null;
+            /** Phone */
+            phone: string | null;
+        };
+        /**
+         * CustomerFillRequest
+         * @description Fill-only update: a field is written only when it is empty on the
+         *     customer; nothing is overwritten or cleared (AI secretary, spec B1).
+         */
+        CustomerFillRequest: {
+            /** Comments Append */
+            comments_append?: string | null;
+            /** Email */
+            email?: string | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Mobile */
+            mobile?: string | null;
+            /** Phone */
+            phone?: string | null;
         };
         /** CustomerLoginResponse */
         CustomerLoginResponse: {
@@ -10694,6 +10806,25 @@ export interface components {
             size_bytes?: number | null;
             /** Version */
             version?: string | null;
+        };
+        /** DialOut */
+        DialOut: {
+            /** Extension */
+            extension: string;
+            /** Number */
+            number: string;
+        };
+        /** DialRequest */
+        DialRequest: {
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Number */
+            number: string;
+            /** Ticket Id */
+            ticket_id?: number | null;
         };
         /** DimensionCountOut */
         DimensionCountOut: {
@@ -13014,6 +13145,11 @@ export interface components {
              * @enum {string}
              */
             dial_scheme: "tel" | "sip";
+            /**
+             * Originate
+             * @default false
+             */
+            originate: boolean;
         };
         /** PhoneNoteRequest */
         PhoneNoteRequest: {
@@ -29336,6 +29472,43 @@ export interface operations {
             };
         };
     };
+    create_company_api_v1_customers_companies_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyCreateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_customer_api_v1_customers__login__get: {
         parameters: {
             query?: never;
@@ -29358,6 +29531,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerUserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fill_customer_api_v1_customers__login__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerFillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerFillOut"];
                 };
             };
             /** @description Validation Error */
@@ -30453,6 +30665,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dial_api_v1_phone_dial_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DialRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DialOut"];
+                };
             };
             /** @description Validation Error */
             422: {

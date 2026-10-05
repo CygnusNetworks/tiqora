@@ -3890,6 +3890,8 @@
     "toLogin": "Přejít k přihlášení"
   },
   "phone": {
+    "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
+    "dialFailed": "Dialling failed",
     "button": "Hovor",
     "menuLabel": "Zapsat hovor",
     "inbound": "Příchozí",

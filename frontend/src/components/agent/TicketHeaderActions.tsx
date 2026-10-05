@@ -30,6 +30,7 @@ import { stateColorVar } from "@/lib/status";
 import type { TicketAiSlots } from "./AiPanel";
 import { TicketBackNav } from "./TicketBackNav";
 import { PhoneCallDialog } from "./phone/PhoneCallDialog";
+import { useOriginate } from "./phone/useOriginate";
 import { phoneApi, type PhoneDirection } from "@/lib/phoneApi";
 import {
   consumePhoneCallRequest,
@@ -221,6 +222,9 @@ export function TicketHeaderActions({
     enabled: perms.rw,
     staleTime: 10 * 60 * 1000,
   });
+  const originate = useOriginate();
+  const customerName =
+    [customerQ.data?.first_name, customerQ.data?.last_name].filter(Boolean).join(" ") || undefined;
   const customerNumbers = [
     { kind: "phone" as const, number: customerQ.data?.phone },
     { kind: "mobile" as const, number: customerQ.data?.mobile },
@@ -306,6 +310,7 @@ export function TicketHeaderActions({
             </Button>
           </span>
           {perms.rw && (
+            <>
             <Menu
               align="right"
               panelTestId="ticket-actions-phone-menu"
@@ -337,7 +342,13 @@ export function TicketHeaderActions({
                       key={n.kind}
                       href={dialHref(n.number, phoneConfigQ.data?.dial_scheme)}
                       data-testid={`phone-dial-${n.kind}`}
-                      onClick={() => openPhoneCall("outbound", n.number)}
+                      onClick={(e) => {
+                        if (originate.enabled && !e.metaKey && !e.ctrlKey) {
+                          e.preventDefault();
+                          void originate.dial(n.number, { ticketId, name: customerName });
+                        }
+                        openPhoneCall("outbound", n.number);
+                      }}
                       className="flex items-center justify-between gap-3 rounded px-2 py-1.5 text-sm text-ink hover:bg-surface-subtle"
                     >
                       <span className="text-xs text-muted">{t(`phone.${n.kind}Label`)}</span>
@@ -347,6 +358,17 @@ export function TicketHeaderActions({
                 </>
               )}
             </Menu>
+            {originate.status.kind === "ringing" && (
+              <span className="text-xs text-muted" data-testid="phone-dial-status">
+                {t("phone.dialRinging", { extension: originate.status.extension })}
+              </span>
+            )}
+            {originate.status.kind === "error" && (
+              <span className="text-xs text-danger" role="alert" data-testid="phone-dial-error">
+                {originate.status.message}
+              </span>
+            )}
+            </>
           )}
           <Menu
             align="right"
