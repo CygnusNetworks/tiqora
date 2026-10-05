@@ -101,7 +101,9 @@
     "openCount": "{{count}} open",
     "closedCount": "{{count}} gesloten",
     "allTickets": "Alle tickets →",
-    "recentTickets": "Recente tickets"
+    "recentTickets": "Recente tickets",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Versleutelingssleutels",

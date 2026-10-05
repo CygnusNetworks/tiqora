@@ -101,7 +101,9 @@
     "openCount": "{{count}} åbne",
     "closedCount": "{{count}} lukkede",
     "allTickets": "Alle sager →",
-    "recentTickets": "Seneste sager"
+    "recentTickets": "Seneste sager",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Krypteringsnøgler",

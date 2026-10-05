@@ -101,7 +101,9 @@
     "openCount": "{{count}} 个未关闭",
     "closedCount": "{{count}} 个已关闭",
     "allTickets": "全部工单 →",
-    "recentTickets": "最近的工单"
+    "recentTickets": "最近的工单",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "加密密钥",

@@ -101,7 +101,9 @@
     "openCount": "{{count}} nyitott",
     "closedCount": "{{count}} lezárt",
     "allTickets": "Összes jegy →",
-    "recentTickets": "Legutóbbi jegyek"
+    "recentTickets": "Legutóbbi jegyek",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Titkosítási kulcsok",

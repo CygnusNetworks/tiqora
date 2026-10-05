@@ -101,7 +101,9 @@
     "openCount": "{{count}} oberts",
     "closedCount": "{{count}} tancats",
     "allTickets": "Tots els tiquets →",
-    "recentTickets": "Tiquets recents"
+    "recentTickets": "Tiquets recents",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Claus de xifratge",

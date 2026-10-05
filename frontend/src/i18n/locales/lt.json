@@ -101,7 +101,9 @@
     "openCount": "{{count}} atvirų",
     "closedCount": "{{count}} uždarytų",
     "allTickets": "Visi bilietai →",
-    "recentTickets": "Naujausi bilietai"
+    "recentTickets": "Naujausi bilietai",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Šifravimo raktai",

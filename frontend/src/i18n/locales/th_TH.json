@@ -101,7 +101,9 @@
     "openCount": "เปิด {{count}}",
     "closedCount": "ปิด {{count}}",
     "allTickets": "ตั๋วทั้งหมด →",
-    "recentTickets": "ตั๋วล่าสุด"
+    "recentTickets": "ตั๋วล่าสุด",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "คีย์เข้ารหัส",

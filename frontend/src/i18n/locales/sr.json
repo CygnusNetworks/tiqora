@@ -101,7 +101,9 @@
     "openCount": "{{count}} отворених",
     "closedCount": "{{count}} затворених",
     "allTickets": "Сви тикети →",
-    "recentTickets": "Недавни тикети"
+    "recentTickets": "Недавни тикети",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Кључеви за шифровање",

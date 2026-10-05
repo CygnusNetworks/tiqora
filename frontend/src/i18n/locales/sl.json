@@ -101,7 +101,9 @@
     "openCount": "{{count}} odprtih",
     "closedCount": "{{count}} zaprtih",
     "allTickets": "Vsi zahtevki →",
-    "recentTickets": "Nedavni zahtevki"
+    "recentTickets": "Nedavni zahtevki",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Šifrirni ključi",
