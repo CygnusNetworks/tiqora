@@ -72,7 +72,11 @@ def normalize_dial_number(raw: str, internal: set[str] | frozenset[str], region:
         raise ValueError("premium-rate numbers are not dialled")
     national = str(phonenumbers.national_significant_number(parsed))
     if phonenumbers.region_code_for_number(parsed) == region:
-        return "0" + national
+        dialled = _DIGITS.sub(
+            "", phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
+        )
+        if dialled.startswith("0"):
+            return dialled
     return f"00{parsed.country_code}{national}"
 
 
