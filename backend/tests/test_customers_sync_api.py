@@ -147,3 +147,20 @@ async def test_create_with_existing_email_is_409_with_login(mariadb_znuny_url: s
     await engine.dispose()
     assert resp.status_code == 409
     assert resp.json()["detail"]["login"] == _PREFIX + "bestand"
+
+
+async def test_create_company_and_conflict(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    body = {"customer_id": "CUSTSYNC Studierendenwerk", "name": "CUSTSYNC Studierendenwerk"}
+    async with client:
+        first = await client.post("/api/v1/customers/companies", json=body)
+        second = await client.post("/api/v1/customers/companies", json=body)
+        found = await client.get(
+            "/api/v1/reference/customer-search", params={"q": "CUSTSYNC Studierendenwerk"}
+        )
+    await engine.dispose()
+    assert first.status_code == 201, first.text
+    assert first.json() == body
+    assert second.status_code == 409
+    assert [c["customer_id"] for c in found.json()["companies"]] == ["CUSTSYNC Studierendenwerk"]
