@@ -171,3 +171,71 @@ async def test_create_company_and_conflict(mariadb_znuny_url: str) -> None:
     assert first.json() == body
     assert second.status_code == 409
     assert [c["customer_id"] for c in found.json()["companies"]] == ["CUSTSYNC Studierendenwerk"]
+
+
+async def test_patch_fills_only_empty_fields(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    async with client:
+        resp = await client.patch(
+            f"/api/v1/customers/{_PREFIX}bestand",
+            json={
+                "first_name": "Anna",
+                "last_name": "Überschrieben",
+                "email": "andere@custsync.example",
+                "phone": "   ",
+                "mobile": "+491701234567",
+                "comments_append": "Weitere Nummer: +4922812345",
+            },
+        )
+    await engine.dispose()
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert sorted(data["changed"]) == ["comments", "first_name", "mobile"]
+    row = _row(mariadb_znuny_url, _PREFIX + "bestand")
+    assert row["first_name"] == "Anna"
+    assert row["last_name"] == "Bestand"
+    assert row["email"] == "Bestand@CustSync.Example"
+    assert row["phone"] == ""
+    assert row["mobile"] == "+491701234567"
+    assert row["comments"] == "Weitere Nummer: +4922812345"
+
+
+async def test_patch_appends_comment_and_caps_length(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    async with client:
+        for i in range(12):
+            await client.patch(
+                f"/api/v1/customers/{_PREFIX}bestand",
+                json={"comments_append": f"Weitere Nummer: +49228000000{i:02d}"},
+            )
+    await engine.dispose()
+    comments = _row(mariadb_znuny_url, _PREFIX + "bestand")["comments"]
+    assert len(comments) <= 250
+    assert comments.endswith("Weitere Nummer: +4922800000011")
+
+
+async def test_patch_unknown_login_is_404(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    async with client:
+        resp = await client.patch(f"/api/v1/customers/{_PREFIX}nope", json={"first_name": "X"})
+    await engine.dispose()
+    assert resp.status_code == 404
+
+
+async def test_patch_email_owned_by_other_customer_is_409(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    async with client:
+        await client.post(
+            "/api/v1/customers",
+            json={"login": _PREFIX + "ohne", "last_name": "Ohne", "customer_id": "CUSTSYNC-X"},
+        )
+        resp = await client.patch(
+            f"/api/v1/customers/{_PREFIX}ohne", json={"email": "BESTAND@custsync.example"}
+        )
+    await engine.dispose()
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["login"] == _PREFIX + "bestand"
