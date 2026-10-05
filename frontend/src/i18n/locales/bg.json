@@ -3943,7 +3943,11 @@
     "openTickets": "Отворени билети на този обаждащ се",
     "logOnTicket": "Записване на обаждането към този билет",
     "pendingUntil": "В очакване до",
-    "noCustomerNumber": "Няма номер"
+    "noCustomerNumber": "Няма номер",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Обаждания",

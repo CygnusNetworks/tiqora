@@ -3943,7 +3943,11 @@
     "openTickets": "Ticket đang mở của người gọi này",
     "logOnTicket": "Ghi cuộc gọi vào ticket này",
     "pendingUntil": "Đang chờ xử lý đến",
-    "noCustomerNumber": "Không có số"
+    "noCustomerNumber": "Không có số",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Cuộc gọi",

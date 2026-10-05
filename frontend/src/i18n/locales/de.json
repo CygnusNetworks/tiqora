@@ -3951,7 +3951,11 @@
     "openTickets": "Offene Tickets dieses Anrufers",
     "logOnTicket": "Anruf zu diesem Ticket erfassen",
     "pendingUntil": "Wartend bis",
-    "noCustomerNumber": "Keine Nummer"
+    "noCustomerNumber": "Keine Nummer",
+    "dialPageTitle": "Rückruf",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Über mein Tischtelefon anrufen",
+    "dialPageTel": "Mit dem Telefonprogramm anrufen"
   },
   "callPopup": {
     "region": "Anrufe",

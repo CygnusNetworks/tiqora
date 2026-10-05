@@ -34,6 +34,7 @@ import {
   type TimeAccountingSearch,
 } from "@/routes/agent/TimeAccountingReportPage";
 import { CustomerDetailPage } from "@/routes/agent/CustomerDetailPage";
+import { DialPage } from "@/routes/agent/DialPage";
 import type { TicketListChannel } from "@/lib/api";
 import { TICKET_CHANNEL_KEYS } from "@/lib/ticketChannel";
 import { TicketAttributeRelationsPage } from "@/routes/admin/TicketAttributeRelationsPage";
@@ -497,6 +498,16 @@ const agentCustomerRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/customers/$login",
   component: CustomerDetailPage,
+});
+
+const agentDialRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/dial",
+  validateSearch: (s: Record<string, unknown>) => ({
+    number: typeof s.number === "string" ? s.number : "",
+    ticket: s.ticket != null && !Number.isNaN(Number(s.ticket)) ? Number(s.ticket) : undefined,
+  }),
+  component: DialPage,
 });
 
 // /portal/login: mounts its own CustomerAuthProvider (a separate session from
@@ -1010,6 +1021,7 @@ const routeTree = rootRoute.addChildren([
     agentServicesRoute,
     agentTimeAccountingRoute,
     agentCustomerRoute,
+    agentDialRoute,
   ]),
   portalLoginRoute,
   portalLayoutRoute.addChildren([

@@ -3943,7 +3943,11 @@
     "openTickets": "Tickets abertos de quen chama",
     "logOnTicket": "Rexistrar a chamada neste ticket",
     "pendingUntil": "Pendente ata",
-    "noCustomerNumber": "Sen número"
+    "noCustomerNumber": "Sen número",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Chamadas",

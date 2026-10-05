@@ -3943,7 +3943,11 @@
     "openTickets": "Otvorene ulaznice ovog pozivatelja",
     "logOnTicket": "Evidentiraj poziv na ovoj ulaznici",
     "pendingUntil": "Na čekanju do",
-    "noCustomerNumber": "Nema broja"
+    "noCustomerNumber": "Nema broja",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Pozivi",

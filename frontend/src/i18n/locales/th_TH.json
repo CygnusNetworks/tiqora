@@ -3943,7 +3943,11 @@
     "openTickets": "ตั๋วที่เปิดอยู่ของผู้โทรรายนี้",
     "logOnTicket": "บันทึกการโทรในตั๋วนี้",
     "pendingUntil": "รอดำเนินการจนถึง",
-    "noCustomerNumber": "ไม่มีหมายเลข"
+    "noCustomerNumber": "ไม่มีหมายเลข",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "การโทร",

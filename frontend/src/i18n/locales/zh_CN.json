@@ -3943,7 +3943,11 @@
     "openTickets": "此来电者的未结工单",
     "logOnTicket": "将通话登记到此工单",
     "pendingUntil": "挂起至",
-    "noCustomerNumber": "无号码"
+    "noCustomerNumber": "无号码",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "通话",

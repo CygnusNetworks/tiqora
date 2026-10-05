@@ -3943,7 +3943,11 @@
     "openTickets": "Åpne saker for denne innringeren",
     "logOnTicket": "Registrer anrop på denne saken",
     "pendingUntil": "Venter til",
-    "noCustomerNumber": "Ingen nummer"
+    "noCustomerNumber": "Ingen nummer",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Anrop",
