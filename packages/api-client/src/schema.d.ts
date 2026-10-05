@@ -4823,6 +4823,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/companies/{customer_id}/vcards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Vcards
+         * @description All valid contacts of a company as one multi-card .vcf.
+         */
+        get: operations["company_vcards_api_v1_customers_companies__customer_id__vcards_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/{login}": {
         parameters: {
             query?: never;
@@ -4951,6 +4971,26 @@ export interface paths {
          *     null when the agent may create tickets nowhere.
          */
         get: operations["suggested_queue_api_v1_customers__login__suggested_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/vcard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer Vcard
+         * @description Download one customer as a vCard 3.0 file.
+         */
+        get: operations["customer_vcard_api_v1_customers__login__vcard_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -29509,6 +29549,41 @@ export interface operations {
             };
         };
     };
+    company_vcards_api_v1_customers_companies__customer_id__vcards_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_customer_api_v1_customers__login__get: {
         parameters: {
             query?: never;
@@ -29793,6 +29868,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueSuggestion"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_vcard_api_v1_customers__login__vcard_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
