@@ -712,6 +712,7 @@
       "customerFirstName": "Име",
       "customerLastName": "Презиме",
       "customerLoginConflict": "Ова пријава већ постоји. Изаберите другу пријаву или уместо тога доделите постојећег клијента путем претраге.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Уклони клијента"
     },
     "inlineAttachments": "Уграђене слике ({{count}})",

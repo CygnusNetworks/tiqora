@@ -712,6 +712,7 @@
       "customerFirstName": "ім'я",
       "customerLastName": "Прізвище",
       "customerLoginConflict": "Цей логін вже існує. Виберіть інший логін або натомість призначте наявного клієнта через пошук.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Прибрати клієнта"
     },
     "inlineAttachments": "Вбудовані зображення ({{count}})",

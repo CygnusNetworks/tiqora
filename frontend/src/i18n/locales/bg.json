@@ -712,6 +712,7 @@
       "customerFirstName": "Първо име",
       "customerLastName": "Фамилия",
       "customerLoginConflict": "Това влизане вече съществува. Изберете друго име за вход или вместо това задайте съществуващия клиент чрез търсене.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Премахване на клиента"
     },
     "inlineAttachments": "Вградени изображения ({{count}})",

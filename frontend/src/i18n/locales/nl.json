@@ -712,6 +712,7 @@
       "customerFirstName": "Voornaam",
       "customerLastName": "Achternaam",
       "customerLoginConflict": "Deze login bestaat al. Kies een andere login, of wijs de bestaande klant toe via de zoekopdracht.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Klant verwijderen"
     },
     "inlineAttachments": "Ingesloten afbeeldingen ({{count}})",

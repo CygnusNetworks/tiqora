@@ -712,6 +712,7 @@
       "customerFirstName": "Имя",
       "customerLastName": "Фамилия",
       "customerLoginConflict": "Этот логин уже существует. Выберите другой логин или вместо этого назначьте существующего клиента через поиск.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Убрать клиента"
     },
     "inlineAttachments": "Встроенные изображения ({{count}})",

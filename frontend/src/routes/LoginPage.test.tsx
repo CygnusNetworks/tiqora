@@ -5,7 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { KERBEROS_REAUTH_DELAY_S, LoginPage } from "./LoginPage";
 
-const navigate = vi.fn();
+const historyPush = vi.fn();
 const login = vi.fn();
 const verifyTotp = vi.fn();
 const verifyPasskey = vi.fn();
@@ -24,7 +24,7 @@ let isLoading = false;
 let searchParams: { next?: string; sso_error?: string } = {};
 
 vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => navigate,
+  useRouter: () => ({ history: { push: historyPush } }),
   useSearch: () => searchParams,
 }));
 
@@ -82,7 +82,7 @@ function renderPage() {
 
 describe("LoginPage", () => {
   beforeEach(() => {
-    navigate.mockReset();
+    historyPush.mockReset();
     login.mockReset();
     verifyTotp.mockReset();
     verifyPasskey.mockReset();
@@ -276,7 +276,7 @@ describe("LoginPage", () => {
       expect(completeEnroll2fa).toHaveBeenCalledWith("123456");
     });
     await waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+      expect(historyPush).toHaveBeenCalledWith("/agent");
     });
   });
 
@@ -307,7 +307,7 @@ describe("LoginPage", () => {
       expect(completeEnrollPasskey).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+      expect(historyPush).toHaveBeenCalledWith("/agent");
     });
   });
 
@@ -334,7 +334,7 @@ describe("LoginPage", () => {
       expect(verifyPasskey).toHaveBeenCalled();
     });
     await waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+      expect(historyPush).toHaveBeenCalledWith("/agent");
     });
   });
 
@@ -413,9 +413,9 @@ describe("LoginPage", () => {
     searchParams = { next: "//evil.com" };
     renderPage();
     await waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+      expect(historyPush).toHaveBeenCalledWith("/agent");
     });
-    expect(navigate).not.toHaveBeenCalledWith({ to: "//evil.com" });
+    expect(historyPush).not.toHaveBeenCalledWith("//evil.com");
   });
 
   it("rejects next=/\\evil.com and falls back to /agent", async () => {
@@ -424,9 +424,9 @@ describe("LoginPage", () => {
     searchParams = { next: "/\\evil.com" };
     renderPage();
     await waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ to: "/agent" });
+      expect(historyPush).toHaveBeenCalledWith("/agent");
     });
-    expect(navigate).not.toHaveBeenCalledWith({ to: "/\\evil.com" });
+    expect(historyPush).not.toHaveBeenCalledWith("/\\evil.com");
   });
 
   it("honors same-site next=/agent/tickets after auth", async () => {
@@ -435,7 +435,28 @@ describe("LoginPage", () => {
     searchParams = { next: "/agent/tickets" };
     renderPage();
     await waitFor(() => {
-      expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets" });
+      expect(historyPush).toHaveBeenCalledWith("/agent/tickets");
     });
+  });
+
+  it("restores the query string of a same-site next after auth", async () => {
+    isAuthenticated = true;
+    isLoading = false;
+    searchParams = { next: "/agent/dial?number=%2B49171&ticket=42" };
+    renderPage();
+    await waitFor(() => {
+      expect(historyPush).toHaveBeenCalledWith("/agent/dial?number=%2B49171&ticket=42");
+    });
+  });
+
+  it("still rejects an external next with a query", async () => {
+    isAuthenticated = true;
+    isLoading = false;
+    searchParams = { next: "https://evil.com/agent?x=1" };
+    renderPage();
+    await waitFor(() => {
+      expect(historyPush).toHaveBeenCalledWith("/agent");
+    });
+    expect(historyPush).not.toHaveBeenCalledWith("https://evil.com/agent?x=1");
   });
 });

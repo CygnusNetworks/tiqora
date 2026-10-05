@@ -712,6 +712,7 @@
       "customerFirstName": "Eesnimi",
       "customerLastName": "Perekonnanimi",
       "customerLoginConflict": "See sisselogimine on juba olemas. Valige mõni muu sisselogimisnimi või määrake selle asemel olemasolev klient otsingu kaudu.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Eemalda klient"
     },
     "inlineAttachments": "Manustatud pildid ({{count}})",

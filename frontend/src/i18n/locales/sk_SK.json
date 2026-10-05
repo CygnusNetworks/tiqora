@@ -712,6 +712,7 @@
       "customerFirstName": "Krstné meno",
       "customerLastName": "Priezvisko",
       "customerLoginConflict": "Toto prihlásenie už existuje. Vyberte iné prihlasovacie meno alebo namiesto toho priraďte existujúceho zákazníka pomocou vyhľadávania.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Odstrániť zákazníka"
     },
     "inlineAttachments": "Vložené obrázky ({{count}})",

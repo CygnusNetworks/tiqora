@@ -712,6 +712,7 @@
       "customerFirstName": "الاسم الأول",
       "customerLastName": "الاسم الأخير",
       "customerLoginConflict": "تسجيل الدخول هذا موجود بالفعل. Choose a different login, or assign the existing customer via search instead.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "إزالة العميل"
     },
     "inlineAttachments": "صور مضمّنة ({{count}})",

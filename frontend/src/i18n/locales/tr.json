@@ -712,6 +712,7 @@
       "customerFirstName": "Ad",
       "customerLastName": "Soyadı",
       "customerLoginConflict": "Bu giriş zaten mevcut. Farklı bir giriş seçin veya bunun yerine mevcut müşteriyi arama yoluyla atayın.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Müşteriyi kaldır"
     },
     "inlineAttachments": "Gömülü resimler ({{count}})",

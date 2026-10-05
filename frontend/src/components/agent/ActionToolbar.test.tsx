@@ -351,7 +351,40 @@ describe("ActionToolbar", () => {
     });
     fireEvent.click(screen.getByTestId("customer-create-submit"));
 
-    expect(await screen.findByTestId("customer-create-conflict")).toBeInTheDocument();
+    const msg = await screen.findByTestId("customer-create-conflict");
+    expect(msg).not.toHaveTextContent("owner.login");
+    expect(patchTicket).not.toHaveBeenCalled();
+  });
+
+  it("names the existing login when the e-mail belongs to another customer (409)", async () => {
+    const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+    createCustomer.mockRejectedValue(new ApiError(
+        409,
+        { detail: { message: "Customer user e-mail already exists", login: "owner.login" } },
+        "/api/v1/customers",
+      ));
+    wrap(<ActionToolbar ticket={makeTicket()} />);
+    fireEvent.click(screen.getByTestId("toolbar-customer"));
+    fireEvent.click(screen.getByTestId("customer-picker-new"));
+
+    fireEvent.change(screen.getByTestId("customer-create-login"), {
+      target: { value: "taken" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-email"), {
+      target: { value: "taken@example.com" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-first-name"), {
+      target: { value: "Tak" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-last-name"), {
+      target: { value: "En" },
+    });
+    fireEvent.change(screen.getByTestId("customer-create-customer-id"), {
+      target: { value: "C-1" },
+    });
+    fireEvent.click(screen.getByTestId("customer-create-submit"));
+
+    expect(await screen.findByTestId("customer-create-conflict")).toHaveTextContent("owner.login");
     expect(patchTicket).not.toHaveBeenCalled();
   });
 });

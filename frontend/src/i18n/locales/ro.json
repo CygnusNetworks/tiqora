@@ -712,6 +712,7 @@
       "customerFirstName": "Prenume",
       "customerLastName": "Nume de familie",
       "customerLoginConflict": "Această autentificare există deja. Alegeți o altă autentificare sau atribuiți clientul existent prin căutare.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Elimină clientul"
     },
     "inlineAttachments": "Imagini încorporate ({{count}})",

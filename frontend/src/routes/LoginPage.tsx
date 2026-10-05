@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useRouter, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { logoUrl } from "@/lib/assets";
@@ -43,7 +43,8 @@ export function LoginPage() {
     isAuthenticated,
     isLoading,
   } = useAuth();
-  const navigate = useNavigate();
+  // history.push takes a full path + query string, so `next` keeps its search.
+  const { history } = useRouter();
   const search = useSearch({ from: "/login" }) as {
     next?: string;
     sso_error?: string;
@@ -83,7 +84,7 @@ export function LoginPage() {
   useEffect(() => {
     if (!isLoading && isAuthenticated && !mustEnroll2fa && !pending2fa) {
       const next = isSafeNextPath(search.next) ? search.next : "/agent";
-      void navigate({ to: next });
+      history.push(next);
     }
   }, [
     isLoading,
@@ -91,7 +92,7 @@ export function LoginPage() {
     mustEnroll2fa,
     pending2fa,
     search.next,
-    navigate,
+    history,
   ]);
 
   // Seamless SSO re-auth: when an expired session bounced the agent here (a
@@ -170,7 +171,7 @@ export function LoginPage() {
 
   const goNext = async () => {
     const next = isSafeNextPath(search.next) ? search.next : "/agent";
-    await navigate({ to: next });
+    history.push(next);
   };
 
   const onSubmit = async (e: FormEvent) => {

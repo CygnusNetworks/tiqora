@@ -712,6 +712,7 @@
       "customerFirstName": "Όνομα",
       "customerLastName": "Επώνυμο",
       "customerLoginConflict": "Αυτή η σύνδεση υπάρχει ήδη. Επιλέξτε μια διαφορετική σύνδεση ή αντιστοιχίστε τον υπάρχοντα πελάτη μέσω αναζήτησης.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Αφαίρεση πελάτη"
     },
     "inlineAttachments": "Ενσωματωμένες εικόνες ({{count}})",

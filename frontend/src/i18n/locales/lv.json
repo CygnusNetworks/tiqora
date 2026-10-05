@@ -712,6 +712,7 @@
       "customerFirstName": "Vārds",
       "customerLastName": "Uzvārds",
       "customerLoginConflict": "Šī pieteikšanās jau pastāv. Izvēlieties citu pieteikumvārdu vai tā vietā piešķiriet esošo klientu, izmantojot meklēšanu.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Noņemt klientu"
     },
     "inlineAttachments": "Iegultie attēli ({{count}})",

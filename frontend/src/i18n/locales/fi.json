@@ -712,6 +712,7 @@
       "customerFirstName": "Etunimi",
       "customerLastName": "Sukunimi",
       "customerLoginConflict": "Tämä kirjautuminen on jo olemassa. Valitse toinen kirjautumistunnus tai määritä olemassa oleva asiakas sen sijaan haun kautta.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Poista asiakas"
     },
     "inlineAttachments": "Upotetut kuvat ({{count}})",
