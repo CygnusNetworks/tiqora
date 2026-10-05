@@ -241,3 +241,22 @@ async def test_patch_email_owned_by_other_customer_is_409(mariadb_znuny_url: str
     await engine.dispose()
     assert resp.status_code == 409
     assert resp.json()["detail"]["login"] == _PREFIX + "bestand"
+
+
+async def test_patch_same_comment_twice_is_noop(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    line = "Weitere Nummer: +4922812345"
+    async with client:
+        first = await client.patch(
+            f"/api/v1/customers/{_PREFIX}bestand", json={"comments_append": line}
+        )
+        second = await client.patch(
+            f"/api/v1/customers/{_PREFIX}bestand", json={"comments_append": f"  {line} "}
+        )
+    await engine.dispose()
+    assert first.json()["changed"] == ["comments"]
+    assert second.status_code == 200, second.text
+    assert second.json()["changed"] == []
+    comments = _row(mariadb_znuny_url, _PREFIX + "bestand")["comments"]
+    assert comments.count(line) == 1
