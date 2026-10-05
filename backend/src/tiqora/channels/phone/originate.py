@@ -11,6 +11,7 @@ outbound trunk call) once the agent picks up. Settings live in
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 import httpx
@@ -19,8 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.channels.common import channel_setting
 
 DEFAULT_INTERNAL = "60,61,62,69"
-_DIGITS = re.compile(r"\D")
-_EXTERNAL = re.compile(r"^0\d{4,}$")
+_DIGITS = re.compile(r"[^0-9]")
+_EXTERNAL = re.compile(r"^0[0-9]{4,}$")
+_NAME_MAX = 40
+_NAME_DROP = frozenset('"\\<>')
 
 
 class OriginateError(Exception):
@@ -47,7 +50,10 @@ def normalize_dial_number(raw: str, internal: set[str] | frozenset[str]) -> str:
     text = (raw or "").strip()
     if not text or re.search(r"[A-Za-z*#]", text):
         raise ValueError("not a phone number")
+    if any(ord(ch) > 127 and unicodedata.category(ch) == "Nd" for ch in text):
+        raise ValueError("not a phone number")
     plus = text.startswith("+")
+    text = text.replace("(0)", "")
     digits = _DIGITS.sub("", text)
     if plus:
         digits = "0" + digits[2:] if digits.startswith("49") else "00" + digits
@@ -88,6 +94,16 @@ async def load_originate_config(session: AsyncSession) -> OriginateConfig | None
     )
 
 
+def _display_name(raw: str) -> str:
+    """Name for the callerId: no quotes, backslashes, angle brackets or
+    control characters, whitespace collapsed, at most ``_NAME_MAX`` chars."""
+    spaced = "".join(" " if ch.isspace() else ch for ch in raw or "")
+    kept = "".join(
+        ch for ch in spaced if ch not in _NAME_DROP and not unicodedata.category(ch).startswith("C")
+    )
+    return " ".join(kept.split())[:_NAME_MAX].strip()
+
+
 async def originate(
     config: OriginateConfig,
     extension: str,
@@ -100,9 +116,13 @@ async def originate(
 
     The callerId is what the desk phone shows while it rings: who is about
     to be called."""
-    name = caller_name.replace('"', "").strip()
+    name = _display_name(caller_name)
+    try:
+        endpoint = config.endpoint.format(extension=extension)
+    except (KeyError, IndexError, ValueError) as exc:
+        raise OriginateError(f"invalid endpoint template: {exc!r}") from exc
     params = {
-        "endpoint": config.endpoint.format(extension=extension),
+        "endpoint": endpoint,
         "extension": number,
         "context": config.context,
         "priority": "1",
