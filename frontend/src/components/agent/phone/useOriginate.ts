@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ApiError } from "@/lib/api";
 import { phoneApi } from "@/lib/phoneApi";
 
 export type OriginateStatus =
@@ -19,6 +20,7 @@ export function useOriginate() {
   const [status, setStatus] = useState<OriginateStatus>({ kind: "idle" });
   const dial = useCallback(
     async (number: string, opts?: { ticketId?: number; name?: string }) => {
+      setStatus({ kind: "idle" });
       try {
         const out = await phoneApi.dial({
           number,
@@ -27,11 +29,13 @@ export function useOriginate() {
         });
         setStatus({ kind: "ringing", extension: out.extension });
       } catch (err) {
-        // ApiError carries the backend's string `detail` (403/404/409/422/429/502).
-        const detail = (err as { detail?: unknown })?.detail;
+        // ApiError.message is the backend's string `detail` (403/404/409/422/429/502),
+        // or the generic "HTTP <status>" when the body had none.
+        const reason = err instanceof ApiError ? err.message : "";
+        const useReason = reason !== "" && reason !== `HTTP ${err instanceof ApiError ? err.status : 0}`;
         setStatus({
           kind: "error",
-          message: typeof detail === "string" ? detail : t("phone.dialFailed"),
+          message: useReason ? reason : t("phone.dialFailed"),
         });
       }
     },
