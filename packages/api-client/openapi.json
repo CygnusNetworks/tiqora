@@ -679,8 +679,20 @@
         "type": "object"
       },
       "AgentCustomerCreateRequest": {
-        "description": "Body for agent-side customer-user creation (Znuny AgentTicketCustomer).\n\nNo password \u2014 agents create the contact record; portal auth is separate.",
+        "description": "Body for agent-side customer-user creation (Znuny AgentTicketCustomer).\n\nNo password \u2014 agents create the contact record; portal auth is separate.\n``email`` and ``first_name`` may be empty: the AI secretary creates\ncallers it only knows by surname and number (the columns are NOT NULL,\nso empty means ``\"\"``).",
         "properties": {
+          "comments": {
+            "anyOf": [
+              {
+                "maxLength": 250,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
           "customer_id": {
             "maxLength": 150,
             "minLength": 1,
@@ -688,14 +700,14 @@
             "type": "string"
           },
           "email": {
+            "default": "",
             "maxLength": 150,
-            "minLength": 1,
             "title": "Email",
             "type": "string"
           },
           "first_name": {
+            "default": "",
             "maxLength": 100,
-            "minLength": 1,
             "title": "First Name",
             "type": "string"
           },
@@ -710,6 +722,18 @@
             "minLength": 1,
             "title": "Login",
             "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
           },
           "phone": {
             "anyOf": [
@@ -726,8 +750,6 @@
         },
         "required": [
           "login",
-          "email",
-          "first_name",
           "last_name",
           "customer_id"
         ],
