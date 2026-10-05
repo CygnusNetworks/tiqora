@@ -3943,7 +3943,11 @@
     "openTickets": "Відкриті квитки цього абонента",
     "logOnTicket": "Зафіксувати дзвінок у цьому квитку",
     "pendingUntil": "В очікуванні до",
-    "noCustomerNumber": "Немає номера"
+    "noCustomerNumber": "Немає номера",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Дзвінки",

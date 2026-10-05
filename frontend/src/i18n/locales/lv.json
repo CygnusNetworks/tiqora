@@ -3943,7 +3943,11 @@
     "openTickets": "Šī zvanītāja atvērtās biļetes",
     "logOnTicket": "Reģistrēt zvanu šajā biļetē",
     "pendingUntil": "Gaida līdz",
-    "noCustomerNumber": "Nav numura"
+    "noCustomerNumber": "Nav numura",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Zvani",

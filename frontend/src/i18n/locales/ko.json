@@ -3943,7 +3943,11 @@
     "openTickets": "이 발신자의 열린 티켓",
     "logOnTicket": "이 티켓에 통화 기록",
     "pendingUntil": "보류 기한",
-    "noCustomerNumber": "번호 없음"
+    "noCustomerNumber": "번호 없음",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "통화",

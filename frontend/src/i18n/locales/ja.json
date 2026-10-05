@@ -3951,7 +3951,11 @@
     "openTickets": "この発信者の未完了チケット",
     "logOnTicket": "このチケットに通話を記録",
     "pendingUntil": "保留期限",
-    "noCustomerNumber": "番号なし"
+    "noCustomerNumber": "番号なし",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "通話",

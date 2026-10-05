@@ -3943,7 +3943,11 @@
     "openTickets": "इस कॉलर के खुले टिकट",
     "logOnTicket": "इस टिकट पर कॉल दर्ज करें",
     "pendingUntil": "लंबित तक",
-    "noCustomerNumber": "कोई नंबर नहीं"
+    "noCustomerNumber": "कोई नंबर नहीं",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "कॉल",

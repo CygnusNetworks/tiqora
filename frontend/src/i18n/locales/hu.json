@@ -3943,7 +3943,11 @@
     "openTickets": "A hívó nyitott jegyei",
     "logOnTicket": "Hívás rögzítése erre a jegyre",
     "pendingUntil": "Függőben eddig",
-    "noCustomerNumber": "Nincs szám"
+    "noCustomerNumber": "Nincs szám",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Hívások",

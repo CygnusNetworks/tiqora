@@ -3943,7 +3943,11 @@
     "openTickets": "تیکت‌های باز این تماس‌گیرنده",
     "logOnTicket": "ثبت تماس روی این تیکت",
     "pendingUntil": "در انتظار تا",
-    "noCustomerNumber": "بدون شماره"
+    "noCustomerNumber": "بدون شماره",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "تماس‌ها",

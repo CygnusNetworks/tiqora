@@ -3943,7 +3943,11 @@
     "openTickets": "Tiket terbuka pemanggil ini",
     "logOnTicket": "Rekod panggilan pada tiket ini",
     "pendingUntil": "Belum selesai sehingga",
-    "noCustomerNumber": "Tiada nombor"
+    "noCustomerNumber": "Tiada nombor",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Panggilan",

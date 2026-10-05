@@ -3943,7 +3943,11 @@
     "openTickets": "Tikiti zilizo wazi za mpigaji huyu",
     "logOnTicket": "Rekodi simu kwenye tikiti hii",
     "pendingUntil": "Inasubiri hadi",
-    "noCustomerNumber": "Hakuna nambari"
+    "noCustomerNumber": "Hakuna nambari",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Simu",

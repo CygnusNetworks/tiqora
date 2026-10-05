@@ -3943,7 +3943,11 @@
     "openTickets": "Tickets ouverts de cet appelant",
     "logOnTicket": "Enregistrer l'appel sur ce ticket",
     "pendingUntil": "En attente jusqu'au",
-    "noCustomerNumber": "Aucun numéro"
+    "noCustomerNumber": "Aucun numéro",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Appels",

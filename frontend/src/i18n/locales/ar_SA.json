@@ -3943,7 +3943,11 @@
     "openTickets": "التذاكر المفتوحة لهذا المتصل",
     "logOnTicket": "تسجيل المكالمة على هذه التذكرة",
     "pendingUntil": "في انتظار حتى",
-    "noCustomerNumber": "لا يوجد رقم"
+    "noCustomerNumber": "لا يوجد رقم",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "مكالمات",

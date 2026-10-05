@@ -3943,7 +3943,11 @@
     "openTickets": "Otvorené tickety tohto volajúceho",
     "logOnTicket": "Zaznamenať hovor k tomuto ticketu",
     "pendingUntil": "Čaká do",
-    "noCustomerNumber": "Bez čísla"
+    "noCustomerNumber": "Bez čísla",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Hovory",

@@ -3943,7 +3943,11 @@
     "openTickets": "Öppna ärenden för den här uppringaren",
     "logOnTicket": "Registrera samtalet på det här ärendet",
     "pendingUntil": "Väntar till",
-    "noCustomerNumber": "Inget nummer"
+    "noCustomerNumber": "Inget nummer",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Samtal",

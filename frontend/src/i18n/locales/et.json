@@ -3943,7 +3943,11 @@
     "openTickets": "Selle helistaja avatud piletid",
     "logOnTicket": "Salvesta kõne sellele piletile",
     "pendingUntil": "Ootel kuni",
-    "noCustomerNumber": "Number puudub"
+    "noCustomerNumber": "Number puudub",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Kõned",

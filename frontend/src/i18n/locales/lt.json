@@ -3943,7 +3943,11 @@
     "openTickets": "Šio skambinančiojo atviri bilietai",
     "logOnTicket": "Įrašyti skambutį į šį bilietą",
     "pendingUntil": "Laukiama iki",
-    "noCustomerNumber": "Nėra numerio"
+    "noCustomerNumber": "Nėra numerio",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Skambučiai",

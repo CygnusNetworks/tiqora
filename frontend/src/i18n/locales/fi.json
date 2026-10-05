@@ -3943,7 +3943,11 @@
     "openTickets": "Tämän soittajan avoimet liput",
     "logOnTicket": "Kirjaa puhelu tähän tikettiin",
     "pendingUntil": "Odottaa asti",
-    "noCustomerNumber": "Ei numeroa"
+    "noCustomerNumber": "Ei numeroa",
+    "dialPageTitle": "Call back",
+    "dialPageTicket": "Ticket {{id}}",
+    "dialPageCall": "Call from my desk phone",
+    "dialPageTel": "Call with the phone app"
   },
   "callPopup": {
     "region": "Puhelut",
