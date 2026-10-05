@@ -2378,11 +2378,11 @@ crypto = [
 
 [[package]]
 name = "pymysql"
-version = "1.2.3"
+version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b1/d4/c15b459e25a23767d2f4065ef40968920320f04e302889574310c21c96a3/pymysql-1.2.3.tar.gz", hash = "sha256:d5b288529782e536ae171866df3ca9dc4f6cbfb3cc2f18e6f837fbb90dbc262b", size = 50629, upload-time = "2026-09-17T12:22:49.146Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c9/bc/1c6a92f385940f727daeecf3bacaf186e03875dff57197801046c583bcf0/pymysql-1.2.0.tar.gz", hash = "sha256:6c7b17ca686988104d7426c27895b455cdeea3e9d3ceb1270f0c3704fead8c33", size = 49021, upload-time = "2026-05-19T08:26:22.302Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/4b/0a906d8184f011ff8dbd4722743783867589b33269d2c5fff238d636fdcb/pymysql-1.2.3-py3-none-any.whl", hash = "sha256:14f1c68e2ed859243ae5ca41ffbe677027fc46bc136a9f0be8a4e928e5e7415a", size = 46740, upload-time = "2026-09-17T12:22:47.826Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/bd/2534e130295c8cfd4f0a2e31623baab7502278f1e97bcfe61db75656a77f/pymysql-1.2.0-py3-none-any.whl", hash = "sha256:62169ce6d5510f08e140c5e7990ee884a9764024e4a9a27b2cc11f1099322ae0", size = 45716, upload-time = "2026-05-19T08:26:20.974Z" },
 ]
 
 [[package]]
@@ -2784,8 +2784,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography" },
-    { name = "jeepney" },
+    { name = "cryptography", marker = "python_full_version >= '3.15' or sys_platform != 'win32'" },
+    { name = "jeepney", marker = "python_full_version >= '3.15' or sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
@@ -3183,8 +3183,8 @@ requires-dist = [
     { name = "psycopg2-binary", marker = "extra == 'dev'", specifier = ">=2.9.12" },
     { name = "pydantic", specifier = ">=2.10.0" },
     { name = "pydantic-settings", specifier = ">=2.6.0" },
-    { name = "pymysql", specifier = ">=1.2.0,<1.2.4" },
-    { name = "pymysql", marker = "extra == 'dev'", specifier = ">=1.2.0,<1.2.4" },
+    { name = "pymysql", specifier = "==1.2.0" },
+    { name = "pymysql", marker = "extra == 'dev'", specifier = "==1.2.0" },
     { name = "pyotp", specifier = ">=2.9.0" },
     { name = "pypdf", specifier = ">=5" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.0" },
@@ -3211,7 +3211,7 @@ provides-extras = ["kerberos", "crypto", "dev"]
 [package.metadata.requires-dev]
 dev = [
     { name = "psycopg2-binary", specifier = ">=2.9.12" },
-    { name = "pymysql", specifier = ">=1.2.0,<1.2.4" },
+    { name = "pymysql", specifier = "==1.2.0" },
 ]
 
 [[package]]

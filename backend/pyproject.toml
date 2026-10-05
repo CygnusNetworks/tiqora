@@ -39,14 +39,15 @@ dependencies = [
     "defusedxml>=0.7.1",
     "webauthn>=2",
     # Sync drivers used by tiqora bootstrap (base-schema load) and tests.
-    # Upper bound is load-bearing: PyMySQL >=1.2.1 turned
-    # pymysql.converters.escape_dict/escape_bytes_prefixed into a "DO NOT
-    # IMPORT THIS!!!" string sentinel (the fix for the bytes-escaping SQL
-    # injection, GHSA-x4f8-9hx9-hpp9). aiomysql 0.3.2 still imports and calls
-    # escape_bytes_prefixed at module level, so every query with bytes
-    # parameters raises `TypeError: 'str' object is not callable`. Lift it
-    # only once aiomysql ships a release that no longer relies on that name.
-    "pymysql>=1.2.0,<1.2.4",
+    # Pinned to exactly 1.2.0: aiomysql 0.3.2 imports and calls
+    # pymysql.converters.escape_bytes_prefixed at module level, and only
+    # 1.2.0 still ships it as a working function. 1.2.1/1.2.2 removed the
+    # name outright (ImportError), and 1.2.3 reinstated it as a "DO NOT
+    # IMPORT THIS!!!" string sentinel -- part of the bytes-escaping SQL
+    # injection fix, GHSA-x4f8-9hx9-hpp9 -- so calling it raises
+    # `TypeError: 'str' object is not callable`. Lift it only once aiomysql
+    # ships a release that no longer relies on that name.
+    "pymysql==1.2.0",
     "psycopg2-binary>=2.9.12",
     # GDPR anonymize engine (ValueMapper) draws replacement values via faker
     # at runtime — must ship in the prod image, not just the dev group.
@@ -87,7 +88,7 @@ dev = [
     "types-passlib>=1.7.7",
     "types-pyyaml>=6.0.12.20260518",
     "types-defusedxml>=0.7.0.20260504",
-    "pymysql>=1.2.0,<1.2.4",
+    "pymysql==1.2.0",
     "psycopg2-binary>=2.9.12",
 ]
 
@@ -179,5 +180,5 @@ markers = [
 [dependency-groups]
 dev = [
     "psycopg2-binary>=2.9.12",
-    "pymysql>=1.2.0,<1.2.4",
+    "pymysql==1.2.0",
 ]
