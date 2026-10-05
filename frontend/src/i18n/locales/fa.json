@@ -712,6 +712,7 @@
       "customerFirstName": "نام کوچک",
       "customerLastName": "نام خانوادگی",
       "customerLoginConflict": "این ورود از قبل وجود دارد. ورود دیگری را انتخاب کنید یا به جای آن مشتری موجود را از طریق جستجو اختصاص دهید.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "حذف مشتری"
     },
     "inlineAttachments": "تصاویر جاسازی شده ({{count}})",

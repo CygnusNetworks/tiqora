@@ -712,6 +712,7 @@
       "customerFirstName": "Keresztnév",
       "customerLastName": "Vezetéknév",
       "customerLoginConflict": "Ez a bejelentkezés már létezik. Válasszon másik bejelentkezési nevet, vagy rendelje hozzá a meglévő ügyfelet kereséssel.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Ügyfél eltávolítása"
     },
     "inlineAttachments": "Beágyazott képek ({{count}})",

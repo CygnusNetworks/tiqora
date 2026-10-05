@@ -712,6 +712,7 @@
       "customerFirstName": "Förnamn",
       "customerLastName": "Efternamn",
       "customerLoginConflict": "Denna inloggning finns redan. Välj en annan inloggning eller tilldela den befintliga kunden via sök istället.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Ta bort kund"
     },
     "inlineAttachments": "Inbäddade bilder ({{count}})",

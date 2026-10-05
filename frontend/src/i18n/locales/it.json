@@ -712,6 +712,7 @@
       "customerFirstName": "Nome",
       "customerLastName": "Cognome",
       "customerLoginConflict": "Questo login esiste già. Scelga un login diverso, oppure assegni il cliente esistente tramite la ricerca.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Rimuovi cliente"
     },
     "inlineAttachments": "Immagini incorporate ({{count}})",

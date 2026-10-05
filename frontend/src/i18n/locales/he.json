@@ -712,6 +712,7 @@
       "customerFirstName": "שם פרטי",
       "customerLastName": "שם משפחה",
       "customerLoginConflict": "התחברות זו כבר קיימת. בחר כניסה אחרת, או הקצה את הלקוח הקיים באמצעות חיפוש במקום זאת.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "הסרת לקוח"
     },
     "inlineAttachments": "תמונות מוטבעות ({{count}})",

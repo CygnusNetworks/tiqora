@@ -712,6 +712,7 @@
       "customerFirstName": "पहला नाम",
       "customerLastName": "अंतिम नाम",
       "customerLoginConflict": "यह लॉगिन पहले से मौजूद है. एक अलग लॉगिन चुनें, या इसके बजाय खोज के माध्यम से मौजूदा ग्राहक को असाइन करें।",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "ग्राहक हटाएँ"
     },
     "inlineAttachments": "एंबेडेड छवियां ({{count}})",

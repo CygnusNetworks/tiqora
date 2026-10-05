@@ -712,6 +712,7 @@
       "customerFirstName": "Nom de pila",
       "customerLastName": "Cognom",
       "customerLoginConflict": "Aquest inici de sessió ja existeix. Trieu un inici de sessió diferent o assigneu el client existent mitjançant la cerca.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Treu el client"
     },
     "inlineAttachments": "Imatges incrustades ({{count}})",

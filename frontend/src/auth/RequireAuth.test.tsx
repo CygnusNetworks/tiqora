@@ -5,6 +5,7 @@ import { RequireAuth } from "./RequireAuth";
 let isAuthenticated = false;
 let isLoading = false;
 let pathname = "/agent/tickets/5";
+let searchStr = "";
 
 vi.mock("./AuthContext", () => ({
   useAuth: () => ({ isAuthenticated, isLoading }),
@@ -16,8 +17,8 @@ vi.mock("@tanstack/react-router", () => ({
     navigateMock(props);
     return <div data-testid="navigate-stub">{props.to}</div>;
   },
-  useRouterState: ({ select }: { select: (s: { location: { pathname: string } } ) => unknown }) =>
-    select({ location: { pathname } }),
+  useRouterState: ({ select }: { select: (s: { location: { pathname: string; searchStr: string } }) => unknown }) =>
+    select({ location: { pathname, searchStr } }),
 }));
 
 describe("RequireAuth", () => {
@@ -26,6 +27,7 @@ describe("RequireAuth", () => {
     isAuthenticated = false;
     isLoading = false;
     pathname = "/agent/tickets/5";
+    searchStr = "";
   });
 
   it("shows a spinner while loading", () => {
@@ -49,11 +51,26 @@ describe("RequireAuth", () => {
     expect(navigateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "/login",
-        search: { next: encodeURIComponent(pathname) },
+        search: { next: "/agent/tickets/5" },
         replace: true,
       }),
     );
     expect(screen.queryByTestId("protected")).toBeNull();
+  });
+
+  it("keeps the query string in next", () => {
+    pathname = "/agent/dial";
+    searchStr = "?number=%2B49171&ticket=42";
+    render(
+      <RequireAuth>
+        <div data-testid="protected">secret</div>
+      </RequireAuth>,
+    );
+    expect(navigateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        search: { next: "/agent/dial?number=%2B49171&ticket=42" },
+      }),
+    );
   });
 
   it("falls back to /agent as next when pathname is empty", () => {
@@ -64,7 +81,7 @@ describe("RequireAuth", () => {
       </RequireAuth>,
     );
     expect(navigateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ search: { next: encodeURIComponent("/agent") } }),
+      expect.objectContaining({ search: { next: "/agent" } }),
     );
   });
 

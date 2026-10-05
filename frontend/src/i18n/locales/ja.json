@@ -712,6 +712,7 @@
       "customerFirstName": "名",
       "customerLastName": "姓",
       "customerLoginConflict": "このログインはすでに存在します。別のログインを選択するか、代わりに検索を通じて既存の顧客を割り当てます。",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "顧客を外す"
     },
     "inlineAttachments": "埋め込み画像 ({{count}})",

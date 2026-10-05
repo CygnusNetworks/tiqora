@@ -712,6 +712,7 @@
       "customerFirstName": "Fornavn",
       "customerLastName": "Etternavn",
       "customerLoginConflict": "Denne påloggingen eksisterer allerede. Velg en annen pålogging, eller tilordne den eksisterende kunden via søk i stedet.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Fjern kunde"
     },
     "inlineAttachments": "Innebygde bilder ({{count}})",

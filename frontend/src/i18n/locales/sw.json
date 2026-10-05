@@ -712,6 +712,7 @@
       "customerFirstName": "Jina la kwanza",
       "customerLastName": "Jina la mwisho",
       "customerLoginConflict": "Kuingia huku tayari kunapatikana. Chagua njia tofauti ya kuingia, au mpe mteja aliyepo kupitia utafutaji badala yake.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Ondoa mteja"
     },
     "inlineAttachments": "Picha zilizopachikwa ({{count}})",

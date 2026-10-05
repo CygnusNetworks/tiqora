@@ -712,6 +712,7 @@
       "customerFirstName": "이름",
       "customerLastName": "성",
       "customerLoginConflict": "이 로그인은 이미 존재합니다. 다른 로그인을 선택하거나 대신 검색을 통해 기존 고객을 할당하세요.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "고객 제거"
     },
     "inlineAttachments": "삽입된 이미지({{count}})",

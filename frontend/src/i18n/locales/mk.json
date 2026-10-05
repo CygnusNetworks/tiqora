@@ -712,6 +712,7 @@
       "customerFirstName": "Име",
       "customerLastName": "Презиме",
       "customerLoginConflict": "Ова најавување веќе постои. Изберете различно најавување или наместо тоа доделете го постоечкиот клиент преку пребарување.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Отстрани клиент"
     },
     "inlineAttachments": "Вградени слики ({{count}})",

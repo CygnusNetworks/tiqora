@@ -712,6 +712,7 @@
       "customerFirstName": "名",
       "customerLastName": "姓",
       "customerLoginConflict": "该登录名已存在。选择不同的登录名，或通过搜索分配现有客户。",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "移除客户"
     },
     "inlineAttachments": "嵌入图像 ({{count}})",

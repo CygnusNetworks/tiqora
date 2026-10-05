@@ -712,6 +712,7 @@
       "customerFirstName": "nombre",
       "customerLastName": "apellido",
       "customerLoginConflict": "Este inicio de sesión ya existe. Elija un inicio de sesión diferente o asigne el cliente existente mediante la búsqueda.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Quitar cliente"
     },
     "inlineAttachments": "Imágenes incrustadas ({{count}})",

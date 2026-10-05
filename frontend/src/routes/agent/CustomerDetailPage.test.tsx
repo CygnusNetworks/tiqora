@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
+import { ApiError } from "@/lib/api";
 import { CustomerDetailPage } from "./CustomerDetailPage";
 
-const { navigate, getCustomer, listTickets, phoneConfig, customerCryptoKeys } = vi.hoisted(() => ({
+const { navigate, getCustomer, listTickets, phoneConfig, dial, customerCryptoKeys } = vi.hoisted(() => ({
   navigate: vi.fn(),
   getCustomer: vi.fn(),
   listTickets: vi.fn(),
   phoneConfig: vi.fn(),
+  dial: vi.fn(),
   customerCryptoKeys: {
     list: vi.fn(),
     uploadPgp: vi.fn(),
@@ -44,7 +46,7 @@ vi.mock("@/lib/api", async () => {
 
 vi.mock("@/lib/phoneApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/phoneApi")>("@/lib/phoneApi");
-  return { ...actual, phoneApi: { phoneConfig } };
+  return { ...actual, phoneApi: { phoneConfig, dial } };
 });
 
 vi.mock("@/components/agent/TicketTable", () => ({ TicketTable: () => null }));
@@ -63,6 +65,7 @@ beforeEach(() => {
   });
   listTickets.mockReset().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 1 });
   phoneConfig.mockReset().mockResolvedValue({ dial_scheme: "tel" });
+  dial.mockReset();
   for (const fn of Object.values(customerCryptoKeys)) fn.mockReset();
   customerCryptoKeys.list.mockResolvedValue(keys({ pgp_enabled: false, smime_enabled: false }));
 });
@@ -230,5 +233,66 @@ describe("CustomerDetailPage vCard downloads", () => {
     const link = await screen.findByTestId("company-vcards");
     expect(link).toHaveAttribute("href", "/api/v1/customers/companies/CUST%201%2Fx/vcards");
     expect(link).toHaveAttribute("download");
+  });
+});
+
+describe("CustomerDetailPage click-to-dial via the PBX", () => {
+  async function renderOriginate() {
+    phoneConfig.mockResolvedValue({ dial_scheme: "tel", originate: true });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <CustomerDetailPage />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    const mobile = await screen.findByTestId("customer-dial-mobile");
+    await waitFor(() => expect(phoneConfig).toHaveBeenCalled());
+    // let the phone-config query settle so the link is in originate mode
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    return mobile;
+  }
+
+  it("stays on the page and shows the error when the dial is refused", async () => {
+    dial.mockRejectedValue(
+      new ApiError(409, { detail: "no phone extension set for this agent" }, "/api/v1/phone/dial"),
+    );
+    const mobile = await renderOriginate();
+    fireEvent.click(mobile);
+    expect(await screen.findByRole("alert")).toHaveTextContent("no phone extension set for this agent");
+    expect(dial).toHaveBeenCalledWith({ number: "0171 1234567", ticket_id: null, name: "Jane Doe" });
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("opens the outbound phone ticket after a successful dial", async () => {
+    dial.mockResolvedValue({ extension: "60", number: "01711234567" });
+    const mobile = await renderOriginate();
+    fireEvent.click(mobile);
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({
+        to: "/agent/tickets/new",
+        search: { type: "phone", direction: "outbound", customer: "jane.doe", number: "0171 1234567" },
+      }),
+    );
+  });
+
+  it("keeps the plain tel: behaviour when originate is off", async () => {
+    phoneConfig.mockResolvedValue({ dial_scheme: "tel", originate: false });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <CustomerDetailPage />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+    const mobile = await screen.findByTestId("customer-dial-mobile");
+    mobile.addEventListener("click", (e) => e.preventDefault());
+    fireEvent.click(mobile);
+    expect(dial).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledTimes(1);
   });
 });

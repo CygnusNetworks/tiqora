@@ -9,7 +9,8 @@ export type OriginateStatus =
   | { kind: "ringing"; extension: string }
   | { kind: "error"; message: string };
 
-/** Click-to-dial over the PBX when the admin configured it (`originate`). */
+/** Click-to-dial over the PBX when the admin configured it (`originate`).
+ * `dial` resolves to whether the call was originated (errors land in `status`). */
 export function useOriginate() {
   const { t } = useTranslation();
   const q = useQuery({
@@ -19,7 +20,7 @@ export function useOriginate() {
   });
   const [status, setStatus] = useState<OriginateStatus>({ kind: "idle" });
   const dial = useCallback(
-    async (number: string, opts?: { ticketId?: number; name?: string }) => {
+    async (number: string, opts?: { ticketId?: number; name?: string }): Promise<boolean> => {
       setStatus({ kind: "idle" });
       try {
         const out = await phoneApi.dial({
@@ -28,6 +29,7 @@ export function useOriginate() {
           name: opts?.name ?? "",
         });
         setStatus({ kind: "ringing", extension: out.extension });
+        return true;
       } catch (err) {
         // ApiError.message is the backend's string `detail` (403/404/409/422/429/502),
         // or the generic "HTTP <status>" when the body had none.
@@ -37,6 +39,7 @@ export function useOriginate() {
           kind: "error",
           message: useReason ? reason : t("phone.dialFailed"),
         });
+        return false;
       }
     },
     [t],

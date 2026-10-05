@@ -712,6 +712,7 @@
       "customerFirstName": "Vardas",
       "customerLastName": "Pavardė",
       "customerLoginConflict": "Šis prisijungimas jau yra. Pasirinkite kitą prisijungimo vardą arba priskirkite esamą klientą naudodami paiešką.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Pašalinti klientą"
     },
     "inlineAttachments": "Įterpti vaizdai ({{count}})",

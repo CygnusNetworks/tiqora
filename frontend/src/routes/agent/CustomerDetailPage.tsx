@@ -144,6 +144,7 @@ export function CustomerDetailPage() {
                     <DialLink
                       number={number}
                       testId={`customer-dial-${kind}`}
+                      name={[c.first_name, c.last_name].filter(Boolean).join(" ").trim() || undefined}
                       // Dialling opens the phone ticket form, outbound, for
                       // this customer — the call gets logged right away.
                       onDial={() =>

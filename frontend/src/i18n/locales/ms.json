@@ -712,6 +712,7 @@
       "customerFirstName": "nama pertama",
       "customerLastName": "nama keluarga",
       "customerLoginConflict": "Log masuk ini sudah wujud. Pilih log masuk lain atau tetapkan pelanggan sedia ada melalui carian sebaliknya.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Buang pelanggan"
     },
     "inlineAttachments": "Imej terbenam ({{count}})",

@@ -649,12 +649,24 @@ export function CustomerPickerDialog({
   );
 }
 
+/** The existing login named by the create endpoint's e-mail-conflict 409, if any. */
+function conflictEmailOwner(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null;
+  const body = err.detail as { detail?: unknown } | null;
+  const inner = body && typeof body === "object" ? body.detail : null;
+  if (inner && typeof inner === "object" && "login" in inner) {
+    const login = (inner as { login: unknown }).login;
+    return typeof login === "string" && login !== "" ? login : null;
+  }
+  return null;
+}
+
 /** "+ Neu anlegen" sub-form of `CustomerPickerDialog` — creates a customer
  * user (``POST /api/v1/customers``, agent-accessible, no portal password)
  * then hands the created ref back to the caller to assign to the ticket.
- * A 409 (login already taken) is shown as a plain error, per spec: the
- * create endpoint's conflict response carries no customer data to offer a
- * "assign the existing one instead" shortcut. */
+ * A 409 is shown as a plain error (login taken, or — naming the existing
+ * login — e-mail owned by another customer); there is no "assign the
+ * existing one instead" shortcut. */
 function CustomerCreateDialog({
   onCreated,
   onBack,
@@ -684,6 +696,9 @@ function CustomerCreateDialog({
   });
 
   const isConflict = create.isError && create.error instanceof ApiError && create.error.status === 409;
+  // 409 for an e-mail owned by another customer: the body is
+  // `{detail: {message, login}}` — name that login; a plain login clash has a string detail.
+  const emailOwner = isConflict ? conflictEmailOwner(create.error) : null;
   const valid = login.trim() && email.trim() && firstName.trim() && lastName.trim() && customerId.trim();
 
   return (
@@ -740,7 +755,9 @@ function CustomerCreateDialog({
         </label>
         {isConflict && (
           <p className="text-xs text-danger" data-testid="customer-create-conflict">
-            {t("ticket.dialog.customerLoginConflict")}
+            {emailOwner
+              ? t("ticket.dialog.customerEmailConflict", { login: emailOwner })
+              : t("ticket.dialog.customerLoginConflict")}
           </p>
         )}
         {create.isError && !isConflict && (

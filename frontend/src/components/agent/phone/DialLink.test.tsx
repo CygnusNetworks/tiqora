@@ -58,14 +58,18 @@ describe("DialLink click-to-dial", () => {
     const dialSpy = vi.spyOn(phoneApi, "dial");
     renderLink({ number: "0228123", testId: "d" }, false);
     expect(screen.getByTestId("d")).toHaveAttribute("href", "tel:0228123");
-    fireEvent.click(screen.getByTestId("d"));
+    const link = screen.getByTestId("d");
+    link.addEventListener("click", (e) => e.preventDefault()); // jsdom cannot follow tel:
+    fireEvent.click(link);
     expect(dialSpy).not.toHaveBeenCalled();
   });
 
   it("follows the link on ctrl-click even when originate is on", () => {
     const dialSpy = vi.spyOn(phoneApi, "dial");
     renderLink({ number: "0228123", testId: "d" }, true);
-    fireEvent.click(screen.getByTestId("d"), { ctrlKey: true });
+    const link = screen.getByTestId("d");
+    link.addEventListener("click", (e) => e.preventDefault()); // jsdom cannot follow tel:
+    fireEvent.click(link, { ctrlKey: true });
     expect(dialSpy).not.toHaveBeenCalled();
   });
 
@@ -87,5 +91,18 @@ describe("DialLink click-to-dial", () => {
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(i18n.t("phone.dialFailed")),
     );
+  });
+
+  it("runs onDial after a successful dial, not after a failed one", async () => {
+    const dialSpy = vi.spyOn(phoneApi, "dial");
+    const onDial = vi.fn();
+    dialSpy.mockRejectedValueOnce(new ApiError(429, { detail: "slow down" }, "/api/v1/phone/dial"));
+    renderLink({ number: "0228123", testId: "d", onDial }, true);
+    fireEvent.click(screen.getByTestId("d"));
+    await screen.findByRole("alert");
+    expect(onDial).not.toHaveBeenCalled();
+    dialSpy.mockResolvedValueOnce({ extension: "60", number: "0228123" });
+    fireEvent.click(screen.getByTestId("d"));
+    await waitFor(() => expect(onDial).toHaveBeenCalledTimes(1));
   });
 });

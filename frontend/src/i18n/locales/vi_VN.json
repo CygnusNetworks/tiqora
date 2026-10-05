@@ -712,6 +712,7 @@
       "customerFirstName": "Tên",
       "customerLastName": "Họ",
       "customerLoginConflict": "Thông tin đăng nhập này đã tồn tại. Thay vào đó, hãy chọn thông tin đăng nhập khác hoặc chỉ định khách hàng hiện tại thông qua tìm kiếm.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Gỡ khách hàng"
     },
     "inlineAttachments": "Hình ảnh được nhúng ({{count}})",

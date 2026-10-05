@@ -712,6 +712,7 @@
       "customerFirstName": "Vorname",
       "customerLastName": "Nachname",
       "customerLoginConflict": "Dieser Login existiert bereits. Bitte einen anderen Login wählen oder den bestehenden Kunden über die Suche zuweisen.",
+      "customerEmailConflict": "Die E-Mail-Adresse gehört bereits zum Kunden \"{{login}}\". Bitte diesen Kunden über die Suche zuweisen.",
       "clearCustomer": "Kunde entfernen"
     },
     "inlineAttachments": "Eingebettete Bilder ({{count}})",

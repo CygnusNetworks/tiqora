@@ -712,6 +712,7 @@
       "customerFirstName": "Ime",
       "customerLastName": "Prezime",
       "customerLoginConflict": "Ova prijava već postoji. Odaberite drugu prijavu ili umjesto toga dodijelite postojećeg kupca putem pretraživanja.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Ukloni korisnika"
     },
     "inlineAttachments": "Ugrađene slike ({{count}})",

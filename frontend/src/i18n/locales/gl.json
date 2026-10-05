@@ -712,6 +712,7 @@
       "customerFirstName": "Nome de pila",
       "customerLastName": "Apelido",
       "customerLoginConflict": "Este inicio de sesión xa existe. Escolla un inicio de sesión diferente ou asigne o cliente existente mediante a busca.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Quitar cliente"
     },
     "inlineAttachments": "Imaxes inseridas ({{count}})",

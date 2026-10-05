@@ -712,6 +712,7 @@
       "customerFirstName": "ชื่อ",
       "customerLastName": "นามสกุล",
       "customerLoginConflict": "ข้อมูลเข้าสู่ระบบนี้มีอยู่แล้ว เลือกข้อมูลเข้าสู่ระบบอื่น หรือมอบหมายลูกค้าปัจจุบันผ่านการค้นหาแทน",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "ลบลูกค้า"
     },
     "inlineAttachments": "รูปภาพที่ฝัง ({{count}})",

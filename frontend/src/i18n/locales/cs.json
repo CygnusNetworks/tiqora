@@ -712,6 +712,7 @@
       "customerFirstName": "Jméno",
       "customerLastName": "Příjmení",
       "customerLoginConflict": "Tento login již existuje. Zvolte jiný, nebo přiřaďte existujícího zákazníka přes vyhledávání.",
+      "customerEmailConflict": "The e-mail address already belongs to the customer \"{{login}}\". Assign that customer via search instead.",
       "clearCustomer": "Odebrat zákazníka"
     },
     "inlineAttachments": "Vložené obrázky ({{count}})",
