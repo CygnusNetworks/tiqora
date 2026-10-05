@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.api.v1.admin.common import (
@@ -30,14 +30,19 @@ class AgentCustomerCreateRequest(BaseModel):
     """Body for agent-side customer-user creation (Znuny AgentTicketCustomer).
 
     No password — agents create the contact record; portal auth is separate.
+    ``email`` and ``first_name`` may be empty: the AI secretary creates
+    callers it only knows by surname and number (the columns are NOT NULL,
+    so empty means ``""``).
     """
 
     login: str = Field(..., min_length=1, max_length=200)
-    email: str = Field(..., min_length=1, max_length=150)
-    first_name: str = Field(..., min_length=1, max_length=100)
+    email: str = Field("", max_length=150)
+    first_name: str = Field("", max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
     customer_id: str = Field(..., min_length=1, max_length=150)
     phone: str | None = Field(None, max_length=150)
+    mobile: str | None = Field(None, max_length=150)
+    comments: str | None = Field(None, max_length=250)
 
 
 class AgentCustomerCreateOut(BaseModel):
@@ -78,15 +83,36 @@ async def create_customer(
             status_code=status.HTTP_409_CONFLICT,
             detail="Customer user login already exists",
         )
+    email = body.email.strip()
+    if email:
+        owner = (
+            (
+                await session.execute(
+                    select(CustomerUser.login).where(
+                        func.lower(CustomerUser.email) == email.lower(),
+                        CustomerUser.valid_id == 1,
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if owner is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"message": "Customer user e-mail already exists", "login": owner},
+            )
 
     ts = now()
     cu = CustomerUser(
         login=login,
-        email=body.email.strip(),
+        email=email,
         customer_id=body.customer_id.strip(),
         first_name=body.first_name.strip(),
         last_name=body.last_name.strip(),
         phone=body.phone.strip() if body.phone else None,
+        mobile=body.mobile.strip() if body.mobile else None,
+        comments=body.comments.strip() if body.comments else None,
         pw=None,
         valid_id=1,
         create_time=ts,
