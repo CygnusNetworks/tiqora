@@ -536,6 +536,17 @@ curl -b cookies.txt "$TIQORA_URL/api/v1/reference/dynamic-fields?screen=AgentTic
 `/reference/customers` and `/reference/customer-search` also match phone and
 mobile numbers once the query contains five or more digits.
 
+Customer write endpoints (any authenticated agent):
+
+- `POST /api/v1/customers` creates a customer user; `email` and `first_name`
+  may be empty, `mobile` and `comments` are accepted, and a known e-mail
+  answers `409 {"detail": {"message": "...", "login": "..."}}` with the login of
+  the existing customer.
+- `POST /api/v1/customers/companies` creates a customer company.
+- `PATCH /api/v1/customers/{login}` is fill-only: it sets empty fields but
+  never overwrites existing values; `comments_append` adds a line to the
+  comments and skips it when that line is already present.
+
 ## Integrations (external tools)
 
 ```sh

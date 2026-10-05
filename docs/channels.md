@@ -202,6 +202,24 @@ click dials and opens `PhoneCallDialog` outbound with the timer running; on
 the customer page (`/agent/customers/{login}`) it opens the New-ticket page in
 phone mode, outbound, with the customer and number prefilled.
 
+#### Click-to-dial over the PBX
+
+With `channel.phone.originate_enabled = true` and `originate_ari_url`,
+`originate_ari_user`, `originate_ari_secret`, a click on a number calls
+`POST /api/v1/phone/dial`: Asterisk first rings the agent's extension
+(`TiqoraPhoneExtension`, the first one; `originate_endpoint`, default
+`SIP/{extension}`) and dials the number in the context `originate_context`
+(default `tiqora-dial`) once the agent picks up. Agent session only (API keys
+get `403`), one request per agent every 5 s. Number rules: external numbers
+must be valid per libphonenumber (`phonenumbers`) and premium-rate numbers are
+refused; numbers of the configured region (`originate_region`, default `DE`)
+are dialled in national format (`0…`), all others as `00<country code><number>`.
+Internal numbers are those listed in `originate_internal` (default
+`60,61,62,69`). Ctrl/Cmd-click still uses the `tel:`/`sip:` link.
+`/agent/dial?number=…&ticket=…` is the confirmation page for links in e-mails
+(e.g. the phone secretary's "call back" button): opening it never dials, only
+the explicit button click does.
+
 ### Queue list
 
 A ticket whose **first** article is on the `Phone` channel is listed as
