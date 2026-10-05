@@ -33,6 +33,9 @@ class _Redis:
         self.keys[key] = value
         return True
 
+    async def delete(self, key: str) -> int:
+        return 1 if self.keys.pop(key, None) is not None else 0
+
 
 def _app(
     monkeypatch: pytest.MonkeyPatch,
@@ -41,6 +44,7 @@ def _app(
     config: OriginateConfig | None = CFG,
     extensions: list[str] | None = None,
     originate: Any = None,
+    redis_client: _Redis | None = None,
 ) -> Any:
     from tiqora.api.app import create_app
     from tiqora.api.v1 import phone_cti
@@ -50,7 +54,7 @@ def _app(
     )
     app = create_app(Settings(environment="test"))
     app.dependency_overrides[get_current_user] = lambda: user
-    redis = _Redis()
+    redis = redis_client or _Redis()
     app.dependency_overrides[get_redis] = lambda: redis
 
     async def _db() -> Any:
@@ -118,3 +122,17 @@ async def test_dial_502_when_ari_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     orig = AsyncMock(side_effect=OriginateError("ARI 400: Endpoint not found"))
     resp = await _dial(_app(monkeypatch, originate=orig), {"number": "01717630944"})
     assert resp.status_code == 502
+
+
+async def test_dial_502_frees_the_rate_limit_slot(monkeypatch: pytest.MonkeyPatch) -> None:
+    from httpx import ASGITransport, AsyncClient
+
+    redis = _Redis()
+    orig = AsyncMock(side_effect=[OriginateError("ARI 400: Endpoint not found"), None])
+    app = _app(monkeypatch, originate=orig, redis_client=redis)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        failed = await client.post("/api/v1/phone/dial", json={"number": "01717630944"})
+        assert "tiqora:dial:7" not in redis.keys
+        retry = await client.post("/api/v1/phone/dial", json={"number": "01717630944"})
+    assert failed.status_code == 502
+    assert retry.status_code == 202

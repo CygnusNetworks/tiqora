@@ -327,3 +327,24 @@ async def test_company_vcards_download(mariadb_znuny_url: str) -> None:
     assert "Gabi" not in resp.text
     assert "ORG:CustSync VCard GmbH" in resp.text
     assert missing.status_code == 404
+
+
+async def test_company_vcards_with_slash_in_customer_id(mariadb_znuny_url: str) -> None:
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO customer_company (customer_id, name, valid_id, create_time,"
+                " create_by, change_time, change_by)"
+                " VALUES ('CUSTSYNC/SLASH', 'CustSync Slash GmbH', 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+    engine.dispose()
+    client, engine = await _client(mariadb_znuny_url)
+    async with client:
+        encoded = await client.get("/api/v1/customers/companies/CUSTSYNC%2FSLASH/vcards")
+        plain = await client.get("/api/v1/customers/companies/CUSTSYNC/SLASH/vcards")
+    await engine.dispose()
+    assert encoded.status_code == 200, encoded.text
+    assert plain.status_code == 200, plain.text

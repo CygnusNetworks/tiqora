@@ -209,7 +209,8 @@ def _vcard_response(content: str, filename: str) -> Response:
     )
 
 
-@router.get("/companies/{customer_id}/vcards")
+# `:path`: company ids may contain "/" (Starlette decodes %2F before routing).
+@router.get("/companies/{customer_id:path}/vcards")
 async def company_vcards(
     customer_id: str,
     user: CurrentUser,

@@ -9,6 +9,7 @@ tabs. The PBX webhook feeding the state is ``POST /channels/phone/events``
 
 from __future__ import annotations
 
+import contextlib
 from typing import Annotated
 
 import redis.asyncio as redis
@@ -102,5 +103,8 @@ async def dial(
     try:
         await originate(config, extensions[0], number, body.name)
     except OriginateError as exc:
+        # The call never started: free the slot so an immediate retry is not a 429.
+        with contextlib.suppress(redis.RedisError, ConnectionError, OSError):
+            await redis_client.delete(f"tiqora:dial:{user.id}")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return DialOut(extension=extensions[0], number=number)
