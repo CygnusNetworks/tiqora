@@ -195,6 +195,108 @@ async def get_customer(
     return result
 
 
+_FILL_FIELDS = ("first_name", "last_name", "email", "phone", "mobile")
+_COMMENTS_MAX = 250
+
+
+class CustomerFillRequest(BaseModel):
+    """Fill-only update: a field is written only when it is empty on the
+    customer; nothing is overwritten or cleared (AI secretary, spec B1)."""
+
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
+    email: str | None = Field(None, max_length=150)
+    phone: str | None = Field(None, max_length=150)
+    mobile: str | None = Field(None, max_length=150)
+    comments_append: str | None = Field(None, max_length=250)
+
+
+class CustomerFillOut(BaseModel):
+    login: str
+    customer_id: str
+    first_name: str
+    last_name: str
+    email: str
+    phone: str | None
+    mobile: str | None
+    comments: str | None
+    changed: list[str]
+
+
+def _blank(value: str | None) -> bool:
+    return value is None or not value.strip()
+
+
+def _append_comment(current: str | None, line: str) -> str:
+    """Append ``line``; when the column (250) would overflow, drop the
+    oldest lines first."""
+    lines = [part for part in (current or "").split("\n") if part.strip()]
+    lines.append(line)
+    while len("\n".join(lines)) > _COMMENTS_MAX and len(lines) > 1:
+        lines.pop(0)
+    return "\n".join(lines)[-_COMMENTS_MAX:]
+
+
+@router.patch("/{login}", response_model=CustomerFillOut)
+async def fill_customer(
+    login: str,
+    body: CustomerFillRequest,
+    user: CurrentUser,
+    session: DbSession,
+) -> CustomerFillOut:
+    cu = (
+        await session.execute(select(CustomerUser).where(CustomerUser.login == login))
+    ).scalar_one_or_none()
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    changed: list[str] = []
+    for name in _FILL_FIELDS:
+        raw = getattr(body, name)
+        if raw is None or _blank(raw) or not _blank(getattr(cu, name)):
+            continue
+        value = raw.strip()
+        if name == "email":
+            owner = (
+                (
+                    await session.execute(
+                        select(CustomerUser.login).where(
+                            func.lower(CustomerUser.email) == value.lower(),
+                            CustomerUser.valid_id == 1,
+                            CustomerUser.login != cu.login,
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if owner is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={"message": "Customer user e-mail already exists", "login": owner},
+                )
+        setattr(cu, name, value)
+        changed.append(name)
+    if body.comments_append is not None and not _blank(body.comments_append):
+        cu.comments = _append_comment(cu.comments, body.comments_append.strip())
+        changed.append("comments")
+    if changed:
+        cu.change_time = now()
+        cu.change_by = user.id
+        await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+        await session.commit()
+    return CustomerFillOut(
+        login=cu.login,
+        customer_id=cu.customer_id,
+        first_name=cu.first_name,
+        last_name=cu.last_name,
+        email=cu.email,
+        phone=cu.phone,
+        mobile=cu.mobile,
+        comments=cu.comments,
+        changed=changed,
+    )
+
+
 @router.get("/{login}/suggested-queue", response_model=QueueSuggestion)
 async def suggested_queue(
     login: str,
