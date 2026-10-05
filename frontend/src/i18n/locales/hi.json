@@ -101,7 +101,9 @@
     "openCount": "{{count}} खुले",
     "closedCount": "{{count}} बंद",
     "allTickets": "सभी टिकट →",
-    "recentTickets": "हाल के टिकट"
+    "recentTickets": "हाल के टिकट",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "एन्क्रिप्शन कुंजियाँ",

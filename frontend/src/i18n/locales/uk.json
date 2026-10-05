@@ -101,7 +101,9 @@
     "openCount": "{{count}} відкритих",
     "closedCount": "{{count}} закритих",
     "allTickets": "Усі заявки →",
-    "recentTickets": "Нещодавні заявки"
+    "recentTickets": "Нещодавні заявки",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Ключі шифрування",

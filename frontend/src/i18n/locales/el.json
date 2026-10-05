@@ -101,7 +101,9 @@
     "openCount": "{{count}} ανοιχτά",
     "closedCount": "{{count}} κλειστά",
     "allTickets": "Όλα τα αιτήματα →",
-    "recentTickets": "Πρόσφατα αιτήματα"
+    "recentTickets": "Πρόσφατα αιτήματα",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Κλειδιά κρυπτογράφησης",

@@ -104,6 +104,26 @@ export function CustomerDetailPage() {
           {c.first_name} {c.last_name}
         </h1>
         <p className="mt-1 font-mono text-sm text-muted">{c.login}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <a
+            href={api.customerVcardUrl(c.login)}
+            download
+            className="font-medium text-accent hover:underline"
+            data-testid="customer-vcard"
+          >
+            {t("customerCentre.downloadVcard")}
+          </a>
+          {c.company_name && (
+            <a
+              href={api.companyVcardsUrl(c.customer_id)}
+              download
+              className="font-medium text-accent hover:underline"
+              data-testid="company-vcards"
+            >
+              {t("customerCentre.downloadCompanyVcards")}
+            </a>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 rounded-lg border border-hairline bg-surface p-4 sm:grid-cols-2">

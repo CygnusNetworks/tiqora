@@ -101,7 +101,9 @@
     "openCount": "{{count}} wazi",
     "closedCount": "{{count}} zimefungwa",
     "allTickets": "Tiketi zote →",
-    "recentTickets": "Tiketi za hivi karibuni"
+    "recentTickets": "Tiketi za hivi karibuni",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Funguo za usimbaji",

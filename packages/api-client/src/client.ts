@@ -1391,6 +1391,19 @@ export class ApiClient {
     );
   }
 
+  /** Download URL of one customer's vCard (session-cookie auth, like attachments). */
+  customerVcardUrl(login: string): string {
+    return joinUrl(this.baseUrl, `/api/v1/customers/${encodeURIComponent(login)}/vcard`);
+  }
+
+  /** Download URL of one .vcf holding all contacts of a company. */
+  companyVcardsUrl(customerId: string): string {
+    return joinUrl(
+      this.baseUrl,
+      `/api/v1/customers/companies/${encodeURIComponent(customerId)}/vcards`,
+    );
+  }
+
   listHistory(
     ticketId: number,
     order: "asc" | "desc" = "desc",

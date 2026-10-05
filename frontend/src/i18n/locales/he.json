@@ -101,7 +101,9 @@
     "openCount": "{{count}} פתוחים",
     "closedCount": "{{count}} סגורים",
     "allTickets": "כל הפניות →",
-    "recentTickets": "פניות אחרונות"
+    "recentTickets": "פניות אחרונות",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "מפתחות הצפנה",

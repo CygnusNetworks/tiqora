@@ -101,7 +101,9 @@
     "openCount": "{{count}} terbuka",
     "closedCount": "{{count}} ditutup",
     "allTickets": "Semua tiket →",
-    "recentTickets": "Tiket terbaru"
+    "recentTickets": "Tiket terbaru",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Kunci penyulitan",

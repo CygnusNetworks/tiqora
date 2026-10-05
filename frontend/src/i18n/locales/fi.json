@@ -101,7 +101,9 @@
     "openCount": "{{count}} avointa",
     "closedCount": "{{count}} suljettua",
     "allTickets": "Kaikki tiketit →",
-    "recentTickets": "Viimeisimmät tiketit"
+    "recentTickets": "Viimeisimmät tiketit",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Salausavaimet",

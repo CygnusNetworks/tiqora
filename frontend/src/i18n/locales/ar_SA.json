@@ -101,7 +101,9 @@
     "openCount": "{{count}} مفتوحة",
     "closedCount": "{{count}} مغلقة",
     "allTickets": "كل التذاكر →",
-    "recentTickets": "التذاكر الأخيرة"
+    "recentTickets": "التذاكر الأخيرة",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "مفاتيح التشفير",

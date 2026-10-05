@@ -101,7 +101,9 @@
     "openCount": "{{count}} açık",
     "closedCount": "{{count}} kapalı",
     "allTickets": "Tüm biletler →",
-    "recentTickets": "Son biletler"
+    "recentTickets": "Son biletler",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Şifreleme anahtarları",

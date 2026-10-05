@@ -101,7 +101,9 @@
     "openCount": "{{count}} đang mở",
     "closedCount": "{{count}} đã đóng",
     "allTickets": "Tất cả ticket →",
-    "recentTickets": "Ticket gần đây"
+    "recentTickets": "Ticket gần đây",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Khóa mã hóa",

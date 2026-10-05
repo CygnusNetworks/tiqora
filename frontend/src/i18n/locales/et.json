@@ -101,7 +101,9 @@
     "openCount": "{{count}} avatud",
     "closedCount": "{{count}} suletud",
     "allTickets": "Kõik piletid →",
-    "recentTickets": "Hiljutised piletid"
+    "recentTickets": "Hiljutised piletid",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Krüpteerimisvõtmed",

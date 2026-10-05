@@ -101,7 +101,9 @@
     "openCount": "{{count}} باز",
     "closedCount": "{{count}} بسته‌شده",
     "allTickets": "همه تیکت‌ها →",
-    "recentTickets": "تیکت‌های اخیر"
+    "recentTickets": "تیکت‌های اخیر",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "کلیدهای رمزنگاری",

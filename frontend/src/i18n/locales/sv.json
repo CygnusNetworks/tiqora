@@ -101,7 +101,9 @@
     "openCount": "{{count}} öppna",
     "closedCount": "{{count}} stängda",
     "allTickets": "Alla ärenden →",
-    "recentTickets": "Senaste ärenden"
+    "recentTickets": "Senaste ärenden",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Krypteringsnycklar",

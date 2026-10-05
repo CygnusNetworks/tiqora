@@ -101,7 +101,9 @@
     "openCount": "미결 {{count}}",
     "closedCount": "종료 {{count}}",
     "allTickets": "모든 티켓 →",
-    "recentTickets": "최근 티켓"
+    "recentTickets": "최근 티켓",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "암호화 키",

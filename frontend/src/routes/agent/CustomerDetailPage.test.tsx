@@ -29,7 +29,17 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { getCustomer, listTickets, customerCryptoKeys } };
+  const real = actual.api;
+  return {
+    ...actual,
+    api: {
+      getCustomer,
+      listTickets,
+      customerCryptoKeys,
+      customerVcardUrl: real.customerVcardUrl.bind(real),
+      companyVcardsUrl: real.companyVcardsUrl.bind(real),
+    },
+  };
 });
 
 vi.mock("@/lib/phoneApi", async () => {
@@ -182,5 +192,43 @@ describe("CustomerDetailPage keys", () => {
     await screen.findByTestId("customer-detail-page");
     await waitFor(() => expect(customerCryptoKeys.list).toHaveBeenCalled());
     expect(screen.queryByTestId("customer-keys-card")).toBeNull();
+  });
+});
+
+describe("CustomerDetailPage vCard downloads", () => {
+  function renderPage() {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <CustomerDetailPage />
+        </I18nextProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("offers only the customer vCard when there is no company", async () => {
+    renderPage();
+    const link = await screen.findByTestId("customer-vcard");
+    expect(link).toHaveAttribute("href", "/api/v1/customers/jane.doe/vcard");
+    expect(link).toHaveAttribute("download");
+    expect(screen.queryByTestId("company-vcards")).toBeNull();
+  });
+
+  it("adds the company vCard link, URL-encoded, when the customer has a company", async () => {
+    getCustomer.mockResolvedValue({
+      login: "jane.doe",
+      email: "jane@example.com",
+      customer_id: "CUST 1/x",
+      first_name: "Jane",
+      last_name: "Doe",
+      phone: null,
+      mobile: null,
+      company_name: "ACME",
+    });
+    renderPage();
+    const link = await screen.findByTestId("company-vcards");
+    expect(link).toHaveAttribute("href", "/api/v1/customers/companies/CUST%201%2Fx/vcards");
+    expect(link).toHaveAttribute("download");
   });
 });

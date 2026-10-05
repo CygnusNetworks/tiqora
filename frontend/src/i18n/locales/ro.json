@@ -101,7 +101,9 @@
     "openCount": "{{count}} deschise",
     "closedCount": "{{count}} închise",
     "allTickets": "Toate tichetele →",
-    "recentTickets": "Tichete recente"
+    "recentTickets": "Tichete recente",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Chei de criptare",

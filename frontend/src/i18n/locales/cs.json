@@ -101,7 +101,9 @@
     "openCount": "{{count}} otevřených",
     "closedCount": "{{count}} uzavřených",
     "allTickets": "Všechny tickety →",
-    "recentTickets": "Nedávné tickety"
+    "recentTickets": "Nedávné tickety",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Šifrovací klíče",

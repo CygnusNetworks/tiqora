@@ -101,7 +101,9 @@
     "openCount": "{{count}} open",
     "closedCount": "{{count}} closed",
     "allTickets": "All tickets →",
-    "recentTickets": "Recent tickets"
+    "recentTickets": "Recent tickets",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Encryption keys",

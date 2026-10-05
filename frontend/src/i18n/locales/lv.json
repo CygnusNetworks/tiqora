@@ -101,7 +101,9 @@
     "openCount": "{{count}} atvērti",
     "closedCount": "{{count}} aizvērti",
     "allTickets": "Visi pieteikumi →",
-    "recentTickets": "Jaunākie pieteikumi"
+    "recentTickets": "Jaunākie pieteikumi",
+    "downloadVcard": "Download vCard",
+    "downloadCompanyVcards": "All company contacts (vCard)"
   },
   "cryptoKeys": {
     "title": "Šifrēšanas atslēgas",
