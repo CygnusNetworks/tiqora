@@ -173,3 +173,22 @@ async def test_admin_user_phone_extension(seeded: str) -> None:
             assert cleared.phone_extension is None
     finally:
         await engine.dispose()
+
+
+async def test_extensions_for_user_tolerates_duplicate_preference_rows(seeded: str) -> None:
+    sync = create_engine(seeded)
+    with sync.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+                " VALUES (:id, :k, '999')"
+            ),
+            {"id": ANNA, "k": PHONE_EXTENSION_PREF},
+        )
+    sync.dispose()
+    engine = create_async_engine(_mysql_async(seeded))
+    try:
+        async with async_sessionmaker(engine)() as session:
+            assert (await extensions_for_user(session, ANNA))[0] in {"100", "999"}
+    finally:
+        await engine.dispose()

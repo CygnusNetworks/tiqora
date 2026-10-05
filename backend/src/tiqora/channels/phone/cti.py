@@ -77,7 +77,8 @@ async def extensions_for_user(session: AsyncSession, user_id: int) -> list[str]:
         ),
         {"u": user_id, "k": PHONE_EXTENSION_PREF},
     )
-    raw = row.scalar_one_or_none()
+    # `.first()`: duplicate preference rows must not raise.
+    raw = row.scalars().first()
     return parse_extensions(decode_preference_value(raw))
 
 
