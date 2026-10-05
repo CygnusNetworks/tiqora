@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -23,6 +24,7 @@ from tiqora.domain.new_ticket_queue import (
     suggest_new_ticket_queue,
 )
 from tiqora.domain.schemas import CustomerUserOut
+from tiqora.domain.vcard import build_vcard, vcard_filename
 
 router = APIRouter(prefix="/customers", tags=["customers"])
 
@@ -193,6 +195,70 @@ async def get_customer(
     if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return result
+
+
+def _vcard_response(content: str, filename: str) -> Response:
+    ascii_name = (
+        filename.encode("ascii", "ignore").decode("ascii").replace('"', "") or "kontakt.vcf"
+    )
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
+    return Response(
+        content=content,
+        media_type="text/vcard; charset=utf-8",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@router.get("/companies/{customer_id}/vcards")
+async def company_vcards(
+    customer_id: str,
+    user: CurrentUser,
+    session: DbSession,
+) -> Response:
+    """All valid contacts of a company as one multi-card .vcf."""
+    _ = user
+    company_name = (
+        await session.execute(
+            select(CustomerCompany.name).where(CustomerCompany.customer_id == customer_id)
+        )
+    ).scalar_one_or_none()
+    customers = (
+        (
+            await session.execute(
+                select(CustomerUser)
+                .where(CustomerUser.customer_id == customer_id, CustomerUser.valid_id == 1)
+                .order_by(CustomerUser.last_name, CustomerUser.first_name, CustomerUser.login)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if company_name is None and not customers:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    body = "".join(build_vcard(cu, company_name) for cu in customers)
+    return _vcard_response(body, vcard_filename(company_name or customer_id))
+
+
+@router.get("/{login}/vcard")
+async def customer_vcard(
+    login: str,
+    user: CurrentUser,
+    session: DbSession,
+) -> Response:
+    """Download one customer as a vCard 3.0 file."""
+    _ = user
+    cu = (
+        await session.execute(select(CustomerUser).where(CustomerUser.login == login))
+    ).scalar_one_or_none()
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    company_name = (
+        await session.execute(
+            select(CustomerCompany.name).where(CustomerCompany.customer_id == cu.customer_id)
+        )
+    ).scalar_one_or_none()
+    name = " ".join(p for p in ((cu.first_name or "").strip(), (cu.last_name or "").strip()) if p)
+    return _vcard_response(build_vcard(cu, company_name), vcard_filename(name or cu.login))
 
 
 _FILL_FIELDS = ("first_name", "last_name", "email", "phone", "mobile")

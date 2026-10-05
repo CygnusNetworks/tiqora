@@ -260,3 +260,70 @@ async def test_patch_same_comment_twice_is_noop(mariadb_znuny_url: str) -> None:
     assert second.json()["changed"] == []
     comments = _row(mariadb_znuny_url, _PREFIX + "bestand")["comments"]
     assert comments.count(line) == 1
+
+
+def _seed_vcard_company(url: str) -> None:
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO customer_company (customer_id, name, valid_id, create_time,"
+                " create_by, change_time, change_by)"
+                " VALUES ('CUSTSYNC-VC', 'CustSync VCard GmbH', 1, :t, 1, :t, 1)"
+            ),
+            {"t": NOW},
+        )
+        for login, last, first, valid in (
+            ("zeta", "Zeta", "Zoe", 1),
+            ("alpha", "Alpha", "Alf", 1),
+            ("gone", "Gone", "Gabi", 2),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO customer_user (login, email, customer_id, first_name,"
+                    " last_name, valid_id, create_time, create_by, change_time, change_by)"
+                    " VALUES (:login, :email, 'CUSTSYNC-VC', :first, :last, :valid, :t, 1, :t, 1)"
+                ),
+                {
+                    "login": _PREFIX + login,
+                    "email": f"{login}@custsync-vc.example",
+                    "first": first,
+                    "last": last,
+                    "valid": valid,
+                    "t": NOW,
+                },
+            )
+    engine.dispose()
+
+
+async def test_customer_vcard_download(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    async with client:
+        resp = await client.get(f"/api/v1/customers/{_PREFIX}bestand/vcard")
+        missing = await client.get("/api/v1/customers/custsync.nope/vcard")
+    await engine.dispose()
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("text/vcard")
+    disposition = resp.headers["content-disposition"]
+    assert "attachment" in disposition and ".vcf" in disposition
+    assert "UID:tiqora-customer-custsync.bestand" in resp.text
+    assert missing.status_code == 404
+
+
+async def test_company_vcards_download(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    _seed_vcard_company(mariadb_znuny_url)
+    client, engine = await _client(mariadb_znuny_url)
+    async with client:
+        resp = await client.get("/api/v1/customers/companies/CUSTSYNC-VC/vcards")
+        missing = await client.get("/api/v1/customers/companies/CUSTSYNC-NOPE/vcards")
+    await engine.dispose()
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"].startswith("text/vcard")
+    assert 'filename="CustSync VCard GmbH.vcf"' in resp.headers["content-disposition"]
+    assert resp.text.count("BEGIN:VCARD") == 2
+    assert resp.text.index("FN:Alf Alpha") < resp.text.index("FN:Zoe Zeta")
+    assert "Gabi" not in resp.text
+    assert "ORG:CustSync VCard GmbH" in resp.text
+    assert missing.status_code == 404
