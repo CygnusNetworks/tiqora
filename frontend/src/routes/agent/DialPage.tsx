@@ -36,7 +36,7 @@ export function DialPage() {
         </p>
       )}
       <div className="mt-4">
-        {enabled ? (
+        {!number ? null : enabled ? (
           <Button
             data-testid="dial-page-call"
             disabled={!number || status.kind === "ringing"}

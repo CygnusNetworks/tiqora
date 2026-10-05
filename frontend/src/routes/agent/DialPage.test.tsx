@@ -63,4 +63,12 @@ describe("DialPage", () => {
     expect(link).toHaveAttribute("href", "tel:+491717630944");
     expect(screen.queryByTestId("dial-page-call")).toBeNull();
   });
+
+  it("offers neither call button nor tel: link without a number", async () => {
+    search = { number: "" };
+    renderPage();
+    expect(await screen.findByText("–")).toBeInTheDocument();
+    expect(screen.queryByTestId("dial-page-call")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
 });
