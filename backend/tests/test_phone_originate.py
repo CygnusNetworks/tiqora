@@ -83,3 +83,57 @@ async def test_originate_maps_connection_errors() -> None:
 
     with pytest.raises(OriginateError):
         await originate(CFG, "60", "01717630944", "", transport=httpx.MockTransport(handler))
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("+49 (0)171 7630944", "01717630944"),
+        ("+49(0)228 909098-70", "022890909870"),
+    ],
+)
+def test_normalize_drops_bracketed_trunk_zero(raw: str, expected: str) -> None:
+    assert normalize_dial_number(raw, INTERNAL) == expected
+
+
+@pytest.mark.parametrize("raw", ["0٢٢٨١٢٣٤٥٦", "０２２８１２３４５６", "+４９ 171 7630944"])
+def test_normalize_rejects_non_ascii_digits(raw: str) -> None:
+    with pytest.raises(ValueError):
+        normalize_dial_number(raw, INTERNAL)
+
+
+async def _caller_id(name: str) -> str:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={})
+
+    await originate(CFG, "60", "01717630944", name, transport=httpx.MockTransport(handler))
+    return seen[0].url.params["callerId"]
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("Evil <0900>", '"Evil 0900" <01717630944>'),
+        ("Bob\\", '"Bob" <01717630944>'),
+        ('"a\nb"', '"a b" <01717630944>'),
+        ("x" * 100, f'"{"x" * 40}" <01717630944>'),
+        ("<>\\\x00", '"01717630944" <01717630944>'),
+    ],
+)
+async def test_originate_sanitises_caller_name(name: str, expected: str) -> None:
+    assert await _caller_id(name) == expected
+
+
+async def test_originate_malformed_endpoint_template() -> None:
+    bad = OriginateConfig(**{**CFG.__dict__, "endpoint": "SIP/{ext}"})
+    with pytest.raises(OriginateError):
+        await originate(
+            bad,
+            "60",
+            "01717630944",
+            "",
+            transport=httpx.MockTransport(lambda r: httpx.Response(200)),
+        )
