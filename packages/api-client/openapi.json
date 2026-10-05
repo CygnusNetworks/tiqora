@@ -10072,6 +10072,56 @@
         "title": "DbStatusOut",
         "type": "object"
       },
+      "DialOut": {
+        "properties": {
+          "extension": {
+            "title": "Extension",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "extension",
+          "number"
+        ],
+        "title": "DialOut",
+        "type": "object"
+      },
+      "DialRequest": {
+        "properties": {
+          "name": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Number",
+            "type": "string"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          }
+        },
+        "required": [
+          "number"
+        ],
+        "title": "DialRequest",
+        "type": "object"
+      },
       "DimensionCountOut": {
         "properties": {
           "count": {
@@ -16758,6 +16808,11 @@
             ],
             "title": "Dial Scheme",
             "type": "string"
+          },
+          "originate": {
+            "default": false,
+            "title": "Originate",
+            "type": "boolean"
           }
         },
         "required": [
@@ -57492,6 +57547,82 @@
           }
         },
         "summary": "Dismiss",
+        "tags": [
+          "phone"
+        ]
+      }
+    },
+    "/api/v1/phone/dial": {
+      "post": {
+        "description": "Click-to-dial: ring the agent's desk phone, then dial ``number``.\n\nSession only: an API key (whatever its scopes) must not ring desk phones\nand dial out over the trunk.",
+        "operationId": "dial_api_v1_phone_dial_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DialOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dial",
         "tags": [
           "phone"
         ]

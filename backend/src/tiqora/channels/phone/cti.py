@@ -68,6 +68,19 @@ CallStateName = Literal["ringing", "answered", "ended"]
 CallDirection = Literal["inbound", "outbound"]
 
 
+async def extensions_for_user(session: AsyncSession, user_id: int) -> list[str]:
+    """The agent's own extensions (``TiqoraPhoneExtension``), in stored order."""
+    row = await session.execute(
+        text(
+            "SELECT preferences_value FROM user_preferences"
+            " WHERE user_id = :u AND preferences_key = :k"
+        ),
+        {"u": user_id, "k": PHONE_EXTENSION_PREF},
+    )
+    raw = row.scalar_one_or_none()
+    return parse_extensions(decode_preference_value(raw))
+
+
 # ---------------------------------------------------------------------------
 # Extensions
 # ---------------------------------------------------------------------------
@@ -357,6 +370,7 @@ __all__ = [
     "apply_call_event",
     "dismiss_call",
     "extension_matches",
+    "extensions_for_user",
     "list_active_calls",
     "normalize_extensions",
     "parse_extensions",

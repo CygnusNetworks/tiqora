@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.schemas import UserUpdate
-from tiqora.channels.phone.cti import PHONE_EXTENSION_PREF, users_for_extension
+from tiqora.channels.phone.cti import PHONE_EXTENSION_PREF, extensions_for_user, users_for_extension
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser
 
@@ -113,6 +113,17 @@ async def _client(sync_url: str, user_id: int) -> Any:
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_redis] = lambda: fake_redis
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test"), engine
+
+
+async def test_extensions_for_user_reads_own_preference(seeded: str) -> None:
+    engine = create_async_engine(_mysql_async(seeded))
+    try:
+        factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with factory() as session:
+            assert await extensions_for_user(session, ANNA) == ["100", "PJSIP/anna"]
+            assert await extensions_for_user(session, 999_999) == []
+    finally:
+        await engine.dispose()
 
 
 async def test_agents_cannot_set_their_own_extension(seeded: str) -> None:

@@ -129,6 +129,8 @@ class CallerLookupOut(BaseModel):
 class PhoneConfigOut(BaseModel):
     #: Link scheme for click-to-call: ``tel:`` (softphone/OS handler) or ``sip:``.
     dial_scheme: Literal["tel", "sip"]
+    #: ``POST /phone/dial`` is configured (desk phone rings, then dials).
+    originate: bool = False
 
 
 class DynamicFieldDefOut(BaseModel):
@@ -477,9 +479,12 @@ async def screen_dynamic_fields(
 @router.get("/phone-config", response_model=PhoneConfigOut)
 async def phone_config(user: CurrentUser, session: DbSession) -> PhoneConfigOut:
     """Agent-side phone settings (admin: ``channel.phone.dial_scheme``)."""
+    from tiqora.channels.phone.originate import load_originate_config
+
     _ = user
     scheme = (await channel_setting(session, "phone", "dial_scheme") or "tel").strip().lower()
-    return PhoneConfigOut(dial_scheme="sip" if scheme == "sip" else "tel")
+    originate_on = await load_originate_config(session) is not None
+    return PhoneConfigOut(dial_scheme="sip" if scheme == "sip" else "tel", originate=originate_on)
 
 
 @router.get("/queues", response_model=list[QueueRefOut])

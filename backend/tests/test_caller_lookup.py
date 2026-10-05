@@ -236,7 +236,7 @@ async def test_customer_searches_match_phone_numbers(client: Any) -> None:
 async def test_phone_config_dial_scheme(client: Any, mariadb_znuny_url: str) -> None:
     default = await client.get("/api/v1/reference/phone-config")
     assert default.status_code == 200
-    assert default.json() == {"dial_scheme": "tel"}
+    assert default.json() == {"dial_scheme": "tel", "originate": False}
     engine = create_engine(mariadb_znuny_url)
     with engine.begin() as conn:
         conn.execute(
@@ -245,4 +245,4 @@ async def test_phone_config_dial_scheme(client: Any, mariadb_znuny_url: str) -> 
         )
     engine.dispose()
     sip = await client.get("/api/v1/reference/phone-config")
-    assert sip.json() == {"dial_scheme": "sip"}
+    assert sip.json() == {"dial_scheme": "sip", "originate": False}
