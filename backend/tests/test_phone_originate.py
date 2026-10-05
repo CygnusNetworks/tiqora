@@ -35,6 +35,40 @@ def test_normalize_rejects(raw: str) -> None:
         normalize_dial_number(raw, INTERNAL)
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("+49 (0)228 909098-70", "022890909870"),
+        ("0049 171 7630944", "01717630944"),
+        ("0171/7630944", "01717630944"),
+        ("+1 650 253 0000", "0016502530000"),
+    ],
+)
+def test_normalize_with_phonenumbers(raw: str, expected: str) -> None:
+    assert normalize_dial_number(raw, INTERNAL) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "0900 1234567",  # premium rate: never dialled
+        "+49 900 1234567",
+        "0228 12",  # too short for a valid DE number
+        "+49 1234",
+        "110",
+        "112",
+    ],
+)
+def test_normalize_rejects_invalid_and_premium(raw: str) -> None:
+    with pytest.raises(ValueError):
+        normalize_dial_number(raw, INTERNAL)
+
+
+def test_normalize_region_switches_domestic_format() -> None:
+    assert normalize_dial_number("+43 1 234567", INTERNAL, "AT") == "01234567"
+    assert normalize_dial_number("+49 171 7630944", INTERNAL, "AT") == "00491717630944"
+
+
 CFG = OriginateConfig(
     ari_url="http://pbx-asterisk:8088/ari",
     ari_user="tiqora",

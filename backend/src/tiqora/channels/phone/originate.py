@@ -15,13 +15,15 @@ import unicodedata
 from dataclasses import dataclass
 
 import httpx
+import phonenumbers
+from phonenumbers import PhoneNumberType
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.channels.common import channel_setting
 
 DEFAULT_INTERNAL = "60,61,62,69"
 _DIGITS = re.compile(r"[^0-9]")
-_EXTERNAL = re.compile(r"^0[0-9]{4,}$")
+_BLOCKED_TYPES = frozenset({PhoneNumberType.PREMIUM_RATE})
 _NAME_MAX = 40
 _NAME_DROP = frozenset('"\\<>')
 
@@ -39,29 +41,39 @@ class OriginateConfig:
     endpoint: str
     timeout: int
     internal: frozenset[str]
+    region: str = "DE"
 
 
-def normalize_dial_number(raw: str, internal: set[str] | frozenset[str]) -> str:
-    """Digits the PBX dials: ``+49…`` → ``0…``, ``+…`` → ``00…``.
+def normalize_dial_number(raw: str, internal: set[str] | frozenset[str], region: str = "DE") -> str:
+    """Digits the PBX dials, checked with libphonenumber.
 
-    Allowed: an internal extension from ``internal`` or ``0`` plus at least
-    four digits (``[outcalls]`` matches ``_*0XXX.``). Raises ValueError.
+    Internal extensions from ``internal`` pass unchanged. Anything else must
+    be a valid number for libphonenumber (``region`` for numbers without
+    ``+``/``00``) and not premium rate; numbers of ``region`` are dialled in
+    national format (``0...``), all others as ``00<cc><number>``.
+    Raises ValueError.
     """
     text = (raw or "").strip()
     if not text or re.search(r"[A-Za-z*#]", text):
         raise ValueError("not a phone number")
     if any(ord(ch) > 127 and unicodedata.category(ch) == "Nd" for ch in text):
         raise ValueError("not a phone number")
-    plus = text.startswith("+")
     text = text.replace("(0)", "")
-    digits = _DIGITS.sub("", text)
-    if plus:
-        digits = "0" + digits[2:] if digits.startswith("49") else "00" + digits
-    if digits in internal:
-        return digits
-    if not _EXTERNAL.match(digits):
-        raise ValueError("number too short or not dialable")
-    return digits
+    digits_only = _DIGITS.sub("", text)
+    if digits_only in internal and not text.startswith("+"):
+        return digits_only
+    try:
+        parsed = phonenumbers.parse(text, region)
+    except phonenumbers.NumberParseException as exc:
+        raise ValueError("not a phone number") from exc
+    if not phonenumbers.is_valid_number(parsed):
+        raise ValueError("not a valid phone number")
+    if phonenumbers.number_type(parsed) in _BLOCKED_TYPES:
+        raise ValueError("premium-rate numbers are not dialled")
+    national = str(phonenumbers.national_significant_number(parsed))
+    if phonenumbers.region_code_for_number(parsed) == region:
+        return "0" + national
+    return f"00{parsed.country_code}{national}"
 
 
 async def load_originate_config(session: AsyncSession) -> OriginateConfig | None:
@@ -82,6 +94,10 @@ async def load_originate_config(session: AsyncSession) -> OriginateConfig | None
         timeout = max(5, min(120, int(timeout_raw or "30")))
     except ValueError:
         timeout = 30
+    region_raw = (await channel_setting(session, "phone", "originate_region", "DE") or "").strip()
+    region = region_raw.upper()
+    if not re.fullmatch(r"[A-Z]{2}", region):
+        region = "DE"
     internal = frozenset(p.strip() for p in (internal_raw or "").split(",") if p.strip())
     return OriginateConfig(
         ari_url=url.rstrip("/"),
@@ -91,6 +107,7 @@ async def load_originate_config(session: AsyncSession) -> OriginateConfig | None
         endpoint=(endpoint or "SIP/{extension}").strip(),
         timeout=timeout,
         internal=internal,
+        region=region,
     )
 
 

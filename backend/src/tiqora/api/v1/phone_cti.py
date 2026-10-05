@@ -90,7 +90,7 @@ async def dial(
     if not extensions:
         raise HTTPException(status_code=409, detail="no phone extension set for this agent")
     try:
-        number = normalize_dial_number(body.number, config.internal)
+        number = normalize_dial_number(body.number, config.internal, config.region)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     try:
