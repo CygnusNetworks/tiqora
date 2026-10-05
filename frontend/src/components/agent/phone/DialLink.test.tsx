@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
+import { ApiError } from "@/lib/api";
 import { phoneApi } from "@/lib/phoneApi";
 import { DialLink } from "./DialLink";
 
@@ -69,14 +70,22 @@ describe("DialLink click-to-dial", () => {
   });
 
   it("shows the server's reason when dialling fails", async () => {
-    vi.spyOn(phoneApi, "dial").mockRejectedValue({
-      status: 409,
-      detail: "no phone extension set for this agent",
-    });
+    vi.spyOn(phoneApi, "dial").mockRejectedValue(
+      new ApiError(409, { detail: "no phone extension set for this agent" }, "/api/v1/phone/dial"),
+    );
     renderLink({ number: "0228123", testId: "d" }, true);
     fireEvent.click(screen.getByTestId("d"));
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent("no phone extension"),
+    );
+  });
+
+  it("shows the generic message for a non-API error", async () => {
+    vi.spyOn(phoneApi, "dial").mockRejectedValue(new Error("network"));
+    renderLink({ number: "0228123", testId: "d" }, true);
+    fireEvent.click(screen.getByTestId("d"));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(i18n.t("phone.dialFailed")),
     );
   });
 });
