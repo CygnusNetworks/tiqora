@@ -149,6 +149,9 @@ class ToolOutcome:
     proposal: dict[str, str] | None = None  # {"kind", "subject", "body"} — unmasked
     escalate_reason: str | None = None
     no_reply_reason: str | None = None
+    # no_reply_needed with resolved=true: the customer confirmed the issue is
+    # solved. The runtime closes the ticket if the queue policy allows it.
+    no_reply_resolved: bool = False
     raw_result: Any = None
 
 
@@ -382,7 +385,19 @@ def _local_tool_schemas(
                 ),
                 "parameters": {
                     "type": "object",
-                    "properties": {"reason": {"type": "string"}},
+                    "properties": {
+                        "reason": {"type": "string"},
+                        "resolved": {
+                            "type": "boolean",
+                            "description": (
+                                "true only when the customer's latest message confirms "
+                                "that their issue is solved (e.g. 'works now, thanks') and "
+                                "nothing is left to do; the ticket is then closed. Leave "
+                                "it false for advertising, notifications and anything "
+                                "still open."
+                            ),
+                        },
+                    },
                     "required": ["reason"],
                 },
             },
@@ -765,8 +780,10 @@ class ToolExecutor:
         Deliberately does not touch the ticket state: which target states the
         agent may set is a queue-policy decision (``allowed_state_types``), and
         a tool that quietly bypassed it would defeat the point of that setting.
-        A queue that wants junk closed lists a closed state type there; the
-        model then calls ``update_ticket_fields`` before this tool.
+        ``resolved=true`` only flags the outcome; the runtime closes the ticket
+        through the same policy gate it uses after a sent reply. A queue that
+        wants junk closed lists a closed state type there; the model then calls
+        ``update_ticket_fields`` before this tool.
         """
         reason = arguments.get("reason")
         if not isinstance(reason, str) or not reason.strip():
@@ -790,6 +807,7 @@ class ToolExecutor:
             content_for_model="Run closed without a customer message.",
             terminal=True,
             no_reply_reason=unmasked,
+            no_reply_resolved=arguments.get("resolved") is True,
         )
 
     async def _kb_search(self, arguments: dict[str, Any]) -> ToolOutcome:
