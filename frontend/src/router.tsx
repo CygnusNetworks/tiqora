@@ -34,6 +34,10 @@ import {
   type TimeAccountingSearch,
 } from "@/routes/agent/TimeAccountingReportPage";
 import { CustomerDetailPage } from "@/routes/agent/CustomerDetailPage";
+import {
+  CustomerDirectoryPage,
+  type CustomerDirectorySearch,
+} from "@/routes/agent/CustomerDirectoryPage";
 import { DialPage } from "@/routes/agent/DialPage";
 import { validateDialSearch } from "@/routes/agent/dialSearch";
 import type { TicketListChannel } from "@/lib/api";
@@ -493,6 +497,25 @@ const agentTimeAccountingRoute = createRoute({
     };
   },
   component: TimeAccountingReportPage,
+});
+
+const agentCustomersRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/customers",
+  validateSearch: (s: Record<string, unknown>): CustomerDirectorySearch => {
+    const str = (v: unknown) => (typeof v === "string" && v !== "" ? v : undefined);
+    // Company ids can look numeric; the router JSON-parses search values.
+    const id = (v: unknown) => (typeof v === "number" ? String(v) : str(v));
+    const page = typeof s.page === "number" ? s.page : Number(s.page);
+    return {
+      q: id(s.q),
+      company: id(s.company),
+      company_name: id(s.company_name),
+      page: Number.isInteger(page) && page > 1 ? page : undefined,
+      invalid: s.invalid === true || s.invalid === "true" ? true : undefined,
+    };
+  },
+  component: CustomerDirectoryPage,
 });
 
 const agentCustomerRoute = createRoute({
@@ -1018,6 +1041,7 @@ const routeTree = rootRoute.addChildren([
     agentTemplatesRoute,
     agentServicesRoute,
     agentTimeAccountingRoute,
+    agentCustomersRoute,
     agentCustomerRoute,
     agentDialRoute,
   ]),

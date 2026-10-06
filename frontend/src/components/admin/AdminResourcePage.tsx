@@ -103,6 +103,8 @@ export type AdminResourcePageProps<Out, Create, Update> = {
   drawer?: Pick<CrudDrawerProps, "size" | "appearance" | "stableTabHeight" | "footerStatus">;
   /** Edit dialog title for a row (default: admin.form.editTitle with `title`). */
   editTitle?: (row: Out) => string;
+  /** Extra controls in the page header, left of the "new" button. */
+  headerActions?: ReactNode;
 };
 
 const defaultIsRowValid = (row: unknown): boolean =>
@@ -209,6 +211,7 @@ export function AdminResourcePage<Out, Create, Update>({
   rowActions,
   drawer,
   editTitle,
+  headerActions,
 }: AdminResourcePageProps<Out, Create, Update>) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -503,7 +506,8 @@ export function AdminResourcePage<Out, Create, Update>({
   return (
     <div className="space-y-3 p-4" data-testid={`admin-${resourceKey}-page`}>
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-xl font-semibold text-ink">{title}</h1>
+        <h1 className="mr-auto font-display text-xl font-semibold text-ink">{title}</h1>
+        {headerActions}
         <Button
           variant="primary"
           size="sm"

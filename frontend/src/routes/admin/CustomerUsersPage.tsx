@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
 import {
   api,
+  ApiError,
   type AdminPage,
   type CustomerUserAdminOut,
   type CustomerUserAdminCreate,
@@ -17,6 +18,14 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { MenuItem } from "@/components/ui/Menu";
 import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
+import { CustomerDirectoryAccessDialog } from "@/components/admin/CustomerDirectoryAccessDialog";
+import { CustomerCompanyCell, CustomerNameCell } from "@/components/customers/CustomerCells";
+import {
+  downloadUrl,
+  saveSelectedVcards,
+  VCARD_EXPORT_MAX,
+} from "@/components/customers/vcardExport";
+import { DownloadIcon, KeyIcon, UsersIcon } from "@/components/ui/icons";
 import { bulkInChunks } from "@/lib/bulk";
 import { formatDateTime } from "@/lib/format";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
@@ -45,6 +54,7 @@ export function CustomerUsersPage() {
   const [companyError, setCompanyError] = useState<string | null>(null);
   // Znuny AdminCustomerUser shows the customer preference modules PGP/SMIME.
   const [keysLogin, setKeysLogin] = useState<string | null>(null);
+  const [accessOpen, setAccessOpen] = useState(false);
   const debouncedCompanySearch = useDebouncedValue(companySearch, 300);
 
   const companiesQ = useQuery({
@@ -62,39 +72,49 @@ export function CustomerUsersPage() {
     enabled: companyDialog !== null,
   });
 
+  // Name first; lower-priority columns drop out as the window narrows instead
+  // of scrolling the table sideways (login/id stay in the edit dialog).
   const columns: DataTableColumn<CustomerUserAdminOut>[] = [
-    { key: "id", header: t("admin.table.id"), mono: true, render: (r) => r.id },
-    {
-      key: "login",
-      header: t("admin.customerUsers.login"),
-      sortable: true,
-      render: (r) => r.login,
-    },
-    {
-      key: "email",
-      header: t("admin.customerUsers.email"),
-      sortable: true,
-      render: (r) => r.email,
-    },
-    {
-      key: "customer_id",
-      header: t("admin.customerUsers.customerId"),
-      mono: true,
-      sortable: true,
-      render: (r) => r.customer_id,
-    },
     {
       key: "name",
       header: t("admin.customerUsers.name"),
       sortable: true,
-      sortKey: "first_name",
-      render: (r) => `${r.first_name} ${r.last_name}`,
+      sortKey: "last_name",
+      render: (r) => (
+        <CustomerNameCell
+          firstName={r.first_name}
+          lastName={r.last_name}
+          email={r.email}
+          login={r.login}
+        />
+      ),
+    },
+    {
+      key: "customer_id",
+      header: t("admin.customerUsers.company"),
+      sortable: true,
+      render: (r) => <CustomerCompanyCell companyName={r.company_name} customerId={r.customer_id} />,
+    },
+    {
+      key: "phone",
+      header: t("admin.customerUsers.phone"),
+      hideBelow: "lg",
+      render: (r) => <span className="tabular-nums text-muted">{r.phone || "–"}</span>,
+    },
+    {
+      key: "login",
+      header: t("admin.customerUsers.login"),
+      sortable: true,
+      mono: true,
+      hideBelow: "2xl",
+      render: (r) => r.login,
     },
     {
       key: "changed",
       header: t("admin.table.changed"),
       sortable: true,
       sortKey: "change_time",
+      hideBelow: "xl",
       render: (r) => formatDateTime(r.change_time, locale),
     },
   ];
@@ -148,6 +168,26 @@ export function CustomerUsersPage() {
     },
   ];
 
+  // Resolve logins of selected ids from the currently cached list pages.
+  const loginsFor = useCallback(
+    (ids: Array<number | string>): string[] => {
+      const loginById = new Map<number, string>();
+      const cached = queryClient.getQueriesData<AdminPage<CustomerUserAdminOut>>({
+        queryKey: ["admin", "customer-users"],
+      });
+      for (const [, data] of cached) {
+        for (const row of data?.items ?? []) {
+          loginById.set(row.id, row.login);
+        }
+      }
+      return ids
+        .map(Number)
+        .map((id) => loginById.get(id))
+        .filter((login): login is string => Boolean(login));
+    },
+    [queryClient],
+  );
+
   const bulkActions: AdminBulkAction[] = useMemo(
     () => [
       {
@@ -194,31 +234,32 @@ export function CustomerUsersPage() {
         },
       },
       {
+        key: "vcards",
+        label: t("admin.customerUsers.bulk.vcards"),
+        run: async (ids) => {
+          const logins = loginsFor(ids);
+          if (logins.length > VCARD_EXPORT_MAX) {
+            throw new ApiError(
+              422,
+              t("customerDirectory.exportTooMany", { max: VCARD_EXPORT_MAX }),
+              "",
+            );
+          }
+          await saveSelectedVcards(logins);
+        },
+      },
+      {
         key: "gdpr",
         label: t("admin.customerUsers.bulk.gdpr"),
         run: async (ids) => {
-          // Resolve logins from the currently cached customer-users list pages.
-          const loginById = new Map<number, string>();
-          const cached = queryClient.getQueriesData<AdminPage<CustomerUserAdminOut>>({
-            queryKey: ["admin", "customer-users"],
-          });
-          for (const [, data] of cached) {
-            for (const row of data?.items ?? []) {
-              loginById.set(row.id, row.login);
-            }
-          }
-          const logins = ids
-            .map(Number)
-            .map((id) => loginById.get(id))
-            .filter((login): login is string => Boolean(login));
           await navigate({
             to: "/admin/gdpr",
-            search: { logins: logins.join(",") },
+            search: { logins: loginsFor(ids).join(",") },
           });
         },
       },
     ],
-    [t, queryClient, navigate],
+    [t, loginsFor, navigate],
   );
 
   const applyCompany = async () => {
@@ -260,10 +301,38 @@ export function CustomerUsersPage() {
         pageSize={100}
         allowAllPageSize
         bulkActions={bulkActions}
+        headerActions={
+          <Button
+            variant="secondary"
+            size="sm"
+            data-testid="admin-customer-directory-access"
+            onClick={() => setAccessOpen(true)}
+          >
+            <UsersIcon className="text-[14px]" />
+            {t("admin.customerUsers.access")}
+          </Button>
+        }
         rowActions={(row) => (
-          <MenuItem testId={`admin-customer-user-keys-${row.id}`} onSelect={() => setKeysLogin(row.login)}>
-            {t("cryptoKeys.openButton")}
-          </MenuItem>
+          <>
+            <MenuItem
+              testId={`admin-customer-user-vcard-${row.id}`}
+              onSelect={() => downloadUrl(api.customerVcardUrl(row.login))}
+            >
+              <span className="inline-flex items-center gap-2">
+                <DownloadIcon className="text-[14px]" />
+                {t("customerCentre.downloadVcard")}
+              </span>
+            </MenuItem>
+            <MenuItem
+              testId={`admin-customer-user-keys-${row.id}`}
+              onSelect={() => setKeysLogin(row.login)}
+            >
+              <span className="inline-flex items-center gap-2">
+                <KeyIcon className="text-[14px]" />
+                {t("cryptoKeys.openButton")}
+              </span>
+            </MenuItem>
+          </>
         )}
         toFormValues={(row) =>
           row
@@ -306,6 +375,8 @@ export function CustomerUsersPage() {
           ...(v.password ? { password: v.password as string } : {}),
         })}
       />
+
+      {accessOpen && <CustomerDirectoryAccessDialog onClose={() => setAccessOpen(false)} />}
 
       <Dialog
         open={keysLogin !== null}

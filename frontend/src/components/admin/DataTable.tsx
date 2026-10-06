@@ -28,6 +28,27 @@ export type DataTableColumn<T> = {
    * sortKey "change_time"). Defaults to `key`.
    */
   sortKey?: string;
+  /**
+   * Hide this column in the desktop table below the given breakpoint, so
+   * narrow windows drop low-priority columns instead of scrolling sideways.
+   * The phone card layout (below `md`) still lists it.
+   */
+  hideBelow?: DataTableBreakpoint;
+};
+
+export type DataTableBreakpoint = "lg" | "xl" | "2xl";
+
+// Static strings so Tailwind's JIT sees every class. `cn` is plain clsx, so a
+// hidden column must not also carry the plain `md:table-cell`.
+const HEADER_DISPLAY: Record<DataTableBreakpoint, string> = {
+  lg: "hidden lg:table-cell",
+  xl: "hidden xl:table-cell",
+  "2xl": "hidden 2xl:table-cell",
+};
+const CELL_DISPLAY: Record<DataTableBreakpoint, string> = {
+  lg: "md:hidden lg:table-cell",
+  xl: "md:hidden xl:table-cell",
+  "2xl": "md:hidden 2xl:table-cell",
 };
 
 export type DataTableSelection = {
@@ -250,12 +271,19 @@ export function DataTable<T>({
                     sortKey={colSortKey}
                     sort={sort}
                     onSortChange={onSortChange}
-                    className={col.className}
+                    className={cn(col.className, col.hideBelow && HEADER_DISPLAY[col.hideBelow])}
                   />
                 );
               }
               return (
-                <th key={col.key} className={cn("py-1.5 pl-4 pr-2 font-medium", col.className)}>
+                <th
+                  key={col.key}
+                  className={cn(
+                    "py-1.5 pl-4 pr-2 font-medium",
+                    col.className,
+                    col.hideBelow && HEADER_DISPLAY[col.hideBelow],
+                  )}
+                >
                   {col.header}
                 </th>
               );
@@ -342,7 +370,8 @@ export function DataTable<T>({
                       // pseudo-element label.
                       "flex items-center justify-between gap-4 px-2 py-1 text-xs before:shrink-0 before:font-medium before:uppercase before:tracking-wide before:text-[10.5px] before:text-muted before:content-[attr(data-label)]",
                       // Desktop: restore the original table cell exactly.
-                      "md:table-cell md:px-0 md:py-1 md:pl-4 md:pr-2 md:before:content-none",
+                      "md:px-0 md:py-1 md:pl-4 md:pr-2 md:before:content-none",
+                      col.hideBelow ? CELL_DISPLAY[col.hideBelow] : "md:table-cell",
                       col.mono && "font-mono text-muted",
                       col.className,
                     )}

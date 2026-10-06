@@ -352,12 +352,12 @@ describe("CustomerUsersPage", () => {
     });
     expect(header.textContent).toMatch(/▼/);
 
-    // Name column maps to first_name sort key.
+    // Name column sorts by last name.
     list.mockClear();
-    fireEvent.click(screen.getByTestId("admin-sort-first_name"));
+    fireEvent.click(screen.getByTestId("admin-sort-last_name"));
     await waitFor(() => {
       expect(list).toHaveBeenCalledWith(
-        expect.objectContaining({ sort: "first_name", order: "asc" }),
+        expect.objectContaining({ sort: "last_name", order: "asc" }),
         expect.anything(),
       );
     });

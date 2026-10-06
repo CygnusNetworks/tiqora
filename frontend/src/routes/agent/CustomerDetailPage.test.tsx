@@ -6,7 +6,8 @@ import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { CustomerDetailPage } from "./CustomerDetailPage";
 
-const { navigate, getCustomer, listTickets, phoneConfig, dial, customerCryptoKeys } = vi.hoisted(() => ({
+const { navigate, getCustomer, listTickets, phoneConfig, dial, customerCryptoKeys, auth } = vi.hoisted(() => ({
+  auth: { canUseDirectory: true },
   navigate: vi.fn(),
   getCustomer: vi.fn(),
   listTickets: vi.fn(),
@@ -51,7 +52,14 @@ vi.mock("@/lib/phoneApi", async () => {
 
 vi.mock("@/components/agent/TicketTable", () => ({ TicketTable: () => null }));
 
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({
+    user: { id: 1, login: "agent", can_use_customer_directory: auth.canUseDirectory },
+  }),
+}));
+
 beforeEach(() => {
+  auth.canUseDirectory = true;
   navigate.mockReset();
   getCustomer.mockReset().mockResolvedValue({
     login: "jane.doe",
@@ -233,6 +241,23 @@ describe("CustomerDetailPage vCard downloads", () => {
     const link = await screen.findByTestId("company-vcards");
     expect(link).toHaveAttribute("href", "/api/v1/customers/companies/CUST%201%2Fx/vcards");
     expect(link).toHaveAttribute("download");
+  });
+
+  it("hides the company vCards without the customer-directory permission", async () => {
+    auth.canUseDirectory = false;
+    getCustomer.mockResolvedValue({
+      login: "jane.doe",
+      email: "jane@example.com",
+      customer_id: "CUST1",
+      first_name: "Jane",
+      last_name: "Doe",
+      phone: null,
+      mobile: null,
+      company_name: "ACME",
+    });
+    renderPage();
+    await screen.findByTestId("customer-vcard");
+    expect(screen.queryByTestId("company-vcards")).toBeNull();
   });
 });
 
