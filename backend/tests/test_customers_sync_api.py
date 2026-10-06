@@ -64,6 +64,7 @@ def _cleanup(sync_url: str) -> None:
         )
         # Customer writes queue a Znuny cache invalidation row (tiqora table).
         conn.execute(text("DELETE FROM tiqora_cache_invalidation"))
+        conn.execute(text("DELETE FROM tiqora_feature_grant"))
         conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": _UID})
     engine.dispose()
 
@@ -262,6 +263,20 @@ async def test_patch_same_comment_twice_is_noop(mariadb_znuny_url: str) -> None:
     assert comments.count(line) == 1
 
 
+def _grant_directory(url: str) -> None:
+    """Company vCards are a list export: the agent needs the directory grant."""
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO tiqora_feature_grant (feature, subject_type, subject_id)"
+                " VALUES ('customer_directory', 'user', :id)"
+            ),
+            {"id": _UID},
+        )
+    engine.dispose()
+
+
 def _seed_vcard_company(url: str) -> None:
     engine = create_engine(url)
     with engine.begin() as conn:
@@ -314,6 +329,7 @@ async def test_customer_vcard_download(mariadb_znuny_url: str) -> None:
 async def test_company_vcards_download(mariadb_znuny_url: str) -> None:
     _seed(mariadb_znuny_url)
     _seed_vcard_company(mariadb_znuny_url)
+    _grant_directory(mariadb_znuny_url)
     client, engine = await _client(mariadb_znuny_url)
     async with client:
         resp = await client.get("/api/v1/customers/companies/CUSTSYNC-VC/vcards")
@@ -330,6 +346,8 @@ async def test_company_vcards_download(mariadb_znuny_url: str) -> None:
 
 
 async def test_company_vcards_with_slash_in_customer_id(mariadb_znuny_url: str) -> None:
+    _seed(mariadb_znuny_url)
+    _grant_directory(mariadb_znuny_url)
     engine = create_engine(mariadb_znuny_url)
     with engine.begin() as conn:
         conn.execute(

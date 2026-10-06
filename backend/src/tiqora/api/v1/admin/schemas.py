@@ -453,6 +453,8 @@ class CustomerUserAdminOut(BaseModel):
     valid_id: int
     create_time: UtcDateTime | None
     change_time: UtcDateTime | None
+    #: ``customer_company.name`` for ``customer_id``; filled by the list endpoint only.
+    company_name: str | None = None
 
 
 class CustomerUserAdminCreate(BaseModel):

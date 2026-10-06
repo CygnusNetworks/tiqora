@@ -36,6 +36,7 @@ from tiqora.domain.auth import (
 )
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
+from tiqora.domain.feature_grants import CUSTOMER_DIRECTORY, FeatureGrantService
 from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.passkey import two_factor_enabled, webauthn_enabled
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
@@ -117,6 +118,14 @@ async def _user_me(
     except Exception:  # noqa: BLE001 — never fail /me if tiqora tables missing
         data["can_edit_templates"] = False
         # Clear aborted transaction so callers (e.g. PUT language) can continue.
+        with contextlib.suppress(Exception):
+            await session.rollback()
+    try:
+        data["can_use_customer_directory"] = await FeatureGrantService(session).may_use(
+            user.id, CUSTOMER_DIRECTORY
+        )
+    except Exception:  # noqa: BLE001 — same guard as above (table missing before migrate)
+        data["can_use_customer_directory"] = False
         with contextlib.suppress(Exception):
             await session.rollback()
     return UserMe(**data)

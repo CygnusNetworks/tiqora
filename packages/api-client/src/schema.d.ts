@@ -2109,6 +2109,27 @@ export interface paths {
         patch: operations["update_dynamic_field_api_v1_admin_dynamic_fields__field_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/feature-grants/{feature}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Feature Grants */
+        get: operations["get_feature_grants_api_v1_admin_feature_grants__feature__get"];
+        /**
+         * Set Feature Grants
+         * @description Replace who may use *feature*.
+         */
+        put: operations["set_feature_grants_api_v1_admin_feature_grants__feature__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/follow-up-possible": {
         parameters: {
             query?: never;
@@ -4780,6 +4801,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Directory
+         * @description Customer users, name first. Default order: last name, first name.
+         */
+        get: operations["list_directory_api_v1_customer_directory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-directory/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Companies
+         * @description Valid companies for the directory's company filter.
+         */
+        get: operations["search_companies_api_v1_customer_directory_companies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-directory/vcards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Filtered Vcards
+         * @description Everything matching the list filters as one multi-card .vcf.
+         *
+         *     A plain GET so the UI can offer it as a download link (session cookie).
+         *     At most ``EXPORT_MAX`` contacts per file.
+         */
+        get: operations["export_filtered_vcards_api_v1_customer_directory_vcards_get"];
+        put?: never;
+        /**
+         * Export Selected Vcards
+         * @description A selection of contacts as one .vcf. POST because a selection of
+         *     hundreds of logins would not fit into a URL.
+         */
+        post: operations["export_selected_vcards_api_v1_customer_directory_vcards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers": {
         parameters: {
             query?: never;
@@ -4833,6 +4922,9 @@ export interface paths {
         /**
          * Company Vcards
          * @description All valid contacts of a company as one multi-card .vcf.
+         *
+         *     A list export, so it needs the customer-directory permission; the single
+         *     customer vCard below stays open to every agent (ticket work).
          */
         get: operations["company_vcards_api_v1_customers_companies__customer_id__vcards_get"];
         put?: never;
@@ -10438,6 +10530,46 @@ export interface components {
             /** Smime Filename */
             smime_filename?: string | null;
         };
+        /** CustomerDirectoryCompany */
+        CustomerDirectoryCompany: {
+            /** Customer Id */
+            customer_id: string;
+            /** Name */
+            name: string;
+        };
+        /** CustomerDirectoryEntry */
+        CustomerDirectoryEntry: {
+            /** City */
+            city: string | null;
+            /** Company Name */
+            company_name?: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /** Mobile */
+            mobile: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Title */
+            title: string | null;
+            /** Valid Id */
+            valid_id: number;
+        };
+        /**
+         * CustomerDirectoryExportRequest
+         * @description Exactly these contacts (a selection), in name order.
+         */
+        CustomerDirectoryExportRequest: {
+            /** Logins */
+            logins: string[];
+        };
         /** CustomerFillOut */
         CustomerFillOut: {
             /** Changed */
@@ -10624,6 +10756,8 @@ export interface components {
             city: string | null;
             /** Comments */
             comments: string | null;
+            /** Company Name */
+            company_name?: string | null;
             /** Country */
             country: string | null;
             /** Create Time */
@@ -11169,6 +11303,36 @@ export interface components {
             hit?: components["schemas"]["EscalationHitOut"] | null;
             /** Valid */
             valid: boolean;
+        };
+        /**
+         * FeatureGrantsOut
+         * @description Grants of one feature. Admins always have it; empty lists = admin-only.
+         */
+        FeatureGrantsOut: {
+            /** Group Ids */
+            group_ids: number[];
+            /** Role Ids */
+            role_ids: number[];
+            /** User Ids */
+            user_ids: number[];
+        };
+        /** FeatureGrantsUpdate */
+        FeatureGrantsUpdate: {
+            /**
+             * Group Ids
+             * @default []
+             */
+            group_ids: number[];
+            /**
+             * Role Ids
+             * @default []
+             */
+            role_ids: number[];
+            /**
+             * User Ids
+             * @default []
+             */
+            user_ids: number[];
         };
         /**
          * FollowUpPossibleOut
@@ -12720,6 +12884,17 @@ export interface components {
         Page_CustomerCompanyOut_: {
             /** Items */
             items: components["schemas"]["CustomerCompanyOut"][];
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total */
+            total: number;
+        };
+        /** Page[CustomerDirectoryEntry] */
+        Page_CustomerDirectoryEntry_: {
+            /** Items */
+            items: components["schemas"]["CustomerDirectoryEntry"][];
             /** Page */
             page: number;
             /** Page Size */
@@ -15816,6 +15991,11 @@ export interface components {
              * @default false
              */
             can_edit_templates: boolean;
+            /**
+             * Can Use Customer Directory
+             * @default false
+             */
+            can_use_customer_directory: boolean;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -21725,6 +21905,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DynamicFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_feature_grants_api_v1_admin_feature_grants__feature__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                feature: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureGrantsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_feature_grants_api_v1_admin_feature_grants__feature__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                feature: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureGrantsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureGrantsOut"];
                 };
             };
             /** @description Validation Error */
@@ -29467,6 +29721,157 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WhatsAppWebhookResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_directory_api_v1_customer_directory_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                customer_id?: string | null;
+                page?: number;
+                page_size?: number;
+                valid?: "valid" | "invalid" | "all";
+                sort?: string | null;
+                order?: "asc" | "desc";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CustomerDirectoryEntry_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_companies_api_v1_customer_directory_companies_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDirectoryCompany"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_filtered_vcards_api_v1_customer_directory_vcards_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                customer_id?: string | null;
+                valid?: "valid" | "invalid" | "all";
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_selected_vcards_api_v1_customer_directory_vcards_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerDirectoryExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

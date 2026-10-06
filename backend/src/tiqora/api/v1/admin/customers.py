@@ -141,7 +141,18 @@ async def list_customer_users(
         default=CustomerUser.login,
         tiebreaker=CustomerUser.login,
     )
-    return await paginate(session, CustomerUserAdminOut, stmt, params)
+    page = await paginate(session, CustomerUserAdminOut, stmt, params)
+    ids = {item.customer_id for item in page.items if item.customer_id}
+    if ids:
+        rows = await session.execute(
+            select(CustomerCompany.customer_id, CustomerCompany.name).where(
+                CustomerCompany.customer_id.in_(ids)
+            )
+        )
+        names = dict(rows.tuples().all())
+        for item in page.items:
+            item.company_name = names.get(item.customer_id)
+    return page
 
 
 @router.patch("/customer-users/bulk", response_model=CustomerUserBulkUpdateResult)

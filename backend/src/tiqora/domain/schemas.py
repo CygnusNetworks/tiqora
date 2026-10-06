@@ -59,6 +59,9 @@ class UserMe(BaseModel):
     # per-template grant to them / a group they hold ``rw`` on). Drives the
     # agent "Templates" nav item.
     can_edit_templates: bool = False
+    # True when the agent may open the "Kunden" directory (admin, or a
+    # customer_directory grant to them, a group they belong to or a role).
+    can_use_customer_directory: bool = False
 
 
 class UserLanguageUpdate(BaseModel):

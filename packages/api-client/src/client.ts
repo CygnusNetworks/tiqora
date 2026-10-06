@@ -241,6 +241,19 @@ export type StandardTemplateCreate = Schemas["StandardTemplateCreate"];
 export type StandardTemplateUpdate = Schemas["StandardTemplateUpdate"];
 export type TemplateEditorsOut = Schemas["TemplateEditorsOut"];
 export type TemplateEditorsUpdate = Schemas["TemplateEditorsUpdate"];
+export type CustomerDirectoryEntry = Schemas["CustomerDirectoryEntry"];
+export type CustomerDirectoryCompany = Schemas["CustomerDirectoryCompany"];
+export type FeatureGrantsOut = Schemas["FeatureGrantsOut"];
+export type FeatureGrantsUpdate = Schemas["FeatureGrantsUpdate"];
+/** Feature keys of `/admin/feature-grants/{feature}`. */
+export type FeatureKey = "customer_directory";
+/** Filters of the agent customer directory (list + vCard export). */
+export type CustomerDirectoryFilter = {
+  search?: string;
+  /** Company (`customer_id`) filter. */
+  customerId?: string;
+  valid?: AdminValidFilter;
+};
 // Hand-written (do not regenerate schema.d.ts): standard_attachment master +
 // template/attachment + customer-user/group assignment editors.
 export type StandardAttachmentOut = {
@@ -1404,6 +1417,52 @@ export class ApiClient {
     );
   }
 
+  /** Customer directory page (needs the customer_directory feature). */
+  listCustomerDirectory(
+    params: CustomerDirectoryFilter & { page?: number; pageSize?: number },
+    signal?: AbortSignal,
+  ) {
+    return this.request<AdminPage<CustomerDirectoryEntry>>("GET", "/api/v1/customer-directory", {
+      query: {
+        page: params.page,
+        page_size: params.pageSize,
+        valid: params.valid,
+        search: params.search || undefined,
+        customer_id: params.customerId || undefined,
+      },
+      signal,
+    });
+  }
+
+  searchCustomerDirectoryCompanies(search: string, signal?: AbortSignal) {
+    return this.request<CustomerDirectoryCompany[]>(
+      "GET",
+      "/api/v1/customer-directory/companies",
+      { query: { search: search || undefined }, signal },
+    );
+  }
+
+  /**
+   * Download URL of one .vcf with everything matching the filter (the server
+   * caps the count). Session-cookie auth, like attachments.
+   */
+  customerDirectoryVcardsUrl(filter: CustomerDirectoryFilter): string {
+    const q = new URLSearchParams();
+    if (filter.search) q.set("search", filter.search);
+    if (filter.customerId) q.set("customer_id", filter.customerId);
+    if (filter.valid) q.set("valid", filter.valid);
+    const qs = q.toString();
+    return joinUrl(this.baseUrl, `/api/v1/customer-directory/vcards${qs ? `?${qs}` : ""}`);
+  }
+
+  /** vCard text (.vcf) of exactly these contacts; POST because selections get long. */
+  exportCustomerVcards(logins: string[], signal?: AbortSignal) {
+    return this.request<string>("POST", "/api/v1/customer-directory/vcards", {
+      body: { logins },
+      signal,
+    });
+  }
+
   listHistory(
     ticketId: number,
     order: "asc" | "desc" = "desc",
@@ -2270,6 +2329,20 @@ export class ApiClient {
       `/api/v1/admin/templates/${templateId}/editors`,
       { body, signal },
     );
+  }
+
+  /** Who may use an agent feature (agents, groups, roles). Admin only. */
+  getFeatureGrants(feature: FeatureKey, signal?: AbortSignal) {
+    return this.request<FeatureGrantsOut>("GET", `/api/v1/admin/feature-grants/${feature}`, {
+      signal,
+    });
+  }
+
+  setFeatureGrants(feature: FeatureKey, body: FeatureGrantsUpdate, signal?: AbortSignal) {
+    return this.request<FeatureGrantsOut>("PUT", `/api/v1/admin/feature-grants/${feature}`, {
+      body,
+      signal,
+    });
   }
 
   /** Agent-facing template editing — only templates the caller is granted. */

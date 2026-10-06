@@ -679,8 +679,20 @@
         "type": "object"
       },
       "AgentCustomerCreateRequest": {
-        "description": "Body for agent-side customer-user creation (Znuny AgentTicketCustomer).\n\nNo password \u2014 agents create the contact record; portal auth is separate.",
+        "description": "Body for agent-side customer-user creation (Znuny AgentTicketCustomer).\n\nNo password \u2014 agents create the contact record; portal auth is separate.\n``email`` and ``first_name`` may be empty: the AI secretary creates\ncallers it only knows by surname and number (the columns are NOT NULL,\nso empty means ``\"\"``).",
         "properties": {
+          "comments": {
+            "anyOf": [
+              {
+                "maxLength": 250,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
           "customer_id": {
             "maxLength": 150,
             "minLength": 1,
@@ -688,14 +700,14 @@
             "type": "string"
           },
           "email": {
+            "default": "",
             "maxLength": 150,
-            "minLength": 1,
             "title": "Email",
             "type": "string"
           },
           "first_name": {
+            "default": "",
             "maxLength": 100,
-            "minLength": 1,
             "title": "First Name",
             "type": "string"
           },
@@ -710,6 +722,18 @@
             "minLength": 1,
             "title": "Login",
             "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
           },
           "phone": {
             "anyOf": [
@@ -726,8 +750,6 @@
         },
         "required": [
           "login",
-          "email",
-          "first_name",
           "last_name",
           "customer_id"
         ],
@@ -7537,6 +7559,46 @@
         "title": "ChannelConfigUpdate",
         "type": "object"
       },
+      "CompanyCreateOut": {
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CompanyCreateOut",
+        "type": "object"
+      },
+      "CompanyCreateRequest": {
+        "properties": {
+          "customer_id": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CompanyCreateRequest",
+        "type": "object"
+      },
       "ComposeContextOut": {
         "properties": {
           "from_address": {
@@ -8583,6 +8645,295 @@
         "title": "CustomerCryptoKeysOut",
         "type": "object"
       },
+      "CustomerDirectoryCompany": {
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CustomerDirectoryCompany",
+        "type": "object"
+      },
+      "CustomerDirectoryEntry": {
+        "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "login",
+          "email",
+          "customer_id",
+          "title",
+          "first_name",
+          "last_name",
+          "phone",
+          "mobile",
+          "city",
+          "valid_id"
+        ],
+        "title": "CustomerDirectoryEntry",
+        "type": "object"
+      },
+      "CustomerDirectoryExportRequest": {
+        "description": "Exactly these contacts (a selection), in name order.",
+        "properties": {
+          "logins": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Logins",
+            "type": "array"
+          }
+        },
+        "required": [
+          "logins"
+        ],
+        "title": "CustomerDirectoryExportRequest",
+        "type": "object"
+      },
+      "CustomerFillOut": {
+        "properties": {
+          "changed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed",
+            "type": "array"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "login",
+          "customer_id",
+          "first_name",
+          "last_name",
+          "email",
+          "phone",
+          "mobile",
+          "comments",
+          "changed"
+        ],
+        "title": "CustomerFillOut",
+        "type": "object"
+      },
+      "CustomerFillRequest": {
+        "description": "Fill-only update: a field is written only when it is empty on the\ncustomer; nothing is overwritten or cleared (AI secretary, spec B1).",
+        "properties": {
+          "comments_append": {
+            "anyOf": [
+              {
+                "maxLength": 250,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments Append"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "title": "CustomerFillRequest",
+        "type": "object"
+      },
       "CustomerLoginResponse": {
         "properties": {
           "customer": {
@@ -9088,6 +9439,17 @@
               }
             ],
             "title": "Comments"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
           },
           "country": {
             "anyOf": [
@@ -9852,6 +10214,56 @@
           "connected"
         ],
         "title": "DbStatusOut",
+        "type": "object"
+      },
+      "DialOut": {
+        "properties": {
+          "extension": {
+            "title": "Extension",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "extension",
+          "number"
+        ],
+        "title": "DialOut",
+        "type": "object"
+      },
+      "DialRequest": {
+        "properties": {
+          "name": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Number",
+            "type": "string"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          }
+        },
+        "required": [
+          "number"
+        ],
+        "title": "DialRequest",
         "type": "object"
       },
       "DimensionCountOut": {
@@ -10672,6 +11084,69 @@
           "valid"
         ],
         "title": "EscalationTestOut",
+        "type": "object"
+      },
+      "FeatureGrantsOut": {
+        "description": "Grants of one feature. Admins always have it; empty lists = admin-only.",
+        "properties": {
+          "group_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "role_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Role Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user_ids",
+          "group_ids",
+          "role_ids"
+        ],
+        "title": "FeatureGrantsOut",
+        "type": "object"
+      },
+      "FeatureGrantsUpdate": {
+        "properties": {
+          "group_ids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Group Ids",
+            "type": "array"
+          },
+          "role_ids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Role Ids",
+            "type": "array"
+          },
+          "user_ids": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "User Ids",
+            "type": "array"
+          }
+        },
+        "title": "FeatureGrantsUpdate",
         "type": "object"
       },
       "FollowUpPossibleOut": {
@@ -15268,6 +15743,37 @@
         "title": "Page[CustomerCompanyOut]",
         "type": "object"
       },
+      "Page_CustomerDirectoryEntry_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerDirectoryEntry"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Page[CustomerDirectoryEntry]",
+        "type": "object"
+      },
       "Page_CustomerUserAdminOut_": {
         "properties": {
           "items": {
@@ -16540,6 +17046,11 @@
             ],
             "title": "Dial Scheme",
             "type": "string"
+          },
+          "originate": {
+            "default": false,
+            "title": "Originate",
+            "type": "boolean"
           }
         },
         "required": [
@@ -22860,6 +23371,13 @@
             ],
             "title": "Last Sender Type"
           },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/TicketListLink"
+            },
+            "title": "Links",
+            "type": "array"
+          },
           "lock": {
             "anyOf": [
               {
@@ -22874,6 +23392,28 @@
           "lock_id": {
             "title": "Lock Id",
             "type": "integer"
+          },
+          "merged_into_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Id"
+          },
+          "merged_into_tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Tn"
           },
           "owner_id": {
             "title": "Owner Id",
@@ -23293,6 +23833,39 @@
             "title": "Link Type",
             "type": "string"
           },
+          "other_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Role"
+          },
+          "other_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other State"
+          },
+          "other_state_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other State Type"
+          },
           "other_ticket_id": {
             "title": "Other Ticket Id",
             "type": "integer"
@@ -23519,6 +24092,13 @@
             ],
             "title": "Last Sender Type"
           },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/TicketListLink"
+            },
+            "title": "Links",
+            "type": "array"
+          },
           "lock": {
             "anyOf": [
               {
@@ -23533,6 +24113,28 @@
           "lock_id": {
             "title": "Lock Id",
             "type": "integer"
+          },
+          "merged_into_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Id"
+          },
+          "merged_into_tn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merged Into Tn"
           },
           "owner_id": {
             "title": "Owner Id",
@@ -23650,6 +24252,41 @@
           "change_time"
         ],
         "title": "TicketListItem",
+        "type": "object"
+      },
+      "TicketListLink": {
+        "description": "A ticket\u2194ticket link as shown in the queue list (the *other* ticket).",
+        "properties": {
+          "link_type": {
+            "title": "Link Type",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "tn": {
+            "title": "Tn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "tn",
+          "link_type"
+        ],
+        "title": "TicketListLink",
         "type": "object"
       },
       "TicketPermissions": {
@@ -24308,6 +24945,11 @@
           "can_edit_templates": {
             "default": false,
             "title": "Can Edit Templates",
+            "type": "boolean"
+          },
+          "can_use_customer_directory": {
+            "default": false,
+            "title": "Can Use Customer Directory",
             "type": "boolean"
           },
           "email": {
@@ -37393,6 +38035,163 @@
         "summary": "Update Dynamic Field",
         "tags": [
           "admin:dynamic-fields"
+        ]
+      }
+    },
+    "/api/v1/admin/feature-grants/{feature}": {
+      "get": {
+        "operationId": "get_feature_grants_api_v1_admin_feature_grants__feature__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "feature",
+            "required": true,
+            "schema": {
+              "title": "Feature",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureGrantsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Feature Grants",
+        "tags": [
+          "admin:feature-grants"
+        ]
+      },
+      "put": {
+        "description": "Replace who may use *feature*.",
+        "operationId": "set_feature_grants_api_v1_admin_feature_grants__feature__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "feature",
+            "required": true,
+            "schema": {
+              "title": "Feature",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeatureGrantsUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeatureGrantsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Feature Grants",
+        "tags": [
+          "admin:feature-grants"
         ]
       }
     },
@@ -54422,6 +55221,453 @@
         ]
       }
     },
+    "/api/v1/customer-directory": {
+      "get": {
+        "description": "Customer users, name first. Default order: last name, first name.",
+        "operationId": "list_directory_api_v1_customer_directory_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "valid",
+            "required": false,
+            "schema": {
+              "default": "valid",
+              "enum": [
+                "valid",
+                "invalid",
+                "all"
+              ],
+              "title": "Valid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CustomerDirectoryEntry_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Directory",
+        "tags": [
+          "customer-directory"
+        ]
+      }
+    },
+    "/api/v1/customer-directory/companies": {
+      "get": {
+        "description": "Valid companies for the directory's company filter.",
+        "operationId": "search_companies_api_v1_customer_directory_companies_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerDirectoryCompany"
+                  },
+                  "title": "Response Search Companies Api V1 Customer Directory Companies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Companies",
+        "tags": [
+          "customer-directory"
+        ]
+      }
+    },
+    "/api/v1/customer-directory/vcards": {
+      "get": {
+        "description": "Everything matching the list filters as one multi-card .vcf.\n\nA plain GET so the UI can offer it as a download link (session cookie).\nAt most ``EXPORT_MAX`` contacts per file.",
+        "operationId": "export_filtered_vcards_api_v1_customer_directory_vcards_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "valid",
+            "required": false,
+            "schema": {
+              "default": "valid",
+              "enum": [
+                "valid",
+                "invalid",
+                "all"
+              ],
+              "title": "Valid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Filtered Vcards",
+        "tags": [
+          "customer-directory"
+        ]
+      },
+      "post": {
+        "description": "A selection of contacts as one .vcf. POST because a selection of\nhundreds of logins would not fit into a URL.",
+        "operationId": "export_selected_vcards_api_v1_customer_directory_vcards_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerDirectoryExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Selected Vcards",
+        "tags": [
+          "customer-directory"
+        ]
+      }
+    },
     "/api/v1/customers": {
       "post": {
         "description": "Create a valid customer_user as any authenticated agent.\n\nMirrors Znuny's AgentTicketCustomer \"add customer\" \u2014 not admin-gated.",
@@ -54498,6 +55744,155 @@
         ]
       }
     },
+    "/api/v1/customers/companies": {
+      "post": {
+        "description": "Create a customer company as any authenticated agent (the AI\nsecretary files a caller's organisation that Tiqora does not know).",
+        "operationId": "create_company_api_v1_customers_companies_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyCreateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Company",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/companies/{customer_id}/vcards": {
+      "get": {
+        "description": "All valid contacts of a company as one multi-card .vcf.\n\nA list export, so it needs the customer-directory permission; the single\ncustomer vCard below stays open to every agent (ticket work).",
+        "operationId": "company_vcards_api_v1_customers_companies__customer_id__vcards_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "title": "Customer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Vcards",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
     "/api/v1/customers/{login}": {
       "get": {
         "operationId": "get_customer_api_v1_customers__login__get",
@@ -54567,6 +55962,88 @@
           }
         },
         "summary": "Get Customer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "patch": {
+        "operationId": "fill_customer_api_v1_customers__login__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerFillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerFillOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fill Customer",
         "tags": [
           "customers"
         ]
@@ -55068,6 +56545,79 @@
           }
         },
         "summary": "Suggested Queue",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{login}/vcard": {
+      "get": {
+        "description": "Download one customer as a vCard 3.0 file.",
+        "operationId": "customer_vcard_api_v1_customers__login__vcard_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Customer Vcard",
         "tags": [
           "customers"
         ]
@@ -56990,6 +58540,82 @@
           }
         },
         "summary": "Dismiss",
+        "tags": [
+          "phone"
+        ]
+      }
+    },
+    "/api/v1/phone/dial": {
+      "post": {
+        "description": "Click-to-dial: ring the agent's desk phone, then dial ``number``.\n\nSession only: an API key (whatever its scopes) must not ring desk phones\nand dial out over the trunk.",
+        "operationId": "dial_api_v1_phone_dial_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DialOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dial",
         "tags": [
           "phone"
         ]
