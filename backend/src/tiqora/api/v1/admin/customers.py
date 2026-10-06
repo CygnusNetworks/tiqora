@@ -20,7 +20,6 @@ from tiqora.api.v1.admin.pagination import (
     CustomerUserListParamsDep,
     ListParamsDep,
     Page,
-    apply_sort,
     apply_valid_filter,
     paginate,
 )
@@ -37,23 +36,12 @@ from tiqora.api.v1.admin.schemas import (
     CustomerUserGroupAssignment,
     GroupOut,
 )
+from tiqora.api.v1.customer_sort import order_customer_users
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUserCustomer
 from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
 from tiqora.znuny.password import hash_password
 
 router = APIRouter(tags=["admin:customers"])
-
-# Allowlisted sort keys for GET /customer-users (prevents arbitrary column order).
-CUSTOMER_USER_SORT_COLUMNS = {
-    "login": CustomerUser.login,
-    "email": CustomerUser.email,
-    "first_name": CustomerUser.first_name,
-    "last_name": CustomerUser.last_name,
-    "customer_id": CustomerUser.customer_id,
-    "valid_id": CustomerUser.valid_id,
-    "create_time": CustomerUser.create_time,
-    "change_time": CustomerUser.change_time,
-}
 
 # Columns searched by both the plain substring search and the regex search.
 CUSTOMER_USER_SEARCH_COLUMNS = (
@@ -134,13 +122,8 @@ async def list_customer_users(
                     func.lower(CustomerUser.last_name).like(pattern),
                 )
             )
-    stmt = apply_sort(
-        stmt,
-        CUSTOMER_USER_SORT_COLUMNS,
-        params,
-        default=CustomerUser.login,
-        tiebreaker=CustomerUser.login,
-    )
+    # Allowlisted sort keys only (see customer_sort); default = name order.
+    stmt = order_customer_users(stmt, params.sort, params.order)
     page = await paginate(session, CustomerUserAdminOut, stmt, params)
     ids = {item.customer_id for item in page.items if item.customer_id}
     if ids:

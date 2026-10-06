@@ -153,6 +153,25 @@ describe("CustomerDirectoryPage", () => {
     expect(navigate).toHaveBeenCalled();
   });
 
+  it("sorts by the column headers via the URL", async () => {
+    state.search = { sort: "company", order: "desc" } satisfies CustomerDirectorySearch;
+    renderPage();
+    await screen.findByTestId("customer-directory-open-laura");
+    expect(listCustomerDirectory).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: "company", order: "desc" }),
+      expect.anything(),
+    );
+    fireEvent.click(screen.getByTestId("admin-sort-city"));
+    const call = navigate.mock.calls.at(-1)?.[0] as {
+      search: (prev: CustomerDirectorySearch) => CustomerDirectorySearch;
+    };
+    expect(call.search({ page: 3, sort: "company", order: "desc" })).toEqual({
+      page: undefined,
+      sort: "city",
+      order: undefined,
+    });
+  });
+
   it("disables the list export above the cap", async () => {
     listCustomerDirectory.mockResolvedValue({
       items: [entry("laura", "Laura", "Gomez")],

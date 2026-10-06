@@ -2331,7 +2331,7 @@ async def test_admin_customer_user_list_sort(
             reversed([i.login for i in change_asc.items])
         )
 
-        # Invalid / unknown sort key → safe default (login asc), not an error.
+        # Invalid / unknown sort key → safe default (name asc), not an error.
         bad = await admin_customers.list_customer_users(
             admin_user,
             s,
@@ -2340,14 +2340,16 @@ async def test_admin_customer_user_list_sort(
             ),
             search=ns,
         )
-        assert [i.login for i in bad.items] == [
+        # Same last name → first name decides: High (z), Low (a), Mid (m).
+        name_order = [
+            f"z.sort.{ns}@example.com",
             f"a.sort.{ns}@example.com",
             f"m.sort.{ns}@example.com",
-            f"z.sort.{ns}@example.com",
         ]
+        assert [i.login for i in bad.items] == name_order
 
-        # Absent sort → login default.
+        # Absent sort → name default (last name, first name, login).
         default = await admin_customers.list_customer_users(admin_user, s, base, search=ns)
-        assert [i.login for i in default.items] == [i.login for i in login_asc.items]
+        assert [i.login for i in default.items] == name_order
 
     await engine.dispose()

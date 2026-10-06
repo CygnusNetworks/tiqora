@@ -1419,7 +1419,13 @@ export class ApiClient {
 
   /** Customer directory page (needs the customer_directory feature). */
   listCustomerDirectory(
-    params: CustomerDirectoryFilter & { page?: number; pageSize?: number },
+    params: CustomerDirectoryFilter & {
+      page?: number;
+      pageSize?: number;
+      /** name (default), company, phone, city, email, login, first_name, customer_id. */
+      sort?: string;
+      order?: "asc" | "desc";
+    },
     signal?: AbortSignal,
   ) {
     return this.request<AdminPage<CustomerDirectoryEntry>>("GET", "/api/v1/customer-directory", {
@@ -1429,6 +1435,8 @@ export class ApiClient {
         valid: params.valid,
         search: params.search || undefined,
         customer_id: params.customerId || undefined,
+        sort: params.sort,
+        order: params.sort ? params.order : undefined,
       },
       signal,
     });

@@ -21,10 +21,10 @@ from tiqora.api.v1.admin.pagination import (
     ListParamsDep,
     Page,
     ValidFilter,
-    apply_sort,
     apply_valid_filter,
     window,
 )
+from tiqora.api.v1.customer_sort import order_customer_users
 from tiqora.api.v1.customers import vcard_response
 from tiqora.api.v1.feature_deps import CustomerDirectoryUser
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
@@ -34,14 +34,6 @@ router = APIRouter(prefix="/customer-directory", tags=["customer-directory"])
 
 #: Most contacts one export may contain; larger requests get a 422.
 EXPORT_MAX: Final[int] = 1000
-
-_SORT_COLUMNS = {
-    "name": CustomerUser.last_name,
-    "first_name": CustomerUser.first_name,
-    "email": CustomerUser.email,
-    "customer_id": CustomerUser.customer_id,
-    "login": CustomerUser.login,
-}
 
 _SEARCH_COLUMNS = (
     CustomerUser.login,
@@ -121,19 +113,10 @@ async def list_directory(
     search: str | None = None,
     customer_id: str | None = None,
 ) -> Page[CustomerDirectoryEntry]:
-    """Customer users, name first. Default order: last name, first name."""
+    """Customer users, name first. Sort keys: see ``customer_sort``; default name order."""
     _ = user
     stmt = _filtered(search, customer_id, params.valid)
-    if params.sort in _SORT_COLUMNS:
-        stmt = apply_sort(
-            stmt,
-            _SORT_COLUMNS,
-            params,
-            default=CustomerUser.last_name,
-            tiebreaker=CustomerUser.login,
-        )
-    else:
-        stmt = stmt.order_by(*_ORDER)
+    stmt = order_customer_users(stmt, params.sort, params.order)
     rows, total = await window(session, stmt, params)
     names = await _company_names(session, (r.customer_id for r in rows))
     items = [
