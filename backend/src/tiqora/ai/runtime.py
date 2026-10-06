@@ -539,8 +539,10 @@ def _build_system_prompt(
         parts.append(
             "You do not have to close the ticket yourself: once your message is "
             "sent, the system closes the ticket for a factual reply and leaves it "
-            "open for a clarifying question. Call update_ticket_fields only when "
-            "you want a different state than that."
+            "open for a clarifying question. When the customer only confirms that "
+            "the issue is solved, end with no_reply_needed and resolved=true — the "
+            "system closes the ticket. Call update_ticket_fields only when you want "
+            "a different state than that."
         )
     if kind_hint:
         parts.append(f"Hint: this run is expected to produce a '{kind_hint}' message.")
@@ -661,6 +663,8 @@ def _disclosure_footer(default_text: str, override_text: str | None) -> str:
     return (override_text or default_text or "").strip()
 
 
+_NO_REPLY_RESOLVED = "no_reply_resolved"
+
 # Ticket-state *types* Tiqora moves a ticket to after answering on its own,
 # most-preferred first, per proposal kind. A factual reply finishes the
 # conversation, so it closes; a clarifying question is still waiting on the
@@ -670,6 +674,9 @@ def _disclosure_footer(default_text: str, override_text: str | None) -> str:
 _AUTO_STATE_TYPES_BY_KIND: dict[str, tuple[str, ...]] = {
     DRAFT_KIND_REPLY: ("closed", "open"),
     DRAFT_KIND_CLARIFY: ("open",),
+    # no_reply_needed(resolved=true): the customer confirmed the fix. Closed
+    # or nothing — a ticket nobody answers is not bumped to "open".
+    _NO_REPLY_RESOLVED: ("closed",),
 }
 
 # Canonical Znuny state name per type, preferred over any other state sharing
@@ -1881,6 +1888,34 @@ async def run_ticket_agent(
             state.last_run_at = datetime.now(UTC).replace(tzinfo=None)
             state.last_customer_article_id = based_on_article_id
             await session.commit()
+            # "Thanks, works now" reopens a ticket the AI reply had closed
+            # (Znuny follow-up). Without this it stays open with nothing left
+            # to do (prod ticket 2026100610000046). Same policy gate as after
+            # a sent reply; Manual Assist never changes the state.
+            if (
+                outcome.no_reply_resolved
+                and trigger != TRIGGER_MANUAL
+                and not executor.state_change_applied
+                and ticket.state_type.strip().lower() != "closed"
+            ):
+                try:
+                    auto_state_id = await _resolve_auto_state_id(
+                        session,
+                        kind=_NO_REPLY_RESOLVED,
+                        allowed_state_types=resolve_allowed_state_types(policy.allowed_state_types),
+                    )
+                    if auto_state_id is not None:
+                        await domain_change_state(
+                            session,
+                            ticket_id=ticket_id,
+                            new_state_id=auto_state_id,
+                            user_id=actor_user_id,
+                            sysconfig=sysconfig,
+                        )
+                        await session.commit()
+                except Exception:  # noqa: BLE001 — the run is done; only the close failed
+                    await session.rollback()
+                    logger.exception("ai_runtime_resolved_close_failed", ticket_id=ticket_id)
             return AgentRunResult(
                 status=STATUS_NO_REPLY,
                 notes=outcome.no_reply_reason,

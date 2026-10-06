@@ -3517,6 +3517,105 @@ async def test_terminal_force_can_close_a_run_with_no_reply_needed(
         await engine.dispose()
 
 
+def _resolved_response(reason: str) -> LlmResponse:
+    return LlmResponse(
+        content=None,
+        tool_calls=[
+            ToolCall(
+                id="call_resolved",
+                name="no_reply_needed",
+                arguments={"reason": reason, "resolved": True},
+            )
+        ],
+        usage=LlmUsage(prompt_tokens=9, completion_tokens=4),
+    )
+
+
+async def _run_no_reply(
+    url: str,
+    *,
+    ns: int,
+    response: LlmResponse,
+    allowed_state_types: str | None,
+    trigger: str = TRIGGER_AUTO,
+) -> int:
+    """Run one auto no_reply_needed on an open ticket; return its new state id."""
+    seed = _seed_ticket(url, ns=ns, ticket_state_id=STATE_OPEN_ID)
+    engine = create_async_engine(_mysql_async(url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            await _setup_policy(
+                session,
+                seed=seed,
+                autonomy=AUTONOMY_FULL,
+                enabled_auto_reply=True,
+                allowed_state_types=allowed_state_types,
+            )
+        async with factory() as session:
+            result = await run_ticket_agent(
+                session,
+                settings=get_settings(),
+                llm=ScriptedLlm([response]),
+                ticket_id=seed["ticket_id"],
+                trigger=trigger,
+                acting_user_id=seed["agent_id"] if trigger == TRIGGER_MANUAL else None,
+                run_id=f"run-resolved-{ns}",
+            )
+        assert result.status == "no_reply"
+        return await _ticket_state_id(factory, seed["ticket_id"])
+    finally:
+        await engine.dispose()
+
+
+async def test_no_reply_resolved_closes_the_ticket(mariadb_znuny_url: str) -> None:
+    """Prod ticket 2026100610000046: the AI reply closed the ticket, the
+    customer's "resolved now, thanks" reopened it, and the run ended in
+    no_reply_needed — leaving an open ticket with nothing left to do."""
+    state_id = await _run_no_reply(
+        mariadb_znuny_url,
+        ns=89,
+        response=_resolved_response("Kunde bestätigt: WLAN geht jetzt."),
+        allowed_state_types='["open", "closed"]',
+    )
+    assert state_id == STATE_CLOSED_ID
+
+
+async def test_no_reply_resolved_respects_allowed_state_types(mariadb_znuny_url: str) -> None:
+    """Default policy (reopen only) never closes, resolved or not."""
+    state_id = await _run_no_reply(
+        mariadb_znuny_url,
+        ns=90,
+        response=_resolved_response("Kunde bestätigt: WLAN geht jetzt."),
+        allowed_state_types=None,
+    )
+    assert state_id == STATE_OPEN_ID
+
+
+async def test_no_reply_without_resolved_leaves_the_state(mariadb_znuny_url: str) -> None:
+    """A newsletter is no confirmation — it stays where it is for an agent."""
+    state_id = await _run_no_reply(
+        mariadb_znuny_url,
+        ns=91,
+        response=_no_reply_response("Werbe-Newsletter, keine Anfrage."),
+        allowed_state_types='["open", "closed"]',
+    )
+    assert state_id == STATE_OPEN_ID
+
+
+async def test_no_reply_resolved_in_manual_assist_leaves_the_state(
+    mariadb_znuny_url: str,
+) -> None:
+    state_id = await _run_no_reply(
+        mariadb_znuny_url,
+        ns=92,
+        response=_resolved_response("Kunde bestätigt: WLAN geht jetzt."),
+        allowed_state_types='["open", "closed"]',
+        trigger=TRIGGER_MANUAL,
+    )
+    assert state_id == STATE_OPEN_ID
+
+
 async def test_terminal_force_without_tool_call_still_skips(
     mariadb_znuny_url: str,
 ) -> None:
