@@ -4810,7 +4810,7 @@ export interface paths {
         };
         /**
          * List Directory
-         * @description Customer users, name first. Default order: last name, first name.
+         * @description Customer users, name first. Sort keys: see ``customer_sort``; default name order.
          */
         get: operations["list_directory_api_v1_customer_directory_get"];
         put?: never;

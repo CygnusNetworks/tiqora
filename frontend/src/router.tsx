@@ -513,6 +513,8 @@ const agentCustomersRoute = createRoute({
       company_name: id(s.company_name),
       page: Number.isInteger(page) && page > 1 ? page : undefined,
       invalid: s.invalid === true || s.invalid === "true" ? true : undefined,
+      sort: str(s.sort),
+      order: s.order === "desc" ? "desc" : undefined,
     };
   },
   component: CustomerDirectoryPage,

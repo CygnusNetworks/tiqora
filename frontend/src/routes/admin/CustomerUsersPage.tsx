@@ -79,7 +79,6 @@ export function CustomerUsersPage() {
       key: "name",
       header: t("admin.customerUsers.name"),
       sortable: true,
-      sortKey: "last_name",
       render: (r) => (
         <CustomerNameCell
           firstName={r.first_name}
@@ -90,7 +89,7 @@ export function CustomerUsersPage() {
       ),
     },
     {
-      key: "customer_id",
+      key: "company",
       header: t("admin.customerUsers.company"),
       sortable: true,
       render: (r) => <CustomerCompanyCell companyName={r.company_name} customerId={r.customer_id} />,
@@ -99,6 +98,7 @@ export function CustomerUsersPage() {
       key: "phone",
       header: t("admin.customerUsers.phone"),
       hideBelow: "lg",
+      sortable: true,
       render: (r) => <span className="tabular-nums text-muted">{r.phone || "–"}</span>,
     },
     {

@@ -264,6 +264,56 @@ async def test_list_search_company_and_me_flag(seeded: str) -> None:
     assert me.json()["can_use_customer_directory"] is True
 
 
+async def test_sort_orders(seeded: str) -> None:
+    engine = create_engine(seeded)
+    with engine.begin() as conn:
+        # A contact without a company record, and distinct phone numbers.
+        conn.execute(
+            text(
+                "INSERT INTO customer_user (login, email, customer_id, first_name, last_name,"
+                " phone, valid_id, create_time, create_by, change_time, change_by)"
+                " VALUES (:login, 'solo@custdir.example', 'CUSTDIR-SOLO', 'Sam', 'Adler',"
+                " '0228 1', 1, :t, 1, :t, 1)"
+            ),
+            {"login": _PREFIX + "solo", "t": NOW},
+        )
+        for login, phone in (("laura", "0228 3"), ("anna", "0228 4"), ("kevin", "0228 2")):
+            conn.execute(
+                text("UPDATE customer_user SET phone = :p WHERE login = :l"),
+                {"p": phone, "l": _PREFIX + login},
+            )
+    engine.dispose()
+
+    client, http_engine = await _client(seeded, ROOT)
+
+    async def names(**params: str) -> list[str]:
+        resp = await client.get(
+            "/api/v1/customer-directory", params={"search": "custdir", **params}
+        )
+        assert resp.status_code == 200, resp.text
+        return [i["last_name"] for i in resp.json()["items"]]
+
+    async with client:
+        default = await names()
+        company_asc = await names(sort="company")
+        company_desc = await names(sort="company", order="desc")
+        phone = await names(sort="phone")
+        unknown = await names(sort="pw; drop", order="desc")
+        admin = await client.get(
+            "/api/v1/admin/customer-users", params={"search": "custdir", "sort": "company"}
+        )
+    await http_engine.dispose()
+
+    assert default == ["Adler", "Berger", "Gomez", "Wu"]
+    # By company *name* (Globex < Northwind), contacts without a company last.
+    assert company_asc == ["Wu", "Berger", "Gomez", "Adler"]
+    assert company_desc == ["Gomez", "Berger", "Wu", "Adler"]
+    assert phone == ["Adler", "Wu", "Gomez", "Berger"]
+    assert unknown == default
+    assert admin.status_code == 200, admin.text
+    assert [i["last_name"] for i in admin.json()["items"]] == company_asc
+
+
 async def test_vcard_exports(seeded: str) -> None:
     await _grant(seeded, FeatureGrants(user_ids=[DIRECT]))
     client, engine = await _client(seeded, DIRECT)

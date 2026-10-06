@@ -352,12 +352,20 @@ describe("CustomerUsersPage", () => {
     });
     expect(header.textContent).toMatch(/▼/);
 
-    // Name column sorts by last name.
+    // Name column sorts by name (last name, first name), company by company name.
     list.mockClear();
-    fireEvent.click(screen.getByTestId("admin-sort-last_name"));
+    fireEvent.click(screen.getByTestId("admin-sort-name"));
     await waitFor(() => {
       expect(list).toHaveBeenCalledWith(
-        expect.objectContaining({ sort: "last_name", order: "asc" }),
+        expect.objectContaining({ sort: "name", order: "asc" }),
+        expect.anything(),
+      );
+    });
+    list.mockClear();
+    fireEvent.click(screen.getByTestId("admin-sort-company"));
+    await waitFor(() => {
+      expect(list).toHaveBeenCalledWith(
+        expect.objectContaining({ sort: "company", order: "asc" }),
         expect.anything(),
       );
     });

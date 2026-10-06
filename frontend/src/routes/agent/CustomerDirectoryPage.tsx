@@ -4,7 +4,11 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type CustomerDirectoryEntry } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
-import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableSortState,
+} from "@/components/admin/DataTable";
 import { CustomerCompanyCell, CustomerNameCell } from "@/components/customers/CustomerCells";
 import { saveSelectedVcards, VCARD_EXPORT_MAX } from "@/components/customers/vcardExport";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +27,9 @@ export type CustomerDirectorySearch = {
   company_name?: string;
   page?: number;
   invalid?: boolean;
+  /** Server sort key (name, company, phone, city); absent = name order. */
+  sort?: string;
+  order?: "asc" | "desc";
 };
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -77,10 +84,24 @@ export function CustomerDirectoryPage() {
     valid: search.invalid ? ("all" as const) : ("valid" as const),
   };
 
+  const sortState: DataTableSortState = {
+    sort: search.sort ?? null,
+    order: search.order ?? "asc",
+  };
+
   const listQ = useQuery({
-    queryKey: ["customer-directory", filter, page],
+    queryKey: ["customer-directory", filter, page, sortState],
     queryFn: ({ signal }) =>
-      api.listCustomerDirectory({ ...filter, page, pageSize: PAGE_SIZE }, signal),
+      api.listCustomerDirectory(
+        {
+          ...filter,
+          page,
+          pageSize: PAGE_SIZE,
+          sort: sortState.sort ?? undefined,
+          order: sortState.order,
+        },
+        signal,
+      ),
     enabled: allowed,
     placeholderData: keepPreviousData,
   });
@@ -101,6 +122,7 @@ export function CustomerDirectoryPage() {
     {
       key: "name",
       header: t("customerDirectory.name"),
+      sortable: true,
       render: (r) => (
         <CustomerNameCell
           firstName={r.first_name}
@@ -123,6 +145,7 @@ export function CustomerDirectoryPage() {
     {
       key: "company",
       header: t("customerDirectory.company"),
+      sortable: true,
       render: (r) =>
         search.company ? (
           <CustomerCompanyCell companyName={r.company_name} customerId={r.customer_id} />
@@ -141,6 +164,7 @@ export function CustomerDirectoryPage() {
       key: "phone",
       header: t("customerDirectory.phone"),
       hideBelow: "lg",
+      sortable: true,
       render: (r) => (
         <span className="tabular-nums text-muted">{r.phone || r.mobile || "–"}</span>
       ),
@@ -149,6 +173,7 @@ export function CustomerDirectoryPage() {
       key: "city",
       header: t("customerDirectory.city"),
       hideBelow: "xl",
+      sortable: true,
       render: (r) => <span className="text-muted">{r.city || "–"}</span>,
     },
     {
@@ -400,6 +425,13 @@ export function CustomerDirectoryPage() {
           isLoading={listQ.isLoading}
           busy={listQ.isFetching && !listQ.isLoading}
           emptyLabel={t("customerDirectory.empty")}
+          sort={sortState}
+          onSortChange={(next) =>
+            setSearch({
+              sort: next.sort ?? undefined,
+              order: next.sort && next.order === "desc" ? "desc" : undefined,
+            })
+          }
           isRowValid={search.invalid ? (r) => r.valid_id === 1 : undefined}
           selection={{
             selected,
