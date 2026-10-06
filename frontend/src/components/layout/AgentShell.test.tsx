@@ -40,8 +40,16 @@ vi.mock("@/components/agent/AccountMenu", () => ({
   AccountMenu: () => <div data-testid="account-menu-stub" />,
 }));
 
+const authFlags = vi.hoisted(() => ({ canUseDirectory: false }));
 vi.mock("@/auth/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 1, login: "agent", can_edit_templates: false } }),
+  useAuth: () => ({
+    user: {
+      id: 1,
+      login: "agent",
+      can_edit_templates: false,
+      can_use_customer_directory: authFlags.canUseDirectory,
+    },
+  }),
 }));
 
 const { listQueues, myTicketCounts, dashboardSummary } = vi.hoisted(() => ({
@@ -62,7 +70,15 @@ async function renderShell(initialEntry = "/agent") {
       </AgentShell>
     ),
   });
-  const childPaths = ["/agent", "/agent/queues", "/agent/kb", "/agent/calendar", "/agent/stats", "/agent/search"];
+  const childPaths = [
+    "/agent",
+    "/agent/queues",
+    "/agent/kb",
+    "/agent/calendar",
+    "/agent/stats",
+    "/agent/search",
+    "/agent/customers",
+  ];
   const childRoutes = childPaths.map((path) =>
     createRoute({
       getParentRoute: () => rootRoute,
@@ -99,7 +115,21 @@ describe("AgentShell sidebar", () => {
       ai_escalated: 0,
     });
     window.localStorage.clear();
+    authFlags.canUseDirectory = false;
     void i18n.changeLanguage("de");
+  });
+
+  it("shows the customer directory only with its permission", async () => {
+    await renderShell();
+    await screen.findByTestId("agent-sidebar-nav");
+    expect(screen.queryByTestId("agent-nav-customers")).toBeNull();
+  });
+
+  it("links the customer directory when the agent may use it", async () => {
+    authFlags.canUseDirectory = true;
+    await renderShell();
+    const link = await screen.findByTestId("agent-nav-customers");
+    expect(link).toHaveAttribute("href", "/agent/customers");
   });
 
   it("renders all groups expanded by default", async () => {

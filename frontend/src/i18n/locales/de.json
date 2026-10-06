@@ -76,7 +76,8 @@
     "queueSearch": "Queues filtern…",
     "noQueueMatch": "Keine passenden Queues.",
     "templates": "Templates",
-    "escalatedCount": "{{count}} eskaliert"
+    "escalatedCount": "{{count}} eskaliert",
+    "customers": "Kunden"
   },
   "views": {
     "mine": "Meine Tickets",
@@ -2338,8 +2339,19 @@
         "companyPicked": "Ausgewählt: {{id}}",
         "companyApply": "Zuweisen",
         "companyRequired": "Bitte eine Kunden-ID wählen oder eingeben.",
-        "gdpr": "DSGVO: anonymisieren/löschen"
-      }
+        "gdpr": "DSGVO: anonymisieren/löschen",
+        "vcards": "vCards herunterladen"
+      },
+      "company": "Firma",
+      "access": "Zugriff auf Kundenliste",
+      "accessTitle": "Wer darf die Kundenliste nutzen",
+      "accessHint": "Die Kundenliste im Agentenbereich zeigt alle Kundenbenutzer und exportiert ganze Listen und Firmen als vCard. Admins haben immer Zugriff. Keine Auswahl = nur Admins.",
+      "accessUsers": "Einzelne Agenten",
+      "accessGroups": "Gruppen",
+      "accessGroupsHint": "Alle Mitglieder dieser Gruppen, egal mit welchem Recht.",
+      "accessRoles": "Rollen",
+      "accessRolesHint": "Alle Agenten mit einer dieser Rollen.",
+      "accessLoadError": "Die aktuelle Zugriffsliste konnte nicht geladen werden."
     },
     "customerCompanies": {
       "title_plural": "Kundenunternehmen",
@@ -3977,5 +3989,33 @@
     "newTicket": "Neues Telefon-Ticket",
     "ignore": "Ignorieren",
     "close": "Schließen"
+  },
+  "customerDirectory": {
+    "title": "Kunden",
+    "subtitle": "Kundenkontakte suchen und als vCard herunterladen.",
+    "searchPlaceholder": "Name, E-Mail, Firma oder Telefon",
+    "companyFilter": "Nach Firma filtern…",
+    "companySearch": "Firmenname oder Kunden-ID suchen",
+    "noCompanyMatch": "Keine passende Firma.",
+    "clearCompany": "Firmenfilter entfernen",
+    "companyContacts": "Kontakte: {{count}}",
+    "companyTickets": "Tickets dieser Firma",
+    "exportCompany": "Alle {{count}} als vCard",
+    "exportList": "Liste als vCard ({{count}})",
+    "exportListTooMany": "Mehr als {{max}} Kontakte. Suche eingrenzen oder eine Firma wählen, um die Liste zu exportieren.",
+    "exportSelection": "vCards herunterladen",
+    "exportTooMany": "Höchstens {{max}} Kontakte pro Export. Suche eingrenzen oder eine Firma wählen.",
+    "exportFailed": "Download fehlgeschlagen: {{message}}",
+    "clearSelection": "Auswahl aufheben",
+    "includeInvalid": "Auch ungültige",
+    "name": "Name",
+    "company": "Firma",
+    "phone": "Telefon",
+    "city": "Ort",
+    "noCompany": "Ohne Firma",
+    "empty": "Keine Kunden gefunden. Suche oder Firmenfilter anpassen.",
+    "loadError": "Kundenliste konnte nicht geladen werden.",
+    "deniedTitle": "Kein Zugriff auf die Kundenliste",
+    "deniedBody": "Ein Admin kann den Zugriff unter Admin › Kundenbenutzer › Zugriff auf Kundenliste vergeben."
   }
 }

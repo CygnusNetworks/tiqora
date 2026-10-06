@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Spinner } from "@/components/ui/Spinner";
 import { DialLink } from "@/components/agent/phone/DialLink";
 import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
+import { useAuth } from "@/auth/AuthContext";
 
 /**
  * Customer Information Centre (agent): contact master data + open/closed
@@ -15,6 +16,7 @@ import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
 export function CustomerDetailPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { login: loginParam } = useParams({ from: "/agent/customers/$login" });
   const login = decodeURIComponent(loginParam ?? "");
 
@@ -113,7 +115,8 @@ export function CustomerDetailPage() {
           >
             {t("customerCentre.downloadVcard")}
           </a>
-          {c.company_name && (
+          {/* A company export is a list export: needs the customer-directory grant. */}
+          {c.company_name && user?.can_use_customer_directory && (
             <a
               href={api.companyVcardsUrl(c.customer_id)}
               download

@@ -23,6 +23,8 @@ export const demoUser = {
   last_name: "Turner",
   auth_method: "password",
   is_admin: true,
+  can_edit_templates: true,
+  can_use_customer_directory: true,
   email: "alex.turner@example.com",
 };
 
@@ -1269,7 +1271,11 @@ const adminDynFields = [
   ["Category", "Dropdown", "Ticket"], ["Impact", "Dropdown", "Ticket"], ["Urgency", "Dropdown", "Ticket"],
   ["AssetTag", "Text", "Ticket"], ["ResolutionCode", "Dropdown", "Ticket"], ["CustomerSatisfaction", "Dropdown", "Ticket"],
 ].map(([name, ft, ot], i) => ({ id: i + 1, internal_field: 0, name, label: name, field_order: i + 1, field_type: ft, object_type: ot, config: {}, valid_id: 1, create_time: t0, change_time: t0 }));
-const adminCustomerUsers = CUSTOMERS.map((c, i) => ({ id: i + 1, login: c.login, email: c.login, customer_id: c.cid, title: null, first_name: c.name.split(" ")[0], last_name: c.name.split(" ")[1], valid_id: 1, create_time: t0, change_time: t0 }));
+const COMPANY_NAMES: Record<string, string> = { ACME: "Acme Corporation", NORTHWIND: "Northwind Traders", GLOBEX: "Globex GmbH", INITECH: "Initech AG" };
+const adminCustomerUsers = CUSTOMERS.map((c, i) => ({ id: i + 1, login: c.login, email: c.login, customer_id: c.cid, company_name: COMPANY_NAMES[c.cid] ?? null, title: null, first_name: c.name.split(" ")[0], last_name: c.name.split(" ")[1], phone: `+49 228 401 2${i}0`, valid_id: 1, create_time: t0, change_time: t0 }));
+const directoryEntries = [...adminCustomerUsers]
+  .sort((a, b) => a.last_name.localeCompare(b.last_name))
+  .map((c) => ({ login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name, title: null, first_name: c.first_name, last_name: c.last_name, phone: c.phone, mobile: null, city: "Bonn", valid_id: 1 }));
 const adminCustomerCompanies = [
   ["ACME", "ACME Corporation"], ["NORTHWIND", "Northwind Traders"], ["GLOBEX", "Globex Inc."], ["INITECH", "Initech LLC"],
 ].map(([customer_id, name], i) => ({ id: i + 1, customer_id, name, street: "1 Market St", zip: "90210", city: "Springfield", country: "US", url: null, comments: null, valid_id: 1, create_time: t0, change_time: t0 }));
@@ -1583,6 +1589,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/admin/follow-up-possible"))
     return [{ id: 1, name: "possible", valid_id: 1 }, { id: 2, name: "reject", valid_id: 1 }, { id: 3, name: "new ticket", valid_id: 1 }];
   if (p.endsWith("/admin/customer-users")) return page(adminCustomerUsers);
+  if (p.endsWith("/customer-directory")) return page(directoryEntries);
+  if (p.endsWith("/customer-directory/companies")) return Object.entries(COMPANY_NAMES).map(([customer_id, name]) => ({ customer_id, name }));
+  if (p.match(/\/admin\/feature-grants\/[^/]+$/)) return { user_ids: [], group_ids: [2], role_ids: [] };
   if (p.endsWith("/admin/customer-companies")) return page(adminCustomerCompanies);
   if (p.endsWith("/admin/gdpr/jobs")) return page([]);
   // Admin — AI subsystem (settings, providers, models, profiles, task

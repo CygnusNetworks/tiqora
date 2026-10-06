@@ -16,6 +16,7 @@ import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
 import { AccountMenu } from "@/components/agent/AccountMenu";
 import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
 import {
+  AddressBookIcon,
   BookIcon,
   CalendarIcon,
   ChartIcon,
@@ -513,6 +514,15 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             disabled={!user?.id}
             active={onQueues && listSearch.view === "watched"}
           />
+          {user?.can_use_customer_directory && (
+            <NavItem
+              to="/agent/customers"
+              label={t("sidebar.customers")}
+              icon={<AddressBookIcon />}
+              testId="agent-nav-customers"
+              onNavigate={onNavigate}
+            />
+          )}
           <NavItem
             to="/agent/services"
             label={t("sidebar.services")}

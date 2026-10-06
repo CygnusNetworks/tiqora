@@ -451,3 +451,25 @@ export function CertificateIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Address book — the agent customer directory. */
+export function AddressBookIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="5" y="3.5" width="14" height="17" rx="2" />
+      <path d="M3.5 8h3M3.5 12h3M3.5 16h3" />
+      <circle cx="12.5" cy="10" r="2.25" />
+      <path d="M9 16a3.5 3.5 0 0 1 7 0" />
+    </Icon>
+  );
+}
+
+/** Arrow into a tray — file download. */
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 4v11m0 0-4-4m4 4 4-4" />
+      <path d="M5 19h14" />
+    </Icon>
+  );
+}

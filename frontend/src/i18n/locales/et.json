@@ -76,7 +76,8 @@
     "queueSearch": "Filtreeri järjekorrad…",
     "noQueueMatch": "Ükski järjekord ei vasta.",
     "templates": "Mallid",
-    "escalatedCount": "{{count}} eskaleeritud"
+    "escalatedCount": "{{count}} eskaleeritud",
+    "customers": "Customers"
   },
   "views": {
     "mine": "Minu piletid",
@@ -2338,8 +2339,19 @@
         "companyPicked": "Valitud: {{id}}",
         "companyApply": "Määra",
         "companyRequired": "Valige või sisestage kliendi ID.",
-        "gdpr": "GDPR: anonüümseks muutmine/kustutamine"
-      }
+        "gdpr": "GDPR: anonüümseks muutmine/kustutamine",
+        "vcards": "Download vCards"
+      },
+      "company": "Company",
+      "access": "Customer list access",
+      "accessTitle": "Who may use the customer list",
+      "accessHint": "The customer list in the agent area shows all customer users and exports whole lists and companies as vCards. Admins always have access. Nothing selected = admins only.",
+      "accessUsers": "Individual agents",
+      "accessGroups": "Groups",
+      "accessGroupsHint": "Every member of these groups, whatever their permission there.",
+      "accessRoles": "Roles",
+      "accessRolesHint": "Every agent holding one of these roles.",
+      "accessLoadError": "Could not load the current access list."
     },
     "customerCompanies": {
       "title_plural": "Kliendifirmad",
@@ -3969,5 +3981,33 @@
     "newTicket": "Uus telefonipilet",
     "ignore": "Ignoreeri",
     "close": "Sule"
+  },
+  "customerDirectory": {
+    "title": "Customers",
+    "subtitle": "Search customer contacts and download them as vCards.",
+    "searchPlaceholder": "Name, email, company or phone",
+    "companyFilter": "Filter by company…",
+    "companySearch": "Search company name or ID",
+    "noCompanyMatch": "No matching company.",
+    "clearCompany": "Remove company filter",
+    "companyContacts": "Contacts: {{count}}",
+    "companyTickets": "Tickets of this company",
+    "exportCompany": "All {{count}} as vCard",
+    "exportList": "List as vCard ({{count}})",
+    "exportListTooMany": "More than {{max}} contacts. Narrow the search or pick a company to export the list.",
+    "exportSelection": "Download vCards",
+    "exportTooMany": "At most {{max}} contacts per export. Narrow the search or pick a company.",
+    "exportFailed": "Download failed: {{message}}",
+    "clearSelection": "Clear selection",
+    "includeInvalid": "Include invalid",
+    "name": "Name",
+    "company": "Company",
+    "phone": "Phone",
+    "city": "City",
+    "noCompany": "No company",
+    "empty": "No customers match. Change the search or the company filter.",
+    "loadError": "Could not load the customer list.",
+    "deniedTitle": "No access to the customer list",
+    "deniedBody": "An admin can grant access under Admin › Customer users › Customer list access."
   }
 }
