@@ -2901,6 +2901,10 @@
           "name": "Работник со вештачка интелигенција",
           "description": "Обработува задачи со вештачка интелигенција (автоматски нацрт, автоматски одговор, ескалација) во заднина."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Чистење на ревизија на вештачката интелигенција",
           "description": "Ги брише редовите на дневникот за ревизија на LLM покрај конфигурираното задржување еднаш дневно."

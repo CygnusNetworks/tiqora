@@ -2901,6 +2901,10 @@
           "name": "nhân viên AI",
           "description": "Xử lý các tác vụ AI (tự động soạn thảo, tự động trả lời, báo cáo) ở chế độ nền."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Dọn dẹp kiểm toán AI",
           "description": "Xóa các hàng nhật ký kiểm tra LLM ngoài thời gian lưu giữ đã định cấu hình mỗi ngày một lần."

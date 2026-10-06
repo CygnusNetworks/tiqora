@@ -34,6 +34,7 @@ function daemon(overrides: Partial<DaemonServiceOut> = {}): DaemonServiceOut {
     schedule: "interval",
     interval_seconds: 15,
     interval_overridden: false,
+    tick_timeout_seconds: 0,
     daily_at: null,
     last_run_at: "2026-07-19T10:00:00+00:00",
     last_ok_at: "2026-07-19T10:00:00+00:00",

@@ -2901,6 +2901,10 @@
           "name": "AI работник",
           "description": "Обработва AI задачи (автоматична чернова, автоматичен отговор, ескалация) във фонов режим."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Почистване на одит на AI",
           "description": "Изтрива редове от регистрационния файл за одит на LLM след конфигурираното задържане веднъж на ден."

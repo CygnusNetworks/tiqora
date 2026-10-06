@@ -2901,6 +2901,10 @@
           "name": "pekerja AI",
           "description": "Memproses tugas AI (autodraf, autobalas, peningkatan) di latar belakang."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Pembersihan audit AI",
           "description": "Memadamkan baris log audit LLM melepasi pengekalan yang dikonfigurasikan sekali sehari."

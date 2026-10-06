@@ -2901,6 +2901,10 @@
           "name": "Traballador de IA",
           "description": "Procesa tarefas de IA (borrador automático, resposta automática, escalada) en segundo plano."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Limpeza de auditoría de IA",
           "description": "Elimina as filas do rexistro de auditoría de LLM despois da retención configurada unha vez ao día."

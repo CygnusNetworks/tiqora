@@ -2901,6 +2901,10 @@
           "name": "人工智慧工作者",
           "description": "在背景處理 AI 任務（自動草稿、自動回覆、升級）。"
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "AI審計清理",
           "description": "每天刪除一次超過配置保留時間的 LLM 審核日誌行。"

@@ -41,6 +41,7 @@ function sysinfo(overrides: Partial<SystemInfoOut> = {}): SystemInfoOut {
         schedule: "interval",
         interval_seconds: 15,
         interval_overridden: false,
+        tick_timeout_seconds: 0,
         daily_at: null,
         last_run_at: recentIso,
         last_ok_at: recentIso,

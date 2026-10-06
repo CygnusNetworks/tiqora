@@ -2901,6 +2901,10 @@
           "name": "AI-arbejder",
           "description": "Behandler AI-opgaver (auto-draft, auto-reply, eskalering) i baggrunden."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "AI revision oprydning",
           "description": "Sletter LLM-revisionslogrækker forbi den konfigurerede opbevaring én gang om dagen."

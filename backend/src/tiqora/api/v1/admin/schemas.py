@@ -1536,6 +1536,7 @@ class DaemonServiceOut(BaseModel):
     schedule: Literal["interval", "daily"]
     interval_seconds: int | None = None
     interval_overridden: bool = False
+    tick_timeout_seconds: int = 0
     daily_at: str | None = None
     last_run_at: UtcDateTime | None = None
     last_ok_at: UtcDateTime | None = None

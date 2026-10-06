@@ -2901,6 +2901,10 @@
           "name": "Εργάτης AI",
           "description": "Επεξεργάζεται εργασίες AI (αυτόματο πρόχειρο, αυτόματη απάντηση, κλιμάκωση) στο παρασκήνιο."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Εκκαθάριση ελέγχου AI",
           "description": "Διαγράφει σειρές καταγραφής ελέγχου LLM πέρα από τη διαμορφωμένη διατήρηση μία φορά την ημέρα."

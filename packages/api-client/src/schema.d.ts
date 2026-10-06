@@ -10793,6 +10793,11 @@ export interface components {
             schedule: "interval" | "daily";
             /** Slug */
             slug: string;
+            /**
+             * Tick Timeout Seconds
+             * @default 0
+             */
+            tick_timeout_seconds: number;
             /** Toggleable */
             toggleable: boolean;
         };
