@@ -13,3 +13,16 @@
 # (inkl. @vitest/mocker) sind eingespielt, damit sind die drei Eintraege vom
 # 2026-09-09 erledigt. Neue zurueckgestellte Funde als [[IgnoredVulns]] mit
 # id, ignoreUntil und reason hier eintragen.
+
+[[IgnoredVulns]]
+id = "GHSA-vfj7-8cjw-p6xm"
+ignoreUntil = 2026-10-20
+reason = """
+braces 3.0.3 (CVSS 8.7): Stack-Overflow durch fehlende Tiefenbegrenzung in den
+rekursiven AST-Walkern bei stark verschachtelten Brace-Patterns. Kein Fix
+veroeffentlicht -- 3.0.3 ist weiterhin die neueste npm-Version. Kommt nur
+transitiv ueber chokidar (Datei-Watcher) und micromatch (Glob-Matching) als
+Build-/Dev-Werkzeug herein; tiqora uebergibt keine fremden Brace-Patterns zur
+Laufzeit. Trotz hoher Schwere nur zwei Wochen zurueckgestellt, da noch kein
+Fix existiert und der Scan dann erneut prueft, ob einer erschienen ist.
+"""
