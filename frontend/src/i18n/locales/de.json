@@ -2909,6 +2909,10 @@
           "name": "KI-Worker",
           "description": "Verarbeitet KI-Aufgaben (Auto-Draft, Auto-Reply, Escalation) im Hintergrund."
         },
+        "telegram_poller": {
+          "name": "Telegram-Poller",
+          "description": "Holt neue Telegram-Nachrichten per Long-Polling (getUpdates) ab und legt daraus Tickets bzw. Artikel an."
+        },
         "ai_audit_cleanup": {
           "name": "KI-Audit-Bereinigung",
           "description": "Löscht LLM-Audit-Log-Einträge nach Ablauf der konfigurierten Aufbewahrungsfrist täglich."

@@ -2901,6 +2901,10 @@
           "name": "AI 작업자",
           "description": "백그라운드에서 AI 업무(자동 초안, 자동 회신, 에스컬레이션)를 처리합니다."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "AI 감사 정리",
           "description": "하루에 한 번 구성된 보존 기간을 지난 LLM 감사 로그 행을 삭제합니다."

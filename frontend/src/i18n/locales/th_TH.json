@@ -2901,6 +2901,10 @@
           "name": "พนักงานเอไอ",
           "description": "ประมวลผลงาน AI (ร่างอัตโนมัติ การตอบกลับอัตโนมัติ การยกระดับ) ในเบื้องหลัง"
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "การล้างการตรวจสอบ AI",
           "description": "ลบแถวบันทึกการตรวจสอบ LLM เลยการเก็บรักษาที่กำหนดค่าไว้วันละครั้ง"

@@ -2901,6 +2901,10 @@
           "name": "एआई कार्यकर्ता",
           "description": "पृष्ठभूमि में AI कार्यों (ऑटो-ड्राफ्ट, ऑटो-रिप्लाई, एस्केलेशन) को संसाधित करता है।"
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "एआई ऑडिट क्लीनअप",
           "description": "दिन में एक बार कॉन्फ़िगर किए गए रिटेंशन से पहले एलएलएम ऑडिट लॉग पंक्तियों को हटा देता है।"

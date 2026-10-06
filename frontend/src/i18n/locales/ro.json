@@ -2901,6 +2901,10 @@
           "name": "Lucrător AI",
           "description": "Procesează sarcinile AI (schiță automată, răspuns automat, escaladare) în fundal."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Curățarea auditului AI",
           "description": "Șterge rândurile din jurnalul de audit LLM dincolo de păstrarea configurată o dată pe zi."

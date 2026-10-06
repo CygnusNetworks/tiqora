@@ -10,6 +10,8 @@ particular optional backend is reachable in CI.
 
 from __future__ import annotations
 
+import socket
+
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -118,8 +120,11 @@ class _FakeContainers:
         self._me = me
         self._all = all_items
         self.last_filters: dict[str, str] | None = None
+        self.known_idents = {socket.gethostname()}
 
-    def get(self, _ident: str) -> _FakeContainer:
+    def get(self, ident: str) -> _FakeContainer:
+        if ident not in self.known_idents:
+            raise LookupError(f"No such container: {ident}")
         return self._me
 
     def list(self, all: bool = False, filters: dict[str, str] | None = None):  # noqa: A002
@@ -184,3 +189,36 @@ def test_containers_probe_env_override_wins(monkeypatch: pytest.MonkeyPatch) -> 
     admin_system._collect_containers_sync("custom-project")
 
     assert fake_containers.last_filters == {"label": f"{label}=custom-project"}
+
+
+def test_containers_probe_finds_self_via_mountinfo_when_hostname_is_stale(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A Watchtower-recreated container keeps the old container's hostname, so
+    get(hostname) 404s — the mountinfo ID must still scope the list to the stack."""
+    label = "com.docker.compose.project"
+    real_id = "5b1737ad4e65150579841140c39150814da17c2a637670c2594957c8360d1b8d"
+    me = _FakeContainer("tiqora-api", {label: "tiqora"})
+    fake_containers = _FakeContainers(me, [me, _FakeContainer("znuny-web", {label: "otrs65"})])
+    fake_containers.known_idents = {real_id}
+    monkeypatch.setattr(admin_system, "_docker_configured", lambda: True)
+    monkeypatch.setattr(admin_system, "_own_container_id_from_mountinfo", lambda: real_id)
+    fake_docker = type(
+        "M", (), {"from_env": staticmethod(lambda: _FakeDockerClient(fake_containers))}
+    )
+    monkeypatch.setitem(__import__("sys").modules, "docker", fake_docker)
+
+    out = admin_system._collect_containers_sync()
+
+    assert fake_containers.last_filters == {"label": f"{label}=tiqora"}
+    assert [c.name for c in out.items] == ["tiqora-api"]
+
+
+def test_mountinfo_container_id_regex() -> None:
+    cid = "5b1737ad4e65150579841140c39150814da17c2a637670c2594957c8360d1b8d"
+    line = (
+        f"615 610 254:2 /var/lib/docker/containers/{cid}/hostname /etc/hostname "
+        "rw,relatime - ext4 /dev/vda2 rw\n"
+    )
+    m = admin_system._MOUNTINFO_ID_RE.search(line)
+    assert m is not None and m.group(1) == cid

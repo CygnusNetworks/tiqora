@@ -2901,6 +2901,10 @@
           "name": "عامل الذكاء الاصطناعي",
           "description": "يعالج مهام الذكاء الاصطناعي (المسودة التلقائية، الرد التلقائي، التصعيد) في الخلفية."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "تنظيف تدقيق الذكاء الاصطناعي",
           "description": "حذف صفوف سجل تدقيق LLM بعد فترة الاحتفاظ التي تم تكوينها مرة واحدة يوميًا."

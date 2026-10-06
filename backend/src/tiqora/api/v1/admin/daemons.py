@@ -99,6 +99,7 @@ def _to_out(svc: DaemonService, raw: dict[str, str]) -> DaemonServiceOut:
         schedule=svc.schedule_kind,
         interval_seconds=interval_seconds,
         interval_overridden=interval_overridden,
+        tick_timeout_seconds=svc.tick_timeout_seconds,
         daily_at=svc.daily_at,
         last_run_at=_parse_dt(raw.get(f"{status_base}.last_run")),
         last_ok_at=_parse_dt(raw.get(f"{status_base}.last_ok")),

@@ -2909,6 +2909,10 @@
           "name": "AIワーカー",
           "description": "AIタスク (自動ドラフト、自動返信、エスカレーション) をバックグラウンドで処理します。"
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "AI監査クリーンアップ",
           "description": "設定された保持期間を過ぎたLLM監査ログ行を1日に1回削除します。"

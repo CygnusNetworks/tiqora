@@ -35,9 +35,12 @@ from tiqora.domain.settings_store import (
     get_setting_bool,
     set_setting,
 )
+from tiqora.worker.services import DAEMON_SERVICES_BY_SLUG
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
+
+_LONG_POLL_SECONDS = DAEMON_SERVICES_BY_SLUG["telegram_poller"].tick_timeout_seconds
 
 
 async def run_telegram_poller_tick(
@@ -75,7 +78,7 @@ async def run_telegram_poller_tick(
     gateway = gateway or TelegramGateway(bot_token=bot_token)
     try:
         updates = await gateway.get_updates(
-            offset=offset, timeout=20, allowed_updates=["message", "callback_query"]
+            offset=offset, timeout=_LONG_POLL_SECONDS, allowed_updates=["message", "callback_query"]
         )
     except TelegramApiError as exc:
         logger.warning("telegram_poller_get_updates_failed", error=str(exc))

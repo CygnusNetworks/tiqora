@@ -61,6 +61,9 @@ class DaemonService:
     interval_key: str | None = None
     interval_settings_attr: str | None = None
     daily_at: str | None = None  # UTC "HH:MM"
+    # Seconds one tick blocks by design (long-poll), on top of the sleep
+    # interval — the "stale" threshold must allow for it or the row flaps.
+    tick_timeout_seconds: int = 0
 
 
 DAEMON_SERVICES: tuple[DaemonService, ...] = (
@@ -174,6 +177,7 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         schedule_kind="interval",
         interval_key=KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
         interval_settings_attr="telegram_poller_interval_seconds",
+        tick_timeout_seconds=20,  # getUpdates long-poll
     ),
     DaemonService(
         slug="ai_audit_cleanup",

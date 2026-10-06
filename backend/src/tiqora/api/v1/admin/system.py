@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import os
 import platform
+import re
 import socket as _socket
 import time
 from datetime import UTC, datetime
@@ -222,12 +223,32 @@ def _docker_configured() -> bool:
 _COMPOSE_PROJECT_LABEL = "com.docker.compose.project"
 
 
+#: Docker bind-mounts these per-container files from ``<data-root>/containers/<id>/``.
+_MOUNTINFO_ID_RE = re.compile(r"/containers/([0-9a-f]{64})/(?:hostname|hosts|resolv\.conf)\s")
+
+
+def _own_container_id_from_mountinfo() -> str | None:
+    """This container's full ID, read from its ``/etc/hostname`` bind mount.
+
+    Needed because the hostname is not reliably the ID: a container recreated
+    by Watchtower inherits the *old* container's ``Config.Hostname``, so
+    ``containers.get(gethostname())`` 404s after the first auto-update."""
+    with contextlib.suppress(OSError), open("/proc/self/mountinfo", encoding="utf-8") as fh:
+        for line in fh:
+            if m := _MOUNTINFO_ID_RE.search(line):
+                return m.group(1)
+    return None
+
+
 def _own_compose_project(client: object) -> str | None:
     """Read this container's own compose-project label, so the probe can scope
     itself to Tiqora's stack instead of every container on a shared host."""
-    with contextlib.suppress(Exception):
-        me = client.containers.get(_socket.gethostname())  # type: ignore[attr-defined]
-        return (me.labels or {}).get(_COMPOSE_PROJECT_LABEL)
+    for ident in (_socket.gethostname(), _own_container_id_from_mountinfo()):
+        if not ident:
+            continue
+        with contextlib.suppress(Exception):
+            me = client.containers.get(ident)  # type: ignore[attr-defined]
+            return (me.labels or {}).get(_COMPOSE_PROJECT_LABEL)
     return None
 
 

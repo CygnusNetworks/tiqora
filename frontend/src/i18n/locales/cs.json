@@ -2901,6 +2901,10 @@
           "name": "Worker AI",
           "description": "Zpracovává AI úlohy (auto-koncept, auto-odpověď, eskalace) na pozadí."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Úklid AI auditu",
           "description": "Jednou denně maže řádky LLM audit logu po uplynutí nastavené retence."

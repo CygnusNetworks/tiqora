@@ -2901,6 +2901,10 @@
           "name": "AI darbinieks",
           "description": "Apstrādā AI uzdevumus (automātiskā melnraksts, automātiskā atbilde, eskalācija) fonā."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "AI audita tīrīšana",
           "description": "Reizi dienā dzēš LLM audita žurnāla rindas, kas pārsniedz konfigurēto saglabāšanu."

@@ -2901,6 +2901,10 @@
           "name": "Mfanyakazi wa AI",
           "description": "Huchakata kazi za AI (rasimu ya kiotomatiki, jibu la kiotomatiki, kupanda) chinichini."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Usafishaji wa ukaguzi wa AI",
           "description": "Hufuta safumlalo za kumbukumbu za ukaguzi za LLM kupita uhifadhi uliosanidiwa mara moja kwa siku."

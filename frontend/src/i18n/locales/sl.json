@@ -2901,6 +2901,10 @@
           "name": "AI delavec",
           "description": "Obdeluje naloge AI (samodejni osnutek, samodejni odgovor, stopnjevanje) v ozadju."
         },
+        "telegram_poller": {
+          "name": "Telegram poller",
+          "description": "Fetches new Telegram messages via long polling (getUpdates) and turns them into tickets or articles."
+        },
         "ai_audit_cleanup": {
           "name": "Čiščenje revizije AI",
           "description": "Enkrat na dan izbriše vrstice revizijskega dnevnika LLM mimo konfiguriranega zadrževanja."
