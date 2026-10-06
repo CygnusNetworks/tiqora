@@ -10057,6 +10057,11 @@
             "title": "Slug",
             "type": "string"
           },
+          "tick_timeout_seconds": {
+            "default": 0,
+            "title": "Tick Timeout Seconds",
+            "type": "integer"
+          },
           "toggleable": {
             "title": "Toggleable",
             "type": "boolean"
