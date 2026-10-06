@@ -11,6 +11,7 @@ from tiqora.api.v1 import (
     channels_sms,
     channels_telegram,
     channels_whatsapp,
+    customer_directory,
     customer_keys,
     customers,
     events,
@@ -48,6 +49,7 @@ api_v1_router.include_router(ai.refine_router)
 api_v1_router.include_router(process.router)
 api_v1_router.include_router(events.router)
 api_v1_router.include_router(customers.router)
+api_v1_router.include_router(customer_directory.router)
 api_v1_router.include_router(customer_keys.router)
 api_v1_router.include_router(reference.router)
 api_v1_router.include_router(templates.router)

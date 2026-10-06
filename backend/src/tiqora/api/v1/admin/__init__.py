@@ -25,6 +25,7 @@ from tiqora.api.v1.admin import (
     customers,
     daemons,
     dynamic_fields,
+    feature_grants,
     gdpr,
     generic_agent,
     groups,
@@ -91,6 +92,7 @@ admin_router.include_router(system.router)
 admin_router.include_router(placeholder_variables.queue_variables_router)
 admin_router.include_router(placeholder_variables.customer_fields_router)
 admin_router.include_router(customer_links.router)
+admin_router.include_router(feature_grants.router)
 admin_router.include_router(ai.router)
 admin_router.include_router(ai_models.router)
 admin_router.include_router(ai_audit.router)

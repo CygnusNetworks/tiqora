@@ -16,6 +16,7 @@ from tiqora.api.v1.admin.common import (
     invalidate_znuny_cache_types,
     now,
 )
+from tiqora.api.v1.feature_deps import CustomerDirectoryUser
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.domain.customer_service import CustomerService
 from tiqora.domain.new_ticket_queue import (
@@ -197,7 +198,7 @@ async def get_customer(
     return result
 
 
-def _vcard_response(content: str, filename: str) -> Response:
+def vcard_response(content: str, filename: str) -> Response:
     ascii_name = (
         filename.encode("ascii", "ignore").decode("ascii").replace('"', "") or "kontakt.vcf"
     )
@@ -213,10 +214,14 @@ def _vcard_response(content: str, filename: str) -> Response:
 @router.get("/companies/{customer_id:path}/vcards")
 async def company_vcards(
     customer_id: str,
-    user: CurrentUser,
+    user: CustomerDirectoryUser,
     session: DbSession,
 ) -> Response:
-    """All valid contacts of a company as one multi-card .vcf."""
+    """All valid contacts of a company as one multi-card .vcf.
+
+    A list export, so it needs the customer-directory permission; the single
+    customer vCard below stays open to every agent (ticket work).
+    """
     _ = user
     company_name = (
         await session.execute(
@@ -237,7 +242,7 @@ async def company_vcards(
     if company_name is None and not customers:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     body = "".join(build_vcard(cu, company_name) for cu in customers)
-    return _vcard_response(body, vcard_filename(company_name or customer_id))
+    return vcard_response(body, vcard_filename(company_name or customer_id))
 
 
 @router.get("/{login}/vcard")
@@ -259,7 +264,7 @@ async def customer_vcard(
         )
     ).scalar_one_or_none()
     name = " ".join(p for p in ((cu.first_name or "").strip(), (cu.last_name or "").strip()) if p)
-    return _vcard_response(build_vcard(cu, company_name), vcard_filename(name or cu.login))
+    return vcard_response(build_vcard(cu, company_name), vcard_filename(name or cu.login))
 
 
 _FILL_FIELDS = ("first_name", "last_name", "email", "phone", "mobile")

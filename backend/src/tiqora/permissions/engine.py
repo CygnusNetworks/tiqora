@@ -157,6 +157,20 @@ class PermissionEngine:
         perms = await self.queue_permissions(user_id)
         return any("rw" in perms.get(gid, set()) for gid in group_ids)
 
+    async def role_ids(self, user_id: int) -> set[int]:
+        """Valid roles *user_id* holds directly (``role_user``); empty for invalid users."""
+        if not await self._user_is_valid(user_id):
+            return set()
+        rows = await self._session.execute(
+            select(RoleUser.role_id)
+            .join(Roles, Roles.id == RoleUser.role_id)
+            .where(RoleUser.user_id == user_id, Roles.valid_id == 1)
+        )
+        return set(rows.scalars().all())
+
+    async def is_valid_user(self, user_id: int) -> bool:
+        return await self._user_is_valid(user_id)
+
     async def _user_is_valid(self, user_id: int) -> bool:
         result = await self._session.execute(
             select(Users.id).where(Users.id == user_id, Users.valid_id == 1)

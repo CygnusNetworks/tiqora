@@ -760,3 +760,21 @@ class TiqoraQueueCustomerLink(TiqoraBase):
     change_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+
+
+class TiqoraFeatureGrant(TiqoraBase):
+    """Who may use an agent feature that is not tied to a queue.
+
+    One row grants *feature* (e.g. ``customer_directory``) to a single agent
+    (``subject_type = "user"``), every member of a permission group
+    (``"group"``) or every agent holding a role (``"role"``). Admins always
+    have every feature; a feature with no rows is admin-only. Soft joins to
+    ``users.id`` / ``permission_groups.id`` / ``roles.id`` (no FK — parallel
+    operation stays additive ``tiqora_*`` only).
+    """
+
+    __tablename__ = "tiqora_feature_grant"
+
+    feature: Mapped[str] = mapped_column(String(64), primary_key=True, nullable=False)
+    subject_type: Mapped[str] = mapped_column(String(16), primary_key=True, nullable=False)
+    subject_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
