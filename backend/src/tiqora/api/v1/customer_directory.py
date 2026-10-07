@@ -209,17 +209,29 @@ class CustomerShortlist(BaseModel):
 
 
 async def _favorites(session: AsyncSession, user_id: int) -> list[CustomerFavoriteEntry]:
-    rows = (
-        await session.execute(
-            select(CustomerUser)
-            .join(
-                TiqoraCustomerFavorite, TiqoraCustomerFavorite.customer_login == CustomerUser.login
+    # Two queries, no JOIN: on MariaDB the tiqora_* table gets the server's
+    # default collation, Znuny's customer_user.login often another one, and
+    # comparing the two columns fails with "Illegal mix of collations".
+    logins = list(
+        (
+            await session.execute(
+                select(TiqoraCustomerFavorite.customer_login).where(
+                    TiqoraCustomerFavorite.user_id == user_id
+                )
             )
-            .where(TiqoraCustomerFavorite.user_id == user_id, CustomerUser.valid_id == 1)
-            .order_by(*_ORDER)
-        )
-    ).scalars()
-    customers = list(rows)
+        ).scalars()
+    )
+    if not logins:
+        return []
+    customers = list(
+        (
+            await session.execute(
+                select(CustomerUser)
+                .where(CustomerUser.login.in_(logins), CustomerUser.valid_id == 1)
+                .order_by(*_ORDER)
+            )
+        ).scalars()
+    )
     names = await _company_names(session, (cu.customer_id for cu in customers))
     return [
         CustomerFavoriteEntry(
