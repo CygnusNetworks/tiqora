@@ -1337,6 +1337,7 @@ async def run_erasure(
                 counts["customer_user"] += 1
 
         # ---- related master tables (snapshot; delete mode removes) ----
+        has_favorites = await _table_exists(session, "tiqora_customer_favorite")
         for old_login in logins:
             # customer_preferences (composite PK user_id + preferences_key)
             prefs = (
@@ -1469,6 +1470,22 @@ async def run_erasure(
                         },
                     )
                 counts["group_customer_user"] += 1
+
+            # Agents' starred customers (tiqora-owned, no backup: convenience
+            # data). Anonymize follows the new login; delete drops the stars.
+            if has_favorites and mode == "anonymize":
+                await session.execute(
+                    text(
+                        "UPDATE tiqora_customer_favorite SET customer_login = :new_u"
+                        " WHERE customer_login = :old_u"
+                    ),
+                    {"new_u": login_to_new[old_login], "old_u": old_login},
+                )
+            elif has_favorites:
+                await session.execute(
+                    text("DELETE FROM tiqora_customer_favorite WHERE customer_login = :u"),
+                    {"u": old_login},
+                )
 
         # ---- tickets: rewrite refs ----
         # anonymize: customer_user_id follows the new login; customer_id stays
@@ -2158,6 +2175,14 @@ async def _rollback_login_renames(session: AsyncSession, job_id: int) -> None:
         ):
             await session.execute(
                 text(f"UPDATE {table} SET user_id = :old WHERE user_id = :new"),
+                {"old": old_login, "new": new_login},
+            )
+        if await _table_exists(session, "tiqora_customer_favorite"):
+            await session.execute(
+                text(
+                    "UPDATE tiqora_customer_favorite SET customer_login = :old"
+                    " WHERE customer_login = :new"
+                ),
                 {"old": old_login, "new": new_login},
             )
 

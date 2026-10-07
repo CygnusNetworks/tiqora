@@ -31,6 +31,7 @@ from tiqora.api.v1.feature_deps import CustomerDirectoryUser
 from tiqora.db.legacy.article import Article, CommunicationChannel
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.db.tiqora.models import TiqoraCustomerFavorite
 from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.vcard import build_vcard, vcard_filename
 
@@ -168,6 +169,8 @@ class CustomerDirectoryExportRequest(BaseModel):
 SHORTLIST_DAYS: Final[int] = 90
 #: Entries per shortlist section.
 SHORTLIST_SIZE: Final[int] = 6
+#: Most favorites one agent may keep.
+FAVORITES_MAX: Final[int] = 50
 
 
 class CustomerShortlistEntry(BaseModel):
@@ -187,9 +190,50 @@ class CustomerShortlistEntry(BaseModel):
     ticket_count: int
 
 
+class CustomerFavoriteEntry(BaseModel):
+    login: str
+    email: str
+    customer_id: str
+    company_name: str | None = None
+    first_name: str
+    last_name: str
+    phone: str | None
+    mobile: str | None
+
+
 class CustomerShortlist(BaseModel):
+    #: Customer users the agent starred, by name.
+    favorites: list[CustomerFavoriteEntry]
     recent: list[CustomerShortlistEntry]
     frequent: list[CustomerShortlistEntry]
+
+
+async def _favorites(session: AsyncSession, user_id: int) -> list[CustomerFavoriteEntry]:
+    rows = (
+        await session.execute(
+            select(CustomerUser)
+            .join(
+                TiqoraCustomerFavorite, TiqoraCustomerFavorite.customer_login == CustomerUser.login
+            )
+            .where(TiqoraCustomerFavorite.user_id == user_id, CustomerUser.valid_id == 1)
+            .order_by(*_ORDER)
+        )
+    ).scalars()
+    customers = list(rows)
+    names = await _company_names(session, (cu.customer_id for cu in customers))
+    return [
+        CustomerFavoriteEntry(
+            login=cu.login,
+            email=cu.email,
+            customer_id=cu.customer_id,
+            company_name=names.get(cu.customer_id),
+            first_name=cu.first_name,
+            last_name=cu.last_name,
+            phone=cu.phone,
+            mobile=cu.mobile,
+        )
+        for cu in customers
+    ]
 
 
 @router.get("/shortlist", response_model=CustomerShortlist)
@@ -197,12 +241,13 @@ async def customer_shortlist(
     user: CustomerDirectoryUser,
     session: DbSession,
 ) -> CustomerShortlist:
-    """The agent's own recent and most frequent customer users.
+    """The agent's favorites and own recent and most frequent customer users.
 
-    Derived from the articles the agent wrote in the last ``SHORTLIST_DAYS``
-    days (mails, phone notes, internal notes), grouped by the ticket's
-    customer user. Invalid customer users are left out.
+    Recent and frequent are derived from the articles the agent wrote in the
+    last ``SHORTLIST_DAYS`` days (mails, phone notes, internal notes), grouped
+    by the ticket's customer user. Invalid customer users are left out.
     """
+    favorites = await _favorites(session, user.id)
     since = datetime.now() - timedelta(days=SHORTLIST_DAYS)
     last_at = func.max(Article.create_time).label("last_at")
     tickets = func.count(func.distinct(Ticket.id)).label("tickets")
@@ -224,7 +269,7 @@ async def customer_shortlist(
     ).all()
     stats = {row[0]: (row[1], int(row[2])) for row in (*recent_rows, *frequent_rows)}
     if not stats:
-        return CustomerShortlist(recent=[], frequent=[])
+        return CustomerShortlist(favorites=favorites, recent=[], frequent=[])
 
     channel_rows = await session.execute(
         select(Ticket.customer_user_id, Article.create_time, CommunicationChannel.name)
@@ -275,7 +320,41 @@ async def customer_shortlist(
             )
         return out
 
-    return CustomerShortlist(recent=entries(recent_rows), frequent=entries(frequent_rows))
+    return CustomerShortlist(
+        favorites=favorites, recent=entries(recent_rows), frequent=entries(frequent_rows)
+    )
+
+
+# `:path`: logins may contain "/".
+@router.put("/favorites/{login:path}", status_code=status.HTTP_204_NO_CONTENT)
+async def add_favorite(login: str, user: CustomerDirectoryUser, session: DbSession) -> None:
+    """Star a customer user for this agent (idempotent)."""
+    if await session.get(TiqoraCustomerFavorite, (user.id, login)) is not None:
+        return
+    exists = await session.scalar(select(CustomerUser.id).where(CustomerUser.login == login))
+    if exists is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    count = await session.scalar(
+        select(func.count())
+        .select_from(TiqoraCustomerFavorite)
+        .where(TiqoraCustomerFavorite.user_id == user.id)
+    )
+    if int(count or 0) >= FAVORITES_MAX:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"At most {FAVORITES_MAX} favorites",
+        )
+    session.add(TiqoraCustomerFavorite(user_id=user.id, customer_login=login))
+    await session.commit()
+
+
+@router.delete("/favorites/{login:path}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_favorite(login: str, user: CustomerDirectoryUser, session: DbSession) -> None:
+    """Unstar a customer user for this agent (idempotent)."""
+    row = await session.get(TiqoraCustomerFavorite, (user.id, login))
+    if row is not None:
+        await session.delete(row)
+        await session.commit()
 
 
 class CustomerDirectoryCompanyDetail(BaseModel):

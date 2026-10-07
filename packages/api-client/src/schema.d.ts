@@ -4881,6 +4881,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-directory/favorites/{login}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Add Favorite
+         * @description Star a customer user for this agent (idempotent).
+         */
+        put: operations["add_favorite_api_v1_customer_directory_favorites__login__put"];
+        post?: never;
+        /**
+         * Remove Favorite
+         * @description Unstar a customer user for this agent (idempotent).
+         */
+        delete: operations["remove_favorite_api_v1_customer_directory_favorites__login__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer-directory/shortlist": {
         parameters: {
             query?: never;
@@ -4890,11 +4914,11 @@ export interface paths {
         };
         /**
          * Customer Shortlist
-         * @description The agent's own recent and most frequent customer users.
+         * @description The agent's favorites and own recent and most frequent customer users.
          *
-         *     Derived from the articles the agent wrote in the last ``SHORTLIST_DAYS``
-         *     days (mails, phone notes, internal notes), grouped by the ticket's
-         *     customer user. Invalid customer users are left out.
+         *     Recent and frequent are derived from the articles the agent wrote in the
+         *     last ``SHORTLIST_DAYS`` days (mails, phone notes, internal notes), grouped
+         *     by the ticket's customer user. Invalid customer users are left out.
          */
         get: operations["customer_shortlist_api_v1_customer_directory_shortlist_get"];
         put?: never;
@@ -10676,6 +10700,25 @@ export interface components {
             /** Logins */
             logins: string[];
         };
+        /** CustomerFavoriteEntry */
+        CustomerFavoriteEntry: {
+            /** Company Name */
+            company_name?: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /** Mobile */
+            mobile: string | null;
+            /** Phone */
+            phone: string | null;
+        };
         /** CustomerFillOut */
         CustomerFillOut: {
             /** Changed */
@@ -10760,6 +10803,8 @@ export interface components {
         };
         /** CustomerShortlist */
         CustomerShortlist: {
+            /** Favorites */
+            favorites: components["schemas"]["CustomerFavoriteEntry"][];
             /** Frequent */
             frequent: components["schemas"]["CustomerShortlistEntry"][];
             /** Recent */
@@ -30087,6 +30132,72 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomerDirectoryCompanyDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_favorite_api_v1_customer_directory_favorites__login__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_favorite_api_v1_customer_directory_favorites__login__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

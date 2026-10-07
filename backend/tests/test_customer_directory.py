@@ -46,6 +46,10 @@ def _cleanup(url: str) -> None:
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
         conn.execute(text("DELETE FROM tiqora_feature_grant"))
+        conn.execute(
+            text("DELETE FROM tiqora_customer_favorite WHERE customer_login LIKE :p"),
+            {"p": _PREFIX + "%"},
+        )
         conn.execute(text("DELETE FROM article WHERE id BETWEEN 9860 AND 9869"))
         conn.execute(text("DELETE FROM ticket WHERE id BETWEEN 9860 AND 9869"))
         # Written by the customer edit (Znuny cache signals).
@@ -527,8 +531,41 @@ async def test_shortlist_empty_and_forbidden(seeded: str) -> None:
         denied = await outsider.get("/api/v1/customer-directory/shortlist")
     await engine.dispose()
     await engine2.dispose()
-    assert empty.json() == {"recent": [], "frequent": []}
+    assert empty.json() == {"favorites": [], "recent": [], "frequent": []}
     assert denied.status_code == 403
+
+
+async def test_favorites_star_list_and_unstar(seeded: str) -> None:
+    await _grant(seeded, FeatureGrants(user_ids=[DIRECT, ROLED]))
+    client, engine = await _client(seeded, DIRECT)
+    other, engine2 = await _client(seeded, ROLED)
+    async with client, other:
+        base = "/api/v1/customer-directory/favorites/"
+        for login in ("laura", "anna", "old", "laura"):  # twice: idempotent
+            resp = await client.put(base + _PREFIX + login)
+            assert resp.status_code == 204, resp.text
+        missing = await client.put(base + _PREFIX + "nobody")
+        starred = (await client.get("/api/v1/customer-directory/shortlist")).json()
+        theirs = (await other.get("/api/v1/customer-directory/shortlist")).json()
+        assert (await client.delete(base + _PREFIX + "anna")).status_code == 204
+        assert (await client.delete(base + _PREFIX + "anna")).status_code == 204
+        after = (await client.get("/api/v1/customer-directory/shortlist")).json()
+    await engine.dispose()
+    await engine2.dispose()
+    assert missing.status_code == 404
+    # By name; Olga is invalid and left out. Favorites are per agent.
+    assert [e["login"] for e in starred["favorites"]] == [_PREFIX + "anna", _PREFIX + "laura"]
+    assert starred["favorites"][0]["company_name"] == "Custdir Northwind"
+    assert theirs["favorites"] == []
+    assert [e["login"] for e in after["favorites"]] == [_PREFIX + "laura"]
+
+
+async def test_favorites_forbidden_without_grant(seeded: str) -> None:
+    outsider, engine = await _client(seeded, OUTSIDER)
+    async with outsider:
+        resp = await outsider.put(f"/api/v1/customer-directory/favorites/{_PREFIX}laura")
+    await engine.dispose()
+    assert resp.status_code == 403
 
 
 async def test_company_detail(seeded: str) -> None:

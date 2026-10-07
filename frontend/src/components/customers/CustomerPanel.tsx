@@ -8,8 +8,9 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { StateChip } from "@/components/ui/StatusChip";
 import { Spinner } from "@/components/ui/Spinner";
-import { BuildingIcon, DownloadIcon, PencilIcon } from "@/components/ui/icons";
+import { BuildingIcon, DownloadIcon, PencilIcon, StarIcon } from "@/components/ui/icons";
 import { api, type CustomerUserOut } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { humanDuration } from "@/lib/status";
 import { CallAction, EmailTicketLink, PhoneTicketLink } from "./CustomerActions";
 import {
@@ -19,6 +20,7 @@ import {
   EncryptedReachChip,
 } from "./CustomerKeys";
 import { customerName, initialsOf } from "./customerFormat";
+import { useCustomerShortlist, useFavoriteToggle } from "./favorites";
 
 const TICKETS_SHOWN = 8;
 
@@ -63,6 +65,10 @@ export function CustomerPanel({
     enabled: Boolean(login),
   });
   const keysQ = useCustomerCryptoKeys(login);
+  // Favorites live on the "Kunden" page, so starring needs its grant.
+  const canStar = Boolean(user?.can_use_customer_directory);
+  const shortlistQ = useCustomerShortlist(canStar);
+  const toggleFavorite = useFavoriteToggle();
 
   if (customerQ.isLoading) {
     return (
@@ -91,6 +97,7 @@ export function CustomerPanel({
   const total = ticketsQ.data?.total ?? 0;
   const openCount = openQ.data?.total ?? 0;
   const invalid = c.valid_id != null && c.valid_id !== 1;
+  const favorite = Boolean(shortlistQ.data?.favorites.some((f) => f.login === c.login));
 
   const companyLabel = c.company_name || c.customer_id;
   const companyLink = onOpenCompany ? (
@@ -140,6 +147,22 @@ export function CustomerPanel({
             <EncryptedReachChip data={keysQ.data} />
           </div>
         </div>
+        {canStar && (
+          <Button
+            variant="ghost"
+            onClick={() => toggleFavorite.mutate({ customer: c, favorite: !favorite })}
+            aria-pressed={favorite}
+            disabled={!shortlistQ.data}
+            title={favorite ? t("customerWorkbench.favoriteRemove") : t("customerWorkbench.favoriteAdd")}
+            data-testid="customer-favorite"
+          >
+            <StarIcon
+              className={cn("text-[15px]", favorite && "text-warn")}
+              fill={favorite ? "currentColor" : "none"}
+            />
+            {t("customerWorkbench.favorite")}
+          </Button>
+        )}
         {onEdit && user?.can_edit_customers && (
           <Button variant="ghost" onClick={() => onEdit(c)} data-testid="customer-edit">
             <PencilIcon className="text-[14px]" />

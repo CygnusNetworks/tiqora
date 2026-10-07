@@ -11,11 +11,12 @@ import {
 } from "@/components/customers/CustomerEditDrawer";
 import { CustomerPanel } from "@/components/customers/CustomerPanel";
 import { customerName, initialsOf } from "@/components/customers/customerFormat";
+import { useCustomerShortlist } from "@/components/customers/favorites";
 import { VCARD_EXPORT_MAX } from "@/components/customers/vcardExport";
 import { Avatar } from "@/components/ui/Avatar";
 import { Spinner } from "@/components/ui/Spinner";
 import { BuildingIcon, DownloadIcon, PlusIcon, SearchIcon } from "@/components/ui/icons";
-import { api, type CustomerShortlistEntry } from "@/lib/api";
+import { api, type CustomerFavoriteEntry, type CustomerShortlistEntry } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { displayTimeZone } from "@/lib/timeZone";
 
@@ -60,7 +61,7 @@ const tabClass = (on: boolean) =>
 
 /**
  * Agent customer workbench ("Kunden"): search on the left — people or
- * companies — with the agent's own recent and frequent customers when
+ * companies — with the agent's favorites, recent and frequent customers when
  * nothing is typed; the selected customer or company on the right with its
  * ticket and call actions. A ringing call shows on top. Needs the
  * customer_directory feature; creating and editing needs customer_edit.
@@ -96,12 +97,7 @@ export function CustomerDirectoryPage() {
   const q = search.q ?? "";
   const valid = search.invalid ? ("all" as const) : ("valid" as const);
 
-  const shortlistQ = useQuery({
-    queryKey: ["customer-directory", "shortlist"],
-    queryFn: ({ signal }) => api.getCustomerShortlist(signal),
-    enabled: allowed,
-    staleTime: 30 * 1000,
-  });
+  const shortlistQ = useCustomerShortlist(allowed);
   const peopleQ = useQuery({
     queryKey: ["customer-directory", "search", q, valid, pageSize],
     queryFn: ({ signal }) =>
@@ -115,16 +111,17 @@ export function CustomerDirectoryPage() {
     enabled: allowed && companiesTab && q !== "",
   });
 
+  const favorites = useMemo(() => shortlistQ.data?.favorites ?? [], [shortlistQ.data]);
   const recent = useMemo(() => shortlistQ.data?.recent ?? [], [shortlistQ.data]);
   const frequent = useMemo(() => shortlistQ.data?.frequent ?? [], [shortlistQ.data]);
   // Companies of the agent's own customers, for the companies tab without a term.
   const ownCompanies = useMemo(() => {
     const seen = new Map<string, string>();
-    for (const e of [...recent, ...frequent]) {
+    for (const e of [...favorites, ...recent, ...frequent]) {
       if (e.company_name && !seen.has(e.customer_id)) seen.set(e.customer_id, e.company_name);
     }
     return Array.from(seen, ([customer_id, name]) => ({ customer_id, name }));
-  }, [recent, frequent]);
+  }, [favorites, recent, frequent]);
 
   if (!allowed) {
     return (
@@ -152,7 +149,7 @@ export function CustomerDirectoryPage() {
       const first = (q ? companies : ownCompanies)[0];
       if (first) selectCompany(first.customer_id);
     } else {
-      const first = q ? people[0]?.login : recent[0]?.login;
+      const first = q ? people[0]?.login : (favorites[0] ?? recent[0])?.login;
       if (first) selectPerson(first);
     }
   };
@@ -219,6 +216,7 @@ export function CustomerDirectoryPage() {
           <div className="-mx-1 min-h-0 flex-1 overflow-y-auto" data-testid="customer-rail-list">
             {!companiesTab && !q && (
               <ShortlistSections
+                favorites={favorites}
                 recent={recent}
                 frequent={frequent}
                 loading={shortlistQ.isLoading}
@@ -389,6 +387,7 @@ function prefillFrom(term: string) {
 }
 
 function ShortlistSections({
+  favorites,
   recent,
   frequent,
   loading,
@@ -396,6 +395,7 @@ function ShortlistSections({
   onSelect,
   when,
 }: {
+  favorites: CustomerFavoriteEntry[];
   recent: CustomerShortlistEntry[];
   frequent: CustomerShortlistEntry[];
   loading: boolean;
@@ -419,11 +419,23 @@ function ShortlistSections({
       </div>
     );
   }
-  if (recent.length === 0 && frequent.length === 0) {
+  if (favorites.length === 0 && recent.length === 0 && frequent.length === 0) {
     return <EmptyRail>{t("customerWorkbench.shortlistEmpty")}</EmptyRail>;
   }
   return (
     <>
+      {favorites.length > 0 && <RailHeading>{t("customerWorkbench.favorites")}</RailHeading>}
+      {favorites.map((e) => (
+        <PersonRow
+          key={`fav-${e.login}`}
+          name={customerName(e)}
+          email={e.email}
+          sub={e.company_name || e.email}
+          selected={selected === e.login}
+          onSelect={() => onSelect(e.login)}
+          testId={`customer-favorite-${e.login}`}
+        />
+      ))}
       {recent.length > 0 && <RailHeading>{t("customerWorkbench.recent")}</RailHeading>}
       {recent.map((e) => (
         <PersonRow

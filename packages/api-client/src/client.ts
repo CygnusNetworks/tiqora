@@ -246,6 +246,7 @@ export type CustomerDirectoryCompany = Schemas["CustomerDirectoryCompany"];
 export type CustomerDirectoryCompanyDetail = Schemas["CustomerDirectoryCompanyDetail"];
 export type CustomerShortlist = Schemas["CustomerShortlist"];
 export type CustomerShortlistEntry = Schemas["CustomerShortlistEntry"];
+export type CustomerFavoriteEntry = Schemas["CustomerFavoriteEntry"];
 export type CustomerUpdateInput = Schemas["CustomerUpdateRequest"];
 export type FeatureGrantsOut = Schemas["FeatureGrantsOut"];
 export type FeatureGrantsUpdate = Schemas["FeatureGrantsUpdate"];
@@ -1465,11 +1466,19 @@ export class ApiClient {
     });
   }
 
-  /** The agent's own recent and frequent customer users (last 90 days of articles). */
+  /** The agent's favorites plus own recent and frequent customer users (last 90 days of articles). */
   getCustomerShortlist(signal?: AbortSignal) {
     return this.request<CustomerShortlist>("GET", "/api/v1/customer-directory/shortlist", {
       signal,
     });
+  }
+
+  /** Star (true) or unstar (false) a customer user for the current agent. */
+  setCustomerFavorite(login: string, favorite: boolean) {
+    return this.request<void>(
+      favorite ? "PUT" : "DELETE",
+      `/api/v1/customer-directory/favorites/${encodeURIComponent(login)}`,
+    );
   }
 
   /** One company's master data and valid contact count. */

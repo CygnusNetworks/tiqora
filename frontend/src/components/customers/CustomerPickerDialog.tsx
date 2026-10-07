@@ -12,6 +12,7 @@ import { cn } from "@/lib/cn";
 import { usePatchTicket } from "@/lib/ticket";
 import { CompanyField } from "./CustomerEditDrawer";
 import { customerName, initialsOf, parseFrom } from "./customerFormat";
+import { useCustomerShortlist } from "./favorites";
 
 const inputCls =
   "w-full rounded-md border border-hairline bg-bg px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent";
@@ -48,8 +49,9 @@ function conflictOwner(err: unknown): string | null {
 
 /**
  * Assign the ticket's customer. Search on the left (or suggestions: the
- * sender of the ticket and the agent's recent customers), a preview of the
- * highlighted customer on the right so the agent sees whom they assign.
+ * sender of the ticket and the agent's favorite and recent customers), a
+ * preview of the highlighted customer on the right so the agent sees whom
+ * they assign.
  * "Neu anlegen" creates the customer prefilled from the ticket's sender and
  * assigns it in one go.
  */
@@ -88,13 +90,10 @@ export function CustomerPickerDialog({
     queryFn: ({ signal }) => api.searchReferenceCustomers({ q: sender.email }, signal),
     enabled: mode === "search" && sender.email !== "",
   });
-  // … and the agent's own recent customers (customer-directory grant only).
-  const shortlistQ = useQuery({
-    queryKey: ["customer-directory", "shortlist"],
-    queryFn: ({ signal }) => api.getCustomerShortlist(signal),
-    enabled: mode === "search" && Boolean(user?.can_use_customer_directory),
-    staleTime: 30 * 1000,
-  });
+  // … and the agent's favorites and recent customers (customer-directory grant only).
+  const shortlistQ = useCustomerShortlist(
+    mode === "search" && Boolean(user?.can_use_customer_directory),
+  );
 
   const candidates: Candidate[] = useMemo(() => {
     if (term.length >= 2) {
@@ -108,7 +107,11 @@ export function CustomerPickerDialog({
       seen.add(c.login);
       out.push({ ...c, name: c.full_name || c.login, reason: t("customerPicker.sender") });
     }
-    for (const e of shortlistQ.data?.recent ?? []) {
+    const shortlist = [
+      ...(shortlistQ.data?.favorites ?? []).map((e) => ({ e, reason: t("customerPicker.favorite") })),
+      ...(shortlistQ.data?.recent ?? []).map((e) => ({ e, reason: t("customerPicker.recent") })),
+    ];
+    for (const { e, reason } of shortlist) {
       if (seen.has(e.login)) continue;
       seen.add(e.login);
       out.push({
@@ -116,7 +119,7 @@ export function CustomerPickerDialog({
         email: e.email,
         customer_id: e.customer_id,
         name: customerName(e),
-        reason: t("customerPicker.recent"),
+        reason,
       });
     }
     return out;

@@ -4149,7 +4149,11 @@
     "recent": "Recent",
     "frequent": "Frequent",
     "ticketCount_one": "1 ticket",
-    "ticketCount_other": "{{count}} tickets"
+    "ticketCount_other": "{{count}} tickets",
+    "favorites": "Favorites",
+    "favorite": "Favorite",
+    "favoriteAdd": "Add to favorites",
+    "favoriteRemove": "Remove from favorites"
   },
   "customerPicker": {
     "title": "Ticket customer",
@@ -4167,6 +4171,7 @@
     "matchesSender": "Matches the sender of this ticket.",
     "assign": "Assign {{name}}",
     "prefilled": "Prefilled from the ticket's sender.",
-    "createAndAssign": "Create and assign"
+    "createAndAssign": "Create and assign",
+    "favorite": "Favorite"
   }
 }

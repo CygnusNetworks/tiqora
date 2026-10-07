@@ -778,3 +778,21 @@ class TiqoraFeatureGrant(TiqoraBase):
     feature: Mapped[str] = mapped_column(String(64), primary_key=True, nullable=False)
     subject_type: Mapped[str] = mapped_column(String(16), primary_key=True, nullable=False)
     subject_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+
+
+class TiqoraCustomerFavorite(TiqoraBase):
+    """A customer user an agent starred on the "Kunden" page.
+
+    Personal: one row per agent and customer user, listed above the agent's
+    recent and frequent customers. Soft joins to ``users.id`` and
+    ``customer_user.login`` (no FK); GDPR erasure renames or drops the rows
+    with the customer user.
+    """
+
+    __tablename__ = "tiqora_customer_favorite"
+
+    user_id: Mapped[int] = mapped_column(Integer, primary_key=True, nullable=False)
+    customer_login: Mapped[str] = mapped_column(String(200), primary_key=True, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
