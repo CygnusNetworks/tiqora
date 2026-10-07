@@ -177,6 +177,8 @@ function resetMocks() {
   listReferenceStates.mockResolvedValue([
     { id: 1, name: "new", type_name: "new" },
     { id: 4, name: "open", type_name: "open" },
+    { id: 2, name: "closed successful", type_name: "closed" },
+    { id: 6, name: "pending reminder", type_name: "pending reminder" },
   ]);
   listReferencePriorities.mockResolvedValue([
     { id: 3, name: "3 normal" },
@@ -297,19 +299,21 @@ describe("QueuesPage selection", () => {
     expect(screen.getByTestId("queue-select-all-status").textContent).not.toMatch(/begrenzt/);
   });
 
-  it("state change: dropdown -> confirm dialog -> patchTicket per id -> success clears selection", async () => {
+  it("state change: panel field -> apply -> patchTicket per id -> success clears selection", async () => {
     await renderQueuesPage();
     await screen.findByTestId("ticket-row-101");
 
     fireEvent.click(screen.getByTestId("queue-row-check-101"));
     fireEvent.click(screen.getByTestId("queue-row-check-102"));
 
-    fireEvent.click(screen.getByTestId("queue-bulk-state"));
-    const option = await screen.findByTestId("queue-bulk-state-menu-option-4");
-    fireEvent.click(option);
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    await screen.findByTestId("queue-bulk-panel");
+    expect(screen.getByTestId("queue-bulk-apply")).toBeDisabled();
 
-    const confirmButton = await screen.findByTestId("queue-bulk-confirm");
-    fireEvent.click(confirmButton);
+    fireEvent.click(screen.getByTestId("queue-bulk-state-select"));
+    fireEvent.click(await screen.findByTestId("queue-bulk-state-select-menu-option-4"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-apply"));
 
     await waitFor(() => {
       expect(screen.getByTestId("queue-bulk-status")).toBeInTheDocument();
@@ -318,8 +322,101 @@ describe("QueuesPage selection", () => {
     expect(patchTicket).toHaveBeenCalledWith(101, { state_id: 4 });
     expect(patchTicket).toHaveBeenCalledWith(102, { state_id: 4 });
     expect(screen.getByTestId("queue-bulk-status").textContent).toMatch(/2/);
-    // Selection cleared: the status message stays, the selection part is gone.
+    // Selection cleared: the status message stays, the selection part and the panel are gone.
     expect(screen.queryByTestId("queue-selected-count")).toBeNull();
+    expect(screen.queryByTestId("queue-bulk-panel")).toBeNull();
+  });
+
+  it("quick close prefills 'closed successful'; one click on apply closes the tickets", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-close")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-close"));
+
+    expect(screen.getByTestId("queue-bulk-quick-close")).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("queue-bulk-apply").textContent).toMatch(/1 Ticket schließen/);
+    fireEvent.click(screen.getByTestId("queue-bulk-apply"));
+
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(101, { state_id: 2 }));
+  });
+
+  it("a quick action pressed again takes its change back out", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-mine"));
+    expect(screen.getByTestId("queue-bulk-field-owner-clear")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-mine"));
+
+    expect(screen.getByTestId("queue-bulk-quick-mine")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByTestId("queue-bulk-field-owner-clear")).toBeNull();
+    expect(screen.getByTestId("queue-bulk-apply")).toBeDisabled();
+  });
+
+  it("several fields go out in one PATCH per ticket", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+    fireEvent.click(screen.getByTestId("queue-row-check-102"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-mine"));
+    await waitFor(() => expect(screen.getByTestId("queue-bulk-priority-4")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("queue-bulk-priority-4"));
+    fireEvent.click(screen.getByTestId("queue-bulk-lock-lock"));
+
+    expect(screen.getByTestId("queue-bulk-apply").textContent).toMatch(/3 Änderungen/);
+    fireEvent.click(screen.getByTestId("queue-bulk-apply"));
+
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledTimes(2));
+    const body = { priority_id: 4, owner_id: 5, lock: "lock" };
+    expect(patchTicket).toHaveBeenCalledWith(101, body);
+    expect(patchTicket).toHaveBeenCalledWith(102, body);
+  });
+
+  it("a pending state is sent with its reminder date", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-pending")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-pending"));
+    fireEvent.change(screen.getByTestId("queue-bulk-pending-time"), {
+      target: { value: "2031-03-04T10:30" },
+    });
+    fireEvent.click(screen.getByTestId("queue-bulk-apply"));
+
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledTimes(1));
+    const [, body] = patchTicket.mock.calls[0];
+    expect(body.state_id).toBe(6);
+    expect(typeof body.pending_time).toBe("string");
+    expect(Number.isNaN(Date.parse(body.pending_time))).toBe(false);
+  });
+
+  it("without a date a pending state cannot be applied", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-pending")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-pending"));
+    fireEvent.change(screen.getByTestId("queue-bulk-pending-time"), { target: { value: "" } });
+
+    expect(screen.getByTestId("queue-bulk-apply")).toBeDisabled();
+  });
+
+  it("closing the panel discards the draft", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-mine"));
+    fireEvent.click(screen.getByTestId("queue-bulk-panel-close"));
+
+    expect(screen.queryByTestId("queue-bulk-panel")).toBeNull();
+    expect(screen.getByTestId("queue-bulk-quick-mine")).toHaveAttribute("aria-pressed", "false");
   });
 
   it("partial failure keeps failed ids selected and reports a partial-fail status", async () => {
@@ -333,11 +430,9 @@ describe("QueuesPage selection", () => {
     fireEvent.click(screen.getByTestId("queue-row-check-101"));
     fireEvent.click(screen.getByTestId("queue-row-check-102"));
 
-    fireEvent.click(screen.getByTestId("queue-bulk-priority"));
-    const option = await screen.findByTestId("queue-bulk-priority-menu-option-4");
-    fireEvent.click(option);
-
-    fireEvent.click(await screen.findByTestId("queue-bulk-confirm"));
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    fireEvent.click(await screen.findByTestId("queue-bulk-priority-4"));
+    fireEvent.click(screen.getByTestId("queue-bulk-apply"));
 
     await waitFor(() => {
       expect(screen.getByTestId("queue-bulk-status")).toBeInTheDocument();
