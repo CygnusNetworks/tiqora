@@ -40,7 +40,7 @@ beforeEach(() => {
 
 describe("DialPage", () => {
   it("does not dial on load, dials on click", async () => {
-    const dialSpy = vi.spyOn(phoneApi, "dial").mockResolvedValue({ extension: "60", number: "01717630944" });
+    const dialSpy = vi.spyOn(phoneApi, "dial").mockResolvedValue({ extension: "60", number: "01717630944", ring_timeout: 30 });
     renderPage();
     const button = await screen.findByTestId("dial-page-call");
     expect(dialSpy).not.toHaveBeenCalled();

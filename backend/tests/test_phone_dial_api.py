@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -11,6 +13,7 @@ from tiqora.api.deps import get_current_user, get_db, get_redis
 from tiqora.channels.phone.originate import OriginateConfig, OriginateError
 from tiqora.config import Settings
 from tiqora.domain.auth import AuthenticatedUser
+from tiqora.events.pubsub import TIQORA_EVENTS_CHANNEL
 
 CFG = OriginateConfig(
     ari_url="http://pbx-asterisk:8088/ari",
@@ -24,17 +27,24 @@ CFG = OriginateConfig(
 
 
 class _Redis:
-    def __init__(self) -> None:
+    def __init__(self, *, fail_calls: bool = False) -> None:
         self.keys: dict[str, str] = {}
+        self.published: list[tuple[str, str]] = []
+        self.fail_calls = fail_calls
 
     async def set(self, key: str, value: str, ex: int | None = None, nx: bool = False) -> Any:
         if nx and key in self.keys:
             return None
+        if self.fail_calls and key.startswith("tiqora:call:"):
+            raise ConnectionError("redis down")
         self.keys[key] = value
         return True
 
     async def delete(self, key: str) -> int:
         return 1 if self.keys.pop(key, None) is not None else 0
+
+    async def publish(self, channel: str, message: str) -> None:
+        self.published.append((channel, message))
 
 
 def _app(
@@ -83,8 +93,44 @@ async def test_dial_rings_the_agents_extension(monkeypatch: pytest.MonkeyPatch) 
     app = _app(monkeypatch, originate=orig)
     resp = await _dial(app, {"number": "+49 171 7630944", "name": "Kettler"})
     assert resp.status_code == 202, resp.text
-    assert resp.json() == {"extension": "60", "number": "01717630944"}
-    orig.assert_awaited_once_with(CFG, "60", "01717630944", "Kettler")
+    assert resp.json() == {
+        "extension": "60",
+        "number": "01717630944",
+        "call_id": None,
+        "ring_timeout": 30,
+    }
+    orig.assert_awaited_once_with(CFG, "60", "01717630944", "Kettler", channel_id=None)
+
+
+async def test_dial_tracks_the_call_with_originate_cti(monkeypatch: pytest.MonkeyPatch) -> None:
+    redis = _Redis()
+    orig = AsyncMock(return_value=None)
+    cfg = dataclasses.replace(CFG, track_calls=True)
+    app = _app(monkeypatch, config=cfg, originate=orig, redis_client=redis)
+    resp = await _dial(app, {"number": "01717630944", "ticket_id": 5})
+    assert resp.status_code == 202, resp.text
+    call_id = resp.json()["call_id"]
+    assert call_id.startswith("tiqora-")
+    assert orig.await_args.kwargs == {"channel_id": call_id}
+    stored = json.loads(redis.keys[f"tiqora:call:{call_id}"])
+    assert stored["click_to_dial"] is True
+    assert stored["direction"] == "outbound"
+    assert stored["user_ids"] == [7]
+    assert stored["ringing_at"] is None
+    events = [json.loads(m) for c, m in redis.published if c == TIQORA_EVENTS_CHANNEL]
+    assert [(e["event"], e["user_ids"], e["call"]["call_id"]) for e in events] == [
+        ("ringing", [7], call_id)
+    ]
+
+
+async def test_dial_untracked_when_the_call_state_store_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg = dataclasses.replace(CFG, track_calls=True)
+    app = _app(monkeypatch, config=cfg, redis_client=_Redis(fail_calls=True))
+    resp = await _dial(app, {"number": "01717630944"})
+    assert resp.status_code == 202
+    assert resp.json()["call_id"] is None
 
 
 async def test_dial_rejects_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:

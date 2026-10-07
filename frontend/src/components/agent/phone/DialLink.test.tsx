@@ -32,7 +32,7 @@ describe("DialLink click-to-dial", () => {
   it("dials through the PBX when originate is on", async () => {
     const dialSpy = vi
       .spyOn(phoneApi, "dial")
-      .mockResolvedValue({ extension: "60", number: "01717630944" });
+      .mockResolvedValue({ extension: "60", number: "01717630944", ring_timeout: 30 });
     const onDial = vi.fn();
     renderLink(
       {
@@ -101,7 +101,7 @@ describe("DialLink click-to-dial", () => {
     fireEvent.click(screen.getByTestId("d"));
     await screen.findByRole("alert");
     expect(onDial).not.toHaveBeenCalled();
-    dialSpy.mockResolvedValueOnce({ extension: "60", number: "0228123" });
+    dialSpy.mockResolvedValueOnce({ extension: "60", number: "0228123", ring_timeout: 30 });
     fireEvent.click(screen.getByTestId("d"));
     await waitFor(() => expect(onDial).toHaveBeenCalledTimes(1));
   });

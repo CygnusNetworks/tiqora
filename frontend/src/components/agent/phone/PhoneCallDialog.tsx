@@ -20,6 +20,7 @@ import {
   pendingIso,
   savePhoneDraft,
   timerFromCall,
+  type DialledCall,
   type PhoneNextState,
 } from "@/lib/phoneCall";
 import { ComposerBody } from "../ComposerBody";
@@ -33,6 +34,7 @@ import { useChatAttachments } from "../telegram/useChatAttachments";
 import { DynamicFieldInputs, type DynamicFieldValues } from "./DynamicFieldInputs";
 import { PendingTimeInput } from "./PendingTimeInput";
 import { useCallTimer } from "./useCallTimer";
+import { useDialledCall } from "./useDialledCall";
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -57,7 +59,9 @@ function autoSubject(t: (k: string, o?: Record<string, unknown>) => string, tick
  * customer visibility, ticket dynamic fields and attachments — one request to
  * `POST /tickets/{id}/phone-calls`.
  *
- * Mount it only while open: the timer starts on mount. Text, direction and
+ * Mount it only while open: the timer starts on mount — for a click-to-dial
+ * call the PBX reports on (`dialled`) only once the other side answers, and
+ * it stops at the hangup. Text, direction and
  * elapsed time are kept per ticket in localStorage until the call is saved
  * or the draft discarded, so closing the dialog mid-call loses nothing.
  */
@@ -67,6 +71,7 @@ export function PhoneCallDialog({
   callerNumber,
   startedAt,
   endedAt,
+  dialled,
   onClose,
 }: {
   ticket: TicketDetail;
@@ -78,6 +83,8 @@ export function PhoneCallDialog({
   startedAt?: number | null;
   /** CTI popup: epoch ms the call ended — the timer shows the fixed duration. */
   endedAt?: number | null;
+  /** Click-to-dial the PBX reports on: the timer follows the call. */
+  dialled?: DialledCall | null;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -94,8 +101,26 @@ export function PhoneCallDialog({
   const [body, setBody] = useState(draft?.body ?? "");
   const refineReview = useRefineReview(setBody);
   const { review: reviewOpen, currentReviewText } = refineReview;
-  const [callTimer] = useState(() => timerFromCall(startedAt, endedAt));
+  const [callTimer] = useState(() =>
+    dialled ? { initialSeconds: 0, autoStart: false } : timerFromCall(startedAt, endedAt),
+  );
   const timer = useCallTimer(callTimer ?? { initialSeconds: draft?.elapsed ?? 0 });
+  const progress = useDialledCall(dialled);
+  const phase = progress?.phase;
+  const answeredAt = progress?.answeredAt ?? null;
+  const callEndedAt = progress?.endedAt ?? null;
+  const { reset: resetTimer } = timer;
+  // The PBX's answer starts the timer, its hangup fixes the duration; a call
+  // that never connected books nothing.
+  useEffect(() => {
+    if (phase === "connected" && answeredAt !== null) {
+      resetTimer(Math.floor((Date.now() - answeredAt) / 1000), true);
+    } else if (phase === "ended" && answeredAt !== null && callEndedAt !== null) {
+      resetTimer(Math.floor((callEndedAt - answeredAt) / 1000), false);
+    } else if (phase === "failed") {
+      resetTimer(0, false);
+    }
+  }, [phase, answeredAt, callEndedAt, resetTimer]);
   const [timeUnits, setTimeUnits] = useState("");
   const [timeTouched, setTimeTouched] = useState(false);
   const [nextState, setNextState] = useState<PhoneNextState>(perms.rw ? "default" : "keep");
@@ -344,6 +369,35 @@ export function PhoneCallDialog({
             </button>
           </span>
         </div>
+
+        {progress && phase !== "connected" && (
+          <p
+            role="status"
+            data-testid="phone-dial-progress"
+            data-phase={phase}
+            className={cn(
+              "flex flex-wrap items-center gap-2 rounded-md px-2 py-1.5 text-xs",
+              phase === "failed" ? "bg-danger/10 text-danger" : "bg-surface-subtle text-muted",
+            )}
+          >
+            {phase === "pickup" && t("phone.dialRinging", { extension: progress.extension ?? "" })}
+            {phase === "calling" && t("phone.dialCalling", { number: progress.number || callerNumber || "" })}
+            {phase === "ended" && t("phone.dialEnded")}
+            {phase === "failed" && (
+              <>
+                {t("phone.dialNotConnected")}
+                <button
+                  type="button"
+                  data-testid="phone-dial-discard"
+                  onClick={() => void onDiscard()}
+                  className="ml-auto rounded border border-danger/40 px-2 py-0.5 font-medium hover:bg-danger/10"
+                >
+                  {t("phone.discard")}
+                </button>
+              </>
+            )}
+          </p>
+        )}
 
         <label className="block text-xs text-muted">
           {t("phone.subject")}

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ApiError } from "@/lib/api";
-import { phoneApi } from "@/lib/phoneApi";
+import { phoneApi, type DialOut } from "@/lib/phoneApi";
 
 export type OriginateStatus =
   | { kind: "idle" }
@@ -10,7 +10,8 @@ export type OriginateStatus =
   | { kind: "error"; message: string };
 
 /** Click-to-dial over the PBX when the admin configured it (`originate`).
- * `dial` resolves to whether the call was originated (errors land in `status`). */
+ * `dial` resolves to the PBX's answer, or null when the call was not
+ * originated (errors land in `status`). */
 export function useOriginate() {
   const { t } = useTranslation();
   const q = useQuery({
@@ -20,7 +21,7 @@ export function useOriginate() {
   });
   const [status, setStatus] = useState<OriginateStatus>({ kind: "idle" });
   const dial = useCallback(
-    async (number: string, opts?: { ticketId?: number; name?: string }): Promise<boolean> => {
+    async (number: string, opts?: { ticketId?: number; name?: string }): Promise<DialOut | null> => {
       setStatus({ kind: "idle" });
       try {
         const out = await phoneApi.dial({
@@ -29,7 +30,7 @@ export function useOriginate() {
           name: opts?.name ?? "",
         });
         setStatus({ kind: "ringing", extension: out.extension });
-        return true;
+        return out;
       } catch (err) {
         // ApiError.message is the backend's string `detail` (403/404/409/422/429/502),
         // or the generic "HTTP <status>" when the body had none.
@@ -39,7 +40,7 @@ export function useOriginate() {
           kind: "error",
           message: useReason ? reason : t("phone.dialFailed"),
         });
-        return false;
+        return null;
       }
     },
     [t],

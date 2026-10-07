@@ -538,7 +538,7 @@ describe("TicketHeaderActions", () => {
       phone: "+49 228 555-0101",
     });
     phoneConfig.mockResolvedValue({ dial_scheme: "tel", originate: true });
-    dial.mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce({ extension: "60", number: "+492285550101" });
+    dial.mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce({ extension: "60", number: "+492285550101", ring_timeout: 30 });
     wrap(
       <TicketHeaderActions
         ticket={makeTicket({ customer_email: "bob@example.com" })}

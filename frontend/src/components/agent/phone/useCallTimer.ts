@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 
 /**
  * Stopwatch for a phone call: starts running (or paused) at *initialSeconds*,
- * ticks once a second, can be paused and resumed. `elapsed` is whole seconds.
+ * ticks once a second, can be paused and resumed, or set (`reset`) when the
+ * PBX reports the call's answer or end. `elapsed` is whole seconds.
  */
 export function useCallTimer({
   initialSeconds = 0,
@@ -37,5 +38,12 @@ export function useCallTimer({
     setNow(stamp);
   }, [startedAt]);
 
-  return { elapsed, running, pause, resume };
+  const reset = useCallback((seconds: number, run: boolean) => {
+    const stamp = Date.now();
+    setBase(Math.max(0, seconds));
+    setStartedAt(run ? stamp : null);
+    setNow(stamp);
+  }, []);
+
+  return { elapsed, running, pause, resume, reset };
 }

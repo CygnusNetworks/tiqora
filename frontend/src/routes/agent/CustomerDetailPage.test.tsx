@@ -334,7 +334,7 @@ describe("CustomerDetailPage click-to-dial via the PBX", () => {
   });
 
   it("opens the outbound phone ticket after a successful dial", async () => {
-    dial.mockResolvedValue({ extension: "60", number: "01711234567" });
+    dial.mockResolvedValue({ extension: "60", number: "01711234567", ring_timeout: 30 });
     const mobile = await renderOriginate();
     fireEvent.click(mobile);
     await waitFor(() =>

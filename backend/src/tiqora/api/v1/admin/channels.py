@@ -58,6 +58,7 @@ CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
         "originate_timeout",
         "originate_internal",
         "originate_region",
+        "originate_cti",
     },
     "telegram": {
         "bot_token",

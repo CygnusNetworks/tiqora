@@ -366,6 +366,11 @@
             "title": "Call Id",
             "type": "string"
           },
+          "click_to_dial": {
+            "default": false,
+            "title": "Click To Dial",
+            "type": "boolean"
+          },
           "direction": {
             "enum": [
               "inbound",
@@ -10695,6 +10700,17 @@
       },
       "DialOut": {
         "properties": {
+          "call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Id"
+          },
           "extension": {
             "title": "Extension",
             "type": "string"
@@ -10702,11 +10718,16 @@
           "number": {
             "title": "Number",
             "type": "string"
+          },
+          "ring_timeout": {
+            "title": "Ring Timeout",
+            "type": "integer"
           }
         },
         "required": [
           "extension",
-          "number"
+          "number",
+          "ring_timeout"
         ],
         "title": "DialOut",
         "type": "object"

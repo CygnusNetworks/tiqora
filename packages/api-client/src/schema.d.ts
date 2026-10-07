@@ -7916,6 +7916,11 @@ export interface components {
             /** Call Id */
             call_id: string;
             /**
+             * Click To Dial
+             * @default false
+             */
+            click_to_dial: boolean;
+            /**
              * Direction
              * @enum {string}
              */
@@ -11175,10 +11180,14 @@ export interface components {
         };
         /** DialOut */
         DialOut: {
+            /** Call Id */
+            call_id?: string | null;
             /** Extension */
             extension: string;
             /** Number */
             number: string;
+            /** Ring Timeout */
+            ring_timeout: number;
         };
         /** DialRequest */
         DialRequest: {

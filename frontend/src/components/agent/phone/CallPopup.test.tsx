@@ -28,6 +28,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 function call(overrides: Partial<ActiveCall> = {}): ActiveCall {
   return {
     call_id: "c1",
+    click_to_dial: false,
     state: "ringing",
     number: "+492285550101",
     extension: "100",

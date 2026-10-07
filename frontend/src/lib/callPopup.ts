@@ -48,13 +48,15 @@ export function applyCallEvent(calls: ActiveCall[], message: CallEventMessage): 
     : [message.call, ...rest];
 }
 
-/** Calls the viewer should see: theirs, and ended ones only for 15 minutes. */
+/** Calls the viewer should see: theirs, and ended ones only for 15 minutes.
+ * Click-to-dial calls belong to the phone-call form, not the popup. */
 export function visibleCalls(
   calls: ActiveCall[],
   userId: number | null | undefined,
   now: number = Date.now(),
 ): ActiveCall[] {
   return calls.filter((c) => {
+    if (c.click_to_dial) return false;
     if (userId != null && !c.user_ids.includes(userId)) return false;
     if (c.state !== "ended") return true;
     const ended = callEndedAt(c);

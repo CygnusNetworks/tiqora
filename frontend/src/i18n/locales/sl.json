@@ -3964,6 +3964,9 @@
   "phone": {
     "dialRinging": "Desk phone {{extension}} is ringing – pick up to dial",
     "dialFailed": "Dialling failed",
+    "dialCalling": "Picked up – calling {{number}} …",
+    "dialEnded": "Hung up – the call duration is final",
+    "dialNotConnected": "The call did not connect – no time is booked",
     "button": "Klic",
     "menuLabel": "Zabeleži klic",
     "inbound": "Dohodno",

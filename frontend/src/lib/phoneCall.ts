@@ -152,7 +152,13 @@ export type PhoneCallRequestIntent = {
   startedAt?: number | null;
   /** Epoch ms the call ended — the timer shows the fixed duration. */
   endedAt?: number | null;
+  /** Click-to-dial the PBX reports on (`call_id`): the timer follows the call. */
+  dialled?: DialledCall | null;
 };
+
+/** A click-to-dial call the PBX tracks: id, desk-phone ring timeout (s) and
+ * when it was dialled (epoch ms). */
+export type DialledCall = { callId: string; ringTimeout: number; at: number };
 
 const pendingIntents = new Map<number, PhoneCallRequestIntent>();
 const requestListeners = new Set<(ticketId: number) => void>();
