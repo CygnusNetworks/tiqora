@@ -1201,7 +1201,9 @@
     "themeSystem": "System",
     "timeZone": "Zeitzone",
     "timeZoneBrowser": "Browser-Zeitzone verwenden ({{zone}})",
-    "timeZoneError": "Die Zeitzone konnte nicht gespeichert werden."
+    "timeZoneError": "Die Zeitzone konnte nicht gespeichert werden.",
+    "display": "Anzeige",
+    "showAvatars": "Avatare anzeigen"
   },
   "timeZoneHint": {
     "browserVsSystem": "Dein Browser ist auf {{browser}} eingestellt; E-Mails und Benachrichtigungen verwenden {{system}}.",
@@ -3712,6 +3714,16 @@
       "problemNotConfigured": "{{name}} ist nicht festgelegt",
       "problemNotWritable": "{{path}} ist nicht beschreibbar",
       "problemCannotCreate": "{{path}} fehlt und lässt sich nicht anlegen"
+    },
+    "avatars": {
+      "button": "Kundenbilder",
+      "title": "Kundenbilder",
+      "hint": "Woher Tiqora Bilder von Kunden und Firmenlogos automatisch holen darf. Der Server ruft sie ab und speichert sie zwischen; die Browser der Agenten fragen diese Seiten nie selbst an. Hochgeladene Bilder gelten immer.",
+      "gravatar": "Gravatar",
+      "gravatarHint": "Profilbild zur E-Mail-Adresse von gravatar.com. Der Server schickt dafür nur den SHA-256-Hash der Adresse.",
+      "favicon": "Website-Icons",
+      "faviconHint": "Icon der Website zur Mail-Domain bzw. Firmen-URL. Nie für Freemail-Domains wie gmail.com.",
+      "loadError": "Die Einstellungen konnten nicht geladen werden."
     }
   },
   "kb": {
@@ -4173,5 +4185,56 @@
     "prefilled": "Aus dem Absender des Tickets vorbelegt.",
     "createAndAssign": "Anlegen und zuweisen",
     "favorite": "Favorit"
+  },
+  "avatars": {
+    "editPhoto": "Bild ändern",
+    "editLogo": "Logo ändern",
+    "uploadPhoto": "Bild hochladen",
+    "removePhoto": "Bild entfernen",
+    "uploadLogo": "Logo hochladen",
+    "removeLogo": "Logo entfernen",
+    "uploadError": "Das Bild konnte nicht gespeichert werden.",
+    "tooLarge": "Das Bild ist zu groß (höchstens 2 MB).",
+    "wrongType": "Nur Bilder als PNG, JPEG oder WebP.",
+    "wrongDrop": "Zieh ein Bild (PNG, JPEG, WebP) oder eine vCard (.vcf) hierher.",
+    "logoNeedsUrl": "Trag zuerst die Website der Firma ein – das Logo wird zu ihrer Domain gespeichert.",
+    "dropCustomer": "Bild oder vCard ablegen, um den Kunden zu ergänzen",
+    "dropLogo": "Bild als Firmenlogo ablegen"
+  },
+  "vcard": {
+    "import": "vCards importieren",
+    "importHint": "Fotos und fehlende Kontaktdaten aus einer .vcf-Datei übernehmen – oder Kontakte aus Apple Kontakte auf diese Seite ziehen.",
+    "importTitle": "vCards importieren",
+    "importDescription": "Jede Karte wird über ihre E-Mail-Adressen einem Kunden zugeordnet. Übernommen werden nur das Foto und leere Felder.",
+    "dropHere": "vCard-Datei zum Importieren ablegen",
+    "wrongFile": "Das ist keine vCard-Datei (.vcf).",
+    "applyTitle": "Aus vCard übernehmen",
+    "takePhoto": "Foto übernehmen",
+    "replacePhoto": "Bild ersetzen",
+    "fillFields": "Leere Felder füllen",
+    "fillList": "Füllen: {{fields}}",
+    "noChanges": "Hier fehlt nichts, was die Karte liefern könnte.",
+    "apply": "Übernehmen",
+    "applySelected_one": "1 Karte übernehmen",
+    "applySelected_other": "{{count}} Karten übernehmen",
+    "applied_one": "1 Kunde aktualisiert.",
+    "applied_other": "{{count}} Kunden aktualisiert.",
+    "applyError": "Die vCard konnte nicht übernommen werden.",
+    "previewError": "Die vCard-Datei konnte nicht gelesen werden.",
+    "empty": "Die Datei enthält keine Kontakte.",
+    "multipleCards": "Die Datei enthält mehrere Kontakte, keiner gehört zu diesem Kunden. Importiere sie über die Kundenliste.",
+    "otherCustomer": "Die Karte gehört zu {{name}}; sie wird trotzdem auf den hier gezeigten Kunden angewendet.",
+    "matched": "Kunde: {{name}}",
+    "unmatched": "Kein Kunde mit dieser E-Mail-Adresse.",
+    "createCustomer": "Als Kunde anlegen",
+    "truncated": "Die Datei enthält mehr Kontakte; gezeigt werden nur die ersten 500.",
+    "photoHint": "Fotos sind nur dabei, wenn in macOS Kontakte unter Einstellungen → vCard „Fotos in vCards exportieren“ aktiviert ist.",
+    "fields": {
+      "first_name": "Vorname",
+      "last_name": "Nachname",
+      "email": "E-Mail",
+      "phone": "Telefon",
+      "mobile": "Mobil"
+    }
   }
 }

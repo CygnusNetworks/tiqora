@@ -123,10 +123,11 @@ def _seed(url: str) -> None:
             )
         conn.execute(
             text(
-                "INSERT INTO customer_company (customer_id, name, valid_id, create_time,"
+                "INSERT INTO customer_company (customer_id, name, url, valid_id, create_time,"
                 " create_by, change_time, change_by)"
-                " VALUES ('CUSTDIR-NW', 'Custdir Northwind', 1, :t, 1, :t, 1),"
-                "        ('CUSTDIR-GX', 'Custdir Globex', 1, :t, 1, :t, 1)"
+                " VALUES ('CUSTDIR-NW', 'Custdir Northwind', 'https://northwind.example',"
+                "         1, :t, 1, :t, 1),"
+                "        ('CUSTDIR-GX', 'Custdir Globex', NULL, 1, :t, 1, :t, 1)"
             ),
             {"t": NOW},
         )
@@ -279,7 +280,10 @@ async def test_list_search_company_and_me_flag(seeded: str) -> None:
     assert body["items"][0]["company_name"] == "Custdir Northwind"
     assert [i["login"] for i in two_words.json()["items"]] == [_PREFIX + "laura"]
     assert by_company.json()["total"] == 3
-    assert {c["customer_id"] for c in companies.json()} == {"CUSTDIR-GX", "CUSTDIR-NW"}
+    assert {c["customer_id"]: c["url"] for c in companies.json()} == {
+        "CUSTDIR-GX": None,
+        "CUSTDIR-NW": "https://northwind.example",
+    }
     assert me.json()["can_use_customer_directory"] is True
 
 
@@ -519,6 +523,7 @@ async def test_shortlist_recent_and_frequent(seeded: str) -> None:
     assert laura["ticket_count"] == 2
     assert laura["last_channel"] == "Phone"
     assert laura["company_name"] == "Custdir Northwind"
+    assert laura["company_url"] == "https://northwind.example"
     assert body["recent"][0]["last_channel"] == "Email"
 
 

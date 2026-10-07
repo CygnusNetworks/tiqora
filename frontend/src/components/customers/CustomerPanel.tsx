@@ -10,8 +10,12 @@ import { StateChip } from "@/components/ui/StatusChip";
 import { Spinner } from "@/components/ui/Spinner";
 import { BuildingIcon, DownloadIcon, PencilIcon, StarIcon } from "@/components/ui/icons";
 import { api, type CustomerUserOut } from "@/lib/api";
+import { avatarApi } from "@/lib/avatarApi";
 import { cn } from "@/lib/cn";
 import { humanDuration } from "@/lib/status";
+import { isAvatarImage, isVcardFile, useFileDrop } from "@/lib/useFileDrop";
+import { DropOverlay, EditableAvatar } from "./AvatarEditor";
+import { useAvatarEditor } from "./useAvatarEditor";
 import { CallAction, EmailTicketLink, PhoneTicketLink } from "./CustomerActions";
 import {
   CustomerKeysAddLink,
@@ -21,6 +25,7 @@ import {
 } from "./CustomerKeys";
 import { customerName, initialsOf } from "./customerFormat";
 import { useCustomerShortlist, useFavoriteToggle } from "./favorites";
+import { VcardApplyDialog } from "./VcardImport";
 
 const TICKETS_SHOWN = 8;
 
@@ -28,6 +33,8 @@ const TICKETS_SHOWN = 8;
  * One customer user with what an agent does next front and centre: start an
  * e-mail ticket, log a call, dial. Below: their own tickets (not the whole
  * company's), contact data and the vCard / key extras.
+ * Agents who may edit customers can set the picture from the avatar menu or
+ * by dropping an image — or a .vcf from Apple Contacts — onto the panel.
  */
 export function CustomerPanel({
   login,
@@ -69,6 +76,22 @@ export function CustomerPanel({
   const canStar = Boolean(user?.can_use_customer_directory);
   const shortlistQ = useCustomerShortlist(canStar);
   const toggleFavorite = useFavoriteToggle();
+
+  const canEdit = Boolean(user?.can_edit_customers);
+  const avatar = useAvatarEditor({
+    upload: (file) => avatarApi.uploadCustomerAvatar(login, file),
+    remove: () => avatarApi.deleteCustomerAvatar(login),
+  });
+  const [vcardFile, setVcardFile] = useState<File | null>(null);
+  const drop = useFileDrop({
+    accept: (f) => isAvatarImage(f) || isVcardFile(f),
+    onFiles: ([file]) => {
+      if (isVcardFile(file)) setVcardFile(file);
+      else void avatar.uploadFile(file);
+    },
+    onReject: () => avatar.setError(t("avatars.wrongDrop")),
+    disabled: !canEdit || !customerQ.data,
+  });
 
   if (customerQ.isLoading) {
     return (
@@ -128,9 +151,17 @@ export function CustomerPanel({
   );
 
   return (
-    <div className="space-y-5" data-testid="customer-panel">
+    <div className="relative space-y-5" data-testid="customer-panel" {...drop.dropProps}>
       <header className="flex flex-wrap items-center gap-4">
-        <Avatar email={c.email} initials={initialsOf(name)} size={52} />
+        <EditableAvatar editor={avatar} canEdit={canEdit} kind="photo" testId="customer-avatar">
+          <Avatar
+            email={c.email}
+            version={avatar.version}
+            initials={initialsOf(name)}
+            size={52}
+            testId="customer-avatar-image"
+          />
+        </EditableAvatar>
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl font-semibold text-ink" data-testid="customer-name">
             {name}
@@ -170,6 +201,11 @@ export function CustomerPanel({
           </Button>
         )}
       </header>
+      {avatar.error && (
+        <p className="-mt-2 text-sm text-danger" role="alert" data-testid="customer-avatar-error">
+          {avatar.error}
+        </p>
+      )}
 
       <div
         className="flex flex-wrap items-start gap-2 border-b border-hairline pb-5"
@@ -300,6 +336,19 @@ export function CustomerPanel({
       </div>
 
       <CustomerKeysDialog login={c.login} open={keysOpen} onClose={() => setKeysOpen(false)} />
+
+      {vcardFile && (
+        <VcardApplyDialog
+          file={vcardFile}
+          customer={c}
+          onClose={() => setVcardFile(null)}
+          onApplied={(photo) => {
+            setVcardFile(null);
+            if (photo) avatar.bump();
+          }}
+        />
+      )}
+      <DropOverlay active={drop.active}>{t("avatars.dropCustomer")}</DropOverlay>
     </div>
   );
 }

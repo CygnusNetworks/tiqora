@@ -512,3 +512,32 @@ export function MobileIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Framed picture — avatars, photos, logos. */
+export function ImageIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <circle cx="9" cy="10" r="1.75" />
+      <path d="m20.5 16-5-5-8 8.5" />
+    </Icon>
+  );
+}
+
+export function UploadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 16V5m0 0-4 4m4-4 4 4" />
+      <path d="M5 19h14" />
+    </Icon>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 7h16M10 11v6M14 11v6" />
+      <path d="M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </Icon>
+  );
+}

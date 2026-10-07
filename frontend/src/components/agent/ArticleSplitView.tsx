@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { useShowAvatars } from "@/lib/showAvatars";
 import { AiOriginMarker, AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
 import { ArticleSecurityBadge } from "./ArticleSecurityBadge";
 import { useArticleSecurity } from "./useArticleSecurity";
@@ -139,6 +140,7 @@ function ArticleListRow({
   onSelect: () => void;
 }) {
   const { t } = useTranslation();
+  const showAvatars = useShowAvatars();
   const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
   return (
     <div
@@ -153,7 +155,7 @@ function ArticleListRow({
     >
       <Avatar
         initials={initialsFor(article)}
-        email={emailFromAddress(article.from_address)}
+        email={showAvatars ? emailFromAddress(article.from_address) : null}
         tone={avatarTone(article.sender_type)}
         size={24}
         className="mt-0.5"

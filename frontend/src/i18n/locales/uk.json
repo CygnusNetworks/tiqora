@@ -1201,7 +1201,9 @@
     "themeSystem": "System",
     "timeZone": "Time zone",
     "timeZoneBrowser": "Use browser time zone ({{zone}})",
-    "timeZoneError": "Could not save the time zone."
+    "timeZoneError": "Could not save the time zone.",
+    "display": "Display",
+    "showAvatars": "Show avatars"
   },
   "timeZoneHint": {
     "browserVsSystem": "Your browser is set to {{browser}}; e-mails and notifications use {{system}}.",
@@ -3704,6 +3706,16 @@
       "problemNotConfigured": "{{name}} не задано",
       "problemNotWritable": "{{path}} недоступний для запису",
       "problemCannotCreate": "{{path}} відсутній і його не вдається створити"
+    },
+    "avatars": {
+      "button": "Customer pictures",
+      "title": "Customer pictures",
+      "hint": "Where pictures of customers and company logos may come from automatically. The server fetches and caches them; agents' browsers never contact these sites. Uploaded pictures always apply.",
+      "gravatar": "Gravatar",
+      "gravatarHint": "Profile picture for the e-mail address from gravatar.com. The server sends only the address's SHA-256 hash.",
+      "favicon": "Website icons",
+      "faviconHint": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com.",
+      "loadError": "The settings could not be loaded."
     }
   },
   "kb": {
@@ -4165,5 +4177,56 @@
     "prefilled": "Prefilled from the ticket's sender.",
     "createAndAssign": "Create and assign",
     "favorite": "Favorite"
+  },
+  "avatars": {
+    "editPhoto": "Change picture",
+    "editLogo": "Change logo",
+    "uploadPhoto": "Upload picture",
+    "removePhoto": "Remove picture",
+    "uploadLogo": "Upload logo",
+    "removeLogo": "Remove logo",
+    "uploadError": "The picture could not be saved.",
+    "tooLarge": "The picture is too large (2 MB at most).",
+    "wrongType": "Only PNG, JPEG or WebP pictures.",
+    "wrongDrop": "Drop a picture (PNG, JPEG, WebP) or a vCard (.vcf).",
+    "logoNeedsUrl": "Enter the company's website first — the logo is stored for its domain.",
+    "dropCustomer": "Drop a picture or vCard to update this customer",
+    "dropLogo": "Drop a picture as the company logo"
+  },
+  "vcard": {
+    "import": "Import vCards",
+    "importHint": "Take photos and missing contact details from a .vcf file — or drag contacts from Apple Contacts onto this page.",
+    "importTitle": "Import vCards",
+    "importDescription": "Each card is matched to a customer by its e-mail addresses. Only the photo and empty fields are taken over.",
+    "dropHere": "Drop a vCard file to import it",
+    "wrongFile": "That is not a vCard file (.vcf).",
+    "applyTitle": "Update from vCard",
+    "takePhoto": "Use photo",
+    "replacePhoto": "Replace picture",
+    "fillFields": "Fill empty fields",
+    "fillList": "Fill: {{fields}}",
+    "noChanges": "Nothing here that is missing.",
+    "apply": "Apply",
+    "applySelected_one": "Apply 1 card",
+    "applySelected_other": "Apply {{count}} cards",
+    "applied_one": "1 customer updated.",
+    "applied_other": "{{count}} customers updated.",
+    "applyError": "The vCard could not be applied.",
+    "previewError": "The vCard file could not be read.",
+    "empty": "The file contains no contacts.",
+    "multipleCards": "The file has several contacts and none belongs to this customer. Import it from the customer list instead.",
+    "otherCustomer": "This card belongs to {{name}}; it is applied to the customer shown here anyway.",
+    "matched": "Customer: {{name}}",
+    "unmatched": "No customer with this e-mail address.",
+    "createCustomer": "Create as customer",
+    "truncated": "The file has more contacts; only the first 500 are shown.",
+    "photoHint": "Photos are only included when macOS Contacts → Settings → vCard → “Export photos in vCards” is turned on.",
+    "fields": {
+      "first_name": "First name",
+      "last_name": "Last name",
+      "email": "E-mail",
+      "phone": "Phone",
+      "mobile": "Mobile"
+    }
   }
 }

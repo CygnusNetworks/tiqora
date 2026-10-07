@@ -18,6 +18,7 @@ from sqlalchemy import (
     func,
     true,
 )
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tiqora.db.tiqora.base import TiqoraBase
@@ -795,4 +796,36 @@ class TiqoraCustomerFavorite(TiqoraBase):
     customer_login: Mapped[str] = mapped_column(String(200), primary_key=True, nullable=False)
     create_time: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
+    )
+
+
+#: Normalized avatar PNGs (256 px, typically 20-150 KiB): ``MEDIUMBLOB`` on
+#: MariaDB — plain ``BLOB`` stops at 64 KiB — and ``BYTEA`` on PostgreSQL.
+AVATAR_IMAGE_BLOB = LargeBinary().with_variant(mysql.MEDIUMBLOB(), "mysql", "mariadb")
+
+
+class TiqoraAvatar(TiqoraBase):
+    """A picture an agent uploaded for a customer (person) or a company logo.
+
+    ``kind = "email"``: ``subject_key`` is the SHA-256 hex of the customer's
+    normalized e-mail address (the same key the read endpoint is called
+    with, so the address itself never appears in a URL). ``kind = "domain"``:
+    ``subject_key`` is the company's website domain without ``www.``.
+    ``owner_ref`` names the customer login / company id the upload was made
+    for (audit, GDPR erasure). ``data`` is always a normalized PNG.
+    """
+
+    __tablename__ = "tiqora_avatar"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    subject_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    owner_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    content_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    data: Mapped[bytes] = mapped_column(AVATAR_IMAGE_BLOB, nullable=False)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("kind", "subject_key", name="uq_tiqora_avatar_kind_subject"),
     )

@@ -20,13 +20,14 @@ import { Dialog } from "@/components/ui/Dialog";
 import { MenuItem } from "@/components/ui/Menu";
 import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
 import { CustomerDirectoryAccessDialog } from "@/components/admin/CustomerDirectoryAccessDialog";
+import { AvatarSettingsDialog } from "@/components/admin/AvatarSettingsDialog";
 import { CustomerCompanyCell, CustomerNameCell } from "@/components/customers/CustomerCells";
 import {
   downloadUrl,
   saveSelectedVcards,
   VCARD_EXPORT_MAX,
 } from "@/components/customers/vcardExport";
-import { DownloadIcon, KeyIcon, UsersIcon } from "@/components/ui/icons";
+import { DownloadIcon, ImageIcon, KeyIcon, UsersIcon } from "@/components/ui/icons";
 import { bulkInChunks } from "@/lib/bulk";
 import { formatDateTime } from "@/lib/format";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
@@ -56,6 +57,7 @@ export function CustomerUsersPage() {
   // Znuny AdminCustomerUser shows the customer preference modules PGP/SMIME.
   const [keysLogin, setKeysLogin] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState<FeatureKey | null>(null);
+  const [avatarsOpen, setAvatarsOpen] = useState(false);
   const debouncedCompanySearch = useDebouncedValue(companySearch, 300);
 
   const companiesQ = useQuery({
@@ -322,6 +324,15 @@ export function CustomerUsersPage() {
               <UsersIcon className="text-[14px]" />
               {t("admin.customerUsers.editAccess")}
             </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="admin-customer-avatars"
+              onClick={() => setAvatarsOpen(true)}
+            >
+              <ImageIcon className="text-[14px]" />
+              {t("admin.avatars.button")}
+            </Button>
           </>
         }
         rowActions={(row) => (
@@ -391,6 +402,7 @@ export function CustomerUsersPage() {
       {accessOpen && (
         <CustomerDirectoryAccessDialog feature={accessOpen} onClose={() => setAccessOpen(null)} />
       )}
+      {avatarsOpen && <AvatarSettingsDialog onClose={() => setAvatarsOpen(false)} />}
 
       <Dialog
         open={keysLogin !== null}

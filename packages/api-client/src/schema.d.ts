@@ -1408,6 +1408,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/avatars": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Avatar Settings */
+        get: operations["get_avatar_settings_api_v1_admin_avatars_get"];
+        /** Put Avatar Settings */
+        put: operations["put_avatar_settings_api_v1_admin_avatars_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/channels": {
         parameters: {
             query?: never;
@@ -4481,6 +4499,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/avatars/domain/{domain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Domain Avatar
+         * @description Uploaded logo, else the website's icon (when enabled, not for freemail), else 404.
+         */
+        get: operations["domain_avatar_api_v1_avatars_domain__domain__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/avatars/email/{sha256}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Avatar
+         * @description Uploaded photo, else Gravatar (when enabled), else 404.
+         */
+        get: operations["person_avatar_api_v1_avatars_email__sha256__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/appointments": {
         parameters: {
             query?: never;
@@ -5000,6 +5058,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/companies/{customer_id}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload Company Logo
+         * @description Store a logo for the company's website domain (``customer_company.url``).
+         */
+        put: operations["upload_company_logo_api_v1_customers_companies__customer_id__logo_put"];
+        post?: never;
+        /** Delete Company Logo */
+        delete: operations["delete_company_logo_api_v1_customers_companies__customer_id__logo_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/companies/{customer_id}/vcards": {
         parameters: {
             query?: never;
@@ -5017,6 +5096,46 @@ export interface paths {
         get: operations["company_vcards_api_v1_customers_companies__customer_id__vcards_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/vcard-import/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Vcard Import
+         * @description Fill blank fields and/or store photos for the selected cards.
+         */
+        post: operations["apply_vcard_import_api_v1_customers_vcard_import_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/vcard-import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Vcard Import
+         * @description What importing this .vcf would do, per card. Writes nothing.
+         */
+        post: operations["preview_vcard_import_api_v1_customers_vcard_import_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5043,6 +5162,27 @@ export interface paths {
         head?: never;
         /** Fill Customer */
         patch: operations["fill_customer_api_v1_customers__login__patch"];
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Upload Customer Avatar
+         * @description Store a photo for the customer's e-mail address (PNG/JPEG/WebP, max 2 MiB).
+         */
+        put: operations["upload_customer_avatar_api_v1_customers__login__avatar_put"];
+        post?: never;
+        /** Delete Customer Avatar */
+        delete: operations["delete_customer_avatar_api_v1_customers__login__avatar_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/customers/{login}/crypto-keys": {
@@ -10067,6 +10207,27 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** AvatarSettings */
+        AvatarSettings: {
+            /**
+             * Favicon Enabled
+             * @default true
+             */
+            favicon_enabled: boolean;
+            /**
+             * Gravatar Enabled
+             * @default true
+             */
+            gravatar_enabled: boolean;
+        };
+        /**
+         * AvatarUploadOut
+         * @description ``version`` changes with every upload; append it as ``?v=``.
+         */
+        AvatarUploadOut: {
+            /** Version */
+            version: string;
+        };
         /** BacklogPointOut */
         BacklogPointOut: {
             /** Bucket */
@@ -10095,6 +10256,21 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** Body_apply_vcard_import_api_v1_customers_vcard_import_apply_post */
+        Body_apply_vcard_import_api_v1_customers_vcard_import_apply_post: {
+            /** File */
+            file: string;
+            /**
+             * Selections
+             * @description JSON: [{"index", "login", "photo", "fields"}]
+             */
+            selections: string;
+        };
+        /** Body_preview_vcard_import_api_v1_customers_vcard_import_preview_post */
+        Body_preview_vcard_import_api_v1_customers_vcard_import_preview_post: {
+            /** File */
+            file: string;
+        };
         /** Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post */
         Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post: {
             /** File */
@@ -10107,6 +10283,16 @@ export interface components {
         };
         /** Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post */
         Body_upload_attachment_api_v1_kb_articles__article_id__attachments_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_company_logo_api_v1_customers_companies__customer_id__logo_put */
+        Body_upload_company_logo_api_v1_customers_companies__customer_id__logo_put: {
+            /** File */
+            file: string;
+        };
+        /** Body_upload_customer_avatar_api_v1_customers__login__avatar_put */
+        Body_upload_customer_avatar_api_v1_customers__login__avatar_put: {
             /** File */
             file: string;
         };
@@ -10643,6 +10829,8 @@ export interface components {
             customer_id: string;
             /** Name */
             name: string;
+            /** Url */
+            url?: string | null;
         };
         /** CustomerDirectoryCompanyDetail */
         CustomerDirectoryCompanyDetail: {
@@ -10704,6 +10892,8 @@ export interface components {
         CustomerFavoriteEntry: {
             /** Company Name */
             company_name?: string | null;
+            /** Company Url */
+            company_url?: string | null;
             /** Customer Id */
             customer_id: string;
             /** Email */
@@ -10814,6 +11004,8 @@ export interface components {
         CustomerShortlistEntry: {
             /** Company Name */
             company_name?: string | null;
+            /** Company Url */
+            company_url?: string | null;
             /** Customer Id */
             customer_id: string;
             /** Email */
@@ -16336,6 +16528,60 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** VCardImportApplied */
+        VCardImportApplied: {
+            /** Filled */
+            filled: string[];
+            /** Login */
+            login: string;
+            /** Photo */
+            photo: boolean;
+        };
+        /** VCardImportApplyOut */
+        VCardImportApplyOut: {
+            /** Applied */
+            applied: components["schemas"]["VCardImportApplied"][];
+        };
+        /** VCardImportCard */
+        VCardImportCard: {
+            /** Display Name */
+            display_name: string;
+            /** Emails */
+            emails: string[];
+            /** Fill Fields */
+            fill_fields: string[];
+            /** First Name */
+            first_name: string | null;
+            /** Has Existing Avatar */
+            has_existing_avatar: boolean;
+            /** Has Photo */
+            has_photo: boolean;
+            /** Index */
+            index: number;
+            /** Last Name */
+            last_name: string | null;
+            /** Match Login */
+            match_login: string | null;
+            /** Match Name */
+            match_name: string | null;
+            /** Mobile */
+            mobile: string | null;
+            /** Org */
+            org: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Photo Preview */
+            photo_preview: string | null;
+            /** Title */
+            title: string | null;
+        };
+        /** VCardImportPreview */
+        VCardImportPreview: {
+            /** Cards */
+            cards: components["schemas"]["VCardImportCard"][];
+            /** Truncated */
+            truncated: boolean;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -20180,6 +20426,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QueueOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_avatar_settings_api_v1_admin_avatars_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarSettings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_avatar_settings_api_v1_admin_avatars_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvatarSettings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarSettings"];
                 };
             };
             /** @description Validation Error */
@@ -29183,6 +29499,100 @@ export interface operations {
             };
         };
     };
+    domain_avatar_api_v1_avatars_domain__domain__get: {
+        parameters: {
+            query?: {
+                /** @description Cache buster; ignored */
+                v?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                /** @description Domain without scheme, e.g. example.com */
+                domain: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The picture */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                    "image/webp": unknown;
+                };
+            };
+            /** @description No picture for this key */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    person_avatar_api_v1_avatars_email__sha256__get: {
+        parameters: {
+            query?: {
+                /** @description Cache buster; ignored */
+                v?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                /** @description SHA-256 hex of the lowercased address */
+                sha256: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The picture */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                    "image/webp": unknown;
+                };
+            };
+            /** @description No picture for this key */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_appointments_api_v1_calendar_appointments_get: {
         parameters: {
             query: {
@@ -30391,6 +30801,78 @@ export interface operations {
             };
         };
     };
+    upload_company_logo_api_v1_customers_companies__customer_id__logo_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_company_logo_api_v1_customers_companies__customer_id__logo_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarUploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_company_logo_api_v1_customers_companies__customer_id__logo_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     company_vcards_api_v1_customers_companies__customer_id__vcards_get: {
         parameters: {
             query?: never;
@@ -30413,6 +30895,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_vcard_import_api_v1_customers_vcard_import_apply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_apply_vcard_import_api_v1_customers_vcard_import_apply_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VCardImportApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_vcard_import_api_v1_customers_vcard_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_vcard_import_api_v1_customers_vcard_import_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VCardImportPreview"];
                 };
             };
             /** @description Validation Error */
@@ -30527,6 +31083,78 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomerFillOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_customer_avatar_api_v1_customers__login__avatar_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_customer_avatar_api_v1_customers__login__avatar_put"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AvatarUploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_avatar_api_v1_customers__login__avatar_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

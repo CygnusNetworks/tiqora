@@ -6,7 +6,12 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { BuildingIcon, DownloadIcon, PlusIcon } from "@/components/ui/icons";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
+import { domainFromUrl } from "@/lib/avatar";
+import { avatarApi } from "@/lib/avatarApi";
+import { isAvatarImage, useFileDrop } from "@/lib/useFileDrop";
+import { DropOverlay, EditableAvatar } from "./AvatarEditor";
+import { useAvatarEditor } from "./useAvatarEditor";
 import { CallAction, EmailTicketLink } from "./CustomerActions";
 import { customerName, initialsOf } from "./customerFormat";
 
@@ -14,7 +19,9 @@ const CONTACTS_SHOWN = 200;
 
 /**
  * A customer company: its contacts with the same quick actions as a single
- * customer, the company's tickets and the company vCard export.
+ * customer, the company's tickets and the company vCard export. The logo
+ * comes from the company website (favicon) or an upload, keyed by the domain
+ * of the company URL.
  */
 export function CompanyPanel({
   customerId,
@@ -49,6 +56,23 @@ export function CompanyPanel({
       api.listTickets({ customer_id: customerId, state_type: "open", limit: 1 }, signal),
   });
 
+  const canEdit = Boolean(user?.can_edit_customers);
+  const domain = domainFromUrl(companyQ.data?.url);
+  const logo = useAvatarEditor({
+    // Logos are stored per website domain: without a URL there is nothing to key it by.
+    upload: (file) =>
+      domain
+        ? avatarApi.uploadCompanyLogo(customerId, file)
+        : Promise.reject(new ApiError(422, { detail: t("avatars.logoNeedsUrl") }, "")),
+    remove: () => avatarApi.deleteCompanyLogo(customerId),
+  });
+  const drop = useFileDrop({
+    accept: isAvatarImage,
+    onFiles: ([file]) => void logo.uploadFile(file),
+    onReject: () => logo.setError(t("avatars.wrongType")),
+    disabled: !canEdit || !companyQ.data,
+  });
+
   if (companyQ.isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -71,11 +95,24 @@ export function CompanyPanel({
   const openCount = openQ.data?.total ?? 0;
 
   return (
-    <div className="space-y-5" data-testid="company-panel">
+    <div className="relative space-y-5" data-testid="company-panel" {...drop.dropProps}>
       <header className="flex flex-wrap items-center gap-4">
-        <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-xl border border-hairline bg-surface-subtle text-muted">
-          <BuildingIcon className="text-[24px]" />
-        </span>
+        {/* Only rows with a company record can carry a logo. */}
+        <EditableAvatar editor={logo} canEdit={canEdit && Boolean(co)} kind="logo" testId="company-logo">
+          {domain ? (
+            <Avatar
+              domain={domain}
+              version={logo.version}
+              initials={initialsOf(name)}
+              size={52}
+              testId="company-logo-image"
+            />
+          ) : (
+            <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-xl border border-hairline bg-surface-subtle text-muted">
+              <BuildingIcon className="text-[24px]" />
+            </span>
+          )}
+        </EditableAvatar>
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl font-semibold text-ink" data-testid="company-name">
             {name}
@@ -101,6 +138,11 @@ export function CompanyPanel({
           </Button>
         )}
       </header>
+      {logo.error && (
+        <p className="-mt-2 text-sm text-danger" role="alert" data-testid="company-logo-error">
+          {logo.error}
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-b border-hairline pb-4 text-sm">
         <span className="text-muted">{t("customerWorkbench.contactCount", { count: contactTotal })}</span>
@@ -170,6 +212,7 @@ export function CompanyPanel({
           </ul>
         )}
       </section>
+      <DropOverlay active={drop.active}>{t("avatars.dropLogo")}</DropOverlay>
     </div>
   );
 }

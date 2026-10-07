@@ -117,8 +117,8 @@ export function initialsFor(a: ArticleListItem): string {
  * `parseRecipient` (RecipientsField.tsx) already handles for the compose
  * side, reused here rather than re-implementing the angle-bracket parsing.
  * Returns undefined when nothing plausible is present, so callers can hand
- * it straight to `Avatar`'s optional `email` prop (Gravatar lookup, d=404
- * falls back to initials).
+ * it straight to `Avatar`'s optional `email` prop (avatar-proxy lookup; a
+ * 404 falls back to initials).
  */
 export function emailFromAddress(raw: string | null | undefined): string | undefined {
   return parseRecipient(raw ?? "")?.email;

@@ -6,6 +6,7 @@ from tiqora.api.v1 import (
     agents,
     ai,
     auth,
+    avatars,
     calendar,
     channels_phone,
     channels_sms,
@@ -29,6 +30,7 @@ from tiqora.api.v1 import (
     tickets,
     tickets_crypto,
     tickets_telegram,
+    vcard_import,
 )
 from tiqora.api.v1.admin import admin_router
 
@@ -48,6 +50,10 @@ api_v1_router.include_router(ai.router)
 api_v1_router.include_router(ai.refine_router)
 api_v1_router.include_router(process.router)
 api_v1_router.include_router(events.router)
+api_v1_router.include_router(avatars.router)
+# Before customers.router, like /companies/.../vcards before /{login}/vcard.
+api_v1_router.include_router(avatars.customer_router)
+api_v1_router.include_router(vcard_import.router)
 api_v1_router.include_router(customers.router)
 api_v1_router.include_router(customer_directory.router)
 api_v1_router.include_router(customer_keys.router)

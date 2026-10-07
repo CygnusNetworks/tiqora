@@ -1668,6 +1668,12 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/customer-directory")) return page(directoryEntries);
   if (p.endsWith("/customer-directory/companies")) return Object.entries(COMPANY_NAMES).map(([customer_id, name]) => ({ customer_id, name }));
   if (p.match(/\/admin\/feature-grants\/[^/]+$/)) return { user_ids: [], group_ids: [2], role_ids: [] };
+  // Avatar sources (the demo cannot read the PUT body; saving echoes the defaults).
+  if (p.endsWith("/admin/avatars")) return { gravatar_enabled: true, favicon_enabled: true };
+  if (p.endsWith("/customers/vcard-import/preview")) return { cards: [], truncated: false };
+  if (p.endsWith("/customers/vcard-import/apply")) return { applied: [] };
+  if (p.match(/\/customers\/(companies\/[^/]+\/logo|[^/]+\/avatar)$/))
+    return method === "PUT" ? { version: String(Date.now()) } : {};
   if (p.endsWith("/admin/customer-companies")) return page(adminCustomerCompanies);
   if (p.endsWith("/admin/gdpr/jobs")) return page([]);
   // Admin — AI subsystem (settings, providers, models, profiles, task

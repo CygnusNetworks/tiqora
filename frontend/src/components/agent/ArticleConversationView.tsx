@@ -17,6 +17,7 @@ import {
 } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/Avatar";
+import { useShowAvatars } from "@/lib/showAvatars";
 import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { useTicketReplyDrafts } from "@/lib/replyDrafts";
 import { AiOriginToggle, AiOriginTrace } from "./AiOriginBadge";
@@ -248,6 +249,7 @@ function Bubble({
   telegram?: TelegramBubbleContext;
 }) {
   const { t } = useTranslation();
+  const showAvatars = useShowAvatars();
   const senderName = senderDisplayName(article.from_address) || t("ticket.unknownSender");
   const isSystem = (article.sender_type || "").toLowerCase() === "system";
   // Side alone is easy to lose while scrolling — pair it with a clear hue:
@@ -283,7 +285,7 @@ function Bubble({
         <div className={cn("flex max-w-[76%] items-start gap-2", side === "right" && "flex-row-reverse")}>
           <Avatar
             initials={initialsFor(article)}
-            email={emailFromAddress(article.from_address)}
+            email={showAvatars ? emailFromAddress(article.from_address) : null}
             tone={avatarTone(article.sender_type)}
             size={24}
             className="mt-0.5"

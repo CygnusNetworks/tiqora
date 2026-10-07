@@ -18,6 +18,7 @@ from tiqora.api.v1.admin import (
     attachments,
     auth_config,
     auto_responses,
+    avatars,
     channels,
     crypto_keys,
     crypto_settings,
@@ -96,5 +97,6 @@ admin_router.include_router(feature_grants.router)
 admin_router.include_router(ai.router)
 admin_router.include_router(ai_models.router)
 admin_router.include_router(ai_audit.router)
+admin_router.include_router(avatars.router)
 
 __all__ = ["admin_router"]

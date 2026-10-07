@@ -18,6 +18,12 @@ from tiqora.api.v1.admin.common import (
 )
 from tiqora.api.v1.feature_deps import CustomerDirectoryUser, CustomerEditUser
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
+from tiqora.domain.customer_fill import (
+    FILL_FIELDS,
+    CustomerEmailTakenError,
+    fill_blank_fields,
+    is_blank,
+)
 from tiqora.domain.customer_service import CustomerService
 from tiqora.domain.new_ticket_queue import (
     NewTicketScreen,
@@ -282,7 +288,6 @@ async def customer_vcard(
     return vcard_response(build_vcard(cu, company_name), vcard_filename(name or cu.login))
 
 
-_FILL_FIELDS = ("first_name", "last_name", "email", "phone", "mobile")
 _COMMENTS_MAX = 250
 
 
@@ -310,10 +315,6 @@ class CustomerFillOut(BaseModel):
     changed: list[str]
 
 
-def _blank(value: str | None) -> bool:
-    return value is None or not value.strip()
-
-
 def _append_comment(current: str | None, line: str) -> str:
     """Append ``line``; when the column (250) would overflow, drop the
     oldest lines first."""
@@ -336,34 +337,16 @@ async def fill_customer(
     ).scalar_one_or_none()
     if cu is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
-    changed: list[str] = []
-    for name in _FILL_FIELDS:
-        raw = getattr(body, name)
-        if raw is None or _blank(raw) or not _blank(getattr(cu, name)):
-            continue
-        value = raw.strip()
-        if name == "email":
-            owner = (
-                (
-                    await session.execute(
-                        select(CustomerUser.login).where(
-                            func.lower(CustomerUser.email) == value.lower(),
-                            CustomerUser.valid_id == 1,
-                            CustomerUser.login != cu.login,
-                        )
-                    )
-                )
-                .scalars()
-                .first()
-            )
-            if owner is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail={"message": "Customer user e-mail already exists", "login": owner},
-                )
-        setattr(cu, name, value)
-        changed.append(name)
-    if body.comments_append is not None and not _blank(body.comments_append):
+    try:
+        changed = await fill_blank_fields(
+            session, cu, {name: getattr(body, name) for name in FILL_FIELDS}
+        )
+    except CustomerEmailTakenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": "Customer user e-mail already exists", "login": exc.owner},
+        ) from exc
+    if body.comments_append is not None and not is_blank(body.comments_append):
         line = body.comments_append.strip()
         existing = [part.strip() for part in (cu.comments or "").split("\n")]
         if line not in existing:

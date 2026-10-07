@@ -8,6 +8,8 @@ customer_user under that company), this replaces:
 * ``article_data_mime`` for every article on that customer's tickets:
   ``a_from``/``a_to``/``a_cc`` (address occurrences only) and ``a_body``
   (lorem-scrubbed, structure preserved);
+* ``tiqora_avatar``: uploaded photos of these customers are deleted (they are
+  keyed by the old address, and a photo is PII in itself);
 * ``customer_company`` (optional, ``anonymize_company=True`` — off by
   default since a company may have other, non-anonymized customer_users).
 
@@ -22,13 +24,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.avatars.service import EMAIL, cache_key, email_key, forget_cached
 from tiqora.config import Settings
 from tiqora.db.legacy.article import Article, ArticleDataMime
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.db.tiqora.models import TiqoraAvatar
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
@@ -42,6 +46,7 @@ class CustomerNotFoundError(ValueError):
 class CustomerAnonymizeResult:
     customer_users: int = 0
     customer_companies: int = 0
+    avatars: int = 0
     articles: int = 0
     tickets_touched: int = 0
     progress: list[str] = field(default_factory=list)
@@ -52,6 +57,7 @@ class CustomerAnonymizeResult:
             "===============================",
             f"customer_user rows updated:     {self.customer_users}",
             f"customer_company rows updated:  {self.customer_companies}",
+            f"tiqora_avatar rows deleted:     {self.avatars}",
             f"article_data_mime rows updated: {self.articles}",
             f"tickets touched:                {self.tickets_touched}",
         ]
@@ -61,9 +67,19 @@ class CustomerAnonymizeResult:
         return {
             "customer_user": self.customer_users,
             "customer_company": self.customer_companies,
+            "tiqora_avatar": self.avatars,
             "article_data_mime": self.articles,
             "tickets_touched": self.tickets_touched,
         }
+
+
+async def _has_avatar_table(session: AsyncSession) -> bool:
+    row = (
+        await session.execute(
+            text("SELECT 1 FROM information_schema.tables WHERE table_name = 'tiqora_avatar'")
+        )
+    ).first()
+    return row is not None
 
 
 async def anonymize_customer(
@@ -109,6 +125,8 @@ async def anonymize_customer(
     logins = [c.login for c in customers]
     resolved_customer_id = customer_id or customers[0].customer_id
 
+    avatar_keys = sorted({email_key(c.email) for c in customers if (c.email or "").strip()})
+
     # --- customer_user PII ---
     async with session_factory() as session, session.begin():
         for cust in customers:
@@ -145,7 +163,17 @@ async def anonymize_customer(
                 },
             )
             result.customer_users += 1
+        if avatar_keys and await _has_avatar_table(session):
+            deleted = await session.execute(
+                delete(TiqoraAvatar).where(
+                    TiqoraAvatar.kind == EMAIL, TiqoraAvatar.subject_key.in_(avatar_keys)
+                )
+            )
+            result.avatars = int(getattr(deleted, "rowcount", 0) or 0)
     progress.append(f"customer_user: {result.customer_users} rows updated")
+    if avatar_keys:
+        await forget_cached(settings.redis_url, [cache_key(EMAIL, key) for key in avatar_keys])
+        progress.append(f"tiqora_avatar: {result.avatars} rows deleted")
 
     # --- optional customer_company ---
     if anonymize_company and resolved_customer_id:

@@ -4,8 +4,11 @@ import { toBcp47 } from "@/i18n";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { MutationRequest, TicketListItem } from "@/lib/api";
 import { dayBucket, formatDateTime, formatListTime, type DayBucket } from "@/lib/format";
-import { senderDisplayName } from "@/lib/articleChannel";
+import { emailFromAddress, senderDisplayName } from "@/lib/articleChannel";
 import { cn } from "@/lib/cn";
+import { useShowAvatars } from "@/lib/showAvatars";
+import { Avatar } from "@/components/ui/Avatar";
+import { initialsOf } from "@/components/customers/customerFormat";
 import { setTicketNavContext, type TicketNavContext } from "@/lib/ticketNavContext";
 import { Button } from "@/components/ui/Button";
 import { CopyTn } from "./CopyTn";
@@ -538,6 +541,12 @@ function TicketRow({
   const chatName = ticket.chat_display_name || null;
   const chatHandle = ticket.chat_username ? `@${ticket.chat_username}` : null;
   const chatIdentity = chatName || chatHandle;
+  // Customer picture before the name (agent preference, see AccountMenu).
+  // No company-logo fallback here — a logo in every row is noisy.
+  const showAvatars = useShowAvatars();
+  const avatarEmail = customerEmail || emailFromAddress(ticket.first_from) || null;
+  const avatarName = customerEmail || senderDisplayName(ticket.first_from) || customerLabel || "?";
+  const showAvatar = showAvatars && !chatIdentity && Boolean(customerLabel || senderFallback);
 
   const escalationBadge = escLevel !== "none" && nearest != null && (
     <span
@@ -783,6 +792,17 @@ function TicketRow({
           <TicketLinkChip ticket={ticket} onHover={onLinkHover} onOpenTicket={onOpenTicket} />
           <span aria-hidden>·</span>
           <ChannelPill channel={channel} testId={`ticket-channel-${ticket.id}`} />
+          {showAvatar && (
+            // -my keeps the 20px circle from growing the 16px meta line.
+            <Avatar
+              email={avatarEmail}
+              domainFallback={false}
+              initials={initialsOf(avatarName)}
+              size={20}
+              className="-my-0.5"
+              testId={`ticket-customer-avatar-${ticket.id}`}
+            />
+          )}
           <span className="min-w-0 truncate" data-testid={`ticket-customer-cell-${ticket.id}`}>
             {chatIdentity ? (
               <span data-testid={`ticket-chat-identity-${ticket.id}`}>

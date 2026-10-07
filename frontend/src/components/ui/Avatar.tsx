@@ -1,15 +1,24 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
-import { gravatarUrl } from "@/lib/gravatar";
+import { domainLogoUrl, emailDomain, personAvatarUrl } from "@/lib/avatar";
 
 export type AvatarProps = {
-  /** Explicit picture URL (e.g. OIDC/Google ``picture`` claim) — preferred over Gravatar. */
+  /** Explicit picture URL (e.g. OIDC/Google ``picture`` claim) — tried first. */
   avatarUrl?: string | null;
-  /** Email used for Gravatar lookup when no explicit avatar URL is set. */
+  /** Email of the person: their picture via the avatar proxy, then (with
+   * ``domainFallback``) the logo of the mail domain. */
   email?: string | null;
-  /** Initials shown when there is no image source, or image load fails / 404s. */
+  /** Logo domain tried after the person picture (company website), e.g. for
+   * company avatars that have no e-mail at all. */
+  domain?: string | null;
+  /** Try the logo of the e-mail's domain when there is no person picture
+   * (default on). Lists turn it off — a logo in every row is noisy. */
+  domainFallback?: boolean;
+  /** Cache buster after an upload (appended as ``?v=`` to proxy URLs). */
+  version?: string | null;
+  /** Initials shown when there is no image source, or every image fails / 404s. */
   initials: string;
-  /** CSS pixel size of the circle (image is requested at 2× for retina). */
+  /** CSS pixel size of the circle. */
   size?: number;
   className?: string;
   /** Optional test id for the root element. */
@@ -19,39 +28,65 @@ export type AvatarProps = {
   tone?: "accent" | "customer";
 };
 
+type Candidate = { src: string; kind: "explicit" | "person" | "domain" };
+
 /**
- * Circular avatar priority: explicit ``avatarUrl`` → Gravatar(email) → initials.
- * Load errors (including Gravatar ``d=404``) fall back to initials without a
- * broken image.
+ * Circular avatar. Candidates in order: explicit ``avatarUrl`` → person
+ * picture (``/api/v1/avatars/email/{sha256}``) → domain logo
+ * (``/api/v1/avatars/domain/{domain}``) → initials. A load error (the proxy
+ * answers 404 when it has nothing) moves on to the next candidate without a
+ * broken image. Logos are shown whole on white instead of cropped.
  */
 export function Avatar({
   avatarUrl,
   email,
+  domain,
+  domainFallback = true,
+  version,
   initials,
   size = 24,
   className,
   testId,
   tone = "accent",
 }: AvatarProps) {
-  const explicit = (avatarUrl ?? "").trim() || null;
-  const candidate = explicit ?? gravatarUrl(email, { size: size * 2 });
-  // `failed` is derived from a per-source key rather than a boolean+effect, so it
-  // resets automatically whenever the source changes — no reset effect that could
-  // clobber a synchronous "already broken" detection on the same commit.
-  const srcKey = candidate ?? "";
-  const [failedKey, setFailedKey] = useState<string | null>(null);
-  const failed = candidate != null && failedKey === srcKey;
-  const src = failed ? null : candidate;
+  const candidates = useMemo(() => {
+    const out: Candidate[] = [];
+    const explicit = (avatarUrl ?? "").trim();
+    if (explicit) out.push({ src: explicit, kind: "explicit" });
+    const person = personAvatarUrl(email, version);
+    if (person) out.push({ src: person, kind: "person" });
+    const logo = domainLogoUrl(domain ?? (domainFallback ? emailDomain(email) : null), version);
+    if (logo) out.push({ src: logo, kind: "domain" });
+    return out;
+  }, [avatarUrl, email, domain, domainFallback, version]);
 
-  // A cached failed image (e.g. a 404 Gravatar hit again after client-side nav)
-  // can fire its `error` event before React attaches `onError`, leaving a broken
-  // image with no fallback — the "sometimes broken" avatar. Re-check the element's
-  // load result the moment it mounts and fall back to initials if it's broken.
+  // Failures are remembered per source URL rather than as an index, so they
+  // reset by themselves whenever the sources change — no reset effect that
+  // could clobber a synchronous "already broken" detection on the same commit.
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set());
+  const current = candidates.find((c) => !failed.has(c.src)) ?? null;
+  const currentSrc = current?.src ?? "";
+
+  const markFailed = useCallback(
+    (src: string) =>
+      setFailed((prev) => {
+        if (prev.has(src)) return prev;
+        const next = new Set(prev);
+        next.add(src);
+        return next;
+      }),
+    [],
+  );
+
+  // A cached failed image (e.g. a 404 hit again after client-side nav) can
+  // fire its `error` event before React attaches `onError`, leaving a broken
+  // image with no fallback. Re-check the element's load result the moment it
+  // mounts and move on if it's broken.
   const checkBroken = useCallback(
     (node: HTMLImageElement | null) => {
-      if (node?.complete && node.naturalWidth === 0) setFailedKey(srcKey);
+      if (node?.complete && node.naturalWidth === 0) markFailed(currentSrc);
     },
-    [srcKey],
+    [currentSrc, markFailed],
   );
 
   const dim = { width: size, height: size };
@@ -60,18 +95,28 @@ export function Avatar({
     className,
   );
 
-  if (src) {
+  if (current) {
+    const logo = current.kind === "domain";
     return (
       <img
+        // A fresh element per candidate: no stale `complete`/`naturalWidth`
+        // from the previous source when checkBroken runs.
+        key={current.src}
         ref={checkBroken}
-        src={src}
+        src={current.src}
         alt=""
         width={size}
         height={size}
         data-testid={testId ?? "avatar-image"}
-        className={cn(base, "bg-surface-subtle object-cover")}
-        style={dim}
-        onError={() => setFailedKey(srcKey)}
+        data-kind={current.kind}
+        className={cn(
+          base,
+          logo
+            ? "border border-hairline bg-white object-contain"
+            : "bg-surface-subtle object-cover",
+        )}
+        style={logo ? { ...dim, padding: Math.max(1, Math.round(size * 0.12)) } : dim}
+        onError={() => markFailed(current.src)}
         referrerPolicy="no-referrer"
       />
     );

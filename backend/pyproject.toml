@@ -39,6 +39,9 @@ dependencies = [
     "defusedxml>=0.7.1",
     "webauthn>=2",
     "phonenumbers>=8.13",
+    # Customer avatars / company logos (tiqora.avatars.normalize): decode
+    # uploads, Gravatar and favicons (incl. ICO) and re-encode them as PNG.
+    "pillow>=11.0",
     # Sync drivers used by tiqora bootstrap (base-schema load) and tests.
     # Upper bound is load-bearing: PyMySQL >=1.2.1 turned
     # pymysql.converters.escape_dict/escape_bytes_prefixed into a "DO NOT

@@ -17,9 +17,10 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from sqlalchemy import bindparam, select, text
+from sqlalchemy import bindparam, delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.avatars.service import EMAIL, cache_key, email_key, forget_cached
 from tiqora.config import Settings
 from tiqora.db.legacy.article import (
     Article,
@@ -37,7 +38,7 @@ from tiqora.db.legacy.customer import (
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
 from tiqora.db.legacy.ticket import Ticket, TicketHistory, TicketState, TicketStateType
 from tiqora.db.legacy.user import GroupCustomerUser
-from tiqora.db.tiqora.models import TiqoraGdprBackup, TiqoraGdprJob
+from tiqora.db.tiqora.models import TiqoraAvatar, TiqoraGdprBackup, TiqoraGdprJob
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.domain.settings_store import get_setting
 from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT, _emit_event
@@ -1132,7 +1133,9 @@ async def run_erasure(
         "customer_company_deleted": 0,
         "ticket_history": 0,
         "dynamic_field_value": 0,
+        "tiqora_avatar": 0,
     }
+    avatar_keys: list[str] = []
 
     async with session_factory() as session, session.begin():
         pii_cols = await resolve_customer_user_pii_columns(session)
@@ -1166,6 +1169,9 @@ async def run_erasure(
         by_id = {int(c.id): c for c in customers}
         ordered = [by_id[i] for i in customer_user_ids if i in by_id]
         logins = [c.login for c in ordered]
+        # Uploaded photos are keyed by the address hash — capture it before
+        # anonymize rewrites the address.
+        avatar_keys = sorted({email_key(c.email) for c in ordered if (c.email or "").strip()})
         login_to_new: dict[str, str] = {}
         company_to_new: dict[str, str] = {}
 
@@ -1892,6 +1898,39 @@ async def run_erasure(
                     )
                     counts["customer_company_deleted"] += 1
 
+        # ---- uploaded customer photos (both modes: a photo is PII either way) ----
+        if avatar_keys and await _table_exists(session, "tiqora_avatar"):
+            avatar_table = TiqoraAvatar.__table__
+            avatar_rows = (
+                (
+                    await session.execute(
+                        select(avatar_table).where(
+                            avatar_table.c.kind == EMAIL,
+                            avatar_table.c.subject_key.in_(avatar_keys),
+                        )
+                    )
+                )
+                .mappings()
+                .all()
+            )
+            for avatar_row in avatar_rows:
+                full_avatar = dict(avatar_row)
+                await _add_backup(
+                    session,
+                    job_id=job_id,
+                    table_name="tiqora_avatar",
+                    row_pk={"id": full_avatar["id"]},
+                    original_row=full_avatar,
+                    created=now,
+                )
+            if avatar_rows:
+                await session.execute(
+                    delete(TiqoraAvatar).where(
+                        TiqoraAvatar.id.in_([int(r["id"]) for r in avatar_rows])
+                    )
+                )
+            counts["tiqora_avatar"] = len(avatar_rows)
+
         # ---- hard-delete master rows (delete mode) ----
         if mode == "delete":
             for old_login in logins:
@@ -1932,6 +1971,10 @@ async def run_erasure(
             if mode == "anonymize"
             else logins
         )
+
+    # Cached Gravatar pictures of the erased addresses (best-effort, no Redis
+    # in the transaction above).
+    await forget_cached(settings.redis_url, [cache_key(EMAIL, key) for key in avatar_keys])
 
     # Audit outside the big txn (record_audit commits itself).
     async with session_factory() as session:
@@ -2071,6 +2114,7 @@ async def rollback_job(
                     "customer_preferences",
                     "customer_user_customer",
                     "group_customer_user",
+                    "tiqora_avatar",
                 ):
                     await _insert_row(session, table, {**pk, **original})
                 else:

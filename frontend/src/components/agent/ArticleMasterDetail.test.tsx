@@ -351,15 +351,15 @@ describe("ArticleMasterDetail view switching (split vs. conversation)", () => {
     expect(screen.getByTestId("conversation-bubble-11")).toHaveAttribute("data-side", "right");
   });
 
-  it("resolves a Gravatar avatar for a bubble sender with a real from_address", async () => {
+  it("resolves a proxied avatar for a bubble sender with a real from_address", async () => {
     wrap(<ArticleMasterDetail ticketId={8} />);
     await screen.findByTestId("article-conversation");
     const bubble = screen.getByTestId("conversation-bubble-10");
     // "wa-customer@example.com" (CHAT_ARTICLES id 10) — Avatar prefers
-    // Gravatar(email) over the initials fallback once an email is passed.
+    // the proxied picture (by e-mail hash) over the initials once an email is passed.
     expect(within(bubble).getByTestId("avatar-image")).toHaveAttribute(
       "src",
-      expect.stringMatching(/^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{32}\?/),
+      expect.stringMatching(/^\/api\/v1\/avatars\/email\/[0-9a-f]{64}$/),
     );
   });
 
@@ -370,11 +370,11 @@ describe("ArticleMasterDetail view switching (split vs. conversation)", () => {
     const row = await screen.findByTestId("article-list-item-20");
     expect(row).toHaveTextContent("> Danke & Gruße, das Team");
     expect(row).not.toHaveTextContent("&gt;");
-    // Same fixture doubles as the split-view Avatar/Gravatar regression case
+    // Same fixture doubles as the split-view Avatar regression case
     // ("Jane Doe <jane.doe@example.com>" → a resolvable email).
     expect(within(row).getByTestId("avatar-image")).toHaveAttribute(
       "src",
-      expect.stringMatching(/^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{32}\?/),
+      expect.stringMatching(/^\/api\/v1\/avatars\/email\/[0-9a-f]{64}$/),
     );
   });
 

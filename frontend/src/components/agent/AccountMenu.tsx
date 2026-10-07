@@ -9,6 +9,7 @@ import {
   ChevronDownIcon,
   ClockIcon,
   GlobeIcon,
+  ImageIcon,
   LogOutIcon,
   MonitorIcon,
   MoonIcon,
@@ -17,7 +18,8 @@ import {
   SunIcon,
 } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { userEmailForAvatar } from "@/lib/gravatar";
+import { userEmailForAvatar } from "@/lib/avatar";
+import { setShowAvatars, useShowAvatars } from "@/lib/showAvatars";
 import { getLocale, localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
 import { useTimeZoneSetting } from "./useTimeZoneSetting";
 
@@ -91,6 +93,7 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
   const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const showAvatars = useShowAvatars();
 
   const currentLang = resolveLocaleCode(i18n.language);
   const languageItems = localePickerItems();
@@ -131,6 +134,7 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
           <Avatar
             avatarUrl={avatarUrl}
             email={email}
+            domainFallback={false}
             initials={initials}
             size={24}
             testId="account-menu-avatar"
@@ -242,6 +246,17 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
         onSelect={() => setTheme("system")}
       >
         {t("account.themeSystem")}
+      </MenuItem>
+
+      <MenuLabel>{t("account.display")}</MenuLabel>
+      <MenuItem
+        icon={<ImageIcon />}
+        keepOpen
+        selected={showAvatars}
+        testId="account-menu-show-avatars"
+        onSelect={() => setShowAvatars(!showAvatars)}
+      >
+        {t("account.showAvatars")}
       </MenuItem>
 
       <MenuSeparator />

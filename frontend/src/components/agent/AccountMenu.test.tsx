@@ -180,13 +180,13 @@ describe("AccountMenu", () => {
     expect(logout).toHaveBeenCalledOnce();
   });
 
-  it("renders an avatar for the signed-in user (Gravatar when email is set)", () => {
+  it("renders an avatar for the signed-in user (avatar proxy when email is set)", () => {
     open();
     const img = screen.getByTestId("account-menu-avatar");
     expect(img.tagName).toBe("IMG");
     expect(img).toHaveAttribute(
       "src",
-      expect.stringMatching(/^https:\/\/www\.gravatar\.com\/avatar\/[0-9a-f]{32}\?/),
+      expect.stringMatching(/^\/api\/v1\/avatars\/email\/[0-9a-f]{64}$/),
     );
   });
 });

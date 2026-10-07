@@ -49,6 +49,9 @@ vi.mock("@/components/customers/CustomerEditDrawer", () => ({
     <div data-testid="stub-drawer">{JSON.stringify(s)}</div>
   ),
 }));
+vi.mock("@/components/customers/VcardImport", () => ({
+  VcardImportDialog: ({ file }: { file: File }) => <div data-testid="stub-import">{file.name}</div>,
+}));
 vi.mock("@/components/customers/CustomerCallStrip", () => ({
   CustomerCallStrip: () => null,
 }));
@@ -242,6 +245,50 @@ describe("CustomerDirectoryPage", () => {
     expect(listCustomerDirectory).not.toHaveBeenCalled();
     fireEvent.click(row);
     expect(lastSearch()).toMatchObject({ tab: "companies", company: "NW" });
+  });
+
+  it("shows a company's website logo when the hit carries a URL", async () => {
+    searchCompanies.mockResolvedValue([
+      { customer_id: "NW", name: "Northwind", url: "https://www.northwind.example" },
+      { customer_id: "XX", name: "Ohne Web" },
+    ]);
+    state.search = { tab: "companies", q: "n" };
+    renderPage();
+    expect(await screen.findByTestId("company-row-logo-NW")).toHaveAttribute(
+      "src",
+      "/api/v1/avatars/domain/northwind.example",
+    );
+    expect(screen.queryByTestId("company-row-logo-XX")).not.toBeInTheDocument();
+  });
+
+  it("offers the vCard import only to agents who may edit", async () => {
+    renderPage();
+    await screen.findByTestId("customer-recent-hanna");
+    expect(screen.queryByTestId("customer-import")).not.toBeInTheDocument();
+    // Without the grant a dropped file is left alone.
+    fireEvent.drop(screen.getByTestId("customer-directory-page"), {
+      dataTransfer: { types: ["Files"], files: [new File([""], "a.vcf")] },
+    });
+    expect(screen.queryByTestId("stub-import")).not.toBeInTheDocument();
+  });
+
+  it("opens the import dialog for a dropped .vcf and refuses other files", async () => {
+    state.canEdit = true;
+    renderPage();
+    await screen.findByTestId("customer-recent-hanna");
+    expect(screen.getByTestId("customer-import")).toBeInTheDocument();
+    const page = screen.getByTestId("customer-directory-page");
+
+    fireEvent.drop(page, {
+      dataTransfer: { types: ["Files"], files: [new File([""], "bild.png", { type: "image/png" })] },
+    });
+    expect(screen.getByTestId("customer-import-rejected")).toBeInTheDocument();
+
+    fireEvent.drop(page, {
+      dataTransfer: { types: ["Files"], files: [new File(["BEGIN:VCARD"], "Kontakte.vcf")] },
+    });
+    expect(screen.getByTestId("stub-import")).toHaveTextContent("Kontakte.vcf");
+    expect(screen.queryByTestId("customer-import-rejected")).not.toBeInTheDocument();
   });
 
   it("lists the companies of the agent's own customers without a term", async () => {

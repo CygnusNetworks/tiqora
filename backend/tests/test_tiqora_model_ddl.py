@@ -36,3 +36,14 @@ def test_auth_config_user_id_does_not_generate_ids() -> None:
     table = TiqoraUserAuthConfig.__table__
     assert "AUTO_INCREMENT" not in _column_ddl(table, "user_id", mysql.dialect())
     assert "SERIAL" not in _column_ddl(table, "user_id", postgresql.dialect())
+
+
+def test_avatar_data_fits_more_than_64_kib_on_mariadb() -> None:
+    """``tiqora_avatar.data`` holds 256 px PNGs that can exceed plain
+    ``BLOB``'s 64 KiB — MariaDB needs ``MEDIUMBLOB`` (same as migration
+    ``20261007_0060``); PostgreSQL's ``BYTEA`` has no such limit."""
+    from tiqora.db.tiqora.models import TiqoraAvatar
+
+    table = TiqoraAvatar.__table__
+    assert "MEDIUMBLOB" in _column_ddl(table, "data", mysql.dialect())
+    assert "BYTEA" in _column_ddl(table, "data", postgresql.dialect())

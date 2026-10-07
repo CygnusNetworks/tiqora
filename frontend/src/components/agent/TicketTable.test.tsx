@@ -11,6 +11,8 @@ import {
 } from "@tanstack/react-router";
 import i18n from "@/i18n";
 import type { TicketListItem } from "@/lib/api";
+import { sha256 } from "@/lib/sha256";
+import { setShowAvatars } from "@/lib/showAvatars";
 import { TicketTable } from "./TicketTable";
 
 function makeItem(overrides: Partial<TicketListItem> = {}): TicketListItem {
@@ -209,6 +211,44 @@ describe("TicketTable customer cell", () => {
     ]);
     expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("10042");
     expect(screen.getByTestId("ticket-customer-email-11")).toHaveTextContent("bob@example.com");
+  });
+
+  it("shows the customer's avatar before the name, without a domain logo", async () => {
+    await renderTable([
+      makeItem({ customer_id: "10042", customer_user_id: "bob", customer_email: "bob@example.com" }),
+    ]);
+    const avatar = screen.getByTestId("ticket-customer-avatar-11");
+    expect(avatar).toHaveAttribute("src", `/api/v1/avatars/email/${sha256("bob@example.com")}`);
+    fireEvent.error(avatar);
+    // Straight to initials: lists skip the company-logo stage.
+    expect(screen.getByTestId("ticket-customer-avatar-11").tagName).toBe("SPAN");
+    expect(screen.getByTestId("ticket-customer-avatar-11")).toHaveTextContent("B");
+  });
+
+  it("takes the avatar address from the first sender when no customer e-mail is known", async () => {
+    await renderTable([
+      makeItem({
+        customer_user_id: undefined,
+        customer_id: undefined,
+        first_from: '"Alice Example" <alice@example.com>',
+      }),
+    ]);
+    expect(screen.getByTestId("ticket-customer-avatar-11")).toHaveAttribute(
+      "src",
+      `/api/v1/avatars/email/${sha256("alice@example.com")}`,
+    );
+  });
+
+  it("hides the avatar when the agent turned avatars off", async () => {
+    setShowAvatars(false);
+    try {
+      await renderTable([makeItem({ customer_user_id: "bob", customer_email: "bob@example.com" })]);
+      expect(screen.getByTestId("ticket-customer-cell-11")).toHaveTextContent("bob");
+      expect(screen.queryByTestId("ticket-customer-avatar-11")).toBeNull();
+      expect(document.querySelector('img[src^="/api/v1/avatars/"]')).toBeNull();
+    } finally {
+      setShowAvatars(true);
+    }
   });
 
   it("does not duplicate the customer number as an e-mail line when no e-mail is known", async () => {

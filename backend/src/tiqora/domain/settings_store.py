@@ -159,6 +159,12 @@ KEY_TELEGRAM_UPDATE_OFFSET = "channel.telegram.update_offset"
 # completion and is not touched by this key.
 KEY_AI_LLM_MAX_COMPLETION_TOKENS = "ai.llm.max_completion_tokens"
 
+# Customer avatars (tiqora.avatars.service): fetch people's pictures from
+# Gravatar and company logos from the company website. Default ON; uploaded
+# pictures are served either way.
+KEY_AVATARS_GRAVATAR_ENABLED = "avatars.gravatar.enabled"
+KEY_AVATARS_FAVICON_ENABLED = "avatars.favicon.enabled"
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)

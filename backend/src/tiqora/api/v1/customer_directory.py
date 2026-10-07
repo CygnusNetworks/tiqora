@@ -70,6 +70,9 @@ class CustomerDirectoryEntry(BaseModel):
 class CustomerDirectoryCompany(BaseModel):
     customer_id: str
     name: str
+    #: Company website (``customer_company.url``) — the frontend derives the
+    #: logo domain from it.
+    url: str | None = None
 
 
 def _filtered(search: str | None, customer_id: str | None, valid: ValidFilter) -> Select[Any]:
@@ -95,16 +98,23 @@ def _filtered(search: str | None, customer_id: str | None, valid: ValidFilter) -
     return stmt
 
 
-async def _company_names(session: AsyncSession, customer_ids: Iterable[str]) -> dict[str, str]:
+async def _companies(
+    session: AsyncSession, customer_ids: Iterable[str]
+) -> dict[str, tuple[str, str | None]]:
+    """``customer_id`` → (name, website url) of the given companies."""
     ids = sorted({cid for cid in customer_ids if cid})
     if not ids:
         return {}
     rows = await session.execute(
-        select(CustomerCompany.customer_id, CustomerCompany.name).where(
+        select(CustomerCompany.customer_id, CustomerCompany.name, CustomerCompany.url).where(
             CustomerCompany.customer_id.in_(ids)
         )
     )
-    return {cid: name for cid, name in rows.all()}
+    return {cid: (name, url) for cid, name, url in rows.all()}
+
+
+async def _company_names(session: AsyncSession, customer_ids: Iterable[str]) -> dict[str, str]:
+    return {cid: name for cid, (name, _url) in (await _companies(session, customer_ids)).items()}
 
 
 _ORDER = (CustomerUser.last_name, CustomerUser.first_name, CustomerUser.login)
@@ -144,7 +154,7 @@ async def search_companies(
 ) -> list[CustomerDirectoryCompany]:
     """Valid companies for the directory's company filter."""
     _ = user
-    stmt = select(CustomerCompany.customer_id, CustomerCompany.name).where(
+    stmt = select(CustomerCompany.customer_id, CustomerCompany.name, CustomerCompany.url).where(
         CustomerCompany.valid_id == 1
     )
     if search and (term := search.strip().lower()):
@@ -156,7 +166,10 @@ async def search_companies(
             )
         )
     rows = await session.execute(stmt.order_by(CustomerCompany.name).limit(limit))
-    return [CustomerDirectoryCompany(customer_id=cid, name=name) for cid, name in rows.all()]
+    return [
+        CustomerDirectoryCompany(customer_id=cid, name=name, url=url)
+        for cid, name, url in rows.all()
+    ]
 
 
 class CustomerDirectoryExportRequest(BaseModel):
@@ -178,6 +191,8 @@ class CustomerShortlistEntry(BaseModel):
     email: str
     customer_id: str
     company_name: str | None = None
+    #: Company website (``customer_company.url``), for the company logo.
+    company_url: str | None = None
     first_name: str
     last_name: str
     phone: str | None
@@ -195,6 +210,8 @@ class CustomerFavoriteEntry(BaseModel):
     email: str
     customer_id: str
     company_name: str | None = None
+    #: Website of the customer's company (logo in the companies rail).
+    company_url: str | None = None
     first_name: str
     last_name: str
     phone: str | None
@@ -232,13 +249,14 @@ async def _favorites(session: AsyncSession, user_id: int) -> list[CustomerFavori
             )
         ).scalars()
     )
-    names = await _company_names(session, (cu.customer_id for cu in customers))
+    companies = await _companies(session, (cu.customer_id for cu in customers))
     return [
         CustomerFavoriteEntry(
             login=cu.login,
             email=cu.email,
             customer_id=cu.customer_id,
-            company_name=names.get(cu.customer_id),
+            company_name=companies.get(cu.customer_id, (None, None))[0],
+            company_url=companies.get(cu.customer_id, (None, None))[1],
             first_name=cu.first_name,
             last_name=cu.last_name,
             phone=cu.phone,
@@ -306,7 +324,7 @@ async def customer_shortlist(
             await session.execute(select(CustomerUser).where(CustomerUser.login.in_(list(stats))))
         ).scalars()
     }
-    names = await _company_names(session, (cu.customer_id for cu in customers.values()))
+    companies = await _companies(session, (cu.customer_id for cu in customers.values()))
 
     def entries(rows: Iterable[Any]) -> list[CustomerShortlistEntry]:
         out = []
@@ -315,12 +333,14 @@ async def customer_shortlist(
             if cu is None:
                 continue
             at, count = stats[row[0]]
+            company_name, company_url = companies.get(cu.customer_id, (None, None))
             out.append(
                 CustomerShortlistEntry(
                     login=cu.login,
                     email=cu.email,
                     customer_id=cu.customer_id,
-                    company_name=names.get(cu.customer_id),
+                    company_name=company_name,
+                    company_url=company_url,
                     first_name=cu.first_name,
                     last_name=cu.last_name,
                     phone=cu.phone,

@@ -24,6 +24,9 @@ export const handlers = [
   http.post("*/api/v1/ai/refine", async ({ request }) =>
     HttpResponse.json(demoRefine((await request.json()) as Parameters<typeof demoRefine>[0])),
   ),
+  // No pictures in the demo: the avatar proxy "has nothing", so every
+  // avatar shows its initials (the catch-all's JSON would be a broken image).
+  http.get("*/api/v1/avatars/*", () => new HttpResponse(null, { status: 404 })),
   http.all("*/api/*", ({ request }) => {
     const url = new URL(request.url);
     if (url.pathname.endsWith("/events/stream")) {

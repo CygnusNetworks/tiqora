@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
@@ -13,12 +13,22 @@ import { CustomerPanel } from "@/components/customers/CustomerPanel";
 import { customerName, initialsOf } from "@/components/customers/customerFormat";
 import { useCustomerShortlist } from "@/components/customers/favorites";
 import { VCARD_EXPORT_MAX } from "@/components/customers/vcardExport";
+import { DropOverlay } from "@/components/customers/AvatarEditor";
+import { VcardImportDialog } from "@/components/customers/VcardImport";
 import { Avatar } from "@/components/ui/Avatar";
 import { Spinner } from "@/components/ui/Spinner";
-import { BuildingIcon, DownloadIcon, PlusIcon, SearchIcon } from "@/components/ui/icons";
+import {
+  BuildingIcon,
+  DownloadIcon,
+  PlusIcon,
+  SearchIcon,
+  UploadIcon,
+} from "@/components/ui/icons";
 import { api, type CustomerFavoriteEntry, type CustomerShortlistEntry } from "@/lib/api";
+import { domainFromUrl } from "@/lib/avatar";
 import { cn } from "@/lib/cn";
 import { displayTimeZone } from "@/lib/timeZone";
+import { isVcardFile, useFileDrop } from "@/lib/useFileDrop";
 
 const PAGE_SIZE = 30;
 
@@ -79,6 +89,19 @@ export function CustomerDirectoryPage() {
   const debouncedQuery = useDebounced(query.trim(), 250);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [drawer, setDrawer] = useState<CustomerDrawerState | null>(null);
+  // A .vcf (Apple Contacts drag, or picked) under review in the import dialog.
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importRejected, setImportRejected] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const drop = useFileDrop({
+    accept: isVcardFile,
+    onFiles: ([file]) => {
+      setImportRejected(false);
+      setImportFile(file);
+    },
+    onReject: () => setImportRejected(true),
+    disabled: !canEdit,
+  });
 
   const setSearch = (patch: Partial<CustomerDirectorySearch>, replace = false) =>
     void navigate({
@@ -116,11 +139,13 @@ export function CustomerDirectoryPage() {
   const frequent = useMemo(() => shortlistQ.data?.frequent ?? [], [shortlistQ.data]);
   // Companies of the agent's own customers, for the companies tab without a term.
   const ownCompanies = useMemo(() => {
-    const seen = new Map<string, string>();
+    const seen = new Map<string, { name: string; url: string | null }>();
     for (const e of [...favorites, ...recent, ...frequent]) {
-      if (e.company_name && !seen.has(e.customer_id)) seen.set(e.customer_id, e.company_name);
+      if (e.company_name && !seen.has(e.customer_id)) {
+        seen.set(e.customer_id, { name: e.company_name, url: e.company_url ?? null });
+      }
     }
-    return Array.from(seen, ([customer_id, name]) => ({ customer_id, name }));
+    return Array.from(seen, ([customer_id, co]) => ({ customer_id, ...co }));
   }, [favorites, recent, frequent]);
 
   if (!allowed) {
@@ -155,7 +180,12 @@ export function CustomerDirectoryPage() {
   };
 
   return (
-    <div className="flex min-h-full flex-col" data-testid="customer-directory-page">
+    <div
+      className="relative flex min-h-full flex-col"
+      data-testid="customer-directory-page"
+      {...drop.dropProps}
+    >
+      <DropOverlay active={drop.active}>{t("vcard.dropHere")}</DropOverlay>
       <CustomerCallStrip onShowCustomer={selectPerson} />
       <div className="flex flex-1 flex-wrap">
         <aside
@@ -284,6 +314,7 @@ export function CustomerDirectoryPage() {
                   <CompanyRow
                     key={co.customer_id}
                     name={co.name}
+                    url={companyUrl(co)}
                     customerId={co.customer_id}
                     selected={search.company === co.customer_id}
                     onSelect={() => selectCompany(co.customer_id)}
@@ -310,6 +341,40 @@ export function CustomerDirectoryPage() {
                 <PlusIcon className="text-[14px]" />
                 {t("customerWorkbench.newCustomer")}
               </button>
+            )}
+            {canEdit && (
+              <>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".vcf,text/vcard,text/x-vcard"
+                  className="hidden"
+                  data-testid="customer-import-file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) {
+                      setImportRejected(false);
+                      setImportFile(file);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => importInputRef.current?.click()}
+                  title={t("vcard.importHint")}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-hairline bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-surface-subtle"
+                  data-testid="customer-import"
+                >
+                  <UploadIcon className="text-[14px]" />
+                  {t("vcard.import")}
+                </button>
+                {importRejected && (
+                  <p className="px-1 text-xs text-danger" role="alert" data-testid="customer-import-rejected">
+                    {t("vcard.wrongFile")}
+                  </p>
+                )}
+              </>
             )}
             <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted">
               <label className="inline-flex items-center gap-1.5">
@@ -360,6 +425,16 @@ export function CustomerDirectoryPage() {
           )}
         </section>
       </div>
+
+      {/* Hidden while the create form for one of its cards is open; it comes
+          back afterwards (re-matched, so a just-created customer shows up). */}
+      {importFile && !drawer && (
+        <VcardImportDialog
+          file={importFile}
+          onClose={() => setImportFile(null)}
+          onCreate={(prefill) => setDrawer({ mode: "create", prefill })}
+        />
+      )}
 
       {drawer && (
         <CustomerEditDrawer
@@ -529,17 +604,26 @@ function PersonRow({
   );
 }
 
+/** Website of a company search hit — only when the API sends one (the
+ * shortlist-derived rows have none). */
+function companyUrl(co: object): string | null {
+  return "url" in co && typeof co.url === "string" ? co.url : null;
+}
+
 function CompanyRow({
   name,
+  url,
   customerId,
   selected,
   onSelect,
 }: {
   name: string;
+  url?: string | null;
   customerId: string;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const domain = domainFromUrl(url);
   return (
     <button
       type="button"
@@ -548,9 +632,18 @@ function CompanyRow({
       className={rowClass(selected)}
       data-testid={`company-row-${customerId}`}
     >
-      <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md border border-hairline bg-surface-subtle text-muted">
-        <BuildingIcon className="text-[15px]" />
-      </span>
+      {domain ? (
+        <Avatar
+          domain={domain}
+          initials={initialsOf(name)}
+          size={30}
+          testId={`company-row-logo-${customerId}`}
+        />
+      ) : (
+        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md border border-hairline bg-surface-subtle text-muted">
+          <BuildingIcon className="text-[15px]" />
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium text-ink">{name}</span>
         <span className="block truncate font-mono text-[11px] text-muted">{customerId}</span>
