@@ -23,6 +23,8 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from tiqora.domain.timezones import format_in_zone
+
 _REPLY_PREFIX_RE = re.compile(r"^\s*(re|aw|antw|fwd|wg)\s*:\s*", re.IGNORECASE)
 
 
@@ -124,16 +126,18 @@ def quote_plaintext_body(
     *,
     from_address: str | None,
     sent_at: datetime | None,
+    time_zone: str = "UTC",
 ) -> str:
     """Attribution line + ``> ``-prefixed quoted body (plaintext only).
 
     Mirrors Znuny's ``On <date>, <from> wrote:`` attribution followed by the
     quoted text, each line prefixed with ``> ``. HTML bodies must be
     converted to plaintext by the caller before quoting (Tiqora does not
-    quote HTML directly).
+    quote HTML directly). *sent_at* is a DB datetime (naive = UTC); the date
+    is written in *time_zone* (the replying agent's) with its abbreviation.
     """
     who = from_address or "unknown sender"
-    when = sent_at.strftime("%Y-%m-%d %H:%M") if sent_at else "an earlier date"
+    when = format_in_zone(sent_at, time_zone, "%Y-%m-%d %H:%M %Z") if sent_at else "an earlier date"
     attribution = f"On {when}, {who} wrote:"
     lines = (body or "").splitlines() or [""]
     quoted = "\n".join(f"> {line}" if line else ">" for line in lines)

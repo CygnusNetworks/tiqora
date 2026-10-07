@@ -78,6 +78,7 @@ from tiqora.domain.schemas import (
     TicketPermissions,
 )
 from tiqora.domain.subject_hook import load_subject_config
+from tiqora.domain.timezones import resolve_user_time_zone
 from tiqora.permissions.engine import PERMISSION_KEYS, PermissionEngine
 from tiqora.storage.backend import AttachmentContent, AttachmentMeta, DbMimeStorage
 
@@ -1845,6 +1846,8 @@ class TicketService:
     async def list_history(
         self, user_id: int, ticket_id: int, *, order: str = "desc"
     ) -> list[HistoryEntry]:
+        from tiqora.znuny.sysconfig import SysConfig
+
         await self._assert_ticket_ro(user_id, ticket_id)
         types = {
             r.id: r.name for r in (await self._session.execute(select(TicketHistoryType))).scalars()
@@ -1854,6 +1857,7 @@ class TicketService:
         logins: dict[int, str] = {
             r.id: r.login for r in (await self._session.execute(select(Users))).scalars()
         }
+        zone = await resolve_user_time_zone(self._session, SysConfig(self._session), user_id)
         order_col = TicketHistory.id.asc() if order.lower() == "asc" else TicketHistory.id.desc()
         rows = (
             (
@@ -1884,6 +1888,7 @@ class TicketService:
                     history_type=types.get(h.history_type_id),
                     name=h.name,
                     resolve_user=_resolve,
+                    time_zone=zone,
                 ),
                 history_type_id=h.history_type_id,
                 history_type=types.get(h.history_type_id),
@@ -2013,7 +2018,14 @@ class TicketService:
                 "application/xhtml+xml",
             }
             plain = html_to_plaintext(raw_body) if is_html else raw_body
-            quoted = quote_plaintext_body(plain, from_address=from_addr, sent_at=art.create_time)
+            # The quote header names a wall-clock time: write it in the replying
+            # agent's zone, not the UTC the DB holds.
+            quoted = quote_plaintext_body(
+                plain,
+                from_address=from_addr,
+                sent_at=art.create_time,
+                time_zone=await resolve_user_time_zone(self._session, sysconfig, user_id),
+            )
             # Empty answer area above the quote (two newlines), then the quote.
             body = f"\n\n{quoted}\n"
 

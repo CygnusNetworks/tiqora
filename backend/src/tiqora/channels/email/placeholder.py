@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import html
 import re
+import zoneinfo
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 import structlog
@@ -23,6 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.domain.settings_store import get_setting_bool
+from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -107,13 +109,18 @@ class PlaceholderContext:
     queue_name: str = ""
     customer_subject: str = ""
     customer_email_lines: list[str] = field(default_factory=list)
+    # Zone the map values were rendered in (and OTRS_EMAIL_DATE uses): whoever
+    # the text is written for. Datetimes are stringified at load time, so a
+    # context is only valid for the zone it was loaded with.
+    time_zone: str = "UTC"
 
 
-def _as_str(value: Any) -> str:
+def _as_str(value: Any, zone: str = "UTC") -> str:
     if value is None:
         return ""
     if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d %H:%M:%S")
+        # DB datetimes are UTC; templates show Znuny's format in the reader's zone.
+        return format_in_zone(value, zone, "%Y-%m-%d %H:%M:%S")
     if isinstance(value, bytes | bytearray | memoryview):
         try:
             return bytes(value).decode("utf-8", errors="replace")
@@ -139,12 +146,13 @@ def _lookup(data: dict[str, str], field: str) -> str | None:
 def _row_to_maps(
     row: dict[str, Any],
     col_to_tag: dict[str, str],
+    zone: str = "UTC",
 ) -> dict[str, str]:
     """Build a lowercased tag map from a DB row: mapped Znuny names + raw columns."""
     out: dict[str, str] = {}
     for col, value in row.items():
         col_s = str(col)
-        sval = _as_str(value)
+        sval = _as_str(value, zone)
         out[col_s.lower()] = sval
         mapped = col_to_tag.get(col_s) or col_to_tag.get(col_s.lower())
         if mapped:
@@ -185,6 +193,7 @@ async def _fetch_customer_maps(
     *,
     customer_user_id: str | None,
     customer_id: str | None,
+    time_zone: str = "UTC",
 ) -> dict[str, str]:
     """Merge customer_company then customer_user (Znuny order: company under user).
 
@@ -204,7 +213,7 @@ async def _fetch_customer_maps(
         )
         mapping = result.mappings().first()
         if mapping is not None:
-            user = _row_to_maps(dict(mapping), _CUSTOMER_USER_COL_TO_TAG)
+            user = _row_to_maps(dict(mapping), _CUSTOMER_USER_COL_TO_TAG, time_zone)
             if not cid:
                 cid = (user.get("usercustomerid") or user.get("customer_id") or "").strip() or None
             first = user.get("userfirstname") or user.get("first_name") or ""
@@ -223,7 +232,7 @@ async def _fetch_customer_maps(
         )
         mapping = result.mappings().first()
         if mapping is not None:
-            company = _row_to_maps(dict(mapping), _CUSTOMER_COMPANY_COL_TO_TAG)
+            company = _row_to_maps(dict(mapping), _CUSTOMER_COMPANY_COL_TO_TAG, time_zone)
             if "validid" in company:
                 company["customercompanyvalidid"] = company["validid"]
 
@@ -232,7 +241,9 @@ async def _fetch_customer_maps(
     return merged
 
 
-async def _fetch_queue_maps(session: AsyncSession, queue_id: int | None) -> dict[str, str]:
+async def _fetch_queue_maps(
+    session: AsyncSession, queue_id: int | None, time_zone: str = "UTC"
+) -> dict[str, str]:
     if not queue_id:
         return {}
     # SELECT q.* so site-specific queue columns (e.g. domain, phonenumber from a
@@ -279,7 +290,7 @@ async def _fetch_queue_maps(session: AsyncSession, queue_id: int | None) -> dict
     }
     for col, value in row.items():
         col_s = str(col)
-        sval = _as_str(value)
+        sval = _as_str(value, time_zone)
         data[col_s.lower()] = sval
         # Match aliases case-insensitively (drivers may return mixed case).
         for alias in aliases.get(col_s, ()) or aliases.get(col_s.lower(), ()):
@@ -364,16 +375,21 @@ async def load_placeholder_context(
     queue_name: str = "",
     customer_subject: str = "",
     customer_email_lines: list[str] | None = None,
+    time_zone: str = "UTC",
 ) -> PlaceholderContext:
-    """Load replacement maps for a ticket (and optional acting agent)."""
+    """Load replacement maps for a ticket (and optional acting agent).
+
+    Datetime values are rendered in *time_zone* -- the reader's display zone.
+    """
     ctx = PlaceholderContext(
         queue_name=queue_name or "",
         customer_subject=customer_subject or "",
         customer_email_lines=list(customer_email_lines or []),
+        time_zone=time_zone,
     )
     # Seed with any caller-provided ticket vars (autoresponse / notifications).
     if ticket:
-        ctx.ticket = _lower_map({k: _as_str(v) for k, v in ticket.items()})
+        ctx.ticket = _lower_map({k: _as_str(v, time_zone) for k, v in ticket.items()})
 
     if ticket_id is None or session is None:
         if queue_name and "queue" not in ctx.ticket:
@@ -423,12 +439,13 @@ async def load_placeholder_context(
     ctx.owner = _agent_maps_from_row(owner_row)
     ctx.responsible = _agent_maps_from_row(resp_row)
     ctx.current_user = _agent_maps_from_row(current_row)
-    ctx.queue = await _fetch_queue_maps(session, int(queue_id) if queue_id else None)
+    ctx.queue = await _fetch_queue_maps(session, int(queue_id) if queue_id else None, time_zone)
     ctx.queue_vars = await _fetch_queue_variables(session, int(queue_id) if queue_id else None)
     ctx.customer = await _fetch_customer_maps(
         session,
         customer_user_id=str(cuid) if cuid else None,
         customer_id=str(cid) if cid else None,
+        time_zone=time_zone,
     )
     ctx.customer_allowlist = await _fetch_customer_allowlist(session)
 
@@ -463,12 +480,12 @@ async def load_placeholder_context(
         "customerid": _as_str(row.get("customer_id")),
         "customeruserid": _as_str(row.get("customer_user_id")),
         "archiveflag": _as_str(row.get("archive_flag")),
-        "created": _as_str(row.get("create_time")),
-        "changed": _as_str(row.get("change_time")),
+        "created": _as_str(row.get("create_time"), time_zone),
+        "changed": _as_str(row.get("change_time"), time_zone),
         "createby": _as_str(row.get("create_by")),
         "changeby": _as_str(row.get("change_by")),
-        "createtime": _as_str(row.get("create_time")),
-        "changetime": _as_str(row.get("change_time")),
+        "createtime": _as_str(row.get("create_time"), time_zone),
+        "changetime": _as_str(row.get("change_time"), time_zone),
     }
     # Raw column names for OTRS_TICKET_tn / title etc.
     for col in (
@@ -486,7 +503,7 @@ async def load_placeholder_context(
 
     # Caller-supplied ticket vars win for explicit keys (autoresponse overrides).
     if ticket:
-        ticket_map.update(_lower_map({k: _as_str(v) for k, v in ticket.items()}))
+        ticket_map.update(_lower_map({k: _as_str(v, time_zone) for k, v in ticket.items()}))
     ctx.ticket = ticket_map
     return ctx
 
@@ -620,8 +637,9 @@ async def _resolve_tag(
         return "" if value is None else str(value)
 
     if tag_u in {"EMAIL_DATE", "EMAILDATE"}:
-        # Lightweight stand-in for OTRS_EMAIL_DATE (no timezone param support).
-        return datetime.now(UTC).strftime("%A, %B %d, %Y at %H:%M:%S (UTC)")
+        # Znuny's OTRS_EMAIL_DATE in the context zone (no [TimeZone] param support).
+        now = datetime.now(zoneinfo.ZoneInfo(ctx.time_zone))
+        return f"{now:%A, %B %d, %Y at %H:%M:%S} ({ctx.time_zone})"
 
     if tag_u == "FIRST_NAME":
         return ctx.current_user.get("userfirstname") or ""
@@ -697,27 +715,33 @@ async def _expand_placeholders_inner(
 ) -> str:
     if context is not None:
         ctx = context
-    elif session is not None and ticket_id is not None:
-        ctx = await load_placeholder_context(
-            session,
-            ticket_id=ticket_id,
-            user_id=user_id,
-            ticket=ticket,
-            queue_name=queue_name,
-            customer_subject=customer_subject,
-            customer_email_lines=customer_email_lines,
-        )
     else:
-        ctx = PlaceholderContext(
-            ticket=_lower_map({k: _as_str(v) for k, v in (ticket or {}).items()}),
-            queue_name=queue_name or "",
-            customer_subject=customer_subject or "",
-            customer_email_lines=list(customer_email_lines or []),
-        )
-        if queue_name and "queue" not in ctx.ticket:
-            ctx.ticket["queue"] = queue_name
-        if session is not None and user_id is not None:
-            ctx.current_user = _agent_maps_from_row(await _fetch_user_row(session, user_id))
+        # The acting agent reads (or sends) this text: their zone when known,
+        # else the system default (autoresponses have no agent).
+        zone = await resolve_user_time_zone(session, sysconfig, user_id)
+        if session is not None and ticket_id is not None:
+            ctx = await load_placeholder_context(
+                session,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                ticket=ticket,
+                queue_name=queue_name,
+                customer_subject=customer_subject,
+                customer_email_lines=customer_email_lines,
+                time_zone=zone,
+            )
+        else:
+            ctx = PlaceholderContext(
+                ticket=_lower_map({k: _as_str(v, zone) for k, v in (ticket or {}).items()}),
+                queue_name=queue_name or "",
+                customer_subject=customer_subject or "",
+                customer_email_lines=list(customer_email_lines or []),
+                time_zone=zone,
+            )
+            if queue_name and "queue" not in ctx.ticket:
+                ctx.ticket["queue"] = queue_name
+            if session is not None and user_id is not None:
+                ctx.current_user = _agent_maps_from_row(await _fetch_user_row(session, user_id))
 
     result = text
     offset = 0

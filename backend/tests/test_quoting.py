@@ -153,9 +153,27 @@ def test_quote_plaintext_body_attribution_and_prefix() -> None:
         sent_at=datetime(2026, 6, 26, 10, 5),
     )
     lines = out.splitlines()
-    assert lines[0] == "On 2026-06-26 10:05, cust@example.com wrote:"
+    assert lines[0] == "On 2026-06-26 10:05 UTC, cust@example.com wrote:"
     assert lines[1] == "> line one"
     assert lines[2] == "> line two"
+
+
+def test_quote_plaintext_body_header_in_the_agents_time_zone() -> None:
+    # DB times are naive UTC; the header shows the agent's wall-clock time.
+    summer = quote_plaintext_body(
+        "x",
+        from_address="c@example.com",
+        sent_at=datetime(2026, 10, 7, 8, 8),
+        time_zone="Europe/Berlin",
+    )
+    assert summer.splitlines()[0] == "On 2026-10-07 10:08 CEST, c@example.com wrote:"
+    winter = quote_plaintext_body(
+        "x",
+        from_address="c@example.com",
+        sent_at=datetime(2026, 1, 15, 8, 8),
+        time_zone="Europe/Berlin",
+    )
+    assert winter.splitlines()[0] == "On 2026-01-15 09:08 CET, c@example.com wrote:"
 
 
 def test_quote_plaintext_body_blank_lines_use_bare_marker() -> None:

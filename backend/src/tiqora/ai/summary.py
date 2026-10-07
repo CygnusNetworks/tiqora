@@ -359,7 +359,8 @@ def _render_articles(
             if mask:
                 attach_text = mask_attachment_block(pii, attach_text)
             body = f"{body}\n\n{attach_text}" if body else attach_text
-        when = f" {a.create_time:%Y-%m-%d %H:%M}" if with_time and a.create_time else ""
+        # DB time is UTC; say so, or the model reads it as local wall-clock time.
+        when = f" {a.create_time:%Y-%m-%d %H:%M} UTC" if with_time and a.create_time else ""
         lines.append(f"--- article {a.id} [{_label(a)}]{when} ---")
         if subject_line:
             lines.append(subject_line)

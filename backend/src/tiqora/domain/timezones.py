@@ -9,6 +9,7 @@ whoever it is written for, because the backend cannot know a browser's zone.
 
 from __future__ import annotations
 
+import functools
 import zoneinfo
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -26,12 +27,19 @@ if TYPE_CHECKING:
 USER_TIME_ZONE_KEY = "UserTimeZone"
 
 
+@functools.cache
+def _known_zones() -> frozenset[str]:
+    # ``available_timezones()`` scans the tz database on every call (~20 ms);
+    # notifications validate a zone per recipient.
+    return frozenset(zoneinfo.available_timezones() | {"UTC"})
+
+
 def valid_time_zone(name: object) -> str | None:
     """Return *name* if it is a usable IANA zone, else ``None``."""
     if not isinstance(name, str):
         return None
     candidate = name.strip()
-    if not candidate or candidate not in zoneinfo.available_timezones() | {"UTC"}:
+    if not candidate or candidate not in _known_zones():
         return None
     return candidate
 
@@ -74,3 +82,8 @@ def to_zone(value: datetime, zone: str) -> datetime:
     """Convert a DB datetime (naive = UTC) to wall-clock time in *zone*."""
     aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
     return aware.astimezone(zoneinfo.ZoneInfo(zone))
+
+
+def format_in_zone(value: datetime, zone: str, fmt: str) -> str:
+    """``strftime`` a DB datetime (naive = UTC) as wall-clock time in *zone*."""
+    return to_zone(value, zone).strftime(fmt)
