@@ -17,6 +17,11 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
 
   if (!isAuthenticated) {
+    // The router flips the location to /login before this guard unmounts. In
+    // that window we still render, and navigating again would stack a new
+    // `next=/login?next=…` on every pass — an endless redirect loop (endless
+    // spinner, memory growth) instead of the login form.
+    if (pathname === "/login" || pathname.startsWith("/login/")) return null;
     // Path + query (an /agent/dial link from a mail needs its ?number=&ticket=).
     // Not pre-encoded: the router encodes `search` itself, and a second
     // encoding made LoginPage see "%2Fagent..." and drop the target.
