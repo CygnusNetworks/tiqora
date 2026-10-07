@@ -273,3 +273,62 @@ async def test_escalation_update_time_from_customer_article(mariadb_znuny_url: s
             assert cols["update"] > 0
     finally:
         await engine.dispose()
+
+
+@pytest.mark.db
+async def test_calendar_zone_does_not_shift_utc_timestamps(mariadb_znuny_url: str) -> None:
+    """A Europe/Berlin calendar walks working hours in Berlin time, but the
+    ticket's create_time stays UTC (OTRSTimeZone). Reading it as Berlin time
+    moved every deadline by the UTC offset."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    berlin = {
+        **_SYSCONFIG_FIXTURE,
+        "TimeZone::Calendar9Name": yaml_encode_effective("Berlin"),
+        "TimeZone::Calendar9": yaml_encode_effective("Europe/Berlin"),
+        "TimeWorkingHours::Calendar9": _SYSCONFIG_FIXTURE["TimeWorkingHours"],
+        "TimeVacationDays::Calendar9": yaml_encode_effective({}),
+        "TimeVacationDaysOneTime::Calendar9": yaml_encode_effective({}),
+    }
+
+    async def fetch(name: str) -> Any | None:
+        return berlin.get(name)
+
+    sysconfig = SysConfig(fetch=fetch)
+    ticket_id = 0
+    try:
+        async with factory() as session:
+            await session.execute(
+                text(
+                    "UPDATE queue SET first_response_time = 60, solution_time = 0,"
+                    " update_time = 0, calendar_name = '9' WHERE id = 1"
+                )
+            )
+            ticket_id = await _insert_ticket(session, "ESC_TEST_CAL_TZ", state_id=1)
+            # Monday 2026-07-20 06:30 UTC = 08:30 CEST, inside working hours.
+            await session.execute(
+                text("UPDATE ticket SET create_time = '2026-07-20 06:30:00' WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+            await session.commit()
+
+            await escalation_index_build(session, ticket_id, 1, sysconfig)
+            await session.commit()
+
+            cols = await _escalation_columns(session, ticket_id)
+            # 60 working minutes later: 09:30 CEST = 07:30 UTC.
+            assert cols["response"] == _epoch("2026-07-20 07:30:00")
+    finally:
+        async with factory() as session:
+            await session.execute(
+                text(
+                    "UPDATE queue SET first_response_time = 0, update_time = 0,"
+                    " solution_time = 0, calendar_name = NULL WHERE id = 1"
+                )
+            )
+            if ticket_id:
+                await session.execute(
+                    text("DELETE FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+                )
+            await session.commit()
+        await engine.dispose()

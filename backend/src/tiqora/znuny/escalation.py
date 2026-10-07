@@ -390,7 +390,11 @@ async def escalation_index_build(
         session, sla_id, queue_id
     )
     working_hours, vacation_days, vacation_once, tz = await _calendar_config(sysconfig, calendar)
-    create_epoch = _to_epoch(create_time, tz)
+    # DB timestamps are OTRSTimeZone wall clock; only the working-hours walk
+    # runs in the calendar's zone. Mixing them shifts every deadline by the
+    # calendar's UTC offset.
+    storage_tz = await sysconfig.otrs_time_zone()
+    create_epoch = _to_epoch(create_time, storage_tz)
 
     escalation_time = 0
 
@@ -411,7 +415,7 @@ async def escalation_index_build(
         last_time = await _last_sender_time(session, ticket_id)
         if last_time is not None:
             dest = destination_time_epoch(
-                _to_epoch(last_time, tz),
+                _to_epoch(last_time, storage_tz),
                 update_min,
                 working_hours,
                 vacation_days,
