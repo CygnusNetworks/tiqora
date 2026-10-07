@@ -150,6 +150,19 @@ def parse_email(raw: bytes) -> ParsedEmail:
             if content_id:
                 content_id = content_id.strip("<>")
 
+            # A nameless inline text part is body text (MIME::Tools and many
+            # list servers label every alternative "inline"), as long as no
+            # earlier part of that type already claimed the body.
+            if (
+                disposition == "inline"
+                and not filename
+                and (
+                    (content_type == "text/plain" and plain_body is None)
+                    or (content_type == "text/html" and html_body is None)
+                )
+            ):
+                disposition = ""
+
             if disposition in ("attachment", "inline") or filename:
                 decoded = part.get_payload(decode=True)
                 payload = decoded if isinstance(decoded, bytes) else b""
