@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { Avatar } from "@/components/ui/Avatar";
-import { priorityColorVar, priorityIdFromName, priorityName } from "@/lib/priority";
+import { priorityColorVar, priorityIdFromName, priorityLabel } from "@/lib/priority";
 import { stateColorVar, stateLabel } from "@/lib/status";
 import { cn } from "@/lib/cn";
 
@@ -158,7 +158,7 @@ export function TicketPropsBar({
   const queueItems = queues.map((q) => ({ value: q.id, label: q.name }));
   const priorityItems = priorities.map((p) => ({
     value: p.id,
-    label: priorityName(p.name) ?? p.name,
+    label: priorityLabel(t, p.name, p.name),
   }));
   const stateItems = states.map((s) => ({ value: s.id, label: stateLabel(t, s.name) }));
   const agentItems = (owner?.agents ?? []).map((a) => ({
@@ -224,7 +224,7 @@ export function TicketPropsBar({
         items={priorityItems}
         value={priorityId}
         onSelect={onPriorityChange}
-        display={priority ? (priorityName(priority.name) ?? priority.name) : none}
+        display={priority ? priorityLabel(t, priority.name, priority.name) : none}
         lead={
           priority ? (
             <Dot color={priorityColorVar(priorityIdFromName(priority.name))} />

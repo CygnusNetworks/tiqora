@@ -1,5 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { priorityColorVar, priorityIdFromName, priorityName } from "./priority";
+import { priorityColorVar, priorityIdFromName, priorityLabel, priorityName } from "./priority";
+
+describe("priorityLabel", () => {
+  const t = (key: string, options?: { defaultValue?: string }) =>
+    key === "ticket.priorityName.veryHigh" ? "sehr hoch" : (options?.defaultValue ?? key);
+
+  it("translates stock Znuny priorities without their rank", () => {
+    expect(priorityLabel(t, "5 very high")).toBe("sehr hoch");
+  });
+
+  it("keeps custom priority names as they are, rank dropped", () => {
+    expect(priorityLabel(t, "4 dringend")).toBe("dringend");
+  });
+
+  it("falls back for an empty priority", () => {
+    expect(priorityLabel(t, null)).toBe("—");
+    expect(priorityLabel(t, "", "")).toBe("");
+  });
+});
 
 describe("priorityName", () => {
   it("strips the leading numeric rank", () => {

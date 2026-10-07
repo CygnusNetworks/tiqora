@@ -5,20 +5,41 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { api, type MutationRequest, type TicketListChannel, type TicketListItem } from "@/lib/api";
 import { flattenQueues } from "@/components/agent/QueueTree";
+import { BulkEditPanel } from "@/components/agent/BulkEditPanel";
+import {
+  clearDraftField,
+  draftReady,
+  draftToMutation,
+  isClosedStateId,
+  isPendingStateId,
+  pendingQuickPicks,
+  type BulkDraft,
+  type BulkField,
+} from "@/lib/bulkDraft";
 import {
   ESCALATION_SOON_SECONDS,
   TicketTable,
   type SortKey,
 } from "@/components/agent/TicketTable";
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
 import { Menu, MenuItem } from "@/components/ui/Menu";
-import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
-import { Spinner } from "@/components/ui/Spinner";
-import { FlagIcon, LockIcon, MoreIcon, UserDashedIcon } from "@/components/ui/icons";
+import type { SelectMenuItem } from "@/components/ui/SelectMenu";
+import {
+  CheckIcon,
+  ClockIcon,
+  FlagIcon,
+  FolderIcon,
+  LockIcon,
+  MoreIcon,
+  PencilIcon,
+  UserDashedIcon,
+  UserIcon,
+} from "@/components/ui/icons";
 import { TICKET_CHANNEL_KEYS, TICKET_CHANNELS } from "@/lib/ticketChannel";
 import { runConcurrent } from "@/lib/bulk";
 import { cn } from "@/lib/cn";
+import { priorityLabel } from "@/lib/priority";
+import { stateLabel } from "@/lib/status";
 
 /** Status segments. "todo" (new + open) is the default working view; the
  * rest filter to one state type each. */
@@ -98,8 +119,6 @@ const SELECT_ALL_PAGE_SIZE = 200;
 const BULK_CONCURRENCY = 4;
 /** How many overdue / due-soon tickets the pinned block shows before "show all". */
 const PINNED_MAX = 5;
-
-type BulkField = "state" | "priority" | "owner" | "queue" | "lock";
 
 type FilterParams = {
   queue_id?: number;
@@ -209,11 +228,11 @@ export function QueuesPage() {
   const [fullIds, setFullIds] = useState<number[]>([]);
   const [fetchingAll, setFetchingAll] = useState(false);
   const lastToggled = useRef<number | null>(null);
-  const [pendingAction, setPendingAction] = useState<{
-    field: BulkField;
-    value: number | string;
-    label: string;
-  } | null>(null);
+  // Bulk change being prepared in the side panel; the selection bar's quick
+  // actions prefill it. Nothing is sent before "apply".
+  const [draft, setDraft] = useState<BulkDraft>({});
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [openField, setOpenField] = useState<{ field: BulkField; seq: number } | null>(null);
   // Row-level quick edit (state/owner) — reference lists are only fetched
   // once the agent opens the first menu (either a row quick-edit trigger or
   // the bulk-action bar), not on page load.
@@ -227,6 +246,8 @@ export function QueuesPage() {
     setFullSelection(false);
     setFullIds([]);
     lastToggled.current = null;
+    setDraft({});
+    setPanelOpen(false);
   };
 
   // Selection is scoped to the current filter/page — reset it whenever
@@ -263,7 +284,8 @@ export function QueuesPage() {
   useEffect(() => {
     if (!hasSelection) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      // An open dropdown (e.g. in the bulk panel) consumes its own Escape.
+      if (e.key === "Escape" && !e.defaultPrevented) {
         clearSelection();
         setStatus(null);
       }
@@ -432,18 +454,12 @@ export function QueuesPage() {
   };
 
   const applyBulkAction = async () => {
-    if (!pendingAction) return;
+    const states = statesQ.data ?? [];
+    if (!draftReady(draft, states)) return;
     const ids = selectedIds;
-    const body: MutationRequest =
-      pendingAction.field === "state"
-        ? { state_id: Number(pendingAction.value) }
-        : pendingAction.field === "priority"
-          ? { priority_id: Number(pendingAction.value) }
-          : pendingAction.field === "owner"
-            ? { owner_id: Number(pendingAction.value) }
-            : pendingAction.field === "queue"
-              ? { queue_id: Number(pendingAction.value) }
-              : { lock: String(pendingAction.value) };
+    // One PATCH per ticket with every picked field: the backend applies them
+    // in one transaction.
+    const body: MutationRequest = draftToMutation(draft, states);
 
     setApplying(true);
     setStatus(null);
@@ -456,7 +472,6 @@ export function QueuesPage() {
     );
     setApplying(false);
     setProgress(null);
-    setPendingAction(null);
 
     if (failed.length === 0) {
       setStatus({ tone: "success", text: t("queue.bulk.updated", { count: succeeded.length }) });
@@ -483,11 +498,11 @@ export function QueuesPage() {
 
   const stateItems: SelectMenuItem<number>[] = (statesQ.data ?? []).map((s) => ({
     value: s.id,
-    label: s.name,
+    label: stateLabel(t, s.name, s.name),
   }));
   const priorityItems: SelectMenuItem<number>[] = (prioritiesQ.data ?? []).map((p) => ({
     value: p.id,
-    label: p.name,
+    label: priorityLabel(t, p.name, p.name),
   }));
   const agentItems: SelectMenuItem<number>[] = (agentsQ.data ?? []).map((a) => ({
     value: a.id,
@@ -497,10 +512,58 @@ export function QueuesPage() {
   const bulkQueueItems: SelectMenuItem<number>[] = flattenQueues(queuesQ.data ?? [])
     .filter((q) => q.valid)
     .map((q) => ({ value: q.id, label: q.name }));
-  const lockItems: SelectMenuItem<string>[] = [
-    { value: "lock", label: t("ticket.toolbar.lock", { defaultValue: "Lock" }) },
-    { value: "unlock", label: t("ticket.toolbar.unlock", { defaultValue: "Unlock" }) },
+
+  // ── Bulk quick actions ─────────────────────────────────────────────────
+  // Each one adds its change to the draft and opens the panel; pressed again
+  // it takes the change back out. Closing the panel discards the draft.
+  const bulkStates = statesQ.data ?? [];
+  const closeState =
+    bulkStates.find((s) => s.name === "closed successful") ??
+    bulkStates.find((s) => s.type_name.startsWith("closed"));
+  const pendingState =
+    bulkStates.find((s) => s.name === "pending reminder") ??
+    bulkStates.find((s) => s.type_name.startsWith("pending"));
+  type QuickAction = "close" | "pending" | "mine" | "move";
+  const quickOn: Record<QuickAction, boolean> = {
+    close: isClosedStateId(bulkStates, draft.state_id),
+    pending: isPendingStateId(bulkStates, draft.state_id),
+    mine: user?.id != null && draft.owner_id === user.id,
+    move: draft.queue_id != null,
+  };
+  const toggleQuick = (action: QuickAction) => {
+    if (quickOn[action]) {
+      const field: BulkField =
+        action === "mine" ? "owner" : action === "move" ? "queue" : "state";
+      setDraft(clearDraftField(draft, field));
+      return;
+    }
+    if (action === "close" && closeState) {
+      setDraft({ ...clearDraftField(draft, "state"), state_id: closeState.id });
+    }
+    if (action === "pending" && pendingState) {
+      setDraft({
+        ...draft,
+        state_id: pendingState.id,
+        pending_until: draft.pending_until ?? pendingQuickPicks()[0].value,
+      });
+    }
+    if (action === "mine" && user?.id != null) setDraft({ ...draft, owner_id: user.id });
+    if (action === "move") setOpenField({ field: "queue", seq: (openField?.seq ?? 0) + 1 });
+    setPanelOpen(true);
+  };
+  const closePanel = () => {
+    setPanelOpen(false);
+    setDraft({});
+  };
+  const quickActions: { key: QuickAction; icon: ReactNode; label: string; disabled?: boolean }[] = [
+    { key: "close", icon: <CheckIcon />, label: t("queue.bulk.quickClose"), disabled: !closeState },
+    { key: "pending", icon: <ClockIcon />, label: t("queue.bulk.quickPending"), disabled: !pendingState },
+    { key: "mine", icon: <UserIcon />, label: t("queue.bulk.quickMine"), disabled: user?.id == null },
+    { key: "move", icon: <FolderIcon />, label: t("queue.bulk.quickMove") },
   ];
+  const selectedKnown = [...pinnedItems, ...items.filter((i) => !pinnedIds.has(i.id))].filter((i) =>
+    effectiveSelected.has(i.id),
+  );
 
   // Row quick edit: one ticket at a time, same invalidation as
   // usePatchTicket/the bulk apply above so the sidebar badges stay in sync.
@@ -780,50 +843,41 @@ export function QueuesPage() {
                 </span>
 
                 <div className="ml-auto flex flex-wrap items-center gap-2">
-                  <BulkMenu
-                    items={stateItems}
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.key}
+                      type="button"
+                      aria-pressed={quickOn[action.key]}
+                      disabled={noSelection || action.disabled}
+                      data-testid={`queue-bulk-quick-${action.key}`}
+                      onClick={() => toggleQuick(action.key)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5",
+                        quickOn[action.key]
+                          ? "border-accent bg-accent-dim text-accent"
+                          : "border-hairline bg-surface text-ink hover:bg-surface-subtle",
+                      )}
+                    >
+                      {action.icon}
+                      {action.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    aria-expanded={panelOpen}
                     disabled={noSelection}
-                    testId="queue-bulk-state"
-                    label={t("queue.bulk.fieldState")}
-                    placeholder={t("ticket.dialog.selectPlaceholder")}
-                    onSelect={(value, label) => setPendingAction({ field: "state", value, label })}
-                  />
-                  <BulkMenu
-                    items={priorityItems}
-                    disabled={noSelection}
-                    testId="queue-bulk-priority"
-                    label={t("queue.bulk.fieldPriority")}
-                    placeholder={t("ticket.dialog.selectPlaceholder")}
-                    onSelect={(value, label) =>
-                      setPendingAction({ field: "priority", value, label })
-                    }
-                  />
-                  <BulkMenu
-                    items={agentItems}
-                    searchThreshold={8}
-                    disabled={noSelection}
-                    testId="queue-bulk-owner"
-                    label={t("queue.bulk.fieldOwner")}
-                    placeholder={t("ticket.dialog.selectPlaceholder")}
-                    onSelect={(value, label) => setPendingAction({ field: "owner", value, label })}
-                  />
-                  <BulkMenu
-                    items={bulkQueueItems}
-                    searchThreshold={8}
-                    disabled={noSelection}
-                    testId="queue-bulk-queue"
-                    label={t("queue.bulk.fieldQueue", { defaultValue: "Queue" })}
-                    placeholder={t("ticket.dialog.selectPlaceholder")}
-                    onSelect={(value, label) => setPendingAction({ field: "queue", value, label })}
-                  />
-                  <BulkMenu
-                    items={lockItems}
-                    disabled={noSelection}
-                    testId="queue-bulk-lock"
-                    label={t("queue.bulk.fieldLock", { defaultValue: "Lock" })}
-                    placeholder={t("ticket.dialog.selectPlaceholder")}
-                    onSelect={(value, label) => setPendingAction({ field: "lock", value, label })}
-                  />
+                    data-testid="queue-bulk-all-fields"
+                    onClick={() => (panelOpen ? closePanel() : setPanelOpen(true))}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5",
+                      panelOpen
+                        ? "border-accent bg-accent-dim text-accent"
+                        : "border-hairline bg-surface text-ink hover:bg-surface-subtle",
+                    )}
+                  >
+                    <PencilIcon />
+                    {t("queue.bulk.allFields")}
+                  </button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -906,90 +960,29 @@ export function QueuesPage() {
         />
       </div>
 
-      {pendingAction && (
-        <Dialog
-          open
-          onClose={() => (applying ? undefined : setPendingAction(null))}
-          title={t("queue.bulk.confirmTitle", {
-            field: t(`queue.bulk.field${capitalize(pendingAction.field)}`),
-          })}
-        >
-          <p className="mb-4">
-            {t("queue.bulk.confirmText", {
-              field: t(`queue.bulk.field${capitalize(pendingAction.field)}`),
-              value: pendingAction.label,
-              count: selectedIds.length,
-            })}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={applying}
-              onClick={() => setPendingAction(null)}
-            >
-              {t("queue.bulk.confirmCancel")}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={applying}
-              data-testid="queue-bulk-confirm"
-              onClick={() => void applyBulkAction()}
-            >
-              {applying && <Spinner className="mr-1 h-3 w-3" />}
-              {t("queue.bulk.confirmApply")}
-            </Button>
-          </div>
-        </Dialog>
+      {hasSelection && panelOpen && (
+        <BulkEditPanel
+          count={selectedIds.length}
+          known={selectedKnown}
+          refs={{
+            states: bulkStates,
+            priorities: prioritiesQ.data ?? [],
+            agents: agentItems,
+            queues: bulkQueueItems,
+          }}
+          draft={draft}
+          onChange={setDraft}
+          meId={user?.id}
+          applying={applying}
+          onApply={() => void applyBulkAction()}
+          onDiscard={() => setDraft({})}
+          onClose={closePanel}
+          openField={openField}
+          className="sticky top-0 max-h-screen w-[340px] shrink-0 self-start overflow-y-auto max-lg:fixed max-lg:inset-y-0 max-lg:right-0 max-lg:z-30 max-lg:max-h-none max-lg:shadow-2xl"
+        />
       )}
     </div>
   );
-}
-
-/** One field dropdown in the bulk-action bar (state, priority, owner, …). */
-function BulkMenu<T extends string | number>({
-  items,
-  disabled,
-  testId,
-  label,
-  placeholder,
-  searchThreshold,
-  onSelect,
-}: {
-  items: SelectMenuItem<T>[];
-  disabled: boolean;
-  testId: string;
-  label: string;
-  placeholder: string;
-  searchThreshold?: number;
-  onSelect: (value: T, label: string) => void;
-}) {
-  return (
-    <SelectMenu
-      items={items}
-      searchThreshold={searchThreshold}
-      onSelect={(value) => onSelect(value, items.find((i) => i.value === value)?.label ?? "")}
-      placeholder={placeholder}
-      panelTestId={`${testId}-menu`}
-      trigger={({ ref, toggleProps }) => (
-        <button
-          ref={ref}
-          type="button"
-          disabled={disabled}
-          data-testid={testId}
-          {...toggleProps}
-          className="inline-flex items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 py-1 text-xs font-medium text-ink transition-colors duration-100 hover:bg-surface-subtle disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {label} ⌄
-        </button>
-      )}
-    />
-  );
-}
-
-function capitalize(field: BulkField): string {
-  return field.charAt(0).toUpperCase() + field.slice(1);
 }
 
 /**

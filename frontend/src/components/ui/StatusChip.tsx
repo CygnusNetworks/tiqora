@@ -1,7 +1,7 @@
 import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import { priorityColorVar, priorityIdFromName, priorityName } from "@/lib/priority";
+import { priorityColorVar, priorityIdFromName, priorityLabel } from "@/lib/priority";
 import { stateColorVar, stateLabel } from "@/lib/status";
 
 /**
@@ -72,7 +72,8 @@ export function PriorityChip({
   className,
   ...rest
 }: PriorityChipProps) {
-  const label = priorityName(priority);
+  const { t } = useTranslation();
+  const label = priority ? priorityLabel(t, priority, "") : "";
   if (!label) return empty ? <>{empty}</> : null;
   const resolvedId =
     priorityId != null && Number.isFinite(priorityId)
