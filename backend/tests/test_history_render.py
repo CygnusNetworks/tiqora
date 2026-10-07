@@ -50,7 +50,7 @@ CASES: list[tuple[str | None, str, str]] = [
         "%%CustomerID=abc;CustomerUser=jdoe;",
         'Customer ID set to "abc", Customer user set to "jdoe".',
     ),
-    ("SetPendingTime", "%%2026-07-01 09:00", "Pending time set to 2026-07-01 09:00."),
+    ("SetPendingTime", "%%2026-07-01 09:00", "Pending time set to 2026-07-01 09:00 UTC."),
     ("Subscribe", "%%Jane Doe", "Jane Doe started watching this ticket."),
     ("Unsubscribe", "%%Jane Doe", "Jane Doe stopped watching this ticket."),
     (
@@ -104,3 +104,16 @@ def test_empty_and_space_only_names_are_graceful() -> None:
 def test_followup_with_tn() -> None:
     out = render_history_entry(history_type="FollowUp", name="%%2026...16")
     assert "2026...16" in out
+
+
+def test_pending_time_is_shown_in_the_viewers_time_zone() -> None:
+    """``SetPendingTime`` stores UTC; the history list shows the agent's wall clock."""
+    rendered = render_history_entry(
+        history_type="SetPendingTime", name="%%2026-10-07 08:00", time_zone="Europe/Berlin"
+    )
+    assert rendered == "Pending time set to 2026-10-07 10:00 CEST."
+    # Znuny's reset marker is not a date: left as is.
+    reset = render_history_entry(
+        history_type="SetPendingTime", name="%%00-00-00 00:00", time_zone="Europe/Berlin"
+    )
+    assert reset == "Pending time set to 00-00-00 00:00."

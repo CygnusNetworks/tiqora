@@ -108,6 +108,7 @@ from tiqora.domain.settings_store import (
 )
 from tiqora.domain.subject_hook import SubjectHookConfig, load_subject_config
 from tiqora.domain.ticket_write_service import ArticleIn, add_article
+from tiqora.domain.timezones import USER_TIME_ZONE_KEY, default_time_zone, valid_time_zone
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.worker.notification_templates import (
     configure_notification_context,
@@ -160,6 +161,8 @@ class _Recipient:
     email: str
     user_id: int | None = None
     language: str = "en"
+    # The agent's own ``UserTimeZone`` preference (raw); None for customers.
+    time_zone: str | None = None
 
 
 @dataclass
@@ -368,9 +371,10 @@ async def _resolve_recipients(
             await session.execute(
                 text(
                     "SELECT preferences_key, preferences_value FROM user_preferences"
-                    " WHERE user_id = :uid AND preferences_key IN ('UserEmail', 'UserLanguage')"
+                    " WHERE user_id = :uid"
+                    " AND preferences_key IN ('UserEmail', 'UserLanguage', :tz_key)"
                 ),
-                {"uid": user_id},
+                {"uid": user_id, "tz_key": USER_TIME_ZONE_KEY},
             )
         ).fetchall()
         prefs = {str(k): _decode_pref(v) for k, v in row}
@@ -387,6 +391,7 @@ async def _resolve_recipients(
                 email=email,
                 user_id=user_id,
                 language=prefs.get("UserLanguage") or "en",
+                time_zone=prefs.get(USER_TIME_ZONE_KEY) or None,
             )
         )
 
@@ -494,16 +499,20 @@ async def _build_notification_context(
     ticket: dict[str, object],
     article_id: int | None,
     recipient_kind: str,
+    time_zone: str,
 ) -> PlaceholderContext:
-    """Placeholder context for one event and one recipient *kind*.
+    """Placeholder context for one event, one recipient *kind* and one *time_zone*.
 
-    Everything here depends on the ticket, the triggering article and whether the
-    reader is an agent or the customer -- never on the individual recipient, who
-    only contributes :attr:`PlaceholderContext.notification_recipient`. Building
-    it once per kind keeps a notification to 30-odd queue subscribers from
+    Everything here depends on the ticket, the triggering article, whether the
+    reader is an agent or the customer and the zone their dates are shown in --
+    never on the individual recipient, who only contributes
+    :attr:`PlaceholderContext.notification_recipient`. Building it once per
+    kind and zone keeps a notification to 30-odd queue subscribers from
     replaying the same ticket/queue/customer lookups for every single mail.
     """
-    context = await load_placeholder_context(session, ticket_id=_as_int(ticket["id"]))
+    context = await load_placeholder_context(
+        session, ticket_id=_as_int(ticket["id"]), time_zone=time_zone
+    )
     # An absent/deleted article must not silently quote a later ticket message.
     context.customer_realname = ""
     context.customer_body = ""
@@ -895,8 +904,11 @@ async def process_event(
     hook_cfg = await load_subject_config(session, sysconfig)
 
     event_article_id = _as_int(payload["article_id"]) if payload.get("article_id") else None
-    # One context per recipient kind, reused across that kind's recipients.
-    contexts: dict[str, PlaceholderContext] = {}
+    # Dates are written in each reader's zone: an agent's own preference, else
+    # the system default (customers always get the default).
+    default_zone = await default_time_zone(sysconfig)
+    # One context per recipient kind and zone, reused across those recipients.
+    contexts: dict[tuple[str, str], PlaceholderContext] = {}
 
     sent = 0
     failed = 0
@@ -912,7 +924,8 @@ async def process_event(
         recipients = await _resolve_recipients(session, notification, ticket, skip_user_ids)
         for recipient in recipients:
             try:
-                base_context = contexts.get(recipient.kind)
+                zone = valid_time_zone(recipient.time_zone) or default_zone
+                base_context = contexts.get((recipient.kind, zone))
                 if base_context is None:
                     base_context = await _build_notification_context(
                         session,
@@ -921,8 +934,9 @@ async def process_event(
                         ticket=ticket,
                         article_id=event_article_id,
                         recipient_kind=recipient.kind,
+                        time_zone=zone,
                     )
-                    contexts[recipient.kind] = base_context
+                    contexts[(recipient.kind, zone)] = base_context
                 if await _send_to_recipient(
                     session,
                     sysconfig,

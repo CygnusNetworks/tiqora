@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -176,3 +178,41 @@ async def test_config_keys_with_colons_and_legacy_underscores() -> None:
         ticket={"TicketNumber": "2026010410000045"},
     )
     assert result == "Cygnus#-2026010410000045 / Cygnus#"
+
+
+_EMAIL_DATE_RE = r"[A-Z][a-z]+day, [A-Z][a-z]+ \d{2}, \d{4} at \d{2}:\d{2}:\d{2}"
+
+
+@pytest.mark.asyncio
+async def test_datetime_values_render_in_the_default_time_zone() -> None:
+    """DB datetimes are UTC; without an agent they show in UserDefaultTimeZone."""
+    created = datetime(2026, 1, 15, 10, 8, 5)  # CET: UTC+1
+    result = await expand_placeholders(
+        None,
+        _sysconfig({"UserDefaultTimeZone": "Europe/Berlin"}),
+        "<OTRS_TICKET_Created>",
+        ticket={"Created": created},  # type: ignore[dict-item]
+    )
+    assert result == "2026-01-15 11:08:05"
+
+    utc = await expand_placeholders(
+        None,
+        _sysconfig(),
+        "<OTRS_TICKET_Created>",
+        ticket={"Created": created},  # type: ignore[dict-item]
+    )
+    assert utc == "2026-01-15 10:08:05"
+
+
+@pytest.mark.asyncio
+async def test_email_date_uses_the_context_time_zone() -> None:
+    berlin = await expand_placeholders(
+        None,
+        _sysconfig(),
+        "<OTRS_EMAIL_DATE>",
+        context=PlaceholderContext(time_zone="Europe/Berlin"),
+    )
+    assert re.fullmatch(_EMAIL_DATE_RE + r" \(Europe/Berlin\)", berlin), berlin
+
+    default = await expand_placeholders(None, _sysconfig(), "<OTRS_EMAIL_DATE>", ticket={})
+    assert re.fullmatch(_EMAIL_DATE_RE + r" \(UTC\)", default), default

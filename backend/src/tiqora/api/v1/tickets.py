@@ -74,6 +74,7 @@ from tiqora.domain.ticket_write_service import (
 from tiqora.domain.ticket_write_service import (
     TicketNotFound as WriteNotFound,
 )
+from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -947,6 +948,12 @@ async def print_ticket(
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
 
+    # A printout has no browser to localise it: write times in the agent's zone.
+    zone = await resolve_user_time_zone(session, SysConfig(session), user.id)
+
+    def _when(value: datetime | None) -> str:
+        return html_escape(format_in_zone(value, zone, "%Y-%m-%d %H:%M %Z")) if value else ""
+
     article_blocks: list[str] = []
     for art in articles:
         try:
@@ -960,7 +967,7 @@ async def print_ticket(
         meta = (
             f"<div class='meta'>"
             f"<strong>#{art.id}</strong> · {html_escape(art.sender_type or '')} · "
-            f"{html_escape(str(art.create_time or ''))}<br/>"
+            f"{_when(art.create_time)}<br/>"
             f"<span>{html_escape(art.from_address or '')}</span>"
             f"{' → ' + html_escape(art.to_address) if art.to_address else ''}"
             f"</div>"
@@ -976,7 +983,7 @@ async def print_ticket(
         try:
             history = await svc.list_history(user.id, ticket_id)
             rows = "".join(
-                f"<tr><td>{html_escape(str(h.create_time or ''))}</td>"
+                f"<tr><td>{_when(h.create_time)}</td>"
                 f"<td>{html_escape(h.history_type or '')}</td>"
                 f"<td>{html_escape(h.rendered or h.name or '')}</td>"
                 f"<td>{html_escape(h.create_by_login or str(h.create_by))}</td></tr>"
@@ -1036,8 +1043,8 @@ async def print_ticket(
       <dt>Owner</dt><dd>{owner}</dd>
       <dt>Customer</dt><dd>{customer}</dd>
       <dt>Service</dt><dd>{html_escape(ticket.service_name or "")}</dd>
-      <dt>Created</dt><dd>{html_escape(str(ticket.create_time or ""))}</dd>
-      <dt>Changed</dt><dd>{html_escape(str(ticket.change_time or ""))}</dd>
+      <dt>Created</dt><dd>{_when(ticket.create_time)}</dd>
+      <dt>Changed</dt><dd>{_when(ticket.change_time)}</dd>
     </dl>
   </div>
   <h2>Articles ({len(article_blocks)})</h2>

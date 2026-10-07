@@ -792,3 +792,51 @@ async def test_customer_allowlist_gate_default_off(
         assert gated == "w= f=Alice"
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_datetime_tags_render_in_the_current_agents_time_zone(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """DB times are UTC; a template shows them in the acting agent's zone.
+
+    ``NOW`` (12:00 UTC on 1 June) is 14:00 CEST for an agent whose
+    ``UserTimeZone`` is Europe/Berlin. Without an acting agent the system
+    default applies (UTC here).
+    """
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url, ns=9)
+    sysconfig = _make_sysconfig()
+    sync_engine = create_engine(sync_url)
+    with sync_engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+                " VALUES (:uid, 'UserTimeZone', 'Europe/Berlin')"
+            ),
+            {"uid": ids["agent"]},
+        )
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    template = "c=<OTRS_TICKET_Created> q=<OTRS_QUEUE_create_time> e=<OTRS_EMAIL_DATE>"
+    try:
+        async with factory() as session:
+            agent_view = await expand_placeholders(
+                session, sysconfig, template, ticket_id=ids["ticket"], user_id=ids["agent"]
+            )
+            default_view = await expand_placeholders(
+                session, sysconfig, template, ticket_id=ids["ticket"]
+            )
+        assert agent_view.startswith("c=2024-06-01 14:00:00 q=2024-06-01 14:00:00 e=")
+        assert agent_view.endswith("(Europe/Berlin)")
+        assert default_view.startswith("c=2024-06-01 12:00:00 q=2024-06-01 12:00:00 e=")
+        assert default_view.endswith("(UTC)")
+    finally:
+        await engine.dispose()
+        with sync_engine.begin() as conn:
+            conn.execute(
+                text("DELETE FROM user_preferences WHERE user_id = :uid"),
+                {"uid": ids["agent"]},
+            )
+        sync_engine.dispose()

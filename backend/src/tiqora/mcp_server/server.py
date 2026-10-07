@@ -598,6 +598,11 @@ async def _db_search(
 # ---------------------------------------------------------------------------
 
 
+def _utc_stamp(value: object) -> str:
+    """A DB datetime (naive UTC) labelled as UTC, so an LLM client never reads it as local."""
+    return f"{value} UTC" if value else "N/A"
+
+
 async def _render_ticket(
     session: AsyncSession,
     *,
@@ -645,8 +650,8 @@ async def _render_ticket(
         f"**State:** {t_row['state_name']} ({t_row['state_type']})",
         f"**Priority:** {t_row['priority']}",
         f"**Customer:** {t_row['customer_user_id'] or t_row['customer_id'] or 'N/A'}",
-        f"**Created:** {t_row['create_time']}",
-        f"**Changed:** {t_row['change_time']}",
+        f"**Created:** {_utc_stamp(t_row['create_time'])}",
+        f"**Changed:** {_utc_stamp(t_row['change_time'])}",
         "",
         "## Articles",
         "",
@@ -675,7 +680,7 @@ async def _render_ticket(
         lines.append(f"### Article #{art[0]} [{art[7] or 'unknown'}] [{visibility}]")
         lines.append(f"**From:** {art[2] or 'N/A'}")
         lines.append(f"**Subject:** {art[3] or '(no subject)'}")
-        lines.append(f"**Date:** {art[6]}")
+        lines.append(f"**Date:** {_utc_stamp(art[6])}")
         lines.append("")
         body = art[4] or ""
         content_type = art[5] or ""

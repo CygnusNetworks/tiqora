@@ -20,6 +20,9 @@ to agents.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime
+
+from tiqora.domain.timezones import format_in_zone
 
 UserResolver = Callable[[int | str | None], str | None]
 
@@ -47,11 +50,21 @@ def _is_numeric(value: str) -> bool:
     return value.strip().isdigit()
 
 
+def _localize_pending_time(value: str, zone: str) -> str:
+    """A ``SetPendingTime`` payload (``YYYY-MM-DD HH:MM``, UTC) as wall-clock time in *zone*."""
+    try:
+        stamp = datetime.strptime(value.strip(), "%Y-%m-%d %H:%M")
+    except ValueError:
+        return value  # e.g. Znuny's ``00-00-00 00:00`` reset marker
+    return format_in_zone(stamp, zone, "%Y-%m-%d %H:%M %Z")
+
+
 def render_history_entry(
     *,
     history_type: str | None,
     name: str,
     resolve_user: UserResolver | None = None,
+    time_zone: str = "UTC",
 ) -> str:
     """Render one history row's ``name`` as a readable, localized-ready sentence.
 
@@ -60,13 +73,16 @@ def render_history_entry(
     id is kept as a fallback. Strings are plain (not yet i18n-translated) —
     the API returns English sentences matching Tiqora's other server-rendered
     strings (history detail is not currently part of the i18n catalogue);
-    the frontend renders ``rendered`` verbatim.
+    the frontend renders ``rendered`` verbatim, so a pending time stored in
+    UTC is written in *time_zone* (the viewing agent's).
     """
     raw = (name or "").strip()
     htype = history_type or ""
     is_empty = not raw or raw in {"%%", "%"}
     is_encoded = raw.startswith("%%")
     values = _split(raw) if is_encoded else ([] if is_empty else [raw])
+    if htype == "SetPendingTime" and values:
+        values = [_localize_pending_time(values[0], time_zone), *values[1:]]
 
     renderer = _RENDERERS.get(htype)
     if renderer is not None:

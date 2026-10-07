@@ -1637,3 +1637,78 @@ async def test_sender_override_wins_and_mail_looks_like_znuny(
         assert sender.envelope_senders == [""]
     finally:
         await engine.dispose()
+
+
+@pytest.mark.db
+async def test_ticket_times_are_rendered_in_each_recipients_time_zone(
+    mariadb_znuny_url: str,
+) -> None:
+    """One event, two agents in different zones: each reads the ticket's UTC
+    creation time as their own wall-clock time; the customer gets the default."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sender = CapturingMailSender()
+    owner_id = 910_914
+    second_agent_id = 910_915
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await _skip_backlog(session)
+            queue_id = await _insert_queue(session, "notify-q-time-zone")
+            await _insert_customer_user(session, "tz.customer", "tz-customer@example.com")
+            for user_id, login, email, zone in (
+                (owner_id, "notify.tz.owner", "tz-owner@example.com", "Europe/Berlin"),
+                (second_agent_id, "notify.tz.second", "tz-second@example.com", "America/New_York"),
+            ):
+                await _insert_agent(session, user_id=user_id, login=login)
+                await _set_user_prefs(session, user_id, email)
+                await session.execute(
+                    text(
+                        "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+                        " VALUES (:uid, 'UserTimeZone', :zone)"
+                    ),
+                    {"uid": user_id, "zone": zone},
+                )
+            ticket_id = await _insert_ticket(
+                session,
+                "NOTIFY_TIME_ZONE",
+                owner_id=owner_id,
+                customer_user_id="tz.customer",
+                queue_id=queue_id,
+            )
+            await session.execute(
+                text("UPDATE ticket SET create_time = '2026-07-15 10:08:00' WHERE id = :tid"),
+                {"tid": ticket_id},
+            )
+            await _insert_notification_event(
+                session,
+                "time-zone",
+                items={
+                    "Events": ["TicketCreate"],
+                    "QueueID": [str(queue_id)],
+                    "Recipients": ["AgentOwner", "Customer"],
+                    "RecipientAgents": [str(second_agent_id)],
+                    "Transports": ["Email"],
+                },
+                subject="TIME-ZONE",
+                body="Created <OTRS_TICKET_Created>",
+            )
+            await _insert_outbox_event(session, "TicketCreate", ticket_id)
+            await session.commit()
+            await set_setting(session, KEY_NOTIFICATIONS_ENABLED, "1")
+
+        result = await run_notifications_tick(session_factory=factory, mail_sender=sender)
+        assert result["sent"] == 3
+        rendered = {
+            str(message["To"]): message.get_content()
+            for message in sender.sent
+            if "TIME-ZONE" in str(message["Subject"])
+        }
+        assert rendered == {
+            "tz-owner@example.com": "Created 2026-07-15 12:08:00\n",
+            "tz-second@example.com": "Created 2026-07-15 06:08:00\n",
+            # No UserDefaultTimeZone/OTRSTimeZone configured here: UTC.
+            "tz-customer@example.com": "Created 2026-07-15 10:08:00\n",
+        }
+    finally:
+        await engine.dispose()
