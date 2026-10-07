@@ -7,7 +7,7 @@ import binascii
 import csv
 import re
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime
 from html import escape as html_escape
 from typing import Annotated, Any, Literal
 
@@ -248,8 +248,8 @@ class DraftOut(BaseModel):
     article_id: int | None = None
     title: str | None = None
     content: str
-    created: datetime
-    changed: datetime
+    created: UtcDateTime
+    changed: UtcDateTime
 
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
@@ -770,7 +770,7 @@ class TimeAccountingReportEntry(BaseModel):
     ticket_title: str | None = None
     article_id: int | None = None
     time_unit: float
-    create_time: datetime | None = None
+    create_time: UtcDateTime | None = None
     create_by: int
     create_by_login: str | None = None
 
@@ -780,6 +780,15 @@ class TimeAccountingReportOut(BaseModel):
     total_units: float
     offset: int
     limit: int
+
+
+def _as_naive_utc(value: datetime) -> datetime:
+    """Normalise a query-param bound to the naive UTC the ``create_time`` columns hold.
+
+    The UI sends the viewer's local day bounds as UTC instants (``…Z``); a
+    naive value is taken as UTC already.
+    """
+    return value.astimezone(UTC).replace(tzinfo=None) if value.tzinfo else value
 
 
 @router.get("/time-accounting", response_model=TimeAccountingReportOut)
@@ -819,9 +828,9 @@ async def time_accounting_report(
     if ticket_id is not None:
         filters.append(TimeAccounting.ticket_id == ticket_id)
     if created_from is not None:
-        filters.append(TimeAccounting.create_time >= created_from)
+        filters.append(TimeAccounting.create_time >= _as_naive_utc(created_from))
     if created_to is not None:
-        filters.append(TimeAccounting.create_time <= created_to)
+        filters.append(TimeAccounting.create_time <= _as_naive_utc(created_to))
 
     base = (
         select(
@@ -2119,7 +2128,7 @@ class MentionOut(BaseModel):
     user_id: int
     ticket_id: int
     article_id: int | None = None
-    create_time: datetime | None = None
+    create_time: UtcDateTime | None = None
     user_login: str | None = None
     user_name: str | None = None
 
@@ -2292,7 +2301,7 @@ class TimeAccountingOut(BaseModel):
     ticket_id: int
     article_id: int | None = None
     time_unit: float
-    create_time: datetime | None = None
+    create_time: UtcDateTime | None = None
     create_by: int
     create_by_login: str | None = None
 

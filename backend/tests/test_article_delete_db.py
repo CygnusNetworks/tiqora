@@ -19,9 +19,11 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     ArticleNotDeletable,
+    InvalidInput,
     TicketAccessDenied,
     TicketNotFound,
     TicketWriteService,
+    add_time_accounting,
 )
 from tiqora.znuny.password import hash_password
 from tiqora.znuny.sysconfig import SysConfig
@@ -354,5 +356,49 @@ async def test_delete_article_wrong_id_not_found(
         svc = TicketWriteService(session, factory, sysconfig)
         with pytest.raises(TicketNotFound):
             await svc.delete_article(ids["agent_rw"], 999_999_999, 1)
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_time_booking_links_only_an_article_of_the_same_ticket(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    engine = create_async_engine(_to_async_url(sync_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session, session.begin():
+        article_id = await _add_note(
+            session, factory, sysconfig, ticket_id=ids["ticket"], user_id=ids["agent_rw"]
+        )
+        entry_id = await add_time_accounting(
+            session,
+            ticket_id=ids["ticket"],
+            article_id=article_id,
+            time_unit=30,
+            user_id=ids["agent_rw"],
+        )
+
+    async with factory() as session:
+        linked = (
+            await session.execute(
+                text("SELECT article_id FROM time_accounting WHERE id = :eid"), {"eid": entry_id}
+            )
+        ).scalar_one()
+        assert linked == article_id
+
+    async with factory() as session, session.begin():
+        with pytest.raises(InvalidInput):
+            await add_time_accounting(
+                session,
+                ticket_id=ids["ticket"],
+                article_id=999_999_999,
+                time_unit=5,
+                user_id=ids["agent_rw"],
+            )
 
     await engine.dispose()

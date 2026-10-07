@@ -137,10 +137,14 @@ export function TimeAccountingReportPage() {
       api.listTimeAccountingReport({
         create_by: search.create_by,
         ticket_id: search.ticket_id,
+        // Bookings are stored in UTC: send the viewer's local day bounds as
+        // UTC instants, or the range is shifted by the UTC offset.
         created_from: search.created_from
-          ? `${search.created_from}T00:00:00`
+          ? new Date(`${search.created_from}T00:00:00`).toISOString()
           : undefined,
-        created_to: search.created_to ? `${search.created_to}T23:59:59` : undefined,
+        created_to: search.created_to
+          ? new Date(`${search.created_to}T23:59:59.999`).toISOString()
+          : undefined,
         offset,
         limit,
       }),

@@ -904,6 +904,14 @@ async def add_time_accounting(
     user_id: int,
 ) -> int:
     """Book *time_unit* on a ticket (``TicketAccountTime``); returns the row id."""
+    if article_id is not None:
+        owner = (
+            await session.execute(
+                text("SELECT ticket_id FROM article WHERE id = :aid"), {"aid": article_id}
+            )
+        ).scalar_one_or_none()
+        if owner is None or int(owner) != ticket_id:
+            raise InvalidInput("article_id does not belong to this ticket")
     await session.execute(
         text(
             "INSERT INTO time_accounting"

@@ -17,11 +17,14 @@ export type ComposerExtrasResult = { failed: Array<"mentions" | "time"> };
 export async function postComposerExtras(
   ticketId: number,
   {
+    articleId,
     body,
     mentions,
     timeUnits,
     queryClient,
   }: {
+    /** The article just written; the booking is linked to it, as Znuny does. */
+    articleId: number;
     body: string;
     mentions: PickedMention[];
     /** Raw field value; blank or non-positive books nothing. */
@@ -47,7 +50,10 @@ export async function postComposerExtras(
 
   if (booking) {
     try {
-      await api.createTicketTimeAccounting(ticketId, { time_unit: units });
+      await api.createTicketTimeAccounting(ticketId, {
+        time_unit: units,
+        article_id: articleId,
+      });
       void queryClient.invalidateQueries({
         queryKey: ["tickets", ticketId, "time-accounting"],
       });

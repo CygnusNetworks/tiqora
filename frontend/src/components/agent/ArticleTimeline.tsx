@@ -335,6 +335,8 @@ export function ArticleComposer({
   const [mentions, setMentions] = useState<PickedMention[]>([]);
   const [timeUnits, setTimeUnits] = useState("");
   const [extrasFailed, setExtrasFailed] = useState<Array<"mentions" | "time">>([]);
+  /** The note the send created — a retried booking links to it too. */
+  const [sentArticleId, setSentArticleId] = useState<number | null>(null);
 
   useEffect(() => {
     onComposingChange?.(open);
@@ -370,7 +372,7 @@ export function ArticleComposer({
 
   const sendMutation = useMutation({
     mutationFn: async () => {
-      await api.createArticle(ticketId, {
+      const { article_id: sent } = await api.createArticle(ticketId, {
         sender_type: "agent",
         subject: subject || t("ticket.composerNote"),
         body,
@@ -380,7 +382,14 @@ export function ArticleComposer({
         channel: "note",
         is_visible_for_customer: false,
       });
-      return postComposerExtras(ticketId, { body, mentions, timeUnits, queryClient });
+      setSentArticleId(sent);
+      return postComposerExtras(ticketId, {
+        articleId: sent,
+        body,
+        mentions,
+        timeUnits,
+        queryClient,
+      });
     },
     onSuccess: (extras) => {
       void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId, "articles"] });
@@ -398,6 +407,8 @@ export function ArticleComposer({
   const retryExtrasMutation = useMutation({
     mutationFn: () =>
       postComposerExtras(ticketId, {
+        // Only reachable after a send succeeded, so the id is always set.
+        articleId: sentArticleId!,
         body,
         mentions: extrasFailed.includes("mentions") ? mentions : [],
         timeUnits: extrasFailed.includes("time") ? timeUnits : "",
