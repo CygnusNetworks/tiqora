@@ -1115,6 +1115,14 @@ export class ApiClient {
     });
   }
 
+  /** Persist Znuny-compatible UserTimeZone (IANA name); null clears it. */
+  setMyTimeZone(timeZone: string | null, signal?: AbortSignal) {
+    return this.request<UserMe>("PUT", "/api/v1/auth/me/time-zone", {
+      body: { time_zone: timeZone },
+      signal,
+    });
+  }
+
   logout(signal?: AbortSignal) {
     return this.request<void>("POST", "/api/v1/auth/logout", { signal });
   }

@@ -56,6 +56,7 @@ from tiqora.domain.schemas import (
     TOTPStatusOut,
     UserLanguageUpdate,
     UserMe,
+    UserTimeZoneUpdate,
 )
 from tiqora.domain.spnego import (
     SpnegoAuthFailed,
@@ -64,10 +65,12 @@ from tiqora.domain.spnego import (
     principal_to_login,
 )
 from tiqora.domain.template_permission import TemplatePermissionService
+from tiqora.domain.timezones import default_time_zone, user_time_zone_preference, valid_time_zone
 from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
+from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
@@ -113,6 +116,12 @@ async def _user_me(
     # swallowed by the language loader's broad except → language always null.
     if "language" not in data:
         data["language"] = await _load_user_language(session, user.id)
+    try:
+        data["time_zone"] = await user_time_zone_preference(session, user.id)
+        data["default_time_zone"] = await default_time_zone(SysConfig(session))
+    except Exception:  # noqa: BLE001 — never fail /me for a missing pref
+        with contextlib.suppress(Exception):
+            await session.rollback()
     try:
         data["can_edit_templates"] = await TemplatePermissionService(session).can_edit_any(user.id)
     except Exception:  # noqa: BLE001 — never fail /me if tiqora tables missing
@@ -435,6 +444,26 @@ async def set_my_language(
             detail=f"Unsupported language code: {body.language!r}",
         )
     await auth.set_user_language(user.id, code)
+    return await _user_me(session, user)
+
+
+@router.put("/me/time-zone", response_model=UserMe)
+async def set_my_time_zone(
+    body: UserTimeZoneUpdate,
+    user: CurrentUser,
+    session: DbSession,
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+) -> UserMe:
+    """Persist Znuny ``UserTimeZone``; drives the UI and server-rendered times."""
+    zone = None
+    if body.time_zone is not None:
+        zone = valid_time_zone(body.time_zone)
+        if zone is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unknown time zone: {body.time_zone!r}",
+            )
+    await auth.set_user_time_zone(user.id, zone)
     return await _user_me(session, user)
 
 

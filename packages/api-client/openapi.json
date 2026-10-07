@@ -24957,6 +24957,11 @@
             "title": "Can Use Customer Directory",
             "type": "boolean"
           },
+          "default_time_zone": {
+            "default": "UTC",
+            "title": "Default Time Zone",
+            "type": "string"
+          },
           "email": {
             "anyOf": [
               {
@@ -24999,6 +25004,17 @@
           "login": {
             "title": "Login",
             "type": "string"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
           }
         },
         "required": [
@@ -25179,6 +25195,27 @@
           "column"
         ],
         "title": "UserReference",
+        "type": "object"
+      },
+      "UserTimeZoneUpdate": {
+        "description": "Body for ``PUT /auth/me/time-zone`` \u2014 IANA zone, or null to clear.",
+        "properties": {
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          }
+        },
+        "required": [
+          "time_zone"
+        ],
+        "title": "UserTimeZoneUpdate",
         "type": "object"
       },
       "UserUpdate": {
@@ -52422,6 +52459,82 @@
           }
         },
         "summary": "Set My Language",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me/time-zone": {
+      "put": {
+        "description": "Persist Znuny ``UserTimeZone``; drives the UI and server-rendered times.",
+        "operationId": "set_my_time_zone_api_v1_auth_me_time_zone_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserTimeZoneUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserMe"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set My Time Zone",
         "tags": [
           "auth"
         ]
