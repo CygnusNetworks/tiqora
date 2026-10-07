@@ -24957,6 +24957,11 @@
             "title": "Can Use Customer Directory",
             "type": "boolean"
           },
+          "default_time_zone": {
+            "default": "UTC",
+            "title": "Default Time Zone",
+            "type": "string"
+          },
           "email": {
             "anyOf": [
               {
@@ -24999,6 +25004,17 @@
           "login": {
             "title": "Login",
             "type": "string"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
           }
         },
         "required": [
@@ -25179,6 +25195,27 @@
           "column"
         ],
         "title": "UserReference",
+        "type": "object"
+      },
+      "UserTimeZoneUpdate": {
+        "description": "Body for ``PUT /auth/me/time-zone`` \u2014 IANA zone, or null to clear.",
+        "properties": {
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          }
+        },
+        "required": [
+          "time_zone"
+        ],
+        "title": "UserTimeZoneUpdate",
         "type": "object"
       },
       "UserUpdate": {
@@ -52427,6 +52464,82 @@
         ]
       }
     },
+    "/api/v1/auth/me/time-zone": {
+      "put": {
+        "description": "Persist Znuny ``UserTimeZone``; drives the UI and server-rendered times.",
+        "operationId": "set_my_time_zone_api_v1_auth_me_time_zone_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserTimeZoneUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserMe"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set My Time Zone",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/methods": {
       "get": {
         "description": "Discovery endpoint the login page uses to decide which buttons to show.",
@@ -60511,6 +60624,24 @@
             }
           },
           {
+            "description": "IANA zone of the created_from/to days; default: the agent's zone.",
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IANA zone of the created_from/to days; default: the agent's zone.",
+              "title": "Tz"
+            }
+          },
+          {
             "description": "Result ordering.",
             "in": "query",
             "name": "sort",
@@ -60719,6 +60850,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -60902,6 +61049,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -61076,6 +61239,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -61270,6 +61449,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -61481,6 +61676,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -61676,6 +61887,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -61850,6 +62077,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -62032,6 +62275,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -62206,6 +62465,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -62400,6 +62675,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
