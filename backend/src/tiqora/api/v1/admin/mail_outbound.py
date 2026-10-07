@@ -8,7 +8,6 @@ a test message to an admin-provided address.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
 import aiosmtplib
@@ -26,6 +25,7 @@ from tiqora.domain.mail_outbound import (
     row_to_public_dict,
     upsert_mail_outbound,
 )
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -49,7 +49,7 @@ class MailOutboundOut(BaseModel):
     oauth2_token_config_name: str = ""
     from_default: str
     timeout_seconds: int
-    change_time: datetime | None = None
+    change_time: UtcDateTime | None = None
     change_by: int | None = None
 
 

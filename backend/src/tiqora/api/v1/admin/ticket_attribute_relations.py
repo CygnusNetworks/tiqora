@@ -12,6 +12,7 @@ from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.common import invalidate_znuny_cache_types
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.db.legacy.config import AclTicketAttributeRelations
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_attribute_relations import parse_attribute_relations_csv
 
 router = APIRouter(prefix="/ticket-attribute-relations", tags=["admin:ticket-attribute-relations"])
@@ -32,8 +33,8 @@ class TicketAttributeRelationOut(BaseModel):
     attribute_2: str
     acl_data: str
     priority: int
-    create_time: datetime | None = None
-    change_time: datetime | None = None
+    create_time: UtcDateTime | None = None
+    change_time: UtcDateTime | None = None
 
 
 class TicketAttributeRelationCreate(BaseModel):

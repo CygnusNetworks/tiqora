@@ -23,6 +23,7 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import Page
 from tiqora.config import get_settings
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.domain.schemas import UtcDateTime
 
 router = APIRouter(prefix="/ai/audit", tags=["admin:ai-audit"])
 
@@ -33,7 +34,7 @@ class AuditLogListItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    ts: datetime
+    ts: UtcDateTime
     run_id: str | None
     provider_id: int | None
     provider_name: str

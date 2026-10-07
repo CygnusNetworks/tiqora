@@ -25,6 +25,15 @@ def _serialize_as_utc(value: datetime) -> str:
     return aware.isoformat()
 
 
+def as_naive_utc(value: datetime) -> datetime:
+    """Normalise a client-supplied bound to the naive UTC the DB columns hold.
+
+    Converts an aware value (e.g. ``…Z`` or ``…+02:00``) to UTC before dropping
+    the offset; a naive value is taken as UTC already.
+    """
+    return value.astimezone(UTC).replace(tzinfo=None) if value.tzinfo else value
+
+
 # Use for every DB-sourced datetime on the read path. ``when_used="json"`` keeps
 # ``model_dump(mode="python")`` returning a real ``datetime`` for internal callers.
 UtcDateTime = Annotated[

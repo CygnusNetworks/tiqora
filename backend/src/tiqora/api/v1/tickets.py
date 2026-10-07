@@ -7,7 +7,7 @@ import binascii
 import csv
 import re
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime
+from datetime import datetime
 from html import escape as html_escape
 from typing import Annotated, Any, Literal
 
@@ -52,6 +52,7 @@ from tiqora.domain.schemas import (
     TicketLinkTargetOut,
     TicketListItem,
     UtcDateTime,
+    as_naive_utc,
 )
 from tiqora.domain.search import SearchIndexService
 from tiqora.domain.ticket_service import (
@@ -782,15 +783,6 @@ class TimeAccountingReportOut(BaseModel):
     limit: int
 
 
-def _as_naive_utc(value: datetime) -> datetime:
-    """Normalise a query-param bound to the naive UTC the ``create_time`` columns hold.
-
-    The UI sends the viewer's local day bounds as UTC instants (``…Z``); a
-    naive value is taken as UTC already.
-    """
-    return value.astimezone(UTC).replace(tzinfo=None) if value.tzinfo else value
-
-
 @router.get("/time-accounting", response_model=TimeAccountingReportOut)
 async def time_accounting_report(
     user: CurrentUser,
@@ -828,9 +820,9 @@ async def time_accounting_report(
     if ticket_id is not None:
         filters.append(TimeAccounting.ticket_id == ticket_id)
     if created_from is not None:
-        filters.append(TimeAccounting.create_time >= _as_naive_utc(created_from))
+        filters.append(TimeAccounting.create_time >= as_naive_utc(created_from))
     if created_to is not None:
-        filters.append(TimeAccounting.create_time <= _as_naive_utc(created_to))
+        filters.append(TimeAccounting.create_time <= as_naive_utc(created_to))
 
     base = (
         select(

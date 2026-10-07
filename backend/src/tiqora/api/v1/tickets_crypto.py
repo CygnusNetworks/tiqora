@@ -15,7 +15,6 @@ route is not captured by ``/tickets/{ticket_id}``.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -32,6 +31,7 @@ from tiqora.crypto.compose import CryptoOptionsOut, crypto_options, split_addres
 from tiqora.crypto.config import CryptoConfig, load_crypto_config
 from tiqora.crypto.pgp import PgpEngine, PgpKeyInfo, scan_armored_keys
 from tiqora.crypto.queue_security import decide, load_queue_policy
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
@@ -120,8 +120,8 @@ class AttachmentPgpKeyOut(BaseModel):
     emails: list[str]
     algorithm: str
     bits: int | None = None
-    created: datetime | None = None
-    expires: datetime | None = None
+    created: UtcDateTime | None = None
+    expires: UtcDateTime | None = None
     status: str  # good | expired | revoked
     #: Already in the Tiqora/Znuny keyring (same fingerprint).
     in_keyring: bool = False

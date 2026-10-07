@@ -8,7 +8,6 @@ can operate in parallel against the same records.
 from __future__ import annotations
 
 import secrets
-from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -40,6 +39,7 @@ from tiqora.domain.oauth2_mail import (
     state_for_config_id,
     update_config,
 )
+from tiqora.domain.schemas import UtcDateTime
 
 router = APIRouter(prefix="/oauth2-token-configs", tags=["admin:oauth2"])
 
@@ -55,14 +55,14 @@ class OAuth2TokenConfigOut(BaseModel):
     scope: str = ""
     valid: bool
     token_status: str
-    token_expiration_date: datetime | None = None
-    refresh_token_expiration_date: datetime | None = None
+    token_expiration_date: UtcDateTime | None = None
+    refresh_token_expiration_date: UtcDateTime | None = None
     has_token: bool = False
     has_refresh_token: bool = False
     error_message: str = ""
-    create_time: datetime | None = None
+    create_time: UtcDateTime | None = None
     create_by: int | None = None
-    change_time: datetime | None = None
+    change_time: UtcDateTime | None = None
     change_by: int | None = None
     redirect_uri: str = ""
 
