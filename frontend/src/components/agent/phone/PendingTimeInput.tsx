@@ -13,7 +13,7 @@ const presetCls =
 /**
  * Callback / pending-until picker: presets (in 1 h · today 16:00 · tomorrow
  * 9:00) plus a free date-time field. `value` is a `datetime-local` string
- * (local time), empty when nothing is picked yet.
+ * (wall time in the agent's display zone), empty when nothing is picked yet.
  */
 export function PendingTimeInput({
   value,

@@ -8,6 +8,7 @@ import {
   type NotificationItem,
 } from "@/lib/notificationStore";
 import { cn } from "@/lib/cn";
+import { displayTimeZone } from "@/lib/timeZone";
 import { useOptionalAuth } from "@/auth/AuthContext";
 import { toBcp47 } from "@/i18n";
 import type { AiLimitOut } from "@/lib/aiApi";
@@ -54,6 +55,7 @@ export function NotificationBell() {
     new Intl.DateTimeFormat(locale, {
       dateStyle: limit.window === "day" ? undefined : "short",
       timeStyle: "short",
+      timeZone: displayTimeZone(),
     }).format(new Date(limit.resets_at));
 
   const openItem = (item: NotificationItem) => {

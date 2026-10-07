@@ -26,6 +26,8 @@ export const demoUser = {
   can_edit_templates: true,
   can_use_customer_directory: true,
   email: "alex.turner@example.com",
+  time_zone: null,
+  default_time_zone: "Europe/Berlin",
 };
 
 // ── Queues (agent tree with counts) ─────────────────────────────────────────
@@ -1473,6 +1475,8 @@ export function resolveData(path: string, method: string): unknown | undefined {
   // Auth
   if (p.endsWith("/auth/methods")) return { password: true, oidc: false, spnego: false, webauthn: true, ldap: false };
   if (p.endsWith("/auth/me")) return demoUser;
+  // The demo cannot read the body; saving keeps the browser-zone default.
+  if (p.endsWith("/auth/me/time-zone") && method === "PUT") return demoUser;
   if (p.endsWith("/auth/login") && method === "POST") return { user: demoUser };
   if (p.endsWith("/auth/logout")) return {};
   if (p.endsWith("/auth/totp")) return { enabled: true, confirmed: true };

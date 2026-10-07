@@ -173,3 +173,34 @@ describe("isPresetActive", () => {
     }
   });
 });
+
+describe("dateRangeForPreset in an explicit zone", () => {
+  // 23:30 UTC on Tuesday 31 March: already Wednesday 1 April in Tokyo.
+  const INSTANT = new Date("2026-03-31T23:30:00Z");
+
+  it("takes today from the zone's calendar", () => {
+    expect(dateRangeForPreset("today", INSTANT, "Asia/Tokyo")).toEqual({
+      from: "2026-04-01",
+      to: "2026-04-01",
+    });
+    expect(dateRangeForPreset("today", INSTANT, "America/New_York")).toEqual({
+      from: "2026-03-31",
+      to: "2026-03-31",
+    });
+  });
+
+  it("derives month and quarter presets from that day", () => {
+    expect(dateRangeForPreset("thisMonth", INSTANT, "Asia/Tokyo")).toEqual({
+      from: "2026-04-01",
+      to: "2026-04-01",
+    });
+    expect(dateRangeForPreset("lastQuarter", INSTANT, "Asia/Tokyo")).toEqual({
+      from: "2026-01-01",
+      to: "2026-03-31",
+    });
+    expect(dateRangeForPreset("thisMonth", INSTANT, "America/New_York")).toEqual({
+      from: "2026-03-01",
+      to: "2026-03-31",
+    });
+  });
+});

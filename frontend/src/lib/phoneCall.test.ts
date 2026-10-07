@@ -8,7 +8,9 @@ import {
   elapsedToMinutes,
   formatElapsed,
   loadPhoneDraft,
+  pendingIso,
   savePhoneDraft,
+  toLocalInputValue,
 } from "./phoneCall";
 
 const STATES = [
@@ -42,6 +44,22 @@ describe("phoneCall helpers", () => {
     expect(callbackPresetDate("tomorrow9", now)).toEqual(new Date(2026, 8, 30, 9, 0, 0));
     // After 16:00 "today 16:00" is gone.
     expect(callbackPresetDate("today16", new Date(2026, 8, 29, 16, 5))).toBeNull();
+  });
+
+  it("anchors callback presets to the wall clock of the given zone", () => {
+    // 21:00 UTC: 23:00 in Berlin, 17:00 in New York.
+    const now = new Date("2026-09-29T21:00:00Z");
+    expect(callbackPresetDate("today16", now, "Europe/Berlin")).toBeNull();
+    expect(callbackPresetDate("today16", now, "America/New_York")).toBeNull();
+    expect(callbackPresetDate("tomorrow9", now, "Europe/Berlin")?.toISOString()).toBe(
+      "2026-09-30T07:00:00.000Z",
+    );
+    expect(callbackPresetDate("tomorrow9", now, "America/New_York")?.toISOString()).toBe(
+      "2026-09-30T13:00:00.000Z",
+    );
+    expect(toLocalInputValue(now, "Europe/Berlin")).toBe("2026-09-29T23:00");
+    expect(pendingIso("2026-09-30T09:00", "Europe/Berlin")).toBe("2026-09-30T07:00:00.000Z");
+    expect(pendingIso("", "Europe/Berlin")).toBeNull();
   });
 
   it("picks the Znuny default state per direction and the callback state", () => {

@@ -1,4 +1,11 @@
-/** Pure date-grid math for the calendar month/week views (no date library). */
+/** Pure date-grid math for the calendar month/week views (no date library).
+ *
+ * Grid cells are browser-local `Date`s that stand for calendar days of the
+ * agent's display zone (their local fields are that zone's wall clock, see
+ * `wallClockDate`); instants from the API are mapped onto them by
+ * `ymdInZone`, and cells back to instants by `wallDateToUtcIso`. */
+
+import { displayTimeZone, ymdInZone, zonedWallTimeToUtc } from "./timeZone";
 
 export function startOfDay(d: Date): Date {
   const out = new Date(d);
@@ -47,14 +54,15 @@ export function isCurrentMonth(d: Date, anchor: Date): boolean {
   return d.getMonth() === anchor.getMonth() && d.getFullYear() === anchor.getFullYear();
 }
 
-/** Group occurrences by their local calendar day (YYYY-MM-DD key). */
+/** Group occurrences by their calendar day in `zone` (YYYY-MM-DD key, the
+ * same as `dayKey` of the grid cell showing that day). */
 export function groupByDay<T extends { start_time: string }>(
   items: T[],
+  zone: string = displayTimeZone(),
 ): Map<string, T[]> {
   const map = new Map<string, T[]>();
   for (const item of items) {
-    const d = new Date(item.start_time);
-    const key = dayKey(d);
+    const key = ymdInZone(item.start_time, zone);
     const list = map.get(key);
     if (list) list.push(item);
     else map.set(key, [item]);
@@ -67,4 +75,11 @@ export function dayKey(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/** The instant a grid `Date` (wall clock of `zone` in its local fields)
+ * stands for, as ISO — for API range bounds. */
+export function wallDateToUtcIso(d: Date, zone: string = displayTimeZone()): string {
+  const hm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return (zonedWallTimeToUtc(dayKey(d), hm, zone) ?? d).toISOString();
 }

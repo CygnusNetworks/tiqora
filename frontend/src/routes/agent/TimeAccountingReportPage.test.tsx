@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { rangeForPreset } from "@/lib/dateRange";
+import { setDisplayTimeZone } from "@/lib/timeZone";
 import { TimeAccountingReportPage, type TimeAccountingSearch } from "./TimeAccountingReportPage";
 
 const navigate = vi.fn();
@@ -79,6 +80,8 @@ function lastSearchPatch(): TimeAccountingSearch {
 }
 
 describe("TimeAccountingReportPage", () => {
+  afterEach(() => setDisplayTimeZone(null));
+
   beforeEach(() => {
     navigate.mockReset();
     searchParams = {};
@@ -161,6 +164,45 @@ describe("TimeAccountingReportPage", () => {
     // One tbody per calendar day, each with a day-total header row.
     expect(screen.getByTestId("ta-table").querySelectorAll("tbody")).toHaveLength(2);
     expect(screen.getByTestId("ta-chart")).toBeInTheDocument();
+  });
+
+  it("groups bookings by calendar day in the agent's zone", async () => {
+    // 09:00Z and 11:00Z on 4 Aug: one day in Los Angeles (02:00, 04:00),
+    // two in Kiritimati (UTC+14: 23:00 on the 4th, 01:00 on the 5th).
+    listTimeAccountingReport.mockResolvedValue({
+      items: [
+        row({ id: 1, create_time: "2026-08-04T09:00:00Z" }),
+        row({ id: 2, create_time: "2026-08-04T11:00:00Z" }),
+      ],
+      total_units: 3,
+      offset: 0,
+      limit: 100,
+    });
+
+    setDisplayTimeZone("America/Los_Angeles");
+    const { unmount } = renderPage();
+    await waitFor(() => expect(screen.getByTestId("ta-table")).toBeInTheDocument());
+    expect(screen.getByTestId("ta-table").querySelectorAll("tbody")).toHaveLength(1);
+    unmount();
+
+    setDisplayTimeZone("Pacific/Kiritimati");
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("ta-table")).toBeInTheDocument());
+    expect(screen.getByTestId("ta-table").querySelectorAll("tbody")).toHaveLength(2);
+    // Times are shown in the zone too: 11:00Z is 01:00 in Kiritimati.
+    expect(screen.getByTestId("ta-table")).toHaveTextContent("01:00");
+  });
+
+  it("sends the date filter as day bounds of the agent's zone", async () => {
+    setDisplayTimeZone("America/Los_Angeles");
+    searchParams = { created_from: "2026-08-04", created_to: "2026-08-05" };
+    renderPage();
+
+    await waitFor(() => expect(listTimeAccountingReport).toHaveBeenCalled());
+    expect(listTimeAccountingReport.mock.calls[0][0]).toMatchObject({
+      created_from: "2026-08-04T07:00:00.000Z",
+      created_to: "2026-08-06T06:59:59.999Z",
+    });
   });
 
   it("omits the chart when all rows fall on one day", async () => {

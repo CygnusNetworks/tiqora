@@ -5,6 +5,14 @@
  */
 import type { StateRef } from "@tiqora/api-client";
 import type { DialScheme, DynamicFieldDef, PhoneDirection } from "./phoneApi";
+import {
+  addDaysYmd,
+  displayTimeZone,
+  fromZonedInputValue,
+  toZonedInputValue,
+  ymdInZone,
+  zonedWallTimeToUtc,
+} from "./timeZone";
 
 /** `mm:ss`, or `h:mm:ss` from one hour on. */
 export function formatElapsed(totalSeconds: number): string {
@@ -26,28 +34,30 @@ export type CallbackPreset = "inOneHour" | "today16" | "tomorrow9";
 
 export const CALLBACK_PRESETS: CallbackPreset[] = ["inOneHour", "today16", "tomorrow9"];
 
-/** The moment a callback preset stands for, relative to *now*. `null` for
- * "today 16:00" once that time has passed. */
-export function callbackPresetDate(preset: CallbackPreset, now: Date = new Date()): Date | null {
-  const d = new Date(now.getTime());
+/** The moment a callback preset stands for, relative to *now*, with the wall
+ * clock of `zone` (the agent's display zone). `null` for "today 16:00" once
+ * that time has passed. */
+export function callbackPresetDate(
+  preset: CallbackPreset,
+  now: Date = new Date(),
+  zone: string = displayTimeZone(),
+): Date | null {
   if (preset === "inOneHour") {
+    const d = new Date(now.getTime());
     d.setSeconds(0, 0);
-    d.setHours(d.getHours() + 1);
-    return d;
+    return new Date(d.getTime() + 3_600_000);
   }
+  const today = ymdInZone(now, zone);
   if (preset === "today16") {
-    d.setHours(16, 0, 0, 0);
-    return d.getTime() > now.getTime() ? d : null;
+    const d = zonedWallTimeToUtc(today, "16:00", zone);
+    return d && d.getTime() > now.getTime() ? d : null;
   }
-  d.setDate(d.getDate() + 1);
-  d.setHours(9, 0, 0, 0);
-  return d;
+  return zonedWallTimeToUtc(addDaysYmd(today, 1), "09:00", zone);
 }
 
-/** `<input type="datetime-local">` value (local time, minutes). */
-export function toLocalInputValue(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** `<input type="datetime-local">` value (wall time in `zone`, minutes). */
+export function toLocalInputValue(d: Date, zone: string = displayTimeZone()): string {
+  return toZonedInputValue(d, zone);
 }
 
 /** Next-state choice in the phone composers. */
@@ -186,11 +196,10 @@ export function timerFromCall(
   };
 }
 
-/** `datetime-local` value → ISO string for the API (`null` when blank). */
-export function pendingIso(value: string): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+/** `datetime-local` value (wall time in `zone`) → ISO string for the API
+ * (`null` when blank). */
+export function pendingIso(value: string, zone: string = displayTimeZone()): string | null {
+  return fromZonedInputValue(value, zone)?.toISOString() ?? null;
 }
 
 /** Required dynamic fields without a value, by name. */

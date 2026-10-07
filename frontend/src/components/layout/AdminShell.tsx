@@ -23,6 +23,8 @@ import {
   type AdminPageGroup,
 } from "@/lib/adminSearch";
 import { cn } from "@/lib/cn";
+import { effectiveTimeZone } from "@/lib/timeZone";
+import { useOptionalAuth } from "@/auth/AuthContext";
 
 const GROUP_META: Record<
   AdminPageGroup,
@@ -271,6 +273,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(NAV_COLLAPSED_KEY) === "1",
   );
+  const timeZone = effectiveTimeZone(useOptionalAuth()?.user?.time_zone);
   // The rail's active group: follows the route, but a rail click may preview
   // another group without navigating.
   const routeGroup = groupForPath(pathname);
@@ -390,7 +393,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main className={cn("min-w-0 flex-1 animate-route-in")}>
+        {/* Keyed by the display zone: a changed zone re-renders every date. */}
+        <main key={timeZone} className={cn("min-w-0 flex-1 animate-route-in")}>
           {children}
         </main>
       </div>

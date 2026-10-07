@@ -13,6 +13,7 @@ import { PriorityChip, StateChip } from "@/components/ui/StatusChip";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
 import { setTicketNavContext } from "@/lib/ticketNavContext";
+import { addDaysYmd, displayTimeZone, ymdInZone } from "@/lib/timeZone";
 import { SmartSearchBar } from "@/components/agent/SmartSearchBar";
 import { detectQueryType } from "@/components/agent/smartSearch";
 
@@ -43,11 +44,9 @@ const STATE_TYPES = ["new", "open", "pending", "closed"] as const;
 const SORT_ORDERS = ["changed_desc", "created_desc", "created_asc"] as const satisfies readonly SortOrder[];
 const DEFAULT_SORT: SortOrder = "changed_desc";
 
-/** ISO date (YYYY-MM-DD) for N days before today, local calendar. */
+/** ISO date (YYYY-MM-DD) for N days before today, in the agent's display zone. */
 function isoDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return addDaysYmd(ymdInZone(new Date()), -days);
 }
 
 /** Preset ranges for the quick chips. `days: null` = clear the range (all time). */
@@ -172,6 +171,7 @@ export function SearchPage() {
       createdTo,
       sort,
       includeArchived,
+      displayTimeZone(),
     ],
     queryFn: ({ signal }) =>
       api.search(
@@ -185,6 +185,8 @@ export function SearchPage() {
           customer_id: customerId,
           created_from: createdFrom,
           created_to: createdTo,
+          // The day chips are the agent's calendar days, not UTC days.
+          tz: createdFrom || createdTo ? displayTimeZone() : undefined,
           sort,
           include_archived: includeArchived || undefined,
         },

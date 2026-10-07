@@ -1150,7 +1150,17 @@
     "theme": "Tema",
     "themeLight": "Lys",
     "themeDark": "Mørk",
-    "themeSystem": "System"
+    "themeSystem": "System",
+    "timeZone": "Time zone",
+    "timeZoneBrowser": "Use browser time zone ({{zone}})",
+    "timeZoneError": "Could not save the time zone."
+  },
+  "timeZoneHint": {
+    "browserVsSystem": "Your browser is set to {{browser}}; e-mails and notifications use {{system}}.",
+    "settingVsDevice": "Times are shown in {{zone}} (your setting); this device is set to {{browser}}.",
+    "useZone": "Use {{zone}}",
+    "choose": "Choose time zone",
+    "dismiss": "Dismiss"
   },
   "newTicket": {
     "new": "Ny",

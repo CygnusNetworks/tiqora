@@ -22,7 +22,8 @@ import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { PlusIcon } from "@/components/ui/icons";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { SelectField } from "@/components/ui/SelectField";
-import { formatDateTime, formatDateOnly } from "@/lib/format";
+import { formatCalendarDay, formatDateTime } from "@/lib/format";
+import { zonedDayEndIso, zonedDayStartIso } from "@/lib/timeZone";
 import { cn } from "@/lib/cn";
 
 const JOBS_KEY = ["admin", "gdpr", "jobs"] as const;
@@ -180,15 +181,14 @@ function parsePrefillLogins(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+// Date-only inputs → day bounds in the agent's display zone, sent as UTC
+// instants (the backend accepts ISO datetimes).
 function dateToIsoStart(date: string): string | null {
-  if (!date) return null;
-  // Date-only input → start of day UTC-ish; backend accepts ISO datetime.
-  return new Date(`${date}T00:00:00`).toISOString();
+  return date ? zonedDayStartIso(date) : null;
 }
 
 function dateToIsoEnd(date: string): string | null {
-  if (!date) return null;
-  return new Date(`${date}T23:59:59.999`).toISOString();
+  return date ? zonedDayEndIso(date) : null;
 }
 
 function buildSelector(form: SelectorForm): ErasureSelectorIn {
@@ -828,7 +828,7 @@ export function GdprPage() {
     if (form.activityKind === "no_open_tickets") return t("admin.gdpr.activity.noOpenTickets");
     if (form.activityKind === "inactive_since") {
       return form.inactiveSince
-        ? `${t("admin.gdpr.activity.inactiveSince")} ${formatDateOnly(form.inactiveSince, locale)}`
+        ? `${t("admin.gdpr.activity.inactiveSince")} ${formatCalendarDay(form.inactiveSince, locale)}`
         : t("admin.gdpr.activity.inactiveSince");
     }
     return "";
@@ -850,9 +850,9 @@ export function GdprPage() {
       case "emailRegex":
         return form.emailRegex;
       case "changedAfter":
-        return formatDateOnly(form.changedAfter, locale);
+        return formatCalendarDay(form.changedAfter, locale);
       case "changedBefore":
-        return formatDateOnly(form.changedBefore, locale);
+        return formatCalendarDay(form.changedBefore, locale);
       case "activity":
         return activityValueText();
       case "validId":

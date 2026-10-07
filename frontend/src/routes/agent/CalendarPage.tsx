@@ -3,7 +3,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import type { AppointmentOut, OccurrenceOut } from "@/lib/api";
-import { addDays, dayKey, groupByDay, isSameDay, monthGridDays, weekDays } from "@/lib/calendarMath";
+import {
+  addDays,
+  dayKey,
+  groupByDay,
+  monthGridDays,
+  wallDateToUtcIso,
+  weekDays,
+} from "@/lib/calendarMath";
+import { formatCalendarDay } from "@/lib/format";
+import {
+  displayTimeZone,
+  fromZonedInputValue,
+  wallClockDate,
+  ymdInZone,
+  zonedDayStartIso,
+  zonedWallTimeToUtc,
+} from "@/lib/timeZone";
+import { toBcp47 } from "@/i18n";
 import { MonthGrid } from "@/components/agent/calendar/MonthGrid";
 import { AppointmentDialog } from "@/components/agent/calendar/AppointmentDialog";
 import {
@@ -26,9 +43,15 @@ const CALENDAR_PALETTE = [
 type ViewMode = "month" | "week" | "agenda";
 
 function toIso(localDateTime: string): string {
-  // datetime-local has no timezone; interpret as local time.
-  const d = new Date(localDateTime);
-  return d.toISOString();
+  // datetime-local has no timezone; interpret it in the agent's display zone.
+  return (fromZonedInputValue(localDateTime) ?? new Date(localDateTime)).toISOString();
+}
+
+/** Recurrence end: the loaded datetime-local value as is, or a picked day
+ * from its start in the agent's display zone. */
+function untilIso(value: string): string | undefined {
+  if (!value) return undefined;
+  return value.includes("T") ? toIso(value) : (zonedDayStartIso(value) ?? undefined);
 }
 
 function fromFormValue(form: AppointmentFormValue) {
@@ -39,7 +62,7 @@ function fromFormValue(form: AppointmentFormValue) {
           type: form.recurrence.type,
           interval: form.recurrence.interval || 1,
           count: form.recurrence.count ? Number(form.recurrence.count) : undefined,
-          until: form.recurrence.until ? new Date(form.recurrence.until).toISOString() : undefined,
+          until: untilIso(form.recurrence.until),
         };
   return {
     calendar_id: form.calendar_id,
@@ -57,7 +80,9 @@ export function CalendarPage() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [view, setView] = useState<ViewMode>("month");
-  const [anchor, setAnchor] = useState(new Date());
+  const locale = toBcp47(i18n.language);
+  // Grid dates hold the display zone's wall clock (see calendarMath).
+  const [anchor, setAnchor] = useState(() => wallClockDate());
   const [selectedCalendarIds, setSelectedCalendarIds] = useState<Set<number> | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<AppointmentOut | null>(null);
@@ -96,14 +121,14 @@ export function CalendarPage() {
     queryKey: [
       "calendar",
       "appointments",
-      rangeStart.toISOString(),
-      rangeEnd.toISOString(),
+      wallDateToUtcIso(rangeStart),
+      wallDateToUtcIso(rangeEnd),
       [...activeCalendarIds].sort(),
     ],
     queryFn: () =>
       api.listAppointments({
-        start: rangeStart.toISOString(),
-        end: rangeEnd.toISOString(),
+        start: wallDateToUtcIso(rangeStart),
+        end: wallDateToUtcIso(rangeEnd),
         calendar_id: [...activeCalendarIds],
       }),
     enabled: (calendarsQ.data ?? []).length > 0,
@@ -143,8 +168,8 @@ export function CalendarPage() {
   const openCreateDialog = (day?: Date) => {
     const calId = [...activeCalendarIds][0] ?? calendarsQ.data?.[0]?.id;
     if (!calId) return;
-    const start = day ? new Date(day) : new Date();
-    if (day) start.setHours(9, 0, 0, 0);
+    // A picked day starts at 09:00 in the agent's display zone.
+    const start = (day && zonedWallTimeToUtc(dayKey(day), "09:00")) || new Date();
     setEditingAppointment(null);
     setFormValue(defaultFormValue(calId, start));
     setFormError(null);
@@ -191,7 +216,7 @@ export function CalendarPage() {
     else setAnchor((a) => new Date(a.getFullYear(), a.getMonth() + delta, 1));
   };
 
-  const monthLabel = new Intl.DateTimeFormat(i18n.language, {
+  const monthLabel = new Intl.DateTimeFormat(locale, {
     month: "long",
     year: "numeric",
   }).format(anchor);
@@ -249,7 +274,7 @@ export function CalendarPage() {
             <Button size="sm" variant="ghost" onClick={() => navigate(-1)} aria-label="prev">
               ‹
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setAnchor(new Date())}>
+            <Button size="sm" variant="secondary" onClick={() => setAnchor(wallClockDate())}>
               {t("calendar.today")}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => navigate(1)} aria-label="next">
@@ -301,7 +326,7 @@ export function CalendarPage() {
           <div className="grid flex-1 grid-cols-7 gap-1" data-testid="calendar-week-view">
             {weekDays(anchor).map((day) => {
               const key = dayKey(day);
-              const dayOccs = occurrences.filter((o) => isSameDay(new Date(o.start_time), day));
+              const dayOccs = occurrences.filter((o) => ymdInZone(o.start_time) === key);
               return (
                 <div
                   key={key}
@@ -309,7 +334,7 @@ export function CalendarPage() {
                   data-testid={`calendar-week-day-${key}`}
                 >
                   <span className="text-xs font-semibold text-muted">
-                    {new Intl.DateTimeFormat(i18n.language, { weekday: "short", day: "numeric" }).format(day)}
+                    {new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" }).format(day)}
                   </span>
                   {dayOccs.map((occ) => (
                     <button
@@ -334,9 +359,7 @@ export function CalendarPage() {
               agendaGroups.map(([day, items]) => (
                 <div key={day} className="mb-3">
                   <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">
-                    {new Intl.DateTimeFormat(i18n.language, { dateStyle: "full" }).format(
-                      new Date(day),
-                    )}
+                    {formatCalendarDay(day, locale, { dateStyle: "full" })}
                   </h3>
                   <ul className="space-y-1">
                     {items.map((occ) => (
@@ -352,9 +375,10 @@ export function CalendarPage() {
                           />
                           <span className="font-medium text-ink">{occ.title}</span>
                           <span className="ml-auto text-xs text-muted">
-                            {new Intl.DateTimeFormat(i18n.language, { timeStyle: "short" }).format(
-                              new Date(occ.start_time),
-                            )}
+                            {new Intl.DateTimeFormat(locale, {
+                              timeStyle: "short",
+                              timeZone: displayTimeZone(),
+                            }).format(new Date(occ.start_time))}
                           </span>
                         </button>
                       </li>

@@ -32065,6 +32065,8 @@ export interface operations {
                 created_from?: string | null;
                 /** @description ISO date, e.g. 2026-07-31 */
                 created_to?: string | null;
+                /** @description IANA zone of the created_from/to days; default: the agent's zone. */
+                tz?: string | null;
                 /** @description Result ordering. */
                 sort?: "changed_desc" | "created_desc" | "created_asc";
                 /** @description Also return archived tickets (admins only; ignored otherwise). */
@@ -32110,6 +32112,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -32151,6 +32154,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -32192,6 +32196,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
                 granularity?: "day" | "week" | "month";
             };
             header?: {
@@ -32234,6 +32239,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
                 granularity?: "day" | "week" | "month";
             };
             header?: {
@@ -32277,6 +32283,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -32319,6 +32326,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -32360,6 +32368,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -32401,6 +32410,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
             };
             header?: {
                 authorization?: string | null;
@@ -32442,6 +32452,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
                 granularity?: "day" | "week" | "month";
             };
             header?: {
@@ -32484,6 +32495,7 @@ export interface operations {
                 priority_id?: number | null;
                 type_id?: number | null;
                 customer_id?: string | null;
+                tz?: string | null;
                 granularity?: "day" | "week" | "month";
             };
             header?: {

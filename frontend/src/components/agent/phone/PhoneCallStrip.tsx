@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { formatElapsed } from "@/lib/phoneCall";
+import { displayTimeZone } from "@/lib/timeZone";
 
 export type CallDirection = "inbound" | "outbound";
 
@@ -21,7 +22,11 @@ function ArrowOut() {
 }
 
 const clock = (ms: number) =>
-  new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  new Date(ms).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: displayTimeZone(),
+  });
 
 const segBtn =
   "inline-flex items-center gap-1.5 px-2.5 py-1 text-[12.5px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent";

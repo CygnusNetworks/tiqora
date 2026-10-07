@@ -7,6 +7,7 @@
  * after a reload from the URL.
  */
 import { dateRangeForPreset, formatYmd, type DateRange } from "./dateRanges";
+import { displayTimeZone, wallClockDate } from "./timeZone";
 
 export type TimeRangePreset =
   | "today"
@@ -45,16 +46,18 @@ function isoWeekRange(now: Date, weeks: number): DateRange {
 }
 
 /**
- * Inclusive local date range for a preset as YYYY-MM-DD.
+ * Inclusive date range for a preset as YYYY-MM-DD, in calendar days of
+ * `zone` (the agent's display zone).
  * Running periods (this week/month/quarter/year) end today; closed periods
  * cover their full span. Pass `now` for deterministic tests.
  */
 export function rangeForPreset(
   preset: TimeRangePreset,
   now: Date = new Date(),
+  zone: string = displayTimeZone(),
 ): DateRange {
-  if (preset === "lastWeek") return isoWeekRange(now, -1);
-  return dateRangeForPreset(preset, now);
+  if (preset === "lastWeek") return isoWeekRange(wallClockDate(now, zone), -1);
+  return dateRangeForPreset(preset, now, zone);
 }
 
 /**
@@ -67,11 +70,12 @@ export function presetForRange(
   from: string | undefined,
   to: string | undefined,
   now: Date = new Date(),
+  zone: string = displayTimeZone(),
 ): TimeRangePreset | null {
   if (!from || !to) return null;
   return (
     TIME_RANGE_PRESETS.find((preset) => {
-      const range = rangeForPreset(preset, now);
+      const range = rangeForPreset(preset, now, zone);
       return range.from === from && range.to === to;
     }) ?? null
   );

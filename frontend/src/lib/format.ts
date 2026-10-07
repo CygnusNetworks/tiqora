@@ -1,4 +1,9 @@
-/** Relative age / datetime helpers for agent tables. */
+/** Relative age / datetime helpers for agent tables.
+ *
+ * Absolute times render in the agent's display time zone (see `timeZone.ts`);
+ * the trailing `timeZone` parameter overrides it (tests, explicit zones). */
+
+import { displayTimeZone, ymdInZone } from "./timeZone";
 
 export function formatAgeSeconds(
   ageSeconds: number | null | undefined,
@@ -38,6 +43,7 @@ export function formatRelative(
 export function formatDateTime(
   value: string | Date | null | undefined,
   locale: string,
+  timeZone: string = displayTimeZone(),
 ): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
@@ -45,13 +51,15 @@ export function formatDateTime(
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   }).format(d);
 }
 
-/** Date-only (no time-of-day) formatting, e.g. for expiry previews. */
+/** Date-only (no time-of-day) formatting of an instant, e.g. for expiry previews. */
 export function formatDateOnly(
   value: string | Date | null | undefined,
   locale: string,
+  timeZone: string = displayTimeZone(),
 ): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
@@ -60,7 +68,36 @@ export function formatDateOnly(
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    timeZone,
   }).format(d);
+}
+
+/** A calendar day given as `YYYY-MM-DD` (a filter bound, a group key) — not
+ * an instant, so no zone may shift it. Same style as `formatDateOnly` unless
+ * `options` say otherwise. */
+export function formatCalendarDay(
+  ymd: string | null | undefined,
+  locale: string,
+  options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit" },
+): string {
+  const m = ymd ? /^(\d{4})-(\d{2})-(\d{2})/.exec(ymd) : null;
+  if (!m) return "—";
+  const noonUtc = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12));
+  return new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(noonUtc);
+}
+
+/** Time of day (hours and minutes) of an instant. */
+export function formatTimeOfDay(
+  value: string | Date | null | undefined,
+  locale: string,
+  timeZone: string = displayTimeZone(),
+): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone }).format(
+    d,
+  );
 }
 
 export function formatBytes(size: string | number | null | undefined): string {
@@ -79,21 +116,28 @@ export function isEscalated(epoch: number | undefined | null): boolean {
 
 export type DayBucket = "today" | "yesterday" | "week" | "older";
 
-function startOfDay(d: Date): number {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+/** Days since the epoch of the calendar day an instant falls on in `zone`. */
+function dayNumber(d: Date, zone: string): number {
+  const [y, m, day] = ymdInZone(d, zone).split("-").map(Number);
+  return Date.UTC(y, m - 1, day) / 86_400_000;
 }
 
-function calendarDaysAgo(d: Date, now: Date): number {
-  return Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000);
+function calendarDaysAgo(d: Date, now: Date, zone: string): number {
+  return dayNumber(now, zone) - dayNumber(d, zone);
 }
 
-/** Which inbox day group a timestamp falls into, by local calendar day
- * (not by 24h distance: 23:50 yesterday is "yesterday" at 00:10 today). */
-export function dayBucket(value: string | Date | null | undefined, now = new Date()): DayBucket {
+/** Which inbox day group a timestamp falls into, by calendar day in the
+ * display zone (not by 24h distance: 23:50 yesterday is "yesterday" at 00:10
+ * today). */
+export function dayBucket(
+  value: string | Date | null | undefined,
+  now = new Date(),
+  timeZone: string = displayTimeZone(),
+): DayBucket {
   if (!value) return "older";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "older";
-  const days = calendarDaysAgo(d, now);
+  const days = calendarDaysAgo(d, now, timeZone);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 7) return "week";
@@ -108,23 +152,27 @@ export function formatListTime(
   locale: string,
   yesterdayLabel: string,
   now = new Date(),
+  timeZone: string = displayTimeZone(),
 ): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return "—";
-  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(d);
-  switch (dayBucket(d, now)) {
+  const time = formatTimeOfDay(d, locale, timeZone);
+  switch (dayBucket(d, now, timeZone)) {
     case "today":
       return time;
     case "yesterday":
       return yesterdayLabel;
     case "week":
-      return `${new Intl.DateTimeFormat(locale, { weekday: "short" }).format(d)} ${time}`;
-    default:
+      return `${new Intl.DateTimeFormat(locale, { weekday: "short", timeZone }).format(d)} ${time}`;
+    default: {
+      const sameYear = ymdInZone(d, timeZone).slice(0, 4) === ymdInZone(now, timeZone).slice(0, 4);
       return new Intl.DateTimeFormat(locale, {
         day: "2-digit",
         month: "2-digit",
-        year: d.getFullYear() === now.getFullYear() ? undefined : "2-digit",
+        year: sameYear ? undefined : "2-digit",
+        timeZone,
       }).format(d);
+    }
   }
 }

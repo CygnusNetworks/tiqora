@@ -16,6 +16,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { formatDateTime } from "@/lib/format";
+import { fromZonedInputValue } from "@/lib/timeZone";
 import { cn } from "@/lib/cn";
 
 const QUERY_KEY = ["admin", "mail", "log"] as const;
@@ -73,8 +74,9 @@ export function MailLogPage() {
       direction: direction || null,
       status: status || null,
       q: q.trim() || null,
-      from: from ? new Date(from).toISOString() : null,
-      to: to ? new Date(to).toISOString() : null,
+      // datetime-local values, read in the agent's display zone.
+      from: fromZonedInputValue(from)?.toISOString() ?? null,
+      to: fromZonedInputValue(to)?.toISOString() ?? null,
     }),
     [page, direction, status, q, from, to],
   );

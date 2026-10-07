@@ -1150,7 +1150,17 @@
     "theme": "Design",
     "themeLight": "Hell",
     "themeDark": "Dunkel",
-    "themeSystem": "System"
+    "themeSystem": "System",
+    "timeZone": "Zeitzone",
+    "timeZoneBrowser": "Browser-Zeitzone verwenden ({{zone}})",
+    "timeZoneError": "Die Zeitzone konnte nicht gespeichert werden."
+  },
+  "timeZoneHint": {
+    "browserVsSystem": "Dein Browser ist auf {{browser}} eingestellt; E-Mails und Benachrichtigungen verwenden {{system}}.",
+    "settingVsDevice": "Zeiten werden in {{zone}} angezeigt (deine Einstellung); dieses Gerät ist auf {{browser}} eingestellt.",
+    "useZone": "{{zone}} übernehmen",
+    "choose": "Zeitzone wählen",
+    "dismiss": "Ausblenden"
   },
   "newTicket": {
     "new": "Neu",
