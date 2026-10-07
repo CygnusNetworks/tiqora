@@ -60,6 +60,12 @@ class UserMe(BaseModel):
     # Znuny ``user_preferences.UserLanguage`` (e.g. ``de``, ``pt_BR``). Used by
     # the agent UI as the preferred interface language and by notifications.
     language: str | None = None
+    # Znuny ``user_preferences.UserTimeZone`` (IANA name), null when the agent
+    # never chose one. The UI then falls back to the browser's zone.
+    time_zone: str | None = None
+    # ``UserDefaultTimeZone`` — what server-rendered text (quotes, placeholders,
+    # notifications) uses for an agent without a preference.
+    default_time_zone: str = "UTC"
     # True when the agent has ``rw`` on the group named ``admin``
     # (see ``PermissionEngine.is_admin``). Used by the agent UI to show
     # admin navigation without probing an admin endpoint.
@@ -77,6 +83,12 @@ class UserLanguageUpdate(BaseModel):
     """Body for ``PUT /auth/me/language`` — Znuny-compatible language code."""
 
     language: str
+
+
+class UserTimeZoneUpdate(BaseModel):
+    """Body for ``PUT /auth/me/time-zone`` — IANA zone, or null to clear."""
+
+    time_zone: str | None
 
 
 class LoginRequest(BaseModel):

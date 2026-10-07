@@ -470,6 +470,22 @@ class AuthService:
         await self._upsert_preference(user_id, "UserLanguage", language)
         await self._session.commit()
 
+    async def set_user_time_zone(self, user_id: int, zone: str | None) -> None:
+        """Upsert Znuny's ``UserTimeZone`` preference; ``None`` removes it."""
+        from sqlalchemy import text
+
+        if zone is None:
+            await self._session.execute(
+                text(
+                    "DELETE FROM user_preferences"
+                    " WHERE user_id = :uid AND preferences_key = 'UserTimeZone'"
+                ),
+                {"uid": user_id},
+            )
+        else:
+            await self._upsert_preference(user_id, "UserTimeZone", zone)
+        await self._session.commit()
+
     async def _stamp_last_login(self, user_id: int) -> None:
         """Record "the agent just signed in" as ``UserLastLogin``.
 

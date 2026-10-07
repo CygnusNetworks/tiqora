@@ -4092,6 +4092,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/me/time-zone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set My Time Zone
+         * @description Persist Znuny ``UserTimeZone``; drives the UI and server-rendered times.
+         */
+        put: operations["set_my_time_zone_api_v1_auth_me_time_zone_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/methods": {
         parameters: {
             query?: never;
@@ -15996,6 +16016,11 @@ export interface components {
              * @default false
              */
             can_use_customer_directory: boolean;
+            /**
+             * Default Time Zone
+             * @default UTC
+             */
+            default_time_zone: string;
             /** Email */
             email?: string | null;
             /** First Name */
@@ -16013,6 +16038,8 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /** Time Zone */
+            time_zone?: string | null;
         };
         /** UserOut */
         UserOut: {
@@ -16053,6 +16080,14 @@ export interface components {
             column: string;
             /** Table */
             table: string;
+        };
+        /**
+         * UserTimeZoneUpdate
+         * @description Body for ``PUT /auth/me/time-zone`` — IANA zone, or null to clear.
+         */
+        UserTimeZoneUpdate: {
+            /** Time Zone */
+            time_zone: string | null;
         };
         /** UserUpdate */
         UserUpdate: {
@@ -28292,6 +28327,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UserLanguageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_my_time_zone_api_v1_auth_me_time_zone_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTimeZoneUpdate"];
             };
         };
         responses: {
