@@ -560,6 +560,55 @@ async def test_favorites_star_list_and_unstar(seeded: str) -> None:
     assert [e["login"] for e in after["favorites"]] == [_PREFIX + "laura"]
 
 
+async def test_favorites_survive_a_collation_mismatch(seeded: str) -> None:
+    """Production: the tiqora_* table got the server default collation, Znuny's
+    customer_user.login another one; a column-to-column compare then fails
+    ("Illegal mix of collations") and took the whole shortlist down."""
+    engine = create_engine(seeded)
+    with engine.begin() as conn:
+        theirs = conn.execute(
+            text(
+                "SELECT character_set_name, collation_name FROM information_schema.columns"
+                " WHERE table_schema = DATABASE() AND table_name = 'customer_user'"
+                " AND column_name = 'login'"
+            )
+        ).one()
+        charset, collation = theirs
+        other = conn.execute(
+            text(
+                "SELECT collation_name FROM information_schema.collations"
+                " WHERE character_set_name = :cs AND collation_name <> :co"
+                " AND collation_name LIKE :pat ORDER BY collation_name LIMIT 1"
+            ),
+            {"cs": charset, "co": collation, "pat": f"{charset}_%_ci"},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "ALTER TABLE tiqora_customer_favorite MODIFY customer_login"
+                f" VARCHAR(200) CHARACTER SET {charset} COLLATE {other} NOT NULL"
+            )
+        )
+    try:
+        await _grant(seeded, FeatureGrants(user_ids=[DIRECT]))
+        client, aengine = await _client(seeded, DIRECT)
+        async with client:
+            put = await client.put(f"/api/v1/customer-directory/favorites/{_PREFIX}laura")
+            resp = await client.get("/api/v1/customer-directory/shortlist")
+        await aengine.dispose()
+        assert put.status_code == 204, put.text
+        assert resp.status_code == 200, resp.text
+        assert [e["login"] for e in resp.json()["favorites"]] == [_PREFIX + "laura"]
+    finally:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE tiqora_customer_favorite MODIFY customer_login"
+                    f" VARCHAR(200) CHARACTER SET {charset} COLLATE {collation} NOT NULL"
+                )
+            )
+        engine.dispose()
+
+
 async def test_favorites_forbidden_without_grant(seeded: str) -> None:
     outsider, engine = await _client(seeded, OUTSIDER)
     async with outsider:
