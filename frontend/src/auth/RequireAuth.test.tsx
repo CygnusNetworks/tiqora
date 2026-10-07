@@ -58,6 +58,18 @@ describe("RequireAuth", () => {
     expect(screen.queryByTestId("protected")).toBeNull();
   });
 
+  it("does not redirect again once the location is already /login", () => {
+    pathname = "/login";
+    searchStr = "?next=%2Fagent";
+    render(
+      <RequireAuth>
+        <div data-testid="protected">secret</div>
+      </RequireAuth>,
+    );
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("protected")).toBeNull();
+  });
+
   it("keeps the query string in next", () => {
     pathname = "/agent/dial";
     searchStr = "?number=%2B49171&ticket=42";
