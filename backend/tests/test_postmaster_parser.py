@@ -67,6 +67,66 @@ def test_html_only_falls_back_to_tag_strip() -> None:
     assert parsed.content_type == "text/plain; charset=utf-8"
 
 
+def test_inline_text_parts_without_filename_are_the_body() -> None:
+    # MIME::Tools-style mail (seen from an S/MIME-signing mailing list): both
+    # alternatives carry "Content-Disposition: inline" but no filename. They
+    # are the body, not two "unnamed" attachments next to an empty article.
+    raw = (
+        b"From: netadmin@example.com\r\n"
+        b"To: support@example.com\r\n"
+        b"Subject: Softwareupdate\r\n"
+        b"MIME-Version: 1.0\r\n"
+        b'Content-Type: multipart/signed; protocol="application/x-pkcs7-signature";'
+        b' micalg="sha-256"; boundary="SIG"\r\n'
+        b"\r\n"
+        b"--SIG\r\n"
+        b'Content-Type: multipart/alternative; boundary="ALT"\r\n'
+        b"\r\n"
+        b"--ALT\r\n"
+        b'Content-Type: text/plain; charset="utf-8"\r\n'
+        b"Content-Disposition: inline\r\n"
+        b"Content-Transfer-Encoding: quoted-printable\r\n"
+        b"\r\n"
+        b"Sehr geehrte Damen und Herren,=0Adas Update l=C3=A4uft heute.\r\n"
+        b"--ALT\r\n"
+        b'Content-Type: text/html; charset="utf-8"\r\n'
+        b"Content-Disposition: inline\r\n"
+        b"\r\n"
+        b"<p>Sehr geehrte Damen und Herren</p>\r\n"
+        b"--ALT--\r\n"
+        b"\r\n"
+        b"--SIG\r\n"
+        b'Content-Type: application/x-pkcs7-signature; name="smime.p7s"\r\n'
+        b"Content-Transfer-Encoding: base64\r\n"
+        b'Content-Disposition: attachment; filename="smime.p7s"\r\n'
+        b"\r\n"
+        b"MIIB\r\n"
+        b"--SIG--\r\n"
+    )
+
+    parsed = parse_email(raw)
+
+    assert parsed.body.startswith("Sehr geehrte Damen und Herren,\ndas Update läuft heute.")
+    assert [a.filename for a in parsed.attachments] == ["smime.p7s"]
+
+
+def test_second_inline_text_part_stays_an_attachment() -> None:
+    # Only the first text/plain part becomes the body; a later one (e.g. a
+    # forwarded snippet) is kept rather than silently dropped.
+    msg = EmailMessage()
+    msg["From"] = "erin@example.com"
+    msg["To"] = "support@example.com"
+    msg["Subject"] = "Two parts"
+    msg.set_content("First part.", disposition="inline")
+    msg.add_attachment("Second part.", disposition="inline")
+
+    parsed = parse_email(_to_bytes(msg))
+
+    assert parsed.body.strip() == "First part."
+    assert len(parsed.attachments) == 1
+    assert parsed.attachments[0].content == b"Second part.\n"
+
+
 def test_base64_attachment_roundtrips() -> None:
     msg = EmailMessage()
     msg["From"] = "dave@example.com"
