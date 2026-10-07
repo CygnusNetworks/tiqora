@@ -1279,6 +1279,20 @@ const adminCustomerUsers = CUSTOMERS.map((c, i) => ({ id: i + 1, login: c.login,
 const directoryEntries = [...adminCustomerUsers]
   .sort((a, b) => a.last_name.localeCompare(b.last_name))
   .map((c) => ({ login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name, title: null, first_name: c.first_name, last_name: c.last_name, phone: c.phone, mobile: null, city: "Bonn", valid_id: 1 }));
+// Customer keys: only Jane Doe has one, like the rare real case.
+const demoCustomerCryptoKeys = (login: string) => ({
+  pgp_enabled: true,
+  smime_enabled: true,
+  can_edit: true,
+  pgp_keys:
+    login === "j.doe@acme.example"
+      ? [{ fingerprint: "8F3A21C49B0E7D5512AC66F0E1D2C3B48F3A21C4", key_id: "E1D2C3B48F3A21C4", short_id: "8F3A21C4", znuny_key_id: "8F3A21C4", uids: ["Jane Doe <j.doe@acme.example>"], emails: ["j.doe@acme.example"], created: "2025-03-14T09:00:00Z", expires: "2027-03-14T09:00:00Z", status: "good", has_secret: false, bits: 4096, algorithm: "RSA", subkey_ids: [] }]
+      : [],
+  smime_certificates: [],
+  pgp_key_id: null,
+  smime_filename: null,
+  problems: [],
+});
 // Customer workbench: the agent's shortlist, one customer, one company.
 const demoCustomerDetail = (login: string) => {
   const c = adminCustomerUsers.find((x) => x.login === login) ?? adminCustomerUsers[0];
@@ -1634,6 +1648,8 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/admin/customer-users")) return page(adminCustomerUsers);
   if (p.endsWith("/customer-directory/shortlist")) return customerShortlist;
   if (p.match(/\/customer-directory\/companies\/[^/]+$/)) return demoCompanyDetail(decodeURIComponent(p.split("/").pop() ?? ""));
+  if (p.match(/\/api\/v1\/customers\/[^/]+\/crypto-keys$/) && method === "GET")
+    return demoCustomerCryptoKeys(decodeURIComponent(p.split("/").at(-2) ?? ""));
   if (p.match(/\/api\/v1\/customers\/[^/]+$/) && method === "GET") return demoCustomerDetail(decodeURIComponent(p.split("/").pop() ?? ""));
   if (p.endsWith("/customer-directory")) return page(directoryEntries);
   if (p.endsWith("/customer-directory/companies")) return Object.entries(COMPANY_NAMES).map(([customer_id, name]) => ({ customer_id, name }));

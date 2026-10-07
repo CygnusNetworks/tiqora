@@ -207,8 +207,13 @@ describe("CustomerDetailPage keys", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByTestId("customer-keys-card")).toBeInTheDocument();
-    expect(screen.getAllByTestId("customer-keys-pgp-row")).toHaveLength(1);
+    expect(await screen.findByTestId("customer-keys-summary")).toHaveTextContent("PGP");
+    expect(screen.getByTestId("customer-keys-reachable")).toBeInTheDocument();
+    expect(screen.queryByTestId("customer-keys-add")).toBeNull();
+    // The key list and upload only live in the dialog.
+    expect(screen.queryByTestId("customer-keys-pgp-row")).toBeNull();
+    fireEvent.click(screen.getByTestId("customer-keys-manage"));
+    expect(await screen.findAllByTestId("customer-keys-pgp-row")).toHaveLength(1);
     expect(screen.getByText(/Jane Doe <jane@example.com>/)).toBeInTheDocument();
 
     const pem = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
@@ -233,9 +238,28 @@ describe("CustomerDetailPage keys", () => {
   it("is read-only without edit permission", async () => {
     customerCryptoKeys.list.mockResolvedValue(keys({ can_edit: false }));
     renderPage();
+    fireEvent.click(await screen.findByTestId("customer-keys-manage"));
     expect(await screen.findByTestId("customer-keys-readonly")).toBeInTheDocument();
     expect(screen.queryByTestId("customer-keys-pgp-delete")).toBeNull();
     expect(screen.queryByTestId("customer-keys-smime-upload-file")).toBeNull();
+  });
+
+  it("shows only an add link while no key is stored", async () => {
+    customerCryptoKeys.list.mockResolvedValue(keys({ pgp_keys: [] }));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("customer-keys-add"));
+    expect(screen.queryByTestId("customer-keys-summary")).toBeNull();
+    expect(screen.queryByTestId("customer-keys-reachable")).toBeNull();
+    expect(await screen.findByTestId("customer-keys-pgp-upload-file")).toBeInTheDocument();
+  });
+
+  it("keeps expired keys visible but drops the encrypted-mail chip", async () => {
+    customerCryptoKeys.list.mockResolvedValue(keys({ pgp_keys: [{ ...pgpKey, status: "expired" }] }));
+    renderPage();
+    expect(await screen.findByTestId("customer-keys-summary")).toHaveTextContent(
+      `PGP ${i18n.t("cryptoKeys.status.expired")}`,
+    );
+    expect(screen.queryByTestId("customer-keys-reachable")).toBeNull();
   });
 
   it("renders nothing while PGP and S/MIME are disabled", async () => {
@@ -243,7 +267,8 @@ describe("CustomerDetailPage keys", () => {
     renderPage();
     await screen.findByTestId("customer-detail-page");
     await waitFor(() => expect(customerCryptoKeys.list).toHaveBeenCalled());
-    expect(screen.queryByTestId("customer-keys-card")).toBeNull();
+    expect(screen.queryByTestId("customer-keys-summary")).toBeNull();
+    expect(screen.queryByTestId("customer-keys-add")).toBeNull();
   });
 });
 

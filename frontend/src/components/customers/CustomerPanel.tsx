@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
-import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
+import { useCustomerCryptoKeys } from "@/components/agent/customerCryptoKeysQuery";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { StateChip } from "@/components/ui/StatusChip";
@@ -11,6 +12,12 @@ import { BuildingIcon, DownloadIcon, PencilIcon } from "@/components/ui/icons";
 import { api, type CustomerUserOut } from "@/lib/api";
 import { humanDuration } from "@/lib/status";
 import { CallAction, EmailTicketLink, PhoneTicketLink } from "./CustomerActions";
+import {
+  CustomerKeysAddLink,
+  CustomerKeysDialog,
+  CustomerKeysSummary,
+  EncryptedReachChip,
+} from "./CustomerKeys";
 import { customerName, initialsOf } from "./customerFormat";
 
 const TICKETS_SHOWN = 8;
@@ -33,6 +40,7 @@ export function CustomerPanel({
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const [keysOpen, setKeysOpen] = useState(false);
 
   const customerQ = useQuery({
     queryKey: ["customers", login],
@@ -54,6 +62,7 @@ export function CustomerPanel({
       api.listTickets({ customer_user_id: login, state_type: "open", limit: 1 }, signal),
     enabled: Boolean(login),
   });
+  const keysQ = useCustomerCryptoKeys(login);
 
   if (customerQ.isLoading) {
     return (
@@ -128,6 +137,7 @@ export function CustomerPanel({
             {c.title && <span>{c.title}</span>}
             {companyLink}
             <span className="font-mono text-xs">{c.customer_id}</span>
+            <EncryptedReachChip data={keysQ.data} />
           </div>
         </div>
         {onEdit && user?.can_edit_customers && (
@@ -221,6 +231,7 @@ export function CustomerPanel({
                 )}
               </dd>
             </div>
+            <CustomerKeysSummary data={keysQ.data} onOpen={() => setKeysOpen(true)} />
             {address && (
               <div>
                 <dt className="text-xs text-muted">{t("customerWorkbench.address")}</dt>
@@ -260,11 +271,12 @@ export function CustomerPanel({
                 {t("customerWorkbench.companyVcards")}
               </a>
             )}
+            <CustomerKeysAddLink data={keysQ.data} onOpen={() => setKeysOpen(true)} />
           </div>
         </aside>
       </div>
 
-      <CustomerCryptoKeys login={c.login} />
+      <CustomerKeysDialog login={c.login} open={keysOpen} onClose={() => setKeysOpen(false)} />
     </div>
   );
 }

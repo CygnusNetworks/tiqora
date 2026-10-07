@@ -7,16 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { formatDateOnly } from "@/lib/format";
 import { readCertificateFile, readFileText } from "@/lib/cryptoFiles";
+import { statusTone } from "./cryptoStatus";
 
 const FILE_INPUT_CLASS =
   "block w-full text-sm text-ink file:mr-3 file:rounded-md file:border-0 file:bg-surface-subtle file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-ink hover:file:bg-hairline";
-
-function statusTone(status: string): "success" | "warn" | "danger" | "muted" {
-  if (status === "good" || status === "valid") return "success";
-  if (status === "expired") return "warn";
-  if (status === "revoked" || status === "invalid") return "danger";
-  return "muted";
-}
 
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
