@@ -126,6 +126,7 @@ export type {
   CustomerDirectoryCompanyDetail,
   CustomerShortlist,
   CustomerShortlistEntry,
+  CustomerFavoriteEntry,
   CustomerUpdateInput,
   CustomerUserOut,
   CustomerDirectoryFilter,

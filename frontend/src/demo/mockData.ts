@@ -1311,7 +1311,15 @@ const shortlistEntry = (login: string, minutesAgo: number, channel: string, coun
     last_at: new Date(Date.now() - minutesAgo * 60_000).toISOString(), last_channel: channel, ticket_count: count,
   };
 };
+const favoriteEntry = (login: string) => {
+  const c = demoCustomerDetail(login);
+  return {
+    login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name,
+    first_name: c.first_name, last_name: c.last_name, phone: c.phone, mobile: c.mobile,
+  };
+};
 const customerShortlist = {
+  favorites: [favoriteEntry("j.doe@acme.example"), favoriteEntry("l.gomez@northwind.example")],
   recent: [
     shortlistEntry("j.doe@acme.example", 12, "Phone", 6),
     shortlistEntry("s.patel@northwind.example", 70, "Email", 3),
@@ -1647,6 +1655,12 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return [{ id: 1, name: "possible", valid_id: 1 }, { id: 2, name: "reject", valid_id: 1 }, { id: 3, name: "new ticket", valid_id: 1 }];
   if (p.endsWith("/admin/customer-users")) return page(adminCustomerUsers);
   if (p.endsWith("/customer-directory/shortlist")) return customerShortlist;
+  if (p.includes("/customer-directory/favorites/")) {
+    const login = decodeURIComponent(p.split("/").pop() ?? "");
+    customerShortlist.favorites = customerShortlist.favorites.filter((f) => f.login !== login);
+    if (method === "PUT") customerShortlist.favorites.push(favoriteEntry(login));
+    return {};
+  }
   if (p.match(/\/customer-directory\/companies\/[^/]+$/)) return demoCompanyDetail(decodeURIComponent(p.split("/").pop() ?? ""));
   if (p.match(/\/api\/v1\/customers\/[^/]+\/crypto-keys$/) && method === "GET")
     return demoCustomerCryptoKeys(decodeURIComponent(p.split("/").at(-2) ?? ""));

@@ -160,6 +160,7 @@ export {
   type CustomerDirectoryCompanyDetail,
   type CustomerShortlist,
   type CustomerShortlistEntry,
+  type CustomerFavoriteEntry,
   type CustomerUpdateInput,
   type CustomerDirectoryFilter,
   type FeatureGrantsOut,

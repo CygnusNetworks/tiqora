@@ -2052,3 +2052,72 @@ async def test_run_erasure_anonymize_deletes_telegram_map_row(mariadb_znuny_url:
         assert row is None
 
     await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["anonymize", "delete"])
+async def test_run_erasure_customer_favorites(mariadb_znuny_url: str, mode: str) -> None:
+    """Agents' stars follow the anonymized login, or go with a deleted customer
+    -- the row holds the original login (often an e-mail address)."""
+    from sqlalchemy import create_engine
+
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    sync_engine = create_engine(mariadb_znuny_url)
+    with sync_engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+    sync_engine.dispose()
+
+    engine, factory = await _factory(mariadb_znuny_url)
+    login = f"erase.fav.{mode}@example.com"
+    company = f"ERASE-FAV-{mode.upper()}"
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=True)
+        await _insert_company(session, customer_id=company, name="Acme Favorites")
+        cuid = await _insert_customer(session, login=login, customer_id=company)
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_customer_favorite (user_id, customer_login, create_time)"
+                " VALUES (1, :login, :ct)"
+            ),
+            {"login": login, "ct": NOW},
+        )
+        await session.commit()
+
+    await run_erasure(
+        factory,
+        Settings(),
+        customer_user_ids=[cuid],
+        mode=mode,
+        seed=17,
+        force_parallel=True,
+        actor="test",
+    )
+
+    async with factory() as session:
+        starred = (
+            (
+                await session.execute(
+                    text("SELECT customer_login FROM tiqora_customer_favorite WHERE user_id = 1")
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert login not in starred
+        if mode == "anonymize":
+            new_login = (
+                await session.execute(
+                    text("SELECT login FROM customer_user WHERE id = :id"), {"id": cuid}
+                )
+            ).scalar_one()
+            assert new_login in starred
+            await session.execute(
+                text("DELETE FROM tiqora_customer_favorite WHERE customer_login = :l"),
+                {"l": new_login},
+            )
+            await session.commit()
+
+    await engine.dispose()

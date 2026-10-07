@@ -126,6 +126,7 @@ beforeEach(() => {
   state.search = {};
   navigate.mockReset();
   getCustomerShortlist.mockReset().mockResolvedValue({
+    favorites: [],
     recent: [short("hanna", "Hanna", "Voss")],
     frequent: [short("lena", "Lena", "Brandt", { company_name: "Kanzlei", customer_id: "KBS" })],
   });
@@ -159,6 +160,24 @@ describe("CustomerDirectoryPage", () => {
 
     fireEvent.click(recent);
     expect(lastSearch()).toEqual({ tab: undefined, sel: "hanna" });
+  });
+
+  it("lists favorites above recent and frequent, and Enter opens the first", async () => {
+    getCustomerShortlist.mockResolvedValue({
+      favorites: [
+        { ...short("mia", "Mia", "Klein", { company_name: "Stadtwerke", customer_id: "SW" }) },
+      ],
+      recent: [short("hanna", "Hanna", "Voss")],
+      frequent: [],
+    });
+    renderPage();
+    const fav = await screen.findByTestId("customer-favorite-mia");
+    expect(fav).toHaveTextContent("Mia Klein");
+    expect(fav).toHaveTextContent("Stadtwerke");
+    const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(["Favoriten", "Zuletzt"]);
+    fireEvent.keyDown(screen.getByTestId("customer-directory-search"), { key: "Enter" });
+    expect(lastSearch()).toEqual({ tab: undefined, sel: "mia" });
   });
 
   it("searches people from the URL term and offers the hits as vCard", async () => {

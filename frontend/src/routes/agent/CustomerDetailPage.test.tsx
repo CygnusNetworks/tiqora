@@ -6,10 +6,22 @@ import i18n from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { CustomerDetailPage } from "./CustomerDetailPage";
 
-const { navigate, getCustomer, listTickets, phoneConfig, dial, customerCryptoKeys, auth } = vi.hoisted(() => ({
+const {
+  navigate,
+  getCustomer,
+  getCustomerShortlist,
+  setCustomerFavorite,
+  listTickets,
+  phoneConfig,
+  dial,
+  customerCryptoKeys,
+  auth,
+} = vi.hoisted(() => ({
   auth: { canUseDirectory: true },
   navigate: vi.fn(),
   getCustomer: vi.fn(),
+  getCustomerShortlist: vi.fn(),
+  setCustomerFavorite: vi.fn(),
   listTickets: vi.fn(),
   phoneConfig: vi.fn(),
   dial: vi.fn(),
@@ -39,6 +51,8 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     api: {
       getCustomer,
+      getCustomerShortlist,
+      setCustomerFavorite,
       listTickets,
       customerCryptoKeys,
       customerVcardUrl: real.customerVcardUrl.bind(real),
@@ -73,6 +87,8 @@ beforeEach(() => {
     mobile: "0171 1234567",
     company_name: null,
   });
+  getCustomerShortlist.mockReset().mockResolvedValue({ favorites: [], recent: [], frequent: [] });
+  setCustomerFavorite.mockReset().mockResolvedValue(undefined);
   listTickets.mockReset().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 1 });
   phoneConfig.mockReset().mockResolvedValue({ dial_scheme: "tel" });
   dial.mockReset();
@@ -110,6 +126,36 @@ describe("CustomerDetailPage actions", () => {
       expect.objectContaining({ customer_id: "CUST1" }),
       expect.anything(),
     );
+  });
+
+  it("stars and unstars the customer for the agent", async () => {
+    const starred = {
+      favorites: [{ login: "jane.doe", email: "jane@example.com", customer_id: "CUST1", first_name: "Jane", last_name: "Doe" }],
+      recent: [],
+      frequent: [],
+    };
+    renderPage();
+    const star = await screen.findByTestId("customer-favorite");
+    await waitFor(() => expect(star).toBeEnabled());
+    expect(star).toHaveAttribute("aria-pressed", "false");
+
+    getCustomerShortlist.mockResolvedValue(starred);
+    fireEvent.click(star);
+    await waitFor(() => expect(setCustomerFavorite).toHaveBeenCalledWith("jane.doe", true));
+    await waitFor(() => expect(star).toHaveAttribute("aria-pressed", "true"));
+
+    getCustomerShortlist.mockResolvedValue({ ...starred, favorites: [] });
+    fireEvent.click(star);
+    await waitFor(() => expect(setCustomerFavorite).toHaveBeenLastCalledWith("jane.doe", false));
+    await waitFor(() => expect(star).toHaveAttribute("aria-pressed", "false"));
+  });
+
+  it("offers no star without the customer-directory permission", async () => {
+    auth.canUseDirectory = false;
+    renderPage();
+    await screen.findByTestId("customer-name");
+    expect(screen.queryByTestId("customer-favorite")).toBeNull();
+    expect(getCustomerShortlist).not.toHaveBeenCalled();
   });
 
   it("offers editing only with the customer edit permission", async () => {

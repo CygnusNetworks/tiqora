@@ -475,6 +475,15 @@ export function DownloadIcon(props: IconProps) {
 }
 
 /** Office building — a customer company. */
+/** Favorite marker; pass `fill="currentColor"` for the starred state. */
+export function StarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.5Z" />
+    </Icon>
+  );
+}
+
 export function BuildingIcon(props: IconProps) {
   return (
     <Icon {...props}>

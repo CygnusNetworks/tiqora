@@ -8943,6 +8943,74 @@
         "title": "CustomerDirectoryExportRequest",
         "type": "object"
       },
+      "CustomerFavoriteEntry": {
+        "properties": {
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          }
+        },
+        "required": [
+          "login",
+          "email",
+          "customer_id",
+          "first_name",
+          "last_name",
+          "phone",
+          "mobile"
+        ],
+        "title": "CustomerFavoriteEntry",
+        "type": "object"
+      },
       "CustomerFillOut": {
         "properties": {
           "changed": {
@@ -9217,6 +9285,13 @@
       },
       "CustomerShortlist": {
         "properties": {
+          "favorites": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerFavoriteEntry"
+            },
+            "title": "Favorites",
+            "type": "array"
+          },
           "frequent": {
             "items": {
               "$ref": "#/components/schemas/CustomerShortlistEntry"
@@ -9233,6 +9308,7 @@
           }
         },
         "required": [
+          "favorites",
           "recent",
           "frequent"
         ],
@@ -56176,9 +56252,143 @@
         ]
       }
     },
+    "/api/v1/customer-directory/favorites/{login}": {
+      "delete": {
+        "description": "Unstar a customer user for this agent (idempotent).",
+        "operationId": "remove_favorite_api_v1_customer_directory_favorites__login__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Favorite",
+        "tags": [
+          "customer-directory"
+        ]
+      },
+      "put": {
+        "description": "Star a customer user for this agent (idempotent).",
+        "operationId": "add_favorite_api_v1_customer_directory_favorites__login__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Favorite",
+        "tags": [
+          "customer-directory"
+        ]
+      }
+    },
     "/api/v1/customer-directory/shortlist": {
       "get": {
-        "description": "The agent's own recent and most frequent customer users.\n\nDerived from the articles the agent wrote in the last ``SHORTLIST_DAYS``\ndays (mails, phone notes, internal notes), grouped by the ticket's\ncustomer user. Invalid customer users are left out.",
+        "description": "The agent's favorites and own recent and most frequent customer users.\n\nRecent and frequent are derived from the articles the agent wrote in the\nlast ``SHORTLIST_DAYS`` days (mails, phone notes, internal notes), grouped\nby the ticket's customer user. Invalid customer users are left out.",
         "operationId": "customer_shortlist_api_v1_customer_directory_shortlist_get",
         "parameters": [
           {
