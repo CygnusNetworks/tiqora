@@ -61,6 +61,12 @@ class CustomerService:
             phone=cu.phone,
             mobile=cu.mobile,
             company_name=company_name,
+            street=cu.street,
+            zip=cu.zip,
+            city=cu.city,
+            country=cu.country,
+            comments=cu.comments,
+            valid_id=cu.valid_id,
         )
 
     async def quick_search(

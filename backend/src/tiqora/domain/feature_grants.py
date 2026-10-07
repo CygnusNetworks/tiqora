@@ -26,8 +26,10 @@ from tiqora.permissions.engine import PermissionEngine
 
 #: The agent "Kunden" page: customer list, company filter and vCard list exports.
 CUSTOMER_DIRECTORY: Final[str] = "customer_directory"
+#: Create and edit customer users from the agent "Kunden" page.
+CUSTOMER_EDIT: Final[str] = "customer_edit"
 
-FEATURES: Final[frozenset[str]] = frozenset({CUSTOMER_DIRECTORY})
+FEATURES: Final[frozenset[str]] = frozenset({CUSTOMER_DIRECTORY, CUSTOMER_EDIT})
 
 SubjectType = Literal["user", "group", "role"]
 

@@ -1,36 +1,57 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import type { CustomerDirectorySearch } from "./CustomerDirectoryPage";
 import { CustomerDirectoryPage } from "./CustomerDirectoryPage";
 
-const { state, navigate, listCustomerDirectory, exportCustomerVcards, downloadText } = vi.hoisted(
-  () => ({
-    state: { canUse: true, search: {} as Record<string, unknown> },
+const { state, navigate, listCustomerDirectory, getCustomerShortlist, searchCompanies } =
+  vi.hoisted(() => ({
+    state: {
+      canUse: true,
+      canEdit: false,
+      search: {} as CustomerDirectorySearch,
+    },
     navigate: vi.fn(),
     listCustomerDirectory: vi.fn(),
-    exportCustomerVcards: vi.fn(),
-    downloadText: vi.fn(),
-  }),
-);
+    getCustomerShortlist: vi.fn(),
+    searchCompanies: vi.fn(),
+  }));
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
   useSearch: () => state.search,
-  Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
-    <a data-to={String(rest.to)} data-testid={rest["data-testid"] as string | undefined}>
-      {children}
-    </a>
-  ),
 }));
 
 vi.mock("@/auth/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 7, login: "agent", can_use_customer_directory: state.canUse } }),
+  useAuth: () => ({
+    user: {
+      id: 7,
+      login: "agent",
+      can_use_customer_directory: state.canUse,
+      can_edit_customers: state.canEdit,
+    },
+  }),
 }));
 
-vi.mock("@/lib/cryptoFiles", () => ({ downloadText }));
+// The right-hand panels and the drawer have their own tests.
+vi.mock("@/components/customers/CustomerPanel", () => ({
+  CustomerPanel: ({ login }: { login: string }) => <div data-testid="stub-customer">{login}</div>,
+}));
+vi.mock("@/components/customers/CompanyPanel", () => ({
+  CompanyPanel: ({ customerId }: { customerId: string }) => (
+    <div data-testid="stub-company">{customerId}</div>
+  ),
+}));
+vi.mock("@/components/customers/CustomerEditDrawer", () => ({
+  CustomerEditDrawer: ({ state: s }: { state: unknown }) => (
+    <div data-testid="stub-drawer">{JSON.stringify(s)}</div>
+  ),
+}));
+vi.mock("@/components/customers/CustomerCallStrip", () => ({
+  CustomerCallStrip: () => null,
+}));
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -39,10 +60,8 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     api: {
       listCustomerDirectory,
-      exportCustomerVcards,
-      searchCustomerDirectoryCompanies: vi.fn().mockResolvedValue([]),
-      customerVcardUrl: real.customerVcardUrl.bind(real),
-      companyVcardsUrl: real.companyVcardsUrl.bind(real),
+      getCustomerShortlist,
+      searchCustomerDirectoryCompanies: searchCompanies,
       customerDirectoryVcardsUrl: real.customerDirectoryVcardsUrl.bind(real),
     },
   };
@@ -64,6 +83,31 @@ function entry(login: string, first: string, last: string, company: string | nul
   };
 }
 
+function short(login: string, first: string, last: string, extra: Record<string, unknown> = {}) {
+  return {
+    login,
+    email: `${login}@example.com`,
+    customer_id: "ACME",
+    company_name: "ACME",
+    first_name: first,
+    last_name: last,
+    phone: null,
+    mobile: null,
+    last_at: new Date().toISOString(),
+    last_channel: "Phone",
+    ticket_count: 4,
+    ...extra,
+  };
+}
+
+/** The search object the page last navigated to (navigate gets an updater). */
+function lastSearch(): CustomerDirectorySearch {
+  const call = navigate.mock.calls.at(-1)?.[0] as {
+    search: (prev: CustomerDirectorySearch) => CustomerDirectorySearch;
+  };
+  return call.search(state.search);
+}
+
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -78,16 +122,20 @@ function renderPage() {
 beforeEach(() => {
   void i18n.changeLanguage("de");
   state.canUse = true;
+  state.canEdit = false;
   state.search = {};
   navigate.mockReset();
-  exportCustomerVcards.mockReset().mockResolvedValue("BEGIN:VCARD\r\nEND:VCARD\r\n");
-  downloadText.mockReset();
+  getCustomerShortlist.mockReset().mockResolvedValue({
+    recent: [short("hanna", "Hanna", "Voss")],
+    frequent: [short("lena", "Lena", "Brandt", { company_name: "Kanzlei", customer_id: "KBS" })],
+  });
   listCustomerDirectory.mockReset().mockResolvedValue({
     items: [entry("laura", "Laura", "Gomez"), entry("kevin", "Kevin", "Wu", null)],
     total: 2,
     page: 1,
-    page_size: 50,
+    page_size: 30,
   });
+  searchCompanies.mockReset().mockResolvedValue([{ customer_id: "NW", name: "Northwind" }]);
 });
 
 describe("CustomerDirectoryPage", () => {
@@ -95,92 +143,102 @@ describe("CustomerDirectoryPage", () => {
     state.canUse = false;
     renderPage();
     expect(screen.getByTestId("customer-directory-denied")).toBeInTheDocument();
+    expect(getCustomerShortlist).not.toHaveBeenCalled();
     expect(listCustomerDirectory).not.toHaveBeenCalled();
   });
 
-  it("lists contacts name first, linked to the customer centre, with vCard links", async () => {
+  it("shows the agent's recent and frequent customers instead of a list", async () => {
     renderPage();
-    const open = await screen.findByTestId("customer-directory-open-laura");
-    expect(open).toHaveAttribute("data-to", "/agent/customers/$login");
-    expect(open).toHaveTextContent("Laura Gomez");
-    expect(screen.getByText("Ohne Firma")).toBeInTheDocument();
-    expect(screen.getByTestId("customer-directory-vcard-laura")).toHaveAttribute(
-      "href",
-      "/api/v1/customers/laura/vcard",
+    const recent = await screen.findByTestId("customer-recent-hanna");
+    expect(recent).toHaveTextContent("Hanna Voss");
+    expect(recent).toHaveTextContent("Telefon");
+    expect(screen.getByTestId("customer-frequent-lena")).toHaveTextContent("4 Tickets");
+    // No search term, no directory listing.
+    expect(listCustomerDirectory).not.toHaveBeenCalled();
+    expect(screen.getByText("Wähle links einen Kunden oder suche nach Name, E-Mail oder Telefonnummer.")).toBeInTheDocument();
+
+    fireEvent.click(recent);
+    expect(lastSearch()).toEqual({ tab: undefined, sel: "hanna" });
+  });
+
+  it("searches people from the URL term and offers the hits as vCard", async () => {
+    state.search = { q: "acme" };
+    renderPage();
+    const row = await screen.findByTestId("customer-row-laura");
+    expect(row).toHaveTextContent("Laura Gomez");
+    expect(listCustomerDirectory).toHaveBeenCalledWith(
+      { search: "acme", valid: "valid", page: 1, pageSize: 30 },
+      expect.anything(),
     );
     expect(screen.getByTestId("customer-directory-export-list")).toHaveAttribute(
       "href",
-      "/api/v1/customer-directory/vcards?valid=valid",
+      "/api/v1/customer-directory/vcards?search=acme&valid=valid",
     );
-    expect(listCustomerDirectory).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 1, pageSize: 50, valid: "valid" }),
-      expect.anything(),
-    );
+    fireEvent.click(row);
+    expect(lastSearch()).toMatchObject({ q: "acme", sel: "laura" });
   });
 
-  it("downloads the selected contacts as one file", async () => {
+  it("Enter in the search field opens the first hit", async () => {
+    state.search = { q: "acme" };
     renderPage();
-    await screen.findByTestId("customer-directory-open-laura");
-    fireEvent.click(screen.getByTestId("admin-row-select-laura"));
-    fireEvent.click(screen.getByTestId("admin-row-select-kevin"));
-    const bar = screen.getByTestId("customer-directory-selection-bar");
-    fireEvent.click(within(bar).getByTestId("customer-directory-export-selection"));
-    await waitFor(() => expect(exportCustomerVcards).toHaveBeenCalledWith(["laura", "kevin"]));
-    await waitFor(() =>
-      expect(downloadText).toHaveBeenCalledWith(
-        "kontakte.vcf",
-        expect.stringContaining("BEGIN:VCARD"),
-        expect.stringContaining("text/vcard"),
-      ),
-    );
-    await waitFor(() => expect(screen.queryByTestId("customer-directory-selection-bar")).toBeNull());
+    await screen.findByTestId("customer-row-laura");
+    fireEvent.keyDown(screen.getByTestId("customer-directory-search"), { key: "Enter" });
+    expect(lastSearch()).toMatchObject({ sel: "laura" });
   });
 
-  it("shows the company row with its export when filtered by company", async () => {
-    state.search = { company: "ACME", company_name: "ACME GmbH" } satisfies CustomerDirectorySearch;
+  it("offers to create the searched customer only to agents who may edit", async () => {
+    listCustomerDirectory.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 30 });
+    state.search = { q: "Ilka Brenner" };
     renderPage();
-    const banner = await screen.findByTestId("customer-directory-company-banner");
-    expect(banner).toHaveTextContent("ACME GmbH");
-    expect(within(banner).getByTestId("customer-directory-export-company")).toHaveAttribute(
-      "href",
-      "/api/v1/customers/companies/ACME/vcards",
-    );
-    expect(listCustomerDirectory).toHaveBeenCalledWith(
-      expect.objectContaining({ customerId: "ACME" }),
-      expect.anything(),
-    );
-    fireEvent.click(screen.getByTestId("customer-directory-company-clear"));
-    expect(navigate).toHaveBeenCalled();
+    await screen.findByText("Niemand gefunden.");
+    expect(screen.queryByTestId("customer-create-from-search")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("customer-new")).not.toBeInTheDocument();
   });
 
-  it("sorts by the column headers via the URL", async () => {
-    state.search = { sort: "company", order: "desc" } satisfies CustomerDirectorySearch;
+  it("prefills the create form from the search term", async () => {
+    state.canEdit = true;
+    listCustomerDirectory.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 30 });
+    state.search = { q: "Ilka Brenner" };
     renderPage();
-    await screen.findByTestId("customer-directory-open-laura");
-    expect(listCustomerDirectory).toHaveBeenCalledWith(
-      expect.objectContaining({ sort: "company", order: "desc" }),
-      expect.anything(),
-    );
-    fireEvent.click(screen.getByTestId("admin-sort-city"));
-    const call = navigate.mock.calls.at(-1)?.[0] as {
-      search: (prev: CustomerDirectorySearch) => CustomerDirectorySearch;
-    };
-    expect(call.search({ page: 3, sort: "company", order: "desc" })).toEqual({
-      page: undefined,
-      sort: "city",
-      order: undefined,
+    fireEvent.click(await screen.findByTestId("customer-create-from-search"));
+    expect(JSON.parse(screen.getByTestId("stub-drawer").textContent ?? "")).toEqual({
+      mode: "create",
+      prefill: { first_name: "Ilka", last_name: "Brenner" },
     });
   });
 
-  it("disables the list export above the cap", async () => {
-    listCustomerDirectory.mockResolvedValue({
-      items: [entry("laura", "Laura", "Gomez")],
-      total: 5000,
-      page: 1,
-      page_size: 50,
-    });
+  it("shows the selected customer on the right", async () => {
+    state.search = { sel: "hanna" };
     renderPage();
-    expect(await screen.findByTestId("customer-directory-export-list-disabled")).toBeInTheDocument();
-    expect(screen.queryByTestId("customer-directory-export-list")).toBeNull();
+    expect(screen.getByTestId("stub-customer")).toHaveTextContent("hanna");
+    await screen.findByTestId("customer-recent-hanna");
+    expect(screen.getByTestId("customer-recent-hanna")).toHaveAttribute("aria-current", "true");
+  });
+
+  it("searches companies in their own tab and opens one", async () => {
+    state.search = { tab: "companies", q: "north" };
+    renderPage();
+    const row = await screen.findByTestId("company-row-NW");
+    expect(searchCompanies).toHaveBeenCalledWith("north", expect.anything());
+    expect(listCustomerDirectory).not.toHaveBeenCalled();
+    fireEvent.click(row);
+    expect(lastSearch()).toMatchObject({ tab: "companies", company: "NW" });
+  });
+
+  it("lists the companies of the agent's own customers without a term", async () => {
+    state.search = { tab: "companies", company: "KBS" };
+    renderPage();
+    expect(await screen.findByTestId("company-row-KBS")).toHaveTextContent("Kanzlei");
+    expect(screen.getByTestId("company-row-ACME")).toBeInTheDocument();
+    expect(screen.getByTestId("stub-company")).toHaveTextContent("KBS");
+  });
+
+  it("writes the typed term to the URL", async () => {
+    renderPage();
+    fireEvent.change(screen.getByTestId("customer-directory-search"), {
+      target: { value: "voss" },
+    });
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+    expect(lastSearch()).toMatchObject({ q: "voss" });
   });
 });

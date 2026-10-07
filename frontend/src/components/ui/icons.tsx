@@ -473,3 +473,33 @@ export function DownloadIcon(props: IconProps) {
     </Icon>
   );
 }
+
+/** Office building — a customer company. */
+export function BuildingIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18" />
+      <path d="M8 8h3M8 12h3M8 16h3" />
+    </Icon>
+  );
+}
+
+/** Handset with an outgoing arrow — place a call. */
+export function PhoneOutgoingIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
+      <path d="M15 3h6v6M21 3l-6 6" />
+    </Icon>
+  );
+}
+
+/** Mobile phone. */
+export function MobileIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="7" y="2.5" width="10" height="19" rx="2" />
+      <path d="M11 18h2" />
+    </Icon>
+  );
+}

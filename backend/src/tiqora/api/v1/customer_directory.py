@@ -9,6 +9,7 @@ swallowed by ``GET /customers/{login}``.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime, timedelta
 from typing import Annotated, Any, Final
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -27,7 +28,10 @@ from tiqora.api.v1.admin.pagination import (
 from tiqora.api.v1.customer_sort import order_customer_users
 from tiqora.api.v1.customers import vcard_response
 from tiqora.api.v1.feature_deps import CustomerDirectoryUser
+from tiqora.db.legacy.article import Article, CommunicationChannel
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
+from tiqora.db.legacy.ticket import Ticket
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.vcard import build_vcard, vcard_filename
 
 router = APIRouter(prefix="/customer-directory", tags=["customer-directory"])
@@ -158,6 +162,165 @@ class CustomerDirectoryExportRequest(BaseModel):
     """Exactly these contacts (a selection), in name order."""
 
     logins: list[str] = Field(min_length=1)
+
+
+#: How far back the shortlist looks at the agent's own articles.
+SHORTLIST_DAYS: Final[int] = 90
+#: Entries per shortlist section.
+SHORTLIST_SIZE: Final[int] = 6
+
+
+class CustomerShortlistEntry(BaseModel):
+    login: str
+    email: str
+    customer_id: str
+    company_name: str | None = None
+    first_name: str
+    last_name: str
+    phone: str | None
+    mobile: str | None
+    #: Newest article this agent wrote on a ticket of this customer user.
+    last_at: UtcDateTime
+    #: Communication channel of that article (``Email``, ``Phone``, ``Internal`` …).
+    last_channel: str | None
+    #: Distinct tickets of this customer user the agent wrote on in the window.
+    ticket_count: int
+
+
+class CustomerShortlist(BaseModel):
+    recent: list[CustomerShortlistEntry]
+    frequent: list[CustomerShortlistEntry]
+
+
+@router.get("/shortlist", response_model=CustomerShortlist)
+async def customer_shortlist(
+    user: CustomerDirectoryUser,
+    session: DbSession,
+) -> CustomerShortlist:
+    """The agent's own recent and most frequent customer users.
+
+    Derived from the articles the agent wrote in the last ``SHORTLIST_DAYS``
+    days (mails, phone notes, internal notes), grouped by the ticket's
+    customer user. Invalid customer users are left out.
+    """
+    since = datetime.now() - timedelta(days=SHORTLIST_DAYS)
+    last_at = func.max(Article.create_time).label("last_at")
+    tickets = func.count(func.distinct(Ticket.id)).label("tickets")
+    base = (
+        select(Ticket.customer_user_id, last_at, tickets)
+        .select_from(Article)
+        .join(Ticket, Ticket.id == Article.ticket_id)
+        .join(CustomerUser, CustomerUser.login == Ticket.customer_user_id)
+        .where(
+            Article.create_by == user.id,
+            Article.create_time >= since,
+            CustomerUser.valid_id == 1,
+        )
+        .group_by(Ticket.customer_user_id)
+    )
+    recent_rows = (await session.execute(base.order_by(last_at.desc()).limit(SHORTLIST_SIZE))).all()
+    frequent_rows = (
+        await session.execute(base.order_by(tickets.desc(), last_at.desc()).limit(SHORTLIST_SIZE))
+    ).all()
+    stats = {row[0]: (row[1], int(row[2])) for row in (*recent_rows, *frequent_rows)}
+    if not stats:
+        return CustomerShortlist(recent=[], frequent=[])
+
+    channel_rows = await session.execute(
+        select(Ticket.customer_user_id, Article.create_time, CommunicationChannel.name)
+        .select_from(Article)
+        .join(Ticket, Ticket.id == Article.ticket_id)
+        .join(CommunicationChannel, CommunicationChannel.id == Article.communication_channel_id)
+        .where(
+            Article.create_by == user.id,
+            Article.create_time >= min(at for at, _ in stats.values()),
+            Ticket.customer_user_id.in_(list(stats)),
+        )
+    )
+    last_channel: dict[str, tuple[datetime, str]] = {}
+    for login, created, channel in channel_rows.all():
+        seen = last_channel.get(login)
+        if seen is None or created > seen[0]:
+            last_channel[login] = (created, channel)
+
+    customers = {
+        cu.login: cu
+        for cu in (
+            await session.execute(select(CustomerUser).where(CustomerUser.login.in_(list(stats))))
+        ).scalars()
+    }
+    names = await _company_names(session, (cu.customer_id for cu in customers.values()))
+
+    def entries(rows: Iterable[Any]) -> list[CustomerShortlistEntry]:
+        out = []
+        for row in rows:
+            cu = customers.get(row[0])
+            if cu is None:
+                continue
+            at, count = stats[row[0]]
+            out.append(
+                CustomerShortlistEntry(
+                    login=cu.login,
+                    email=cu.email,
+                    customer_id=cu.customer_id,
+                    company_name=names.get(cu.customer_id),
+                    first_name=cu.first_name,
+                    last_name=cu.last_name,
+                    phone=cu.phone,
+                    mobile=cu.mobile,
+                    last_at=at,
+                    last_channel=last_channel.get(cu.login, (at, None))[1],
+                    ticket_count=count,
+                )
+            )
+        return out
+
+    return CustomerShortlist(recent=entries(recent_rows), frequent=entries(frequent_rows))
+
+
+class CustomerDirectoryCompanyDetail(BaseModel):
+    customer_id: str
+    name: str
+    street: str | None
+    zip: str | None
+    city: str | None
+    country: str | None
+    url: str | None
+    comments: str | None
+    valid_id: int
+    #: Valid contacts of the company.
+    contact_count: int
+
+
+# `:path`: company ids may contain "/".
+@router.get("/companies/{customer_id:path}", response_model=CustomerDirectoryCompanyDetail)
+async def company_detail(
+    customer_id: str,
+    user: CustomerDirectoryUser,
+    session: DbSession,
+) -> CustomerDirectoryCompanyDetail:
+    """One company's master data for the company view of the "Kunden" page."""
+    _ = user
+    co = await session.get(CustomerCompany, customer_id)
+    if co is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    contacts = await session.scalar(
+        select(func.count())
+        .select_from(CustomerUser)
+        .where(CustomerUser.customer_id == customer_id, CustomerUser.valid_id == 1)
+    )
+    return CustomerDirectoryCompanyDetail(
+        customer_id=co.customer_id,
+        name=co.name,
+        street=co.street,
+        zip=co.zip,
+        city=co.city,
+        country=co.country,
+        url=co.url,
+        comments=co.comments,
+        valid_id=co.valid_id,
+        contact_count=int(contacts or 0),
+    )
 
 
 @router.get("/vcards")

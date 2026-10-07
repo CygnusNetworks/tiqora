@@ -10,6 +10,7 @@ import {
   type CustomerUserAdminOut,
   type CustomerUserAdminCreate,
   type CustomerUserAdminUpdate,
+  type FeatureKey,
 } from "@/lib/api";
 import { AdminResourcePage, type AdminBulkAction } from "@/components/admin/AdminResourcePage";
 import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
@@ -54,7 +55,7 @@ export function CustomerUsersPage() {
   const [companyError, setCompanyError] = useState<string | null>(null);
   // Znuny AdminCustomerUser shows the customer preference modules PGP/SMIME.
   const [keysLogin, setKeysLogin] = useState<string | null>(null);
-  const [accessOpen, setAccessOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState<FeatureKey | null>(null);
   const debouncedCompanySearch = useDebouncedValue(companySearch, 300);
 
   const companiesQ = useQuery({
@@ -302,15 +303,26 @@ export function CustomerUsersPage() {
         allowAllPageSize
         bulkActions={bulkActions}
         headerActions={
-          <Button
-            variant="secondary"
-            size="sm"
-            data-testid="admin-customer-directory-access"
-            onClick={() => setAccessOpen(true)}
-          >
-            <UsersIcon className="text-[14px]" />
-            {t("admin.customerUsers.access")}
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="admin-customer-directory-access"
+              onClick={() => setAccessOpen("customer_directory")}
+            >
+              <UsersIcon className="text-[14px]" />
+              {t("admin.customerUsers.access")}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              data-testid="admin-customer-edit-access"
+              onClick={() => setAccessOpen("customer_edit")}
+            >
+              <UsersIcon className="text-[14px]" />
+              {t("admin.customerUsers.editAccess")}
+            </Button>
+          </>
         }
         rowActions={(row) => (
           <>
@@ -376,7 +388,9 @@ export function CustomerUsersPage() {
         })}
       />
 
-      {accessOpen && <CustomerDirectoryAccessDialog onClose={() => setAccessOpen(false)} />}
+      {accessOpen && (
+        <CustomerDirectoryAccessDialog feature={accessOpen} onClose={() => setAccessOpen(null)} />
+      )}
 
       <Dialog
         open={keysLogin !== null}

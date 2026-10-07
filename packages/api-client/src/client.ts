@@ -243,10 +243,14 @@ export type TemplateEditorsOut = Schemas["TemplateEditorsOut"];
 export type TemplateEditorsUpdate = Schemas["TemplateEditorsUpdate"];
 export type CustomerDirectoryEntry = Schemas["CustomerDirectoryEntry"];
 export type CustomerDirectoryCompany = Schemas["CustomerDirectoryCompany"];
+export type CustomerDirectoryCompanyDetail = Schemas["CustomerDirectoryCompanyDetail"];
+export type CustomerShortlist = Schemas["CustomerShortlist"];
+export type CustomerShortlistEntry = Schemas["CustomerShortlistEntry"];
+export type CustomerUpdateInput = Schemas["CustomerUpdateRequest"];
 export type FeatureGrantsOut = Schemas["FeatureGrantsOut"];
 export type FeatureGrantsUpdate = Schemas["FeatureGrantsUpdate"];
 /** Feature keys of `/admin/feature-grants/{feature}`. */
-export type FeatureKey = "customer_directory";
+export type FeatureKey = "customer_directory" | "customer_edit";
 /** Filters of the agent customer directory (list + vCard export). */
 export type CustomerDirectoryFilter = {
   search?: string;
@@ -924,6 +928,13 @@ export type AgentCustomerCreateInput = {
   last_name: string;
   customer_id: string;
   phone?: string | null;
+  mobile?: string | null;
+  comments?: string | null;
+  title?: string | null;
+  street?: string | null;
+  zip?: string | null;
+  city?: string | null;
+  country?: string | null;
 };
 
 export type AgentCustomerCreateOut = {
@@ -1220,6 +1231,8 @@ export class ApiClient {
       state_type?: string;
       owner_id?: number;
       customer_id?: string;
+      /** Only tickets of this customer user (login). */
+      customer_user_id?: string;
       /** Filter by responsible agent user id. */
       responsible_id?: number;
       /** Filter by service id. */
@@ -1450,6 +1463,22 @@ export class ApiClient {
       },
       signal,
     });
+  }
+
+  /** The agent's own recent and frequent customer users (last 90 days of articles). */
+  getCustomerShortlist(signal?: AbortSignal) {
+    return this.request<CustomerShortlist>("GET", "/api/v1/customer-directory/shortlist", {
+      signal,
+    });
+  }
+
+  /** One company's master data and valid contact count. */
+  getCustomerDirectoryCompany(customerId: string, signal?: AbortSignal) {
+    return this.request<CustomerDirectoryCompanyDetail>(
+      "GET",
+      `/api/v1/customer-directory/companies/${encodeURIComponent(customerId)}`,
+      { signal },
+    );
   }
 
   searchCustomerDirectoryCompanies(search: string, signal?: AbortSignal) {
@@ -1807,6 +1836,15 @@ export class ApiClient {
           signal,
         }),
     };
+  }
+
+  /** Overwrite a customer's contact data (needs the customer_edit feature). */
+  updateCustomer(login: string, body: CustomerUpdateInput, signal?: AbortSignal) {
+    return this.request<CustomerUserOut>(
+      "PUT",
+      `/api/v1/customers/${encodeURIComponent(login)}`,
+      { body, signal },
+    );
   }
 
   /**

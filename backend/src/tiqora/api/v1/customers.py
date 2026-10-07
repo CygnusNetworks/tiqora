@@ -16,7 +16,7 @@ from tiqora.api.v1.admin.common import (
     invalidate_znuny_cache_types,
     now,
 )
-from tiqora.api.v1.feature_deps import CustomerDirectoryUser
+from tiqora.api.v1.feature_deps import CustomerDirectoryUser, CustomerEditUser
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser
 from tiqora.domain.customer_service import CustomerService
 from tiqora.domain.new_ticket_queue import (
@@ -47,6 +47,11 @@ class AgentCustomerCreateRequest(BaseModel):
     phone: str | None = Field(None, max_length=150)
     mobile: str | None = Field(None, max_length=150)
     comments: str | None = Field(None, max_length=250)
+    title: str | None = Field(None, max_length=50)
+    street: str | None = Field(None, max_length=150)
+    zip: str | None = Field(None, max_length=200)
+    city: str | None = Field(None, max_length=200)
+    country: str | None = Field(None, max_length=200)
 
 
 class AgentCustomerCreateOut(BaseModel):
@@ -57,6 +62,11 @@ class AgentCustomerCreateOut(BaseModel):
     customer_id: str
     first_name: str
     last_name: str
+
+
+def _optional(value: str | None) -> str | None:
+    stripped = (value or "").strip()
+    return stripped or None
 
 
 @router.post(
@@ -117,6 +127,11 @@ async def create_customer(
         phone=body.phone.strip() if body.phone else None,
         mobile=body.mobile.strip() if body.mobile else None,
         comments=body.comments.strip() if body.comments else None,
+        title=_optional(body.title),
+        street=_optional(body.street),
+        zip=_optional(body.zip),
+        city=_optional(body.city),
+        country=_optional(body.country),
         pw=None,
         valid_id=1,
         create_time=ts,
@@ -370,6 +385,88 @@ async def fill_customer(
         comments=cu.comments,
         changed=changed,
     )
+
+
+class CustomerUpdateRequest(BaseModel):
+    """Full edit of a customer user from the agent "Kunden" page.
+
+    Every field is written as sent; an empty optional field clears the
+    column. Login, password and validity stay admin matters.
+    """
+
+    title: str | None = Field(None, max_length=50)
+    first_name: str = Field("", max_length=100)
+    last_name: str = Field(..., min_length=1, max_length=100)
+    email: str = Field("", max_length=150)
+    customer_id: str = Field(..., min_length=1, max_length=150)
+    phone: str | None = Field(None, max_length=150)
+    mobile: str | None = Field(None, max_length=150)
+    street: str | None = Field(None, max_length=150)
+    zip: str | None = Field(None, max_length=200)
+    city: str | None = Field(None, max_length=200)
+    country: str | None = Field(None, max_length=200)
+    comments: str | None = Field(None, max_length=250)
+
+
+@router.put("/{login}", response_model=CustomerUserOut)
+async def update_customer(
+    login: str,
+    body: CustomerUpdateRequest,
+    user: CustomerEditUser,
+    session: DbSession,
+) -> CustomerUserOut:
+    """Overwrite a customer user's contact data (``customer_edit`` feature)."""
+    cu = (
+        await session.execute(select(CustomerUser).where(CustomerUser.login == login))
+    ).scalar_one_or_none()
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    last_name = body.last_name.strip()
+    customer_id = body.customer_id.strip()
+    if not last_name or not customer_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="last_name and customer_id are required",
+        )
+    email = body.email.strip()
+    if email and email.lower() != (cu.email or "").lower():
+        owner = (
+            (
+                await session.execute(
+                    select(CustomerUser.login).where(
+                        func.lower(CustomerUser.email) == email.lower(),
+                        CustomerUser.valid_id == 1,
+                        CustomerUser.login != cu.login,
+                    )
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if owner is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"message": "Customer user e-mail already exists", "login": owner},
+            )
+    cu.title = _optional(body.title)
+    cu.first_name = body.first_name.strip()
+    cu.last_name = last_name
+    cu.email = email
+    cu.customer_id = customer_id
+    cu.phone = _optional(body.phone)
+    cu.mobile = _optional(body.mobile)
+    cu.street = _optional(body.street)
+    cu.zip = _optional(body.zip)
+    cu.city = _optional(body.city)
+    cu.country = _optional(body.country)
+    cu.comments = _optional(body.comments)
+    cu.change_time = now()
+    cu.change_by = user.id
+    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    await session.commit()
+    result = await CustomerService(session).get_by_login(login)
+    assert result is not None
+    return result
 
 
 @router.get("/{login}/suggested-queue", response_model=QueueSuggestion)

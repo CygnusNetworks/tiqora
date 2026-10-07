@@ -681,6 +681,18 @@
       "AgentCustomerCreateRequest": {
         "description": "Body for agent-side customer-user creation (Znuny AgentTicketCustomer).\n\nNo password \u2014 agents create the contact record; portal auth is separate.\n``email`` and ``first_name`` may be empty: the AI secretary creates\ncallers it only knows by surname and number (the columns are NOT NULL,\nso empty means ``\"\"``).",
         "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
           "comments": {
             "anyOf": [
               {
@@ -692,6 +704,18 @@
               }
             ],
             "title": "Comments"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
           },
           "customer_id": {
             "maxLength": 150,
@@ -746,6 +770,42 @@
               }
             ],
             "title": "Phone"
+          },
+          "street": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Street"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "zip": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip"
           }
         },
         "required": [
@@ -8663,6 +8723,106 @@
         "title": "CustomerDirectoryCompany",
         "type": "object"
       },
+      "CustomerDirectoryCompanyDetail": {
+        "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "contact_count": {
+            "title": "Contact Count",
+            "type": "integer"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "street": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Street"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "valid_id": {
+            "title": "Valid Id",
+            "type": "integer"
+          },
+          "zip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name",
+          "street",
+          "zip",
+          "city",
+          "country",
+          "url",
+          "comments",
+          "valid_id",
+          "contact_count"
+        ],
+        "title": "CustomerDirectoryCompanyDetail",
+        "type": "object"
+      },
       "CustomerDirectoryEntry": {
         "properties": {
           "city": {
@@ -9050,6 +9210,121 @@
         "title": "CustomerSearchOut",
         "type": "object"
       },
+      "CustomerShortlist": {
+        "properties": {
+          "frequent": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerShortlistEntry"
+            },
+            "title": "Frequent",
+            "type": "array"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/CustomerShortlistEntry"
+            },
+            "title": "Recent",
+            "type": "array"
+          }
+        },
+        "required": [
+          "recent",
+          "frequent"
+        ],
+        "title": "CustomerShortlist",
+        "type": "object"
+      },
+      "CustomerShortlistEntry": {
+        "properties": {
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_at": {
+            "format": "date-time",
+            "title": "Last At",
+            "type": "string"
+          },
+          "last_channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Channel"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "login": {
+            "title": "Login",
+            "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "ticket_count": {
+            "title": "Ticket Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "login",
+          "email",
+          "customer_id",
+          "first_name",
+          "last_name",
+          "phone",
+          "mobile",
+          "last_at",
+          "last_channel",
+          "ticket_count"
+        ],
+        "title": "CustomerShortlistEntry",
+        "type": "object"
+      },
       "CustomerSmimeCertificateIn": {
         "properties": {
           "certificate": {
@@ -9252,6 +9527,137 @@
           "tickets"
         ],
         "title": "CustomerTicketsOut",
+        "type": "object"
+      },
+      "CustomerUpdateRequest": {
+        "description": "Full edit of a customer user from the agent \"Kunden\" page.\n\nEvery field is written as sent; an empty optional field clears the\ncolumn. Login, password and validity stay admin matters.",
+        "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "maxLength": 250,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "customer_id": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "email": {
+            "default": "",
+            "maxLength": 150,
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "default": "",
+            "maxLength": 100,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "mobile": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobile"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "street": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Street"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "zip": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip"
+          }
+        },
+        "required": [
+          "last_name",
+          "customer_id"
+        ],
+        "title": "CustomerUpdateRequest",
         "type": "object"
       },
       "CustomerUserAdminCreate": {
@@ -9873,6 +10279,28 @@
       },
       "CustomerUserOut": {
         "properties": {
+          "city": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "City"
+          },
+          "comments": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comments"
+          },
           "company_name": {
             "anyOf": [
               {
@@ -9883,6 +10311,17 @@
               }
             ],
             "title": "Company Name"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
           },
           "customer_id": {
             "title": "Customer Id",
@@ -9926,6 +10365,17 @@
             ],
             "title": "Phone"
           },
+          "street": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Street"
+          },
           "title": {
             "anyOf": [
               {
@@ -9936,6 +10386,28 @@
               }
             ],
             "title": "Title"
+          },
+          "valid_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valid Id"
+          },
+          "zip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zip"
           }
         },
         "required": [
@@ -24946,6 +25418,11 @@
               }
             ],
             "title": "Avatar Url"
+          },
+          "can_edit_customers": {
+            "default": false,
+            "title": "Can Edit Customers",
+            "type": "boolean"
           },
           "can_edit_templates": {
             "default": false,
@@ -55603,6 +56080,147 @@
         ]
       }
     },
+    "/api/v1/customer-directory/companies/{customer_id}": {
+      "get": {
+        "description": "One company's master data for the company view of the \"Kunden\" page.",
+        "operationId": "company_detail_api_v1_customer_directory_companies__customer_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "title": "Customer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDirectoryCompanyDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Detail",
+        "tags": [
+          "customer-directory"
+        ]
+      }
+    },
+    "/api/v1/customer-directory/shortlist": {
+      "get": {
+        "description": "The agent's own recent and most frequent customer users.\n\nDerived from the articles the agent wrote in the last ``SHORTLIST_DAYS``\ndays (mails, phone notes, internal notes), grouped by the ticket's\ncustomer user. Invalid customer users are left out.",
+        "operationId": "customer_shortlist_api_v1_customer_directory_shortlist_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerShortlist"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Customer Shortlist",
+        "tags": [
+          "customer-directory"
+        ]
+      }
+    },
     "/api/v1/customer-directory/vcards": {
       "get": {
         "description": "Everything matching the list filters as one multi-card .vcf.\n\nA plain GET so the UI can offer it as a download link (session cookie).\nAt most ``EXPORT_MAX`` contacts per file.",
@@ -56162,6 +56780,89 @@
           }
         },
         "summary": "Fill Customer",
+        "tags": [
+          "customers"
+        ]
+      },
+      "put": {
+        "description": "Overwrite a customer user's contact data (``customer_edit`` feature).",
+        "operationId": "update_customer_api_v1_customers__login__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerUserOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Customer",
         "tags": [
           "customers"
         ]
@@ -63139,6 +63840,24 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "description": "Only tickets of this customer user (login).",
+            "in": "query",
+            "name": "customer_user_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only tickets of this customer user (login).",
+              "title": "Customer User Id"
             }
           },
           {

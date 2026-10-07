@@ -430,6 +430,7 @@ class TicketService:
         state_type: str | None,
         owner_id: int | None,
         customer_id: str | None = None,
+        customer_user_id: str | None = None,
         responsible_id: int | None = None,
         service_id: int | None = None,
         locked: bool | None = None,
@@ -478,6 +479,8 @@ class TicketService:
             stmt = stmt.where(Ticket.user_id == owner_id)
         if customer_id is not None:
             stmt = stmt.where(Ticket.customer_id == customer_id)
+        if customer_user_id is not None:
+            stmt = stmt.where(Ticket.customer_user_id == customer_user_id)
         if responsible_id is not None:
             stmt = stmt.where(Ticket.responsible_user_id == responsible_id)
         if service_id is not None:
@@ -567,6 +570,7 @@ class TicketService:
         state_type: str | None = None,
         owner_id: int | None = None,
         customer_id: str | None = None,
+        customer_user_id: str | None = None,
         responsible_id: int | None = None,
         service_id: int | None = None,
         locked: bool | None = None,
@@ -589,6 +593,7 @@ class TicketService:
             state_type=state_type,
             owner_id=owner_id,
             customer_id=customer_id,
+            customer_user_id=customer_user_id,
             responsible_id=responsible_id,
             service_id=service_id,
             locked=locked,
