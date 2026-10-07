@@ -17,6 +17,7 @@ from tiqora.api.deps import DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParams, Page, window
 from tiqora.db.tiqora.models import TiqoraMailLog
+from tiqora.domain.schemas import UtcDateTime, as_naive_utc
 
 router = APIRouter(prefix="/mail", tags=["admin:mail"])
 
@@ -28,7 +29,7 @@ class MailLogOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    created_at: datetime
+    created_at: UtcDateTime
     direction: str
     status: str
     from_addr: str
@@ -100,11 +101,11 @@ async def list_mail_log(
             )
         )
     if params.from_dt is not None:
-        # MariaDB DateTime is naive; strip tzinfo for comparison.
-        from_val = params.from_dt.replace(tzinfo=None) if params.from_dt.tzinfo else params.from_dt
+        # MariaDB DateTime is naive UTC; convert before dropping the offset.
+        from_val = as_naive_utc(params.from_dt)
         stmt = stmt.where(TiqoraMailLog.created_at >= from_val)
     if params.to_dt is not None:
-        to_val = params.to_dt.replace(tzinfo=None) if params.to_dt.tzinfo else params.to_dt
+        to_val = as_naive_utc(params.to_dt)
         stmt = stmt.where(TiqoraMailLog.created_at <= to_val)
     stmt = stmt.order_by(TiqoraMailLog.created_at.desc(), TiqoraMailLog.id.desc())
     rows, total = await window(session, stmt, params)

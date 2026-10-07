@@ -3,7 +3,6 @@ avoid merge conflicts with other in-flight admin work, per plan §Phase A)."""
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -71,8 +70,8 @@ class LlmProviderOut(BaseModel):
     budget_cost_week: float | None
     budget_cost_month: float | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
 
 
 class LlmProviderCreate(BaseModel):
@@ -155,8 +154,8 @@ class LlmModelOut(BaseModel):
     price_output_per_1m: float | None
     valid_id: int
     used_in_profiles: list[str]
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
 
 
 class LlmModelTestOut(BaseModel):
@@ -204,8 +203,8 @@ class LlmProfileOut(BaseModel):
     valid_id: int
     entries: list[LlmProfileEntryOut]
     used_by: list[LlmProfileUseOut]
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
 
 
 class AiTaskProfileItem(BaseModel):
@@ -229,10 +228,10 @@ class McpClientOut(BaseModel):
     url: str
     has_auth_token: bool
     transport: McpTransport
-    last_discovered_at: datetime | None
+    last_discovered_at: UtcDateTime | None
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
 
 
 class McpClientCreate(BaseModel):
@@ -333,8 +332,8 @@ class AiQueuePolicyOut(BaseModel):
     # This queue's task overrides only (task absent = global default).
     task_profiles: list[AiTaskProfileItem]
     valid_id: int
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
 
 
 class AiQueuePolicyCreate(BaseModel):
@@ -449,8 +448,8 @@ class AiPromptPartOut(BaseModel):
     content: str
     position: int
     enabled: bool
-    create_time: datetime
-    change_time: datetime
+    create_time: UtcDateTime
+    change_time: UtcDateTime
 
 
 class AiPromptPartCreate(BaseModel):
@@ -509,7 +508,7 @@ class AiUsageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    ts: datetime
+    ts: UtcDateTime
     user_id: int | None
     queue_id: int | None
     ticket_id: int | None
@@ -620,8 +619,8 @@ class AiTriageRowOut(BaseModel):
     error: str | None
     decided_by_user_id: int | None
     decided_note: str | None
-    decided_at: datetime | None
-    create_time: datetime
+    decided_at: UtcDateTime | None
+    create_time: UtcDateTime
 
 
 class AiTriageBucketOut(BaseModel):

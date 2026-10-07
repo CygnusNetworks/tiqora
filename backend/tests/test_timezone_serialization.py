@@ -7,19 +7,22 @@ offset, so the frontend parsed them as browser-local time.
 
 from __future__ import annotations
 
+import importlib
 import inspect
+import pkgutil
+import re
 import typing
 from datetime import UTC, datetime
 
 from pydantic import BaseModel
 from pydantic.functional_serializers import PlainSerializer
 
+import tiqora.api.v1 as api_v1
 from tiqora.api.v1 import ai as ticket_ai
-from tiqora.api.v1 import tickets as ticket_routes
 from tiqora.api.v1.admin import schemas as admin_schemas
-from tiqora.api.v1.tickets import AiOriginOut, TimeAccountingReportEntry, _as_naive_utc
+from tiqora.api.v1.tickets import AiOriginOut, TimeAccountingReportEntry
 from tiqora.db.engine import _utc_connect_args
-from tiqora.domain.schemas import ArticleListItem, HistoryEntry, UtcDateTime
+from tiqora.domain.schemas import ArticleListItem, HistoryEntry, UtcDateTime, as_naive_utc
 
 
 class _Model(BaseModel):
@@ -139,25 +142,36 @@ def test_ticket_ai_response_models_serialize_utc() -> None:
     assert offenders == []
 
 
-# Parsed from client input only — never serialized back out.
-_TICKET_REQUEST_MODELS = {"ArticleCreateRequest", "MutationRequest", "TicketCreateRequest"}
+# Request models are parsed from client input, never serialized back out.
+_REQUEST_MODEL_NAME = re.compile(r"(Request|Params|In|Create|Update)$")
 
 
-def test_ticket_response_models_serialize_utc() -> None:
-    """The time-accounting report showed bookings at their raw UTC wall time
-    (08:08 instead of 10:08 CEST) because ``tickets.py`` declared bare
-    ``datetime`` fields."""
-    offenders = [
-        f"{name}.{field_name}"
-        for name, model in inspect.getmembers(ticket_routes, inspect.isclass)
-        if issubclass(model, BaseModel)
-        and model.__module__ == ticket_routes.__name__
-        and name not in _TICKET_REQUEST_MODELS
-        for field_name, field in model.model_fields.items()
-        if _mentions_datetime(field.annotation)
-        and not _has_utc_serializer(field.annotation, list(field.metadata))
-    ]
-    assert offenders == []
+def test_every_v1_response_model_serializes_utc() -> None:
+    """Route modules declare their own response models, so the central
+    ``UtcDateTime`` only helps where it is used. A bare ``datetime`` there showed
+    e.g. time-accounting bookings at their UTC wall time (08:08 instead of
+    10:08 CEST). Walk the whole ``tiqora.api.v1`` package so a new model
+    cannot regress it."""
+    offenders: list[str] = []
+    for info in pkgutil.walk_packages(api_v1.__path__, f"{api_v1.__name__}."):
+        module = importlib.import_module(info.name)
+        for name, model in inspect.getmembers(module, inspect.isclass):
+            if (
+                not issubclass(model, BaseModel)
+                or model.__module__ != module.__name__
+                or _REQUEST_MODEL_NAME.search(name)
+            ):
+                continue
+            offenders.extend(
+                f"{info.name}.{name}.{field_name}"
+                for field_name, field in model.model_fields.items()
+                if _mentions_datetime(field.annotation)
+                and not _has_utc_serializer(field.annotation, list(field.metadata))
+            )
+    assert offenders == [], (
+        f"{len(offenders)} response field(s) serialize a naive datetime and will "
+        f"display in the wrong timezone: {offenders}"
+    )
 
 
 def test_time_accounting_entry_round_trips_utc() -> None:
@@ -173,8 +187,11 @@ def test_time_accounting_entry_round_trips_utc() -> None:
 
 def test_report_date_bounds_normalised_to_naive_utc() -> None:
     # The UI sends local midnight (CEST) as a UTC instant; the column is naive UTC.
-    assert _as_naive_utc(datetime(2026, 10, 6, 22, 0, tzinfo=UTC)) == datetime(2026, 10, 6, 22, 0)
-    assert _as_naive_utc(datetime(2026, 10, 7, 0, 0)) == datetime(2026, 10, 7, 0, 0)
+    assert as_naive_utc(datetime(2026, 10, 6, 22, 0, tzinfo=UTC)) == datetime(2026, 10, 6, 22, 0)
+    assert as_naive_utc(datetime(2026, 10, 7, 0, 0)) == datetime(2026, 10, 7, 0, 0)
+    # A non-UTC offset is converted, not just stripped.
+    plus_two = datetime.fromisoformat("2026-10-07T00:00:00+02:00")
+    assert as_naive_utc(plus_two) == datetime(2026, 10, 6, 22, 0)
 
 
 def test_ai_state_summary_time_round_trips_utc() -> None:

@@ -20,6 +20,7 @@ from tiqora.api.v1.admin.pagination import ListParamsDep, Page, window
 from tiqora.db.legacy.mail_account import MailAccount
 from tiqora.db.legacy.profile import get_legacy_schema_profile, mail_account_load_options
 from tiqora.domain.oauth2_mail import get_config
+from tiqora.domain.schemas import UtcDateTime
 
 router = APIRouter(prefix="/mail-accounts", tags=["admin:mail-accounts"])
 
@@ -51,8 +52,8 @@ class MailAccountOut(BaseModel):
     comments: str | None = None
     valid: bool
     has_password: bool = False
-    create_time: datetime | None = None
-    change_time: datetime | None = None
+    create_time: UtcDateTime | None = None
+    change_time: UtcDateTime | None = None
 
 
 class MailAccountCreate(BaseModel):

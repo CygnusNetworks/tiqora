@@ -16,7 +16,6 @@ import asyncio
 import base64
 import binascii
 from collections.abc import Callable
-from datetime import datetime
 from typing import NoReturn
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -38,6 +37,7 @@ from tiqora.crypto.pgp import PgpEngine, PgpKeyInfo
 from tiqora.crypto.smime_store import SmimeEntry, SmimeStore
 from tiqora.db.legacy.queue import Queue, SystemAddress
 from tiqora.db.tiqora.models import TiqoraCryptoKey
+from tiqora.domain.schemas import UtcDateTime
 
 router = APIRouter(prefix="/crypto-keys", tags=["admin:crypto"])
 
@@ -58,7 +58,7 @@ class CryptoKeyOut(BaseModel):
     action: str = "import"
     user_id: int | None = None
     detail: str | None = None
-    created: datetime | None = None
+    created: UtcDateTime | None = None
 
 
 class PgpKeyOut(BaseModel):
@@ -68,8 +68,8 @@ class PgpKeyOut(BaseModel):
     znuny_key_id: str
     uids: list[str]
     emails: list[str]
-    created: datetime | None = None
-    expires: datetime | None = None
+    created: UtcDateTime | None = None
+    expires: UtcDateTime | None = None
     status: str
     has_secret: bool
     bits: int | None = None
@@ -94,8 +94,8 @@ class SmimeCertOut(BaseModel):
     issuer: str
     fingerprint: str
     serial: str
-    not_before: datetime | None = None
-    not_after: datetime | None = None
+    not_before: UtcDateTime | None = None
+    not_after: UtcDateTime | None = None
     emails: list[str]
     status: str  # valid | expired | invalid
     has_private: bool
@@ -131,8 +131,8 @@ class SmimeRelationOut(BaseModel):
     ca_filename: str | None = None
     ca_fingerprint: str
     ca_subject: str | None = None
-    ca_not_after: datetime | None = None
-    created: datetime | None = None
+    ca_not_after: UtcDateTime | None = None
+    created: UtcDateTime | None = None
 
 
 class SignKeyOptionOut(BaseModel):
@@ -142,7 +142,7 @@ class SignKeyOptionOut(BaseModel):
     key: str
     label: str
     status: str
-    expires: datetime | None = None
+    expires: UtcDateTime | None = None
     emails: list[str]
 
 

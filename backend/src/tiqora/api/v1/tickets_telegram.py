@@ -9,7 +9,6 @@ mounted under the same ``/tickets`` prefix. Reuses ``tickets.py``'s
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
@@ -21,6 +20,7 @@ from tiqora.channels.telegram import chat_actions
 from tiqora.channels.telegram.messages import buttons_from_json
 from tiqora.channels.telegram.outbound import TelegramDeliveryError
 from tiqora.db.tiqora.models import TiqoraTelegramMessage
+from tiqora.domain.schemas import UtcDateTime
 from tiqora.domain.ticket_service import (
     TicketAccessDenied,
     TicketNotFound,
@@ -45,8 +45,8 @@ class TelegramMessageMeta(BaseModel):
     reply_to_article_id: int | None
     buttons: list[TelegramButtonIn]
     answered_button: int | None
-    edited_at: datetime | None
-    retracted_at: datetime | None
+    edited_at: UtcDateTime | None
+    retracted_at: UtcDateTime | None
     # False for inbound, retracted, and attachment-only messages (Telegram
     # can only edit a text message's text).
     editable: bool
@@ -58,8 +58,8 @@ class TelegramChatOut(BaseModel):
     display_name: str | None
     identity_verified: bool
     customer_user_login: str | None
-    consent_time: datetime | None
-    ai_escalated_at: datetime | None
+    consent_time: UtcDateTime | None
+    ai_escalated_at: UtcDateTime | None
     # Language of the customer's latest message, else their Telegram client
     # language ("de", "en", ...); None = unknown. The reply-button preset uses it.
     customer_language: str | None = None

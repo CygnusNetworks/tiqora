@@ -41,6 +41,7 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.db.tiqora.models import TiqoraGdprJob
+from tiqora.domain.schemas import as_naive_utc
 from tiqora.gdpr.erasure import (
     ErasureError,
     ErasureNotFoundError,
@@ -297,10 +298,10 @@ async def list_erasure_jobs(
         like = f"%{params.q}%"
         stmt = stmt.where(TiqoraGdprJob.resolved_logins.ilike(like))
     if params.from_dt is not None:
-        from_val = params.from_dt.replace(tzinfo=None) if params.from_dt.tzinfo else params.from_dt
+        from_val = as_naive_utc(params.from_dt)
         stmt = stmt.where(TiqoraGdprJob.created >= from_val)
     if params.to_dt is not None:
-        to_val = params.to_dt.replace(tzinfo=None) if params.to_dt.tzinfo else params.to_dt
+        to_val = as_naive_utc(params.to_dt)
         stmt = stmt.where(TiqoraGdprJob.created <= to_val)
     stmt = stmt.order_by(TiqoraGdprJob.created.desc(), TiqoraGdprJob.id.desc())
     rows, total = await window(session, stmt, params)
