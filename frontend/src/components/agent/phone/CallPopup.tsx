@@ -9,7 +9,6 @@ import {
   callAnsweredAt,
   callDurationSeconds,
   callEndedAt,
-  removeCall,
   restoreCalls,
   useCalls,
   visibleCalls,
@@ -18,17 +17,10 @@ import { phoneApi, type ActiveCall, type CallerTicket } from "@/lib/phoneApi";
 import { formatElapsed, requestPhoneCall } from "@/lib/phoneCall";
 import { stateLabel } from "@/lib/status";
 import { useConnectionStatus } from "@/lib/useSSE";
+import { dismissCall, phoneTicketSearchForCall } from "./callTicket";
 
 /** Digits in a number — the caller lookup needs five (as in `CallerLookup`). */
 const digitCount = (value: string) => value.replace(/\D/g, "").length;
-
-/** Hide a card here and in the agent's other tabs (best effort). */
-function dismiss(callId: string) {
-  removeCall(callId);
-  phoneApi.dismissCall(callId).catch(() => {
-    // already gone server-side (TTL) — the local removal is what matters
-  });
-}
 
 function CallCard({ call, now }: { call: ActiveCall; now: number }) {
   const { t } = useTranslation();
@@ -73,26 +65,13 @@ function CallCard({ call, now }: { call: ActiveCall; now: number }) {
       number: number || null,
       ...timing,
     });
-    dismiss(call.call_id);
+    dismissCall(call.call_id);
     void navigate({ to: "/agent/tickets/$ticketId", params: { ticketId: String(tk.id) } });
   };
 
   const newTicket = () => {
-    dismiss(call.call_id);
-    void navigate({
-      to: "/agent/tickets/new",
-      search: {
-        type: "phone",
-        from_call: true,
-        direction: call.direction,
-        number: number || undefined,
-        customer: single?.login,
-        call_started: timing.startedAt ?? undefined,
-        call_ended: timing.endedAt ?? undefined,
-        // The agent who answered becomes the owner (one agent per extension).
-        owner_id: call.answered_by_user_id ?? undefined,
-      },
-    });
+    dismissCall(call.call_id);
+    void navigate({ to: "/agent/tickets/new", search: phoneTicketSearchForCall(call, single?.login) });
   };
 
   return (
@@ -167,7 +146,7 @@ function CallCard({ call, now }: { call: ActiveCall; now: number }) {
         <button
           type="button"
           data-testid="call-card-dismiss"
-          onClick={() => dismiss(call.call_id)}
+          onClick={() => dismissCall(call.call_id)}
           className="ml-auto rounded px-2 py-1 text-[12px] text-muted hover:bg-surface-subtle hover:text-ink"
         >
           {ended ? t("callPopup.close") : t("callPopup.ignore")}

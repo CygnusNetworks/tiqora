@@ -360,6 +360,37 @@ async def test_list_tickets_customer_id_filter(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_list_tickets_customer_user_id_filter(
+    url_fixture: str,
+    request: pytest.FixtureRequest,
+) -> None:
+    """``customer_user_id`` narrows the list to one person's tickets (the
+    customer workbench), not the whole company. Only ``TICKET_PLAIN`` has a
+    customer user in this fixture."""
+    sync_url: str = request.getfixturevalue(url_fixture)
+    ids = _seed(sync_url)
+    async_url = _to_async_url(sync_url)
+    engine = create_async_engine(async_url)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with factory() as session:
+        ts = TicketService(session)
+
+        matched = await ts.list_tickets(
+            ids["reader"], queue_id=ids["queue"], customer_user_id=CUSTOMER_LOGIN, limit=50
+        )
+        assert {i.id for i in matched.items} == {ids["ticket_plain"]}
+
+        unmatched = await ts.list_tickets(
+            ids["reader"], queue_id=ids["queue"], customer_user_id="nobody", limit=50
+        )
+        assert unmatched.total == 0
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_list_tickets_include_archived(
     url_fixture: str,
     request: pytest.FixtureRequest,

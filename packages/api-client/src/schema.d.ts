@@ -4861,6 +4861,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-directory/companies/{customer_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Detail
+         * @description One company's master data for the company view of the "Kunden" page.
+         */
+        get: operations["company_detail_api_v1_customer_directory_companies__customer_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-directory/shortlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer Shortlist
+         * @description The agent's own recent and most frequent customer users.
+         *
+         *     Derived from the articles the agent wrote in the last ``SHORTLIST_DAYS``
+         *     days (mails, phone notes, internal notes), grouped by the ticket's
+         *     customer user. Invalid customer users are left out.
+         */
+        get: operations["customer_shortlist_api_v1_customer_directory_shortlist_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customer-directory/vcards": {
         parameters: {
             query?: never;
@@ -4964,7 +5008,11 @@ export interface paths {
         };
         /** Get Customer */
         get: operations["get_customer_api_v1_customers__login__get"];
-        put?: never;
+        /**
+         * Update Customer
+         * @description Overwrite a customer user's contact data (``customer_edit`` feature).
+         */
+        put: operations["update_customer_api_v1_customers__login__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -8011,8 +8059,12 @@ export interface components {
          *     so empty means ``""``).
          */
         AgentCustomerCreateRequest: {
+            /** City */
+            city?: string | null;
             /** Comments */
             comments?: string | null;
+            /** Country */
+            country?: string | null;
             /** Customer Id */
             customer_id: string;
             /**
@@ -8033,6 +8085,12 @@ export interface components {
             mobile?: string | null;
             /** Phone */
             phone?: string | null;
+            /** Street */
+            street?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Zip */
+            zip?: string | null;
         };
         /** AgentRefOut */
         AgentRefOut: {
@@ -10557,6 +10615,29 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CustomerDirectoryCompanyDetail */
+        CustomerDirectoryCompanyDetail: {
+            /** City */
+            city: string | null;
+            /** Comments */
+            comments: string | null;
+            /** Contact Count */
+            contact_count: number;
+            /** Country */
+            country: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /** Name */
+            name: string;
+            /** Street */
+            street: string | null;
+            /** Url */
+            url: string | null;
+            /** Valid Id */
+            valid_id: number;
+            /** Zip */
+            zip: string | null;
+        };
         /** CustomerDirectoryEntry */
         CustomerDirectoryEntry: {
             /** City */
@@ -10672,6 +10753,41 @@ export interface components {
             /** Contacts */
             contacts: components["schemas"]["CustomerContactRefOut"][];
         };
+        /** CustomerShortlist */
+        CustomerShortlist: {
+            /** Frequent */
+            frequent: components["schemas"]["CustomerShortlistEntry"][];
+            /** Recent */
+            recent: components["schemas"]["CustomerShortlistEntry"][];
+        };
+        /** CustomerShortlistEntry */
+        CustomerShortlistEntry: {
+            /** Company Name */
+            company_name?: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /**
+             * Last At
+             * Format: date-time
+             */
+            last_at: string;
+            /** Last Channel */
+            last_channel: string | null;
+            /** Last Name */
+            last_name: string;
+            /** Login */
+            login: string;
+            /** Mobile */
+            mobile: string | null;
+            /** Phone */
+            phone: string | null;
+            /** Ticket Count */
+            ticket_count: number;
+        };
         /** CustomerSmimeCertificateIn */
         CustomerSmimeCertificateIn: {
             /** Certificate */
@@ -10729,6 +10845,45 @@ export interface components {
             login: string;
             /** Tickets */
             tickets: components["schemas"]["CustomerTicketItem"][];
+        };
+        /**
+         * CustomerUpdateRequest
+         * @description Full edit of a customer user from the agent "Kunden" page.
+         *
+         *     Every field is written as sent; an empty optional field clears the
+         *     column. Login, password and validity stay admin matters.
+         */
+        CustomerUpdateRequest: {
+            /** City */
+            city?: string | null;
+            /** Comments */
+            comments?: string | null;
+            /** Country */
+            country?: string | null;
+            /** Customer Id */
+            customer_id: string;
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /**
+             * First Name
+             * @default
+             */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Mobile */
+            mobile?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Street */
+            street?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Zip */
+            zip?: string | null;
         };
         /** CustomerUserAdminCreate */
         CustomerUserAdminCreate: {
@@ -10890,8 +11045,14 @@ export interface components {
         };
         /** CustomerUserOut */
         CustomerUserOut: {
+            /** City */
+            city?: string | null;
+            /** Comments */
+            comments?: string | null;
             /** Company Name */
             company_name?: string | null;
+            /** Country */
+            country?: string | null;
             /** Customer Id */
             customer_id: string;
             /** Email */
@@ -10906,8 +11067,14 @@ export interface components {
             mobile?: string | null;
             /** Phone */
             phone?: string | null;
+            /** Street */
+            street?: string | null;
             /** Title */
             title?: string | null;
+            /** Valid Id */
+            valid_id?: number | null;
+            /** Zip */
+            zip?: string | null;
         };
         /** DaemonListOut */
         DaemonListOut: {
@@ -16006,6 +16173,11 @@ export interface components {
             auth_method: string;
             /** Avatar Url */
             avatar_url?: string | null;
+            /**
+             * Can Edit Customers
+             * @default false
+             */
+            can_edit_customers: boolean;
             /**
              * Can Edit Templates
              * @default false
@@ -29883,6 +30055,74 @@ export interface operations {
             };
         };
     };
+    company_detail_api_v1_customer_directory_companies__customer_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDirectoryCompanyDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_shortlist_api_v1_customer_directory_shortlist_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerShortlist"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_filtered_vcards_api_v1_customer_directory_vcards_get: {
         parameters: {
             query?: {
@@ -30080,6 +30320,45 @@ export interface operations {
             };
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerUserOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_customer_api_v1_customers__login__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerUpdateRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -32649,6 +32928,8 @@ export interface operations {
                 state_type?: string | null;
                 owner_id?: number | null;
                 customer_id?: string | null;
+                /** @description Only tickets of this customer user (login). */
+                customer_user_id?: string | null;
                 responsible_id?: number | null;
                 service_id?: number | null;
                 /** @description True = lock/tmp_lock only; False = unlock only. */

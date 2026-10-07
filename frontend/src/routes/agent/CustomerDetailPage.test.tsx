@@ -26,7 +26,9 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
   useParams: () => ({ login: "jane.doe" }),
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
-    <a data-to={String(rest.to)}>{children}</a>
+    <a data-to={String(rest.to)} data-testid={rest["data-testid"] as string | undefined}>
+      {children}
+    </a>
   ),
 }));
 
@@ -78,6 +80,45 @@ beforeEach(() => {
   customerCryptoKeys.list.mockResolvedValue(keys({ pgp_enabled: false, smime_enabled: false }));
 });
 
+describe("CustomerDetailPage actions", () => {
+  it("puts the ticket actions first and lists only this person's tickets", async () => {
+    listTickets.mockImplementation((params: { state_type?: string }) =>
+      Promise.resolve(
+        params.state_type === "open"
+          ? { items: [], total: 2, offset: 0, limit: 1 }
+          : {
+              items: [{ id: 42, tn: "2026100710000142", title: "VPN bricht ab", state: "open", age_seconds: 7200 }],
+              total: 1,
+              offset: 0,
+              limit: 8,
+            },
+      ),
+    );
+    renderPage();
+    expect(await screen.findByTestId("customer-email-ticket-jane.doe")).toHaveAttribute(
+      "data-to",
+      "/agent/tickets/new",
+    );
+    expect(screen.getByTestId("customer-phone-ticket-jane.doe")).toBeInTheDocument();
+    expect(await screen.findByTestId("customer-ticket-42")).toHaveTextContent("VPN bricht ab");
+    expect(screen.getByTestId("customer-open-count")).toHaveTextContent(/^2 /);
+    expect(listTickets).toHaveBeenCalledWith(
+      expect.objectContaining({ customer_user_id: "jane.doe" }),
+      expect.anything(),
+    );
+    expect(listTickets).not.toHaveBeenCalledWith(
+      expect.objectContaining({ customer_id: "CUST1" }),
+      expect.anything(),
+    );
+  });
+
+  it("offers editing only with the customer edit permission", async () => {
+    renderPage();
+    await screen.findByTestId("customer-name");
+    expect(screen.queryByTestId("customer-edit")).toBeNull();
+  });
+});
+
 describe("CustomerDetailPage click-to-call", () => {
   it("renders phone and mobile as dial links that open an outbound phone ticket", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -88,9 +129,9 @@ describe("CustomerDetailPage click-to-call", () => {
         </I18nextProvider>
       </QueryClientProvider>,
     );
-    const mobile = await screen.findByTestId("customer-dial-mobile");
+    const mobile = await screen.findByTestId("customer-call-mobile-jane.doe");
     expect(mobile).toHaveAttribute("href", "tel:01711234567");
-    expect(screen.getByTestId("customer-dial-phone")).toHaveAttribute("href", "tel:+492285550101");
+    expect(screen.getByTestId("customer-call-phone-jane.doe")).toHaveAttribute("href", "tel:+492285550101");
     mobile.addEventListener("click", (e) => e.preventDefault());
     fireEvent.click(mobile);
     expect(navigate).toHaveBeenCalledWith({
@@ -272,7 +313,7 @@ describe("CustomerDetailPage click-to-dial via the PBX", () => {
         </I18nextProvider>
       </QueryClientProvider>,
     );
-    const mobile = await screen.findByTestId("customer-dial-mobile");
+    const mobile = await screen.findByTestId("customer-call-mobile-jane.doe");
     await waitFor(() => expect(phoneConfig).toHaveBeenCalled());
     // let the phone-config query settle so the link is in originate mode
     await act(async () => {
@@ -314,7 +355,7 @@ describe("CustomerDetailPage click-to-dial via the PBX", () => {
         </I18nextProvider>
       </QueryClientProvider>,
     );
-    const mobile = await screen.findByTestId("customer-dial-mobile");
+    const mobile = await screen.findByTestId("customer-call-mobile-jane.doe");
     mobile.addEventListener("click", (e) => e.preventDefault());
     fireEvent.click(mobile);
     expect(dial).not.toHaveBeenCalled();

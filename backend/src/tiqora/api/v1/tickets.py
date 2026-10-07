@@ -366,6 +366,9 @@ async def list_tickets(
     state_type: str | None = None,
     owner_id: int | None = None,
     customer_id: str | None = None,
+    customer_user_id: str | None = Query(
+        None, description="Only tickets of this customer user (login)."
+    ),
     responsible_id: int | None = None,
     service_id: int | None = None,
     locked: bool | None = Query(
@@ -404,6 +407,7 @@ async def list_tickets(
         state_type=state_type,
         owner_id=owner_id,
         customer_id=customer_id,
+        customer_user_id=customer_user_id,
         responsible_id=responsible_id,
         service_id=service_id,
         locked=locked,

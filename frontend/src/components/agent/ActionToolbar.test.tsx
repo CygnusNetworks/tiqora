@@ -42,6 +42,9 @@ vi.mock("@/lib/api", async () => {
       listReferenceAgents,
       searchReferenceCustomers,
       createCustomer,
+      getCustomer: vi.fn().mockResolvedValue(null),
+      listTickets: vi.fn().mockResolvedValue({ items: [], total: 0, offset: 0, limit: 1 }),
+      getCustomerShortlist: vi.fn().mockResolvedValue({ recent: [], frequent: [] }),
       listQueues: vi.fn().mockResolvedValue([]),
       listTicketLinks: vi.fn().mockResolvedValue([]),
       searchTickets,
@@ -238,21 +241,31 @@ describe("ActionToolbar", () => {
     expect(trigger).toHaveTextContent("Ada Lovelace");
   });
 
-  it("shows the current customer and prefills search", async () => {
+  it("shows the current customer once and offers to create an unknown sender", async () => {
     searchReferenceCustomers.mockResolvedValue([]);
     wrap(
       <ActionToolbar
         ticket={makeTicket({
           customer_id: "C-9",
           customer_user_id: "bob",
+          first_from: "Ilka Brenner <i.brenner@example.com>",
         })}
       />,
     );
     fireEvent.click(screen.getByTestId("toolbar-customer"));
     expect(screen.getByTestId("customer-picker-current")).toHaveTextContent("bob");
     expect(screen.getByTestId("customer-picker-current")).toHaveTextContent("C-9");
-    const input = screen.getByPlaceholderText(/select|auswählen/i);
-    expect(input).toHaveValue("bob");
+    expect(screen.getByTestId("customer-picker-clear")).toBeInTheDocument();
+    // The sender has no customer yet: one click into the prefilled create form.
+    fireEvent.click(await screen.findByTestId("customer-picker-create-sender"));
+    expect(searchReferenceCustomers).toHaveBeenCalledWith(
+      { q: "i.brenner@example.com" },
+      expect.anything(),
+    );
+    expect(screen.getByTestId("customer-create-email")).toHaveValue("i.brenner@example.com");
+    expect(screen.getByTestId("customer-create-first-name")).toHaveValue("Ilka");
+    expect(screen.getByTestId("customer-create-last-name")).toHaveValue("Brenner");
+    expect(screen.getByTestId("customer-create-login")).toHaveValue("i.brenner@example.com");
   });
 
   it("shows the customer number as a badge on each search result", async () => {
@@ -267,13 +280,13 @@ describe("ActionToolbar", () => {
     wrap(<ActionToolbar ticket={makeTicket()} />);
     fireEvent.click(screen.getByTestId("toolbar-customer"));
     expect(screen.getByTestId("customer-picker-dialog")).toBeInTheDocument();
-    const input = screen.getByPlaceholderText(/select|auswählen/i);
+    const input = screen.getByTestId("customer-picker-search");
     fireEvent.change(input, { target: { value: "ali" } });
     const badge = await screen.findByTestId("customer-picker-id-alice");
     expect(badge).toHaveTextContent("C-10042");
-    // Pill/badge styling (rounded + muted tone), not plain text.
-    expect(badge.className).toMatch(/rounded/);
-    expect(badge.className).toMatch(/text-muted|border-hairline/);
+    expect(badge.className).toMatch(/text-muted/);
+    // The highlighted hit is previewed with its assign button.
+    expect(screen.getByTestId("customer-picker-assign")).toHaveTextContent("Alice Example");
     expect(screen.getByTestId("customer-picker-result-alice")).toHaveTextContent("Alice Example");
     expect(screen.getByTestId("customer-picker-result-alice")).toHaveTextContent(
       "alice@example.com",
@@ -305,18 +318,17 @@ describe("ActionToolbar", () => {
     fireEvent.change(screen.getByTestId("customer-create-last-name"), {
       target: { value: "Person" },
     });
-    fireEvent.change(screen.getByTestId("customer-create-customer-id"), {
-      target: { value: "C-NEW" },
-    });
     fireEvent.click(screen.getByTestId("customer-create-submit"));
 
     await waitFor(() =>
+      // No company picked: the login doubles as customer number.
       expect(createCustomer).toHaveBeenCalledWith({
         login: "newlogin",
         email: "new@example.com",
         first_name: "New",
         last_name: "Person",
-        customer_id: "C-NEW",
+        customer_id: "newlogin",
+        phone: null,
       }),
     );
     await waitFor(() =>
@@ -345,9 +357,6 @@ describe("ActionToolbar", () => {
     });
     fireEvent.change(screen.getByTestId("customer-create-last-name"), {
       target: { value: "En" },
-    });
-    fireEvent.change(screen.getByTestId("customer-create-customer-id"), {
-      target: { value: "C-1" },
     });
     fireEvent.click(screen.getByTestId("customer-create-submit"));
 
@@ -378,9 +387,6 @@ describe("ActionToolbar", () => {
     });
     fireEvent.change(screen.getByTestId("customer-create-last-name"), {
       target: { value: "En" },
-    });
-    fireEvent.change(screen.getByTestId("customer-create-customer-id"), {
-      target: { value: "C-1" },
     });
     fireEvent.click(screen.getByTestId("customer-create-submit"));
 

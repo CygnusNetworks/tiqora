@@ -332,6 +332,9 @@ async def test_agent_create_customer_user(mariadb_znuny_url: str) -> None:
         "last_name": "Customer",
         "customer_id": "ZOOMAPI",
         "phone": "+49 30 123",
+        "street": "Am Hof 1",
+        "city": "Bonn",
+        "zip": "  ",
     }
     async with client:
         create_resp = await client.post("/api/v1/customers", json=body)
@@ -348,6 +351,7 @@ async def test_agent_create_customer_user(mariadb_znuny_url: str) -> None:
         search_resp = await client.get(
             "/api/v1/reference/customers", params={"q": "zoom.api.cust.created"}
         )
+        detail_resp = await client.get(f"/api/v1/customers/{login}")
         # Duplicate login → 409
         dup_resp = await client.post("/api/v1/customers", json=body)
     await engine.dispose()
@@ -356,6 +360,10 @@ async def test_agent_create_customer_user(mariadb_znuny_url: str) -> None:
     logins = {c["login"] for c in search_resp.json()}
     assert login in logins
     assert dup_resp.status_code == 409
+    detail = detail_resp.json()
+    assert (detail["street"], detail["city"]) == ("Am Hof 1", "Bonn")
+    # Blank optional fields are stored as NULL.
+    assert detail["zip"] is None
 
 
 # ── Movable queues ──────────────────────────────────────────────────────────

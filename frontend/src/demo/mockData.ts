@@ -25,6 +25,7 @@ export const demoUser = {
   is_admin: true,
   can_edit_templates: true,
   can_use_customer_directory: true,
+  can_edit_customers: true,
   email: "alex.turner@example.com",
   time_zone: null,
   default_time_zone: "Europe/Berlin",
@@ -1278,6 +1279,44 @@ const adminCustomerUsers = CUSTOMERS.map((c, i) => ({ id: i + 1, login: c.login,
 const directoryEntries = [...adminCustomerUsers]
   .sort((a, b) => a.last_name.localeCompare(b.last_name))
   .map((c) => ({ login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name, title: null, first_name: c.first_name, last_name: c.last_name, phone: c.phone, mobile: null, city: "Bonn", valid_id: 1 }));
+// Customer workbench: the agent's shortlist, one customer, one company.
+const demoCustomerDetail = (login: string) => {
+  const c = adminCustomerUsers.find((x) => x.login === login) ?? adminCustomerUsers[0];
+  return {
+    login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name,
+    first_name: c.first_name, last_name: c.last_name, title: c.customer_id === "ACME" ? "IT-Leitung" : null,
+    phone: c.phone, mobile: c.login.startsWith("j.doe") ? "+49 171 555 2210" : null,
+    street: "Am Hof 1", zip: "53113", city: "Bonn", country: null, comments: null, valid_id: 1,
+  };
+};
+const shortlistEntry = (login: string, minutesAgo: number, channel: string, count: number) => {
+  const c = demoCustomerDetail(login);
+  return {
+    login: c.login, email: c.email, customer_id: c.customer_id, company_name: c.company_name,
+    first_name: c.first_name, last_name: c.last_name, phone: c.phone, mobile: c.mobile,
+    last_at: new Date(Date.now() - minutesAgo * 60_000).toISOString(), last_channel: channel, ticket_count: count,
+  };
+};
+const customerShortlist = {
+  recent: [
+    shortlistEntry("j.doe@acme.example", 12, "Phone", 6),
+    shortlistEntry("s.patel@northwind.example", 70, "Email", 3),
+    shortlistEntry("k.wu@globex.example", 200, "Phone", 2),
+    shortlistEntry("t.hall@initech.example", 26 * 60, "Internal", 1),
+  ],
+  frequent: [
+    shortlistEntry("j.doe@acme.example", 12, "Phone", 6),
+    shortlistEntry("m.reed@acme.example", 3 * 24 * 60, "Email", 5),
+    shortlistEntry("s.patel@northwind.example", 70, "Email", 3),
+    shortlistEntry("l.gomez@northwind.example", 9 * 24 * 60, "Email", 2),
+  ],
+};
+const demoCompanyDetail = (customerId: string) => ({
+  customer_id: customerId, name: COMPANY_NAMES[customerId] ?? customerId, street: "Am Hof 1", zip: "53113",
+  city: "Bonn", country: null, url: null, comments: null, valid_id: 1,
+  contact_count: adminCustomerUsers.filter((c) => c.customer_id === customerId).length,
+});
+
 const adminCustomerCompanies = [
   ["ACME", "ACME Corporation"], ["NORTHWIND", "Northwind Traders"], ["GLOBEX", "Globex Inc."], ["INITECH", "Initech LLC"],
 ].map(([customer_id, name], i) => ({ id: i + 1, customer_id, name, street: "1 Market St", zip: "90210", city: "Springfield", country: "US", url: null, comments: null, valid_id: 1, create_time: t0, change_time: t0 }));
@@ -1593,6 +1632,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/admin/follow-up-possible"))
     return [{ id: 1, name: "possible", valid_id: 1 }, { id: 2, name: "reject", valid_id: 1 }, { id: 3, name: "new ticket", valid_id: 1 }];
   if (p.endsWith("/admin/customer-users")) return page(adminCustomerUsers);
+  if (p.endsWith("/customer-directory/shortlist")) return customerShortlist;
+  if (p.match(/\/customer-directory\/companies\/[^/]+$/)) return demoCompanyDetail(decodeURIComponent(p.split("/").pop() ?? ""));
+  if (p.match(/\/api\/v1\/customers\/[^/]+$/) && method === "GET") return demoCustomerDetail(decodeURIComponent(p.split("/").pop() ?? ""));
   if (p.endsWith("/customer-directory")) return page(directoryEntries);
   if (p.endsWith("/customer-directory/companies")) return Object.entries(COMPANY_NAMES).map(([customer_id, name]) => ({ customer_id, name }));
   if (p.match(/\/admin\/feature-grants\/[^/]+$/)) return { user_ids: [], group_ids: [2], role_ids: [] };

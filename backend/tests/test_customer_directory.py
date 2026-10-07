@@ -4,15 +4,21 @@ gated list, company picker and vCard exports. Own seed block 9860+."""
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tiqora.api.v1.admin.common import CUSTOMER_USER_CACHE_TYPES
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.domain.feature_grants import CUSTOMER_DIRECTORY, FeatureGrants, FeatureGrantService
+from tiqora.domain.feature_grants import (
+    CUSTOMER_DIRECTORY,
+    CUSTOMER_EDIT,
+    FeatureGrants,
+    FeatureGrantService,
+)
 
 pytestmark = pytest.mark.db
 
@@ -40,6 +46,15 @@ def _cleanup(url: str) -> None:
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
         conn.execute(text("DELETE FROM tiqora_feature_grant"))
+        conn.execute(text("DELETE FROM article WHERE id BETWEEN 9860 AND 9869"))
+        conn.execute(text("DELETE FROM ticket WHERE id BETWEEN 9860 AND 9869"))
+        # Written by the customer edit (Znuny cache signals).
+        conn.execute(
+            text("DELETE FROM tiqora_cache_invalidation WHERE cache_type IN :types").bindparams(
+                bindparam("types", expanding=True)
+            ),
+            {"types": list(CUSTOMER_USER_CACHE_TYPES)},
+        )
         conn.execute(text("DELETE FROM customer_user WHERE login LIKE :p"), {"p": _PREFIX + "%"})
         conn.execute(
             text("DELETE FROM customer_company WHERE customer_id LIKE 'CUSTDIR%'"),
@@ -144,11 +159,11 @@ def seeded(mariadb_znuny_url: str) -> Iterator[str]:
     _cleanup(mariadb_znuny_url)
 
 
-async def _grant(url: str, grants: FeatureGrants) -> None:
+async def _grant(url: str, grants: FeatureGrants, feature: str = CUSTOMER_DIRECTORY) -> None:
     engine = create_async_engine(_async_url(url))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
-        await FeatureGrantService(session).set(CUSTOMER_DIRECTORY, grants)
+        await FeatureGrantService(session).set(feature, grants)
         await session.commit()
     await engine.dispose()
 
@@ -361,3 +376,170 @@ async def test_export_cap(seeded: str, monkeypatch: pytest.MonkeyPatch) -> None:
     assert too_many.status_code == 422
     assert ok.status_code == 200
     assert too_many_selected.status_code == 422
+
+
+_EDIT_BODY = {
+    "first_name": "Laura",
+    "last_name": "Gomez-Ruiz",
+    "email": "laura.new@custdir.example",
+    "customer_id": "CUSTDIR-GX",
+    "phone": "0228 555 0100",
+    "mobile": "",
+    "street": "Am Hof 1",
+    "zip": "53113",
+    "city": "Bonn",
+    "comments": "",
+}
+
+
+async def test_edit_customer_needs_customer_edit_grant(seeded: str) -> None:
+    # The directory grant alone is not enough to edit.
+    await _grant(seeded, FeatureGrants(user_ids=[DIRECT]))
+    client, engine = await _client(seeded, DIRECT)
+    async with client:
+        denied = await client.put(f"/api/v1/customers/{_PREFIX}laura", json=_EDIT_BODY)
+        me = await client.get("/api/v1/auth/me")
+    await engine.dispose()
+    assert denied.status_code == 403
+    assert me.json()["can_use_customer_directory"] is True
+    assert me.json()["can_edit_customers"] is False
+
+
+async def test_edit_customer_overwrites_and_clears(seeded: str) -> None:
+    await _grant(seeded, FeatureGrants(user_ids=[DIRECT]), CUSTOMER_EDIT)
+    client, engine = await _client(seeded, DIRECT)
+    async with client:
+        resp = await client.put(f"/api/v1/customers/{_PREFIX}laura", json=_EDIT_BODY)
+        me = await client.get("/api/v1/auth/me")
+        missing = await client.put("/api/v1/customers/custdir.nobody", json=_EDIT_BODY)
+    await engine.dispose()
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["last_name"] == "Gomez-Ruiz"
+    assert body["email"] == "laura.new@custdir.example"
+    assert body["customer_id"] == "CUSTDIR-GX"
+    assert body["company_name"] == "Custdir Globex"
+    assert body["city"] == "Bonn"
+    # Empty optional fields clear the column (the seed had no mobile; phone replaced).
+    assert body["phone"] == "0228 555 0100"
+    assert body["mobile"] is None
+    assert body["comments"] is None
+    assert me.json()["can_edit_customers"] is True
+    assert missing.status_code == 404
+
+
+async def test_edit_customer_email_conflict(seeded: str) -> None:
+    await _grant(seeded, FeatureGrants(user_ids=[DIRECT]), CUSTOMER_EDIT)
+    client, engine = await _client(seeded, DIRECT)
+    async with client:
+        resp = await client.put(
+            f"/api/v1/customers/{_PREFIX}laura",
+            json={**_EDIT_BODY, "email": "ANNA@custdir.example"},
+        )
+        same = await client.put(
+            f"/api/v1/customers/{_PREFIX}laura",
+            json={**_EDIT_BODY, "email": "Laura@custdir.example"},
+        )
+    await engine.dispose()
+    assert resp.status_code == 409
+    assert resp.json()["detail"]["login"] == _PREFIX + "anna"
+    # Keeping one's own address (other case) is not a conflict.
+    assert same.status_code == 200, same.text
+
+
+def _seed_activity(url: str) -> None:
+    """Tickets with articles written by DIRECT (and one by OUTSIDER).
+
+    channel ids follow Znuny's initial data: 1 Email, 2 Phone, 3 Internal.
+    """
+    now = datetime.now()
+    tickets = (
+        (9860, _PREFIX + "laura", "CUSTDIR-NW"),
+        (9861, _PREFIX + "laura", "CUSTDIR-NW"),
+        (9862, _PREFIX + "anna", "CUSTDIR-NW"),
+        (9863, _PREFIX + "kevin", "CUSTDIR-GX"),
+        (9864, _PREFIX + "old", "CUSTDIR-NW"),
+        (9865, _PREFIX + "laura", "CUSTDIR-NW"),
+    )
+    articles = (
+        # (article, ticket, author, channel, age)
+        (9860, 9860, DIRECT, 1, timedelta(days=3)),
+        (9861, 9861, DIRECT, 2, timedelta(days=1)),
+        (9862, 9862, DIRECT, 1, timedelta(hours=1)),
+        (9863, 9863, OUTSIDER, 1, timedelta(minutes=5)),
+        (9864, 9864, DIRECT, 1, timedelta(minutes=10)),
+        (9865, 9865, DIRECT, 3, timedelta(days=200)),
+    )
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        for tid, login, cid in tickets:
+            conn.execute(
+                text(
+                    "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
+                    " user_id, responsible_user_id, ticket_priority_id, ticket_state_id,"
+                    " customer_id, customer_user_id, timeout, until_time, escalation_time,"
+                    " escalation_update_time, escalation_response_time,"
+                    " escalation_solution_time, archive_flag,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, :tn, 'Custdir', 1, 1, 1, 1, 1, 3, 4, :cid, :login,"
+                    " 0, 0, 0, 0, 0, 0, 0, :t, 1, :t, 1)"
+                ),
+                {"id": tid, "tn": f"2024060198{tid}", "cid": cid, "login": login, "t": NOW},
+            )
+        for aid, tid, author, channel, age in articles:
+            conn.execute(
+                text(
+                    "INSERT INTO article (id, ticket_id, article_sender_type_id,"
+                    " communication_channel_id, is_visible_for_customer,"
+                    " search_index_needs_rebuild, create_time, create_by, change_time,"
+                    " change_by) VALUES (:id, :tid, 1, :ch, 1, 0, :t, :by, :t, :by)"
+                ),
+                {"id": aid, "tid": tid, "ch": channel, "t": now - age, "by": author},
+            )
+    engine.dispose()
+
+
+async def test_shortlist_recent_and_frequent(seeded: str) -> None:
+    _seed_activity(seeded)
+    await _grant(seeded, FeatureGrants(user_ids=[DIRECT, OUTSIDER]))
+    client, engine = await _client(seeded, DIRECT)
+    async with client:
+        resp = await client.get("/api/v1/customer-directory/shortlist")
+    await engine.dispose()
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # Kevin's article is OUTSIDER's, Olga is invalid, the 200-day-old article is out.
+    assert [e["login"] for e in body["recent"]] == [_PREFIX + "anna", _PREFIX + "laura"]
+    assert [e["login"] for e in body["frequent"]] == [_PREFIX + "laura", _PREFIX + "anna"]
+    laura = body["frequent"][0]
+    assert laura["ticket_count"] == 2
+    assert laura["last_channel"] == "Phone"
+    assert laura["company_name"] == "Custdir Northwind"
+    assert body["recent"][0]["last_channel"] == "Email"
+
+
+async def test_shortlist_empty_and_forbidden(seeded: str) -> None:
+    await _grant(seeded, FeatureGrants(user_ids=[DIRECT]))
+    client, engine = await _client(seeded, DIRECT)
+    outsider, engine2 = await _client(seeded, OUTSIDER)
+    async with client, outsider:
+        empty = await client.get("/api/v1/customer-directory/shortlist")
+        denied = await outsider.get("/api/v1/customer-directory/shortlist")
+    await engine.dispose()
+    await engine2.dispose()
+    assert empty.json() == {"recent": [], "frequent": []}
+    assert denied.status_code == 403
+
+
+async def test_company_detail(seeded: str) -> None:
+    await _grant(seeded, FeatureGrants(user_ids=[DIRECT]))
+    client, engine = await _client(seeded, DIRECT)
+    async with client:
+        found = await client.get("/api/v1/customer-directory/companies/CUSTDIR-NW")
+        missing = await client.get("/api/v1/customer-directory/companies/CUSTDIR-NOPE")
+    await engine.dispose()
+    assert found.status_code == 200, found.text
+    assert found.json()["name"] == "Custdir Northwind"
+    # Laura and Anna; Olga is invalid.
+    assert found.json()["contact_count"] == 2
+    assert missing.status_code == 404

@@ -709,6 +709,7 @@ export function TicketHeaderActions({
           ticketId={ticketId}
           currentCustomerId={ticket.customer_id}
           currentCustomerUserId={ticket.customer_user_id}
+          senderFrom={ticket.first_from}
           onClose={() => setDialog(null)}
         />
       )}

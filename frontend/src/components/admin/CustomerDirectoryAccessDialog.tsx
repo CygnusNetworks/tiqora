@@ -1,19 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api } from "@/lib/api";
+import { api, type FeatureKey } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
 
-const FEATURE = "customer_directory" as const;
+const TEXTS: Record<FeatureKey, { title: string; hint: string }> = {
+  customer_directory: {
+    title: "admin.customerUsers.accessTitle",
+    hint: "admin.customerUsers.accessHint",
+  },
+  customer_edit: {
+    title: "admin.customerUsers.editAccessTitle",
+    hint: "admin.customerUsers.editAccessHint",
+  },
+};
 
 /**
- * Who may use the agent customer directory ("Kunden"): single agents, every
+ * Who may use an agent feature of the customer area — the directory
+ * ("Kunden") or creating/editing customers there: single agents, every
  * member of a group, every holder of a role. Admins always may.
  */
-export function CustomerDirectoryAccessDialog({ onClose }: { onClose: () => void }) {
+export function CustomerDirectoryAccessDialog({
+  feature = "customer_directory",
+  onClose,
+}: {
+  feature?: FeatureKey;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
+  const FEATURE = feature;
   const qc = useQueryClient();
   const [userIds, setUserIds] = useState<Set<number>>(new Set());
   const [groupIds, setGroupIds] = useState<Set<number>>(new Set());
@@ -107,8 +124,8 @@ export function CustomerDirectoryAccessDialog({ onClose }: { onClose: () => void
     <Dialog
       open
       onClose={onClose}
-      title={t("admin.customerUsers.accessTitle")}
-      description={t("admin.customerUsers.accessHint")}
+      title={t(TEXTS[feature].title)}
+      description={t(TEXTS[feature].hint)}
       size="lg"
       footer={
         <div className="flex items-center justify-end gap-2">

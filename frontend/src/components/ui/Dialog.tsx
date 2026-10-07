@@ -31,6 +31,7 @@ export function Dialog({
   footer,
   footerClassName,
   size = "md",
+  placement = "center",
   className,
 }: {
   open: boolean;
@@ -45,6 +46,8 @@ export function Dialog({
    * on the surface colour) — e.g. a tinted bar with content on both sides. */
   footerClassName?: string;
   size?: keyof typeof SIZE_CLASS;
+  /** `right`: a full-height side panel (edit forms beside the content). */
+  placement?: "center" | "right";
   className?: string;
 }) {
   const { t } = useTranslation();
@@ -117,7 +120,10 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className={cn(
+        "fixed inset-0 z-50 flex",
+        placement === "right" ? "items-stretch justify-end" : "items-center justify-center p-4",
+      )}
       role="dialog"
       aria-modal="true"
       aria-labelledby="dialog-title"
@@ -132,8 +138,10 @@ export function Dialog({
       <div
         ref={panelRef}
         className={cn(
-          "relative z-10 flex max-h-[calc(100vh-3rem)] w-full flex-col rounded-lg border border-hairline bg-surface shadow-xl",
-          "motion-safe:animate-[dialog-pop_140ms_ease-out]",
+          "relative z-10 flex w-full flex-col border-hairline bg-surface shadow-xl",
+          placement === "right"
+            ? "h-full border-l"
+            : "max-h-[calc(100vh-3rem)] rounded-lg border motion-safe:animate-[dialog-pop_140ms_ease-out]",
           SIZE_CLASS[size],
           className,
         )}

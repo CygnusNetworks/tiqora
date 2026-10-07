@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { api, ApiError } from "@/lib/api";
 import type { TicketDetail } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
-import { Badge } from "@/components/ui/Badge";
+import { CustomerPickerDialog } from "@/components/customers/CustomerPickerDialog";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
@@ -14,6 +14,10 @@ import { Spinner } from "@/components/ui/Spinner";
 import { stateLabel } from "@/lib/status";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
 import { fromZonedInputValue } from "@/lib/timeZone";
+
+
+// The ticket's customer dialog lives with the other customer components.
+export { CustomerPickerDialog };
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -422,6 +426,7 @@ export function ActionToolbar({ ticket }: { ticket: TicketDetail }) {
           ticketId={ticketId}
           currentCustomerId={ticket.customer_id}
           currentCustomerUserId={ticket.customer_user_id}
+          senderFrom={ticket.first_from}
           onClose={() => setDialog(null)}
         />
       )}
@@ -520,269 +525,6 @@ export function AgentPickerDialog({
           onSave={() => patch.mutate({ [field]: Number(agentId) })}
           disabled={!agentId || patch.isPending}
         />
-      </div>
-    </Dialog>
-  );
-}
-
-export function CustomerPickerDialog({
-  ticketId,
-  currentCustomerId,
-  currentCustomerUserId,
-  onClose,
-}: {
-  ticketId: number;
-  currentCustomerId?: string | null;
-  currentCustomerUserId?: string | null;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const [q, setQ] = useState(currentCustomerUserId ?? "");
-  const [creating, setCreating] = useState(false);
-  const customersQ = useQuery({
-    queryKey: ["reference", "customers", q],
-    queryFn: () => api.searchReferenceCustomers({ q }),
-    enabled: !creating && q.trim().length >= 2,
-  });
-  const patch = usePatchTicket(ticketId, onClose);
-  const hasCurrent = Boolean(currentCustomerUserId || currentCustomerId);
-
-  if (creating) {
-    return (
-      <CustomerCreateDialog
-        onCreated={(c) =>
-          patch.mutate({ customer_user_id: c.login, customer_id: c.customer_id })
-        }
-        onBack={() => setCreating(false)}
-        onClose={onClose}
-      />
-    );
-  }
-
-  return (
-    <Dialog open onClose={onClose} title={t("ticket.toolbar.customer")}>
-      <div className="space-y-2" data-testid="customer-picker-dialog">
-        {hasCurrent && (
-          <div
-            className="flex items-center gap-2 rounded border border-hairline bg-surface-subtle px-3 py-1.5 text-sm"
-            data-testid="customer-picker-current"
-          >
-            <span className="text-muted">{t("ticket.dialog.currentCustomer")}:</span>
-            <span className="font-medium text-ink">
-              {currentCustomerUserId || "—"}
-            </span>
-            {currentCustomerId ? (
-              <Badge tone="muted" className="ml-auto shrink-0 rounded-full">
-                {currentCustomerId}
-              </Badge>
-            ) : null}
-          </div>
-        )}
-        {/* Undo the assignment — the counterpart of the "—" entry the service
-            and SLA pickers already offer. */}
-        {hasCurrent && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-danger hover:text-danger"
-            data-testid="customer-picker-clear"
-            disabled={patch.isPending}
-            onClick={() => patch.mutate({ clear_customer: true })}
-          >
-            {t("ticket.dialog.clearCustomer")}
-          </Button>
-        )}
-        <input
-          className={inputCls}
-          value={q}
-          autoFocus
-          placeholder={t("ticket.dialog.selectPlaceholder")}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <div className="max-h-56 overflow-auto rounded border border-hairline">
-          {customersQ.isLoading ? (
-            <div className="flex justify-center py-3">
-              <Spinner />
-            </div>
-          ) : (customersQ.data ?? []).length === 0 ? (
-            <div className="px-3 py-2 text-xs text-muted">{t("ticket.noTickets")}</div>
-          ) : (
-            (customersQ.data ?? []).map((c) => (
-              <button
-                key={c.login}
-                type="button"
-                onClick={() =>
-                  patch.mutate({ customer_user_id: c.login, customer_id: c.customer_id })
-                }
-                disabled={patch.isPending}
-                data-testid={`customer-picker-result-${c.login}`}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-ink hover:bg-surface-subtle disabled:opacity-50"
-              >
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-medium">{c.full_name}</span>{" "}
-                  <span className="text-muted">{c.email}</span>
-                </span>
-                {c.customer_id ? (
-                  <Badge
-                    tone="muted"
-                    className="ml-auto shrink-0 rounded-full"
-                    data-testid={`customer-picker-id-${c.login}`}
-                    title={t("ticket.toolbar.customerNumber")}
-                  >
-                    {c.customer_id}
-                  </Badge>
-                ) : null}
-              </button>
-            ))
-          )}
-        </div>
-        <button
-          type="button"
-          data-testid="customer-picker-new"
-          onClick={() => setCreating(true)}
-          className="flex w-full items-center gap-2 rounded border border-dashed border-hairline px-3 py-1.5 text-left text-sm font-medium text-accent hover:bg-surface-subtle"
-        >
-          + {t("ticket.dialog.newCustomer")}
-        </button>
-        {patch.isError && <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>}
-      </div>
-    </Dialog>
-  );
-}
-
-/** The existing login named by the create endpoint's e-mail-conflict 409, if any. */
-function conflictEmailOwner(err: unknown): string | null {
-  if (!(err instanceof ApiError)) return null;
-  const body = err.detail as { detail?: unknown } | null;
-  const inner = body && typeof body === "object" ? body.detail : null;
-  if (inner && typeof inner === "object" && "login" in inner) {
-    const login = (inner as { login: unknown }).login;
-    return typeof login === "string" && login !== "" ? login : null;
-  }
-  return null;
-}
-
-/** "+ Neu anlegen" sub-form of `CustomerPickerDialog` — creates a customer
- * user (``POST /api/v1/customers``, agent-accessible, no portal password)
- * then hands the created ref back to the caller to assign to the ticket.
- * A 409 is shown as a plain error (login taken, or — naming the existing
- * login — e-mail owned by another customer); there is no "assign the
- * existing one instead" shortcut. */
-function CustomerCreateDialog({
-  onCreated,
-  onBack,
-  onClose,
-}: {
-  onCreated: (c: { login: string; customer_id: string }) => void;
-  onBack: () => void;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const [login, setLogin] = useState("");
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [customerId, setCustomerId] = useState("");
-
-  const create = useMutation({
-    mutationFn: () =>
-      api.createCustomer({
-        login: login.trim(),
-        email: email.trim(),
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        customer_id: customerId.trim(),
-      }),
-    onSuccess: (c) => onCreated({ login: c.login, customer_id: c.customer_id }),
-  });
-
-  const isConflict = create.isError && create.error instanceof ApiError && create.error.status === 409;
-  // 409 for an e-mail owned by another customer: the body is
-  // `{detail: {message, login}}` — name that login; a plain login clash has a string detail.
-  const emailOwner = isConflict ? conflictEmailOwner(create.error) : null;
-  const valid = login.trim() && email.trim() && firstName.trim() && lastName.trim() && customerId.trim();
-
-  return (
-    <Dialog open onClose={onClose} title={t("ticket.dialog.newCustomer")}>
-      <div className="space-y-2" data-testid="customer-create-dialog">
-        <label className="block text-xs text-muted">
-          {t("ticket.dialog.customerLogin")}
-          <input
-            className={inputCls}
-            value={login}
-            autoFocus
-            onChange={(e) => setLogin(e.target.value)}
-            data-testid="customer-create-login"
-          />
-        </label>
-        <label className="block text-xs text-muted">
-          {t("ticket.dialog.customerEmail")}
-          <input
-            className={inputCls}
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            data-testid="customer-create-email"
-          />
-        </label>
-        <div className="flex gap-2">
-          <label className="block flex-1 text-xs text-muted">
-            {t("ticket.dialog.customerFirstName")}
-            <input
-              className={inputCls}
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              data-testid="customer-create-first-name"
-            />
-          </label>
-          <label className="block flex-1 text-xs text-muted">
-            {t("ticket.dialog.customerLastName")}
-            <input
-              className={inputCls}
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              data-testid="customer-create-last-name"
-            />
-          </label>
-        </div>
-        <label className="block text-xs text-muted">
-          {t("ticket.toolbar.customerNumber")}
-          <input
-            className={inputCls}
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            data-testid="customer-create-customer-id"
-          />
-        </label>
-        {isConflict && (
-          <p className="text-xs text-danger" data-testid="customer-create-conflict">
-            {emailOwner
-              ? t("ticket.dialog.customerEmailConflict", { login: emailOwner })
-              : t("ticket.dialog.customerLoginConflict")}
-          </p>
-        )}
-        {create.isError && !isConflict && (
-          <p className="text-xs text-danger">{t("ticket.dialog.genericError")}</p>
-        )}
-        <div className="flex items-center justify-between gap-1.5 pt-2">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            {t("ticket.dialog.back")}
-          </Button>
-          <div className="flex gap-1.5">
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              {t("ticket.dialog.cancel")}
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={!valid || create.isPending}
-              data-testid="customer-create-submit"
-              onClick={() => create.mutate()}
-            >
-              {t("ticket.dialog.save")}
-            </Button>
-          </div>
-        </div>
       </div>
     </Dialog>
   );

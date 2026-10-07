@@ -505,16 +505,14 @@ const agentCustomersRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): CustomerDirectorySearch => {
     const str = (v: unknown) => (typeof v === "string" && v !== "" ? v : undefined);
     // Company ids can look numeric; the router JSON-parses search values.
+    // Logins, too ("12345" comes back as a number).
     const id = (v: unknown) => (typeof v === "number" ? String(v) : str(v));
-    const page = typeof s.page === "number" ? s.page : Number(s.page);
     return {
       q: id(s.q),
+      tab: s.tab === "companies" ? "companies" : undefined,
+      sel: id(s.sel),
       company: id(s.company),
-      company_name: id(s.company_name),
-      page: Number.isInteger(page) && page > 1 ? page : undefined,
       invalid: s.invalid === true || s.invalid === "true" ? true : undefined,
-      sort: str(s.sort),
-      order: s.order === "desc" ? "desc" : undefined,
     };
   },
   component: CustomerDirectoryPage,

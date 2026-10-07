@@ -77,6 +77,9 @@ class UserMe(BaseModel):
     # True when the agent may open the "Kunden" directory (admin, or a
     # customer_directory grant to them, a group they belong to or a role).
     can_use_customer_directory: bool = False
+    # True when the agent may create and edit customer users on that page
+    # (admin, or a customer_edit grant).
+    can_edit_customers: bool = False
 
 
 class UserLanguageUpdate(BaseModel):
@@ -500,6 +503,12 @@ class CustomerUserOut(BaseModel):
     phone: str | None = None
     mobile: str | None = None
     company_name: str | None = None
+    street: str | None = None
+    zip: str | None = None
+    city: str | None = None
+    country: str | None = None
+    comments: str | None = None
+    valid_id: int | None = None
 
 
 class SearchHit(BaseModel):
