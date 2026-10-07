@@ -118,7 +118,10 @@ function ExpiryField({
       )}
       <p className="text-xs text-muted" data-testid="admin-api-keys-form-expiry-preview">
         {value
-          ? t("admin.apiKeys.expiryPreviewLabel", { date: formatDateOnly(value, locale) })
+          ? t("admin.apiKeys.expiryPreviewLabel", {
+              // Expiry is end of a UTC day (apiKeyExpiry.ts): show that day.
+              date: formatDateOnly(value, locale, "UTC"),
+            })
           : t("admin.apiKeys.expiryPreviewUnlimited")}
       </p>
     </div>
@@ -392,7 +395,7 @@ export function ApiKeysPage() {
         r.expires_at ? (
           <span className="inline-flex items-center gap-1.5">
             <span className={isExpired(r.expires_at) ? "text-danger" : undefined}>
-              {formatDateOnly(r.expires_at, locale)}
+              {formatDateOnly(r.expires_at, locale, "UTC")}
             </span>
             {isExpired(r.expires_at) && (
               <Badge tone="danger" data-testid={`admin-api-keys-expired-${r.id}`}>

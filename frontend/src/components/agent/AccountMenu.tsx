@@ -7,6 +7,7 @@ import { SelectMenu } from "@/components/ui/SelectMenu";
 import { Avatar } from "@/components/ui/Avatar";
 import {
   ChevronDownIcon,
+  ClockIcon,
   GlobeIcon,
   LogOutIcon,
   MonitorIcon,
@@ -18,12 +19,65 @@ import {
 import { cn } from "@/lib/cn";
 import { userEmailForAvatar } from "@/lib/gravatar";
 import { getLocale, localePickerItems, resolveLocaleCode, setAppLanguage } from "@/i18n";
+import { useTimeZoneSetting } from "./useTimeZoneSetting";
+
+/** Display time zone (Znuny UserTimeZone): "follow the browser" or any IANA
+ * zone, searchable. Mounted only while the account menu is open. */
+function TimeZonePicker() {
+  const { t } = useTranslation();
+  const tz = useTimeZoneSetting();
+  const currentLabel =
+    tz.preference === null
+      ? t("account.timeZoneBrowser", { zone: tz.browser })
+      : tz.preference.replace(/_/g, " ");
+  return (
+    <>
+      <SelectMenu
+        items={tz.items}
+        value={tz.value}
+        onSelect={tz.save}
+        panelTestId="account-menu-tz-panel"
+        trigger={({ open, ref, toggleProps }) => (
+          <button
+            ref={ref}
+            type="button"
+            data-testid="account-menu-tz-select"
+            aria-label={t("account.timeZone")}
+            disabled={tz.isPending}
+            {...toggleProps}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink/90 transition-colors duration-100 hover:bg-surface-subtle focus:outline-none disabled:opacity-60",
+              open && "bg-surface-subtle",
+            )}
+          >
+            <span className="flex w-4 shrink-0 justify-center text-[15px] text-muted" aria-hidden>
+              <ClockIcon />
+            </span>
+            <span className="min-w-0 flex-1 truncate">{currentLabel}</span>
+            <span
+              className={cn("text-muted transition-transform duration-150", open && "rotate-180")}
+              aria-hidden
+            >
+              ⌄
+            </span>
+          </button>
+        )}
+      />
+      {tz.isError && (
+        <p className="px-2.5 pb-1 text-[11.5px] text-danger" data-testid="account-menu-tz-error">
+          {t("account.timeZoneError")}
+        </p>
+      )}
+    </>
+  );
+}
 
 /**
  * Avatar dropdown for account actions, shared by the agent and admin shells.
  * Opens a Menu with the signed-in identity, a link to security / 2FA settings,
  * a language picker (full Znuny locale set via the portal-based `SelectMenu`),
- * the theme choice (light / dark / system) and finally sign-out. This menu is
+ * the display time zone, the theme choice (light / dark / system) and finally
+ * sign-out. This menu is
  * the only place for personal preferences — there is no separate settings
  * page; admin-managed per-user values (e.g. the phone extension) live in
  * the user admin.
@@ -157,6 +211,9 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
           </button>
         )}
       />
+
+      <MenuLabel>{t("account.timeZone")}</MenuLabel>
+      <TimeZonePicker />
 
       <MenuLabel>{t("account.theme")}</MenuLabel>
       <MenuItem

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
+import { browserTimeZone } from "@/lib/timeZone";
 import { AccountMenu } from "./AccountMenu";
 
 const { logout, navigate, setTheme, authUser } = vi.hoisted(() => ({
@@ -33,11 +35,22 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
 }));
 
+const { setMyTimeZone } = vi.hoisted(() => ({ setMyTimeZone: vi.fn() }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  api: { setMyTimeZone },
+}));
+
+let queryClient: QueryClient;
+
 function open() {
+  queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   render(
-    <I18nextProvider i18n={i18n}>
-      <AccountMenu />
-    </I18nextProvider>,
+    <QueryClientProvider client={queryClient}>
+      <I18nextProvider i18n={i18n}>
+        <AccountMenu />
+      </I18nextProvider>
+    </QueryClientProvider>,
   );
   fireEvent.click(screen.getByTestId("account-menu-trigger"));
 }
@@ -120,6 +133,33 @@ describe("AccountMenu", () => {
     expect(langPanel).toBeInTheDocument();
     // Deep option still reachable after scroll.
     expect(within(langPanel).getByText("日本語")).toBeInTheDocument();
+  });
+
+  it("saves a picked time zone and puts the returned /me into the auth query", async () => {
+    const updated = { ...authUser, time_zone: "Asia/Tokyo", default_time_zone: "Europe/Berlin" };
+    setMyTimeZone.mockReset().mockResolvedValue(updated);
+    open();
+    const trigger = screen.getByTestId("account-menu-tz-select");
+    // No preference yet: the browser zone is the current choice.
+    expect(trigger).toHaveTextContent(i18n.t("account.timeZoneBrowser", { zone: browserTimeZone() }));
+    fireEvent.click(trigger);
+    const panel = screen.getByTestId("account-menu-tz-panel");
+    fireEvent.click(within(panel).getByText("Asia/Tokyo"));
+    await vi.waitFor(() => expect(setMyTimeZone).toHaveBeenCalledWith("Asia/Tokyo"));
+    await vi.waitFor(() => expect(queryClient.getQueryData(["auth", "me"])).toEqual(updated));
+  });
+
+  it("clears the preference with the browser option and shows save errors", async () => {
+    setMyTimeZone.mockReset().mockRejectedValue(new Error("422"));
+    open();
+    fireEvent.click(screen.getByTestId("account-menu-tz-select"));
+    fireEvent.click(
+      within(screen.getByTestId("account-menu-tz-panel")).getByText(
+        i18n.t("account.timeZoneBrowser", { zone: browserTimeZone() }),
+      ),
+    );
+    await vi.waitFor(() => expect(setMyTimeZone).toHaveBeenCalledWith(null));
+    expect(await screen.findByTestId("account-menu-tz-error")).toBeInTheDocument();
   });
 
   it("toggles theme via setTheme", () => {

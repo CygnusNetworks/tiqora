@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import { dayKey, groupByDay, isCurrentMonth, isSameDay, monthGridDays } from "@/lib/calendarMath";
+import { dayKey, groupByDay, isCurrentMonth, monthGridDays } from "@/lib/calendarMath";
+import { ymdInZone } from "@/lib/timeZone";
 import type { OccurrenceOut } from "@/lib/api";
 
 const WEEKDAY_KEYS = [
@@ -29,7 +30,7 @@ export function MonthGrid({
   const { t } = useTranslation();
   const days = monthGridDays(anchor);
   const byDay = groupByDay(occurrences);
-  const today = new Date();
+  const todayKey = ymdInZone(new Date());
 
   return (
     <div data-testid="calendar-month-grid" className="flex min-h-0 flex-1 flex-col">
@@ -45,7 +46,7 @@ export function MonthGrid({
           const key = dayKey(day);
           const dayOccurrences = byDay.get(key) ?? [];
           const inMonth = isCurrentMonth(day, anchor);
-          const isToday = isSameDay(day, today);
+          const isToday = key === todayKey;
           return (
             <button
               type="button"

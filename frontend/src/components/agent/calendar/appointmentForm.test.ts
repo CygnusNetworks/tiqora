@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { AppointmentOut } from "@/lib/api";
+import { setDisplayTimeZone } from "@/lib/timeZone";
 import { defaultFormValue, formValueFromAppointment } from "./appointmentForm";
 
 describe("defaultFormValue", () => {
@@ -83,6 +84,17 @@ describe("formValueFromAppointment", () => {
     expect(value.recurrence.interval).toBe(2);
     expect(value.recurrence.count).toBe("5");
     expect(value.recurrence.until).not.toBe("");
+  });
+
+  it("shows start and end in the agent's display zone", () => {
+    setDisplayTimeZone("Asia/Tokyo");
+    try {
+      const value = formValueFromAppointment(makeAppointment());
+      expect(value.start_time).toBe("2026-06-01T18:00");
+      expect(value.end_time).toBe("2026-06-01T19:00");
+    } finally {
+      setDisplayTimeZone(null);
+    }
   });
 
   it("returns empty strings for unparsable or missing date fields", () => {

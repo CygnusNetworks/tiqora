@@ -13,6 +13,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { stateLabel } from "@/lib/status";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
+import { fromZonedInputValue } from "@/lib/timeZone";
 
 const inputCls =
   "w-full rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent";
@@ -885,7 +886,7 @@ export function PendingDialog({
           onSave={() =>
             patch.mutate({
               state_id: Number(stateId),
-              pending_time: when ? new Date(when).toISOString() : null,
+              pending_time: fromZonedInputValue(when)?.toISOString() ?? null,
             })
           }
           disabled={!stateId || !when || patch.isPending}

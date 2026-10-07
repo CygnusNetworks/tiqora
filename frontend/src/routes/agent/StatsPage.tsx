@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
+import { displayTimeZone } from "@/lib/timeZone";
 import {
   DATE_RANGE_PRESETS,
   dateRangeForPreset,
@@ -43,13 +44,16 @@ export function StatsPage() {
   const [granularity, setGranularity] = useState<StatsGranularity>("day");
   const [dimension, setDimension] = useState<StatsDimension>("queue");
 
+  // Date bounds and day/week/month buckets follow the agent's zone.
+  const tz = displayTimeZone();
   const filterParams = useMemo(
     () => ({
       queue_id: queueId,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
+      tz,
     }),
-    [queueId, dateFrom, dateTo],
+    [queueId, dateFrom, dateTo, tz],
   );
 
   const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });

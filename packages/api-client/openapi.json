@@ -60624,6 +60624,24 @@
             }
           },
           {
+            "description": "IANA zone of the created_from/to days; default: the agent's zone.",
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "IANA zone of the created_from/to days; default: the agent's zone.",
+              "title": "Tz"
+            }
+          },
+          {
             "description": "Result ordering.",
             "in": "query",
             "name": "sort",
@@ -60832,6 +60850,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -61015,6 +61049,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -61189,6 +61239,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -61383,6 +61449,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -61594,6 +61676,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -61789,6 +61887,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -61963,6 +62077,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -62145,6 +62275,22 @@
             }
           },
           {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          },
+          {
             "in": "header",
             "name": "authorization",
             "required": false,
@@ -62319,6 +62465,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {
@@ -62513,6 +62675,22 @@
                 }
               ],
               "title": "Customer Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
             }
           },
           {

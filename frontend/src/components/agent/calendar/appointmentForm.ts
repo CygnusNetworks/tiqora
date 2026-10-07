@@ -1,23 +1,19 @@
 import type { AppointmentOut, RecurrenceIn } from "@/lib/api";
+import { toZonedInputValue } from "@/lib/timeZone";
 
 export type AppointmentFormValue = {
   calendar_id: number;
   title: string;
   description: string;
   location: string;
-  start_time: string; // datetime-local value
-  end_time: string; // datetime-local value
+  start_time: string; // datetime-local value (agent's display zone)
+  end_time: string; // datetime-local value (agent's display zone)
   all_day: boolean;
   recurrence: { type: RecurrenceIn["type"] | ""; interval: number; count: string; until: string };
 };
 
-function toLocalInput(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+/** datetime-local value of an instant in the agent's display zone. */
+const toLocalInput = (iso: string | null | undefined): string => toZonedInputValue(iso);
 
 export function defaultFormValue(
   calendarId: number,

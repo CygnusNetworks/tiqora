@@ -710,6 +710,8 @@ export type StatsFilterParams = {
   priority_id?: number;
   type_id?: number;
   customer_id?: string;
+  /** IANA zone for the date bounds and day/week/month buckets; default: the agent's zone. */
+  tz?: string;
 };
 
 // ── Calendar ─────────────────────────────────────────────────────────────
@@ -1907,10 +1909,12 @@ export class ApiClient {
       state_type?: string[];
       owner_id?: number;
       customer_id?: string;
-      /** ISO date ``YYYY-MM-DD`` (inclusive day start UTC). */
+      /** ISO date ``YYYY-MM-DD`` (inclusive day start in ``tz``). */
       created_from?: string;
-      /** ISO date ``YYYY-MM-DD`` (inclusive day end UTC). */
+      /** ISO date ``YYYY-MM-DD`` (inclusive day end in ``tz``). */
       created_to?: string;
+      /** IANA zone of the created_from/to days; default: the agent's zone. */
+      tz?: string;
       /** Result ordering. Defaults to ``changed_desc`` (most recently touched). */
       sort?: "changed_desc" | "created_desc" | "created_asc";
       /** Admins only — also search archived tickets (ignored for non-admins). */

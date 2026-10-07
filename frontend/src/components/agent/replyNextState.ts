@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { ticketPerms } from "@/lib/ticket";
+import { addDaysYmd, ymdInZone, zonedWallTimeToUtc } from "@/lib/timeZone";
 
 /**
  * "Danach" — what happens to the ticket once a reply goes out. Shared by the
@@ -26,18 +27,18 @@ export const NEXT_STATES: { key: NextState; color: string }[] = [
   { key: "closed", color: "var(--color-state-new)" },
 ];
 
-function isoDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+/** Today in the agent's display zone, as `YYYY-MM-DD`. */
 export function todayIso(): string {
-  return isoDate(new Date());
+  return ymdInZone(new Date());
 }
 /** Default reminder for "Wartend": three days from today. */
 export function defaultPendingDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  return isoDate(d);
+  return addDaysYmd(todayIso(), 3);
+}
+
+/** The reminder instant for a picked day: 08:00 in the agent's display zone. */
+export function pendingTimeFor(pendingDate: string): string | null {
+  return zonedWallTimeToUtc(pendingDate, "08:00")?.toISOString() ?? null;
 }
 
 /**
@@ -95,8 +96,8 @@ export function useNextStateOptions(ticketId: number, enabled: boolean) {
     if (!canSetState || stateId == null) return {};
     return {
       state_id: stateId,
-      // 08:00 local on the chosen day — a reminder for the morning.
-      pending_time: needsDate(next) ? new Date(`${pendingDate}T08:00`).toISOString() : null,
+      // 08:00 on the chosen day — a reminder for the morning.
+      pending_time: needsDate(next) ? pendingTimeFor(pendingDate) : null,
     };
   };
 

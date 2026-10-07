@@ -1,4 +1,5 @@
 import type { ArticleListItem } from "@/lib/api";
+import { displayTimeZone } from "@/lib/timeZone";
 
 /** Sort key: incoming_time (epoch seconds) preferred, else create_time. Shared
  * by ArticleTimeline (day grouping), ArticleMasterDetail (list ordering) and
@@ -10,11 +11,14 @@ export function articleSortKey(a: ArticleListItem): number {
   return new Date(a.create_time).getTime();
 }
 
-/** Locale-formatted calendar-day label, used to group articles into day
- * sections in both the split list and the conversation view. */
+/** Locale-formatted calendar-day label (in the agent's display zone), used to
+ * group articles into day sections in both the split list and the
+ * conversation view. */
 export function dayKey(iso: string, locale: string): string {
   const d = new Date(iso);
-  return new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(d);
+  return new Intl.DateTimeFormat(locale, { dateStyle: "full", timeZone: displayTimeZone() }).format(
+    d,
+  );
 }
 
 /** Group a list (already in display order) into contiguous day sections. */

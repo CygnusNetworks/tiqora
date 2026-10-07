@@ -15,6 +15,8 @@ import { NewTicketButton } from "@/components/agent/NewTicketButton";
 import { ConnectionStatus } from "@/components/agent/ConnectionStatus";
 import { AccountMenu } from "@/components/agent/AccountMenu";
 import { OnlineAgentsPopover } from "@/components/agent/OnlineAgentsPopover";
+import { TimeZoneHint } from "@/components/agent/TimeZoneHint";
+import { effectiveTimeZone } from "@/lib/timeZone";
 import {
   AddressBookIcon,
   BookIcon,
@@ -681,6 +683,8 @@ export function AgentShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Part of the page key: a changed display zone re-renders every date.
+  const timeZone = effectiveTimeZone(useAuth().user?.time_zone);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -756,7 +760,11 @@ export function AgentShell({ children }: { children: ReactNode }) {
               searchFill
             />
           </div>
-          <main key={location.pathname} className="flex flex-1 flex-col animate-route-in">
+          <TimeZoneHint />
+          <main
+            key={`${location.pathname}|${timeZone}`}
+            className="flex flex-1 flex-col animate-route-in"
+          >
             {children}
           </main>
         </div>

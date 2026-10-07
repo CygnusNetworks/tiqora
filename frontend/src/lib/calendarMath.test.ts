@@ -7,6 +7,7 @@ import {
   isCurrentMonth,
   groupByDay,
   dayKey,
+  wallDateToUtcIso,
 } from "./calendarMath";
 
 describe("calendarMath", () => {
@@ -47,5 +48,18 @@ describe("calendarMath", () => {
     const grouped = groupByDay(items);
     expect(grouped.get(dayKey(new Date(2026, 0, 1)))).toHaveLength(2);
     expect(grouped.get(dayKey(new Date(2026, 0, 2)))).toHaveLength(1);
+  });
+
+  it("groupByDay uses the calendar day of the given zone", () => {
+    const items = [{ start_time: "2026-01-01T23:30:00Z" }, { start_time: "2026-01-02T01:00:00Z" }];
+    expect([...groupByDay(items, "Europe/Berlin").keys()]).toEqual(["2026-01-02"]);
+    expect([...groupByDay(items, "America/New_York").keys()]).toEqual(["2026-01-01"]);
+  });
+
+  it("wallDateToUtcIso reads a grid cell as wall time of the zone", () => {
+    expect(wallDateToUtcIso(new Date(2026, 6, 1), "Europe/Berlin")).toBe("2026-06-30T22:00:00.000Z");
+    expect(wallDateToUtcIso(new Date(2026, 0, 1, 9, 30), "America/New_York")).toBe(
+      "2026-01-01T14:30:00.000Z",
+    );
   });
 });

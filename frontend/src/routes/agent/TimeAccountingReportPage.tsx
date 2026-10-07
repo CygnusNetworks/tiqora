@@ -11,8 +11,14 @@ import type { SelectMenuItem } from "@/components/ui/SelectMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatTile } from "@/components/agent/stats/StatTile";
 import { cn } from "@/lib/cn";
-import { formatDateOnly } from "@/lib/format";
-import { formatYmd } from "@/lib/dateRanges";
+import { formatCalendarDay } from "@/lib/format";
+import {
+  addDaysYmd,
+  displayTimeZone,
+  ymdInZone,
+  zonedDayEndIso,
+  zonedDayStartIso,
+} from "@/lib/timeZone";
 import {
   TIME_RANGE_PRESETS,
   presetForRange,
@@ -30,19 +36,20 @@ export type TimeAccountingSearch = {
 
 /** One calendar day of bookings, in the order the API returned them. */
 type DayGroup = {
-  /** Local YYYY-MM-DD, or "" for rows without a create_time. */
+  /** YYYY-MM-DD in the display zone, or "" for rows without a create_time. */
   key: string;
   rows: TimeAccountingReportEntry[];
   units: number;
 };
 
-/** Group rows by local calendar day, preserving the server-side ordering. */
+/** Group rows by calendar day in the display zone, preserving the
+ * server-side ordering. */
 function groupByDay(rows: TimeAccountingReportEntry[]): DayGroup[] {
   const groups = new Map<string, DayGroup>();
   for (const row of rows) {
     const parsed = row.create_time ? new Date(row.create_time) : null;
     const key =
-      parsed && !Number.isNaN(parsed.getTime()) ? formatYmd(parsed) : "";
+      parsed && !Number.isNaN(parsed.getTime()) ? ymdInZone(parsed) : "";
     let group = groups.get(key);
     if (!group) {
       group = { key, rows: [], units: 0 };
@@ -64,16 +71,15 @@ function unitsPerDay(groups: DayGroup[]): { day: string; units: number }[] {
   if (dated.length === 0) return [];
   const byDay = new Map(dated.map((g) => [g.key, g.units]));
   const days = [...byDay.keys()].sort();
-  const first = new Date(`${days[0]}T00:00:00`);
-  const last = new Date(`${days[days.length - 1]}T00:00:00`);
-  const span = Math.round((last.getTime() - first.getTime()) / 86_400_000) + 1;
+  const first = Date.parse(`${days[0]}T00:00:00Z`);
+  const last = Date.parse(`${days[days.length - 1]}T00:00:00Z`);
+  const span = Math.round((last - first) / 86_400_000) + 1;
   if (span > 62) {
     return days.map((day) => ({ day, units: byDay.get(day) ?? 0 }));
   }
   const out: { day: string; units: number }[] = [];
   for (let i = 0; i < span; i += 1) {
-    const d = new Date(first.getFullYear(), first.getMonth(), first.getDate() + i);
-    const day = formatYmd(d);
+    const day = addDaysYmd(days[0], i);
     out.push({ day, units: byDay.get(day) ?? 0 });
   }
   return out;
@@ -137,13 +143,13 @@ export function TimeAccountingReportPage() {
       api.listTimeAccountingReport({
         create_by: search.create_by,
         ticket_id: search.ticket_id,
-        // Bookings are stored in UTC: send the viewer's local day bounds as
-        // UTC instants, or the range is shifted by the UTC offset.
+        // Bookings are stored in UTC: send the day bounds in the agent's
+        // display zone as UTC instants, or the range is shifted by the offset.
         created_from: search.created_from
-          ? new Date(`${search.created_from}T00:00:00`).toISOString()
+          ? (zonedDayStartIso(search.created_from) ?? undefined)
           : undefined,
         created_to: search.created_to
-          ? new Date(`${search.created_to}T23:59:59.999`).toISOString()
+          ? (zonedDayEndIso(search.created_to) ?? undefined)
           : undefined,
         offset,
         limit,
@@ -170,7 +176,12 @@ export function TimeAccountingReportPage() {
   );
 
   const timeFormatter = useMemo(
-    () => new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }),
+    () =>
+      new Intl.DateTimeFormat(locale, {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: displayTimeZone(),
+      }),
     [locale],
   );
 
@@ -186,12 +197,12 @@ export function TimeAccountingReportPage() {
     const { created_from: from, created_to: to } = search;
     if (from && to) {
       return t("timeAccounting.rangeBetween", {
-        from: formatDateOnly(from, locale),
-        to: formatDateOnly(to, locale),
+        from: formatCalendarDay(from, locale),
+        to: formatCalendarDay(to, locale),
       });
     }
-    if (from) return t("timeAccounting.rangeFrom", { from: formatDateOnly(from, locale) });
-    if (to) return t("timeAccounting.rangeTo", { to: formatDateOnly(to, locale) });
+    if (from) return t("timeAccounting.rangeFrom", { from: formatCalendarDay(from, locale) });
+    if (to) return t("timeAccounting.rangeTo", { to: formatCalendarDay(to, locale) });
     return null;
   })();
 
@@ -365,7 +376,7 @@ export function TimeAccountingReportPage() {
           <div className="flex h-24 items-end gap-px overflow-x-auto border-b border-hairline">
             {series.map((point) => {
               const label = t("timeAccounting.chartBar", {
-                date: formatDateOnly(`${point.day}T00:00:00`, locale),
+                date: formatCalendarDay(point.day, locale),
                 units: point.units.toFixed(2),
               });
               const pct = maxUnits > 0 ? (point.units / maxUnits) * 100 : 0;
@@ -440,7 +451,7 @@ export function TimeAccountingReportPage() {
                     className="px-3 py-1.5 text-left text-xs font-semibold text-muted"
                   >
                     {group.key
-                      ? formatDateOnly(`${group.key}T00:00:00`, locale)
+                      ? formatCalendarDay(group.key, locale)
                       : t("timeAccounting.dayUnknown")}
                   </th>
                   <td className="px-3 py-1.5 text-right font-mono text-xs tabular-nums text-muted">

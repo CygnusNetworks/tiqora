@@ -1,4 +1,8 @@
-/** Pure date-range presets for stats/report filters (local calendar days). */
+/** Pure date-range presets for stats/report filters (calendar days in the
+ * agent's display zone; the math runs on local `Date`s holding that zone's
+ * wall clock, see `wallClockDate`). */
+
+import { displayTimeZone, wallClockDate } from "./timeZone";
 
 export type DateRangePreset =
   | "today"
@@ -70,17 +74,19 @@ function lastOfMonth(year: number, month: number): Date {
  * Map a preset key to an inclusive local date range as YYYY-MM-DD strings.
  * Open-ended presets (this week/month/quarter/year) run from period start through `now`.
  * Closed presets (last month/quarter/year, last N days) cover the full prior period.
- * Pass `now` for deterministic tests; defaults to the current local time.
+ * "Today" is the calendar day of `now` in `zone` (the agent's display zone).
+ * Pass `now` for deterministic tests; defaults to the current time.
  */
 export function dateRangeForPreset(
   preset: DateRangePreset,
   now: Date = new Date(),
+  zone: string = displayTimeZone(),
 ): DateRange {
   if (preset === "reset") {
     return { from: "", to: "" };
   }
 
-  const today = startOfLocalDay(now);
+  const today = startOfLocalDay(wallClockDate(now, zone));
   const y = today.getFullYear();
   const m = today.getMonth(); // 0-11
   const todayStr = formatYmd(today);
@@ -154,7 +160,8 @@ export function isPresetActive(
   dateFrom: string,
   dateTo: string,
   now: Date = new Date(),
+  zone: string = displayTimeZone(),
 ): boolean {
-  const range = dateRangeForPreset(preset, now);
+  const range = dateRangeForPreset(preset, now, zone);
   return range.from === dateFrom && range.to === dateTo;
 }

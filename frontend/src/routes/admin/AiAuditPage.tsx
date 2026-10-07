@@ -19,7 +19,8 @@ import { Tabs } from "@/components/ui/Tabs";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { ToolResultBody } from "@/components/ai/ToolResultView";
-import { formatDateTime } from "@/lib/format";
+import { formatCalendarDay, formatDateTime } from "@/lib/format";
+import { fromZonedInputValue, ymdInZone, zonedDayStartIso } from "@/lib/timeZone";
 import { cn } from "@/lib/cn";
 import {
   buildAuditPdfHtml,
@@ -45,10 +46,9 @@ function safeParse<T>(raw: string | null | undefined): T | null {
   }
 }
 
+/** Start of today in the agent's display zone. */
 function startOfTodayIso(): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  return zonedDayStartIso(ymdInZone(new Date())) ?? new Date().toISOString();
 }
 
 function daysAgoIso(days: number): string {
@@ -170,10 +170,7 @@ function PerDayChart({
             />
           </div>
           <span className="truncate text-[9px] text-muted">
-            {new Date(d.date).toLocaleDateString(locale, {
-              day: "2-digit",
-              month: "2-digit",
-            })}
+            {formatCalendarDay(d.date, locale, { day: "2-digit", month: "2-digit" })}
           </span>
         </div>
       ))}
@@ -855,13 +852,9 @@ export function AiAuditPage() {
           ? daysAgoIso(7)
           : preset === "30d"
             ? daysAgoIso(30)
-            : customFrom
-              ? new Date(customFrom).toISOString()
-              : undefined;
+            : (fromZonedInputValue(customFrom)?.toISOString() ?? undefined);
     const to =
-      preset === "custom" && customTo
-        ? new Date(customTo).toISOString()
-        : undefined;
+      preset === "custom" ? (fromZonedInputValue(customTo)?.toISOString() ?? undefined) : undefined;
     return {
       from,
       to,

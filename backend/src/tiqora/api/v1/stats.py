@@ -11,13 +11,17 @@ by ``GET /tickets``.
 from __future__ import annotations
 
 import csv
+import zoneinfo
 from collections.abc import AsyncGenerator, Iterable
-from datetime import datetime
+from datetime import datetime, time, timedelta
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import CurrentUser, DbSession
+from tiqora.domain.schemas import as_naive_utc
+from tiqora.domain.timezones import resolve_user_time_zone, valid_time_zone
 from tiqora.stats.schemas import (
     AgentWorkloadItemOut,
     BacklogPointOut,
@@ -29,6 +33,7 @@ from tiqora.stats.schemas import (
     VolumePointOut,
 )
 from tiqora.stats.service import Dimension, Granularity, StatsFilters, StatsService
+from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -40,7 +45,26 @@ class _EchoWriter:
         return value
 
 
-def _filters(
+def _bound(value: datetime | None, zone: str, *, end: bool) -> datetime | None:
+    """Turn a filter bound into the naive UTC the columns hold.
+
+    An aware value is an instant. A naive one is wall-clock time in *zone*;
+    a bare date as upper bound (midnight) means the whole day, so the last day
+    of a range is included.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return as_naive_utc(value)
+    if end and value.time() == time.min:
+        value = value + timedelta(days=1) - timedelta(microseconds=1)
+    return as_naive_utc(value.replace(tzinfo=zoneinfo.ZoneInfo(zone)))
+
+
+async def _filters(
+    session: AsyncSession,
+    user_id: int,
+    tz: str | None,
     date_from: datetime | None,
     date_to: datetime | None,
     queue_id: int | None,
@@ -49,9 +73,12 @@ def _filters(
     type_id: int | None,
     customer_id: str | None,
 ) -> StatsFilters:
+    # ``tz`` (the UI's display zone) wins; otherwise the agent's own setting.
+    zone = valid_time_zone(tz) or await resolve_user_time_zone(session, SysConfig(session), user_id)
     return StatsFilters(
-        date_from=date_from,
-        date_to=date_to,
+        date_from=_bound(date_from, zone, end=False),
+        date_to=_bound(date_to, zone, end=True),
+        time_zone=zone,
         queue_id=queue_id,
         state_id=state_id,
         priority_id=priority_id,
@@ -84,9 +111,21 @@ async def ticket_volume(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
     granularity: Granularity = "day",
 ) -> TicketVolumeOut:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     points = await svc.ticket_volume(user.id, filters, granularity)
     return TicketVolumeOut(
@@ -105,9 +144,21 @@ async def ticket_volume_csv(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
     granularity: Granularity = "day",
 ) -> StreamingResponse:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     points = await svc.ticket_volume(user.id, filters, granularity)
     rows = [[p.bucket, str(p.created), str(p.closed)] for p in points]
@@ -135,8 +186,20 @@ async def open_snapshot(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
 ) -> OpenSnapshotOut:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     items = await svc.open_snapshot(user.id, filters, dimension)
     return OpenSnapshotOut(
@@ -156,8 +219,20 @@ async def open_snapshot_csv(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
 ) -> StreamingResponse:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     items = await svc.open_snapshot(user.id, filters, dimension)
     rows = [[str(i.id) if i.id is not None else "", i.label, str(i.count)] for i in items]
@@ -184,8 +259,20 @@ async def sla_stats(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
 ) -> SlaStatsOut:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     stats = await svc.sla_stats(user.id, filters)
     return SlaStatsOut.from_dataclass(stats)
@@ -202,8 +289,20 @@ async def sla_stats_csv(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
 ) -> StreamingResponse:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     s = await svc.sla_stats(user.id, filters)
     rows = [
@@ -252,8 +351,20 @@ async def agent_workload(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
 ) -> list[AgentWorkloadItemOut]:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     items = await svc.agent_workload(user.id, filters)
     return [AgentWorkloadItemOut.from_dataclass(i) for i in items]
@@ -270,8 +381,20 @@ async def agent_workload_csv(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
 ) -> StreamingResponse:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     items = await svc.agent_workload(user.id, filters)
     rows = [[i.login, i.name, str(i.owned_open), str(i.closed_in_period)] for i in items]
@@ -298,9 +421,21 @@ async def backlog_trend(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
     granularity: Granularity = "day",
 ) -> BacklogTrendOut:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     points = await svc.backlog_trend(user.id, filters, granularity)
     return BacklogTrendOut(
@@ -319,9 +454,21 @@ async def backlog_trend_csv(
     priority_id: int | None = None,
     type_id: int | None = None,
     customer_id: str | None = None,
+    tz: str | None = None,
     granularity: Granularity = "day",
 ) -> StreamingResponse:
-    filters = _filters(date_from, date_to, queue_id, state_id, priority_id, type_id, customer_id)
+    filters = await _filters(
+        session,
+        user.id,
+        tz,
+        date_from,
+        date_to,
+        queue_id,
+        state_id,
+        priority_id,
+        type_id,
+        customer_id,
+    )
     svc = StatsService(session)
     points = await svc.backlog_trend(user.id, filters, granularity)
     rows = [[p.bucket, str(p.open_count)] for p in points]

@@ -16,6 +16,7 @@ import {
 } from "@simplewebauthn/browser";
 import { api, ApiError, type UserMe } from "@/lib/api";
 import { clearLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
+import { setDisplayTimeZone } from "@/lib/timeZone";
 import { resolveLocaleCode, setAppLanguage } from "@/i18n";
 
 type AuthContextValue = {
@@ -83,6 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
     staleTime: 60_000,
   });
+
+  // Agent's Znuny UserTimeZone (null → browser zone) for every date the UI
+  // formats. Set while rendering, not in an effect, so the children rendered
+  // in this same pass already use it; the shells remount their page when the
+  // effective zone changes.
+  setDisplayTimeZone(meQuery.data?.time_zone ?? null);
 
   useEffect(() => {
     if (!meQuery.isLoading) setBootstrapped(true);

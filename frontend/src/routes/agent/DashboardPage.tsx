@@ -11,6 +11,7 @@ import { QueueShortcutCard } from "@/components/agent/dashboard/QueueShortcutCar
 import { DashboardTicketRow } from "@/components/agent/dashboard/DashboardTicketRow";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatDateTime } from "@/lib/format";
+import { displayTimeZone, zonedParts } from "@/lib/timeZone";
 import { cn } from "@/lib/cn";
 import { getLastViews } from "@/lib/lastViews";
 
@@ -54,9 +55,13 @@ export function formatDurationSince(epochSeconds: number): string {
   return h > 0 ? `${h}h${String(m).padStart(2, "0")}m` : `${m}m`;
 }
 
-/** Time-of-day greeting key, German-style tri-split (morning/day/evening). */
-export function greetingKey(date = new Date()): "morning" | "day" | "evening" {
-  const h = date.getHours();
+/** Time-of-day greeting key, German-style tri-split (morning/day/evening),
+ * by the wall clock of `zone` (the agent's display zone). */
+export function greetingKey(
+  date = new Date(),
+  zone: string = displayTimeZone(),
+): "morning" | "day" | "evening" {
+  const h = zonedParts(date, zone).hour;
   if (h < 11) return "morning";
   if (h < 18) return "day";
   return "evening";
@@ -386,6 +391,7 @@ export function DashboardPage() {
             day: "numeric",
             month: "long",
             year: "numeric",
+            timeZone: displayTimeZone(),
           }).format(new Date())}
         </p>
       </div>

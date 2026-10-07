@@ -39,6 +39,7 @@ from tiqora.db.legacy.ticket import (
 )
 from tiqora.db.legacy.user import Users
 from tiqora.domain.queue_service import OPEN_STATE_TYPES
+from tiqora.domain.timezones import to_zone
 from tiqora.permissions.engine import PermissionEngine
 
 Granularity = Literal["day", "week", "month"]
@@ -56,11 +57,13 @@ class StatsFilters:
 
     ``date_from``/``date_to`` bound ``Ticket.create_time`` (and, for the
     "closed" side of a report, ``TicketHistory.create_time``); both ends are
-    inclusive when set.
+    inclusive when set. They are naive UTC like the columns; ``time_zone`` is
+    the zone whose calendar days/weeks/months the buckets follow.
     """
 
     date_from: datetime | None = None
     date_to: datetime | None = None
+    time_zone: str = "UTC"
     queue_id: int | None = None
     state_id: int | None = None
     priority_id: int | None = None
@@ -128,8 +131,9 @@ class BacklogPoint:
 # ---------------------------------------------------------------------------
 
 
-def _bucket_key(dt: datetime | date, granularity: Granularity) -> date:
-    d = dt.date() if isinstance(dt, datetime) else dt
+def _bucket_key(dt: datetime | date, granularity: Granularity, zone: str = "UTC") -> date:
+    # DB datetimes are naive UTC; bucket by the viewer's calendar day.
+    d = to_zone(dt, zone).date() if isinstance(dt, datetime) else dt
     if granularity == "day":
         return d
     if granularity == "week":
@@ -237,7 +241,7 @@ class StatsService:
             created_stmt = created_stmt.where(Ticket.create_time <= filters.date_to)
         created_counts: dict[date, int] = defaultdict(int)
         for (ct,) in (await self._session.execute(created_stmt)).all():
-            created_counts[_bucket_key(ct, granularity)] += 1
+            created_counts[_bucket_key(ct, granularity, filters.time_zone)] += 1
 
         closed_state_ids = await self._closed_state_ids()
         closed_counts: dict[date, int] = defaultdict(int)
@@ -254,7 +258,7 @@ class StatsService:
             if filters.date_to is not None:
                 hist_stmt = hist_stmt.where(TicketHistory.create_time <= filters.date_to)
             for (ct,) in (await self._session.execute(hist_stmt)).all():
-                closed_counts[_bucket_key(ct, granularity)] += 1
+                closed_counts[_bucket_key(ct, granularity, filters.time_zone)] += 1
 
         buckets = sorted(set(created_counts) | set(closed_counts))
         return [
