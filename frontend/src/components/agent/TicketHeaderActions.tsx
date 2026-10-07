@@ -345,7 +345,14 @@ export function TicketHeaderActions({
                       onClick={(e) => {
                         if (originate.enabled && !e.metaKey && !e.ctrlKey) {
                           e.preventDefault();
-                          void originate.dial(n.number, { ticketId, name: customerName });
+                          // The dialog (and its timer) waits for the PBX to
+                          // accept the call; a failed dial only shows the error.
+                          void originate
+                            .dial(n.number, { ticketId, name: customerName })
+                            .then((ok) => {
+                              if (ok) openPhoneCall("outbound", n.number);
+                            });
+                          return;
                         }
                         openPhoneCall("outbound", n.number);
                       }}
@@ -700,7 +707,10 @@ export function TicketHeaderActions({
           callerNumber={phoneCall.number}
           startedAt={phoneCall.startedAt}
           endedAt={phoneCall.endedAt}
-          onClose={() => setPhoneCall(null)}
+          onClose={() => {
+            setPhoneCall(null);
+            originate.reset();
+          }}
         />
       )}
       {ai?.overlays}

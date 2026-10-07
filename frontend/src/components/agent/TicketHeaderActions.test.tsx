@@ -22,6 +22,7 @@ const {
   getTicketCustomerLink,
   getCustomer,
   phoneConfig,
+  dial,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
@@ -37,6 +38,7 @@ const {
   getTicketCustomerLink: vi.fn(),
   getCustomer: vi.fn(),
   phoneConfig: vi.fn(),
+  dial: vi.fn(),
 }));
 
 vi.mock("@/lib/phoneApi", async () => {
@@ -45,6 +47,7 @@ vi.mock("@/lib/phoneApi", async () => {
     ...actual,
     phoneApi: {
       phoneConfig,
+      dial,
       screenDynamicFields: vi.fn().mockResolvedValue([]),
       logPhoneCall: vi.fn(),
     },
@@ -523,6 +526,40 @@ describe("TicketHeaderActions", () => {
     fireEvent.click(screen.getByTestId("phone-menu-inbound"));
     expect(await screen.findByTestId("phone-dialog")).toBeInTheDocument();
     expect(screen.getByTestId("phone-direction-inbound")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("opens the call form after click-to-dial only once the PBX took the call", async () => {
+    getCustomer.mockResolvedValue({
+      login: "bob",
+      email: "bob@example.com",
+      customer_id: "C-9",
+      first_name: "Bob",
+      last_name: "B",
+      phone: "+49 228 555-0101",
+    });
+    phoneConfig.mockResolvedValue({ dial_scheme: "tel", originate: true });
+    dial.mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce({ extension: "60", number: "+492285550101" });
+    wrap(
+      <TicketHeaderActions
+        ticket={makeTicket({ customer_email: "bob@example.com" })}
+        canNote
+        onOpenNote={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId("ticket-actions-phone"));
+    fireEvent.click(await screen.findByTestId("phone-dial-phone"));
+    expect(await screen.findByTestId("phone-dial-error")).toBeInTheDocument();
+    expect(screen.queryByTestId("phone-dialog")).toBeNull();
+
+    // The menu is still open: a failed dial leaves the agent where they were.
+    fireEvent.click(screen.getByTestId("phone-dial-phone"));
+    expect(await screen.findByTestId("phone-dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("phone-dial-status")).toBeInTheDocument();
+
+    // Hung up at the desk phone: discarding the call closes the form and the hint.
+    fireEvent.click(screen.getByTestId("phone-discard"));
+    await waitFor(() => expect(screen.queryByTestId("phone-dialog")).toBeNull());
+    expect(screen.queryByTestId("phone-dial-status")).toBeNull();
   });
 
   it("hides the call button without write permission", async () => {

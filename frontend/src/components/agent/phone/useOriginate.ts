@@ -44,10 +44,13 @@ export function useOriginate() {
     },
     [t],
   );
+  // Clears the "desk phone is ringing" / error hint, e.g. once the call form closes.
+  const reset = useCallback(() => setStatus({ kind: "idle" }), []);
   return {
     enabled: q.data?.originate === true,
     scheme: q.data?.dial_scheme ?? "tel",
     status,
     dial,
+    reset,
   };
 }
