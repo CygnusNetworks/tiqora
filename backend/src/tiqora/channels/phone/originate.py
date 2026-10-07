@@ -6,6 +6,11 @@ ARI ``POST /channels`` with ``endpoint`` = the agent's extension and
 context: Asterisk rings the desk phone first and runs the dialplan (the
 outbound trunk call) once the agent picks up. Settings live in
 ``channel.phone.originate_*`` (admin: channels).
+
+With ``originate_cti`` on, Tiqora names the channel (ARI ``channelId``
+``tiqora-<hex>``, which becomes its ``${UNIQUEID}``) and keeps the call in the
+CTI call state; the PBX's ``[tiqora-dial]`` context reports pickup, answer
+and hangup under that id, so the phone-call form follows the call.
 """
 
 from __future__ import annotations
@@ -42,6 +47,8 @@ class OriginateConfig:
     timeout: int
     internal: frozenset[str]
     region: str = "DE"
+    #: ``originate_cti``: the dialplan reports the call's progress (see module doc).
+    track_calls: bool = False
 
 
 def normalize_dial_number(raw: str, internal: set[str] | frozenset[str], region: str = "DE") -> str:
@@ -103,6 +110,7 @@ async def load_originate_config(session: AsyncSession) -> OriginateConfig | None
     if not re.fullmatch(r"[A-Z]{2}", region):
         region = "DE"
     internal = frozenset(p.strip() for p in (internal_raw or "").split(",") if p.strip())
+    track_raw = (await channel_setting(session, "phone", "originate_cti") or "").strip()
     return OriginateConfig(
         ari_url=url.rstrip("/"),
         ari_user=user,
@@ -112,6 +120,7 @@ async def load_originate_config(session: AsyncSession) -> OriginateConfig | None
         timeout=timeout,
         internal=internal,
         region=region,
+        track_calls=track_raw.lower() in ("1", "true", "yes", "on"),
     )
 
 
@@ -131,12 +140,13 @@ async def originate(
     number: str,
     caller_name: str,
     *,
+    channel_id: str | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> None:
     """Ring ``extension``; on answer Asterisk dials ``number`` in ``context``.
 
     The callerId is what the desk phone shows while it rings: who is about
-    to be called."""
+    to be called. ``channel_id`` becomes the channel's ``${UNIQUEID}``."""
     name = _display_name(caller_name)
     try:
         endpoint = config.endpoint.format(extension=extension)
@@ -150,6 +160,8 @@ async def originate(
         "timeout": str(config.timeout),
         "callerId": f'"{name or number}" <{number}>',
     }
+    if channel_id:
+        params["channelId"] = channel_id
     try:
         async with httpx.AsyncClient(
             auth=(config.ari_user, config.ari_secret), timeout=5.0, transport=transport

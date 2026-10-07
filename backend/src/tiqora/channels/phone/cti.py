@@ -25,6 +25,12 @@ State machine per call:
   ``answered_by_user_id`` (owner prefill of the phone-ticket form).
 * ``hangup`` — the call is ``ended``; the popup keeps offering "log this call"
   for :data:`RECENT_AFTER_HANGUP_SECONDS`.
+* Click-to-dial (``POST /phone/dial`` with ``originate_cti``): Tiqora
+  registers the call itself (:func:`register_dialed_call`, outbound,
+  ``click_to_dial``) while the agent's desk phone rings; ``ringing`` from the
+  dialplan then means the agent picked up and the PBX dials out
+  (``ringing_at``), ``answered`` the other side took the call. These calls
+  feed the phone-call form, not the popup.
 * ``handled`` — the PBX took the call over itself (secretary, IVR, voicemail):
   the call is ``ended`` and dismissed for everybody notified, so it is neither
   shown as missed nor offered for logging. Ignored for unknown calls and for
@@ -177,9 +183,13 @@ class ActiveCall(BaseModel):
     #: extension maps to exactly one agent (a shared desk phone names nobody).
     #: The new-ticket form preselects them as owner.
     answered_by_user_id: int | None = None
+    #: Inbound: the first ring. Click-to-dial: the agent picked up and the
+    #: PBX started dialling out (None while only the desk phone rings).
     ringing_at: UtcDateTime | None
     answered_at: UtcDateTime | None
     ended_at: UtcDateTime | None
+    #: Started from Tiqora (click-to-dial); the call form shows it, not the popup.
+    click_to_dial: bool = False
 
 
 class _StoredCall(ActiveCall):
@@ -317,6 +327,34 @@ async def apply_call_event(
     return CallEventResult(recipients=recipients)
 
 
+async def register_dialed_call(
+    redis_client: redis.Redis,
+    *,
+    call_id: str,
+    user_id: int,
+    extension: str,
+    number: str,
+) -> ActiveCall:
+    """Track a click-to-dial call the PBX accepted: the agent's desk phone
+    rings, later events come from the ``[tiqora-dial]`` dialplan."""
+    call = _StoredCall(
+        call_id=call_id,
+        state="ringing",
+        number=number,
+        extension=extension,
+        direction="outbound",
+        user_ids=[user_id],
+        notified_user_ids=[user_id],
+        ringing_at=None,
+        answered_at=None,
+        ended_at=None,
+        click_to_dial=True,
+    )
+    await _store(redis_client, call)
+    await _publish(redis_client, [user_id], "ringing", call)
+    return call.public()
+
+
 def _is_current(call: _StoredCall, now: datetime) -> bool:
     if call.state != "ended":
         return True
@@ -375,5 +413,6 @@ __all__ = [
     "list_active_calls",
     "normalize_extensions",
     "parse_extensions",
+    "register_dialed_call",
     "users_for_extension",
 ]

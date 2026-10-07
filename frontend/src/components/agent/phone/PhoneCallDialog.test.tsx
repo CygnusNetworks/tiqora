@@ -4,6 +4,8 @@ import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { ApiError, type TicketDetail } from "@/lib/api";
+import { receiveCallEvent, resetCalls, type CallEventName } from "@/lib/callPopup";
+import type { ActiveCall } from "@/lib/phoneApi";
 import { loadPhoneDraft, savePhoneDraft } from "@/lib/phoneCall";
 import { PhoneCallDialog } from "./PhoneCallDialog";
 
@@ -77,7 +79,33 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  resetCalls();
 });
+
+const DIALLED = { callId: "tiqora-1", ringTimeout: 30, at: Date.parse("2026-09-29T10:00:00Z") };
+
+function dialEvent(event: CallEventName, overrides: Partial<ActiveCall> = {}) {
+  act(() => {
+    receiveCallEvent({
+      type: "call_event",
+      user_ids: [7],
+      event,
+      call: {
+        call_id: "tiqora-1",
+        state: "ringing",
+        number: "01717630944",
+        extension: "60",
+        direction: "outbound",
+        user_ids: [7],
+        ringing_at: null,
+        answered_at: null,
+        ended_at: null,
+        click_to_dial: true,
+        ...overrides,
+      },
+    });
+  });
+}
 
 describe("PhoneCallDialog", () => {
   it("runs the timer, prefills subject and books the call's minutes with the inbound default", async () => {
@@ -192,6 +220,67 @@ describe("PhoneCallDialog", () => {
     fireEvent.click(screen.getByTestId("phone-discard"));
     expect(await screen.findByText(i18n.t("phone.discardConfirm"))).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("follows a tracked click-to-dial call: pickup, answer, hangup", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(DIALLED.at);
+    dialEvent("ringing");
+    renderDialog({ initialDirection: "outbound", callerNumber: "01717630944", dialled: DIALLED });
+    expect(screen.getByTestId("phone-dial-progress")).toHaveAttribute("data-phase", "pickup");
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    // Nothing counts while the phones ring.
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("00:00");
+
+    dialEvent("ringing", { ringing_at: "2026-09-29T10:00:05Z" });
+    expect(screen.getByTestId("phone-dial-progress")).toHaveAttribute("data-phase", "calling");
+
+    dialEvent("answered", { state: "answered", ringing_at: "2026-09-29T10:00:05Z", answered_at: "2026-09-29T10:00:08Z" });
+    expect(screen.queryByTestId("phone-dial-progress")).toBeNull();
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("00:02");
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("01:02");
+
+    dialEvent("hangup", {
+      state: "ended",
+      ringing_at: "2026-09-29T10:00:05Z",
+      answered_at: "2026-09-29T10:00:08Z",
+      ended_at: "2026-09-29T10:01:00Z",
+    });
+    expect(screen.getByTestId("phone-dial-progress")).toHaveAttribute("data-phase", "ended");
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("00:52");
+  });
+
+  it("marks a click-to-dial call hung up before the answer as not connected", async () => {
+    dialEvent("ringing", { ringing_at: "2026-09-29T10:00:05Z" });
+    const { onClose } = renderDialog({ initialDirection: "outbound", dialled: DIALLED });
+    dialEvent("hangup", { state: "ended", ringing_at: "2026-09-29T10:00:05Z", ended_at: "2026-09-29T10:00:20Z" });
+    expect(screen.getByTestId("phone-dial-progress")).toHaveAttribute("data-phase", "failed");
+    expect(screen.getByTestId("phone-timer")).toHaveTextContent("00:00");
+    fireEvent.click(screen.getByTestId("phone-dial-discard"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("gives up on a desk phone nobody picked up after the ring timeout", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "setTimeout", "clearTimeout", "Date"] });
+    vi.setSystemTime(DIALLED.at);
+    dialEvent("ringing");
+    renderDialog({ initialDirection: "outbound", dialled: DIALLED });
+    act(() => {
+      vi.advanceTimersByTime(34_000);
+    });
+    expect(screen.getByTestId("phone-dial-progress")).toHaveAttribute("data-phase", "pickup");
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+    expect(screen.getByTestId("phone-dial-progress")).toHaveAttribute("data-phase", "failed");
   });
 
   it("resumes the timer from a stored draft", () => {

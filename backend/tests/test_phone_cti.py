@@ -228,6 +228,46 @@ async def test_hangup_ends_call_and_keeps_number_and_users() -> None:
     assert json.loads(redis.store["tiqora:call:c1"])["state"] == "ended"
 
 
+async def test_click_to_dial_call_follows_the_dialplan_events() -> None:
+    redis = _FakeRedis()
+    registered = await cti.register_dialed_call(
+        cast(Any, redis), call_id="tiqora-1", user_id=7, extension="100", number="01717630944"
+    )
+    assert registered.click_to_dial is True
+    assert registered.state == "ringing"
+    assert registered.ringing_at is None
+
+    # Agent picked up the desk phone, the PBX dials out.
+    await _event(redis, "ringing", call_id="tiqora-1", number="01717630944")
+    # The trunk leg answers: its extension maps to nobody.
+    await _event(redis, "answered", call_id="tiqora-1", ext="", at=T0 + timedelta(seconds=8))
+    result = await _event(
+        redis, "hangup", call_id="tiqora-1", ext=None, at=T0 + timedelta(seconds=68)
+    )
+
+    assert result.recipients == [7]
+    stored = json.loads(redis.store["tiqora:call:tiqora-1"])
+    assert stored["click_to_dial"] is True
+    assert stored["direction"] == "outbound"
+    assert stored["user_ids"] == [7]
+    assert stored["ringing_at"].startswith("2026-09-29T10:00:00")
+    assert stored["answered_at"].startswith("2026-09-29T10:00:08")
+    assert stored["state"] == "ended"
+    assert [e["event"] for e in redis.events()] == ["ringing", "ringing", "answered", "hangup"]
+
+
+async def test_click_to_dial_hung_up_before_answer_has_no_answered_at() -> None:
+    redis = _FakeRedis()
+    await cti.register_dialed_call(
+        cast(Any, redis), call_id="tiqora-2", user_id=7, extension="100", number="01717630944"
+    )
+    await _event(redis, "ringing", call_id="tiqora-2")
+    await _event(redis, "hangup", call_id="tiqora-2", ext=None, at=T0 + timedelta(seconds=20))
+    stored = json.loads(redis.store["tiqora:call:tiqora-2"])
+    assert stored["state"] == "ended"
+    assert stored["answered_at"] is None
+
+
 async def test_hangup_for_unknown_call_and_extension_is_ignored() -> None:
     redis = _FakeRedis()
     result = await _event(redis, "hangup", ext=None)

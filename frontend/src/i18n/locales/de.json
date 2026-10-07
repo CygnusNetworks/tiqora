@@ -3972,6 +3972,9 @@
   "phone": {
     "dialRinging": "Telefon {{extension}} klingelt – abheben, dann wird gewählt",
     "dialFailed": "Wählen fehlgeschlagen",
+    "dialCalling": "Abgehoben – {{number}} wird angerufen …",
+    "dialEnded": "Aufgelegt – die Gesprächsdauer steht fest",
+    "dialNotConnected": "Anruf nicht zustande gekommen – es wird keine Zeit gebucht",
     "button": "Anruf",
     "menuLabel": "Anruf erfassen",
     "inbound": "Eingehend",

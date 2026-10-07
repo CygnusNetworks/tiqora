@@ -37,6 +37,7 @@ import {
   dialHref,
   peekPhoneCallRequest,
   subscribePhoneCallRequests,
+  type DialledCall,
   type PhoneCallRequestIntent,
 } from "@/lib/phoneCall";
 
@@ -229,8 +230,8 @@ export function TicketHeaderActions({
     { kind: "phone" as const, number: customerQ.data?.phone },
     { kind: "mobile" as const, number: customerQ.data?.mobile },
   ].filter((n): n is { kind: "phone" | "mobile"; number: string } => Boolean(n.number?.trim()));
-  const openPhoneCall = (direction: PhoneDirection, number?: string) =>
-    setPhoneCall({ direction, number: number ?? null });
+  const openPhoneCall = (direction: PhoneDirection, number?: string, dialled?: DialledCall | null) =>
+    setPhoneCall({ direction, number: number ?? null, dialled: dialled ?? null });
   // Only badge the header button when the draft belongs to the article this
   // button actually opens — a draft on some other article is advertised by
   // the placeholder in the article view, not here.
@@ -349,8 +350,15 @@ export function TicketHeaderActions({
                           // accept the call; a failed dial only shows the error.
                           void originate
                             .dial(n.number, { ticketId, name: customerName })
-                            .then((ok) => {
-                              if (ok) openPhoneCall("outbound", n.number);
+                            .then((out) => {
+                              if (!out) return;
+                              openPhoneCall(
+                                "outbound",
+                                n.number,
+                                out.call_id
+                                  ? { callId: out.call_id, ringTimeout: out.ring_timeout, at: Date.now() }
+                                  : null,
+                              );
                             });
                           return;
                         }
@@ -707,6 +715,7 @@ export function TicketHeaderActions({
           callerNumber={phoneCall.number}
           startedAt={phoneCall.startedAt}
           endedAt={phoneCall.endedAt}
+          dialled={phoneCall.dialled}
           onClose={() => {
             setPhoneCall(null);
             originate.reset();

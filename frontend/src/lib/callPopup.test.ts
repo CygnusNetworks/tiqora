@@ -17,6 +17,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
 function call(overrides: Partial<ActiveCall> = {}): ActiveCall {
   return {
     call_id: "c1",
+    click_to_dial: false,
     state: "ringing",
     number: "+492285550101",
     extension: "100",
@@ -62,11 +63,12 @@ describe("call popup state", () => {
     expect(calls.map((c) => c.call_id)).toEqual(["c2"]);
   });
 
-  it("hides calls answered by a colleague and ended calls after 15 minutes", () => {
+  it("hides calls answered by a colleague, click-to-dial calls and ended calls after 15 minutes", () => {
     const calls = [
       call({ call_id: "mine" }),
       call({ call_id: "taken", state: "answered", user_ids: [8] }),
       call({ call_id: "recent", state: "ended", ended_at: iso(T0) }),
+      call({ call_id: "dialled", direction: "outbound", click_to_dial: true }),
     ];
     expect(visibleCalls(calls, 7, T0 + 60_000).map((c) => c.call_id)).toEqual(["mine", "recent"]);
     expect(visibleCalls(calls, 7, T0 + 16 * 60_000).map((c) => c.call_id)).toEqual(["mine"]);

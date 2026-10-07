@@ -198,7 +198,10 @@ The New-ticket page's phone mode is a compact form:
 Customer phone and mobile are `tel:` links — or `sip:` when
 `channel.phone.dial_scheme` is `sip` (read by agents via
 `GET /api/v1/reference/phone-config`). In the ticket header's *Anruf* menu a
-click dials and opens `PhoneCallDialog` outbound with the timer running; on
+click dials and opens `PhoneCallDialog` outbound with the timer running (with
+click-to-dial: once the PBX accepted the call; with `originate_cti` the timer
+follows the call, see below); "Anruf verwerfen" drops a call that did not
+take place; on
 the customer page (`/agent/customers/{login}`) it opens the New-ticket page in
 phone mode, outbound, with the customer and number prefilled.
 
@@ -216,6 +219,21 @@ refused; numbers of the configured region (`originate_region`, default `DE`)
 are dialled in national format (`0…`), all others as `00<country code><number>`.
 Internal numbers are those listed in `originate_internal` (default
 `60,61,62,69`). Ctrl/Cmd-click still uses the `tel:`/`sip:` link.
+`POST /phone/dial` answers `{extension, number, call_id, ring_timeout}`.
+
+With `channel.phone.originate_cti = true` Tiqora names the originated channel
+(ARI `channelId` `tiqora-<hex>`, the channel's `${UNIQUEID}`), keeps it in the
+CTI call state (`click_to_dial: true`, outbound, the agent only; not shown in
+the call popup) and returns that id as `call_id`. The PBX's `[tiqora-dial]`
+context reports under it to `POST /channels/phone/events`: `ringing` = the
+agent picked up and the PBX dials out (`ringing_at`), `answered` = the other
+side took the call, `hangup`. The phone-call form shows the progress, starts
+the timer at the answer and stops it at the hangup; a call that ends
+unanswered — or whose desk phone nobody picks up within `originate_timeout`
++ 5 s — is shown as not connected, with the timer at zero and "Anruf
+verwerfen". Only switch it on when the dialplan reports (the reference
+dialplan is `deploy/asterisk/tiqora-cti.conf` in pbx-secretary); without
+events the form would wait for an answer that is never reported.
 `/agent/dial?number=…&ticket=…` is the confirmation page for links in e-mails
 (e.g. the phone secretary's "call back" button): opening it never dials, only
 the explicit button click does.

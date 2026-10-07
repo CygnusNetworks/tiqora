@@ -136,6 +136,48 @@ async def test_originate_posts_channel_request() -> None:
     assert req.headers["authorization"].startswith("Basic ")
 
 
+async def test_originate_names_the_channel() -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"id": "tiqora-abc"})
+
+    await originate(
+        CFG,
+        "60",
+        "01717630944",
+        "",
+        channel_id="tiqora-abc",
+        transport=httpx.MockTransport(handler),
+    )
+    assert dict(seen[0].url.params)["channelId"] == "tiqora-abc"
+
+
+@pytest.mark.parametrize(("setting", "expected"), [(None, False), ("1", True), ("off", False)])
+async def test_load_config_track_calls(
+    monkeypatch: pytest.MonkeyPatch, setting: str | None, expected: bool
+) -> None:
+    values = {
+        "originate_enabled": "1",
+        "originate_ari_url": "http://x/ari",
+        "originate_ari_user": "u",
+        "originate_ari_secret": "s",
+    }
+    if setting is not None:
+        values["originate_cti"] = setting
+
+    async def fake(
+        _session: object, _channel: str, key: str, default: str | None = None
+    ) -> str | None:
+        return values.get(key, default)
+
+    monkeypatch.setattr(originate_mod, "channel_setting", fake)
+    config = await originate_mod.load_originate_config(None)  # type: ignore[arg-type]
+    assert config is not None
+    assert config.track_calls is expected
+
+
 async def test_originate_maps_ari_errors() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(400, text="Endpoint not found")

@@ -10,9 +10,11 @@ tabs. The PBX webhook feeding the state is ``POST /channels/phone/events``
 from __future__ import annotations
 
 import contextlib
+import uuid
 from typing import Annotated
 
 import redis.asyncio as redis
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -22,6 +24,7 @@ from tiqora.channels.phone.cti import (
     dismiss_call,
     extensions_for_user,
     list_active_calls,
+    register_dialed_call,
 )
 from tiqora.channels.phone.originate import (
     OriginateError,
@@ -29,6 +32,8 @@ from tiqora.channels.phone.originate import (
     normalize_dial_number,
     originate,
 )
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/phone", tags=["phone"])
 
@@ -72,6 +77,11 @@ class DialRequest(BaseModel):
 class DialOut(BaseModel):
     extension: str
     number: str
+    #: With ``originate_cti``: the call id the PBX reports under (``call_event``
+    #: SSE); None when the call is not tracked.
+    call_id: str | None = None
+    #: Seconds the desk phone rings before the PBX gives up (``originate_timeout``).
+    ring_timeout: int
 
 
 @router.post("/dial", response_model=DialOut, status_code=status.HTTP_202_ACCEPTED)
@@ -100,11 +110,27 @@ async def dial(
         raise _unavailable(exc) from exc
     if not fresh:
         raise HTTPException(status_code=429, detail="dial request already running")
+    call_id = f"tiqora-{uuid.uuid4().hex}" if config.track_calls else None
     try:
-        await originate(config, extensions[0], number, body.name)
+        await originate(config, extensions[0], number, body.name, channel_id=call_id)
     except OriginateError as exc:
         # The call never started: free the slot so an immediate retry is not a 429.
         with contextlib.suppress(redis.RedisError, ConnectionError, OSError):
             await redis_client.delete(f"tiqora:dial:{user.id}")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return DialOut(extension=extensions[0], number=number)
+    if call_id is not None:
+        try:
+            await register_dialed_call(
+                redis_client,
+                call_id=call_id,
+                user_id=user.id,
+                extension=extensions[0],
+                number=number,
+            )
+        except (redis.RedisError, ConnectionError, OSError):
+            # The phone rings anyway; the form just falls back to its own timer.
+            logger.warning("phone.dial_untracked", call_id=call_id)
+            call_id = None
+    return DialOut(
+        extension=extensions[0], number=number, call_id=call_id, ring_timeout=config.timeout
+    )
