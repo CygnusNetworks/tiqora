@@ -397,7 +397,7 @@ export function CustomerUsersPage() {
         onClose={() => setKeysLogin(null)}
         title={t("cryptoKeys.dialogTitle", { login: keysLogin ?? "" })}
       >
-        {keysLogin && <CustomerCryptoKeys login={keysLogin} framed={false} />}
+        {keysLogin && <CustomerCryptoKeys login={keysLogin} />}
       </Dialog>
 
       <Dialog

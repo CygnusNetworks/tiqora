@@ -1,39 +1,25 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, type CustomerCryptoKeysOut } from "@/lib/api";
 import { CryptoKeysPanel } from "@/components/crypto/CryptoKeysPanel";
 import { Spinner } from "@/components/ui/Spinner";
-
-function customerCryptoKeysQueryKey(login: string) {
-  return ["customers", login, "crypto-keys"] as const;
-}
+import { customerCryptoKeysQueryKey, useCustomerCryptoKeys } from "./customerCryptoKeysQuery";
 
 /**
  * Agent view of a customer's PGP keys / S-MIME certificates (Znuny customer
- * preferences PGP / SMIME, as in AdminCustomerUser). Renders nothing while
- * both backends are off. Upload/delete only with rw in admin or users.
+ * preferences PGP / SMIME, as in AdminCustomerUser), meant for a dialog.
+ * Upload/delete only with rw in admin or users.
  */
-export function CustomerCryptoKeys({
-  login,
-  framed = true,
-}: {
-  login: string;
-  /** Card with heading (customer page) or bare (inside a dialog). */
-  framed?: boolean;
-}) {
+export function CustomerCryptoKeys({ login }: { login: string }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const key = customerCryptoKeysQueryKey(login);
-  const q = useQuery({
-    queryKey: key,
-    queryFn: ({ signal }) => api.customerCryptoKeys.list(login, signal),
-    enabled: Boolean(login),
-  });
+  const q = useCustomerCryptoKeys(login);
 
-  if (q.isLoading) return framed ? null : <Spinner />;
+  if (q.isLoading) return <Spinner />;
   const data = q.data;
   if (!data || (!data.pgp_enabled && !data.smime_enabled)) {
-    return framed ? null : (
+    return (
       <p className="text-sm text-muted" data-testid="customer-keys-disabled">
         {t("cryptoKeys.disabled")}
       </p>
@@ -53,7 +39,7 @@ export function CustomerCryptoKeys({
       }
     : {};
 
-  const body = (
+  return (
     <>
       {!data.can_edit && (
         <p className="mb-3 text-xs text-muted" data-testid="customer-keys-readonly">
@@ -65,13 +51,5 @@ export function CustomerCryptoKeys({
       )}
       <CryptoKeysPanel data={data} handlers={handlers} testId="customer-keys" />
     </>
-  );
-
-  if (!framed) return body;
-  return (
-    <div className="rounded-lg border border-hairline bg-surface p-4" data-testid="customer-keys-card">
-      <h2 className="mb-3 text-sm font-semibold text-ink">{t("cryptoKeys.title")}</h2>
-      {body}
-    </div>
   );
 }
