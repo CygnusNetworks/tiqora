@@ -121,6 +121,8 @@ export function ReplyDialog({
   const [extrasFailed, setExtrasFailed] = useState<Array<"mentions" | "time">>(
     [],
   );
+  /** The article the send created — a retried booking links to it too. */
+  const [sentArticleId, setSentArticleId] = useState<number | null>(null);
   // What the server-side reply draft seeded — the yardstick for "the agent
   // actually typed something". Stays null until the draft query resolves, so
   // nothing is persisted before there is anything to compare against.
@@ -372,7 +374,7 @@ export function ReplyDialog({
 
   const sendMutation = useMutation({
     mutationFn: async (text: string) => {
-      await api.createArticle(ticketId, {
+      const { article_id: sent } = await api.createArticle(ticketId, {
         sender_type: "agent",
         // Telegram has no subject line — the backend fills the ticket
         // title in. The field is hidden below, but seed it explicitly
@@ -398,7 +400,9 @@ export function ReplyDialog({
       });
       // The reply is out; mentions and the booking follow and may fail on
       // their own without costing the message.
+      setSentArticleId(sent);
       return postComposerExtras(ticketId, {
+        articleId: sent,
         body: text,
         mentions,
         timeUnits,
@@ -446,6 +450,8 @@ export function ReplyDialog({
   const retryExtrasMutation = useMutation({
     mutationFn: () =>
       postComposerExtras(ticketId, {
+        // Only reachable after a send succeeded, so the id is always set.
+        articleId: sentArticleId!,
         body,
         mentions: extrasFailed.includes("mentions") ? mentions : [],
         timeUnits: extrasFailed.includes("time") ? timeUnits : "",

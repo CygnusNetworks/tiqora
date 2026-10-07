@@ -117,7 +117,7 @@ describe("ReplyDialog recipient toggles", () => {
   beforeEach(() => {
     getReplyDraft.mockReset();
     listTemplates.mockReset().mockResolvedValue([]);
-    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 99 });
   });
 
   it("toggles collapse a shown Cc field and shows a count badge when collapsed non-empty", async () => {
@@ -518,7 +518,7 @@ describe("ReplyDialog reset after send / persistence without send", () => {
   beforeEach(() => {
     getReplyDraft.mockReset();
     listTemplates.mockReset().mockResolvedValue([]);
-    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 99 });
   });
 
   it("resets body and subject to the server seed after a successful send, on reopen", async () => {
@@ -652,7 +652,7 @@ describe("ReplyDialog Telegram routing", () => {
   beforeEach(() => {
     getReplyDraft.mockReset();
     listTemplates.mockReset().mockResolvedValue([]);
-    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 99 });
   });
 
   it("hides recipient fields and shows the Telegram hint when replying on a Telegram article", async () => {
@@ -808,7 +808,7 @@ describe("ReplyDialog composer extras (mentions + time)", () => {
   beforeEach(() => {
     getReplyDraft.mockReset().mockResolvedValue(baseDraft);
     listTemplates.mockReset().mockResolvedValue([]);
-    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 99 });
     createTicketMention.mockReset().mockResolvedValue({ id: 1 });
     createTicketTimeAccounting.mockReset().mockResolvedValue({ id: 1 });
     listReferenceAgents
@@ -855,6 +855,7 @@ describe("ReplyDialog composer extras (mentions + time)", () => {
     await waitFor(() =>
       expect(createTicketTimeAccounting).toHaveBeenCalledWith(1, {
         time_unit: 15,
+        article_id: 99,
       }),
     );
     expect(onClose).toHaveBeenCalled();
@@ -895,6 +896,10 @@ describe("ReplyDialog composer extras (mentions + time)", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     // Retrying books the time; it never re-sends the article.
     expect(createTicketTimeAccounting).toHaveBeenCalledTimes(2);
+    expect(createTicketTimeAccounting).toHaveBeenLastCalledWith(1, {
+      time_unit: 15,
+      article_id: 99,
+    });
     expect(createArticle).toHaveBeenCalledTimes(1);
   });
 });
@@ -903,7 +908,7 @@ describe("ReplyDialog refine", () => {
   beforeEach(() => {
     getReplyDraft.mockReset();
     listTemplates.mockReset().mockResolvedValue([]);
-    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 99 });
     refine.mockReset();
     refineAvailability.mockReset().mockResolvedValue({ available: true });
   });
@@ -1015,7 +1020,7 @@ describe("ReplyDialog: state after sending (Danach)", () => {
   beforeEach(() => {
     getReplyDraft.mockReset().mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
     listTemplates.mockReset().mockResolvedValue([]);
-    createArticle.mockReset().mockResolvedValue({ id: 99 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 99 });
     listReferenceStates.mockReset().mockResolvedValue(STATES);
     getTicket.mockReset().mockResolvedValue({ id: 1, permissions: perms(true) });
   });

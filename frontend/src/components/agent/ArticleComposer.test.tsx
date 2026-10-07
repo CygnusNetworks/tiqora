@@ -43,7 +43,7 @@ describe("ArticleComposer extras", () => {
     // The minutes/hours toggle persists to localStorage — start each test
     // from the "min" default rather than leaking a prior test's choice.
     window.localStorage.clear();
-    createArticle.mockReset().mockResolvedValue({ id: 42 });
+    createArticle.mockReset().mockResolvedValue({ article_id: 42 });
     createTicketMention.mockReset().mockResolvedValue({ id: 1 });
     createTicketTimeAccounting.mockReset().mockResolvedValue({ id: 1 });
     listReferenceAgents
@@ -79,7 +79,7 @@ describe("ArticleComposer extras", () => {
     fireEvent.change(screen.getByTestId("composer-time"), { target: { value: "7.5" } });
     fireEvent.click(screen.getByTestId("composer-send"));
     await waitFor(() =>
-      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 8 }),
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 8, article_id: 42 }),
     );
   });
 
@@ -91,7 +91,7 @@ describe("ArticleComposer extras", () => {
     expect(screen.getByTestId("composer-time")).toHaveValue(15);
     fireEvent.click(screen.getByTestId("composer-send"));
     await waitFor(() =>
-      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 15 }),
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 15, article_id: 42 }),
     );
   });
 
@@ -102,7 +102,7 @@ describe("ArticleComposer extras", () => {
     fireEvent.change(screen.getByTestId("composer-time"), { target: { value: "0.5" } });
     fireEvent.click(screen.getByTestId("composer-send"));
     await waitFor(() =>
-      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 30 }),
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 30, article_id: 42 }),
     );
   });
 
@@ -119,6 +119,8 @@ describe("ArticleComposer extras", () => {
 
     fireEvent.click(screen.getByTestId("composer-extras-retry"));
     await waitFor(() => expect(createTicketTimeAccounting).toHaveBeenCalledTimes(2));
+    // The retried booking still links to the note that was written.
+    expect(createTicketTimeAccounting).toHaveBeenLastCalledWith(7, { time_unit: 5, article_id: 42 });
     // The note itself is never written twice.
     expect(createArticle).toHaveBeenCalledTimes(1);
   });

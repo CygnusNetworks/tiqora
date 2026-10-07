@@ -15,8 +15,9 @@ from pydantic import BaseModel
 from pydantic.functional_serializers import PlainSerializer
 
 from tiqora.api.v1 import ai as ticket_ai
+from tiqora.api.v1 import tickets as ticket_routes
 from tiqora.api.v1.admin import schemas as admin_schemas
-from tiqora.api.v1.tickets import AiOriginOut
+from tiqora.api.v1.tickets import AiOriginOut, TimeAccountingReportEntry, _as_naive_utc
 from tiqora.db.engine import _utc_connect_args
 from tiqora.domain.schemas import ArticleListItem, HistoryEntry, UtcDateTime
 
@@ -136,6 +137,44 @@ def test_ticket_ai_response_models_serialize_utc() -> None:
         and not _has_utc_serializer(field.annotation, list(field.metadata))
     ]
     assert offenders == []
+
+
+# Parsed from client input only — never serialized back out.
+_TICKET_REQUEST_MODELS = {"ArticleCreateRequest", "MutationRequest", "TicketCreateRequest"}
+
+
+def test_ticket_response_models_serialize_utc() -> None:
+    """The time-accounting report showed bookings at their raw UTC wall time
+    (08:08 instead of 10:08 CEST) because ``tickets.py`` declared bare
+    ``datetime`` fields."""
+    offenders = [
+        f"{name}.{field_name}"
+        for name, model in inspect.getmembers(ticket_routes, inspect.isclass)
+        if issubclass(model, BaseModel)
+        and model.__module__ == ticket_routes.__name__
+        and name not in _TICKET_REQUEST_MODELS
+        for field_name, field in model.model_fields.items()
+        if _mentions_datetime(field.annotation)
+        and not _has_utc_serializer(field.annotation, list(field.metadata))
+    ]
+    assert offenders == []
+
+
+def test_time_accounting_entry_round_trips_utc() -> None:
+    entry = TimeAccountingReportEntry(
+        id=3,
+        ticket_id=1,
+        time_unit=30.0,
+        create_time=datetime(2026, 10, 7, 8, 8, 35),
+        create_by=5,
+    )
+    assert entry.model_dump(mode="json")["create_time"] == "2026-10-07T08:08:35+00:00"
+
+
+def test_report_date_bounds_normalised_to_naive_utc() -> None:
+    # The UI sends local midnight (CEST) as a UTC instant; the column is naive UTC.
+    assert _as_naive_utc(datetime(2026, 10, 6, 22, 0, tzinfo=UTC)) == datetime(2026, 10, 6, 22, 0)
+    assert _as_naive_utc(datetime(2026, 10, 7, 0, 0)) == datetime(2026, 10, 7, 0, 0)
 
 
 def test_ai_state_summary_time_round_trips_utc() -> None:

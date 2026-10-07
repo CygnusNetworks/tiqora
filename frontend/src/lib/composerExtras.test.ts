@@ -17,6 +17,7 @@ const bob = { id: 3, name: "Bob Stone" };
 
 function run(body: string, mentions = [ada], timeUnits = "") {
   return postComposerExtras(7, {
+    articleId: 42,
     body,
     mentions,
     timeUnits,
@@ -42,9 +43,12 @@ describe("postComposerExtras", () => {
     expect(createTicketMention).not.toHaveBeenCalled();
   });
 
-  it("books the minutes from the footer chip", async () => {
+  it("books the minutes from the footer chip against the new article", async () => {
     await run("text", [], "15");
-    expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, { time_unit: 15 });
+    expect(createTicketTimeAccounting).toHaveBeenCalledWith(7, {
+      time_unit: 15,
+      article_id: 42,
+    });
   });
 
   it("books nothing for a blank, zero or unparseable field", async () => {
