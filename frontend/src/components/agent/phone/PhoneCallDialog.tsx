@@ -223,14 +223,21 @@ export function PhoneCallDialog({
           ?.locked_by_name ?? "?")
       : null;
 
+  // Also the way out of a call that never connected (hung up at the desk
+  // phone): stops the timer and drops the draft. Asks only when there is
+  // text or an attachment to lose.
   const onDiscard = async () => {
-    const ok = await confirm({
-      title: t("phone.discard"),
-      message: t("phone.discardConfirm"),
-      confirmLabel: t("ticket.draftDiscardConfirmButton"),
-      variant: "danger",
-    });
-    if (!ok) return;
+    const hasContent =
+      body.trim() !== "" || subjectTouched || attachments.items.length > 0 || draft !== null;
+    if (hasContent) {
+      const ok = await confirm({
+        title: t("phone.discard"),
+        message: t("phone.discardConfirm"),
+        confirmLabel: t("ticket.draftDiscardConfirmButton"),
+        variant: "danger",
+      });
+      if (!ok) return;
+    }
     savedRef.current = true;
     clearPhoneDraft(ticketId);
     onClose();
@@ -270,17 +277,15 @@ export function PhoneCallDialog({
       footerClassName="flex-wrap bg-surface-subtle"
       footer={
         <>
-          {draft && (
-            <Button
-              variant="ghost"
-              size="sm"
-              data-testid="phone-discard"
-              className="hover:text-danger"
-              onClick={() => void onDiscard()}
-            >
-              {t("phone.discard")}
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="phone-discard"
+            className="hover:text-danger"
+            onClick={() => void onDiscard()}
+          >
+            {t("phone.discard")}
+          </Button>
           <span className="flex-1" />
           <Button variant="ghost" size="sm" onClick={onClose} data-testid="phone-cancel">
             {t("ticket.composerCancel")}

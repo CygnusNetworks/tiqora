@@ -178,6 +178,22 @@ describe("PhoneCallDialog", () => {
     await waitFor(() => expect(loadPhoneDraft(7)).toBeNull());
   });
 
+  it("discards a call that never connected right away, without a draft", async () => {
+    const { onClose } = renderDialog({ initialDirection: "outbound", callerNumber: "+492285550101" });
+    fireEvent.click(screen.getByTestId("phone-discard"));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(loadPhoneDraft(7)).toBeNull();
+  });
+
+  it("asks before discarding typed notes", async () => {
+    const { onClose } = renderDialog();
+    fireEvent.change(screen.getByTestId("phone-body"), { target: { value: "notiz" } });
+    fireEvent.click(screen.getByTestId("phone-discard"));
+    expect(await screen.findByText(i18n.t("phone.discardConfirm"))).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it("resumes the timer from a stored draft", () => {
     savePhoneDraft(7, { direction: "inbound", subject: "", body: "x", elapsed: 125 });
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
