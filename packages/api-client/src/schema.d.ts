@@ -6084,6 +6084,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reference/field-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Field Options
+         * @description ACL-filtered options for attribute fields and ``DynamicField_<Name>`` dropdowns.
+         *
+         *     Options come back as ordered ``{value, label}`` lists; unknown fields and
+         *     dynamic fields without selectable values are omitted. With
+         *     ``context.ticket_id`` the ticket must be readable (404 unknown, 403 no
+         *     ``ro`` on its queue, like ``GET /tickets/{id}``).
+         */
+        post: operations["field_options_api_v1_reference_field_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reference/phone-config": {
         parameters: {
             query?: never;
@@ -11983,6 +12008,54 @@ export interface components {
              * @default []
              */
             user_ids: number[];
+        };
+        /** FieldOptionOut */
+        FieldOptionOut: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /** FieldOptionsContext */
+        FieldOptionsContext: {
+            /**
+             * Action
+             * @default AgentTicketZoom
+             */
+            action: string;
+            /** Customer User Id */
+            customer_user_id?: string | null;
+            /** Dynamic Fields */
+            dynamic_fields?: {
+                [key: string]: string[];
+            };
+            /** Priority Id */
+            priority_id?: number | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Service Id */
+            service_id?: number | null;
+            /** Sla Id */
+            sla_id?: number | null;
+            /** State Id */
+            state_id?: number | null;
+            /** Ticket Id */
+            ticket_id?: number | null;
+            /** Type Id */
+            type_id?: number | null;
+        };
+        /** FieldOptionsOut */
+        FieldOptionsOut: {
+            /** Options */
+            options: {
+                [key: string]: components["schemas"]["FieldOptionOut"][];
+            };
+        };
+        /** FieldOptionsRequest */
+        FieldOptionsRequest: {
+            context?: components["schemas"]["FieldOptionsContext"];
+            /** Fields */
+            fields: string[];
         };
         /**
          * Filter
@@ -33479,7 +33552,7 @@ export interface operations {
         parameters: {
             query: {
                 /** @description Znuny frontend module */
-                screen: "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound";
+                screen: "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound" | "AgentTicketFreeText";
             };
             header?: {
                 authorization?: string | null;
@@ -33498,6 +33571,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DynamicFieldDefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    field_options_api_v1_reference_field_options_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FieldOptionsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FieldOptionsOut"];
                 };
             };
             /** @description Validation Error */

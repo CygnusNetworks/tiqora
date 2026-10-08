@@ -9,7 +9,7 @@ CRUD under ``/admin/*`` (which is AdminUser-gated), these are guarded only by
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
@@ -24,8 +24,17 @@ from tiqora.db.legacy.queue import Queue, Service, ServiceSla, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketStateType, TicketType
 from tiqora.db.legacy.user import Users
 from tiqora.domain.customer_service import CustomerService
+from tiqora.domain.field_options import (
+    ATTRIBUTE_OPTION_FIELDS,
+    FieldOptionsOut,
+    FieldOptionsRequest,
+    TicketFieldOptionsOut,
+    collect_field_options,
+    collect_ticket_field_options,
+)
 from tiqora.domain.phone_match import find_customers_by_phone, phone_condition, phone_digits
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound
 from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
@@ -399,7 +408,11 @@ async def caller_lookup(
 
 #: Ticket screens whose ``###DynamicField`` config the agent UI reads.
 DynamicFieldScreen = Literal[
-    "AgentTicketPhone", "AgentTicketPhoneInbound", "AgentTicketPhoneOutbound"
+    "AgentTicketPhone",
+    "AgentTicketPhoneInbound",
+    "AgentTicketPhoneOutbound",
+    # Znuny's "Freie Felder": which fields are editable in the ticket zoom.
+    "AgentTicketFreeText",
 ]
 _EDITABLE_DF_TYPES = frozenset(
     {"Text", "TextArea", "Dropdown", "Multiselect", "Checkbox", "Date", "DateTime"}
@@ -559,189 +572,6 @@ async def compose_context(
     )
 
 
-# ---------------------------------------------------------------------------
-# ACL-filtered field options (new-ticket / form context — no ticket_id)
-# ---------------------------------------------------------------------------
-
-_FIELD_TO_SUBTYPE: dict[str, str] = {
-    "state": "State",
-    "queue": "Queue",
-    "priority": "Priority",
-    "type": "Type",
-    "service": "Service",
-    "sla": "SLA",
-}
-
-
-class TicketFieldOptionsOut(BaseModel):
-    """ACL-filtered id→name maps (string keys for JSON).
-
-    Only requested fields are populated; others are omitted (empty dict).
-    """
-
-    state: dict[str, str] = {}
-    queue: dict[str, str] = {}
-    priority: dict[str, str] = {}
-    type: dict[str, str] = {}
-    service: dict[str, str] = {}
-    sla: dict[str, str] = {}
-
-
-async def _base_field_maps(
-    session: DbSession,
-    user: CurrentUser,
-    fields: set[str],
-    *,
-    queue_id: int | None = None,
-) -> dict[str, dict[int, str]]:
-    """Unfiltered valid id→name maps for the requested fields.
-
-    Queues are still permission-gated (``ro``); ACL is additional filtering.
-    """
-    out: dict[str, dict[int, str]] = {}
-    if "state" in fields:
-        rows = (
-            await session.execute(
-                select(TicketState.id, TicketState.name)
-                .where(TicketState.valid_id == _VALID)
-                .order_by(TicketState.id)
-            )
-        ).all()
-        out["state"] = {int(r[0]): r[1] for r in rows}
-    if "priority" in fields:
-        rows = (
-            await session.execute(
-                select(TicketPriority.id, TicketPriority.name)
-                .where(TicketPriority.valid_id == _VALID)
-                .order_by(TicketPriority.id)
-            )
-        ).all()
-        out["priority"] = {int(r[0]): r[1] for r in rows}
-    if "type" in fields:
-        rows = (
-            await session.execute(
-                select(TicketType.id, TicketType.name)
-                .where(TicketType.valid_id == _VALID)
-                .order_by(TicketType.name)
-            )
-        ).all()
-        out["type"] = {int(r[0]): r[1] for r in rows}
-    if "service" in fields:
-        rows = (
-            await session.execute(
-                select(Service.id, Service.name)
-                .where(Service.valid_id == _VALID)
-                .order_by(Service.name)
-            )
-        ).all()
-        out["service"] = {int(r[0]): r[1] for r in rows}
-    if "sla" in fields:
-        rows = (
-            await session.execute(
-                select(Sla.id, Sla.name).where(Sla.valid_id == _VALID).order_by(Sla.name)
-            )
-        ).all()
-        out["sla"] = {int(r[0]): r[1] for r in rows}
-    if "queue" in fields:
-        pe = PermissionEngine(session)
-        group_ids = await pe.groups_for_permission(user.id, "ro")
-        if not group_ids:
-            out["queue"] = {}
-        else:
-            rows = (
-                await session.execute(
-                    select(Queue.id, Queue.name)
-                    .where(Queue.group_id.in_(group_ids), Queue.valid_id == _VALID)
-                    .order_by(Queue.name)
-                )
-            ).all()
-            out["queue"] = {int(r[0]): r[1] for r in rows}
-    _ = queue_id  # reserved for form-side Queue checks when callers pass it
-    return out
-
-
-async def collect_ticket_field_options(
-    session: DbSession,
-    user: CurrentUser,
-    *,
-    fields: set[str],
-    ticket_id: int | None = None,
-    action: str | None = None,
-    queue_id: int | None = None,
-    service_id: int | None = None,
-    type_id: int | None = None,
-    state_id: int | None = None,
-    priority_id: int | None = None,
-    sla_id: int | None = None,
-) -> TicketFieldOptionsOut:
-    """Load base maps, apply Ticket ACL, then Ticket Attribute Relations."""
-    from tiqora.domain.ticket_acl import filter_id_name_map
-    from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
-
-    base = await _base_field_maps(session, user, fields, queue_id=queue_id)
-    checks: dict[str, Any] | None = None
-    ticket_ctx: dict[str, Any] = {}
-    if queue_id is not None:
-        queue_row = await session.get(Queue, queue_id)
-        ticket_ctx["QueueID"] = str(queue_id)
-        if queue_row is not None:
-            ticket_ctx["Queue"] = queue_row.name
-        checks = {"Ticket": dict(ticket_ctx)}
-    if service_id is not None:
-        svc = await session.get(Service, service_id)
-        ticket_ctx["ServiceID"] = str(service_id)
-        if svc is not None:
-            ticket_ctx["Service"] = svc.name
-    if type_id is not None:
-        ty = await session.get(TicketType, type_id)
-        ticket_ctx["TypeID"] = str(type_id)
-        if ty is not None:
-            ticket_ctx["Type"] = ty.name
-    if state_id is not None:
-        st = await session.get(TicketState, state_id)
-        ticket_ctx["StateID"] = str(state_id)
-        if st is not None:
-            ticket_ctx["State"] = st.name
-    if priority_id is not None:
-        pr = await session.get(TicketPriority, priority_id)
-        ticket_ctx["PriorityID"] = str(priority_id)
-        if pr is not None:
-            ticket_ctx["Priority"] = pr.name
-    if sla_id is not None:
-        sla = await session.get(Sla, sla_id)
-        ticket_ctx["SLAID"] = str(sla_id)
-        if sla is not None:
-            ticket_ctx["SLA"] = sla.name
-    if checks is None and ticket_ctx:
-        checks = {"Ticket": dict(ticket_ctx)}
-    elif checks is not None and ticket_ctx:
-        checks["Ticket"].update(ticket_ctx)
-
-    acl_maps: dict[str, dict[int, str]] = {}
-    for field, mapping in base.items():
-        subtype = _FIELD_TO_SUBTYPE[field]
-        filtered = await filter_id_name_map(
-            session,
-            user_id=user.id,
-            items=mapping,
-            return_sub_type=subtype,
-            ticket_id=ticket_id,
-            action=action,
-            checks=checks,
-        )
-        acl_maps[field] = filtered
-
-    if ticket_ctx:
-        acl_maps = await apply_attribute_relations_to_field_maps(
-            session, acl_maps, ticket_context=ticket_ctx
-        )
-
-    result = TicketFieldOptionsOut()
-    for field, mapping in acl_maps.items():
-        setattr(result, field, {str(k): v for k, v in mapping.items()})
-    return result
-
-
 @router.get("/ticket-field-options", response_model=TicketFieldOptionsOut)
 async def ticket_field_options(
     user: CurrentUser,
@@ -767,7 +597,7 @@ async def ticket_field_options(
     Ticket Attribute Relations further restrict selectable values.
     """
     requested = {f.strip().lower() for f in fields.split(",") if f.strip()}
-    requested &= set(_FIELD_TO_SUBTYPE)
+    requested &= set(ATTRIBUTE_OPTION_FIELDS)
     if not requested:
         return TicketFieldOptionsOut()
     return await collect_ticket_field_options(
@@ -782,3 +612,22 @@ async def ticket_field_options(
         priority_id=priority_id,
         sla_id=sla_id,
     )
+
+
+@router.post("/field-options", response_model=FieldOptionsOut)
+async def field_options(
+    body: FieldOptionsRequest, user: CurrentUser, session: DbSession
+) -> FieldOptionsOut:
+    """ACL-filtered options for attribute fields and ``DynamicField_<Name>`` dropdowns.
+
+    Options come back as ordered ``{value, label}`` lists; unknown fields and
+    dynamic fields without selectable values are omitted. With
+    ``context.ticket_id`` the ticket must be readable (404 unknown, 403 no
+    ``ro`` on its queue, like ``GET /tickets/{id}``).
+    """
+    try:
+        return await collect_field_options(session, user, body)
+    except TicketNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found") from exc
+    except TicketAccessDenied as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden") from exc

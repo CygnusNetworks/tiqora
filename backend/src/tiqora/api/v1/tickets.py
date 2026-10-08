@@ -911,7 +911,7 @@ async def ticket_field_options(
 
     Requires ticket read access. Returns id→name maps under each field key.
     """
-    from tiqora.api.v1.reference import collect_ticket_field_options
+    from tiqora.domain.field_options import collect_ticket_field_options
 
     try:
         detail = await TicketService(session).get_ticket(user.id, ticket_id)

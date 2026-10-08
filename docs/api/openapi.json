@@ -12004,6 +12004,173 @@
         "title": "FeatureGrantsUpdate",
         "type": "object"
       },
+      "FieldOptionOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "FieldOptionOut",
+        "type": "object"
+      },
+      "FieldOptionsContext": {
+        "properties": {
+          "action": {
+            "default": "AgentTicketZoom",
+            "title": "Action",
+            "type": "string"
+          },
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
+          "dynamic_fields": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Dynamic Fields",
+            "type": "object"
+          },
+          "priority_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority Id"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "service_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Id"
+          },
+          "sla_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sla Id"
+          },
+          "state_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Id"
+          },
+          "ticket_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket Id"
+          },
+          "type_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Id"
+          }
+        },
+        "title": "FieldOptionsContext",
+        "type": "object"
+      },
+      "FieldOptionsOut": {
+        "properties": {
+          "options": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/FieldOptionOut"
+              },
+              "type": "array"
+            },
+            "title": "Options",
+            "type": "object"
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "title": "FieldOptionsOut",
+        "type": "object"
+      },
+      "FieldOptionsRequest": {
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/FieldOptionsContext"
+          },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Fields",
+            "type": "array"
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "title": "FieldOptionsRequest",
+        "type": "object"
+      },
       "Filter": {
         "additionalProperties": false,
         "description": "Serialise with ``model_dump(by_alias=True, exclude_none=True)``.",
@@ -63200,7 +63367,8 @@
               "enum": [
                 "AgentTicketPhone",
                 "AgentTicketPhoneInbound",
-                "AgentTicketPhoneOutbound"
+                "AgentTicketPhoneOutbound",
+                "AgentTicketFreeText"
               ],
               "title": "Screen",
               "type": "string"
@@ -63266,6 +63434,82 @@
           }
         },
         "summary": "Screen Dynamic Fields",
+        "tags": [
+          "reference"
+        ]
+      }
+    },
+    "/api/v1/reference/field-options": {
+      "post": {
+        "description": "ACL-filtered options for attribute fields and ``DynamicField_<Name>`` dropdowns.\n\nOptions come back as ordered ``{value, label}`` lists; unknown fields and\ndynamic fields without selectable values are omitted. With\n``context.ticket_id`` the ticket must be readable (404 unknown, 403 no\n``ro`` on its queue, like ``GET /tickets/{id}``).",
+        "operationId": "field_options_api_v1_reference_field_options_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FieldOptionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Field Options",
         "tags": [
           "reference"
         ]
