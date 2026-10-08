@@ -845,7 +845,7 @@ class TiqoraJob(TiqoraBase):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     kind: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
-    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[str] = mapped_column(JOB_RESULT_TEXT, nullable=False)
     result: Mapped[str | None] = mapped_column(JOB_RESULT_TEXT, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     progress_done: Mapped[int] = mapped_column(

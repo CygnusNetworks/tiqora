@@ -243,6 +243,21 @@ async def test_foreign_agent_cannot_download_file(
     assert b"secret" not in resp.content
 
 
+async def test_admin_sees_job_but_cannot_download_foreign_file(
+    env: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    """Files are built from the creator's queue scope: creator-only, even for admins."""
+    _, factory = env
+    job_id, fids = await _make_job(factory, files=(("a.csv", "text/csv", b"secret"),))
+    async with _client(factory, ROOT) as c:
+        meta = await c.get(f"/api/v1/jobs/{job_id}")
+        resp = await c.get(f"/api/v1/jobs/{job_id}/files/{fids[0]}")
+    assert meta.status_code == 200
+    assert [f["id"] for f in meta.json()["files"]] == fids
+    assert resp.status_code == 404
+    assert b"secret" not in resp.content
+
+
 async def test_file_of_foreign_job_is_404(
     env: tuple[str, async_sessionmaker[AsyncSession]],
 ) -> None:

@@ -57,3 +57,5 @@ def test_job_file_data_and_result_fit_large_payloads_on_mariadb() -> None:
     assert "LONGBLOB" in _column_ddl(TiqoraJobFile.__table__, "data", mysql.dialect())
     assert "BYTEA" in _column_ddl(TiqoraJobFile.__table__, "data", postgresql.dialect())
     assert "MEDIUMTEXT" in _column_ddl(TiqoraJob.__table__, "result", mysql.dialect())
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraJob.__table__, "payload", mysql.dialect())
+    assert "TEXT" in _column_ddl(TiqoraJob.__table__, "payload", postgresql.dialect())

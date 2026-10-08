@@ -150,3 +150,38 @@ def test_integrations_path_maps_to_tickets_area() -> None:
     assert scopes_allow(ro, method="GET", path=path + "?login=z50test")
     assert not scopes_allow(ro, method="POST", path=path)
     assert not scopes_allow(frozenset({"customers:ro"}), method="GET", path=path)
+
+
+# Mounted /api/v1 paths that deliberately have no scope area. Add a path only if it is
+# meant to be unreachable for scoped keys.
+_UNSCOPED_EXEMPT: frozenset[str] = frozenset(
+    {
+        # Browser redirect target of the OAuth2 provider (no API key involved).
+        "/api/v1/oauth2/callback",
+    }
+)
+
+
+def test_every_api_v1_route_resolves_to_a_known_scope_area() -> None:
+    """A new router without a prefix in ``_PATH_PREFIX_TO_AREA`` would 403 scoped keys."""
+    from tiqora.api.app import create_app
+    from tiqora.config import Settings
+
+    app = create_app(Settings(environment="test"))
+    # FastAPI wraps included routers (``app.routes`` is not flat); the OpenAPI
+    # schema lists every mounted path.
+    paths = app.openapi()["paths"]
+    assert any(p.startswith("/api/v1/jobs") for p in paths)  # guards the walk itself
+    unknown = sorted(
+        p
+        for p in paths
+        if p.startswith("/api/v1/") and p not in _UNSCOPED_EXEMPT and path_to_area(p) == "_unknown"
+    )
+    assert unknown == []
+
+
+def test_jobs_and_ticket_filters_map_to_tickets() -> None:
+    assert path_to_area("/api/v1/jobs/5/files/3") == "tickets"
+    assert path_to_area("/api/v1/ticket-filters/count") == "tickets"
+    assert path_to_area("/api/v1/customer-directory/vcards") == "customers"
+    assert scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/jobs/5/files/3")

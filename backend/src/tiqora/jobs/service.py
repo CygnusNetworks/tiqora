@@ -177,3 +177,8 @@ async def purge_finished_jobs(session: AsyncSession, *, older_than: datetime) ->
 
 def can_view_job(job: TiqoraJob, *, user_id: int, is_admin: bool) -> bool:
     return is_admin or (job.created_by is not None and job.created_by == user_id)
+
+
+def can_download_job_file(job: TiqoraJob, *, user_id: int) -> bool:
+    """Job files are built from the creator's permissions: creator-only, admins included."""
+    return job.created_by is not None and job.created_by == user_id
