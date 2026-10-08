@@ -1,0 +1,417 @@
+"""SAML service provider: round trips and the malicious-response corpus (pure, in-process IdP)."""
+
+from __future__ import annotations
+
+import base64
+import re
+import urllib.parse
+from pathlib import Path
+
+import defusedxml.ElementTree as safe_et
+import pytest
+
+from tests._saml_idp import IDP_ENTITY_ID, IDP_SLO_URL, SamlTestIdp, require_saml, saml_record
+from tiqora.config import Settings
+from tiqora.identity.saml_sp import SamlResponseInvalid, SamlServiceProvider
+from tiqora.identity.sso_sessions import SsoSessionInfo
+
+pytestmark = [pytest.mark.saml]
+require_saml()
+
+SLUG = "idptest-saml"
+SP_ENTITY = f"https://helpdesk.example.org/api/v1/auth/saml/{SLUG}/metadata"
+AGENT_ACS = f"https://helpdesk.example.org/api/v1/auth/saml/{SLUG}/acs"
+CUSTOMER_ACS = f"https://helpdesk.example.org/api/portal/auth/saml/{SLUG}/acs"
+SP_SLO = f"https://helpdesk.example.org/api/v1/auth/saml/{SLUG}/sls"
+OTHER_SP = "https://other.example.org/sp"
+MAIL = "anna@example.org"
+ATTRS = {"mail": [MAIL], "groups": ["Support"]}
+S = Settings(
+    environment="test",
+    secret_key="unit-test-secret-key-for-identity-saml-sp",
+    public_base_url="https://helpdesk.example.org",
+)
+
+NS_SAML = "urn:oasis:names:tc:SAML:2.0:assertion"
+
+
+@pytest.fixture(scope="module")
+def idp(tmp_path_factory: pytest.TempPathFactory) -> SamlTestIdp:
+    return SamlTestIdp(tmp_path_factory.mktemp("idp"))
+
+
+@pytest.fixture(scope="module")
+def sp(idp: SamlTestIdp) -> SamlServiceProvider:
+    provider = SamlServiceProvider(saml_record(slug=SLUG, idp=idp, settings=S), settings=S)
+    idp.trust_sp(provider.sp_metadata_xml())
+    return provider
+
+
+def _good(idp: SamlTestIdp, **kw: object) -> tuple[str, str]:
+    """A fresh valid response for the agent ACS: ``(request_id, base64)``."""
+    req_id = "id-" + base64.b16encode(__import__("os").urandom(8)).decode()
+    args: dict[str, object] = {
+        "in_response_to": req_id,
+        "acs_url": AGENT_ACS,
+        "sp_entity_id": SP_ENTITY,
+        "attributes": ATTRS,
+    }
+    args.update(kw)
+    return req_id, idp.login_response(**args)  # type: ignore[arg-type]
+
+
+def _xml(b64: str) -> str:
+    return base64.b64decode(b64).decode()
+
+
+def _b64(xml: str) -> str:
+    return base64.b64encode(xml.encode()).decode()
+
+
+def _signed_assertion(xml: str) -> str:
+    m = re.search(r"<(\w+):Assertion\b.*?</\1:Assertion>", xml, re.S)
+    assert m is not None and "Signature" in m.group(0)
+    return m.group(0)
+
+
+def _evil_copy(assertion: str) -> str:
+    evil = re.sub(r"<(\w+:)?Signature\b.*?</(\w+:)?Signature>", "", assertion, flags=re.S)
+    evil = re.sub(r'\bID="[^"]+"', 'ID="evil-1"', evil, count=1)
+    return evil.replace(">u-1001<", ">boss<")
+
+
+async def _reject(
+    sp: SamlServiceProvider,
+    b64: str,
+    req_id: str | None,
+    *,
+    acs: str = AGENT_ACS,
+    outstanding: dict[str, str] | None = None,
+) -> SamlResponseInvalid:
+    if outstanding is None:
+        outstanding = {req_id: acs} if req_id else {}
+    with pytest.raises(SamlResponseInvalid) as err:
+        await sp.parse_login_response(b64, outstanding=outstanding, expected_acs=acs)
+    return err.value
+
+
+def _expect(err: SamlResponseInvalid, reason: str, detail: str) -> None:
+    assert err.reason == reason
+    assert detail in err.detail, err.detail
+
+
+# --------------------------------------------------------------------------- positives
+
+
+async def test_round_trip_agent(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    redir = await sp.login_redirect(relay_state="rs1", user_kind="agent")
+    req_id, acs, relay = idp.parse_login_redirect(redir.url)
+    assert redir.request_id == req_id and relay == "rs1"
+    assert acs == "https://helpdesk.example.org/api/v1/auth/saml/idptest-saml/acs"
+    b64 = idp.login_response(
+        in_response_to=req_id, acs_url=acs, sp_entity_id=SP_ENTITY, attributes=ATTRS
+    )
+    res = await sp.parse_login_response(b64, outstanding={req_id: acs}, expected_acs=acs)
+    assert res.name_id == "u-1001" and res.attributes["mail"] == (MAIL,)
+    assert res.attributes["saml:name_id"] == ("u-1001",) and res.session_index
+    assert res.in_response_to == req_id and res.destination == acs
+    assert res.name_id_format == "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+    assert res.assertion_id and res.not_on_or_after is not None
+
+
+async def test_login_redirect_customer_uses_customer_acs_and_is_signed(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    redir = await sp.login_redirect(relay_state="rs2", user_kind="customer")
+    _, acs, _ = idp.parse_login_redirect(redir.url)
+    assert acs == CUSTOMER_ACS
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(redir.url).query)
+    assert redir.url.startswith("https://idp.example.org/saml/sso?")
+    assert "Signature" in query and "SigAlg" in query
+
+
+async def test_signed_response_and_assertion_accepted(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp, sign_response=True)
+    res = await sp.parse_login_response(
+        b64, outstanding={req_id: AGENT_ACS}, expected_acs=AGENT_ACS
+    )
+    assert res.name_id == "u-1001"
+
+
+async def test_encrypted_assertion_accepted(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    cert = sp.sp_certificate_pem
+    req_id, b64 = _good(idp, encrypt_for_cert=cert)
+    assert "EncryptedAssertion" in _xml(b64) and MAIL not in _xml(b64)
+    res = await sp.parse_login_response(
+        b64, outstanding={req_id: AGENT_ACS}, expected_acs=AGENT_ACS
+    )
+    assert res.attributes["mail"] == (MAIL,)
+
+
+async def test_idp_initiated_accepted_only_when_enabled(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    _, b64 = _good(idp, in_response_to=None)
+    assert (await _reject(sp, b64, None)).reason == "UnsolicitedResponse"
+
+    enabled = SamlServiceProvider(
+        saml_record(slug=SLUG, idp=idp, settings=S, allow_idp_initiated=True), settings=S
+    )
+    idp.trust_sp(enabled.sp_metadata_xml())
+    res = await enabled.parse_login_response(b64, outstanding={}, expected_acs=AGENT_ACS)
+    assert res.in_response_to is None and res.name_id == "u-1001"
+
+
+async def test_in_response_to_still_required_known_when_idp_initiated_enabled(
+    idp: SamlTestIdp,
+) -> None:
+    enabled = SamlServiceProvider(
+        saml_record(slug=SLUG, idp=idp, settings=S, allow_idp_initiated=True), settings=S
+    )
+    idp.trust_sp(enabled.sp_metadata_xml())
+    _, b64 = _good(idp)  # carries an InResponseTo nobody asked for
+    err = await _reject(enabled, b64, None, outstanding={})
+    assert err.reason == "unknown_request"
+
+
+def test_sp_metadata_lists_both_acs_and_slo(sp: SamlServiceProvider) -> None:
+    root = safe_et.fromstring(sp.sp_metadata_xml(), forbid_dtd=True)
+    md = "{urn:oasis:names:tc:SAML:2.0:metadata}"
+    acs = {e.get("Location") for e in root.iter(f"{md}AssertionConsumerService")}
+    slo = {e.get("Location") for e in root.iter(f"{md}SingleLogoutService")}
+    assert acs == {AGENT_ACS, CUSTOMER_ACS}
+    assert slo == {SP_SLO}
+    assert root.get("entityID") == SP_ENTITY
+
+
+# --------------------------------------------------------------------------- corpus
+
+
+async def test_unsigned_assertion_rejected(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    req_id, b64 = _good(idp, sign_assertion=False)
+    assert "Signature" not in _xml(b64)
+    _expect(await _reject(sp, b64, req_id), "SignatureError", "Signature missing for assertion")
+
+
+async def test_signed_response_unsigned_assertion_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp, sign_response=True, sign_assertion=False)
+    assert "Signature" in _xml(b64)
+    _expect(await _reject(sp, b64, req_id), "SignatureError", "Signature missing for assertion")
+
+
+async def test_tampered_attribute_rejected(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    req_id, b64 = _good(idp)
+    xml = _xml(b64)
+    assert MAIL in xml
+    _expect(
+        await _reject(sp, _b64(xml.replace(MAIL, "boss@example.org")), req_id),
+        "SignatureError",
+        "Failed to verify signature",
+    )
+
+
+async def test_xsw_evil_assertion_before_signed_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp)
+    xml = _xml(b64)
+    signed = _signed_assertion(xml)
+    evil = _evil_copy(signed)
+    assert evil != signed and "Signature" not in evil
+    attack = xml.replace(signed, evil + signed, 1)
+    assert attack.count(":Assertion ") == 2
+    assert (await _reject(sp, _b64(attack), req_id)).reason == "assertion_count"
+
+
+async def test_xsw_signed_assertion_wrapped_in_extensions_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp)
+    xml = _xml(b64)
+    signed = _signed_assertion(xml)
+    prefix = re.search(r"<(\w+):Status\b", xml)
+    assert prefix is not None
+    p = prefix.group(1)
+    attack = xml.replace(signed, _evil_copy(signed), 1).replace(
+        f"<{p}:Status", f"<{p}:Extensions>{signed}</{p}:Extensions><{p}:Status", 1
+    )
+    assert attack.count(":Assertion ") == 2 and "Extensions" in attack
+    assert (await _reject(sp, _b64(attack), req_id)).reason == "assertion_count"
+
+
+async def test_doctype_rejected(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    req_id, b64 = _good(idp)
+    xml = _xml(b64)
+    xml = re.sub(r"^<\?xml[^>]*\?>\s*", "", xml)
+    attack = '<!DOCTYPE r [<!ENTITY x "y">]>' + xml
+    assert (await _reject(sp, _b64(attack), req_id)).reason == "dtd"
+
+
+async def test_wrong_audience_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp, tmp_path: Path
+) -> None:
+    other = SamlServiceProvider(saml_record(slug="idptest-other", idp=idp, settings=S), settings=S)
+    idp.trust_sp(other.sp_metadata_xml())
+    other_entity = "https://helpdesk.example.org/api/v1/auth/saml/idptest-other/metadata"
+    req_id, b64 = _good(idp, sp_entity_id=other_entity)
+    assert other_entity in _xml(b64) and SP_ENTITY not in _xml(b64)
+    _expect(await _reject(sp, b64, req_id), "audience_mismatch", "AudienceRestrictions")
+
+
+async def test_expired_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import saml2.time_util as tu
+
+    req_id, b64 = _good(idp)
+    real = tu.utc_now
+    monkeypatch.setattr(tu, "utc_now", lambda: real() + 3600)
+    _expect(await _reject(sp, b64, req_id), "ResponseLifetimeExceed", "too old")
+
+
+async def test_unknown_in_response_to_rejected(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    _, b64 = _good(idp)
+    _expect(
+        await _reject(sp, b64, None, outstanding={}), "UnsolicitedResponse", "Unsolicited response"
+    )
+
+
+async def test_customer_acs_response_posted_to_agent_acs_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp, acs_url=CUSTOMER_ACS)
+    assert (await _reject(sp, b64, req_id, acs=AGENT_ACS)).reason == "destination_mismatch"
+
+
+async def test_stripped_destination_still_bound_by_recipient(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp, acs_url=CUSTOMER_ACS)
+    xml = _xml(b64)
+    stripped = re.sub(r'\sDestination="[^"]*"', "", xml, count=1)
+    assert "Destination" not in stripped.split("Assertion")[0]
+    assert (await _reject(sp, _b64(stripped), req_id, acs=AGENT_ACS)).reason == "recipient_mismatch"
+
+
+async def test_wrong_recipient_with_matching_destination_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp, acs_url=CUSTOMER_ACS)
+    xml = _xml(b64)
+    forged = xml.replace(f'Destination="{CUSTOMER_ACS}"', f'Destination="{AGENT_ACS}"', 1)
+    assert forged != xml and f'Recipient="{CUSTOMER_ACS}"' in forged
+    assert (await _reject(sp, _b64(forged), req_id, acs=AGENT_ACS)).reason == "recipient_mismatch"
+
+
+async def test_signature_by_unknown_key_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp, tmp_path: Path
+) -> None:
+    rogue = SamlTestIdp(tmp_path)  # same entity id, different key
+    assert rogue.entity_id == IDP_ENTITY_ID
+    rogue.trust_sp(sp.sp_metadata_xml())
+    req_id, b64 = _good(rogue)
+    _expect(await _reject(sp, b64, req_id), "SignatureError", "Failed to verify signature")
+
+
+async def test_more_than_one_assertion_rejected(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    req_id, b64 = _good(idp)
+    xml = _xml(b64)
+    signed = _signed_assertion(xml)
+    attack = xml.replace(signed, signed + signed, 1)
+    assert (await _reject(sp, _b64(attack), req_id)).reason == "assertion_count"
+
+
+async def test_oversized_response_rejected(sp: SamlServiceProvider) -> None:
+    big = base64.b64encode(b"<a>" + b"x" * (2 * 1024 * 1024 + 1) + b"</a>").decode()
+    assert (await _reject(sp, big, None, outstanding={})).reason == "too_large"
+
+
+async def test_garbage_rejected(sp: SamlServiceProvider) -> None:
+    assert (await _reject(sp, "!!!not base64!!!", None, outstanding={})).reason in {
+        "base64",
+        "xml",
+    }
+
+
+# --------------------------------------------------------------------------- logout
+
+
+async def test_logout_redirect_none_without_idp_slo(idp: SamlTestIdp) -> None:
+    no_slo = re.sub(r"<(\w+:)?SingleLogoutService\b[^>]*/>", "", idp.metadata_xml(), flags=re.S)
+    assert "SingleLogoutService" not in no_slo
+    provider = SamlServiceProvider(
+        saml_record(slug=SLUG, idp=idp, settings=S, idp_metadata_xml=no_slo), settings=S
+    )
+    info = SsoSessionInfo(
+        provider_id=1,
+        slug=SLUG,
+        kind="saml",
+        subject_hash="h",
+        name_id="u-1001",
+        session_index="s1",
+    )
+    assert await provider.logout_redirect(info, relay_state="rs") is None
+
+
+async def test_logout_redirect_is_signed_and_targets_idp(sp: SamlServiceProvider) -> None:
+    info = SsoSessionInfo(
+        provider_id=1,
+        slug=SLUG,
+        kind="saml",
+        subject_hash="h",
+        name_id="u-1001",
+        name_id_format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
+        session_index="s1",
+    )
+    out = await sp.logout_redirect(info, relay_state="rs9")
+    assert out is not None and out.url.startswith(IDP_SLO_URL + "?")
+    query = urllib.parse.parse_qs(urllib.parse.urlparse(out.url).query)
+    assert query["RelayState"] == ["rs9"] and "Signature" in query
+
+
+async def test_handle_logout_request_verified_and_answered(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    url = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="u-1001", session_index="s1")
+    q = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()}
+    data, reply = await sp.handle_logout_request(
+        q["SAMLRequest"],
+        binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+        relay_state=q.get("RelayState"),
+        sigalg=q.get("SigAlg"),
+        signature=q.get("Signature"),
+    )
+    assert data.name_id == "u-1001" and data.session_indexes == ("s1",)
+    assert reply.startswith(IDP_SLO_URL + "?") and "SAMLResponse=" in reply
+
+
+@pytest.mark.parametrize("mode", ["unsigned", "bad_signature"])
+async def test_handle_logout_request_rejects_unsigned_or_forged(
+    sp: SamlServiceProvider, idp: SamlTestIdp, mode: str
+) -> None:
+    url = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="u-1001", session_index="s1")
+    q = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()}
+    sig = None if mode == "unsigned" else base64.b64encode(b"x" * 256).decode()
+    with pytest.raises(SamlResponseInvalid):
+        await sp.handle_logout_request(
+            q["SAMLRequest"],
+            binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+            relay_state=q.get("RelayState"),
+            sigalg=None if mode == "unsigned" else q.get("SigAlg"),
+            signature=sig,
+        )
+
+
+async def test_parse_logout_response_returns_in_response_to(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    url = idp.logout_response_redirect(sp_slo_url=SP_SLO, in_response_to="id-logout-1")
+    q = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()}
+    got = await sp.parse_logout_response(
+        q["SAMLResponse"], binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+    )
+    assert got == "id-logout-1"
