@@ -6,6 +6,7 @@ cleared around every test; the pristine snapshot holds none of them.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator, Generator
 from datetime import datetime
@@ -17,10 +18,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.db.tiqora.models import TiqoraAclRevision, TiqoraProcessRevision, TiqoraSettings
-from tiqora.deployed import clear_revision_cache, latest_revision_info
+from tiqora.deployed import clear_revision_cache, latest_revision_info, record_revision
+from tiqora.deployed import watcher as watcher_module
 from tiqora.deployed.sync_tables import pending_sync_count
-from tiqora.deployed.watcher import check_deploy_state, run_deploy_watch_tick
+from tiqora.deployed.watcher import (
+    check_deploy_state,
+    revision_write_lock,
+    run_deploy_watch_tick,
+)
 from tiqora.domain import ticket_acl
+from tiqora.process.dump import build_process_dump
 
 pytestmark = pytest.mark.db
 
@@ -106,6 +113,7 @@ async def session_factory(
     _reset(sync_url)
     clear_revision_cache()
     ticket_acl._warned_live = False
+    watcher_module._candidate.clear()
     engine = create_async_engine(_to_async_url(sync_url))
     yield async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     await engine.dispose()
@@ -153,6 +161,9 @@ async def test_draft_edit_is_not_picked_up_until_sync_table_empties(session: Asy
     assert out2.revision_id == out1.revision_id
 
     await _znuny_deploy(session)
+    # First tick after the deploy only notes the new checksum (draft-edit race guard).
+    pre = await check_deploy_state(session, "process", ownership_active=False)
+    assert pre.action == "unchanged" and pre.revision_id == out1.revision_id
     out3 = await check_deploy_state(session, "process", ownership_active=False)
     assert out3.action == "snapshot" and out3.revision_id != out1.revision_id
     info = await latest_revision_info(session, "process")
@@ -191,6 +202,7 @@ async def test_acl_changes_wait_for_acl_sync_to_empty(session: AsyncSession) -> 
     assert waiting.action == "waiting_for_deploy" and waiting.revision_id == first.revision_id
     await session.execute(text("DELETE FROM acl_sync"))
     await session.commit()
+    await check_deploy_state(session, "acl", ownership_active=False)  # confirmation tick
     done = await check_deploy_state(session, "acl", ownership_active=False)
     assert done.action == "snapshot" and done.revision_id != first.revision_id
 
@@ -236,7 +248,7 @@ async def test_tick_result_reports_live_mode(
         settings=Settings(environment="test"), session_factory=session_factory
     )
     assert result2["mode"] == "deployed"
-    assert result2["process"]["action"] == "snapshot"
+    assert result2["process"]["action"] == "snapshot"  # no revision yet: initial, no wait
     assert result2["acl"]["action"] == "unchanged"
 
 
@@ -248,3 +260,87 @@ async def test_acl_live_fallback_warns_once(
         await ticket_acl.load_valid_acls(session)
     warnings = [r for r in caplog.records if r.getMessage() == "acl_definitions_running_live"]
     assert len(warnings) == 1
+
+
+async def test_changing_dump_between_ticks_is_not_snapshotted(session: AsyncSession) -> None:
+    first = await check_deploy_state(session, "process", ownership_active=False)
+    await session.execute(
+        text("UPDATE pm_process SET name = 'v2' WHERE id = :i"), {"i": PROCESS_ID}
+    )
+    await session.commit()
+    seen_v2 = await check_deploy_state(session, "process", ownership_active=False)
+    # A designer keeps editing before the next tick: checksum differs again.
+    await session.execute(
+        text("UPDATE pm_process SET name = 'v3' WHERE id = :i"), {"i": PROCESS_ID}
+    )
+    await session.commit()
+    seen_v3 = await check_deploy_state(session, "process", ownership_active=False)
+    assert seen_v2.action == seen_v3.action == "unchanged"
+    assert seen_v3.revision_id == first.revision_id
+    stable = await check_deploy_state(session, "process", ownership_active=False)
+    assert stable.action == "snapshot" and stable.revision_id != first.revision_id
+    count = (
+        await session.execute(text("SELECT COUNT(*) FROM tiqora_process_revision"))
+    ).scalar_one()
+    assert count == 2
+
+
+async def test_concurrent_writer_is_deduplicated_by_in_lock_recheck(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """The watcher waits on the lock with a stale view; a rival commits the same dump."""
+    async with (
+        session_factory() as holder,
+        session_factory() as rival,
+        session_factory() as watcher_session,
+    ):
+        async with revision_write_lock(holder, "process"):
+            task = asyncio.create_task(
+                check_deploy_state(watcher_session, "process", ownership_active=False)
+            )
+            await asyncio.sleep(1.0)
+            assert not task.done()  # blocked on the lock, latest was None when it looked
+            dump = await build_process_dump(rival)
+            info = await record_revision(
+                rival, "process", dump=dump, source="znuny", deployed_by=None
+            )
+            await rival.commit()
+        out = await asyncio.wait_for(task, timeout=15)
+    assert out.action == "unchanged" and out.revision_id == info.id
+    async with session_factory() as s:
+        count = (await s.execute(text("SELECT COUNT(*) FROM tiqora_process_revision"))).scalar_one()
+    assert count == 1
+
+
+async def test_lock_is_released_after_exception(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(watcher_module, "_LOCK_TIMEOUT_SECONDS", 2)
+    async with session_factory() as a, session_factory() as b:
+        with pytest.raises(RuntimeError, match="boom"):
+            async with revision_write_lock(a, "acl"):
+                raise RuntimeError("boom")
+        async with revision_write_lock(b, "acl"):
+            pass  # acquirable again: the failed holder released it
+
+
+async def test_lock_times_out_instead_of_blocking_forever(
+    session_factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(watcher_module, "_LOCK_TIMEOUT_SECONDS", 1)
+    async with session_factory() as a, session_factory() as b, revision_write_lock(a, "acl"):
+        with pytest.raises(TimeoutError):
+            async with revision_write_lock(b, "acl"):
+                pass
+
+
+async def test_check_deploy_state_rolls_back_on_error(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def boom(*_a: object, **_k: object) -> None:
+        raise RuntimeError("dump failed")
+
+    monkeypatch.setattr(watcher_module, "_build_dump", boom)
+    with pytest.raises(RuntimeError, match="dump failed"):
+        await check_deploy_state(session, "process", ownership_active=False)
+    assert not session.in_transaction()

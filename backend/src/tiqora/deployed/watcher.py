@@ -12,7 +12,9 @@ revision is never duplicated and the newest id is the newest commit (rulings T4/
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
@@ -39,6 +41,13 @@ logger = logging.getLogger(__name__)
 WatchAction = Literal["unchanged", "snapshot", "waiting_for_deploy", "running_live"]
 
 _LOCK_TIMEOUT_SECONDS = 10
+_LOCK_POLL_SECONDS = 0.1
+
+# Checksum seen with an empty sync table that differs from the newest revision, per
+# kind. A Znuny revision is recorded only when the same checksum shows up on two
+# consecutive ticks, so a designer edit that starts between our pending check and
+# the dump build is never snapshotted half-way (ruling T5 fix). In-process state.
+_candidate: dict[str, str] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,7 +79,18 @@ async def revision_write_lock(session: AsyncSession, kind: RevisionKind) -> Asyn
     postgres = engine.dialect.name == "postgresql"
     async with engine.connect() as conn:
         if postgres:
-            await conn.execute(text("SELECT pg_advisory_lock(hashtext(:n))"), {"n": name})
+            deadline = time.monotonic() + _LOCK_TIMEOUT_SECONDS
+            while True:
+                got = (
+                    await conn.execute(
+                        text("SELECT pg_try_advisory_lock(hashtext(:n))"), {"n": name}
+                    )
+                ).scalar_one()
+                if got:
+                    break
+                if time.monotonic() >= deadline:
+                    raise TimeoutError(f"could not get lock {name}")
+                await asyncio.sleep(_LOCK_POLL_SECONDS)
         else:
             got = (
                 await conn.execute(
@@ -82,26 +102,49 @@ async def revision_write_lock(session: AsyncSession, kind: RevisionKind) -> Asyn
         try:
             yield
         finally:
-            if postgres:
-                await conn.execute(text("SELECT pg_advisory_unlock(hashtext(:n))"), {"n": name})
-            else:
-                await conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": name})
+            # Never mask the body's exception; the lock dies with the connection anyway.
+            try:
+                if postgres:
+                    await conn.execute(text("SELECT pg_advisory_unlock(hashtext(:n))"), {"n": name})
+                else:
+                    await conn.execute(text("SELECT RELEASE_LOCK(:n)"), {"n": name})
+            except Exception:  # noqa: BLE001
+                logger.exception("deploy_watch_unlock_failed", extra={"lock": name})
 
 
 async def check_deploy_state(
     session: AsyncSession, kind: RevisionKind, *, ownership_active: bool
 ) -> WatchOutcome:
-    """One watcher decision for one kind (table in the module docs / plan D4)."""
+    """One watcher decision for one kind (plan D4 table).
+
+    This function OWNS its transaction: every exit path ends committed (or rolled
+    back when it raises), because the write path has to commit to take a fresh
+    snapshot under the lock. Callers must not have pending writes of their own.
+    """
+    try:
+        outcome = await _check_deploy_state(session, kind, ownership_active=ownership_active)
+    except BaseException:
+        await session.rollback()
+        raise
+    await session.commit()
+    return outcome
+
+
+async def _check_deploy_state(
+    session: AsyncSession, kind: RevisionKind, *, ownership_active: bool
+) -> WatchOutcome:
     pending = await pending_sync_count(session, kind)
     latest = await latest_revision_info(session, kind)
 
     if not ownership_active and pending > 0:
+        _candidate.pop(kind, None)
         # Drafts exist: keep the current revision; without one the engine runs live.
         action: WatchAction = "running_live" if latest is None else "waiting_for_deploy"
         return WatchOutcome(kind, action, latest.id if latest else None, pending)
 
     dump = await _build_dump(session, kind)
     if latest is not None and dump_checksum(dump) == latest.checksum:
+        _candidate.pop(kind, None)
         if ownership_active and pending > 0:
             await clear_sync_table(session, kind)
             pending = 0
@@ -114,14 +157,22 @@ async def check_deploy_state(
         pending = await pending_sync_count(session, kind)
         latest = await latest_revision_info(session, kind)
         if not ownership_active and pending > 0:
+            _candidate.pop(kind, None)
             action = "running_live" if latest is None else "waiting_for_deploy"
             return WatchOutcome(kind, action, latest.id if latest else None, pending)
         dump = await _build_dump(session, kind)
-        if latest is not None and dump_checksum(dump) == latest.checksum:
+        checksum = dump_checksum(dump)
+        if latest is not None and checksum == latest.checksum:
+            _candidate.pop(kind, None)
             if ownership_active and pending > 0:
                 await clear_sync_table(session, kind)
             await session.commit()
             return WatchOutcome(kind, "unchanged", latest.id, 0 if ownership_active else pending)
+        if latest is not None and not ownership_active and _candidate.get(kind) != checksum:
+            # First sighting of a changed dump after a deploy: confirm on the next tick.
+            _candidate[kind] = checksum
+            return WatchOutcome(kind, "unchanged", latest.id, 0)
+        _candidate.pop(kind, None)
         source: RevisionSource
         if ownership_active:
             source = "tiqora"

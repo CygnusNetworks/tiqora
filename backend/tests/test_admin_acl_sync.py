@@ -1,6 +1,6 @@
 """Admin ACL writes leave ``acl_sync`` rows like Znuny's ACLAdd/ACLUpdate/ACLDelete.
 
-HTTP through the admin router on MariaDB. Seed band 882500-882999: ACL names
+HTTP through the admin router on MariaDB and PostgreSQL. Seed band 882500-882999: ACL names
 start with ``sync882500-`` so cleanup can find rows created through the API.
 """
 
@@ -28,6 +28,14 @@ BASE = "/api/v1/admin/acl"
 PREFIX = "sync882500-"
 
 
+def _to_async_url(sync_url: str) -> str:
+    return (
+        sync_url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
+        .replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+        .replace("postgresql://", "postgresql+asyncpg://", 1)
+    )
+
+
 def _clean(url: str) -> None:
     engine = create_engine(url)
     TiqoraBase.metadata.create_all(
@@ -42,16 +50,17 @@ def _clean(url: str) -> None:
     engine.dispose()
 
 
-@pytest.fixture
-def clean_url(mariadb_znuny_url: str) -> Iterator[str]:
-    _clean(mariadb_znuny_url)
-    yield mariadb_znuny_url
-    _clean(mariadb_znuny_url)
+@pytest.fixture(params=["mariadb_znuny_url", "postgres_znuny_url"])
+def clean_url(request: pytest.FixtureRequest) -> Iterator[str]:
+    url: str = request.getfixturevalue(request.param)
+    _clean(url)
+    yield url
+    _clean(url)
 
 
 @pytest.fixture
 async def factory(clean_url: str) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    engine = create_async_engine(clean_url.replace("mysql+pymysql://", "mysql+aiomysql://", 1))
+    engine = create_async_engine(_to_async_url(clean_url))
     yield async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     await engine.dispose()
 
@@ -77,11 +86,7 @@ async def client(
 async def _sync_rows(factory: async_sessionmaker[AsyncSession]) -> list[tuple[str, str]]:
     async with factory() as session:
         rows = await session.execute(
-            text(
-                "SELECT acl_id, sync_state FROM acl_sync"
-                " WHERE create_time IS NOT NULL AND change_time IS NOT NULL ORDER BY change_time,"
-                " sync_state"
-            )
+            text("SELECT acl_id, sync_state FROM acl_sync ORDER BY sync_state")
         )
         return [(r[0], r[1]) for r in rows]
 
@@ -113,7 +118,14 @@ async def test_create_update_delete_write_acl_sync_like_znuny(
     deleted = await client.delete(f"{BASE}/{acl_id}")
     assert deleted.status_code == 204
     rows = await _sync_rows(factory)
-    assert len(rows) == 3 and (str(acl_id), "deleted") in rows
+    assert rows == [
+        (str(acl_id), "deleted"),
+        (str(acl_id), "not_sync"),
+        (str(acl_id), "not_sync"),
+    ]
+    async with factory() as session:
+        times = (await session.execute(text("SELECT create_time, change_time FROM acl_sync"))).all()
+    assert len(times) == 3 and all(c is not None and m is not None for c, m in times)
 
 
 @pytest.mark.asyncio
