@@ -39,8 +39,17 @@ def _xslt_factory(config: dict[str, Any] | None, huge_xml: bool) -> Mapper:
     return XsltMapper(config, huge_xml=huge_xml)
 
 
-# Task 4 adds "OutOfOffice".
-MAPPER_FACTORIES: dict[str, MapperFactory] = {"Simple": _simple_factory, "XSLT": _xslt_factory}
+def _out_of_office_factory(config: dict[str, Any] | None, huge_xml: bool) -> Mapper:
+    from tiqora.api.compat.mapping.out_of_office import OutOfOfficeMapper
+
+    return OutOfOfficeMapper(config)
+
+
+MAPPER_FACTORIES: dict[str, MapperFactory] = {
+    "Simple": _simple_factory,
+    "XSLT": _xslt_factory,
+    "OutOfOffice": _out_of_office_factory,
+}
 
 
 def build_mapper(mapping_config: Any, *, huge_xml: bool = False) -> Mapper:
