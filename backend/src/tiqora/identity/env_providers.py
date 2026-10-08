@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from typing import Any, Final
+from typing import Any
 
 import structlog
 from pydantic import BaseModel, SecretStr
@@ -36,6 +36,7 @@ logger = structlog.get_logger(__name__)
 __all__ = [
     "ensure_env_providers",
     "env_ldap_config",
+    "env_ldap_tls_warnings",
     "env_runtime_config",
     "reset_env_sync_cache_for_tests",
     "runtime_config",
@@ -44,7 +45,6 @@ __all__ = [
 
 _SYNCED_FINGERPRINT: str | None = None
 _LOCK: asyncio.Lock = asyncio.Lock()
-_USER_ATTRS: Final = ("DN", "UID")
 
 
 def _fingerprint(settings: Settings) -> str:
@@ -68,8 +68,9 @@ def reset_env_sync_cache_for_tests() -> None:
 
 
 def _user_attr(value: str) -> Any:
-    upper = value.strip().upper()
-    return upper if upper in _USER_ATTRS else "DN"
+    """Znuny ``UserAttr eq 'DN'``: exactly "DN" compares the user's DN, anything else
+    (``UID``, ``uid``, ``sAMAccountName`` …) the login."""
+    return "DN" if value.strip() == "DN" else "UID"
 
 
 def _secret(value: str) -> SecretStr | None:
@@ -93,7 +94,18 @@ def _ldap_config(settings: Settings, prefix: str) -> LdapProviderConfig:
         group_dn=get("group_dn"),
         access_attr=get("access_attr"),
         user_attr=_user_attr(get("user_attr")),
+        tls_verify=get("tls_verify"),
     )
+
+
+def env_ldap_tls_warnings(settings: Settings) -> list[str]:
+    """Env LDAP directories that run without TLS certificate verification (startup log)."""
+    out: list[str] = []
+    if settings.ldap_enabled and not settings.ldap_tls_verify:
+        out.append("TIQORA_LDAP_TLS_VERIFY")
+    if settings.customer_ldap_enabled and not settings.customer_ldap_tls_verify:
+        out.append("TIQORA_CUSTOMER_LDAP_TLS_VERIFY")
+    return out
 
 
 def env_ldap_config(settings: Settings, user_kind: UserKind) -> LdapProviderConfig:

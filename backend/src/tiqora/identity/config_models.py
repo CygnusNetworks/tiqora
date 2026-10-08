@@ -7,6 +7,7 @@ Secrets are ``SecretStr | None``.
 
 from __future__ import annotations
 
+import ssl
 from collections.abc import Mapping
 from typing import Annotated, Any, Final, Literal
 
@@ -62,7 +63,26 @@ class LdapProviderConfig(BaseModel):
     group_dn: str = ""
     access_attr: str = "memberUid"
     user_attr: Literal["DN", "UID"] = "DN"
-    subject_attr: str = "entryUUID"  # AD: objectGUID; empty/missing value -> entry DN
+    subject_attr: str = "entryUUID"  # tried first, then objectGUID/entryUUID, the DN last
+    tls_verify: bool = True  # LDAPS/StartTLS: certificate chain + host name are checked
+    ca_certs_pem: str = Field(
+        default="", json_schema_extra={"x-widget": "textarea"}
+    )  # own CA (PEM)
+
+    @field_validator("ca_certs_pem")
+    @classmethod
+    def _valid_ca_pem(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            return ""
+        if "-----BEGIN CERTIFICATE-----" not in value:
+            raise ValueError("Bitte ein CA-Zertifikat im PEM-Format einfügen (BEGIN CERTIFICATE).")
+        try:
+            # Exactly what the TLS layer will load later (ldap3 -> SSLContext cadata).
+            ssl.create_default_context(cadata=value)
+        except (ssl.SSLError, ValueError) as exc:
+            raise ValueError("Das CA-Zertifikat (PEM) ist ungültig.") from exc
+        return value
 
 
 CONFIG_MODELS: Final[dict[ProviderKind, type[BaseModel]]] = {

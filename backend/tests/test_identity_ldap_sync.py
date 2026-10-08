@@ -19,6 +19,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from structlog.testing import capture_logs
 
 from tests._identity_helpers import NOW, FakeRedis, cleanup_statements, make_provider, seed_agent
 from tests._identity_helpers import seed_customer as _seed_customer
@@ -28,8 +29,14 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_db
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.identity import ldap_login
 from tiqora.identity.config_models import GroupGrant, JitDefaults, RoleRule
-from tiqora.identity.store import ProviderChanges, ProviderRecord, update_provider
+from tiqora.identity.store import (
+    ProviderChanges,
+    ProviderRecord,
+    ProviderValidationError,
+    update_provider,
+)
 from tiqora.security.ratelimit import AuthRateLimiter
 
 pytestmark = pytest.mark.db
@@ -305,13 +312,17 @@ async def test_env_ldap_login_unchanged(env: Env, directory: Directory, limiter:
             ("idpldap.ghost", "ghost-secret"),  # bind ok, no account: plan rejected
             ("idpldap.anna", "wrong"),
             ("idpldap.nobody", "x"),
-            ("idpldap.anna", ""),
+            ("idpldap.anna", ""),  # empty password: never sent to the directory
         ):
             resp = await _login(client, login, password)
-            assert resp.status_code in (401, 422), (login, resp.text)
-            if resp.status_code == 401:
-                assert resp.json()["detail"] == "Invalid credentials"
-        assert limiter.failures[:3] == ["idpldap.ghost", "idpldap.anna", "idpldap.nobody"]
+            assert resp.status_code == 401, (login, resp.text)
+            assert resp.json()["detail"] == "Invalid credentials"
+        assert limiter.failures == [
+            "idpldap.ghost",
+            "idpldap.anna",
+            "idpldap.nobody",
+            "idpldap.anna",
+        ]
 
     # Profile untouched (env map = login only), link recorded with the entryUUID subject.
     names = await env.rows("SELECT first_name, last_name FROM users WHERE id = 47210")
@@ -328,9 +339,8 @@ async def test_two_ldap_providers_in_order(
     person(directory, "idpldap.cora", "old-password", host=HOST)
     person(directory, "idpldap.cora", "new-password", host="ldap2.example.org")
     await seed_agent(env.s, 47212, "idpldap.cora")
-    first = await env.provider("first", sort=10)
+    await env.provider("first", sort=10)
     second = await env.provider("second", host="ldap2.example.org", sort=20)
-    _ = first
 
     async with env.client(Settings(**BASE)) as client:  # type: ignore[arg-type]
         resp = await _login(client, "idpldap.cora", "new-password")
@@ -499,3 +509,81 @@ async def test_disabled_env_flag_ignores_stale_env_row(
     # TIQORA_LDAP_ENABLED switched off: the kept env row must not authenticate anyone.
     async with env.client(Settings(**BASE)) as client:  # type: ignore[arg-type]
         assert (await _login(client, "idpldap.anna", "anna-secret")).status_code == 401
+
+
+async def test_chain_budget_skips_remaining_providers(
+    env: Env, directory: Directory, limiter: Limiter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    person(directory, "idpldap.fritz", "fritz-secret", host="ldap2.example.org")
+    await seed_agent(env.s, 47215, "idpldap.fritz")
+    await env.provider("slow", sort=10)  # first in order, hangs past the budget
+    await env.provider("fast", host="ldap2.example.org", sort=20)
+    directory.bind_delay[HOST] = 1.5
+    monkeypatch.setattr(ldap_login, "CHAIN_BUDGET_SECONDS", 0.4)
+    with capture_logs() as logs:
+        async with env.client(Settings(**BASE)) as client:  # type: ignore[arg-type]
+            resp = await _login(client, "idpldap.fritz", "fritz-secret")
+    assert resp.status_code == 401
+    events = {e["event"]: e for e in logs}
+    assert events["ldap_provider_timeout"]["provider"] == f"{SLUG}slow"
+    assert events["ldap_chain_budget_exhausted"]["skipped"] == [f"{SLUG}fast"]
+    assert "ldap2.example.org" not in directory.server_kwargs  # never contacted
+    assert limiter.failures == ["idpldap.fritz"]
+
+
+async def test_group_search_error_skips_role_sync(
+    env: Env, directory: Directory, limiter: Limiter
+) -> None:
+    person(directory, "idpldap.gina", "gina-secret", mail="gina@example.test", sn="G")
+    directory.add(directory.servers[HOST], SUPPORT_DN, cn="support", memberUid="idpldap.gina")
+    rule = RoleRule(attribute="ldap:group_dn", value=SUPPORT_DN, role_ids=[ROLE])
+    await env.provider("grperr", jit=True, rules=[rule])
+    async with env.client(Settings(**BASE)) as client:  # type: ignore[arg-type]
+        resp = await _login(client, "idpldap.gina", "gina-secret")
+        assert resp.status_code == 200, resp.text
+        uid = resp.json()["user"]["id"]
+        assert await env.rows("SELECT role_id FROM role_user WHERE user_id = :u", u=uid) == [
+            (ROLE,)
+        ]
+        # The group's search now ERRORS (noSuchObject): membership unknown -> no strip.
+        directory.delete(HOST, SUPPORT_DN)
+        resp = await _login(client, "idpldap.gina", "gina-secret")
+        assert resp.status_code == 200, resp.text
+    assert await env.rows("SELECT role_id FROM role_user WHERE user_id = :u", u=uid) == [(ROLE,)]
+    assert limiter.failures == []
+
+
+async def test_invalid_group_dn_rule_rejected_on_save(env: Env) -> None:
+    p = await env.provider("baddn")
+    bad = RoleRule(attribute="ldap:group_dn", value="support group", role_ids=[ROLE])
+    with pytest.raises(ProviderValidationError) as err:
+        await update_provider(
+            env.s, p.id, ProviderChanges(role_rules=[bad]), secret_key=KEY, actor_id=1
+        )
+    assert "Ungültiger Gruppen-DN" in err.value.errors["role_rules"]
+    await env.s.rollback()
+    good = RoleRule(attribute="ldap:group_dn", value=SUPPORT_DN, role_ids=[ROLE])
+    other = RoleRule(attribute="groups", value="support group", role_ids=[ROLE])  # not a DN rule
+    saved = await update_provider(
+        env.s, p.id, ProviderChanges(role_rules=[good, other]), secret_key=KEY, actor_id=1
+    )
+    await env.s.commit()
+    assert len(saved.role_rules) == 2
+
+
+async def test_unexpected_error_after_bind_is_503_and_counted(
+    env: Env, directory: Directory, limiter: Limiter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    person(directory, "idpldap.hans", "hans-secret")
+    await seed_agent(env.s, 47216, "idpldap.hans")
+    await env.provider("boom")
+
+    async def broken_apply(*args: Any, **kwargs: Any) -> tuple[int, str]:
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr(ldap_login, "apply_login", broken_apply)
+    async with env.client(Settings(**BASE)) as client:  # type: ignore[arg-type]
+        resp = await _login(client, "idpldap.hans", "hans-secret")
+    assert resp.status_code == 503, resp.text
+    assert resp.json()["detail"].startswith("Die Anmeldung über den Verzeichnisdienst")
+    assert limiter.failures == ["idpldap.hans"] and limiter.resets == []

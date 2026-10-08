@@ -10,7 +10,7 @@ from tiqora.api.deps import DbSession, get_redis
 from tiqora.api.portal.deps import AppSettings, CurrentCustomer, get_customer_auth_service
 from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
 from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest
-from tiqora.identity.ldap_login import ldap_sign_in
+from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 
 router = APIRouter(prefix="/auth", tags=["portal-auth"])
@@ -24,6 +24,15 @@ def _clear_customer_session_cookie(response: Response, settings: AppSettings) ->
         secure=settings.session_cookie_secure,
         httponly=True,
         samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
+    )
+
+
+def _too_many(retry_after: int | None) -> HTTPException:
+    headers = {"Retry-After": str(max(1, retry_after))} if retry_after else None
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many failed login attempts; try again later",
+        headers=headers,
     )
 
 
@@ -51,22 +60,24 @@ async def login(
     customer = await auth.authenticate_password(body.login, body.password)
     if customer is None:
         # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
-        account_login = await ldap_sign_in(
-            session, settings, login=body.login, password=body.password, user_kind="customer"
-        )
+        try:
+            account_login = await ldap_sign_in(
+                session, settings, login=body.login, password=body.password, user_kind="customer"
+            )
+        except LdapSignInUnavailable as exc:
+            # Counted like a failure (no free retries), but honest: try again later.
+            locked = await limiter.record_failure(login=body.login, ip=ip)
+            if locked is not None:
+                raise _too_many(locked.retry_after) from exc
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.message
+            ) from exc
         if account_login is not None:
             customer = await auth.get_customer_by_login(account_login)
     if customer is None:
         locked = await limiter.record_failure(login=body.login, ip=ip)
         if locked is not None:
-            headers = (
-                {"Retry-After": str(max(1, locked.retry_after))} if locked.retry_after else None
-            )
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many failed login attempts; try again later",
-                headers=headers,
-            )
+            raise _too_many(locked.retry_after)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",

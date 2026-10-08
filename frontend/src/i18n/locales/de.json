@@ -4093,7 +4093,15 @@
             },
             "subject_attr": {
               "label": "Eindeutige Kennung",
-              "help": "Bei Active Directory: objectGUID."
+              "help": "Dauerhafte Kennung des Verzeichniseintrags. Leer: objectGUID (Active Directory) oder entryUUID."
+            },
+            "tls_verify": {
+              "label": "Zertifikat des Servers prüfen",
+              "help": "Empfohlen. Nur für ein Testverzeichnis mit selbst ausgestelltem Zertifikat ausschalten."
+            },
+            "ca_certs_pem": {
+              "label": "Eigenes CA-Zertifikat (PEM)",
+              "help": "Nur nötig, wenn das Zertifikat des Verzeichnisses von Ihrer eigenen Zertifizierungsstelle stammt."
             }
           }
         }

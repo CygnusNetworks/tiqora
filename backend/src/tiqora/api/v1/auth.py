@@ -70,7 +70,7 @@ from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.identity.env_providers import ensure_env_providers
 from tiqora.identity.http import safe_next as _safe_next
-from tiqora.identity.ldap_login import ldap_sign_in
+from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
 from tiqora.identity.saml_runtime import saml_availability
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
@@ -443,9 +443,18 @@ async def login(
     user = await auth.authenticate_password(body.login, body.password)
     if user is None:
         # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
-        account_login = await ldap_sign_in(
-            session, settings, login=body.login, password=body.password, user_kind="agent"
-        )
+        try:
+            account_login = await ldap_sign_in(
+                session, settings, login=body.login, password=body.password, user_kind="agent"
+            )
+        except LdapSignInUnavailable as exc:
+            # Counted like a failure (no free retries), but honest: try again later.
+            locked = await limiter.record_failure(login=body.login, ip=ip)
+            if locked is not None:
+                raise _rate_limit_http_exception(locked) from exc
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.message
+            ) from exc
         if account_login is not None:
             user = await auth.get_user_by_login(account_login, auth_method="ldap")
     if user is None:

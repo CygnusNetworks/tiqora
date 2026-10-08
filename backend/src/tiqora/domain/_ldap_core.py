@@ -15,8 +15,10 @@ Ports the semantics of Znuny's ``Kernel::System::Auth::LDAP`` /
 3. If a group DN is configured, verify the user's DN (or the typed login, depending on
    ``user_attr``) is a member per ``access_attr`` under that group (access gate).
 4. Membership of every requested rule group DN with Znuny's AuthSync filter
-   ``(<access_attr>=<user DN or login>)`` under ``base=<group DN>``; a failing search
-   counts as "not a member" (Znuny ``next GROUPDN``).
+   ``(<access_attr>=<user DN or login>)`` under ``base=<group DN>``. No hit = not a
+   member. A search ERROR (exception, referral, noSuchObject, malformed DN …) sets
+   ``group_search_failed`` so role/group sync is skipped for that login — a deliberate
+   deviation from Znuny, which treats it as "not a member" and strips roles.
 5. Re-bind as the resolved DN with the supplied password on the same connection
    (Znuny does the same) — this *is* the actual credential check.
 
@@ -42,7 +44,11 @@ Simplifications vs. Znuny:
 * No ``UserSuffix`` / ``UserLowerCase`` knobs — callers are expected to pass
   the login as typed; add these back if a deployment needs them.
 * No ``NestedGroupSearch`` (AuthSync): rule group membership is direct only.
-* TLS certificate validation follows ldap3's defaults (no CA/verify knob yet).
+* TLS: ``tls_verify`` checks the certificate chain (system CAs or ``ca_certs_pem``) and
+  the host name; env directories default to unverified for compatibility (startup warning).
+* Network: connect timeout 5 s, receive timeout 10 s, referrals are never chased
+  (Net::LDAP does not follow them either: a referral is a failed search).
+* Several user entries for one login are rejected as ambiguous (Znuny takes the last).
 * Matching the resolved UID to a local account (and creating one) is the caller's
   job (``tiqora.identity.ldap_login`` + ``tiqora.identity.login``), not this module's.
 """
@@ -50,6 +56,7 @@ Simplifications vs. Znuny:
 from __future__ import annotations
 
 import asyncio
+import ssl
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -60,6 +67,11 @@ logger = structlog.get_logger(__name__)
 
 # Attributes whose values are binary identifiers: always hex-encoded, never decoded.
 _BINARY_ID_ATTRS = frozenset({"objectguid"})
+# Network bounds: an unreachable or stalled directory must not hold a login (or an
+# executor thread) for long. The login chain adds an overall budget on top.
+CONNECT_TIMEOUT_SECONDS = 5
+RECEIVE_TIMEOUT_SECONDS = 10
+_LDAP_SUCCESS = 0
 
 
 class LdapUnavailable(Exception):
@@ -91,7 +103,9 @@ class LdapConfig:
     always_filter: str = ""
     group_dn: str = ""
     access_attr: str = "memberUid"
-    user_attr: str = "DN"
+    user_attr: str = "DN"  # exactly "DN" compares the user DN, anything else the login
+    tls_verify: bool = False  # LdapProviderConfig defaults to True; env keeps the old default
+    ca_certs_pem: str = field(default="", repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +116,9 @@ class LdapEntry:
     dn: str
     attributes: dict[str, tuple[str, ...]]
     member_group_dns: tuple[str, ...]  # subset of the requested group DNs the user is in
+    # True when at least one rule-group search ERRORED (not "no match"): membership is
+    # unknown, so role/group sync must be skipped for this login (fail safe).
+    group_search_failed: bool = False
 
 
 def _escape_filter_value(ldap3: Any, value: str) -> str:
@@ -140,6 +157,38 @@ def _entry_attributes(raw_attributes: Any, wanted: Sequence[str]) -> dict[str, t
     return out
 
 
+class _SearchError(Exception):  # noqa: N818 - internal control flow
+    """A search raised or returned a non-success result (referral, noSuchObject, …)."""
+
+
+def _search(conn: Any, base: str, filt: str, attributes: Sequence[str]) -> list[dict[str, Any]]:
+    """Entries of one search; ``_SearchError`` on an exception or a non-success result.
+
+    Referrals are not chased (``auto_referrals=False``, Znuny/Net::LDAP parity): a
+    referral answer is a failed search, never a bind to another host.
+    """
+    try:
+        conn.search(search_base=base, search_filter=filt, attributes=list(attributes))
+    except Exception as exc:  # noqa: BLE001 - e.g. LDAPInvalidDnError for a malformed base
+        raise _SearchError(type(exc).__name__) from exc
+    result = conn.result if isinstance(conn.result, dict) else {}
+    code = result.get("result", _LDAP_SUCCESS)
+    if code != _LDAP_SUCCESS:
+        raise _SearchError(str(result.get("description") or code))
+    return _entries(conn)
+
+
+def _tls(ldap3: Any, config: LdapConfig) -> Any:
+    """TLS settings: verified chain + host name, or (env compatibility only) unverified."""
+    if not config.tls_verify:
+        return ldap3.Tls(validate=ssl.CERT_NONE)
+    return ldap3.Tls(
+        validate=ssl.CERT_REQUIRED,
+        ca_certs_data=config.ca_certs_pem or None,
+        sni=config.host.strip(),
+    )
+
+
 def _bind(conn: Any, config: LdapConfig, *, what: str) -> bool:
     """Open, negotiate StartTLS when configured (before any credentials), then bind."""
     conn.open()
@@ -167,10 +216,12 @@ def _authenticate_entry_sync(
 
     try:
         server = ldap3.Server(
-            config.host,
+            config.host.strip(),
             port=config.port,
             use_ssl=config.use_ssl,
             get_info=ldap3.NONE,
+            tls=_tls(ldap3, config),
+            connect_timeout=CONNECT_TIMEOUT_SECONDS,
         )
         search_account = bool(config.bind_dn and config.bind_password)
         conn = ldap3.Connection(
@@ -178,6 +229,8 @@ def _authenticate_entry_sync(
             user=config.bind_dn if search_account else None,
             password=config.bind_password if search_account else None,
             auto_bind=False,
+            auto_referrals=False,
+            receive_timeout=RECEIVE_TIMEOUT_SECONDS,
         )
     except Exception as exc:  # noqa: BLE001 — any connection error is an auth failure
         logger.error("ldap_connect_failed", host=config.host, error=type(exc).__name__)
@@ -204,13 +257,6 @@ def _entries(conn: Any) -> list[dict[str, Any]]:
     return [r for r in (conn.response or []) if r.get("type") == "searchResEntry"]
 
 
-def _has_entry(conn: Any, base: str, filt: str) -> bool:
-    """At least one entry under *base* matches *filt*; a failed search counts as none."""
-    return bool(conn.search(search_base=base, search_filter=filt, attributes=["1.1"])) and bool(
-        _entries(conn)
-    )
-
-
 def _search_and_verify(
     ldap3: Any,
     conn: Any,
@@ -225,12 +271,17 @@ def _search_and_verify(
         filt = f"(&{filt}{config.always_filter})"
 
     wanted = list(dict.fromkeys(a for a in (config.uid_attr, *attributes) if a))
-    if not conn.search(search_base=config.base_dn, search_filter=filt, attributes=wanted):
-        logger.info("ldap_no_user_entry", login=login, base_dn=config.base_dn, filter=filt)
+    try:
+        hits = _search(conn, config.base_dn, filt, wanted)
+    except _SearchError as exc:
+        logger.warning("ldap_user_search_failed", base_dn=config.base_dn, error=str(exc))
         return None
-    hits = _entries(conn)
     if not hits:
         logger.info("ldap_no_user_entry", login=login, base_dn=config.base_dn, filter=filt)
+        return None
+    if len(hits) > 1:
+        # Znuny silently takes the last hit; an ambiguous login must not pick an account.
+        logger.warning("ldap_user_ambiguous", login=login, base_dn=config.base_dn, hits=len(hits))
         return None
 
     hit = hits[0]
@@ -243,29 +294,39 @@ def _search_and_verify(
     )
     user_uid = uid_values[0] if uid_values else login
 
-    member_value = user_dn if config.user_attr.upper() == "DN" else login
+    member_value = user_dn if config.user_attr == "DN" else login
     member_filter = f"({config.access_attr}={_escape_filter_value(ldap3, member_value)})"
 
-    if (
-        config.access_attr
-        and config.group_dn
-        and not _has_entry(conn, config.group_dn, member_filter)
-    ):
-        logger.info(
-            "ldap_group_membership_missing",
-            login=login,
-            group_dn=config.group_dn,
-            filter=member_filter,
-        )
-        return None
+    if config.access_attr and config.group_dn:
+        try:
+            gate = _search(conn, config.group_dn, member_filter, ["1.1"])
+        except _SearchError as exc:
+            logger.warning("ldap_group_search_failed", group_dn=config.group_dn, error=str(exc))
+            return None
+        if not gate:
+            logger.info(
+                "ldap_group_membership_missing",
+                login=login,
+                group_dn=config.group_dn,
+                filter=member_filter,
+            )
+            return None
 
     members: list[str] = []
+    group_search_failed = False
     for group_dn in dict.fromkeys(g for g in member_of_group_dns if g and g.strip()):
-        # Znuny AuthSync: no hit OR a failed search (e.g. the group is gone) = not a member.
-        if _has_entry(conn, group_dn, member_filter):
-            members.append(group_dn)
-        else:
-            logger.info("ldap_not_in_rule_group", login=login, group_dn=group_dn)
+        try:
+            if _search(conn, group_dn, member_filter, ["1.1"]):
+                members.append(group_dn)
+        except _SearchError as exc:
+            # Deviation from Znuny (which treats it as "not a member" and strips): an
+            # erroring group search leaves membership unknown -> sync is skipped.
+            group_search_failed = True
+            logger.warning("ldap_rule_group_search_failed", group_dn=group_dn, error=str(exc))
+
+    if config.use_starttls and not getattr(conn, "tls_started", False):
+        logger.error("ldap_starttls_not_active", host=config.host)
+        return None
 
     # Re-bind as the resolved user DN with the supplied password on the same (already
     # TLS-protected) connection: this is the actual credential check.
@@ -279,6 +340,7 @@ def _search_and_verify(
         dn=user_dn,
         attributes=entry_attrs,
         member_group_dns=tuple(members),
+        group_search_failed=group_search_failed,
     )
 
 

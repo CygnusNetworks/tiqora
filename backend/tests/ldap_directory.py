@@ -11,6 +11,7 @@ ldap3's mock refuses StartTLS, so the recording connection answers it itself
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import ldap3
@@ -30,6 +31,10 @@ class Directory:
         self.filters: list[str] = []
         self.bind_users: list[str | None] = []
         self.starttls_ok = True
+        self.starttls_sets_started = True  # False: start_tls() says ok but TLS is not up
+        self.server_kwargs: dict[str, dict[str, Any]] = {}  # host -> Server(...) kwargs
+        self.connection_kwargs: list[dict[str, Any]] = []
+        self.bind_delay: dict[str, float] = {}  # host -> seconds (slow directory)
 
     def server(self, host: str) -> ldap3.Server:
         srv = ldap3.Server(host, get_info=ldap3.NONE)
@@ -54,6 +59,11 @@ class Directory:
         }
         assert conn.modify(dn, changes), conn.result
 
+    def delete(self, host: str, dn: str) -> None:
+        conn = self._admin(self.servers[host])
+        assert conn.bind()
+        assert conn.delete(dn), conn.result
+
     def delete_value(self, host: str, dn: str, attribute: str, value: str) -> None:
         conn = self._admin(self.servers[host])
         assert conn.bind()
@@ -72,12 +82,17 @@ def install_directory(monkeypatch: pytest.MonkeyPatch) -> Directory:
 
         def start_tls(self, *args: Any, **kwargs: Any) -> bool:
             directory.events.append("start_tls")
+            if directory.starttls_ok and directory.starttls_sets_started:
+                self.tls_started = True
             return directory.starttls_ok
 
         def bind(self, *args: Any, **kwargs: Any) -> Any:
             if not self._in_rebind:
                 directory.events.append("bind")
                 directory.bind_users.append(self.user)
+                delay = directory.bind_delay.get(str(self.server.host), 0.0)
+                if delay:
+                    time.sleep(delay)  # a stalled directory (runs in the executor thread)
             return super().bind(*args, **kwargs)
 
         def rebind(self, *args: Any, **kwargs: Any) -> Any:
@@ -96,9 +111,11 @@ def install_directory(monkeypatch: pytest.MonkeyPatch) -> Directory:
     class Shim:
         NONE = ldap3.NONE
         utils = ldap3.utils
+        Tls = ldap3.Tls
 
         @staticmethod
         def Server(host: str, **kwargs: Any) -> ldap3.Server:  # noqa: N802 - ldap3 API
+            directory.server_kwargs[host] = kwargs
             if host not in directory.servers:
                 raise LDAPSocketOpenError(f"cannot reach {host}")
             return directory.servers[host]
@@ -107,6 +124,7 @@ def install_directory(monkeypatch: pytest.MonkeyPatch) -> Directory:
         def Connection(  # noqa: N802 - ldap3 API
             srv: ldap3.Server, user: str | None = None, password: str | None = None, **kwargs: Any
         ) -> ldap3.Connection:
+            directory.connection_kwargs.append(kwargs)
             return RecordingConnection(
                 srv, user=user, password=password, client_strategy=ldap3.MOCK_SYNC
             )

@@ -161,17 +161,27 @@ password login path.
 
 ## LDAP / Active Directory configuration
 
-Optional bind-search-bind auth against an LDAP/AD directory, tried as a
-fallback when local password auth fails (mirrors Znuny's chained
+Optional bind-search-bind auth against an LDAP/AD directory, tried
+after local password auth fails (mirrors Znuny's chained
 `AuthModule::LDAP`/`CustomerAuth::LDAP`). Separate on/off switches and
 settings exist for agent login (`users`) and the customer portal
-(`customer_user`) — see `tiqora.domain.auth_ldap` /
-`tiqora.domain.customer_auth_ldap` / `tiqora.domain._ldap_core`.
+(`customer_user`). They appear as the read-only identity providers
+`env-ldap` / `env-customer-ldap` — see `tiqora.identity.ldap_login` and
+`tiqora.domain._ldap_core`. Further directories with just-in-time
+accounts and role/group sync (Znuny AuthSync) are configured as identity
+providers in the admin UI and are tried in their sort order; the first
+directory that accepts the password wins.
 
-**No auto-provisioning in v1**: the LDAP UID resolved by the search must
-match an existing, valid local `users.login` (agent) or
-`customer_user.login` (portal) row, or the login is rejected. Provision the
-account locally first, then point it at LDAP.
+**No auto-provisioning for the env directories**: the LDAP UID resolved by
+the search must match an existing, valid local `users.login` (agent) or
+`customer_user.login` (portal) row, or the login is rejected. After the
+first login the account is linked to the directory entry's stable id
+(`objectGUID` / `entryUUID`), so a later rename of the local login keeps
+working.
+
+Connections use a 5 s connect and 10 s receive timeout, never follow
+referrals, and one password login spends at most 20 s across all
+directories. StartTLS is negotiated before any password is sent.
 
 Agent auth (`TIQORA_LDAP_*`) — customer portal uses the identical shape
 under `TIQORA_CUSTOMER_LDAP_*`:
@@ -191,6 +201,7 @@ under `TIQORA_CUSTOMER_LDAP_*`:
 | `TIQORA_LDAP_GROUP_DN` | `cn=helpdesk,ou=groups,dc=example,dc=com` | Optional group-membership gate |
 | `TIQORA_LDAP_ACCESS_ATTR` | `memberUid` | Attribute checked under `GROUP_DN` |
 | `TIQORA_LDAP_USER_ATTR` | `DN` | `DN` compares the user's full DN; anything else compares the login |
+| `TIQORA_LDAP_TLS_VERIFY` | `true` | Verify the directory's certificate (system CAs, host name) for LDAPS/StartTLS. **Defaults to `false` only for compatibility with existing installs; a warning is logged at startup while it is off.** Set it to `true` (customer portal: `TIQORA_CUSTOMER_LDAP_TLS_VERIFY`). |
 
 Simplifications vs. `Kernel::System::Auth::LDAP`: no `Die` (hard-crash on
 connect failure), `UserSuffix`, `UserLowerCase`, or per-directory charset

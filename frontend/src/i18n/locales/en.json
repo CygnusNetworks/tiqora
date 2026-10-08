@@ -4093,7 +4093,15 @@
             },
             "subject_attr": {
               "label": "Unique identifier",
-              "help": "For Active Directory: objectGUID."
+              "help": "Stable ID of the directory entry. Empty: objectGUID (Active Directory) or entryUUID."
+            },
+            "tls_verify": {
+              "label": "Check the server certificate",
+              "help": "Recommended. Turn off only for a test directory with a self-signed certificate."
+            },
+            "ca_certs_pem": {
+              "label": "Own CA certificate (PEM)",
+              "help": "Only needed when the directory's certificate comes from your own certification authority."
             }
           }
         }

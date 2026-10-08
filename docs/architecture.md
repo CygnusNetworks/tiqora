@@ -178,17 +178,21 @@ Key endpoints: `/auth/login|me|logout`, `/queues`, `/tickets`,
   page (`/agent/security`) consumes it as a plain cookie-authenticated
   `<img src>`. 404 with no pending enrollment.
 - **LDAP/AD** (`ldap3`, bind-search-bind): ports
-  `Kernel::System::Auth::LDAP` / `CustomerAuth::LDAP`
-  (`domain/auth_ldap.py` + `domain/customer_auth_ldap.py`, sharing the
-  bind-search-bind core in `domain/_ldap_core.py`). Tried as a **fallback**
-  when local password auth fails and `TIQORA_LDAP_ENABLED` /
-  `TIQORA_CUSTOMER_LDAP_ENABLED` is set. All `ldap3` calls run in an
-  executor (sync library, same rule as `gssapi`). **No auto-provisioning in
-  v1** — the LDAP UID resolved by the search must match an existing,
-  `valid_id = 1` `users.login` / `customer_user.login` row, or the login is
-  rejected. Optional group-membership gate (`GroupDN`/`AccessAttr`, mirrors
-  the Perl module). Simplified vs. Znuny: no `Die`/`UserSuffix`/
-  `UserLowerCase`/per-directory charset knobs.
+  `Kernel::System::Auth::LDAP` / `CustomerAuth::LDAP` and the directory
+  side of `Auth::Sync::LDAP`. LDAP directories are identity providers
+  (`identity/ldap_login.py` on top of the bind-search-bind core in
+  `domain/_ldap_core.py`); `TIQORA_LDAP_*` / `TIQORA_CUSTOMER_LDAP_*` are the
+  read-only `env-ldap` / `env-customer-ldap` rows. Tried after local password
+  auth fails, in provider sort order (first bind wins); the identity then runs
+  through the same login chain as OIDC/SAML (link on the stable entry id,
+  login match, JIT, profile and `ldap:group_dn` role/group sync). Env
+  directories keep the old rule: no auto-provisioning, the UID must match an
+  existing valid login. All `ldap3` calls run in an executor (sync library,
+  same rule as `gssapi`), with connect/receive timeouts, no referral chasing
+  and a 20 s budget per login. Optional group-membership gate
+  (`GroupDN`/`AccessAttr`, mirrors the Perl module). Simplified vs. Znuny:
+  no `Die`/`UserSuffix`/`UserLowerCase`/`NestedGroupSearch`/per-directory
+  charset knobs; a failing group search skips the sync instead of stripping.
 - GenericInterface SessionIDs are validated against Znuny `sessions` (see
   [GenericInterface compat layer](#genericinterface-compat-layer)).
 

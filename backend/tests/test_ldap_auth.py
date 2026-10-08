@@ -304,7 +304,7 @@ async def test_entry_returns_attributes_and_group_membership(anna_dir: Directory
         "anna",
         "anna-secret",
         attributes=["mail", "givenName", "sn", "entryUUID", "telephoneNumber"],
-        member_of_group_dns=[SUPPORT_DN, SALES_DN, "cn=gone,ou=groups,dc=example,dc=org"],
+        member_of_group_dns=[SUPPORT_DN, SALES_DN],
     )
     assert isinstance(entry, LdapEntry)
     assert entry.uid == "anna"
@@ -315,6 +315,38 @@ async def test_entry_returns_attributes_and_group_membership(anna_dir: Directory
     assert entry.attributes["sn"] == ("Muster",)
     assert entry.attributes["entryUUID"] == ("0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0",)
     assert entry.attributes["telephoneNumber"] == ()  # requested, no value: present-empty
+    assert entry.group_search_failed is False  # sales: searched fine, no hit
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "bad_group",
+    [
+        "cn=gone,ou=groups,dc=example,dc=org",  # noSuchObject: non-success result
+        "not a dn",  # LDAPInvalidDnError raised by ldap3 before the request
+    ],
+)
+async def test_group_search_error_marks_entry_and_still_logs_in(
+    anna_dir: Directory, bad_group: str
+) -> None:
+    entry = await ldap_authenticate_entry(
+        _anna_config(),
+        "anna",
+        "anna-secret",
+        member_of_group_dns=[bad_group, SUPPORT_DN],
+    )
+    assert entry is not None  # one broken rule never denies every login
+    assert entry.member_group_dns == (SUPPORT_DN,)
+    assert entry.group_search_failed is True
+    cfg = LdapProviderConfig(host="dir.example.org")
+    ident = identity_from_entry(_record(cfg), entry)
+    assert "ldap:group_dn" not in ident.attributes  # claim absent -> sync skipped
+
+
+@pytest.mark.asyncio
+async def test_access_gate_search_error_denies(anna_dir: Directory) -> None:
+    cfg = _anna_config(group_dn="cn=gone,ou=groups,dc=example,dc=org")
+    assert await ldap_authenticate_entry(cfg, "anna", "anna-secret") is None
 
 
 @pytest.mark.asyncio
@@ -358,11 +390,29 @@ async def test_ldap_subject_prefers_entry_uuid_then_dn(anna_dir: Directory) -> N
     assert ident.attributes["ldap:group_dn"] == (SUPPORT_DN,)
     assert ident.attributes["uid"] == ("anna",)
 
-    # No entryUUID value -> the entry DN.
-    no_uuid = LdapEntry(uid="anna", dn=ANNA_DN, attributes={"entryUUID": ()}, member_group_dns=())
-    assert identity_from_entry(rec, no_uuid).subject == ANNA_DN
+    # Configured attribute empty -> objectGUID, then entryUUID; the DN only as last resort.
     blank_attr = _record(cfg.model_copy(update={"subject_attr": ""}))
-    assert identity_from_entry(blank_attr, entry).subject == ANNA_DN
+    assert "objectGUID" in requested_attributes(blank_attr)
+    assert "entryUUID" in requested_attributes(blank_attr)
+    full = await ldap_authenticate_entry(
+        _anna_config(), "anna", "anna-secret", attributes=requested_attributes(blank_attr)
+    )
+    assert full is not None
+    assert identity_from_entry(blank_attr, full).subject == "0102feff"
+    only_uuid = LdapEntry(
+        uid="anna", dn=ANNA_DN, attributes={"entryUUID": ("u-1",)}, member_group_dns=()
+    )
+    assert identity_from_entry(blank_attr, only_uuid).subject == "u-1"
+    custom = _record(cfg.model_copy(update={"subject_attr": "employeeNumber"}))
+    neither = LdapEntry(
+        uid="anna",
+        dn=ANNA_DN,
+        attributes={"employeeNumber": (), "objectGUID": (), "entryUUID": ()},
+        member_group_dns=(),
+    )
+    with capture_logs() as logs:
+        assert identity_from_entry(custom, neither).subject == ANNA_DN
+    assert any(e["event"] == "ldap_subject_dn_fallback" for e in logs)
 
     # AD objectGUID is binary: hex, never a lossy text decode.
     ad = _record(cfg.model_copy(update={"subject_attr": "objectGUID"}))
@@ -388,5 +438,187 @@ def test_requested_attributes_and_rule_group_dns() -> None:
         RoleRule(attribute="memberOf", value=SALES_DN, role_ids=[3]),
     )
     rec = _record(cfg, rules)
-    assert requested_attributes(rec) == ["uid", "mail", "givenName", "sn", "objectGUID", "memberOf"]
+    assert requested_attributes(rec) == [
+        "uid",
+        "mail",
+        "givenName",
+        "sn",
+        "objectGUID",
+        "entryUUID",
+        "memberOf",
+    ]
     assert rule_group_dns(rec) == [SUPPORT_DN]
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+def _self_signed_pem() -> str:
+    """A CA certificate generated at test time (never committed key material)."""
+    import datetime as dt
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Test CA example.org")])
+    now = dt.datetime.now(dt.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + dt.timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def test_ca_pem_is_validated() -> None:
+    from pydantic import ValidationError
+
+    pem = _self_signed_pem()
+    assert LdapProviderConfig(ca_certs_pem=f"  {pem}  ").ca_certs_pem == pem.strip()
+    assert LdapProviderConfig().tls_verify is True  # DB providers verify by default
+    for bad in ("hello", "-----BEGIN CERTIFICATE-----\nAAAA\n-----END CERTIFICATE-----"):
+        with pytest.raises(ValidationError) as err:
+            LdapProviderConfig(ca_certs_pem=bad)
+        assert "CA-Zertifikat" in str(err.value)
+
+
+@pytest.mark.asyncio
+async def test_tls_verification_settings_reach_ldap3(anna_dir: Directory) -> None:
+    import ssl
+
+    pem = _self_signed_pem()
+    cfg = ldap_core_config(
+        LdapProviderConfig(
+            host=" dir.example.org ",  # stripped before ldap3.Server
+            base_dn=ORG,
+            bind_dn=BIND_DN,
+            bind_password=BIND_PW,  # type: ignore[arg-type]
+            use_starttls=True,
+            ca_certs_pem=pem,
+        )
+    )
+    assert await ldap_authenticate_entry(cfg, "anna", "anna-secret") is not None
+    tls = anna_dir.server_kwargs["dir.example.org"]["tls"]
+    assert tls.validate == ssl.CERT_REQUIRED  # ldap3 then checks the host name, too
+    assert tls.ca_certs_data == pem.strip()
+    assert tls.sni == "dir.example.org"
+
+
+@pytest.mark.asyncio
+async def test_env_tls_verify_defaults_off_and_can_be_enabled(mock_ldap3: Directory) -> None:
+    import ssl
+
+    from tiqora.identity.env_providers import env_ldap_tls_warnings
+
+    assert await _env_auth(_settings(), "alice", "alice-secret") == "alice"
+    assert mock_ldap3.server_kwargs["mock-directory"]["tls"].validate == ssl.CERT_NONE
+    assert env_ldap_tls_warnings(_settings()) == ["TIQORA_LDAP_TLS_VERIFY"]
+    on = _settings(ldap_tls_verify=True)
+    assert await _env_auth(on, "alice", "alice-secret") == "alice"
+    assert mock_ldap3.server_kwargs["mock-directory"]["tls"].validate == ssl.CERT_REQUIRED
+    assert env_ldap_tls_warnings(on) == []
+
+
+@pytest.mark.asyncio
+async def test_connection_bounds_and_no_referrals(mock_ldap3: Directory) -> None:
+    assert await _env_auth(_settings(), "alice", "alice-secret") == "alice"
+    assert mock_ldap3.server_kwargs["mock-directory"]["connect_timeout"] == 5
+    conn_kwargs = mock_ldap3.connection_kwargs[-1]
+    assert conn_kwargs["auto_referrals"] is False
+    assert conn_kwargs["receive_timeout"] == 10
+
+
+@pytest.mark.asyncio
+async def test_rebind_refused_when_starttls_not_active(mock_ldap3: Directory) -> None:
+    mock_ldap3.starttls_sets_started = False  # start_tls() claims success, TLS is not up
+    assert await _env_auth(_settings(ldap_use_starttls=True), "alice", "alice-secret") is None
+    assert "rebind" not in mock_ldap3.events
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_user_search_rejected(mock_ldap3: Directory) -> None:
+    mock_ldap3.add(
+        mock_ldap3.servers["mock-directory"],
+        "uid=alice,ou=contractors,dc=example,dc=com",
+        uid="alice",
+        userPassword="alice-secret",
+        sn="Other Alice",
+        objectClass="inetOrgPerson",
+    )
+    with capture_logs() as logs:
+        assert await _env_auth(_settings(), "alice", "alice-secret") is None
+    assert any(e["event"] == "ldap_user_ambiguous" for e in logs)
+    assert "rebind" not in mock_ldap3.events  # no password tried against either entry
+
+
+@pytest.mark.asyncio
+async def test_anonymous_search_with_wrong_password_rejected(mock_ldap3: Directory) -> None:
+    settings = _settings(ldap_bind_password="")
+    assert await _env_auth(settings, "alice", "wrong") is None
+    assert mock_ldap3.bind_users == [None]  # anonymous search bind, then a failed re-bind
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("password", ["alice-secret\x00", "\x00", "alice\x07secret"])
+async def test_nul_and_control_char_passwords_rejected(
+    mock_ldap3: Directory, password: str
+) -> None:
+    assert await _env_auth(_settings(), "alice", password) is None
+    assert await _env_auth(_settings(), "alice", "alice-secret") == "alice"
+
+
+@pytest.mark.asyncio
+async def test_exact_escaped_filters(mock_ldap3: Directory) -> None:
+    srv = mock_ldap3.servers["mock-directory"]
+    mock_ldap3.add(
+        srv,
+        "uid=o*brien,ou=people,dc=example,dc=com",
+        uid="o*brien",
+        userPassword="ob-secret",
+        sn="O'Brien",
+        objectClass="inetOrgPerson",
+    )
+    mock_ldap3.add(srv, "cn=ops,ou=groups,dc=example,dc=com", cn="ops", memberUid="o*brien")
+    assert await _env_auth(_settings(), "alice\\", "x") is None
+    assert await _env_auth(_settings(), "\x00", "x") is None
+    gate = _settings(
+        ldap_group_dn="cn=ops,ou=groups,dc=example,dc=com",
+        ldap_access_attr="memberUid",
+        ldap_user_attr="UID",
+    )
+    assert await _env_auth(gate, "o*brien", "ob-secret") == "o*brien"
+    assert "(uid=alice\\5c)" in mock_ldap3.filters
+    assert "(uid=\\00)" in mock_ldap3.filters
+    assert "(uid=o\\2abrien)" in mock_ldap3.filters
+    assert "(memberUid=o\\2abrien)" in mock_ldap3.filters  # group member filter, UID mode
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("user_attr", ["sAMAccountName", "uid", "dn", "UID"])
+async def test_env_user_attr_other_than_dn_compares_the_login(
+    mock_ldap3: Directory, user_attr: str
+) -> None:
+    # Znuny `UserAttr eq 'DN'`: only exactly "DN" means DN; the group lists the login.
+    settings = _settings(
+        ldap_group_dn=GROUP_DN, ldap_access_attr="memberUid", ldap_user_attr=user_attr
+    )
+    assert env_ldap_config(settings, "agent").user_attr == "UID"
+    assert await _env_auth(settings, "alice", "alice-secret") == "alice"
+    assert "(memberUid=alice)" in mock_ldap3.filters
+
+
+@pytest.mark.asyncio
+async def test_env_user_attr_dn_compares_the_dn(mock_ldap3: Directory) -> None:
+    settings = _settings(ldap_group_dn=GROUP_DN, ldap_access_attr="member", ldap_user_attr="DN")
+    assert env_ldap_config(settings, "agent").user_attr == "DN"
+    assert await _env_auth(settings, "alice", "alice-secret") is None  # helpdesk lists memberUid
+    assert "(member=uid=alice,ou=people,dc=example,dc=com)" in mock_ldap3.filters

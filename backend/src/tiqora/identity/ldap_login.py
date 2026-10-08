@@ -13,13 +13,20 @@ Env providers (``TIQORA_LDAP_*`` / ``TIQORA_CUSTOMER_LDAP_*``) keep today's beha
 connection data comes from Settings, the login is the directory UID matched against an
 existing valid account, no JIT, no rules (``require_sso_opt_in`` never applies to LDAP).
 
-The subject of an LDAP identity is the first value of ``subject_attr`` (``entryUUID``;
-AD ``objectGUID`` as hex), else the entry DN.
+The subject (link key) of an LDAP identity is a stable entry id: the configured
+``subject_attr``, else ``objectGUID`` (AD, hex), else ``entryUUID`` (OpenLDAP); the entry DN
+only when the directory has none of them (logged — a DN changes on rename/move).
+
+A rule-group search that ERRORS omits ``ldap:group_dn`` from the identity, so the login's
+role/group sync is skipped (absent-claim rule, fail safe). The whole provider chain has a
+time budget (:data:`CHAIN_BUDGET_SECONDS`); providers left when it runs out are skipped.
 """
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
+import time
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +43,8 @@ from tiqora.identity.types import ENV_CUSTOMER_LDAP_SLUG, ENV_LDAP_SLUG, UserKin
 logger = structlog.get_logger(__name__)
 
 __all__ = [
+    "CHAIN_BUDGET_SECONDS",
+    "LdapSignInUnavailable",
     "identity_from_entry",
     "ldap_core_config",
     "ldap_password_login",
@@ -47,6 +56,22 @@ __all__ = [
 
 LDAP_DN_ATTR = "ldap:dn"
 _PSEUDO_PREFIX = "ldap:"
+# Stable entry ids tried after the configured subject attribute.
+STABLE_ID_ATTRS = ("objectGUID", "entryUUID")
+# Overall time for one password login across all LDAP providers (connect 5 s and
+# receive 10 s per directory are bounded in _ldap_core; this keeps a chain of slow
+# directories well under the 90 s proxy timeout).
+CHAIN_BUDGET_SECONDS = 20.0
+
+
+class LdapSignInUnavailable(Exception):  # noqa: N818 - a state, not a bug
+    """A directory accepted the password but the account could not be written/read
+    (database trouble). The password form shows a "try again later" message."""
+
+    message = (
+        "Die Anmeldung über den Verzeichnisdienst ist gerade nicht möglich. "
+        "Bitte versuchen Sie es in einigen Minuten erneut."
+    )
 
 
 def ldap_core_config(cfg: LdapProviderConfig) -> LdapConfig:
@@ -64,6 +89,8 @@ def ldap_core_config(cfg: LdapProviderConfig) -> LdapConfig:
         group_dn=cfg.group_dn,
         access_attr=cfg.access_attr,
         user_attr=cfg.user_attr,
+        tls_verify=cfg.tls_verify,
+        ca_certs_pem=cfg.ca_certs_pem,
     )
 
 
@@ -91,6 +118,7 @@ def requested_attributes(record: ProviderRecord) -> list[str]:
         *amap.customer_id,
         *amap.mobile,
         cfg.subject_attr,
+        *STABLE_ID_ATTRS,
         *(r.attribute for r in record.role_rules),
     ]
     seen: set[str] = set()
@@ -114,16 +142,19 @@ def rule_group_dns(record: ProviderRecord) -> list[str]:
 
 
 def _subject(cfg: LdapProviderConfig, entry: LdapEntry) -> str:
-    if cfg.subject_attr.strip():
-        for value in lookup(entry.attributes, cfg.subject_attr.strip()):
+    names = [n for n in (cfg.subject_attr.strip(), *STABLE_ID_ATTRS) if n]
+    for name in dict.fromkeys(n.lower() for n in names):
+        for value in lookup(entry.attributes, name):
             if value.strip():
                 return value.strip()
+    logger.warning("ldap_subject_dn_fallback", dn=entry.dn, tried=names)
     return entry.dn
 
 
 def identity_from_entry(record: ProviderRecord, entry: LdapEntry) -> ExternalIdentity:
-    """External identity of a bound directory user. ``ldap:group_dn`` is always present
-    (``()`` without memberships) so authoritative role sync is never skipped for LDAP."""
+    """External identity of a bound directory user. ``ldap:group_dn`` is present (``()``
+    without memberships) so authoritative sync strips — unless a group search errored:
+    then it is left out and the login's role/group sync is skipped (membership unknown)."""
     cfg = _ldap_config(record)
     uid_key = cfg.uid_attr.strip() or "uid"
     raw: dict[str, object] = {
@@ -131,7 +162,8 @@ def identity_from_entry(record: ProviderRecord, entry: LdapEntry) -> ExternalIde
     }
     raw[uid_key] = [entry.uid]
     raw[LDAP_DN_ATTR] = [entry.dn]
-    raw[LDAP_GROUP_DN_ATTR] = list(entry.member_group_dns)
+    if not entry.group_search_failed:
+        raw[LDAP_GROUP_DN_ATTR] = list(entry.member_group_dns)
     return ExternalIdentity(
         provider_id=record.id,
         subject=_subject(cfg, entry),
@@ -228,23 +260,46 @@ async def ldap_password_login(
     """
     if not login.strip() or not password:
         return None
-    for record in await ldap_providers(session, settings, user_kind=user_kind):
+    records = await ldap_providers(session, settings, user_kind=user_kind)
+    deadline = time.monotonic() + CHAIN_BUDGET_SECONDS
+    for index, record in enumerate(records):
         cfg = _ldap_config(record)
         if not cfg.host.strip():
             logger.warning("ldap_provider_without_host", provider=record.slug)
             continue
-        entry = await ldap_authenticate_entry(
-            ldap_core_config(cfg),
-            login,
-            password,
-            attributes=requested_attributes(record),
-            member_of_group_dns=rule_group_dns(record),
-        )
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _skip_rest(records[index:])
+            return None
+        try:
+            entry = await asyncio.wait_for(
+                ldap_authenticate_entry(
+                    ldap_core_config(cfg),
+                    login,
+                    password,
+                    attributes=requested_attributes(record),
+                    member_of_group_dns=rule_group_dns(record),
+                ),
+                timeout=remaining,
+            )
+        except TimeoutError:
+            logger.warning("ldap_provider_timeout", provider=record.slug)
+            _skip_rest(records[index + 1 :])
+            return None
         if entry is None:
             continue
         logger.info("ldap_provider_accepted", provider=record.slug, user_kind=user_kind)
         return record, identity_from_entry(record, entry)
     return None
+
+
+def _skip_rest(records: list[ProviderRecord]) -> None:
+    if records:
+        logger.warning(
+            "ldap_chain_budget_exhausted",
+            budget_seconds=CHAIN_BUDGET_SECONDS,
+            skipped=[r.slug for r in records],
+        )
 
 
 async def ldap_sign_in(
@@ -258,22 +313,27 @@ async def ldap_sign_in(
     """Password login against the directories, then the shared login chain (link, login
     match, JIT, profile and role sync; commits). Returns the account's login, or ``None``
     for every failure: no directory accepted the password, or the plan was rejected
-    (the reason is logged, never shown on the password form)."""
+    (the reason is logged, never shown on the password form). Unexpected trouble AFTER a
+    directory accepted the password raises :class:`LdapSignInUnavailable` (no 500)."""
     found = await ldap_password_login(
         session, settings, login=login, password=password, user_kind=user_kind
     )
     if found is None:
         return None
     record, identity = found
-    plan = await plan_login(session, record, identity, user_kind=user_kind, settings=settings)
-    if plan.decision == "reject":
-        logger.info("ldap_login_rejected", provider=record.slug, reason=plan.reject_code)
-        return None
     try:
+        plan = await plan_login(session, record, identity, user_kind=user_kind, settings=settings)
+        if plan.decision == "reject":
+            logger.info("ldap_login_rejected", provider=record.slug, reason=plan.reject_code)
+            return None
         _user_id, account_login = await apply_login(
             session, record, identity, plan, settings=settings
         )
     except LoginRejected as exc:
         logger.info("ldap_login_rejected", provider=record.slug, reason=exc.reject_code)
         return None
+    except Exception as exc:
+        logger.exception("ldap_login_apply_failed", provider=record.slug, error=type(exc).__name__)
+        await _rollback(session)
+        raise LdapSignInUnavailable from exc
     return account_login

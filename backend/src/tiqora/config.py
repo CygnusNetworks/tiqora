@@ -242,6 +242,11 @@ class Settings(BaseSettings):
     ldap_group_dn: str = Field(default="", validation_alias="TIQORA_LDAP_GROUP_DN")
     ldap_access_attr: str = Field(default="memberUid", validation_alias="TIQORA_LDAP_ACCESS_ATTR")
     ldap_user_attr: str = Field(default="DN", validation_alias="TIQORA_LDAP_USER_ATTR")
+    # Verify the directory's TLS certificate (chain against the system CAs + host
+    # name) for LDAPS/StartTLS. Off by default ONLY for compatibility with
+    # installs that predate the switch (self-signed/internal CA); a warning is
+    # logged at startup while it is off. Turn it on.
+    ldap_tls_verify: bool = Field(default=False, validation_alias="TIQORA_LDAP_TLS_VERIFY")
 
     # Customer portal master switch at deployment level. Off by default (opt-in):
     # /api/portal/* answers 404 and the SPA sends "/" straight to the agent
@@ -283,6 +288,10 @@ class Settings(BaseSettings):
     )
     customer_ldap_user_attr: str = Field(
         default="DN", validation_alias="TIQORA_CUSTOMER_LDAP_USER_ATTR"
+    )
+    # Same as ldap_tls_verify (off only for existing installs; warning at startup).
+    customer_ldap_tls_verify: bool = Field(
+        default=False, validation_alias="TIQORA_CUSTOMER_LDAP_TLS_VERIFY"
     )
 
     # TOTP 2FA (Phase 3c)

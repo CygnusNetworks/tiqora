@@ -38,6 +38,7 @@ from tiqora.identity.config_models import (
     merge_config,
     secret_fields,
 )
+from tiqora.identity.mapping import LDAP_GROUP_DN_ATTR
 from tiqora.identity.presets import get_preset
 from tiqora.identity.saml_keys import generate_sp_keypair
 from tiqora.identity.types import (
@@ -366,6 +367,30 @@ async def _validate_assignments(
         raise ProviderValidationError(errors)
 
 
+def _validate_rule_dns(role_rules: list[RoleRule] | None) -> None:
+    """``ldap:group_dn`` rule values must be syntactically valid DNs (RFC 4514): a
+    malformed base DN would make every group search of that provider fail."""
+    if not role_rules:
+        return
+    from ldap3.core.exceptions import LDAPInvalidDnError
+    from ldap3.utils.dn import safe_dn
+
+    for rule in role_rules:
+        if rule.attribute.strip().lower() != LDAP_GROUP_DN_ATTR:
+            continue
+        try:
+            safe_dn(rule.value.strip())
+        except (LDAPInvalidDnError, ValueError, IndexError):
+            raise ProviderValidationError(
+                {
+                    "role_rules": (
+                        f"Ungültiger Gruppen-DN: {rule.value.strip()!r} "
+                        "(Beispiel: cn=support,ou=groups,dc=example,dc=org)."
+                    )
+                }
+            ) from None
+
+
 def _config_errors(exc: ValidationError) -> ProviderValidationError:
     errors: dict[str, str] = {}
     for err in exc.errors():
@@ -536,6 +561,7 @@ async def update_provider(
     new_slug = changes.slug if changes.slug is not None and changes.slug != row.slug else None
     if new_slug is not None:
         await _check_slug(session, new_slug, exclude_id=row.id)
+    _validate_rule_dns(changes.role_rules)
     await _validate_assignments(
         session, role_rules=changes.role_rules, jit_defaults=changes.jit_defaults
     )
@@ -583,7 +609,9 @@ async def update_provider(
 
 
 async def validate_changes(session: AsyncSession, changes: ProviderChanges) -> None:
-    """Role/group ids of *changes* must exist (``ProviderValidationError``). Reads only."""
+    """Role/group ids of *changes* must exist and ``ldap:group_dn`` values be valid DNs
+    (``ProviderValidationError``). Reads only."""
+    _validate_rule_dns(changes.role_rules)
     await _validate_assignments(
         session, role_rules=changes.role_rules, jit_defaults=changes.jit_defaults
     )
