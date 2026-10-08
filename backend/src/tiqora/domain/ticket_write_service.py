@@ -24,11 +24,13 @@ Key Znuny semantics honoured:
 
 from __future__ import annotations
 
+import re
 import secrets
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Final
 
 from sqlalchemy import text
@@ -43,6 +45,7 @@ from tiqora.ai.handoff import (
 )
 from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.db.utf8mb3 import replace_non_bmp
+from tiqora.domain.auth import decode_preference_value
 from tiqora.domain.dynamic_field_values import (
     DynamicFieldValueError,
     load_ticket_dynamic_field,
@@ -58,6 +61,7 @@ from tiqora.znuny.history import (
     TYPE_MISC,
     TYPE_PHONE_CALL_AGENT,
     TYPE_SEND_ANSWER,
+    TYPE_TIME_ACCOUNTING,
     TYPE_WEB_REQUEST_CUSTOMER,
     add_archive_flag_update,
     add_article_history,
@@ -79,6 +83,7 @@ from tiqora.znuny.history import (
     add_unsubscribe,
     history_add,
 )
+from tiqora.znuny.perl_format import perl_num, perl_num_str
 from tiqora.znuny.search_flag import mark_search_rebuild, message_id_md5
 from tiqora.znuny.sysconfig import SysConfig
 from tiqora.znuny.ticket_index import ticket_accelerator_add, ticket_accelerator_update
@@ -165,6 +170,18 @@ class ArticleIn:
     # False: nobody chose (AI reply, process/MCP send, API call without the
     # field) — the queue's security defaults apply (crypto.queue_security).
     email_security_explicit: bool = False
+    # GenericInterface / Znuny ArticleCreate flags (MIMEBase.pm). ``None`` =
+    # today's "%% <subject>" history text; ``no_agent_notify`` = NoAgentNotify
+    # (no legacy Notification* event at all); the three id lists are
+    # ForceNotificationToUserID / ExcludeNotificationToUserID /
+    # ExcludeMuteNotificationToUserID; ``append_signature`` = AppendSignatureToBody
+    # (only read by the outgoing agent email path).
+    history_comment_override: str | None = None
+    no_agent_notify: bool = False
+    force_notification_user_ids: tuple[int, ...] = ()
+    exclude_notification_user_ids: tuple[int, ...] = ()
+    exclude_mute_notification_user_ids: tuple[int, ...] = ()
+    append_signature: bool = True
 
 
 @dataclass
@@ -587,6 +604,44 @@ def _utf8mb3_article(article: ArticleIn) -> ArticleIn:
     )
 
 
+async def _with_forced_recipients_in_to(session: AsyncSession, article: ArticleIn) -> ArticleIn:
+    """Port of ``MIMEBase.pm::ArticleCreate`` (ForceNotificationToUserID, bug#13422).
+
+    Each forced agent (not root, not excluded, valid, with a mail address) is
+    appended to the To header as ``"First Last" <email>``.
+    """
+    if not article.force_notification_user_ids:
+        return article
+    excluded = {int(uid) for uid in article.exclude_notification_user_ids}
+    to_line = article.to_address or ""
+    added = ""
+    for uid in article.force_notification_user_ids:
+        if int(uid) == 1 or int(uid) in excluded:
+            continue
+        row = (
+            await session.execute(
+                text(
+                    "SELECT u.first_name, u.last_name, p.preferences_value FROM users u"
+                    " LEFT JOIN user_preferences p ON p.user_id = u.id"
+                    " AND p.preferences_key = 'UserEmail'"
+                    " WHERE u.id = :uid AND u.valid_id = 1"
+                ),
+                {"uid": int(uid)},
+            )
+        ).first()
+        if row is None:
+            continue
+        email = decode_preference_value(row[2]) or ""
+        if not email:
+            continue
+        if to_line or added:
+            added += ", "
+        added += f'"{row[0] or ""} {row[1] or ""}" <{email}>'
+    if not added:
+        return article
+    return replace(article, to_address=to_line + added)
+
+
 async def add_article(
     session: AsyncSession,
     *,
@@ -623,6 +678,7 @@ async def add_article(
             full_name = " ".join(p for p in (agent_row[0], agent_row[1]) if p).strip()
             article = replace(article, from_address=full_name or agent_row[2])
 
+    article = await _with_forced_recipients_in_to(session, article)
     article = _utf8mb3_article(article)
 
     # Resolve communication channel id by channel name
@@ -777,7 +833,10 @@ async def add_article(
     else:
         history_type = TYPE_ADD_NOTE
 
-    history_comment = f"%% {article.subject[:100]}" if article.subject else "%%"
+    if article.history_comment_override is not None:
+        history_comment = article.history_comment_override
+    else:
+        history_comment = f"%% {article.subject[:100]}" if article.subject else "%%"
     await add_article_history(
         session,
         ticket_id=ticket_id,
@@ -849,17 +908,27 @@ async def add_article(
         legacy_event = "NotificationAddNote"
     elif history_type == TYPE_FOLLOW_UP:
         legacy_event = "NotificationFollowUp"
-    if legacy_event is not None:
+    if legacy_event is not None and not article.no_agent_notify:
         # NotificationEvent.pm never mails the agent who wrote the article
         # (unless AgentSelfNotifyOnAction) -- an agent's own Telegram reply
         # used to come back to them as a notification.
         self_notify = str(await sysconfig.get("AgentSelfNotifyOnAction")) in {"1", "True"}
+        # MIMEBase.pm: SkipRecipients = Exclude + ExcludeMute; Recipients = the
+        # forced agents (the worker still applies skip/valid/permission checks).
+        skip_ids: list[int] = [] if self_notify else [user_id]
+        for uid in (
+            *article.exclude_notification_user_ids,
+            *article.exclude_mute_notification_user_ids,
+        ):
+            if int(uid) not in skip_ids:
+                skip_ids.append(int(uid))
+        legacy_payload: dict[str, Any] = {"article_id": article_id}
+        if article.force_notification_user_ids:
+            legacy_payload["recipient_user_ids"] = [
+                int(uid) for uid in article.force_notification_user_ids
+            ]
         await _emit_legacy_notification(
-            session,
-            legacy_event,
-            ticket_id,
-            {"article_id": article_id},
-            skip_user_ids=() if self_notify else (user_id,),
+            session, legacy_event, ticket_id, legacy_payload, skip_user_ids=skip_ids
         )
 
     # Outbox event
@@ -886,15 +955,45 @@ async def add_article(
     return article_id
 
 
+_TIME_UNIT_TRUNCATE: Final = re.compile(r"\A(\d{1,10}\.\d\d).+?\Z")
+# DB.pm::Quote(..., 'Number')
+_TIME_UNIT_NUMBER: Final = re.compile(r"\A[+-]?\d{1,20}(?:\.\d{1,20})?\Z")
+
+
+def normalize_time_unit(time_unit: str | float) -> str:
+    """``Ticket.pm::TicketAccountTime`` input handling.
+
+    ``,`` becomes ``.``, spaces vanish, and anything after two decimals is cut
+    off (``0,256`` -> ``0.25``; no rounding). Raises :class:`InvalidInput` for
+    a missing unit (Perl-false: empty / ``0``) or a value DB.pm would refuse.
+    """
+    raw = perl_num_str(time_unit) if isinstance(time_unit, int | float) else str(time_unit)
+    if raw in ("", "0"):
+        raise InvalidInput("time_unit is required")
+    unit = raw.replace(",", ".").replace(" ", "")
+    unit = unit.rstrip("\n")  # chomp
+    unit = _TIME_UNIT_TRUNCATE.sub(r"\1", unit)
+    if not _TIME_UNIT_NUMBER.match(unit):
+        raise InvalidInput(f"Invalid number in query '{unit}'!")
+    return unit
+
+
 async def add_time_accounting(
     session: AsyncSession,
     *,
     ticket_id: int,
     article_id: int | None,
-    time_unit: float,
+    time_unit: str | float,
     user_id: int,
 ) -> int:
-    """Book *time_unit* on a ticket (``TicketAccountTime``); returns the row id."""
+    """Book *time_unit* on a ticket; returns the row id.
+
+    Port of ``Ticket.pm::TicketAccountTime``: normalised unit, ticket
+    ``change_time`` bump, ``TimeAccounting`` history row ``%%<unit>%%<total>``
+    (total = Perl sum of every booked unit), cache invalidation and the
+    ``TicketAccountTime`` event.
+    """
+    unit = normalize_time_unit(time_unit)
     if article_id is not None:
         owner = (
             await session.execute(
@@ -904,6 +1003,10 @@ async def add_time_accounting(
         if owner is None or int(owner) != ticket_id:
             raise InvalidInput("article_id does not belong to this ticket")
     await session.execute(
+        text("UPDATE ticket SET change_time = current_timestamp, change_by = :uid WHERE id = :tid"),
+        {"uid": user_id, "tid": ticket_id},
+    )
+    await session.execute(
         text(
             "INSERT INTO time_accounting"
             " (ticket_id, article_id, time_unit, create_time, create_by,"
@@ -911,7 +1014,7 @@ async def add_time_accounting(
             " VALUES (:tid, :aid, :units, current_timestamp, :uid,"
             "         current_timestamp, :uid)"
         ),
-        {"tid": ticket_id, "aid": article_id, "units": time_unit, "uid": user_id},
+        {"tid": ticket_id, "aid": article_id, "units": Decimal(unit), "uid": user_id},
     )
     row = (
         await session.execute(
@@ -924,6 +1027,26 @@ async def add_time_accounting(
     ).first()
     if row is None:
         raise RuntimeError("time_accounting insert succeeded but id read-back failed")
+    await invalidate_ticket_cache(session, ticket_id)
+    # TicketAccountedTimeGet: Perl numeric sum, printed as Perl prints it.
+    booked = (
+        await session.execute(
+            text("SELECT time_unit FROM time_accounting WHERE ticket_id = :tid"),
+            {"tid": ticket_id},
+        )
+    ).fetchall()
+    total = 0.0
+    for (value,) in booked:
+        total += perl_num(value)
+    await history_add(
+        session,
+        ticket_id=ticket_id,
+        article_id=article_id,
+        history_type=TYPE_TIME_ACCOUNTING,
+        name=f"%%{unit}%%{perl_num_str(total)}",
+        user_id=user_id,
+    )
+    await _emit_event(session, "TicketAccountTime", ticket_id, {"article_id": article_id})
     return int(row[0])
 
 

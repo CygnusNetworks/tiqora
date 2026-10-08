@@ -240,7 +240,7 @@ async def prepare_outgoing_agent_email(
     from_line, queue_name, sig_text, _sig_ct = await _queue_outbound_meta(session, queue_id)
 
     body = article.body or ""
-    if sig_text and sig_text.strip():
+    if article.append_signature and sig_text and sig_text.strip():
         # Expand against full ticket context (customer_user, agents, queue) so
         # signature tags like OTRS_AGENT_* / OTRS_CUSTOMER_DATA_* / OTRS_TICKET_*
         # resolve the same way as Answer templates.
