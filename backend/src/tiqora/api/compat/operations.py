@@ -18,13 +18,11 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.api.compat.ticket_get import build_article_entries, build_ticket_entry, znuny_ts
 from tiqora.api.compat.webservices import OperationConfig
 from tiqora.channels.email.outbound_reply import OutboundMailError as _OutboundMailError
 from tiqora.config import Settings, get_settings
-from tiqora.db.legacy.article import Article, ArticleDataMimeAttachment
-from tiqora.db.legacy.article import ArticleDataMime as ArticleDataMimeModel
 from tiqora.db.legacy.customer import CustomerUser
-from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import (
     Ticket,
@@ -1624,16 +1622,14 @@ async def op_ticket_get(
     if get_attachment_contents is None:
         get_attachment_contents = 1
     get_attachment_contents = bool(int(get_attachment_contents))
-    article_order = str(data.get("ArticleOrder") or "ASC").upper()
-    if article_order not in ("ASC", "DESC"):
-        article_order = "ASC"
+    article_order = str(data.get("ArticleOrder") or "ASC")
     try:
         article_limit = int(data.get("ArticleLimit") or 0)
     except (ValueError, TypeError):
         article_limit = 0
     sender_type_filter = data.get("ArticleSenderType")
     if sender_type_filter is not None:
-        sender_type_filter = [str(s).lower() for s in _to_list(sender_type_filter)]
+        sender_type_filter = [str(s) for s in _to_list(sender_type_filter)]
 
     customer_company = ""
     allowed_groups: set[int] = set()
@@ -1643,40 +1639,22 @@ async def op_ticket_get(
         pe = PermissionEngine(session)
         allowed_groups = set(await pe.groups_for_permission(user_id, "ro"))
 
+    html_body_as_attachment = bool(data.get("HTMLBodyAsAttachment"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+
     tickets_out: list[dict[str, Any]] = []
     for tid in ticket_ids:
-        t = (
-            (
-                await session.execute(
-                    text(
-                        "SELECT t.*, ts.name as state_name, tp.name as priority_name,"
-                        " q.name as queue_name, tst.name as state_type,"
-                        " lt.name as lock_name,"
-                        " u.login as owner_login,"
-                        " ru.login as responsible_login,"
-                        " tt.name as type_name,"
-                        " svc.name as service_name,"
-                        " sla.name as sla_name"
-                        " FROM ticket t"
-                        " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-                        " JOIN ticket_priority tp ON tp.id = t.ticket_priority_id"
-                        " JOIN queue q ON q.id = t.queue_id"
-                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-                        " LEFT JOIN ticket_lock_type lt ON lt.id = t.ticket_lock_id"
-                        " LEFT JOIN users u ON u.id = t.user_id"
-                        " LEFT JOIN users ru ON ru.id = t.responsible_user_id"
-                        " LEFT JOIN ticket_type tt ON tt.id = t.type_id"
-                        " LEFT JOIN service svc ON svc.id = t.service_id"
-                        " LEFT JOIN sla ON sla.id = t.sla_id"
-                        " WHERE t.id = :tid LIMIT 1"
-                    ),
-                    {"tid": tid},
-                )
+        # Permission check first (one cheap query) so inaccessible tickets cost nothing more.
+        q_group = (
+            await session.execute(
+                text(
+                    "SELECT q.group_id FROM ticket t JOIN queue q ON q.id = t.queue_id"
+                    " WHERE t.id = :tid"
+                ),
+                {"tid": tid},
             )
-            .mappings()
-            .first()
-        )
-        if t is None:
+        ).scalar_one_or_none()
+        if q_group is None:
             continue
 
         if is_customer:
@@ -1684,91 +1662,30 @@ async def op_ticket_get(
                 session, login=login, customer_id=customer_company, ticket_id=tid
             ):
                 continue
-        else:
-            # Permission check via queue→group
-            q_group = (
-                await session.execute(select(Queue.group_id).where(Queue.id == int(t["queue_id"])))
-            ).scalar_one_or_none()
-            if q_group not in allowed_groups:
-                continue
+        elif q_group not in allowed_groups:
+            continue
 
-        ticket_dict: dict[str, Any] = {
-            "TicketID": t["id"],
-            "TicketNumber": t["tn"],
-            "Title": t["title"],
-            "QueueID": t["queue_id"],
-            "Queue": t["queue_name"],
-            "StateID": t["ticket_state_id"],
-            "State": t["state_name"],
-            "StateType": t["state_type"],
-            "PriorityID": t["ticket_priority_id"],
-            "Priority": t["priority_name"],
-            "LockID": t["ticket_lock_id"],
-            "Lock": t["lock_name"],
-            "OwnerID": t["user_id"],
-            "Owner": t["owner_login"],
-            "ResponsibleID": t["responsible_user_id"],
-            "Responsible": t["responsible_login"],
-            "TypeID": t["type_id"],
-            "Type": t["type_name"],
-            "ServiceID": t["service_id"],
-            "Service": t["service_name"],
-            "SLAID": t["sla_id"],
-            "SLA": t["sla_name"],
-            "CustomerID": t["customer_id"],
-            "CustomerUserID": t["customer_user_id"],
-            "CreateTime": t["create_time"].isoformat() if t["create_time"] else None,
-            "ChangeTime": t["change_time"].isoformat() if t["change_time"] else None,
-            "ArchiveFlag": "n" if not t["archive_flag"] else "y",
-            "UntilTime": t["until_time"] or 0,
-        }
-
-        if extended:
-            ticket_dict["EscalationTime"] = t["escalation_time"] or 0
-            ticket_dict["EscalationResponseTime"] = t["escalation_response_time"] or 0
-            ticket_dict["EscalationUpdateTime"] = t["escalation_update_time"] or 0
-            ticket_dict["EscalationSolutionTime"] = t["escalation_solution_time"] or 0
-            # First response / closed timestamps from history when available
-            fr = (
-                await session.execute(
-                    text(
-                        "SELECT MIN(th.create_time) FROM ticket_history th"
-                        " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
-                        " WHERE th.ticket_id = :tid"
-                        " AND tht.name IN ('SendAnswer','EmailAgent','PhoneCallAgent','AddNote')"
-                    ),
-                    {"tid": tid},
-                )
-            ).first()
-            if fr and fr[0]:
-                ticket_dict["FirstResponse"] = fr[0].isoformat()
-            closed = (
-                await session.execute(
-                    text(
-                        "SELECT MIN(th.create_time) FROM ticket_history th"
-                        " JOIN ticket_state ts ON ts.id = th.state_id"
-                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-                        " WHERE th.ticket_id = :tid AND LOWER(tst.name) LIKE 'closed%'"
-                    ),
-                    {"tid": tid},
-                )
-            ).first()
-            if closed and closed[0]:
-                ticket_dict["Closed"] = closed[0].isoformat()
-
-        if with_dynamic_fields:
-            ticket_dict["DynamicField"] = await _load_dynamic_fields_gi(session, int(t["id"]))
+        ticket_dict = await build_ticket_entry(
+            session, tid, dynamic_fields=with_dynamic_fields, extended=extended, now=now
+        )
+        if ticket_dict is None:
+            continue
 
         if all_articles:
-            ticket_dict["Article"] = await _load_articles_gi(
+            articles = await build_article_entries(
                 session,
-                int(t["id"]),
-                with_attachments=with_attachments,
+                tid,
+                customer_only=is_customer,
+                sender_types=sender_type_filter,
+                order=article_order,
+                limit=article_limit,
+                dynamic_fields=with_dynamic_fields,
+                attachments=with_attachments,
                 get_attachment_contents=get_attachment_contents,
-                article_order=article_order,
-                article_limit=article_limit,
-                sender_type_filter=sender_type_filter,
+                html_body_as_attachment=html_body_as_attachment,
             )
+            if articles:
+                ticket_dict["Article"] = articles
 
         tickets_out.append(ticket_dict)
 
@@ -1776,168 +1693,6 @@ async def op_ticket_get(
         return _err(f"{op}.AccessDenied", f"{op}: No access or tickets not found!")
 
     return {"Ticket": tickets_out}
-
-
-async def _load_dynamic_fields_gi(session: AsyncSession, ticket_id: int) -> list[dict[str, Any]]:
-    """Load dynamic fields in Znuny GI format."""
-    df_rows = (
-        (
-            await session.execute(
-                select(DynamicField).where(
-                    DynamicField.object_type == "Ticket",
-                    DynamicField.valid_id == 1,
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    if not df_rows:
-        return []
-
-    field_by_id = {f.id: f for f in df_rows}
-    values_rows = (
-        (
-            await session.execute(
-                select(DynamicFieldValue).where(
-                    DynamicFieldValue.object_id == ticket_id,
-                    DynamicFieldValue.field_id.in_(field_by_id.keys()),
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    grouped: dict[int, list[Any]] = {fid: [] for fid in field_by_id}
-    for v in values_rows:
-        val: Any
-        if v.value_text is not None:
-            val = v.value_text
-        elif v.value_int is not None:
-            val = v.value_int
-        elif v.value_date is not None:
-            val = v.value_date.strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            continue
-        grouped.setdefault(v.field_id, []).append(val)
-
-    out: list[dict[str, Any]] = []
-    for fid, field in field_by_id.items():
-        vals = grouped.get(fid, [])
-        out.append({"Name": field.name, "Value": vals[0] if len(vals) == 1 else vals})
-    return out
-
-
-async def _load_articles_gi(
-    session: AsyncSession,
-    ticket_id: int,
-    *,
-    with_attachments: bool,
-    get_attachment_contents: bool = True,
-    article_order: str = "ASC",
-    article_limit: int = 0,
-    sender_type_filter: list[str] | None = None,
-) -> list[dict[str, Any]]:
-    """Load articles in Znuny GI format."""
-    order_clause = Article.id.desc() if article_order == "DESC" else Article.id.asc()
-    art_rows = (
-        (
-            await session.execute(
-                select(Article).where(Article.ticket_id == ticket_id).order_by(order_clause)
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    if not art_rows:
-        return []
-
-    # Map sender_type_id → name for filter + response
-    st_rows = (await session.execute(text("SELECT id, name FROM article_sender_type"))).fetchall()
-    st_name_by_id = {int(r[0]): str(r[1]).lower() for r in st_rows}
-
-    if sender_type_filter:
-        allowed = {s.lower() for s in sender_type_filter}
-        art_rows = [
-            a
-            for a in art_rows
-            if st_name_by_id.get(int(a.article_sender_type_id or 0), "") in allowed
-        ]
-
-    if article_limit and article_limit > 0:
-        art_rows = list(art_rows)[:article_limit]
-
-    if not art_rows:
-        return []
-
-    art_ids = [a.id for a in art_rows]
-    mime_rows = (
-        (
-            await session.execute(
-                select(ArticleDataMimeModel).where(ArticleDataMimeModel.article_id.in_(art_ids))
-            )
-        )
-        .scalars()
-        .all()
-    )
-    mime_by_id = {m.article_id: m for m in mime_rows}
-
-    out: list[dict[str, Any]] = []
-    for a in art_rows:
-        m = mime_by_id.get(a.id)
-        st_name = st_name_by_id.get(int(a.article_sender_type_id or 0))
-        art_dict: dict[str, Any] = {
-            "ArticleID": a.id,
-            "TicketID": a.ticket_id,
-            "IsVisibleForCustomer": int(a.is_visible_for_customer or 0),
-            "SenderTypeID": a.article_sender_type_id,
-            "SenderType": st_name,
-            "CommunicationChannelID": a.communication_channel_id,
-            "CreateTime": a.create_time.isoformat() if a.create_time else None,
-        }
-        if m:
-            art_dict.update(
-                {
-                    "From": m.a_from,
-                    "To": m.a_to,
-                    "Cc": m.a_cc,
-                    "Subject": m.a_subject,
-                    "Body": m.a_body,
-                    "ContentType": m.a_content_type,
-                    "MessageID": m.a_message_id,
-                }
-            )
-
-        if with_attachments:
-            att_rows = (
-                (
-                    await session.execute(
-                        select(ArticleDataMimeAttachment).where(
-                            ArticleDataMimeAttachment.article_id == a.id
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            atts: list[dict[str, Any]] = []
-            for att in att_rows:
-                entry: dict[str, Any] = {
-                    "Filename": att.filename,
-                    "ContentType": att.content_type,
-                    "ContentSize": att.content_size,
-                }
-                if get_attachment_contents:
-                    entry["Content"] = base64.b64encode(att.content or b"").decode("ascii")
-                atts.append(entry)
-            art_dict["Attachment"] = atts
-
-        out.append(art_dict)
-
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -2605,7 +2360,7 @@ async def op_ticket_history_get(
                     "ArticleID": r["article_id"],
                     "Name": r["name"],
                     "CreateBy": r["create_by"],
-                    "CreateTime": r["create_time"].isoformat() if r["create_time"] else None,
+                    "CreateTime": znuny_ts(r["create_time"]),
                     "HistoryType": r["history_type"],
                     "QueueID": r["queue_id"],
                     "OwnerID": r["owner_id"],

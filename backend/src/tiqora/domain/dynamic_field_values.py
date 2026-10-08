@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
@@ -115,6 +115,35 @@ def _fmt_date(value: Any) -> str:
     return value.strftime("%Y-%m-%d %H:%M:%S") if isinstance(value, datetime) else str(value)
 
 
+def _render_df_rows(
+    field_type: str, rows: Sequence[tuple[Any, Any, Any]]
+) -> tuple[list[str], bool]:
+    """Typed-column value logic shared by the single and the bulk reader.
+
+    ``rows`` are ``(value_text, value_int, value_date)`` in ``id`` order. Returns
+    ``(values, has_legacy)``; see :func:`_read_df_values`.
+    """
+    out: list[str] = []
+    legacy = False
+    for vt, vi, vd in rows:
+        if field_type == "Checkbox":
+            if vi is not None:
+                out.append(str(int(vi)))
+            elif vt is not None:
+                legacy = True
+                out.append(str(vt))
+        elif field_type in ("Date", "DateTime"):
+            if vd is not None:
+                out.append(_fmt_date(vd))
+            elif vt is not None:
+                legacy = True
+                parsed = _parse_datetime(str(vt))
+                out.append(_fmt_date(parsed) if parsed is not None else str(vt))
+        elif vt is not None:
+            out.append(str(vt))
+    return out, legacy
+
+
 async def _read_df_values(
     session: AsyncSession, field: DynamicFieldConfig, object_id: int
 ) -> tuple[list[str], bool]:
@@ -135,25 +164,33 @@ async def _read_df_values(
             {"fid": field.id, "oid": object_id},
         )
     ).fetchall()
-    out: list[str] = []
-    legacy = False
-    for vt, vi, vd in rows:
-        if field.field_type == "Checkbox":
-            if vi is not None:
-                out.append(str(int(vi)))
-            elif vt is not None:
-                legacy = True
-                out.append(str(vt))
-        elif field.field_type in ("Date", "DateTime"):
-            if vd is not None:
-                out.append(_fmt_date(vd))
-            elif vt is not None:
-                legacy = True
-                parsed = _parse_datetime(str(vt))
-                out.append(_fmt_date(parsed) if parsed is not None else str(vt))
-        elif vt is not None:
-            out.append(str(vt))
-    return out, legacy
+    return _render_df_rows(field.field_type, [(r[0], r[1], r[2]) for r in rows])
+
+
+async def get_df_values_bulk(
+    session: AsyncSession, fields: Sequence[DynamicFieldConfig], object_ids: Sequence[int]
+) -> dict[tuple[int, int], list[str]]:
+    """Values of many fields for many objects in one query.
+
+    Keyed by ``(field_id, object_id)``. A pair is present as soon as the object
+    has at least one stored row for the field (its list may still be empty when
+    every row is NULL) -- callers that mirror Znuny's "only fields with rows"
+    behaviour rely on that. Rendering is identical to :func:`get_df_values`.
+    """
+    if not fields or not object_ids:
+        return {}
+    type_by_id = {f.id: f.field_type for f in fields}
+    stmt = text(
+        "SELECT field_id, object_id, value_text, value_int, value_date FROM dynamic_field_value"
+        " WHERE field_id IN :fids AND object_id IN :oids ORDER BY id"
+    ).bindparams(bindparam("fids", expanding=True), bindparam("oids", expanding=True))
+    rows = (
+        await session.execute(stmt, {"fids": list(type_by_id), "oids": list(set(object_ids))})
+    ).fetchall()
+    grouped: dict[tuple[int, int], list[tuple[Any, Any, Any]]] = {}
+    for fid, oid, vt, vi, vd in rows:
+        grouped.setdefault((int(fid), int(oid)), []).append((vt, vi, vd))
+    return {key: _render_df_rows(type_by_id[key[0]], vals)[0] for key, vals in grouped.items()}
 
 
 async def get_df_values(

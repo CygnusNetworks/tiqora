@@ -7,7 +7,7 @@ Seed ids use the 925xx band (users 9250x, group 92510, queue 92520, ticket
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -455,14 +455,22 @@ async def test_checkbox_empty_value_is_stored_as_zero(env: Any) -> None:
 @pytest.mark.db
 async def test_znuny_format_readers_return_space_separated_dates(env: Any) -> None:
     """Compat GI and process conditions read value_date as "YYYY-MM-DD HH:MM:SS"."""
-    from tiqora.api.compat.operations import _load_dynamic_fields_gi
+    from tiqora.api.compat.ticket_get import build_ticket_entry
     from tiqora.process.engine import _evaluate_field, get_ticket_attrs
 
     url, factory = env
     await _set(factory, "WaveDue", ["2026-02-01"])
     await _set(factory, "WaveWhen", ["2026-02-01 10:30:00"])
     async with factory() as session:
-        gi = {d["Name"]: d["Value"] for d in await _load_dynamic_fields_gi(session, TICKET_ID)}
+        entry = await build_ticket_entry(
+            session,
+            TICKET_ID,
+            dynamic_fields=True,
+            extended=False,
+            now=datetime.now(UTC).replace(tzinfo=None),
+        )
+        assert entry is not None
+        gi = {d["Name"]: d["Value"] for d in entry["DynamicField"]}
         attrs = await get_ticket_attrs(session, TICKET_ID)
     assert gi["WaveDue"] == "2026-02-01 00:00:00"
     assert gi["WaveWhen"] == "2026-02-01 10:30:00"
