@@ -14232,6 +14232,13 @@
       },
       "JitDefaults": {
         "properties": {
+          "allowed_email_domains": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Email Domains",
+            "type": "array"
+          },
           "customer_id": {
             "default": "",
             "title": "Customer Id",

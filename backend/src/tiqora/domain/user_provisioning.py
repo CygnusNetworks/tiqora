@@ -117,6 +117,8 @@ async def _customer_email_in_use(
     return (await session.execute(stmt.limit(1))).first() is not None
 
 
+customer_email_in_use = _customer_email_in_use  # public name for the identity layer
+
 _EMAIL_IN_USE = "Diese E-Mail-Adresse wird bereits von einem anderen Kundenbenutzer verwendet."
 
 

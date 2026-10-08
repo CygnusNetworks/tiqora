@@ -69,6 +69,7 @@ RejectCode = Literal[
     "jit_missing_fields",
     "email_invalid",
     "email_in_use",
+    "jit_domain_not_allowed",
     "provider_disabled",
 ]
 
@@ -85,6 +86,9 @@ REJECT_MESSAGES: Final[dict[str, str]] = {
     "jit_missing_fields": "Für die automatische Anlage fehlen Angaben vom Anmeldedienst.",
     "email_invalid": "Die E-Mail-Adresse vom Anmeldedienst ist für ein neues Konto nicht zulässig.",
     "email_in_use": "Die E-Mail-Adresse wird bereits von einem anderen Kundenkonto verwendet.",
+    "jit_domain_not_allowed": (
+        "Die E-Mail-Domain ist für die automatische Anlage von Konten nicht freigegeben."
+    ),
     "provider_disabled": "Dieser Anmeldedienst ist deaktiviert.",
 }
 
@@ -235,6 +239,17 @@ async def _match_email(
     return (next(iter(accounts.values())) if accounts else None), False
 
 
+def _email_unverified(provider: ProviderRecord, identity: ExternalIdentity) -> bool:
+    """OIDC provider demands a verified e-mail and the IdP did not assert one."""
+    cfg = provider.config
+    return (
+        provider.kind == "oidc"
+        and isinstance(cfg, OidcProviderConfig)
+        and cfg.email_must_be_verified
+        and identity.email_verified is not True
+    )
+
+
 async def _login_in_use(session: AsyncSession, user_kind: UserKind, login: str) -> bool:
     """Any account (valid or not) already owns this login, as ``UserAdd`` checks it."""
     column = Users.login if user_kind == "agent" else CustomerUser.login
@@ -250,20 +265,12 @@ async def _plan_jit(
     user_kind: UserKind,
 ) -> LoginPlan:
     """Step 5: nothing matched. Create the account when the provider allows it. Reads only."""
-    from tiqora.domain.user_provisioning import check_email
+    from tiqora.domain.user_provisioning import check_email, customer_email_in_use
     from tiqora.identity import provisioning
 
     if not provider.jit_enabled:
         return _reject(user_kind, profile, "no_match")
-    if user_kind == "customer" and not await provisioning.customer_backend_is_db(session):
-        return _reject(user_kind, profile, "no_match")
-    cfg = provider.config
-    if (
-        provider.kind == "oidc"
-        and isinstance(cfg, OidcProviderConfig)
-        and cfg.email_must_be_verified
-        and identity.email_verified is not True
-    ):
+    if _email_unverified(provider, identity):
         return _reject(user_kind, profile, "email_unverified")
     account, missing = provisioning.resolve_new_account(provider, profile, user_kind)
     if account is None:
@@ -273,10 +280,14 @@ async def _plan_jit(
             "jit_missing_fields",
             detail="Es fehlen: " + ", ".join(missing),
         )
+    if not provisioning.email_domain_allowed(provider, account.email):
+        return _reject(user_kind, profile, "jit_domain_not_allowed")
     if await _login_in_use(session, user_kind, account.login):
         return _reject(user_kind, profile, "login_taken")
     if not await check_email(session, account.email):
         return _reject(user_kind, profile, "email_invalid")
+    if user_kind == "customer" and await customer_email_in_use(session, account.email):
+        return _reject(user_kind, profile, "email_in_use")
     return LoginPlan(
         user_kind=user_kind,
         decision="create",
@@ -294,12 +305,14 @@ async def _plan_jit(
 async def _plan_profile_changes(
     session: AsyncSession,
     provider: ProviderRecord,
+    identity: ExternalIdentity,
     profile: MappedProfile,
     user_kind: UserKind,
     user_id: int,
 ) -> dict[str, tuple[str | None, str]]:
     """Step 7: fields the IdP sent that differ from the account. A new e-mail address
-    Znuny would refuse is left out (the sign-in itself must not fail over it)."""
+    Znuny would refuse, or that the IdP did not verify (OIDC), is left out: the sign-in
+    itself must not fail over it, and an unverified address must never overwrite the account's."""
     from tiqora.domain.user_provisioning import check_email
     from tiqora.identity import provisioning
 
@@ -309,7 +322,9 @@ async def _plan_profile_changes(
         profile, await provisioning.current_profile(session, user_kind, user_id)
     )
     new_email = changes.get("email")
-    if new_email is not None and not await check_email(session, new_email[1]):
+    if new_email is not None and (
+        _email_unverified(provider, identity) or not await check_email(session, new_email[1])
+    ):
         del changes["email"]
     return changes
 
@@ -354,13 +369,7 @@ async def plan_login(
             account = await _match_login(session, user_kind, profile.login)
     else:
         matched_by = "email"
-        cfg = provider.config
-        if (
-            provider.kind == "oidc"
-            and isinstance(cfg, OidcProviderConfig)
-            and cfg.email_must_be_verified
-            and identity.email_verified is not True
-        ):
+        if _email_unverified(provider, identity):
             return _reject(user_kind, profile, "email_unverified")
         if profile.email:
             account, ambiguous = await _match_email(session, user_kind, profile.email)
@@ -387,7 +396,7 @@ async def plan_login(
         reject_code=None,
         profile=profile,
         profile_changes=await _plan_profile_changes(
-            session, provider, profile, user_kind, account.id
+            session, provider, identity, profile, user_kind, account.id
         ),
         assignments=AssignmentDiff(),
         link_exists=link is not None,
@@ -414,6 +423,10 @@ _PROVISIONING_REJECTS: Final[dict[str, RejectCode]] = {
 }
 
 
+class _RaceLost(Exception):  # noqa: N818 - internal control flow
+    """A concurrent first login created the same account between plan and apply."""
+
+
 async def _create_account(
     session: AsyncSession, provider: ProviderRecord, plan: LoginPlan
 ) -> tuple[int, str]:
@@ -428,36 +441,36 @@ async def _create_account(
         return customer.id, customer.login
     except ProvisioningError as exc:
         await session.rollback()
+        if exc.code == "login_exists":
+            raise _RaceLost from exc
         code = _PROVISIONING_REJECTS.get(exc.code)
         if code is None:
             raise
         raise LoginRejected(code) from exc
     except IntegrityError as exc:  # concurrent first login created the same login
         await session.rollback()
-        raise LoginRejected("login_taken") from exc
+        raise _RaceLost from exc
 
 
 async def _sync_existing(session: AsyncSession, plan: LoginPlan, user_id: int) -> None:
-    from tiqora.domain.user_provisioning import ProvisioningError
+    """One ``sync_profile`` call. A new e-mail address is vetted first (Znuny CheckEmail,
+    customer uniqueness) and dropped when refused, so a refusal never leaves half-applied
+    ORM state behind and never fails the sign-in."""
+    from tiqora.domain.user_provisioning import check_email, customer_email_in_use
     from tiqora.identity.provisioning import sync_profile
 
-    try:
-        await sync_profile(
-            session, user_kind=plan.user_kind, user_id=user_id, changes=plan.profile_changes
+    changes = dict(plan.profile_changes)
+    new_email = changes.get("email")
+    if new_email is not None:
+        address = new_email[1].strip()
+        refused = not await check_email(session, address) or (
+            plan.user_kind == "customer"
+            and await customer_email_in_use(session, address, exclude_id=user_id)
         )
-    except ProvisioningError as exc:
-        if exc.code not in ("email_invalid", "email_in_use"):
-            raise
-        # The new e-mail address is refused (changed since planning, or taken by another
-        # customer): keep the old one, still sync the rest, never fail the sign-in.
-        log.warning(
-            "profile sync skipped the e-mail address of %s %s: %s",
-            plan.user_kind,
-            user_id,
-            exc.code,
-        )
-        rest = {k: v for k, v in plan.profile_changes.items() if k != "email"}
-        await sync_profile(session, user_kind=plan.user_kind, user_id=user_id, changes=rest)
+        if refused:
+            log.warning("profile sync skipped the e-mail address of %s %s", plan.user_kind, user_id)
+            del changes["email"]
+    await sync_profile(session, user_kind=plan.user_kind, user_id=user_id, changes=changes)
 
 
 async def apply_login(
@@ -467,15 +480,32 @@ async def apply_login(
     plan: LoginPlan,
     *,
     settings: Settings,
+    _replanned: bool = False,
 ) -> tuple[int, str]:
     """Create (JIT) or sync the account, store the link and commit. Returns (user_id, login).
 
     Order: create -> flush -> profile sync -> (role sync, later) -> link -> commit.
+    Losing a race against a concurrent first login re-plans once (the other request's
+    committed link/login then matches); otherwise ``login_taken``.
     """
     if plan.decision == "reject":
         raise LoginRejected(plan.reject_code or "no_match")
     if plan.decision == "create":
-        user_id, login = await _create_account(session, provider, plan)
+        try:
+            user_id, login = await _create_account(session, provider, plan)
+        except _RaceLost:
+            if _replanned:
+                raise LoginRejected("login_taken") from None
+            replan = await plan_login(
+                session, provider, identity, user_kind=plan.user_kind, settings=settings
+            )
+            if replan.decision != "login":
+                raise LoginRejected(
+                    (replan.reject_code if replan.decision == "reject" else None) or "login_taken"
+                ) from None
+            return await apply_login(
+                session, provider, identity, replan, settings=settings, _replanned=True
+            )
         await session.flush()
     elif plan.decision == "login" and plan.user_id is not None and plan.login is not None:
         user_id, login = plan.user_id, plan.login

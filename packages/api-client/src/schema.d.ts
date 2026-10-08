@@ -13159,6 +13159,8 @@ export interface components {
         };
         /** JitDefaults */
         JitDefaults: {
+            /** Allowed Email Domains */
+            allowed_email_domains?: string[];
             /**
              * Customer Id
              * @default

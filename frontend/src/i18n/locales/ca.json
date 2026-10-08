@@ -253,6 +253,7 @@
       "jit_missing_fields": "The sign-in service did not send the details needed to create your account.",
       "email_invalid": "The e-mail address sent by the sign-in service is not accepted for a new account. Please contact your administrator.",
       "email_in_use": "The e-mail address is already used by another customer account. Please contact your administrator.",
+      "jit_domain_not_allowed": "Accounts cannot be created automatically for your e-mail domain. Please contact your administrator.",
       "provider_disabled": "This sign-in service is disabled.",
       "unknown_provider": "This sign-in service is not known.",
       "config": "Sign-in through this service is not fully set up yet.",

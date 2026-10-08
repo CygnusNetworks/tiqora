@@ -7,7 +7,10 @@ New accounts get an unusable random password (the IdP is the only way in) and, f
 agents, ``sso_eligible``. Znuny requires a first and a last name (``UserAdd``); when the
 IdP sends none, documented fallbacks are used: first name = local part of the e-mail
 address, last name = the login. The login falls back to the e-mail address when a provider
-matches by e-mail and maps no login. An e-mail address is mandatory.
+matches by e-mail and maps no login. An e-mail address is mandatory. Customers are
+always written to the ``customer_user`` table (a customer directory configured only in
+Znuny's Config.pm is never read by Tiqora). An agent created with ``match_by="login"``
+may share its e-mail address with another agent (Znuny ``UserAdd`` does not forbid it).
 """
 
 from __future__ import annotations
@@ -36,10 +39,8 @@ from tiqora.domain.user_provisioning import (
 from tiqora.identity.mapping import MappedProfile
 from tiqora.identity.store import ProviderRecord
 from tiqora.identity.types import SYSTEM_USER_ID, UserKind
-from tiqora.znuny.sysconfig import SysConfig
 
 PROFILE_FIELDS = ("first_name", "last_name", "email", "mobile")
-_DB_CUSTOMER_MODULE = "Kernel::System::CustomerUser::DB"
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,16 +53,13 @@ class NewAccount:
     mobile: str | None
 
 
-def is_db_customer_module(module: object) -> bool:
-    """Znuny's customer backend ``Module``; unset means the default DB backend."""
-    return module in (None, "", _DB_CUSTOMER_MODULE)
-
-
-async def customer_backend_is_db(session: AsyncSession) -> bool:
-    """JIT customers are only created when ``CustomerUser`` is the DB backend (an
-    LDAP/other directory owns its users; a row we add there would never be consulted)."""
-    cfg = await SysConfig(session).get("CustomerUser")
-    return is_db_customer_module(cfg.get("Module") if isinstance(cfg, dict) else None)
+def email_domain_allowed(provider: ProviderRecord, email: str) -> bool:
+    """``jit_defaults.allowed_email_domains``: empty = any domain, else exact (case-insensitive)."""
+    allowed = provider.jit_defaults.allowed_email_domains
+    if not allowed:
+        return True
+    domain = email.rsplit("@", 1)[-1].strip().lower() if "@" in email else ""
+    return domain in {d.strip().lower().lstrip("@") for d in allowed}
 
 
 def resolve_new_account(
@@ -278,9 +276,8 @@ async def sync_profile(
 __all__ = [
     "NewAccount",
     "current_profile",
-    "customer_backend_is_db",
     "diff_profile",
-    "is_db_customer_module",
+    "email_domain_allowed",
     "provision_agent",
     "provision_customer",
     "resolve_new_account",

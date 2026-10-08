@@ -40,7 +40,8 @@ _READ_BACK = (
     _PRELUDE
     + rf"""
 my %U = $Kernel::OM->Get('Kernel::System::User')->GetUserData(User => '{LOGIN}');
-my %Roles = $Kernel::OM->Get('Kernel::System::Group')->PermissionRoleUserGet(
+$Kernel::OM->Get('Kernel::System::Cache')->CleanUp(Type => 'DBRoleUserGet');
+my %Roles = $Kernel::OM->Get('Kernel::System::Group')->PermissionUserRoleGet(
     UserID => $U{{UserID}},
 );
 print "$U{{UserEmail}}|$U{{ValidID}}|" . join(',', sort keys %Roles);
@@ -85,6 +86,7 @@ async def test_provisioned_agent_is_readable_by_znuny(golden_session_factory) ->
             + rf"""
 my $DBObject = $Kernel::OM->Get('Kernel::System::DB');
 $DBObject->Do(SQL => 'DELETE FROM roles WHERE id = ?', Bind => [\{role_id}]);
+$Kernel::OM->Get('Kernel::System::Cache')->CleanUp(Type => 'DBRoleUserGet');
 print 'ok';
 """
         )

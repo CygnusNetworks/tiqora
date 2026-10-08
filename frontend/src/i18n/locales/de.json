@@ -253,6 +253,7 @@
       "jit_missing_fields": "Für die automatische Anlage Ihres Kontos fehlen Angaben vom Anmeldedienst.",
       "email_invalid": "Die vom Anmeldedienst übermittelte E-Mail-Adresse ist für ein neues Konto nicht zulässig. Bitte wenden Sie sich an Ihre Administration.",
       "email_in_use": "Die E-Mail-Adresse wird bereits von einem anderen Kundenkonto verwendet. Bitte wenden Sie sich an Ihre Administration.",
+      "jit_domain_not_allowed": "Für Ihre E-Mail-Domain werden Konten nicht automatisch angelegt. Bitte wenden Sie sich an Ihre Administration.",
       "provider_disabled": "Dieser Anmeldedienst ist deaktiviert.",
       "unknown_provider": "Dieser Anmeldedienst ist nicht bekannt.",
       "config": "Die Anmeldung über diesen Anmeldedienst ist noch nicht vollständig eingerichtet.",

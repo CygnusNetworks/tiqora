@@ -40,6 +40,7 @@ ROLE_ID = 47350
 GROUP_ID = 47350
 NOW = datetime(2026, 10, 8, 12, 0, 0)
 _URLS: set[str] = set()
+_MAKERS: list[async_sessionmaker[AsyncSession]] = []  # second sessions for race tests
 _INVAL_MARK: dict[str, int] = {}  # url -> MAX(id) of tiqora_cache_invalidation at module start
 SETTINGS = Settings(environment="test", secret_key=KEY)
 MAP = AttributeMap(
@@ -49,7 +50,7 @@ MAP = AttributeMap(
     last_name=["family_name"],
     mobile=["phone"],
 )
-_JIT_USERS = "(SELECT id FROM users WHERE login LIKE 'idp.%.4735%' OR login LIKE 'idp.%.4736%')"
+_JIT_USERS = "(SELECT id FROM users WHERE login LIKE 'idp.%.473%')"
 
 
 def _stmts(url: str) -> tuple[tuple[str, dict[str, object]], ...]:
@@ -66,7 +67,7 @@ def _stmts(url: str) -> tuple[tuple[str, dict[str, object]], ...]:
     )
     return (
         *by_login,
-        ("DELETE FROM users WHERE login LIKE 'idp.%.4735%' OR login LIKE 'idp.%.4736%'", {}),
+        ("DELETE FROM users WHERE login LIKE 'idp.%.473%'", {}),
         ("DELETE FROM role_user WHERE role_id = :r", {"r": ROLE_ID}),
         ("DELETE FROM group_user WHERE group_id = :g", {"g": GROUP_ID}),
         ("DELETE FROM roles WHERE id = :r", {"r": ROLE_ID}),
@@ -110,6 +111,7 @@ async def env(request: pytest.FixtureRequest) -> AsyncIterator[AsyncSession]:
     _clean(url)
     engine = create_async_engine(_to_async_url(url))
     maker = async_sessionmaker(engine, expire_on_commit=False)
+    _MAKERS[:] = [maker]
     async with maker() as s:
         for stmt in (
             "INSERT INTO roles (id, name, valid_id, create_time, create_by, change_time,"
@@ -151,6 +153,7 @@ async def _jit_provider(
         p = await update_provider(
             s, p.id, ProviderChanges(jit_defaults=defaults), secret_key=KEY, actor_id=1
         )
+    await s.commit()  # race tests read the provider from a second session
     return p
 
 
@@ -290,14 +293,24 @@ async def test_jit_rejected_email_is_clean_reject(env: AsyncSession) -> None:
     assert await _count(s, "users") == before
 
 
-async def test_jit_apply_maps_provisioning_error_to_reject(env: AsyncSession) -> None:
-    """A race (login taken, e-mail refused) between plan and apply is a reject, not a 500."""
+async def test_jit_race_with_existing_login_logs_in_through_it(env: AsyncSession) -> None:
+    """The account appears between plan and apply: the re-plan matches it by login."""
     s = env
     p = await _jit_provider(s, "race")
     ident = _ident(p.id, "sub-r", preferred_username="idp.race.47356", email="r@example.test")
     plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
     assert plan.decision == "create"
     await seed_agent(s, 47356, "idp.race.47356")  # appears after planning
+    assert await apply_login(s, p, ident, plan, settings=SETTINGS) == (47356, "idp.race.47356")
+
+
+async def test_jit_race_with_taken_login_rejects_when_match_by_email(env: AsyncSession) -> None:
+    s = env
+    p = await _jit_provider(s, "race1b", match_by="email")
+    ident = _ident(p.id, "sub-r1", preferred_username="idp.race1.47377", email="r1@example.test")
+    plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+    assert plan.decision == "create"
+    await seed_agent(s, 47377, "idp.race1.47377", valid_id=2)  # invalid owner of the login
     with pytest.raises(LoginRejected) as exc:
         await apply_login(s, p, ident, plan, settings=SETTINGS)
     assert exc.value.reject_code == "login_taken"
@@ -383,28 +396,91 @@ async def test_jit_customer_email_in_use_rejects(env: AsyncSession) -> None:
     assert n == 0
 
 
-async def test_jit_customer_needs_db_backend(
+async def test_jit_customer_email_preflight_in_plan(env: AsyncSession) -> None:
+    s = env
+    await seed_customer(s, "idp.pre@example.org", email="pre@example.test")
+    p = await _jit_provider(s, "custpre", audience="customer")
+    ident = _ident(
+        p.id, "sub-pre", preferred_username="idp.pre2@example.org", email="pre@example.test"
+    )
+    plan = await plan_login(s, p, ident, user_kind="customer", settings=SETTINGS)
+    assert (plan.decision, plan.reject_code) == ("reject", "email_in_use")
+
+
+async def test_jit_domain_gate(env: AsyncSession) -> None:
+    s = env
+    p = await _jit_provider(
+        s, "domain", defaults=JitDefaults(allowed_email_domains=[" @Example.Test ", "", "a.test"])
+    )
+    assert p.jit_defaults.allowed_email_domains == ["example.test", "a.test"]
+    ok = _ident(p.id, "d1", preferred_username="idp.dom.47370", email="Wer@EXAMPLE.test")
+    assert (await plan_login(s, p, ok, user_kind="agent", settings=SETTINGS)).decision == "create"
+    for i, mail in enumerate(("wer@evil.example.test", "wer@other.test", "wer@xexample.test")):
+        bad = _ident(p.id, f"d{i + 2}", preferred_username="idp.dom.47371", email=mail)
+        plan = await plan_login(s, p, bad, user_kind="agent", settings=SETTINGS)
+        assert (plan.decision, plan.reject_code) == ("reject", "jit_domain_not_allowed"), mail
+    # the gate only guards creation: an existing account still signs in
+    await seed_agent(s, 47372, "idp.dom.47372", email="x@other.test")
+    old = _ident(p.id, "d9", preferred_username="idp.dom.47372", email="x@other.test")
+    assert (await plan_login(s, p, old, user_kind="agent", settings=SETTINGS)).decision == "login"
+
+
+async def test_jit_case_only_login_collision(env: AsyncSession) -> None:
+    s = env
+    await seed_agent(s, 47373, "IDP.Case.47373")
+    p = await _jit_provider(s, "casecol", match_by="email")
+    ident = _ident(p.id, "c1", preferred_username="idp.case.47373", email="c@example.test")
+    plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+    assert (plan.decision, plan.reject_code) == ("reject", "login_taken")
+
+
+async def test_concurrent_first_login_logs_in_through_committed_link(
     env: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    s = env
+    p = await _jit_provider(s, "race2")
+    ident = _ident(p.id, "sub-r2", preferred_username="idp.race2.47374", email="r2@example.test")
+    plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+    assert plan.decision == "create"
+    async with _MAKERS[0]() as other:  # the concurrent request wins
+        winner = await plan_login(other, p, ident, user_kind="agent", settings=SETTINGS)
+        uid, _ = await apply_login(other, p, ident, winner, settings=SETTINGS)
+    got = await apply_login(s, p, ident, plan, settings=SETTINGS)
+    assert got == (uid, "idp.race2.47374")
+    n = (
+        await s.execute(text("SELECT COUNT(*) FROM users WHERE login = 'idp.race2.47374'"))
+    ).scalar_one()
+    assert n == 1
+
+
+async def test_integrity_error_on_create_replans(
+    env: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The DB unique violation (not the pre-check) is turned into a re-plan, then login_taken."""
+    from sqlalchemy.exc import IntegrityError
+
     from tiqora.identity import provisioning
-    from tiqora.identity.provisioning import is_db_customer_module
-
-    assert is_db_customer_module(None) is True
-    assert is_db_customer_module("Kernel::System::CustomerUser::DB") is True
-    assert is_db_customer_module("Kernel::System::CustomerUser::LDAP") is False
-
-    async def _not_db(_session: AsyncSession) -> bool:
-        return False
 
     s = env
-    p = await _jit_provider(s, "custldap", audience="customer")
-    ident = _ident(p.id, "sub-l", preferred_username="idp.ldap@example.org", email="l@example.test")
-    assert (await plan_login(s, p, ident, user_kind="customer", settings=SETTINGS)).decision == (
-        "create"
-    )
-    monkeypatch.setattr(provisioning, "customer_backend_is_db", _not_db)
-    plan = await plan_login(s, p, ident, user_kind="customer", settings=SETTINGS)
-    assert (plan.decision, plan.reject_code) == ("reject", "no_match")
+    p = await _jit_provider(s, "race3")
+    ident = _ident(p.id, "sub-r3", preferred_username="idp.race3.47375", email="r3@example.test")
+    plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+
+    async def _boom(*_a: object, **_k: object) -> None:
+        raise IntegrityError("INSERT", {}, Exception("duplicate"))
+
+    monkeypatch.setattr(provisioning, "create_agent", _boom)
+    # nobody else created the account: re-plan still says "create" -> clean reject, no 500
+    with pytest.raises(LoginRejected) as exc:
+        await apply_login(s, p, ident, plan, settings=SETTINGS)
+    assert exc.value.reject_code == "login_taken"
+    # someone else committed the link meanwhile: the re-plan logs in through it
+    monkeypatch.undo()
+    async with _MAKERS[0]() as other:
+        w = await plan_login(other, p, ident, user_kind="agent", settings=SETTINGS)
+        uid, _ = await apply_login(other, p, ident, w, settings=SETTINGS)
+    monkeypatch.setattr(provisioning, "create_agent", _boom)
+    assert (await apply_login(s, p, ident, plan, settings=SETTINGS))[0] == uid
 
 
 async def test_profile_sync_only_when_changed(env: AsyncSession) -> None:
@@ -510,3 +586,55 @@ async def test_plan_is_read_only(env: AsyncSession) -> None:
     assert [await _count(s, t) for t in tables] == before
     changed = (await s.execute(text("SELECT last_name FROM users WHERE id = 47363"))).scalar_one()
     assert changed == "Test"
+
+
+async def test_profile_sync_customer_email_in_use_keeps_names_and_audit(
+    env: AsyncSession,
+) -> None:
+    s = env
+    await seed_customer(s, "idp.sync-a@example.org", email="a@example.test")
+    cid = await seed_customer(s, "idp.sync-b@example.org", email="b@example.test")
+    p = await _jit_provider(s, "custsync", audience="customer", match_by="login")
+    ident = _ident(
+        p.id,
+        "sub-cs",
+        preferred_username="idp.sync-b@example.org",
+        email="a@example.test",  # taken by the other customer
+        family_name="Umbenannt",
+    )
+    plan = await plan_login(s, p, ident, user_kind="customer", settings=SETTINGS)
+    assert plan.profile_changes["last_name"] == ("Kunde", "Umbenannt")
+    await apply_login(s, p, ident, plan, settings=SETTINGS)
+    row = (
+        await s.execute(
+            text(
+                "SELECT last_name, email, change_by, change_time FROM customer_user WHERE id = :i"
+            ),
+            {"i": cid},
+        )
+    ).one()
+    assert (row[0], row[1], row[2]) == ("Umbenannt", "b@example.test", 1)
+    assert row[3] != NOW  # the name change updated change_time
+    # plan also covers a plain customer name/mobile sync
+    again = await plan_login(s, p, ident, user_kind="customer", settings=SETTINGS)
+    assert "last_name" not in again.profile_changes
+
+
+async def test_profile_sync_unverified_oidc_email_not_applied(env: AsyncSession) -> None:
+    s = env
+    await seed_agent(s, 47376, "idp.unver.47376", email="alt@example.test")
+    p = await _jit_provider(s, "unver")
+    ident = _ident(
+        p.id,
+        "sub-u",
+        verified=False,
+        preferred_username="idp.unver.47376",
+        email="neu@example.test",
+        given_name="Idp",
+        family_name="Neu",
+    )
+    plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+    assert plan.decision == "login"
+    assert plan.profile_changes == {"last_name": ("Test", "Neu")}
+    await apply_login(s, p, ident, plan, settings=SETTINGS)
+    assert await _pref(s, 47376, "UserEmail") == "alt@example.test"

@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Annotated, Any, Final, Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from tiqora.identity.types import GroupPermission, ProviderKind
 from tiqora.settings_sections.section import SECRET_MASK, field_kind
@@ -118,6 +118,14 @@ class JitDefaults(BaseModel):
     initial_groups: list[GroupGrant] = Field(default_factory=list)  # agents, first login only
     customer_id: str = ""  # customers: fixed CustomerID when not mapped
     update_profile_on_login: bool = True
+    # JIT admission gate: empty = any e-mail domain, else only these (exact, case-insensitive).
+    allowed_email_domains: list[str] = Field(default_factory=list)
+
+    @field_validator("allowed_email_domains")
+    @classmethod
+    def _normalize_domains(cls, value: list[str]) -> list[str]:
+        cleaned = (d.strip().lower().lstrip("@") for d in value)
+        return list(dict.fromkeys(d for d in cleaned if d))
 
 
 def secret_fields(kind: ProviderKind) -> frozenset[str]:
