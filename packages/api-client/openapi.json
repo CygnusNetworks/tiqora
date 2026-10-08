@@ -6771,6 +6771,18 @@
             "title": "Portal Enabled",
             "type": "boolean"
           },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/LoginProviderOut"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "saml": {
+            "default": false,
+            "title": "Saml",
+            "type": "boolean"
+          },
           "spnego": {
             "default": false,
             "title": "Spnego",
@@ -14793,6 +14805,44 @@
           }
         },
         "title": "LlmProviderUpdate",
+        "type": "object"
+      },
+      "LoginProviderOut": {
+        "properties": {
+          "icon": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icon"
+          },
+          "kind": {
+            "enum": [
+              "oidc",
+              "saml"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "kind",
+          "label"
+        ],
+        "title": "LoginProviderOut",
         "type": "object"
       },
       "LoginRequest": {
@@ -54914,6 +54964,7 @@
     },
     "/api/v1/auth/oidc/callback": {
       "get": {
+        "description": "Alias of ``/auth/oidc/env-oidc/callback`` (browsers: 302 to ``next``; API clients: JSON).",
         "operationId": "oidc_callback_api_v1_auth_oidc_callback_get",
         "parameters": [
           {
@@ -54958,7 +55009,7 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "API clients: the session as JSON"
           },
           "422": {
             "content": {
@@ -54979,7 +55030,26 @@
     },
     "/api/v1/auth/oidc/login": {
       "get": {
+        "description": "Alias of ``/auth/sso/env-oidc/login`` (production env OIDC keeps its URLs).",
         "operationId": "oidc_login_api_v1_auth_oidc_login_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -54988,9 +55058,91 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Oidc Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/oidc/{slug}/callback": {
+      "get": {
+        "operationId": "oidc_provider_callback_api_v1_auth_oidc__slug__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "OIDC callback of a provider",
         "tags": [
           "auth"
         ]
@@ -55480,6 +55632,78 @@
           }
         },
         "summary": "Spnego",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/sso/{slug}/login": {
+      "get": {
+        "operationId": "sso_login_api_v1_auth_sso__slug__login_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          },
+          {
+            "in": "query",
+            "name": "test",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Test"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start an SSO login",
         "tags": [
           "auth"
         ]

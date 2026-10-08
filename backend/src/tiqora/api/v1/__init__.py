@@ -6,6 +6,7 @@ from tiqora.api.v1 import (
     agents,
     ai,
     auth,
+    auth_sso,
     avatars,
     calendar,
     channels_phone,
@@ -38,6 +39,7 @@ from tiqora.api.v1.admin import admin_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth.router)
+api_v1_router.include_router(auth_sso.router)
 api_v1_router.include_router(oauth2_callback.router)
 api_v1_router.include_router(agents.router)
 api_v1_router.include_router(calendar.router)

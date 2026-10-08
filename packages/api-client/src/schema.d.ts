@@ -4209,7 +4209,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Callback */
+        /**
+         * Oidc Callback
+         * @description Alias of ``/auth/oidc/env-oidc/callback`` (browsers: 302 to ``next``; API clients: JSON).
+         */
         get: operations["oidc_callback_api_v1_auth_oidc_callback_get"];
         put?: never;
         post?: never;
@@ -4226,8 +4229,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Login */
+        /**
+         * Oidc Login
+         * @description Alias of ``/auth/sso/env-oidc/login`` (production env OIDC keeps its URLs).
+         */
         get: operations["oidc_login_api_v1_auth_oidc_login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/{slug}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC callback of a provider */
+        get: operations["oidc_provider_callback_api_v1_auth_oidc__slug__callback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4420,6 +4443,23 @@ export interface paths {
          *     bare 401, so the browser never shows a native Negotiate popup.
          */
         get: operations["spnego_api_v1_auth_spnego_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/{slug}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start an SSO login */
+        get: operations["sso_login_api_v1_auth_sso__slug__login_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10328,6 +10368,13 @@ export interface components {
              * @default true
              */
             portal_enabled: boolean;
+            /** Providers */
+            providers?: components["schemas"]["LoginProviderOut"][];
+            /**
+             * Saml
+             * @default false
+             */
+            saml: boolean;
             /**
              * Spnego
              * @default false
@@ -12990,6 +13037,20 @@ export interface components {
             price_currency?: string | null;
             /** Valid Id */
             valid_id?: number | null;
+        };
+        /** LoginProviderOut */
+        LoginProviderOut: {
+            /** Icon */
+            icon?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml";
+            /** Label */
+            label: string;
+            /** Slug */
+            slug: string;
         };
         /** LoginRequest */
         LoginRequest: {
@@ -29605,7 +29666,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description API clients: the session as JSON */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -29627,7 +29688,9 @@ export interface operations {
     };
     oidc_login_api_v1_auth_oidc_login_get: {
         parameters: {
-            query?: never;
+            query?: {
+                next?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -29641,6 +29704,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oidc_provider_callback_api_v1_auth_oidc__slug__callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -29909,6 +30015,40 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_login_api_v1_auth_sso__slug__login_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+                test?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

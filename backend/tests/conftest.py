@@ -157,6 +157,16 @@ def _reset_identity_env_sync() -> Generator[None, None, None]:
     reset_env_sync_cache_for_tests()
 
 
+@pytest.fixture(autouse=True)
+def _reset_oidc_discovery_cache() -> Generator[None, None, None]:
+    """OIDC discovery documents are cached per process: tests must not see each other's."""
+    from tiqora.domain.oidc import clear_discovery_cache
+
+    clear_discovery_cache()
+    yield
+    clear_discovery_cache()
+
+
 @pytest.fixture(autouse=True, scope="module")
 def _restore_db_between_modules(request: pytest.FixtureRequest) -> Generator[None, None, None]:
     """Undo whatever the module wrote, for every container that is running.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
 
@@ -99,6 +99,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class LoginProviderOut(BaseModel):
+    slug: str
+    kind: Literal["oidc", "saml"]
+    # button_label or name; env rows without a button label: "" (frontend default text)
+    label: str
+    icon: str | None = None
+
+
 class AuthMethodsOut(BaseModel):
     password: bool = True
     oidc: bool = False
@@ -109,6 +117,10 @@ class AuthMethodsOut(BaseModel):
     # Whether the customer portal is available at all (see portal_gate). The
     # landing page uses this to skip straight to the agent login.
     portal_enabled: bool = True
+    # Enabled OIDC/SAML providers with the agent audience (sort, id).
+    providers: list[LoginProviderOut] = Field(default_factory=list)
+    # SAML is usable on this server (pysaml2 + xmlsec1 present).
+    saml: bool = False
 
 
 class TOTPEnrollOut(BaseModel):

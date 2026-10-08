@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import contextlib
-import secrets
 from html import escape as html_escape
 from typing import Annotated, Any
 from urllib.parse import quote
@@ -37,13 +36,13 @@ from tiqora.domain.auth import (
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.feature_grants import CUSTOMER_DIRECTORY, CUSTOMER_EDIT, FeatureGrantService
-from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.passkey import two_factor_enabled, webauthn_enabled
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
 from tiqora.domain.password_setup import redeem_token, resolve_token
 from tiqora.domain.portal_gate import portal_enabled as resolve_portal_enabled
 from tiqora.domain.schemas import (
     AuthMethodsOut,
+    LoginProviderOut,
     LoginRequest,
     LoginResponse,
     PasskeyAuthenticateFinishIn,
@@ -68,6 +67,12 @@ from tiqora.domain.template_permission import TemplatePermissionService
 from tiqora.domain.timezones import default_time_zone, user_time_zone_preference, valid_time_zone
 from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
+from tiqora.identity.env_providers import ensure_env_providers
+from tiqora.identity.http import safe_next as _safe_next
+from tiqora.identity.saml_runtime import saml_availability
+from tiqora.identity.sso_routes import finish_oidc_callback, start_sso_login
+from tiqora.identity.store import ProviderRecord, list_enabled
+from tiqora.identity.types import ENV_OIDC_SLUG
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 from tiqora.znuny.sysconfig import SysConfig
@@ -75,10 +80,6 @@ from tiqora.znuny.sysconfig import SysConfig
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-_OIDC_STATE_PREFIX = "tiqora:oidc:state:"
-_OIDC_STATE_TTL = 300
-_OIDC_STATE_COOKIE = "tiqora_oidc_state"
 
 
 async def _load_user_language(session: AsyncSession, user_id: int) -> str | None:
@@ -169,20 +170,6 @@ def _clear_session_cookie(response: Response, settings: AppSettings) -> None:
         httponly=True,
         samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
     )
-
-
-def _safe_next(next_path: str | None, *, default: str = "/") -> str:
-    """Same-site absolute path only — reject protocol-relative (``//evil``),
-    backslash tricks (``/\\evil``) and anything carrying a scheme/host, so the
-    post-SSO redirect can never be turned into an open redirect."""
-    if (
-        isinstance(next_path, str)
-        and next_path.startswith("/")
-        and not next_path.startswith("//")
-        and not next_path.startswith("/\\")
-    ):
-        return next_path
-    return default
 
 
 def _sso_failure_redirect(safe_next: str) -> RedirectResponse:
@@ -290,6 +277,47 @@ def _rate_limit_http_exception(decision: object) -> HTTPException:
     )
 
 
+def _login_provider(record: ProviderRecord) -> LoginProviderOut:
+    # Env rows without a button label render the frontend's default text (label "").
+    label = (record.button_label or "") if record.source == "env" else record.label
+    return LoginProviderOut(
+        slug=record.slug,
+        kind=record.kind,  # type: ignore[arg-type]
+        label=label,
+        icon=record.button_icon,
+    )
+
+
+async def _login_providers(session: AsyncSession, settings: AppSettings) -> list[LoginProviderOut]:
+    """Enabled agent SSO providers (sort, id); env OIDC never depends on a DB row."""
+    records: list[ProviderRecord] = []
+    try:
+        await ensure_env_providers(session, settings)
+        records = await list_enabled(
+            session, secret_key=settings.secret_key, kind="oidc", user_kind="agent"
+        )
+        if saml_availability().available:
+            records += await list_enabled(
+                session, secret_key=settings.secret_key, kind="saml", user_kind="agent"
+            )
+            records.sort(key=lambda r: (r.sort, r.id))
+    except Exception as exc:  # noqa: BLE001 - any DB trouble must not hide password/env login
+        logger.warning("auth_methods_providers_failed", error=str(exc))
+        records = []
+        with contextlib.suppress(Exception):
+            await session.rollback()
+    providers = [_login_provider(r) for r in records if r.slug != ENV_OIDC_SLUG]
+    env_row = next((r for r in records if r.slug == ENV_OIDC_SLUG), None)
+    if settings.oidc_enabled:
+        env_entry = (
+            _login_provider(env_row)
+            if env_row is not None
+            else LoginProviderOut(slug=ENV_OIDC_SLUG, kind="oidc", label="", icon=None)
+        )
+        providers = [env_entry, *providers]
+    return providers
+
+
 @router.get("/methods", response_model=AuthMethodsOut)
 async def auth_methods(settings: AppSettings, session: DbSession) -> AuthMethodsOut:
     """Discovery endpoint the login page uses to decide which buttons to show."""
@@ -300,6 +328,8 @@ async def auth_methods(settings: AppSettings, session: DbSession) -> AuthMethods
         ldap=settings.ldap_enabled,
         webauthn=webauthn_enabled(settings),
         portal_enabled=await resolve_portal_enabled(session, settings),
+        providers=await _login_providers(session, settings),
+        saml=saml_availability().available,
     )
 
 
@@ -881,117 +911,53 @@ async def passkey_authenticate_finish(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/oidc/login")
-async def oidc_login(request: Request, settings: AppSettings) -> RedirectResponse:
+@router.get("/oidc/login", response_model=None)
+async def oidc_login(
+    request: Request,
+    settings: AppSettings,
+    session: DbSession,
+    next: Annotated[str | None, Query()] = None,
+) -> Response:
+    """Alias of ``/auth/sso/env-oidc/login`` (production env OIDC keeps its URLs)."""
     if not settings.oidc_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OIDC is not enabled")
-    redis_client = await get_redis(request)
-    state = secrets.token_urlsafe(24)
-    oidc = OIDCService(settings)
-    # PKCE when the provider advertises S256 (security review L-5). The verifier
-    # is stored server-side under the state key, so it never touches the browser
-    # and the callback can only redeem a code it actually initiated.
-    code_verifier = secrets.token_urlsafe(64) if await oidc.supports_pkce() else None
-    await redis_client.set(f"{_OIDC_STATE_PREFIX}{state}", code_verifier or "1", ex=_OIDC_STATE_TTL)
-    try:
-        url = await oidc.authorize_url(state, code_verifier=code_verifier)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("oidc_discovery_failed", error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="OIDC provider unreachable"
-        ) from exc
-    resp = RedirectResponse(url, status_code=status.HTTP_302_FOUND)
-    # Bind the state to THIS browser: the callback requires this cookie to match
-    # the returned state, so an attacker cannot replay a state/code they minted
-    # into a victim's session (OIDC login CSRF / session fixation — security review).
-    resp.set_cookie(
-        key=_OIDC_STATE_COOKIE,
-        value=state,
-        httponly=True,
-        secure=settings.session_cookie_secure,
-        samesite="lax",  # sent on the top-level IdP → callback redirect
-        max_age=_OIDC_STATE_TTL,
-        path="/",
+    return await start_sso_login(
+        request,
+        slug=ENV_OIDC_SLUG,
+        user_kind="agent",
+        next_path=next,
+        test_id=None,
+        session=session,
+        settings=settings,
+        current_admin_id=None,
     )
-    return resp
 
 
-@router.get("/oidc/callback", response_model=LoginResponse)
+@router.get(
+    "/oidc/callback",
+    response_model=None,
+    responses={200: {"model": LoginResponse, "description": "API clients: the session as JSON"}},
+)
 async def oidc_callback(
     request: Request,
-    response: Response,
-    auth: Annotated[AuthService, Depends(get_auth_service)],
-    totp: TOTPServiceDep,
     settings: AppSettings,
     session: DbSession,
     code: str | None = None,
     state: str | None = None,
-) -> LoginResponse:
+) -> Response:
+    """Alias of ``/auth/oidc/env-oidc/callback`` (browsers: 302 to ``next``; API clients: JSON)."""
     if not settings.oidc_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OIDC is not enabled")
-    if not code or not state:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code/state")
-    redis_client = await get_redis(request)
-    state_key = f"{_OIDC_STATE_PREFIX}{state}"
-    cookie_state = request.cookies.get(_OIDC_STATE_COOKIE)
-    stored_state = await redis_client.get(state_key)
-    # State must exist server-side AND match the per-browser cookie set at /login.
-    if not cookie_state or not secrets.compare_digest(cookie_state, state) or not stored_state:
-        response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state"
-        )
-    await redis_client.delete(state_key)
-    response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
-
-    # "1" is the sentinel for a flow started without PKCE (provider does not
-    # advertise S256); anything else is the code_verifier.
-    if isinstance(stored_state, bytes):
-        stored_state = stored_state.decode("utf-8")
-    code_verifier = None if stored_state == "1" else str(stored_state)
-
-    oidc = OIDCService(settings)
-    try:
-        claims = await oidc.fetch_claims(code, code_verifier=code_verifier)
-    except OIDCError as exc:
-        logger.warning("oidc_exchange_failed", error=str(exc))
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
-
-    login_value = claims.get(settings.oidc_claim)
-    if not login_value or not isinstance(login_value, str):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"OIDC claim '{settings.oidc_claim}' missing from userinfo response",
-        )
-
-    user = await auth.get_user_by_login(login_value, auth_method="sso")
-    if user is None:
-        # No auto-provisioning in v1: unknown users are rejected outright.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No local user matches SSO identity '{login_value}'",
-        )
-
-    # Per-account SSO gate, consistent with the SPNEGO path (security review L-1).
-    if not (await AuthConfigService(session).get(user.id)).sso_eligible:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="SSO not enabled for this account",
-        )
-
-    # Best-effort Google/OIDC profile picture (userinfo ``picture`` claim).
-    picture_raw = claims.get("picture")
-    avatar_url: str | None = None
-    if isinstance(picture_raw, str):
-        picture = picture_raw.strip()
-        if picture.startswith(("http://", "https://")):
-            avatar_url = picture
-
-    # SSO is the strong factor — skip the TOTP pending branch entirely.
-    _ = totp
-    token = await auth.create_session(user, avatar_url=avatar_url)
-    _set_session_cookie(response, settings, token)
-    return LoginResponse(user=await _user_me(session, user, extra={"avatar_url": avatar_url}))
+    return await finish_oidc_callback(
+        request,
+        slug=ENV_OIDC_SLUG,
+        user_kind="agent",
+        code=code,
+        state=state,
+        session=session,
+        settings=settings,
+        json_response=not _wants_html(request),
+    )
 
 
 # ---------------------------------------------------------------------------

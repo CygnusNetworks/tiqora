@@ -12,7 +12,7 @@ import httpx
 import pytest
 
 from tiqora.config import Settings
-from tiqora.domain.oidc import OIDCError, OIDCService
+from tiqora.domain.oidc import OIDCError, OIDCService, oidc_client_config_from_settings
 
 # Public hostname so outbound IP-pinning can resolve in tests (no network I/O:
 # MockTransport answers the HTTP calls; only DNS is real).
@@ -67,7 +67,9 @@ def _make_transport(
 @pytest.mark.asyncio
 async def test_authorize_url_contains_client_and_state() -> None:
     settings = _settings()
-    service = OIDCService(settings, transport=_make_transport(claims={}))
+    service = OIDCService(
+        oidc_client_config_from_settings(settings), transport=_make_transport(claims={})
+    )
     url = await service.authorize_url("xyz-state")
     assert url.startswith(f"{ISSUER}/authorize")
     assert "client_id=tiqora" in url
@@ -78,7 +80,7 @@ async def test_authorize_url_contains_client_and_state() -> None:
 async def test_fetch_claims_maps_preferred_username() -> None:
     settings = _settings()
     service = OIDCService(
-        settings,
+        oidc_client_config_from_settings(settings),
         transport=_make_transport(claims={"preferred_username": "jdoe", "email": "j@x.com"}),
     )
     claims = await service.fetch_claims("auth-code-123")
@@ -88,7 +90,10 @@ async def test_fetch_claims_maps_preferred_username() -> None:
 @pytest.mark.asyncio
 async def test_fetch_claims_custom_claim_name() -> None:
     settings = _settings(oidc_claim="upn")
-    service = OIDCService(settings, transport=_make_transport(claims={"upn": "jdoe@corp"}))
+    service = OIDCService(
+        oidc_client_config_from_settings(settings),
+        transport=_make_transport(claims={"upn": "jdoe@corp"}),
+    )
     claims = await service.fetch_claims("code")
     assert claims[settings.oidc_claim] == "jdoe@corp"
 
@@ -96,7 +101,10 @@ async def test_fetch_claims_custom_claim_name() -> None:
 @pytest.mark.asyncio
 async def test_fetch_claims_userinfo_failure_raises_oidc_error() -> None:
     settings = _settings()
-    service = OIDCService(settings, transport=_make_transport(claims={}, userinfo_status=500))
+    service = OIDCService(
+        oidc_client_config_from_settings(settings),
+        transport=_make_transport(claims={}, userinfo_status=500),
+    )
     with pytest.raises(OIDCError):
         await service.fetch_claims("code")
 
@@ -116,7 +124,9 @@ async def test_discovery_is_cached() -> None:
             },
         )
 
-    service = OIDCService(_settings(), transport=httpx.MockTransport(handler))
+    service = OIDCService(
+        oidc_client_config_from_settings(_settings()), transport=httpx.MockTransport(handler)
+    )
     await service.discover()
     await service.discover()
     assert calls == ["/.well-known/openid-configuration"], (
