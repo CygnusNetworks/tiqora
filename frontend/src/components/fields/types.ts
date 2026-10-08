@@ -41,6 +41,11 @@ export type FieldKindProps = {
   testId: string;
   disabled?: boolean;
   invalid?: boolean;
+  required?: boolean;
+  /** id(s) of the error / help element describing the control */
+  describedBy?: string;
+  /** id of the visible label element (for composite controls) */
+  labelId?: string;
   options: FieldOption[];
 };
 export type FieldKindRegistration = { kind: string; component: ComponentType<FieldKindProps> };

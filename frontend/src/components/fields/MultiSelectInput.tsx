@@ -10,6 +10,11 @@ export function MultiSelectInput({
   testId,
   disabled,
   invalid,
+  required,
+  id,
+  labelId,
+  label,
+  describedBy,
 }: {
   value: string[];
   onChange: (next: string[]) => void;
@@ -17,13 +22,26 @@ export function MultiSelectInput({
   testId: string;
   disabled?: boolean;
   invalid?: boolean;
+  required?: boolean;
+  id?: string;
+  /** id of the visible label element naming the group */
+  labelId?: string;
+  /** fallback accessible name when no visible label element is linked */
+  label?: string;
+  describedBy?: string;
 }) {
   const { t } = useTranslation();
   const labelOf = (v: string) => options.find((o) => o.value === v)?.label ?? v;
   const rest = options.filter((o) => !value.includes(o.value));
   return (
     <div
+      id={id}
+      role="group"
       data-testid={testId}
+      aria-labelledby={labelId}
+      aria-label={labelId ? undefined : label}
+      aria-describedby={describedBy}
+      aria-required={required || undefined}
       aria-invalid={invalid || undefined}
       className={`flex min-h-[30px] w-full flex-wrap items-center gap-1.5 rounded border bg-surface px-2 py-1 ${
         invalid ? "border-danger" : "border-hairline"

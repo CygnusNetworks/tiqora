@@ -37,7 +37,10 @@ export function SelectField<T extends string | number>({
   className,
   disabled,
   bare,
+  id,
+  invalid,
   "aria-label": ariaLabel,
+  "aria-describedby": ariaDescribedBy,
 }: {
   items: SelectMenuItem<T>[];
   value: T | null | undefined;
@@ -50,7 +53,11 @@ export function SelectField<T extends string | number>({
   disabled?: boolean;
   /** No frame of its own, for a trigger that sits inside a bordered group. */
   bare?: boolean;
+  /** DOM id of the trigger, so a `<label htmlFor>` names and focuses it. */
+  id?: string;
+  invalid?: boolean;
   "aria-label"?: string;
+  "aria-describedby"?: string;
 }) {
   const selected = items.find((i) => i.value === value);
   return (
@@ -64,8 +71,11 @@ export function SelectField<T extends string | number>({
         <button
           ref={ref}
           type="button"
+          id={id}
           data-testid={testId}
           aria-label={ariaLabel}
+          aria-invalid={invalid || undefined}
+          aria-describedby={ariaDescribedBy}
           disabled={disabled}
           {...toggleProps}
           className={cn(

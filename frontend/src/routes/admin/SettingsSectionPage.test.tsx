@@ -80,12 +80,22 @@ describe("SettingsSectionPage", () => {
     expect(await screen.findByTestId("admin-settings-saved")).toBeInTheDocument();
   });
 
-  it("sends a typed secret and an empty string for a cleared one", async () => {
+  it("sends a typed secret", async () => {
     renderPage();
     const secret = await screen.findByTestId("schema-form-secret_note");
     fireEvent.change(secret, { target: { value: "neu" } });
     fireEvent.click(screen.getByTestId("admin-settings-save"));
     await waitFor(() => expect(put).toHaveBeenCalledWith("jobs", { secret_note: "neu" }));
+  });
+
+  it("sends nothing for a secret that was typed and erased again", async () => {
+    renderPage();
+    const secret = await screen.findByTestId("schema-form-secret_note");
+    fireEvent.change(secret, { target: { value: "x" } });
+    fireEvent.change(secret, { target: { value: "" } });
+    fireEvent.change(screen.getByTestId("schema-form-max_concurrency"), { target: { value: "4" } });
+    fireEvent.click(screen.getByTestId("admin-settings-save"));
+    await waitFor(() => expect(put).toHaveBeenCalledWith("jobs", { max_concurrency: 4 }));
   });
 
   it("sends an empty string when the stored secret is removed", async () => {

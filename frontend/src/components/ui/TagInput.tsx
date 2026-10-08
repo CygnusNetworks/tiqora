@@ -24,12 +24,21 @@ export function TagInput({
   suggestions = [],
   placeholder,
   testId,
+  id,
+  required,
+  invalid,
+  describedBy,
 }: {
   value: string[];
   onChange: (next: string[]) => void;
   suggestions?: TagSuggestion[];
   placeholder?: string;
   testId?: string;
+  /** DOM id of the text input, so a `<label htmlFor>` names and focuses it. */
+  id?: string;
+  required?: boolean;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -126,6 +135,10 @@ export function TagInput({
         ))}
         <input
           ref={inputRef}
+          id={id}
+          aria-required={required || undefined}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
           type="text"
           role="combobox"
           aria-expanded={open}

@@ -4285,6 +4285,8 @@
     "secretStored": "Stored – leave empty to keep it unchanged",
     "secretRemove": "Remove",
     "addValue": "Add",
-    "removeValue": "Remove {{label}}"
+    "removeValue": "Remove {{label}}",
+    "secretCleared": "Will be removed on save",
+    "secretKeep": "Keep"
   }
 }

@@ -4285,6 +4285,8 @@
     "secretStored": "Gespeichert – leer lassen, um nichts zu ändern",
     "secretRemove": "Entfernen",
     "addValue": "Hinzufügen",
-    "removeValue": "{{label}} entfernen"
+    "removeValue": "{{label}} entfernen",
+    "secretCleared": "Wird beim Speichern entfernt",
+    "secretKeep": "Behalten"
   }
 }

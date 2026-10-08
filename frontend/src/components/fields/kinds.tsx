@@ -26,7 +26,7 @@ function asList(value: FieldValue): string[] {
 }
 
 function nativeInput(type: string) {
-  return function NativeInput({ def, value, onChange, id, testId, disabled, invalid }: FieldKindProps) {
+  return function NativeInput({ def, value, onChange, id, testId, disabled, invalid, required, describedBy }: FieldKindProps) {
     return (
       <input
         id={id}
@@ -37,6 +37,8 @@ function nativeInput(type: string) {
         placeholder={def.placeholder}
         maxLength={def.maxLength}
         aria-invalid={invalid || undefined}
+        aria-required={required || undefined}
+        aria-describedby={describedBy}
         className={inputCls(invalid)}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -48,7 +50,7 @@ const TextKind = nativeInput("text");
 const DateKind = nativeInput("date");
 const DateTimeKind = nativeInput("datetime-local");
 
-function NumberKind({ def, value, onChange, id, testId, disabled, invalid }: FieldKindProps) {
+function NumberKind({ def, value, onChange, id, testId, disabled, invalid, required, describedBy }: FieldKindProps) {
   return (
     <input
       id={id}
@@ -61,6 +63,8 @@ function NumberKind({ def, value, onChange, id, testId, disabled, invalid }: Fie
       max={def.max}
       step={def.step}
       aria-invalid={invalid || undefined}
+      aria-required={required || undefined}
+      aria-describedby={describedBy}
       className={inputCls(invalid)}
       onChange={(e) => {
         const raw = e.target.value;
@@ -72,7 +76,7 @@ function NumberKind({ def, value, onChange, id, testId, disabled, invalid }: Fie
   );
 }
 
-function TextareaKind({ def, value, onChange, id, testId, disabled, invalid }: FieldKindProps) {
+function TextareaKind({ def, value, onChange, id, testId, disabled, invalid, required, describedBy }: FieldKindProps) {
   return (
     <textarea
       id={id}
@@ -83,13 +87,15 @@ function TextareaKind({ def, value, onChange, id, testId, disabled, invalid }: F
       placeholder={def.placeholder}
       maxLength={def.maxLength}
       aria-invalid={invalid || undefined}
+      aria-required={required || undefined}
+      aria-describedby={describedBy}
       className={inputCls(invalid)}
       onChange={(e) => onChange(e.target.value)}
     />
   );
 }
 
-function BooleanKind({ def, value, onChange, id, testId, disabled }: FieldKindProps) {
+function BooleanKind({ def, value, onChange, id, testId, disabled, required, describedBy, labelId }: FieldKindProps) {
   return (
     <Switch
       id={id}
@@ -97,12 +103,15 @@ function BooleanKind({ def, value, onChange, id, testId, disabled }: FieldKindPr
       checked={value === true}
       disabled={disabled || def.readOnly}
       onChange={onChange}
-      aria-label={def.label}
+      aria-labelledby={labelId}
+      aria-label={labelId ? undefined : def.label}
+      aria-describedby={describedBy}
+      aria-required={required}
     />
   );
 }
 
-function SelectKind({ def, value, onChange, testId, disabled, invalid, options }: FieldKindProps) {
+function SelectKind({ def, value, onChange, id, testId, disabled, invalid, describedBy, labelId, options }: FieldKindProps) {
   const { t } = useTranslation();
   const items = def.allowEmpty ? [{ value: "", label: t("fields.none") }, ...options] : options;
   return (
@@ -113,13 +122,16 @@ function SelectKind({ def, value, onChange, testId, disabled, invalid, options }
       testId={testId}
       placeholder={def.placeholder}
       disabled={disabled || def.readOnly}
-      aria-label={def.label}
+      id={id}
+      invalid={invalid}
+      aria-describedby={describedBy}
+      aria-label={labelId ? undefined : def.label}
       className={invalid ? "border-danger" : undefined}
     />
   );
 }
 
-function MultiSelectKind({ def, value, onChange, testId, disabled, invalid, options }: FieldKindProps) {
+function MultiSelectKind({ def, value, onChange, id, testId, disabled, invalid, required, describedBy, labelId, options }: FieldKindProps) {
   return (
     <MultiSelectInput
       value={asList(value)}
@@ -128,11 +140,16 @@ function MultiSelectKind({ def, value, onChange, testId, disabled, invalid, opti
       testId={testId}
       disabled={disabled || def.readOnly}
       invalid={invalid}
+      required={required}
+      id={id}
+      labelId={labelId}
+      label={def.label}
+      describedBy={describedBy}
     />
   );
 }
 
-function TagsKind({ def, value, onChange, testId, disabled, options }: FieldKindProps) {
+function TagsKind({ def, value, onChange, id, testId, disabled, invalid, required, describedBy, options }: FieldKindProps) {
   if (disabled || def.readOnly) {
     return (
       <div data-testid={testId} className="flex flex-wrap gap-1.5">
@@ -148,16 +165,28 @@ function TagsKind({ def, value, onChange, testId, disabled, options }: FieldKind
     <TagInput
       value={asList(value)}
       onChange={onChange}
-      suggestions={options.map((o) => ({ name: o.label }))}
+      suggestions={options.map((o) => ({ name: o.value }))}
       placeholder={def.placeholder}
       testId={testId}
+      id={id}
+      required={required}
+      invalid={invalid}
+      describedBy={describedBy}
     />
   );
 }
 
-function SecretKind({ def, value, onChange, id, testId, disabled, invalid }: FieldKindProps) {
+/**
+ * Secret contract: `null` = untouched (server keeps the stored value),
+ * `""` = clear the stored value (only the explicit remove button emits it),
+ * any other string = new secret. Erasing typed text goes back to `null`.
+ */
+function SecretKind({ def, value, onChange, id, testId, disabled, invalid, required, describedBy }: FieldKindProps) {
   const { t } = useTranslation();
-  const typed = asString(value) !== "";
+  const typed = typeof value === "string" && value !== "";
+  const cleared = def.secretSet && value === "";
+  const untouchedStored = def.secretSet && (value === null || value === undefined);
+  const locked = disabled || def.readOnly;
   return (
     <div className="flex items-center gap-2">
       <input
@@ -165,14 +194,16 @@ function SecretKind({ def, value, onChange, id, testId, disabled, invalid }: Fie
         data-testid={testId}
         type="password"
         autoComplete="new-password"
-        value={asString(value)}
-        disabled={disabled || def.readOnly}
-        placeholder={def.secretSet ? t("fields.secretStored") : def.placeholder}
+        value={typed ? (value as string) : ""}
+        disabled={locked}
+        placeholder={cleared ? t("fields.secretCleared") : untouchedStored ? t("fields.secretStored") : def.placeholder}
         aria-invalid={invalid || undefined}
+        aria-required={required && !def.secretSet ? true : undefined}
+        aria-describedby={describedBy}
         className={inputCls(invalid)}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
       />
-      {def.secretSet && !typed && !disabled && !def.readOnly && (
+      {untouchedStored && !locked && (
         <button
           type="button"
           data-testid={`${testId}-clear`}
@@ -180,6 +211,16 @@ function SecretKind({ def, value, onChange, id, testId, disabled, invalid }: Fie
           className="shrink-0 rounded border border-hairline px-2 py-1 text-xs text-muted hover:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
         >
           {t("fields.secretRemove")}
+        </button>
+      )}
+      {cleared && !locked && (
+        <button
+          type="button"
+          data-testid={`${testId}-keep`}
+          onClick={() => onChange(null)}
+          className="shrink-0 rounded border border-hairline px-2 py-1 text-xs text-muted hover:text-ink focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        >
+          {t("fields.secretKeep")}
         </button>
       )}
     </div>

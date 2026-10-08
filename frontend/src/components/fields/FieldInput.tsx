@@ -15,6 +15,8 @@ export function FieldInput({
   disabled,
   invalid,
   id,
+  labelId,
+  describedBy,
 }: {
   def: FieldDef;
   value: FieldValue;
@@ -25,6 +27,8 @@ export function FieldInput({
   invalid?: boolean;
   /** DOM id for label association; generated when omitted. */
   id?: string;
+  labelId?: string;
+  describedBy?: string;
 }) {
   const { t } = useTranslation();
   const generated = useId();
@@ -46,6 +50,9 @@ export function FieldInput({
       testId={testId}
       disabled={disabled}
       invalid={invalid}
+      required={def.required}
+      describedBy={describedBy}
+      labelId={labelId}
       options={options ?? def.options ?? []}
     />
   );

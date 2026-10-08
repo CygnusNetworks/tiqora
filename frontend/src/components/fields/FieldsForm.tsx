@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { FieldInput } from "./FieldInput";
 import type { FieldDef, FieldErrors, FieldOption, FieldValue, FieldValues } from "./types";
@@ -22,24 +23,31 @@ export function FieldsForm({
   columns?: 1 | 2;
   testId?: string;
 }) {
+  const { t } = useTranslation();
   if (fields.length === 0) return null;
   return (
     <div className={cn("grid gap-3", columns === 2 ? "sm:grid-cols-2" : "grid-cols-1")} data-testid={testId}>
       {fields.map((def) => {
         const controlId = `${testId}-${def.key}-control`;
         const error = errors?.[def.key];
+        const labelId = `${testId}-${def.key}-label`;
+        const errorId = `${testId}-${def.key}-error`;
+        const helpId = `${testId}-${def.key}-help`;
+        const describedBy = error ? errorId : def.help ? helpId : undefined;
         const loaded = def.optionsKey ? optionsByKey?.[def.optionsKey] : undefined;
         return (
           <div key={def.key} className="min-w-0">
             <label
               htmlFor={controlId}
-              data-testid={`${testId}-${def.key}-label`}
+              id={labelId}
+              data-testid={labelId}
               className="mb-1 block text-xs font-medium text-muted"
             >
               {def.label}
               {def.required && (
-                <span aria-hidden="true" className="ml-0.5 text-danger">
-                  *
+                <span className="ml-0.5 text-danger">
+                  <span aria-hidden="true">*</span>
+                  <span className="sr-only"> ({t("fields.required")})</span>
                 </span>
               )}
             </label>
@@ -52,10 +60,12 @@ export function FieldsForm({
               options={loaded ?? def.options}
               disabled={disabled}
               invalid={!!error}
+              labelId={labelId}
+              describedBy={describedBy}
             />
-            {def.help && !error && <p className="mt-1 text-xs text-muted">{def.help}</p>}
+            {def.help && !error && <p id={helpId} className="mt-1 text-xs text-muted">{def.help}</p>}
             {error && (
-              <p data-testid={`${testId}-${def.key}-error`} role="alert" className="mt-1 text-xs text-danger">
+              <p id={errorId} data-testid={errorId} role="alert" className="mt-1 text-xs text-danger">
                 {error}
               </p>
             )}
