@@ -481,6 +481,9 @@ async def _insert_env_row(
         match_by=match_by,
         require_sso_opt_in=require_sso_opt_in,
     )
+    # Env rows never persist connection data: the runtime config is rebuilt from Settings.
+    row.config = "{}"
+    row.secrets_enc = None
     session.add(row)
     await session.flush()
     return provider_from_row(row, secret_key=secret_key)
