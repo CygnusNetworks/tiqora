@@ -264,7 +264,7 @@ async def test_purge_finished_jobs_deletes_files_first(
         ids = (old.id, recent.id, running.id)
         # Other test rows from earlier runs must not count: scope via the ids.
         deleted = await purge_finished_jobs(s, older_than=now - timedelta(days=14))
-        assert deleted >= 1
+        assert deleted == 1
         s.expire_all()
         assert await get_job(s, ids[0]) is None
         assert await get_job(s, ids[1]) is not None
@@ -363,3 +363,28 @@ async def test_context_add_file(factory: async_sessionmaker[AsyncSession]) -> No
         )
     with pytest.raises(JobFailed):
         await ctx.add_file("big", "x/y", b"\0" * (MAX_JOB_FILE_BYTES + 1))
+
+
+async def test_request_cancel_after_concurrent_claim_sets_cancel_requested(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    job_id = await _committed_job(factory)  # committed as running by helper
+    async with factory() as other:
+        await other.execute(update(TiqoraJob).where(TiqoraJob.id == job_id).values(status="queued"))
+        await other.commit()
+    async with factory() as s:
+        job = await get_job(s, job_id)
+        assert job is not None and job.status == "queued"  # stale view
+        async with factory() as claimer:
+            await claimer.execute(
+                update(TiqoraJob).where(TiqoraJob.id == job_id).values(status="running")
+            )
+            await claimer.commit()
+        await request_cancel(s, job)
+        assert job.status == "running"
+        assert job.cancel_requested is True
+        await s.commit()
+    async with factory() as s:
+        row = await get_job(s, job_id)
+        assert row is not None
+        assert (row.status, row.cancel_requested) == ("running", True)

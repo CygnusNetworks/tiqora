@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
@@ -132,11 +132,25 @@ async def request_cancel(session: AsyncSession, job: TiqoraJob) -> TiqoraJob:
     if job.status in TERMINAL_STATUSES:
         raise JobNotCancellable(job.status)
     if job.status == "queued":
-        job.status = "cancelled"
-        job.finished_at = utc_now()
-    else:
-        job.cancel_requested = True
-    await session.flush()
+        # Guarded: a worker may claim the job between our read and this write.
+        result = await session.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == job.id, TiqoraJob.status == "queued")
+            .values(status="cancelled", finished_at=utc_now())
+        )
+        if result.rowcount == 1:  # type: ignore[attr-defined]
+            await session.refresh(job)
+            return job
+    # Running (or claimed meanwhile). Guarded write, so a repeatable-read snapshot
+    # (MariaDB) cannot hide a state change; rowcount 0 means the job is terminal.
+    result = await session.execute(
+        update(TiqoraJob)
+        .where(TiqoraJob.id == job.id, TiqoraJob.status == "running")
+        .values(cancel_requested=True)
+    )
+    await session.refresh(job)
+    if result.rowcount != 1:  # type: ignore[attr-defined]
+        raise JobNotCancellable(job.status)
     return job
 
 
