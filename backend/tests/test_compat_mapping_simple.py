@@ -394,19 +394,34 @@ def test_value_default_ignore_drops_key() -> None:
     assert m.map({"a": "1", "n": {"x": 1}}) == {"n": {"x": 1}}
 
 
-def test_bad_regex_in_key_map_surfaces_as_mapping_error() -> None:
+def test_bad_regex_fails_at_build_time() -> None:
+    base = {"KeyMapDefault": {"MapType": "Keep"}, "ValueMapDefault": {"MapType": "Keep"}}
+    with pytest.raises(MappingConfigError, match="Invalid regular expression"):
+        build_mapper({"Type": "Simple", "Config": {**base, "KeyMapRegEx": {"(unclosed": "c"}}})
+    with pytest.raises(MappingConfigError, match="Invalid regular expression"):
+        build_mapper(
+            {
+                "Type": "Simple",
+                "Config": {**base, "ValueMap": {"k": {"ValueMapRegEx": {"[": "c"}}}},
+            }
+        )
+
+
+def test_catastrophic_regex_is_mapping_error_not_a_hang() -> None:
     m = build_mapper(
         {
             "Type": "Simple",
             "Config": {
-                "KeyMapRegEx": {"(?<=a+)b": "c"},
+                "KeyMapRegEx": {"(a+)+": "c"},
                 "KeyMapDefault": {"MapType": "Keep"},
                 "ValueMapDefault": {"MapType": "Keep"},
             },
         }
     )
-    with pytest.raises(MappingError):
-        m.map({"a": "1"})
+    started = time.monotonic()
+    with pytest.raises(MappingError, match="timed out"):
+        m.map({"a" * 40 + "b": "1"})
+    assert time.monotonic() - started < 1
 
 
 def test_mapping_new_errors() -> None:

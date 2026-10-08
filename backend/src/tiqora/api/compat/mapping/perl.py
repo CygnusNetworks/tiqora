@@ -10,7 +10,9 @@ import re
 from functools import lru_cache
 from typing import Any
 
-from tiqora.api.compat.mapping import MappingConfigError
+import regex
+
+from tiqora.api.compat.mapping import MappingConfigError, MappingError
 from tiqora.znuny.perl_format import perl_num_str
 
 
@@ -41,20 +43,43 @@ def perl_str(value: Any) -> str:
     return str(value)
 
 
+# Webservice configs are admin-controlled but still untrusted for CPU time: a catastrophic pattern
+# such as ``(a+)+`` must not block the event loop. mrab-regex enforces a per-call timeout.
+REGEX_TIMEOUT_SECONDS = 0.2
+
+
 @lru_cache(maxsize=512)
-def compile_perl_regex(pattern: str, *, verbose: bool) -> re.Pattern[str]:
+def compile_perl_regex(pattern: str, *, verbose: bool) -> regex.Pattern[str]:
     """Compile a Perl regex from a webservice config; ``verbose`` = Perl ``/xms``."""
-    flags = re.VERBOSE | re.MULTILINE | re.DOTALL if verbose else 0
+    flags = regex.VERBOSE | regex.MULTILINE | regex.DOTALL if verbose else 0
     try:
-        return re.compile(pattern, flags)
-    except (re.error, RecursionError, OverflowError) as exc:
-        raise MappingConfigError(f"Ungültiger regulärer Ausdruck {pattern!r}: {exc}") from exc
+        return regex.compile(pattern, flags)
+    except (regex.error, RecursionError, OverflowError) as exc:
+        raise MappingConfigError(f"Invalid regular expression {pattern!r}: {exc}") from exc
+
+
+def _fullmatch_x_regex(pattern: str) -> regex.Pattern[str]:
+    # Perl interpolates the pattern *unparenthesised* into ``m{ \A $pattern \z }xms``, so a
+    # top-level alternation ``a|b`` is only anchored on its first/last branch - same as Znuny.
+    # ``\z`` (Perl: absolute end) is spelled ``\Z`` here: in Python/regex ``\Z`` is also absolute
+    # end of string (unlike Perl's ``\Z``, which also allows a trailing newline), and ``\z`` is
+    # not available in ``re`` before 3.14.
+    return compile_perl_regex(rf"\A{pattern} \Z", verbose=True)
+
+
+def check_perl_fullmatch_x(pattern: str) -> None:
+    """Compile eagerly so a broken pattern fails when the mapper is built (MappingConfigError)."""
+    _fullmatch_x_regex(pattern)
 
 
 def perl_fullmatch_x(pattern: str, value: str) -> bool:
-    """``$value =~ m{ \\A $pattern \\z }xms`` (pattern interpolated unparenthesised, like Perl)."""
-    regex = compile_perl_regex(rf"\A{pattern} \Z", verbose=True)
-    return regex.search(value) is not None
+    """``$value =~ m{ \A $pattern \z }xms``; MappingError if the match exceeds the time budget."""
+    try:
+        return _fullmatch_x_regex(pattern).search(value, timeout=REGEX_TIMEOUT_SECONDS) is not None
+    except TimeoutError as exc:
+        raise MappingError(
+            f"regex timed out after {REGEX_TIMEOUT_SECONDS}s (pattern {pattern!r})"
+        ) from exc
 
 
 _REPL_TOKEN = re.compile(r"\$\{(\d+)\}|\$(\d+)|\\\$|\\(?!\d)")

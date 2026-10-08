@@ -6,6 +6,7 @@ from typing import Any
 
 from tiqora.api.compat.mapping import DataInclude, MappingConfigError, MappingError
 from tiqora.api.compat.mapping.perl import (
+    check_perl_fullmatch_x,
     perl_fullmatch_x,
     perl_is_string,
     perl_str,
@@ -74,6 +75,10 @@ def _config_check(config: Any) -> None:
                 f"Got MapType 'MapTo', but MapTo value is not valid in {config_type}!"
             )
 
+    # Deviation from Perl (which compiles lazily): broken patterns fail when the mapper is built.
+    for pattern in config.get("KeyMapRegEx") or {}:
+        check_perl_fullmatch_x(perl_str(pattern))
+
     value_map = config.get("ValueMap")
     if isinstance(value_map, dict) and value_map:
         for key_name, entry in value_map.items():
@@ -90,6 +95,9 @@ def _config_check(config: Any) -> None:
                         f"Got {sub_name} in {perl_str(key_name)} in ValueMap,"
                         " but it is no hash ref with content!"
                     )
+                if sub_name == "ValueMapRegEx":
+                    for pattern in sub:
+                        check_perl_fullmatch_x(perl_str(pattern))
                 for sub_key, sub_val in sub.items():
                     if not perl_is_string(sub_key):
                         raise MappingConfigError(

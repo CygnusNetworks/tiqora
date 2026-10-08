@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
+import time
 from decimal import Decimal
 
 import pytest
 
-from tiqora.api.compat.mapping import MappingConfigError
+from tiqora.api.compat.mapping import MappingConfigError, MappingError
 from tiqora.api.compat.mapping.perl import (
     compile_perl_regex,
     perl_fullmatch_x,
@@ -67,8 +68,8 @@ def test_perl_replacement() -> None:
 
 
 def test_bad_regex_is_config_error() -> None:
-    with pytest.raises(MappingConfigError):
-        compile_perl_regex("(?<=a+)b", verbose=True)
+    with pytest.raises(MappingConfigError, match="Invalid regular expression"):
+        compile_perl_regex("(unclosed", verbose=True)
 
 
 def test_compile_flags() -> None:
@@ -98,3 +99,17 @@ def test_perl_num(value: object, num: float, text: str) -> None:
 def test_perl_num_integral_is_int() -> None:
     assert isinstance(perl_num(Decimal("3.00")), int)
     assert isinstance(perl_num("1.50"), float)
+
+
+def test_catastrophic_pattern_times_out_fast() -> None:
+    started = time.monotonic()
+    with pytest.raises(MappingError, match="timed out"):
+        perl_fullmatch_x("(a+)+", "a" * 40 + "b")
+    assert time.monotonic() - started < 1
+
+
+def test_unanchored_alternation_matches_like_znuny() -> None:
+    # m{ \A a|b \z }xms == (\A a) | (b \z): "ax" and "xb" both match, "xbx" does not
+    assert perl_fullmatch_x("a|b", "ax")
+    assert perl_fullmatch_x("a|b", "xb")
+    assert not perl_fullmatch_x("a|b", "xbx")
