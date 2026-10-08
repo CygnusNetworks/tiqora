@@ -346,3 +346,162 @@ async def test_reloader_leaves_no_tasks_behind() -> None:
     stop.set()
     await asyncio.wait_for(task, 2)
     assert asyncio.all_tasks() == before
+
+
+class _StubPubSub:
+    """pubsub stub whose get_message / subscribe can be scripted to fail."""
+
+    def __init__(self, owner: _StubRedis) -> None:
+        self.owner = owner
+        self.closed = False
+        self.queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    async def subscribe(self, channel: str) -> None:
+        if self.owner.subscribe_failures > 0:
+            self.owner.subscribe_failures -= 1
+            raise ConnectionError("subscribe failed")
+        self.owner.live = self
+
+    async def unsubscribe(self, channel: str | None = None) -> None:
+        pass
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+    async def get_message(
+        self,
+        ignore_subscribe_messages: bool = False,
+        timeout: float = 0.0,  # noqa: ASYNC109
+    ) -> dict[str, Any] | None:
+        if self.owner.get_failures > 0 and timeout:
+            self.owner.get_failures -= 1
+            raise ConnectionError("get_message failed")
+        try:
+            return await asyncio.wait_for(self.queue.get(), timeout=timeout or 0.001)
+        except TimeoutError:
+            return None
+
+
+class _StubRedis:
+    def __init__(self, *, subscribe_failures: int = 0, get_failures: int = 0) -> None:
+        self.subscribe_failures = subscribe_failures
+        self.get_failures = get_failures
+        self.pubsubs: list[_StubPubSub] = []
+        self.live: _StubPubSub | None = None
+        self.factory_failures = 0
+
+    def pubsub(self) -> _StubPubSub:
+        if self.factory_failures > 0:
+            self.factory_failures -= 1
+            raise ConnectionError("pubsub() failed")
+        ps = _StubPubSub(self)
+        self.pubsubs.append(ps)
+        return ps
+
+
+class _CountingApp:
+    """App stand-in whose registry refresh is observable via session_factory calls."""
+
+    def __init__(self, redis: Any) -> None:
+        self.calls: list[bool] = []
+        outer = self
+
+        class _State:
+            pass
+
+        self.state = _State()
+        self.state.redis = redis  # type: ignore[attr-defined]
+        self.state.session_factory = lambda: outer  # type: ignore[attr-defined]
+        reg = type("R", (), {})()
+
+        async def refresh(session: Any, *, force: bool = False) -> bool:
+            outer.calls.append(force)
+            return True
+
+        reg.refresh = refresh  # type: ignore[attr-defined]
+        self.state.compat_webservices = reg  # type: ignore[attr-defined]
+
+    async def __aenter__(self) -> _CountingApp:
+        return self
+
+    async def __aexit__(self, *exc: Any) -> None:
+        return None
+
+
+async def _until(predicate: Any, seconds: float = 3.0) -> bool:
+    for _ in range(int(seconds / 0.01)):
+        if predicate():
+            return True
+        await asyncio.sleep(0.01)
+    return False
+
+
+async def test_get_message_error_closes_pubsub_and_resubscribes() -> None:
+    redis = _StubRedis(get_failures=1)
+    app = _CountingApp(redis)
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_webservice_reloader(app, interval_seconds=0.3, stop=stop))
+    try:
+        assert await _until(lambda: len(redis.pubsubs) >= 2)  # resubscribed
+        assert redis.pubsubs[0].closed is True
+        # no hot loop: the failure was followed by a ~interval wait, not a spin
+        assert len(redis.pubsubs) <= 3
+        assert await _until(lambda: redis.live is redis.pubsubs[-1])
+        calls_before = len(app.calls)
+        await redis.pubsubs[-1].queue.put({"type": "message", "data": "reload"})
+        assert await _until(lambda: True in app.calls[calls_before:])
+    finally:
+        stop.set()
+        await asyncio.wait_for(task, 2)
+    assert all(ps.closed for ps in redis.pubsubs[:-1])
+    assert redis.pubsubs[-1].closed is True
+
+
+async def test_subscribe_error_closes_pubsub_and_polling_continues() -> None:
+    redis = _StubRedis(subscribe_failures=2)
+    app = _CountingApp(redis)
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_webservice_reloader(app, interval_seconds=0.05, stop=stop))
+    try:
+        assert await _until(lambda: len(app.calls) >= 2)  # fallback polling reloads
+        assert await _until(lambda: redis.live is not None)  # then subscribes successfully
+    finally:
+        stop.set()
+        await asyncio.wait_for(task, 2)
+    failed = [ps for ps in redis.pubsubs if ps is not redis.live]
+    assert len(failed) >= 2
+    assert all(ps.closed for ps in failed)
+    assert all(force is False for force in app.calls[:2])
+
+
+async def test_pubsub_factory_error_falls_back_to_polling() -> None:
+    redis = _StubRedis()
+    redis.factory_failures = 2
+    app = _CountingApp(redis)
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_webservice_reloader(app, interval_seconds=0.05, stop=stop))
+    try:
+        assert await _until(lambda: len(app.calls) >= 2)
+        assert await _until(lambda: redis.live is not None)
+    finally:
+        stop.set()
+        await asyncio.wait_for(task, 2)
+    assert task.exception() is None
+
+
+async def test_message_burst_is_coalesced_into_one_forced_reload() -> None:
+    redis = _StubRedis()
+    app = _CountingApp(redis)
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_webservice_reloader(app, interval_seconds=30, stop=stop))
+    try:
+        assert await _until(lambda: redis.live is not None)
+        assert redis.live is not None
+        for _ in range(5):
+            await redis.live.queue.put({"type": "message", "data": "reload"})
+        assert await _until(lambda: True in app.calls)
+        await asyncio.sleep(0.2)
+    finally:
+        stop.set()
+        await asyncio.wait_for(task, 2)
+    assert app.calls.count(True) == 1
