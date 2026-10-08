@@ -119,7 +119,12 @@ def _to_async_url(sync_url: str) -> str:
     return sync_url
 
 
+_NOTIF_IDS = "(SELECT id FROM notification_event WHERE name LIKE 'dfval-notify%')"
+
+
 def _cleanup(conn: Any) -> None:
+    key_col = "`key`" if conn.dialect.name == "mysql" else '"key"'
+    conn.execute(text(f"DELETE FROM tiqora_settings WHERE {key_col} = 'notification.sender_email'"))
     for sql in (
         f"DELETE FROM ticket_history WHERE ticket_id = {TICKET_ID}",
         f"DELETE FROM tiqora_event_outbox WHERE ticket_id = {TICKET_ID}",
@@ -130,6 +135,10 @@ def _cleanup(conn: Any) -> None:
         f"DELETE FROM queue WHERE id = {QUEUE_ID}",
         f"DELETE FROM group_user WHERE group_id = {GROUP_ID}",
         f"DELETE FROM permission_groups WHERE id = {GROUP_ID}",
+        f"DELETE FROM notification_event_item WHERE notification_id IN {_NOTIF_IDS}",
+        f"DELETE FROM notification_event_message WHERE notification_id IN {_NOTIF_IDS}",
+        "DELETE FROM notification_event WHERE name LIKE 'dfval-notify%'",
+        f"DELETE FROM user_preferences WHERE user_id IN ({AGENT_RW}, {AGENT_RO})",
         f"DELETE FROM users WHERE id IN ({AGENT_RW}, {AGENT_RO})",
     ):
         conn.execute(text(sql))
@@ -460,3 +469,160 @@ async def test_znuny_format_readers_return_space_separated_dates(env: Any) -> No
     assert attrs["DynamicField_WaveDue"] == "2026-02-01 00:00:00"
     assert _evaluate_field("2026-02-01 00:00:00", "String", attrs["DynamicField_WaveDue"])
     assert _evaluate_field("2026-01-31 00:00:00", "GreaterThan", attrs["DynamicField_WaveDue"])
+
+
+def _legacy_row(url: str, name: str, value_text: str) -> None:
+    _query(
+        url,
+        "INSERT INTO dynamic_field_value (field_id, object_id, value_text) VALUES (:f, :o, :v)",
+        f=DFS[name][0],
+        o=TICKET_ID,
+        v=value_text,
+    )
+
+
+@pytest.mark.db
+async def test_reads_use_the_typed_column_not_the_first_non_empty(env: Any) -> None:
+    from tiqora.domain.dynamic_field_values import get_df_values
+
+    url, factory = env
+    # Stray value_text next to the typed value must not shadow it (Znuny ValueGet).
+    _query(
+        url,
+        "INSERT INTO dynamic_field_value (field_id, object_id, value_text, value_int)"
+        " VALUES (:f, :o, 'junk', 1)",
+        f=DFS["WaveFlag"][0],
+        o=TICKET_ID,
+    )
+    _query(
+        url,
+        "INSERT INTO dynamic_field_value (field_id, object_id, value_text, value_date)"
+        " VALUES (:f, :o, 'junk', :d)",
+        f=DFS["WaveDue"][0],
+        o=TICKET_ID,
+        d=datetime(2026, 2, 1),
+    )
+    async with factory() as session:
+        flag = await load_ticket_dynamic_field(session, "WaveFlag")
+        due = await load_ticket_dynamic_field(session, "WaveDue")
+        assert flag is not None and due is not None
+        assert await get_df_values(session, flag, TICKET_ID) == ["1"]
+        assert await get_df_values(session, due, TICKET_ID) == ["2026-02-01 00:00:00"]
+
+
+@pytest.mark.db
+async def test_legacy_value_text_of_typed_field_is_read_and_rewritten(env: Any) -> None:
+    from tiqora.domain.dynamic_field_values import get_df_values
+
+    url, factory = env
+    _legacy_row(url, "WaveDue", "2026-02-01")
+    _legacy_row(url, "WaveFlag", "1")
+    async with factory() as session:
+        due = await load_ticket_dynamic_field(session, "WaveDue")
+        flag = await load_ticket_dynamic_field(session, "WaveFlag")
+        assert due is not None and flag is not None
+        assert await get_df_values(session, due, TICKET_ID) == ["2026-02-01 00:00:00"]
+        assert await get_df_values(session, flag, TICKET_ID) == ["1"]
+    # Same logical value, but the legacy row counts as changed -> typed column.
+    assert await _set(factory, "WaveDue", ["2026-02-01"]) is True
+    assert await _set(factory, "WaveFlag", ["1"]) is True
+    assert _rows(url, "WaveDue") == [(None, datetime(2026, 2, 1), None)]
+    assert _rows(url, "WaveFlag") == [(None, None, 1)]
+    # Now it is a normal typed row again: unchanged -> no-op.
+    assert await _set(factory, "WaveDue", ["2026-02-01"]) is False
+    assert await _set(factory, "WaveFlag", ["1"]) is False
+
+
+@pytest.mark.db
+async def test_event_is_named_per_field_like_znuny(env: Any) -> None:
+    url, factory = env
+    await _set(factory, "WaveText", ["x"])
+    rows = _query(
+        url, "SELECT event_type FROM tiqora_event_outbox WHERE ticket_id = :t", t=TICKET_ID
+    )
+    assert [r[0] for r in rows] == ["TicketDynamicFieldUpdate_WaveText"]
+
+
+@pytest.mark.db
+async def test_znuny_notification_bound_to_df_event_fires(env: Any) -> None:
+    from tiqora.channels.email.smtp import CapturingMailSender
+    from tiqora.config import get_settings
+    from tiqora.domain.settings_store import KEY_NOTIFICATION_SENDER_EMAIL, set_setting
+    from tiqora.worker.notifications import process_event
+    from tiqora.znuny.sysconfig import SysConfig
+
+    url, factory = env
+    _query(
+        url,
+        "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+        " VALUES (:u, 'UserEmail', 'dfval.rw@example.org')",
+        u=AGENT_RW,
+    )
+    _query(
+        url,
+        "INSERT INTO notification_event (name, valid_id, create_time, create_by,"
+        " change_time, change_by) VALUES ('dfval-notify', 1, :t, 1, :t, 1)",
+        t=NOW,
+    )
+    nid = _query(url, "SELECT id FROM notification_event WHERE name = 'dfval-notify'")[0][0]
+    for key, value in (
+        ("Events", "TicketDynamicFieldUpdate_WaveText"),
+        ("Transports", "Email"),
+        ("Recipients", "AgentOwner"),
+    ):
+        _query(
+            url,
+            "INSERT INTO notification_event_item (notification_id, event_key, event_value)"
+            " VALUES (:n, :k, :v)",
+            n=nid,
+            k=key,
+            v=value,
+        )
+    _query(
+        url,
+        "INSERT INTO notification_event_message (notification_id, subject, text,"
+        " content_type, language) VALUES (:n, 'DF changed', 'body', 'text/plain', 'en')",
+        n=nid,
+    )
+    async with factory() as session:
+        await set_setting(session, KEY_NOTIFICATION_SENDER_EMAIL, "support@example.org")
+    await _set(factory, "WaveText", ["x"])
+    [(event_type,)] = _query(
+        url, "SELECT event_type FROM tiqora_event_outbox WHERE ticket_id = :t", t=TICKET_ID
+    )
+    sender = CapturingMailSender()
+    async with factory() as session, session.begin():
+        sent, failed = await process_event(
+            session,
+            SysConfig(session),
+            sender,
+            event_type=event_type,
+            ticket_id=TICKET_ID,
+            payload={},
+            user_id=1,
+            settings=get_settings(),
+        )
+    assert (sent, failed) == (1, 0)
+    # The pre-Znuny plain name no longer matches a notification bound per field.
+    async with factory() as session, session.begin():
+        assert await process_event(
+            session,
+            SysConfig(session),
+            CapturingMailSender(),
+            event_type="TicketDynamicFieldUpdate",
+            ticket_id=TICKET_ID,
+            payload={},
+            user_id=1,
+            settings=get_settings(),
+        ) == (0, 0)
+
+
+def test_webhook_plain_df_event_subscription_matches_per_field_events() -> None:
+    from tiqora.worker.webhooks import webhook_matches_event
+
+    assert webhook_matches_event('["TicketDynamicFieldUpdate"]', "TicketDynamicFieldUpdate_Foo")
+    assert webhook_matches_event('["TicketDynamicFieldUpdate_Foo"]', "TicketDynamicFieldUpdate_Foo")
+    assert not webhook_matches_event(
+        '["TicketDynamicFieldUpdate_Bar"]', "TicketDynamicFieldUpdate_Foo"
+    )
+    assert not webhook_matches_event('["TicketCreate"]', "TicketDynamicFieldUpdate_Foo")

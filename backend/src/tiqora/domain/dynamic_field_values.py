@@ -31,6 +31,7 @@ DF_EDITABLE_TYPES = frozenset(
     {"Text", "TextArea", "Dropdown", "Multiselect", "Checkbox", "Date", "DateTime"}
 )
 HISTORY_MAX_CHARS = 166
+DF_UPDATE_EVENT_PREFIX = "TicketDynamicFieldUpdate_"
 
 _SINGLE_VALUE_TYPES = frozenset({"Text", "TextArea", "Dropdown", "Date", "DateTime", "Checkbox"})
 _DATE_RE = re.compile(r"\A(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?\Z")
@@ -110,9 +111,21 @@ async def load_ticket_dynamic_field(session: AsyncSession, name: str) -> Dynamic
     return DynamicFieldConfig(id=int(row[0]), name=str(row[1]), field_type=str(row[2]))
 
 
-async def get_df_values(
+def _fmt_date(value: Any) -> str:
+    return value.strftime("%Y-%m-%d %H:%M:%S") if isinstance(value, datetime) else str(value)
+
+
+async def _read_df_values(
     session: AsyncSession, field: DynamicFieldConfig, object_id: int
-) -> list[str]:
+) -> tuple[list[str], bool]:
+    """Read stored values by field type (Znuny ``ValueGet``): Checkbox from
+    ``value_int``, Date/DateTime from ``value_date``, everything else from
+    ``value_text``.
+
+    Returns ``(values, has_legacy)``. ``has_legacy`` is True when a Date/DateTime/
+    Checkbox row has an empty typed column but a ``value_text`` (written by older
+    Tiqora versions): it is still read, but the caller must rewrite it.
+    """
     rows = (
         await session.execute(
             text(
@@ -123,14 +136,30 @@ async def get_df_values(
         )
     ).fetchall()
     out: list[str] = []
+    legacy = False
     for vt, vi, vd in rows:
-        if vt is not None:
+        if field.field_type == "Checkbox":
+            if vi is not None:
+                out.append(str(int(vi)))
+            elif vt is not None:
+                legacy = True
+                out.append(str(vt))
+        elif field.field_type in ("Date", "DateTime"):
+            if vd is not None:
+                out.append(_fmt_date(vd))
+            elif vt is not None:
+                legacy = True
+                parsed = _parse_datetime(str(vt))
+                out.append(_fmt_date(parsed) if parsed is not None else str(vt))
+        elif vt is not None:
             out.append(str(vt))
-        elif vi is not None:
-            out.append(str(int(vi)))
-        elif vd is not None:
-            out.append(vd.strftime("%Y-%m-%d %H:%M:%S") if isinstance(vd, datetime) else str(vd))
-    return out
+    return out, legacy
+
+
+async def get_df_values(
+    session: AsyncSession, field: DynamicFieldConfig, object_id: int
+) -> list[str]:
+    return (await _read_df_values(session, field, object_id))[0]
 
 
 def df_values_differ(old: Sequence[str], new: Sequence[str]) -> bool:
@@ -187,8 +216,10 @@ async def set_ticket_dynamic_field(
     from tiqora.domain.ticket_write_service import _emit_event
 
     new = normalize_df_values(field.field_type, values)
-    old = await get_df_values(session, field, ticket_id)
-    if not df_values_differ(old, new):
+    old, legacy = await _read_df_values(session, field, ticket_id)
+    # A legacy value_text row of a typed field counts as changed so it is
+    # rewritten into the typed column (only the stored form differs).
+    if not legacy and not df_values_differ(old, new):
         return False
 
     await session.execute(
@@ -235,9 +266,11 @@ async def set_ticket_dynamic_field(
         user_id=user_id,
     )
     await invalidate_ticket_cache(session, ticket_id)
+    # Znuny names the event per field (``TicketDynamicFieldUpdate_<Name>``); that is
+    # what notification events and GI invokers bind to.
     await _emit_event(
         session,
-        "TicketDynamicFieldUpdate",
+        f"{DF_UPDATE_EVENT_PREFIX}{field.name}",
         ticket_id,
         {"field": field.name, "values": new},
     )

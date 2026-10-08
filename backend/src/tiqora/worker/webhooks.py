@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import get_session_factory
 from tiqora.db.tiqora.models import TiqoraWebhook
+from tiqora.domain.dynamic_field_values import DF_UPDATE_EVENT_PREFIX
 from tiqora.security.outbound import OutboundURLError, pin_outbound_url
 
 logger = structlog.get_logger(__name__)
@@ -59,7 +60,11 @@ def webhook_matches_event(events_json: str, event_type: str) -> bool:
         return False
     if not isinstance(events, list) or not events or "*" in events:
         return True
-    return event_type in events
+    if event_type in events:
+        return True
+    # Znuny emits ``TicketDynamicFieldUpdate_<Field>`` per field; a subscription to the
+    # plain ``TicketDynamicFieldUpdate`` (our former name) keeps matching all of them.
+    return event_type.startswith(DF_UPDATE_EVENT_PREFIX) and "TicketDynamicFieldUpdate" in events
 
 
 async def _deliver_one(
