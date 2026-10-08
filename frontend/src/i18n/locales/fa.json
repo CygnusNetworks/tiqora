@@ -2993,6 +2993,10 @@
           "name": "پاکسازی حسابرسی هوش مصنوعی",
           "description": "ردیف‌های گزارش حسابرسی LLM را که از حفظ پیکربندی‌شده گذشته است، یک بار در روز حذف می‌کند."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "تمدید گواهی S/MIME مشتری",
           "description": "گواهی‌های تمدیدشدهٔ مشتری را روزی یک بار از پشتوانهٔ مشتری وارد می‌کند (Znuny RenewCustomerSMIMECertificates؛ به SMIME::FetchFromCustomer نیاز دارد)."

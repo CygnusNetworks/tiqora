@@ -2993,6 +2993,10 @@
           "name": "AI audit tisztítás",
           "description": "Naponta egyszer törli az LLM-naplózási naplósorokat a konfigurált megőrzésen túl."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Ügyfél S/MIME-tanúsítványainak megújítása",
           "description": "Naponta egyszer átveszi a megújított ügyféltanúsítványokat az ügyfél-háttérrendszerből (Znuny RenewCustomerSMIMECertificates; kell hozzá: SMIME::FetchFromCustomer)."

@@ -2993,6 +2993,10 @@
           "name": "AI-revisionsrensning",
           "description": "Raderar LLM-revisionsloggrader som passerat konfigurerad lagringstid en gång om dagen."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Förnyelse av S/MIME-kundcertifikat",
           "description": "Importerar förnyade kundcertifikat från kundbackend en gång om dagen (Znuny RenewCustomerSMIMECertificates; kräver SMIME::FetchFromCustomer)."

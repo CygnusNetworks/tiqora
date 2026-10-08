@@ -200,6 +200,16 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         interval_settings_attr="jobs_poll_interval_seconds",
         tick_timeout_seconds=STATUS_EVERY_SECONDS,
     ),
+    # Deletes expired Znuny `sessions` rows (always on, like Znuny's Maint::Session::DeleteExpired).
+    DaemonService(
+        slug="znuny_session_purge",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="interval",
+        interval_key=None,
+        interval_settings_attr="znuny_session_purge_interval_seconds",
+    ),
     DaemonService(
         slug="smime_customer_renew",
         enabled_key=KEY_SMIME_CUSTOMER_RENEW_ENABLED,

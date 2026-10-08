@@ -2993,6 +2993,10 @@
           "name": "AI pulizia dell'audit",
           "description": "Elimina LLM righe del registro di controllo oltre il periodo di conservazione configurato una volta al giorno."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Rinnovo dei certificati S/MIME dei clienti",
           "description": "Importa ogni giorno dal backend clienti i certificati cliente rinnovati (Znuny RenewCustomerSMIMECertificates; richiede SMIME::FetchFromCustomer)."

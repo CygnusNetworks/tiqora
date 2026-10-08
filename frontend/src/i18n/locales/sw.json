@@ -2993,6 +2993,10 @@
           "name": "Usafishaji wa ukaguzi wa AI",
           "description": "Hufuta safumlalo za kumbukumbu za ukaguzi za LLM kupita uhifadhi uliosanidiwa mara moja kwa siku."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Usasishaji wa vyeti vya wateja vya S/MIME",
           "description": "Huingiza vyeti vya wateja vilivyosasishwa kutoka kwa mfumo wa nyuma wa wateja mara moja kwa siku (Znuny RenewCustomerSMIMECertificates; inahitaji SMIME::FetchFromCustomer)."

@@ -2993,6 +2993,10 @@
           "name": "การล้างการตรวจสอบ AI",
           "description": "ลบแถวบันทึกการตรวจสอบ LLM เลยการเก็บรักษาที่กำหนดค่าไว้วันละครั้ง"
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "การต่ออายุใบรับรองลูกค้า S/MIME",
           "description": "นำเข้าใบรับรองลูกค้าที่ต่ออายุแล้วจากแบ็กเอนด์ลูกค้าวันละครั้ง (Znuny RenewCustomerSMIMECertificates ต้องมี SMIME::FetchFromCustomer)"

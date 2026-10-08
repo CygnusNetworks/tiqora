@@ -72,6 +72,12 @@ def _seed(sync_url: str) -> None:
                 ),
                 {"id": uid, "l": login, "t": now},
             )
+        conn.execute(
+            text(
+                "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+                " VALUES (8992, 'UserEmail', 'gi8992@example.test')"
+            )
+        )
         group_id = conn.execute(
             text("SELECT id FROM permission_groups WHERE name = 'admin'")
         ).scalar()
@@ -189,3 +195,13 @@ async def test_bad_csv_is_wrong_input_structure(sync_url: str) -> None:
     res = await _post(sync_url, {"OutOfOfficeEntriesCSVString": "UserLogin\n"})
     assert res["Error"]["ErrorCode"] == "OutOfOffice.WrongInputStructure"
     assert "OutOfOfficeEntriesCSVString" in res["Error"]["ErrorMessage"]
+
+
+async def test_csv_row_resolved_by_email(sync_url: str) -> None:
+    csv = "UserEmail,StartDate,EndDate,OutOfOffice\ngi8992@example.test,2026-05-01,2026-05-03,yes\n"
+    res = await _post(sync_url, {"OutOfOfficeEntriesCSVString": csv})
+    assert "Error" not in res, res
+    assert res["OutOfOfficeEntries"] == [{"OutOfOffice": 1, "UserLogin": "gi8992.agent"}]
+    prefs = _prefs(sync_url, 8992)
+    assert prefs["OutOfOffice"] == "1"
+    assert (prefs["OutOfOfficeStartMonth"], prefs["OutOfOfficeEndDay"]) == ("05", "03")

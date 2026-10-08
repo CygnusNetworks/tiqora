@@ -48,7 +48,7 @@ from tiqora.api.compat.ticket_get import (
 )
 from tiqora.api.compat.webservices import OperationConfig
 from tiqora.api.compat.znuny_session import (
-    SESSION_GET_ALLOWED_KEYS,
+    session_get_key_allowed,
     write_znuny_session,
     znuny_agent_user_data,
     znuny_customer_user_data,
@@ -657,12 +657,17 @@ def _like_pattern(val: Any) -> str:
     return str(val).replace("*", "%")
 
 
+def _pref_param(session: AsyncSession, value: str) -> bytes | str:
+    """Bind value for ``user_preferences.preferences_value`` (BLOB on MySQL, TEXT on PostgreSQL)."""
+    bind = session.get_bind()
+    if bind is not None and bind.dialect.name == "postgresql":
+        return value
+    return value.encode("utf-8")
+
+
 async def _set_user_preference(session: AsyncSession, user_id: int, key: str, value: str) -> None:
     """Upsert a user_preferences row (UTF-8 bytes; plain text on PostgreSQL's TEXT column)."""
-    bind = session.get_bind()
-    raw: bytes | str = (
-        value if bind is not None and bind.dialect.name == "postgresql" else value.encode("utf-8")
-    )
+    raw = _pref_param(session, value)
     existing = (
         await session.execute(
             text(
@@ -979,7 +984,7 @@ async def op_session_get(
         session_data: list[dict[str, Any]] = []
         for key, val, serialized in rows:
             k = str(key)
-            if k not in SESSION_GET_ALLOWED_KEYS:
+            if not session_get_key_allowed(k):
                 continue
             entry: dict[str, Any] = {"Key": k, "Value": val if val is not None else ""}
             if serialized:
@@ -2700,7 +2705,13 @@ def _parse_znuny_datetime(raw: Any) -> datetime | None:
             return datetime.strptime(value, fmt)  # noqa: DTZ007 - Znuny timestamps are naive UTC
         except ValueError:
             continue
-    return None
+    try:  # ISO variants ("2024-06-01T12:00:00", "...Z", "...+02:00")
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
 
 
 async def op_time_accounting_get(
@@ -2839,7 +2850,7 @@ async def op_out_of_office(
                         " WHERE preferences_key = 'UserEmail'"
                         " AND preferences_value = :e LIMIT 1"
                     ),
-                    {"e": str(entry["UserEmail"]).encode("utf-8")},
+                    {"e": _pref_param(session, str(entry["UserEmail"]))},
                 )
             ).first()
             if row:

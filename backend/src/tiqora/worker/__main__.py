@@ -31,6 +31,7 @@ from tiqora.worker.smime_customer_renew import run_smime_customer_renew_tick
 from tiqora.worker.status import record_tick_status, seconds_until_daily
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
 from tiqora.worker.unlock_timeout import run_unlock_timeout_tick
+from tiqora.worker.znuny_session_purge import run_znuny_session_purge_tick
 
 logger = structlog.get_logger(__name__)
 
@@ -227,6 +228,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             telegram_poller_tick,
             settings.telegram_poller_interval_seconds,
             "daemon.telegram_poller.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "znuny_session_purge",
+            run_znuny_session_purge_tick,
+            settings.znuny_session_purge_interval_seconds,
+            None,
             stop,
         ),
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),

@@ -2993,6 +2993,10 @@
           "name": "Чистење на ревизија на вештачката интелигенција",
           "description": "Ги брише редовите на дневникот за ревизија на LLM покрај конфигурираното задржување еднаш дневно."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Обнова на клиентски S/MIME сертификати",
           "description": "Еднаш дневно ги презема обновените сертификати на клиенти од клиентскиот бекенд (Znuny RenewCustomerSMIMECertificates; потребно е SMIME::FetchFromCustomer)."

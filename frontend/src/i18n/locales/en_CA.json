@@ -3001,6 +3001,10 @@
           "name": "AI audit cleanup",
           "description": "Deletes LLM audit log rows past the configured retention once a day."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME customer certificate renewal",
           "description": "Imports renewed customer certificates from the customer backend once a day (Znuny RenewCustomerSMIMECertificates; needs SMIME::FetchFromCustomer)."

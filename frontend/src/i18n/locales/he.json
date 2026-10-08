@@ -2993,6 +2993,10 @@
           "name": "ניקוי ביקורת AI",
           "description": "מוחק שורות יומן ביקורת LLM מעבר לשמירה שהוגדרה פעם ביום."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "חידוש אישורי S/MIME של לקוחות",
           "description": "מייבא אישורי לקוח שחודשו מה־backend של הלקוחות פעם ביום (Znuny RenewCustomerSMIMECertificates; נדרש SMIME::FetchFromCustomer)."

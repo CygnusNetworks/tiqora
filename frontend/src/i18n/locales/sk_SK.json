@@ -2993,6 +2993,10 @@
           "name": "Vyčistenie auditu AI",
           "description": "Raz denne vymaže riadky denníka auditu LLM po nakonfigurovanom uchovávaní údajov."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Obnova zákazníckych certifikátov S/MIME",
           "description": "Raz denne prevezme obnovené zákaznícke certifikáty zo zákazníckeho backendu (Znuny RenewCustomerSMIMECertificates; potrebuje SMIME::FetchFromCustomer)."

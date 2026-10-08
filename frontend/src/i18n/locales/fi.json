@@ -2993,6 +2993,10 @@
           "name": "AI-tarkastuksen puhdistus",
           "description": "Poistaa LLM-tarkastuslokin rivit määritetyn säilytyksen jälkeen kerran päivässä."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME-asiakasvarmenteiden uusiminen",
           "description": "Tuo uusitut asiakasvarmenteet asiakasjärjestelmästä kerran päivässä (Znuny RenewCustomerSMIMECertificates; tarvitsee SMIME::FetchFromCustomer)."

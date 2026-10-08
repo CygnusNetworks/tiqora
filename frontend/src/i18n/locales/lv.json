@@ -2993,6 +2993,10 @@
           "name": "AI audita tīrīšana",
           "description": "Reizi dienā dzēš LLM audita žurnāla rindas, kas pārsniedz konfigurēto saglabāšanu."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME klientu sertifikātu atjaunošana",
           "description": "Reizi dienā importē atjaunotos klientu sertifikātus no klientu aizmugursistēmas (Znuny RenewCustomerSMIMECertificates; nepieciešams SMIME::FetchFromCustomer)."

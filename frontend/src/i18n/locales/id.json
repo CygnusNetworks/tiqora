@@ -2993,6 +2993,10 @@
           "name": "Pembersihan audit AI",
           "description": "Menghapus baris log audit LLM yang melewati retensi yang dikonfigurasi sekali sehari."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Pembaruan sertifikat S/MIME pelanggan",
           "description": "Mengimpor sertifikat pelanggan yang diperbarui dari backend pelanggan sekali sehari (Znuny RenewCustomerSMIMECertificates; memerlukan SMIME::FetchFromCustomer)."

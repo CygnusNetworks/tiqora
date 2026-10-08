@@ -36,6 +36,7 @@ from tiqora.db.tiqora.models import TiqoraAvatar
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
+from tiqora.znuny.sessions import delete_customer_sessions
 
 
 class CustomerNotFoundError(ValueError):
@@ -163,6 +164,8 @@ async def anonymize_customer(
                 },
             )
             result.customer_users += 1
+            # Znuny/GI sessions hold the person's name, e-mail and login.
+            await delete_customer_sessions(session, cust.login)
         if avatar_keys and await _has_avatar_table(session):
             deleted = await session.execute(
                 delete(TiqoraAvatar).where(

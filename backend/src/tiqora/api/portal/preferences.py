@@ -21,6 +21,7 @@ from __future__ import annotations
 import re
 from typing import Annotated, Any
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -43,7 +44,10 @@ from tiqora.domain.customer_auth import AuthenticatedCustomer
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 from tiqora.znuny.password import hash_password, verify_password
+from tiqora.znuny.sessions import delete_customer_sessions
 from tiqora.znuny.sysconfig import SysConfig
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/preferences", tags=["portal-preferences"])
 
@@ -184,7 +188,15 @@ async def change_password(
     except PasswordPolicyError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     user.pw = hash_password(body.new_password)
+    login = user.login
     await session.commit()
+    # A password change ends the customer's other Znuny/GI sessions (best effort, own rollback).
+    try:
+        await delete_customer_sessions(session, login)
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001 — password already committed
+        await session.rollback()
+        logger.warning("portal_znuny_session_revoke_failed", error=str(exc))
     await limiter.reset(login=key, ip=ip)
 
 

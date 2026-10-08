@@ -2993,6 +2993,10 @@
           "name": "AI auditi puhastamine",
           "description": "Kustutab kord päevas LLM-i auditilogi read, mis jäävad konfigureeritud säilitamisest mööda."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME kliendisertifikaatide uuendamine",
           "description": "Impordib uuendatud kliendisertifikaadid kliendi taustsüsteemist kord päevas (Znuny RenewCustomerSMIMECertificates; vajab SMIME::FetchFromCustomer)."

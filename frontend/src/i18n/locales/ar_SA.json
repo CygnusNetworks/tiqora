@@ -2993,6 +2993,10 @@
           "name": "تنظيف تدقيق الذكاء الاصطناعي",
           "description": "حذف صفوف سجل تدقيق LLM بعد فترة الاحتفاظ التي تم تكوينها مرة واحدة يوميًا."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "تجديد شهادات S/MIME للعملاء",
           "description": "يستورد يوميًا شهادات العملاء المجدَّدة من الواجهة الخلفية للعملاء (Znuny RenewCustomerSMIMECertificates؛ يحتاج إلى SMIME::FetchFromCustomer)."

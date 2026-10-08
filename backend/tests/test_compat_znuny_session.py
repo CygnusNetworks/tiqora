@@ -93,6 +93,10 @@ def _seed(sync_url: str) -> None:
         for key, val in (
             ("UserEmail", "gina8970@example.test"),
             ("UserGoogleAuthenticatorSecretKey", "JBSWY3DPEHPK3PXP"),
+            ("UserTOTPSeed", "JBSWY3DPEHPK3PXQ"),
+            ("UserAuthBackend", "LDAP"),
+            ("UserSMIMEHash", "abc123"),
+            ("UserLanguage", "de"),
         ):
             conn.execute(
                 text(
@@ -239,7 +243,15 @@ async def test_session_create_writes_znuny_rows(sync_url: str) -> None:
         assert before <= int(flat["UserSessionStart"]) <= int(time.time())
         assert flat["UserLastRequest"] == flat["UserSessionStart"]
         assert "UserPw" not in rows
-        assert "UserGoogleAuthenticatorSecretKey" not in rows
+        assert flat["UserLanguage"] == "de"
+        # Allow-list: nothing outside it is copied, whatever it is called.
+        for unlisted in (
+            "UserGoogleAuthenticatorSecretKey",
+            "UserTOTPSeed",
+            "UserAuthBackend",
+            "UserSMIMEHash",
+        ):
+            assert unlisted not in rows
         assert all(z == 0 for _v, z in rows.values())
 
         async with db.factory() as s:
@@ -262,6 +274,35 @@ async def test_session_create_writes_znuny_rows(sync_url: str) -> None:
         assert (await db.rows(other))["UserLogin"][0] == OTHER_LOGIN
     finally:
         await db.engine.dispose()
+
+
+@pytest.mark.usefixtures("_no_2fa")
+async def test_agent_without_email_preference_gets_login_as_email(sync_url: str) -> None:
+    db = _Db(sync_url)
+    try:
+        out = await db.create({"UserLogin": OTHER_LOGIN, "Password": PASSWORD})
+        flat = {k: v for k, (v, _z) in (await db.rows(out["SessionID"])).items()}
+        assert flat["UserEmail"] == OTHER_LOGIN
+    finally:
+        await db.engine.dispose()
+
+
+class _Cfg:
+    def __init__(self, module: str) -> None:
+        self.module = module
+
+    async def get(self, name: str, default: Any = None) -> Any:
+        return self.module if name == "SessionModule" else default
+
+
+async def test_session_module_gate() -> None:
+    from tiqora.api.compat.znuny_session import znuny_session_writes_enabled
+
+    cfg = Settings(secret_key="unit-test-secret-key")
+    db_mod = "Kernel::System::AuthSession::DB"
+    assert await znuny_session_writes_enabled(cfg, _Cfg(db_mod))  # type: ignore[arg-type]
+    for other in ("Kernel::System::AuthSession::FS", "Kernel::System::AuthSession::Redis"):
+        assert not await znuny_session_writes_enabled(cfg, _Cfg(other))  # type: ignore[arg-type]
 
 
 @pytest.mark.usefixtures("_no_2fa")

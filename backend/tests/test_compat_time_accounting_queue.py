@@ -199,7 +199,11 @@ class _FakeSettings:
     session_cookie_name = "tiqora_session"
 
 
-async def _entries(sync_url: str) -> list[dict[str, Any]]:
+async def _entries(
+    sync_url: str,
+    start: str = "2024-06-01 00:00:00",
+    end: str = "2024-06-01 23:59:59",
+) -> list[dict[str, Any]]:
     engine = create_async_engine(_async_url(sync_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
@@ -209,8 +213,8 @@ async def _entries(sync_url: str) -> list[dict[str, Any]]:
                 {
                     "SessionID": SESSION,
                     "TimeAccountingUserLogin": "gi8980.agent",
-                    "TimeAccountingStart": "2024-06-01 00:00:00",
-                    "TimeAccountingEnd": "2024-06-01 23:59:59",
+                    "TimeAccountingStart": start,
+                    "TimeAccountingEnd": end,
                 },
                 session,
                 store,
@@ -248,3 +252,38 @@ async def test_queue_at_falls_back_to_current_queue(sync_url: str) -> None:
             assert await queue_at(session, T_MOVED, datetime(2024, 5, 1, 0, 0, 0)) is None
     finally:
         await engine.dispose()
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        ("2024-06-01T00:00:00", "2024-06-01T23:59:59"),
+        ("2024-06-01T00:00:00Z", "2024-06-01T23:59:59+00:00"),
+        ("2024-06-01T02:00:00+02:00", "2024-06-02T01:59:59+02:00"),
+        ("2024-06-01", "2024-06-01 23:59:59"),
+    ],
+)
+async def test_iso_date_bounds_are_accepted(sync_url: str, start: str, end: str) -> None:
+    entries = await _entries(sync_url, start, end)
+    assert len(entries) == 4
+
+
+async def test_unparsable_date_bound_gives_empty_result(sync_url: str) -> None:
+    engine = create_async_engine(_async_url(sync_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
+    try:
+        async with factory() as session:
+            res = await op_time_accounting_get(
+                {
+                    "SessionID": SESSION,
+                    "TimeAccountingUserLogin": "gi8980.agent",
+                    "TimeAccountingStart": "yesterday",
+                    "TimeAccountingEnd": "2024-06-01 23:59:59",
+                },
+                session,
+                store,
+            )
+    finally:
+        await engine.dispose()
+    assert res == {}

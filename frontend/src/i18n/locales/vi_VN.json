@@ -2993,6 +2993,10 @@
           "name": "Dọn dẹp kiểm toán AI",
           "description": "Xóa các hàng nhật ký kiểm tra LLM ngoài thời gian lưu giữ đã định cấu hình mỗi ngày một lần."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Gia hạn chứng chỉ S/MIME của khách hàng",
           "description": "Nhập các chứng chỉ khách hàng đã gia hạn từ backend khách hàng mỗi ngày một lần (Znuny RenewCustomerSMIMECertificates; cần SMIME::FetchFromCustomer)."

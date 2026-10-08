@@ -45,6 +45,7 @@ from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT, _emit_event
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
+from tiqora.znuny.sessions import delete_customer_sessions
 
 # Znuny CacheType sets (mirrored from admin/common — avoid gdpr→api layering).
 _CUSTOMER_USER_CACHE_TYPES: tuple[str, ...] = (
@@ -1479,6 +1480,8 @@ async def run_erasure(
 
             # Agents' starred customers (tiqora-owned, no backup: convenience
             # data). Anonymize follows the new login; delete drops the stars.
+            # Znuny/GI sessions hold the person's name, e-mail and login.
+            await delete_customer_sessions(session, old_login)
             if has_favorites and mode == "anonymize":
                 await session.execute(
                     text(

@@ -2993,6 +2993,10 @@
           "name": "Εκκαθάριση ελέγχου AI",
           "description": "Διαγράφει σειρές καταγραφής ελέγχου LLM πέρα από τη διαμορφωμένη διατήρηση μία φορά την ημέρα."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Ανανέωση πιστοποιητικών S/MIME πελατών",
           "description": "Εισάγει καθημερινά ανανεωμένα πιστοποιητικά πελατών από το backend πελατών (Znuny RenewCustomerSMIMECertificates· χρειάζεται SMIME::FetchFromCustomer)."

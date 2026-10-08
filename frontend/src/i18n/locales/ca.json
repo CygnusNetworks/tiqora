@@ -2993,6 +2993,10 @@
           "name": "Neteja d'auditoria d'IA",
           "description": "Suprimeix les files del registre d'auditoria de LLM més enllà de la retenció configurada una vegada al dia."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Renovació dels certificats S/MIME de client",
           "description": "Importa un cop al dia els certificats de client renovats des del backend de clients (Znuny RenewCustomerSMIMECertificates; cal SMIME::FetchFromCustomer)."

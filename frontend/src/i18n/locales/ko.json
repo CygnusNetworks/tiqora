@@ -2993,6 +2993,10 @@
           "name": "AI 감사 정리",
           "description": "하루에 한 번 구성된 보존 기간을 지난 LLM 감사 로그 행을 삭제합니다."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME 고객 인증서 갱신",
           "description": "갱신된 고객 인증서를 고객 백엔드에서 하루에 한 번 가져옵니다(Znuny RenewCustomerSMIMECertificates, SMIME::FetchFromCustomer 필요)."

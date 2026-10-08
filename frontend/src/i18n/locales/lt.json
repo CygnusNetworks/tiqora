@@ -2993,6 +2993,10 @@
           "name": "AI audito valymas",
           "description": "Kartą per dieną ištrina LLM audito žurnalo eilutes po sukonfigūruoto saugojimo."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME klientų sertifikatų atnaujinimas",
           "description": "Kartą per dieną iš klientų sistemos importuoja atnaujintus klientų sertifikatus (Znuny RenewCustomerSMIMECertificates; reikia SMIME::FetchFromCustomer)."

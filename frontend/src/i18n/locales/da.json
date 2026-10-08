@@ -2993,6 +2993,10 @@
           "name": "AI revision oprydning",
           "description": "Sletter LLM-revisionslogrækker forbi den konfigurerede opbevaring én gang om dagen."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Fornyelse af S/MIME-kundecertifikater",
           "description": "Henter fornyede kundecertifikater fra kundebackenden én gang om dagen (Znuny RenewCustomerSMIMECertificates; kræver SMIME::FetchFromCustomer)."

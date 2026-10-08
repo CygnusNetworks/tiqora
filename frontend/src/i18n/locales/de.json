@@ -3001,6 +3001,10 @@
           "name": "KI-Audit-Bereinigung",
           "description": "Löscht LLM-Audit-Log-Einträge nach Ablauf der konfigurierten Aufbewahrungsfrist täglich."
         },
+        "znuny_session_purge": {
+          "name": "Znuny-Sitzungen aufräumen",
+          "description": "Löscht abgelaufene Sitzungen der Znuny-Schnittstelle (GenericInterface) alle paar Minuten."
+        },
         "smime_customer_renew": {
           "name": "S/MIME-Kundenzertifikate erneuern",
           "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."

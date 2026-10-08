@@ -2993,6 +2993,10 @@
           "name": "AI denetim temizliği",
           "description": "Günde bir kez, yapılandırılmış saklamayı aşan LLM denetim günlüğü satırlarını siler."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME müşteri sertifikası yenileme",
           "description": "Yenilenmiş müşteri sertifikalarını günde bir kez müşteri arka ucundan alır (Znuny RenewCustomerSMIMECertificates; SMIME::FetchFromCustomer gerekir)."

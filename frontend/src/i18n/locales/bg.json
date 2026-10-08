@@ -2993,6 +2993,10 @@
           "name": "Почистване на одит на AI",
           "description": "Изтрива редове от регистрационния файл за одит на LLM след конфигурираното задържане веднъж на ден."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Подновяване на клиентски S/MIME сертификати",
           "description": "Веднъж дневно импортира подновени клиентски сертификати от клиентския източник на данни (Znuny RenewCustomerSMIMECertificates; изисква SMIME::FetchFromCustomer)."

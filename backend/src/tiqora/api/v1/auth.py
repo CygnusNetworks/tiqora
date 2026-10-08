@@ -15,7 +15,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.compat.znuny_session import delete_znuny_agent_sessions
 from tiqora.api.deps import (
     AppSettings,
     CurrentUser,
@@ -71,6 +70,7 @@ from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
+from tiqora.znuny.sessions import delete_agent_sessions
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -366,10 +366,17 @@ async def complete_password_setup(
     await session.commit()
     # Setting a password through a one-time link is also a recovery path: drop
     # any session that predates the new credential (security review M-2).
+    # DB rows first (own try + rollback), then Redis: a Redis outage must not skip the DB side.
+    try:
+        await delete_agent_sessions(session, user_id)
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001 — password already committed
+        await session.rollback()
+        logger.warning(
+            "password_setup_znuny_session_revoke_failed", user_id=user_id, error=str(exc)
+        )
     try:
         await SessionStore(redis_client, settings).revoke_user_sessions(user_id)
-        await delete_znuny_agent_sessions(session, user_id)
-        await session.commit()
     except Exception as exc:  # noqa: BLE001 — password already committed
         logger.warning("password_setup_session_revoke_failed", user_id=user_id, error=str(exc))
     await limiter.reset(login="__password_setup__", ip=ip)

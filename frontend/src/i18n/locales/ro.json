@@ -2993,6 +2993,10 @@
           "name": "Curățarea auditului AI",
           "description": "Șterge rândurile din jurnalul de audit LLM dincolo de păstrarea configurată o dată pe zi."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Reînnoire certificate S/MIME ale clienților",
           "description": "Importă zilnic certificatele de client reînnoite din backend-ul de clienți (Znuny RenewCustomerSMIMECertificates; necesită SMIME::FetchFromCustomer)."

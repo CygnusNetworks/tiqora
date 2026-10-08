@@ -9,7 +9,6 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
-from tiqora.api.compat.znuny_session import delete_znuny_agent_sessions
 from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.common import (
     USER_CACHE_TYPES,
@@ -58,6 +57,7 @@ from tiqora.domain.welcome_invite import send_setup_invite
 from tiqora.domain.welcome_mail import WelcomeMailError
 from tiqora.permissions.engine import PERMISSION_KEYS
 from tiqora.znuny.password import hash_password
+from tiqora.znuny.sessions import delete_agent_sessions
 
 logger = structlog.get_logger(__name__)
 
@@ -289,12 +289,19 @@ async def update_user(
     # credential it was taken with (security review M-2). Never let a Redis
     # hiccup fail the password write that already committed.
     if password_changed:
+        # DB rows first (own try + rollback), then Redis: a Redis outage must not skip the DB.
+        try:
+            await delete_agent_sessions(session, user_id)
+            await session.commit()
+        except Exception as exc:  # noqa: BLE001 — password already changed
+            await session.rollback()
+            logger.warning(
+                "admin.users.znuny_session_revoke_failed", user_id=user_id, error=str(exc)
+            )
         try:
             revoked = await SessionStore(await get_redis(request), settings).revoke_user_sessions(
                 user_id
             )
-            await delete_znuny_agent_sessions(session, user_id)
-            await session.commit()
             logger.info(
                 "admin.users.sessions_revoked",
                 user_id=user_id,

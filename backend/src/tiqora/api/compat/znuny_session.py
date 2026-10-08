@@ -8,7 +8,6 @@ secrets (2FA seeds, tokens, API keys) are skipped.
 
 from __future__ import annotations
 
-import re
 import secrets
 import string
 from collections.abc import Mapping
@@ -19,11 +18,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.compat.ticket_get import znuny_ts
 from tiqora.config import Settings
+from tiqora.znuny.sessions import delete_agent_sessions as delete_znuny_agent_sessions
 from tiqora.znuny.sysconfig import SysConfig
 
 _ALPHABET = string.ascii_letters + string.digits
 _SESSION_ID_LENGTH = 32
-_SECRET_KEY_RE = re.compile(r"secret|token|pass|pw|key|cert|auth|hash", re.IGNORECASE)
+# Preference rows copied into a session: an allow-list, so a new secret-bearing preference
+# (2FA seed, token, API key) never leaks into `sessions` or SessionGet by name accident.
+_PREF_ALLOWED = frozenset(
+    {
+        "UserEmail",
+        "UserLanguage",
+        "UserTimeZone",
+        "UserMobile",
+        "UserTitle",
+        "UserFirstname",
+        "UserLastname",
+        "UserFullname",
+        "UserCustomerID",
+    }
+)
+_PREF_ALLOWED_PREFIXES = ("OutOfOffice",)
+
+
+def _pref_allowed(key: str) -> bool:
+    return key in _PREF_ALLOWED or key.startswith(_PREF_ALLOWED_PREFIXES)
+
 
 # Keys SessionGet may hand out (everything else - secrets included - stays private).
 SESSION_GET_ALLOWED_KEYS = frozenset(
@@ -45,8 +65,15 @@ SESSION_GET_ALLOWED_KEYS = frozenset(
         "UserRemoteAddr",
         "UserRemoteUserAgent",
         "SessionSource",
+        "UserLanguage",
+        "UserTimeZone",
+        "UserMobile",
     }
 )
+
+
+def session_get_key_allowed(key: str) -> bool:
+    return key in SESSION_GET_ALLOWED_KEYS or key.startswith("OutOfOffice")
 
 
 def random_string(length: int = _SESSION_ID_LENGTH) -> str:
@@ -124,8 +151,11 @@ async def znuny_agent_user_data(
         )
     ).all()
     for key, value in prefs:
-        if key and not _SECRET_KEY_RE.search(str(key)):
+        if key and _pref_allowed(str(key)):
             data.setdefault(str(key), _utf8(value))
+    # User.pm GetUserData: an agent without an e-mail preference uses the login.
+    if not data.get("UserEmail"):
+        data["UserEmail"] = data["UserLogin"]
     return data
 
 
@@ -166,7 +196,7 @@ async def znuny_customer_user_data(session: AsyncSession, login: str) -> dict[st
         )
     ).all()
     for key, value in prefs:
-        if key and not _SECRET_KEY_RE.search(str(key)):
+        if key and _pref_allowed(str(key)):
             data.setdefault(str(key), _utf8(value))
     return data
 
@@ -211,26 +241,13 @@ async def write_znuny_session(
     return session_id
 
 
-async def delete_znuny_agent_sessions(session: AsyncSession, user_id: int) -> int:
-    """Delete every agent session row-set of *user_id* (revocation); caller commits.
-
-    Ids are loaded first and deleted by IN-list: MySQL rejects a DELETE that selects from the
-    table it deletes from.
-    """
-    ids = [
-        str(r[0])
-        for r in (
-            await session.execute(
-                text(
-                    "SELECT a.session_id FROM sessions a JOIN sessions b"
-                    " ON a.session_id = b.session_id"
-                    " WHERE a.data_key = 'UserID' AND a.data_value = :uid"
-                    " AND b.data_key = 'UserType' AND b.data_value = 'User'"
-                ),
-                {"uid": str(user_id)},
-            )
-        ).all()
-    ]
-    for sid in ids:
-        await session.execute(text("DELETE FROM sessions WHERE session_id = :sid"), {"sid": sid})
-    return len(ids)
+__all__ = [
+    "SESSION_GET_ALLOWED_KEYS",
+    "delete_znuny_agent_sessions",
+    "random_string",
+    "session_get_key_allowed",
+    "write_znuny_session",
+    "znuny_agent_user_data",
+    "znuny_customer_user_data",
+    "znuny_session_writes_enabled",
+]

@@ -2993,6 +2993,10 @@
           "name": "AI czyszczenie audytu",
           "description": "Raz dziennie usuwa LLM wierszy dziennika audytu poza skonfigurowanym przechowywaniem."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Odnawianie certyfikatów S/MIME klientów",
           "description": "Raz dziennie importuje odnowione certyfikaty klientów z backendu klienta (Znuny RenewCustomerSMIMECertificates; wymaga SMIME::FetchFromCustomer)."

@@ -2993,6 +2993,10 @@
           "name": "AI审计清理",
           "description": "每天删除一次超过配置保留时间的 LLM 审核日志行。"
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME 客户证书续期",
           "description": "每天从客户后端导入一次已续期的客户证书（Znuny RenewCustomerSMIMECertificates；需要 SMIME::FetchFromCustomer）。"

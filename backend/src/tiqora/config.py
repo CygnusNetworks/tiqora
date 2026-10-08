@@ -402,6 +402,10 @@ class Settings(BaseSettings):
     jobs_poll_interval_seconds: int = Field(
         default=2, ge=1, le=60, validation_alias="TIQORA_JOBS_POLL_INTERVAL_SECONDS"
     )
+    # How often the worker deletes expired Znuny `sessions` rows.
+    znuny_session_purge_interval_seconds: int = Field(
+        default=300, ge=5, le=86400, validation_alias="TIQORA_ZNUNY_SESSION_PURGE_INTERVAL_SECONDS"
+    )
     # Outbound SMTP. Disabled by default so agent email replies store the
     # article without 502ing when no relay is configured (prod often has no
     # TIQORA_SMTP_HOST). Set TIQORA_SMTP_ENABLED=1 once a real relay is wired.

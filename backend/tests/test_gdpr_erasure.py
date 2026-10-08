@@ -315,6 +315,36 @@ async def _insert_article_bundle(
     return article_id
 
 
+async def _insert_customer_session(session: AsyncSession, sid: str, login: str) -> None:
+    """A Znuny/GI customer session row-set (name and e-mail live in it)."""
+    for key, val in (
+        ("UserID", login),
+        ("UserLogin", login),
+        ("UserType", "Customer"),
+        ("UserEmail", login),
+        ("UserLastRequest", "1900000000"),
+        ("UserSessionStart", "1900000000"),
+    ):
+        await session.execute(
+            text(
+                "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
+                " VALUES (:s, :k, :v, 0)"
+            ),
+            {"s": sid, "k": key, "v": val},
+        )
+    await session.commit()
+
+
+async def _session_rows(session: AsyncSession, sid: str) -> int:
+    return int(
+        (
+            await session.execute(
+                text("SELECT COUNT(*) FROM sessions WHERE session_id = :s"), {"s": sid}
+            )
+        ).scalar_one()
+    )
+
+
 async def _factory(url: str) -> tuple:
     engine = create_async_engine(_async_url(url))
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -764,6 +794,10 @@ async def test_anonymize_scrubs_and_rollback_restores(
             actor="test",
         )
 
+    sid = f"GI8960ANO{'MY' if mysql else 'PG'}"
+    async with factory() as session:
+        await _insert_customer_session(session, sid, login)
+
     result = await run_erasure(
         factory,
         Settings(),
@@ -782,6 +816,7 @@ async def test_anonymize_scrubs_and_rollback_restores(
     expected_login = mapper.map_value(login, "login")
 
     async with factory() as session:
+        assert await _session_rows(session, sid) == 0
         row = (
             await session.execute(
                 text(
@@ -1034,6 +1069,7 @@ async def test_delete_removes_master_tokenizes_ticket_and_rollback(
             {"u": login},
         )
         await session.commit()
+        await _insert_customer_session(session, f"GI8960DEL{'MY' if mysql else 'PG'}", login)
 
     result = await run_erasure(
         factory,
@@ -1052,6 +1088,7 @@ async def test_delete_removes_master_tokenizes_ticket_and_rollback(
             )
         ).scalar_one()
         assert int(gone) == 0
+        assert await _session_rows(session, f"GI8960DEL{'MY' if mysql else 'PG'}") == 0
         prefs = (
             await session.execute(
                 text("SELECT COUNT(*) FROM customer_preferences WHERE user_id = :u"),

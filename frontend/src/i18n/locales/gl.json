@@ -2993,6 +2993,10 @@
           "name": "Limpeza de auditoría de IA",
           "description": "Elimina as filas do rexistro de auditoría de LLM despois da retención configurada unha vez ao día."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "Renovación dos certificados S/MIME do cliente",
           "description": "Importa cada día os certificados de cliente renovados desde o backend de clientes (Znuny RenewCustomerSMIMECertificates; precisa SMIME::FetchFromCustomer)."

@@ -2993,6 +2993,10 @@
           "name": "AI auditopschoning",
           "description": "Verwijdert eenmaal per dag LLM auditlogboekrijen voorbij de geconfigureerde retentie."
         },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
         "smime_customer_renew": {
           "name": "S/MIME-klantcertificaten vernieuwen",
           "description": "Neemt vernieuwde klantcertificaten eenmaal per dag over uit de klantbackend (Znuny RenewCustomerSMIMECertificates; vereist SMIME::FetchFromCustomer)."
