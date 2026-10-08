@@ -74,7 +74,7 @@ async def refresh_provider_metadata(
     return provider_from_row(row, secret_key=settings.secret_key)
 
 
-async def _record_error(session: AsyncSession, provider_id: int, message: str) -> None:
+async def record_metadata_error(session: AsyncSession, provider_id: int, message: str) -> None:
     await session.rollback()
     row = await session.get(TiqoraIdentityProvider, provider_id)
     if row is not None:
@@ -122,7 +122,7 @@ async def run_identity_metadata_refresh_tick(
                     exc_info=not isinstance(exc, SamlMetadataError),
                 )
                 try:
-                    await _record_error(session, record.id, message)
+                    await record_metadata_error(session, record.id, message)
                 except Exception:
                     logger.exception("identity_metadata_error_not_stored", provider_id=record.id)
                     await session.rollback()
@@ -131,6 +131,7 @@ async def run_identity_metadata_refresh_tick(
 
 
 __all__ = [
+    "record_metadata_error",
     "refresh_provider_metadata",
     "run_identity_metadata_refresh_tick",
 ]

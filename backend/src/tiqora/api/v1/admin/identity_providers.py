@@ -3,6 +3,9 @@
 Static paths are declared before ``/{provider_id}``. Secrets are never returned: they show
 as ``SECRET_MASK`` when set. Env rows (``source="env"``) are read-only. Every route is
 admin-only and lives under ``/api/v1/admin`` (API-key scope area ``admin``).
+
+SAML test logins use the SAVED IdP metadata: a draft's metadata URL or XML is not fetched or
+parsed for the test (save first, then test). Other draft fields apply in memory.
 """
 
 from __future__ import annotations
@@ -54,7 +57,10 @@ from tiqora.identity.config_models import (
 )
 from tiqora.identity.env_providers import ensure_env_providers, runtime_config
 from tiqora.identity.login import ExternalIdentity, plan_login, plan_to_dict
-from tiqora.identity.metadata_refresh import _record_error, refresh_provider_metadata
+from tiqora.identity.metadata_refresh import (
+    record_metadata_error,
+    refresh_provider_metadata,
+)
 from tiqora.identity.presets import PRESETS
 from tiqora.identity.saml_metadata import SamlMetadataError, parse_idp_metadata
 from tiqora.identity.store import (
@@ -87,6 +93,7 @@ MSG_NO_LDAP_TEST = (
     "Für LDAP gibt es keine Testanmeldung – bitte die Vorschau mit Beispielwerten nutzen."
 )
 MSG_NOT_FOUND = "Anmeldedienst nicht gefunden."
+MSG_NO_METADATA_URL = "Für diesen Anmeldedienst ist keine Metadaten-URL hinterlegt."
 MSG_NOT_SAML = "Metadaten gibt es nur für SAML-Anmeldedienste."
 MSG_AUDIENCE = "Dieser Anmeldedienst gilt nicht für diese Zielgruppe."
 
@@ -437,7 +444,7 @@ async def update_identity_provider(
         record = await update_provider(
             session, provider_id, body, secret_key=settings.secret_key, actor_id=admin.id
         )
-        if before is not None and _metadata_stale(before, record):
+        if body.config is not None and before is not None and _metadata_stale(before, record):
             record = await _check_metadata(session, settings, record)
         await session.commit()
     except ProviderNotFound:
@@ -477,6 +484,12 @@ async def refresh_identity_provider_metadata(
     record = await _require(session, settings, provider_id)
     if record.kind != "saml":
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": MSG_NOT_SAML})
+    cfg = record.config
+    if isinstance(cfg, SamlProviderConfig) and not cfg.idp_metadata_url.strip():
+        # Pasted XML (or nothing): there is nothing to fetch and nothing to record as an error.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": MSG_NO_METADATA_URL}
+        )
     try:
         record = await refresh_provider_metadata(
             session, record, settings=settings, transport=_metadata_transport
@@ -485,7 +498,7 @@ async def refresh_identity_provider_metadata(
     except SamlMetadataError as exc:
         message = str(exc)
         with contextlib.suppress(Exception):
-            await _record_error(session, record.id, message)
+            await record_metadata_error(session, record.id, message)
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": message}
         ) from exc
@@ -580,6 +593,8 @@ async def preview_identity_mapping(
     _ = admin
     await _ensure_env(session, settings)
     record = await _require(session, settings, provider_id)
+    if not audience_includes(record.audience, body.audience):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"message": MSG_AUDIENCE})
     record = await _check_draft(session, record, body.draft)
     identity = ExternalIdentity(
         provider_id=record.id,

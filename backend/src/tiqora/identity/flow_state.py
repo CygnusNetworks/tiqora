@@ -225,7 +225,9 @@ async def put_test(redis: Any, test_id: str, data: TestRun, *, secret_key: str) 
     """Store a test run. The draft may carry secrets (client secret): it is Fernet-encrypted."""
     payload = data.model_dump(mode="json", exclude={"draft"})
     if data.draft is not None:
-        payload["draft_enc"] = encrypt_secret(secret_key, data.draft.model_dump_json())
+        payload["draft_enc"] = encrypt_secret(
+            secret_key, data.draft.model_dump_json(exclude_unset=True)
+        )
     await redis.set(f"{TEST_PREFIX}{test_id}", json.dumps(payload), ex=TEST_TTL)
 
 

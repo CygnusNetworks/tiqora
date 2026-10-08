@@ -807,3 +807,94 @@ def test_every_identity_admin_route_maps_to_the_admin_api_key_area() -> None:
     paths = [p for p in create_app(_settings()).openapi()["paths"] if p.startswith(BASE)]
     assert len(paths) >= 11
     assert {path_to_area(p) for p in paths} == {"admin"}
+
+
+async def test_clearing_metadata_source_drops_stored_metadata(
+    env: Env, monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    xml = _metadata_xml(tmp_path_factory)
+    monkeypatch.setattr(
+        admin_api,
+        "_metadata_transport",
+        httpx.MockTransport(lambda _r: httpx.Response(200, text=xml)),
+    )
+    created = await env.create("md-clear", preset="generic_saml")
+    ok = await env.patch(
+        created["id"], {"config": {"idp_metadata_url": "https://idp.example.org/md"}}
+    )
+    assert ok.json()["metadata_fetched_at"] is not None
+    cleared = await env.patch(created["id"], {"config": {"idp_metadata_url": ""}})
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["metadata_fetched_at"] is None
+    stored = await get_provider_by_slug(env.session, f"{SLUG}md-clear", secret_key=KEY)
+    assert stored is not None
+    assert stored.metadata_xml is None and stored.metadata_error is None
+
+
+async def test_patch_without_config_never_refetches_metadata(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[str] = []
+
+    def unreachable(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        return httpx.Response(503)
+
+    monkeypatch.setattr(admin_api, "_metadata_transport", httpx.MockTransport(unreachable))
+    stored = await make_provider(
+        env.session,
+        slug=f"{SLUG}md-down",
+        kind="saml",
+        enabled=True,
+        config={"idp_metadata_url": "https://idp.example.org/md"},
+        settings=env.settings,
+    )
+    await env.session.commit()
+    resp = await env.patch(stored.id, {"enabled": False})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["enabled"] is False
+    assert calls == []
+
+
+async def test_refresh_with_pasted_xml_only_is_422_without_stored_error(
+    env: Env, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    created = await env.create("md-pasted", preset="generic_saml")
+    saved = await env.patch(
+        created["id"], {"config": {"idp_metadata_xml": _metadata_xml(tmp_path_factory)}}
+    )
+    assert saved.status_code == 200, saved.text
+    resp = await env.client.post(f"{BASE}/{created['id']}/refresh-metadata")
+    assert resp.status_code == 422
+    assert "Metadaten-URL" in resp.json()["detail"]["message"]
+    assert (await env.client.get(f"{BASE}/{created['id']}")).json()["metadata_error"] is None
+
+
+async def test_preview_checks_audience(env: Env) -> None:
+    provider = await env.oidc_provider("prev-aud")
+    resp = await env.client.post(
+        f"{BASE}/{provider['id']}/preview", json={"audience": "customer", "attributes": {}}
+    )
+    assert resp.status_code == 422
+
+
+async def test_stored_draft_keeps_unset_fields(env: Env) -> None:
+    from tiqora.identity import flow_state
+    from tiqora.identity.store import ProviderChanges, get_provider, record_with_changes
+
+    provider = await env.oidc_provider("draft-keep")
+    await env.patch(provider["id"], {"button_label": "Mein Login"})
+    run = flow_state.TestRun(
+        provider_id=provider["id"],
+        admin_id=ADMIN1,
+        audience="agent",
+        draft=ProviderChanges(name="Neuer Name"),
+    )
+    await flow_state.put_test(env.redis, "tid-draft", run, secret_key=KEY)
+    back = await flow_state.get_test(env.redis, "tid-draft", secret_key=KEY)
+    assert back is not None and back.draft is not None
+    assert back.draft.model_fields_set == {"name"}
+    record = await get_provider(env.session, provider["id"], secret_key=KEY)
+    assert record is not None
+    drafted = record_with_changes(record, back.draft)
+    assert (drafted.name, drafted.button_label) == ("Neuer Name", "Mein Login")

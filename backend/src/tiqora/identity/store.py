@@ -76,6 +76,19 @@ __all__ = [
 ]
 
 _NULLABLE_FIELDS = frozenset({"button_label", "button_icon"})
+# Scalar ProviderChanges fields copied 1:1 onto the row / record (None = unchanged unless nullable).
+_SIMPLE_FIELDS = (
+    "name",
+    "audience",
+    "enabled",
+    "sort",
+    "button_label",
+    "button_icon",
+    "match_by",
+    "require_sso_opt_in",
+    "jit_enabled",
+    "sync_mode",
+)
 _RULES_ADAPTER: TypeAdapter[list[RoleRule]] = TypeAdapter(list[RoleRule])
 
 MSG_SLUG_INVALID = "Dieser Kurzname ist ungültig (nur a–z, 0–9 und Bindestrich, 2–63 Zeichen)."
@@ -538,24 +551,21 @@ async def update_provider(
     if merged is not None:
         new_secrets = _secret_values(kind, merged)
         row.config = _encode_config(kind, merged)
+        if (
+            isinstance(merged, SamlProviderConfig)
+            and not merged.idp_metadata_url.strip()
+            and not merged.idp_metadata_xml.strip()
+        ):
+            # Stored trust data must not outlive the admin's configuration.
+            row.metadata_xml = None
+            row.metadata_fetched_at = None
+            row.metadata_error = None
         # Re-encrypting yields a different Fernet token; only rewrite on a real change.
         if new_secrets != _secret_values(kind, current.config):
             row.secrets_enc = _encode_secrets(secret_key, new_secrets)
 
-    simple = (
-        "name",
-        "audience",
-        "enabled",
-        "sort",
-        "button_label",
-        "button_icon",
-        "match_by",
-        "require_sso_opt_in",
-        "jit_enabled",
-        "sync_mode",
-    )
     sent = changes.model_fields_set
-    for field_name in simple:
+    for field_name in _SIMPLE_FIELDS:
         value = getattr(changes, field_name)
         # Only the button fields are nullable; None elsewhere means "unchanged".
         if field_name in sent and (value is not None or field_name in _NULLABLE_FIELDS):
@@ -598,20 +608,7 @@ def record_with_changes(record: ProviderRecord, changes: ProviderChanges) -> Pro
         secrets = frozenset(_secret_values(record.kind, config))
     sent = changes.model_fields_set
     simple: dict[str, Any] = {}
-    for name in (
-        "name",
-        "audience",
-        "enabled",
-        "sort",
-        "button_label",
-        "button_icon",
-        "match_by",
-        "require_sso_opt_in",
-        "jit_enabled",
-        "sync_mode",
-        "attribute_map",
-        "jit_defaults",
-    ):
+    for name in (*_SIMPLE_FIELDS, "attribute_map", "jit_defaults"):
         value = getattr(changes, name)
         if name in sent and (value is not None or name in _NULLABLE_FIELDS):
             simple[name] = value
