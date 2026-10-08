@@ -3000,10 +3000,15 @@
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
+        },
+        "deploy_watch": {
+          "name": "Deploy watcher",
+          "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
         }
       },
       "takeoverBadge": "अधिग्रहण",
-      "settingsLink": "Settings"
+      "settingsLink": "Settings",
+      "deployLive": "No deployment detected yet: Tiqora runs the drafts directly. Please deploy once in Znuny."
     },
     "mailLog": {
       "title": "ईमेल संचार लॉग",

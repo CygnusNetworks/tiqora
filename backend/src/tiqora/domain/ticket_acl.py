@@ -46,6 +46,8 @@ from tiqora.permissions.engine import PERMISSION_KEYS
 
 logger = logging.getLogger(__name__)
 
+_warned_live = False
+
 _VALID = 1
 _ROOT_USER_ID = 1
 
@@ -612,6 +614,10 @@ async def load_valid_acls(session: AsyncSession) -> list[AclRule]:
     if revision is not None:
         acls = revision.dump.get("ACL") or {}
         return [_rule_from_dump(name, acls[name]) for name in sorted(acls)]
+    global _warned_live  # noqa: PLW0603
+    if not _warned_live:
+        _warned_live = True
+        logger.warning("acl_definitions_running_live", extra={"reason": "no deployed revision yet"})
     result = await session.execute(select(Acl).where(Acl.valid_id == _VALID).order_by(Acl.name))
     return [
         AclRule(

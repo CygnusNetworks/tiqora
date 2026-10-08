@@ -273,6 +273,15 @@ export function DaemonsPage() {
                       <div className="mt-0.5 text-xs text-muted">
                         {t(`admin.daemons.services.${svc.slug}.description`)}
                       </div>
+                      {svc.slug === "deploy_watch" &&
+                        (svc.last_result as { mode?: string } | null)?.mode === "live" && (
+                          <div
+                            className="mt-0.5 text-xs text-amber"
+                            data-testid="daemon-deploy-live"
+                          >
+                            {t("admin.daemons.deployLive")}
+                          </div>
+                        )}
                       {svc.slug === "jobs" && (
                         <Link
                           to="/admin/settings/$section"

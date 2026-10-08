@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
+from tiqora.deployed.watcher import run_deploy_watch_tick
 from tiqora.domain.settings_store import get_setting_int
 from tiqora.jobs.runner import JobRunner
 from tiqora.logging_setup import configure_logging
@@ -164,6 +165,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def telegram_poller_tick() -> dict[str, int]:
         return await run_telegram_poller_tick(settings=settings)
 
+    async def deploy_watch_tick() -> dict[str, Any]:
+        return await run_deploy_watch_tick(settings=settings)
+
     from tiqora.extensions import get_registry
 
     job_runner = JobRunner(
@@ -228,6 +232,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             settings.telegram_poller_interval_seconds,
             "daemon.telegram_poller.interval_seconds",
             stop,
+        ),
+        _interval_loop(
+            "deploy_watch", deploy_watch_tick, settings.deploy_watch_interval_seconds, None, stop
         ),
         _daily_loop("gdpr_retention", run_gdpr_retention_tick, "03:00", stop),
         _daily_loop("gdpr_erasure_purge", run_gdpr_erasure_purge_tick, "03:30", stop),

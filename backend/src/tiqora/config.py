@@ -431,6 +431,12 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_OUTBOX_DRAIN_INTERVAL"
     )
 
+    # Deploy watcher (process/ACL revisions); a full dump + checksum per tick while
+    # Znuny's sync tables are empty (ruling F31).
+    deploy_watch_interval_seconds: int = Field(
+        default=30, ge=5, le=3600, validation_alias="TIQORA_DEPLOY_WATCH_INTERVAL_SECONDS"
+    )
+
     # AI worker (tiqora-ai-worker, separate process/compose service — see
     # ~/TIQORA_LLM_PLAN.md §3.0/§3.4). ``daemon.ai_worker.enabled``
     # (default OFF) is the takeover switch; this is only the tick cadence.

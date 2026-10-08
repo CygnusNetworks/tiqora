@@ -18,6 +18,17 @@ from tiqora.api.v1.admin.common import ACL_CACHE_TYPES, invalidate_znuny_cache_t
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.schemas import AclCreate, AclOut, AclUpdate
 from tiqora.db.legacy.config import Acl
+from tiqora.deployed.sync_tables import mark_acl_changed
+
+
+def _stored(field: str, value: object) -> object:
+    """Normalise like ACLUpdate's comparison (``|| ''`` / ``|| 0``)."""
+    if field in ("comments", "description"):
+        return value or ""
+    if field == "stop_after_match":
+        return value or 0
+    return value
+
 
 router = APIRouter(prefix="/acl", tags=["admin:acl"])
 
@@ -55,6 +66,8 @@ async def create_acl(body: AclCreate, admin: AdminUser, session: DbSession) -> A
         change_by=admin.id,
     )
     session.add(row)
+    await session.flush()  # the id is needed for acl_sync
+    await mark_acl_changed(session, acl_id=row.id, sync_state="not_sync")
     await invalidate_znuny_cache_types(session, ACL_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
@@ -67,10 +80,18 @@ async def update_acl(acl_id: int, body: AclUpdate, admin: AdminUser, session: Db
     row = await session.get(Acl, acl_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ACL not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    updates = body.model_dump(exclude_unset=True)
+    # ACLUpdate returns early when nothing stored changed (ACL/DB/ACL.pm:530-541):
+    # no change_time bump, no acl_sync row, no cache invalidation.
+    if not any(
+        _stored(field, getattr(row, field)) != _stored(field, v) for field, v in updates.items()
+    ):
+        return row
+    for field, value in updates.items():
         setattr(row, field, value)
     row.change_time = now()
     row.change_by = admin.id
+    await mark_acl_changed(session, acl_id=row.id, sync_state="not_sync")
     await invalidate_znuny_cache_types(session, ACL_CACHE_TYPES)
     await session.commit()
     await session.refresh(row)
@@ -85,5 +106,6 @@ async def delete_acl(acl_id: int, admin: AdminUser, session: DbSession) -> None:
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ACL not found")
     await session.delete(row)
+    await mark_acl_changed(session, acl_id=acl_id, sync_state="deleted")
     await invalidate_znuny_cache_types(session, ACL_CACHE_TYPES)
     await session.commit()

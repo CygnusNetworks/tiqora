@@ -3008,10 +3008,15 @@
         "jobs": {
           "name": "Hintergrundaufgaben",
           "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."
+        },
+        "deploy_watch": {
+          "name": "Deploy-Wächter",
+          "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."
         }
       },
       "takeoverBadge": "Übernahme",
-      "settingsLink": "Einstellungen"
+      "settingsLink": "Einstellungen",
+      "deployLive": "Noch keine Bereitstellung erkannt: Tiqora nutzt die Entwürfe direkt. Bitte in Znuny einmal bereitstellen."
     },
     "mailLog": {
       "title": "E-Mail-Kommunikationsprotokoll",
