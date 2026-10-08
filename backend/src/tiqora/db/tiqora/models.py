@@ -831,8 +831,9 @@ class TiqoraAvatar(TiqoraBase):
     )
 
 
-#: Handler results are JSON up to 1 MB: plain ``TEXT`` stops at 64 KiB on MariaDB.
-JOB_RESULT_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
+#: Handler results and revision dumps are JSON up to 1 MB and more: plain ``TEXT`` stops at
+#: 64 KiB on MariaDB.
+MEDIUM_TEXT_VARIANT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
 #: Files a job produced (up to 200 MiB): ``LONGBLOB`` on MariaDB, ``BYTEA`` on PostgreSQL.
 JOB_FILE_BLOB = LargeBinary().with_variant(mysql.LONGBLOB(), "mysql", "mariadb")
 
@@ -845,8 +846,8 @@ class TiqoraJob(TiqoraBase):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     kind: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
-    payload: Mapped[str] = mapped_column(JOB_RESULT_TEXT, nullable=False)
-    result: Mapped[str | None] = mapped_column(JOB_RESULT_TEXT, nullable=True)
+    payload: Mapped[str] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=False)
+    result: Mapped[str | None] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     progress_done: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
@@ -886,3 +887,43 @@ class TiqoraJobFile(TiqoraBase):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (Index("ix_tiqora_job_file_job", "job_id"),)
+
+
+#: Alias for the deployed-revision ``config`` column (one shared MEDIUMTEXT expression).
+REVISION_CONFIG_TEXT = MEDIUM_TEXT_VARIANT
+
+
+class TiqoraProcessRevision(TiqoraBase):
+    """A deployed snapshot of the process configuration (canonical JSON dump).
+
+    ``config`` is deferred: read it with an explicit ``select(Model.config)``.
+    Timestamps are app-written naive UTC.
+    """
+
+    __tablename__ = "tiqora_process_revision"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    config: Mapped[str] = deferred(mapped_column(REVISION_CONFIG_TEXT, nullable=False))
+    deployed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    deployed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (Index("ix_tiqora_process_revision_checksum", "checksum"),)
+
+
+class TiqoraAclRevision(TiqoraBase):
+    """A deployed snapshot of the ACL configuration (same columns as the process one)."""
+
+    __tablename__ = "tiqora_acl_revision"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    entity_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    config: Mapped[str] = deferred(mapped_column(REVISION_CONFIG_TEXT, nullable=False))
+    deployed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    deployed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    __table_args__ = (Index("ix_tiqora_acl_revision_checksum", "checksum"),)
