@@ -879,26 +879,9 @@ async def add_article(
         ).first()
         reset_unlock = prev is not None and prev[0] == "agent"
     if reset_unlock:
-        current_timeout = (
-            await session.execute(
-                text("SELECT timeout FROM ticket WHERE id = :tid"), {"tid": ticket_id}
-            )
-        ).scalar_one()
-        if int(current_timeout or 0) != incoming_time:
-            await session.execute(
-                text(
-                    "UPDATE ticket SET timeout = :to, change_time = current_timestamp,"
-                    " change_by = :uid WHERE id = :tid"
-                ),
-                {"to": incoming_time, "uid": user_id, "tid": ticket_id},
-            )
-            await history_add(
-                session,
-                ticket_id=ticket_id,
-                history_type=TYPE_MISC,
-                name="Reset of unlock time.",
-                user_id=user_id,
-            )
+        await ticket_unlock_timeout_update(
+            session, ticket_id=ticket_id, unlock_timeout=incoming_time, user_id=user_id
+        )
 
     # Legacy per-article notification events (MIMEBase.pm). Exactly one of
     # them fires, chosen by history type -- and NotificationNewTicket only for
@@ -1686,6 +1669,9 @@ async def assign_owner(
     )
     if new_lock_id != current_lock_id:
         await add_lock(session, ticket_id=ticket_id, lock="lock", user_id=user_id)
+        await ticket_unlock_timeout_update(
+            session, ticket_id=ticket_id, unlock_timeout=int(time.time()), user_id=user_id
+        )
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_legacy_notification(
@@ -1736,6 +1722,37 @@ async def assign_responsible(
     )
 
 
+async def ticket_unlock_timeout_update(
+    session: AsyncSession, *, ticket_id: int, unlock_timeout: int, user_id: int
+) -> None:
+    """Port of ``Ticket.pm::TicketUnlockTimeoutUpdate``.
+
+    Silent no-op when ``ticket.timeout`` already equals ``unlock_timeout``; otherwise
+    writes it (bumping change_time/change_by) plus a Misc "Reset of unlock time." row.
+    """
+    current_timeout = (
+        await session.execute(
+            text("SELECT timeout FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+        )
+    ).scalar_one()
+    if int(current_timeout or 0) == unlock_timeout:
+        return
+    await session.execute(
+        text(
+            "UPDATE ticket SET timeout = :to, change_time = current_timestamp,"
+            " change_by = :uid WHERE id = :tid"
+        ),
+        {"to": unlock_timeout, "uid": user_id, "tid": ticket_id},
+    )
+    await history_add(
+        session,
+        ticket_id=ticket_id,
+        history_type=TYPE_MISC,
+        name="Reset of unlock time.",
+        user_id=user_id,
+    )
+
+
 async def lock_ticket(
     session: AsyncSession,
     *,
@@ -1759,6 +1776,10 @@ async def lock_ticket(
         {"uid": user_id, "tid": ticket_id},
     )
     await add_lock(session, ticket_id=ticket_id, lock="lock", user_id=user_id)
+    # TicketLockSet (Lock => 'lock') restarts the unlock timeout at the current epoch second.
+    await ticket_unlock_timeout_update(
+        session, ticket_id=ticket_id, unlock_timeout=int(time.time()), user_id=user_id
+    )
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_event(session, "TicketLockUpdate", ticket_id, {"lock": "lock"})

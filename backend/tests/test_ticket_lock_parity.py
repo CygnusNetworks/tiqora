@@ -304,6 +304,58 @@ async def test_lock_set_same_state_noop_mariadb(mariadb_znuny_url: str) -> None:
 
 
 @pytest.mark.db
+async def test_lock_resets_unlock_timeout_mariadb(mariadb_znuny_url: str) -> None:
+    """TicketLockSet (lock) calls TicketUnlockTimeoutUpdate: ticket.timeout becomes the
+    current epoch and a Misc "Reset of unlock time." row follows the Lock row."""
+    import time
+
+    url = _mysql_async(mariadb_znuny_url)
+    engine = create_async_engine(url)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed(session)
+    ticket_id = await _make_ticket(factory, sysconfig, "Lock Timeout")
+    async with factory() as session, session.begin():
+        await session.execute(
+            text("UPDATE ticket SET timeout = 5 WHERE id = :tid"), {"tid": ticket_id}
+        )
+
+    before = int(time.time())
+    async with factory() as session, session.begin():
+        await lock_ticket(session, ticket_id=ticket_id, user_id=_UID_ALICE, sysconfig=sysconfig)
+    after = int(time.time())
+
+    async with factory() as session:
+        timeout = (
+            await session.execute(
+                text("SELECT timeout FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).scalar_one()
+        misc = (
+            (
+                await session.execute(
+                    text(
+                        "SELECT h.name FROM ticket_history h"
+                        " JOIN ticket_history_type ht ON ht.id = h.history_type_id"
+                        " WHERE h.ticket_id = :tid AND ht.name = 'Misc'"
+                    ),
+                    {"tid": ticket_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+    assert before <= int(timeout) <= after
+    assert misc == ["Reset of unlock time."]
+    history = await _history_types(factory, ticket_id)
+    assert history[-2:] == ["Lock", "Misc"]
+
+    await engine.dispose()
+
+
+@pytest.mark.db
 async def test_close_unlocks_and_owns_mariadb(mariadb_znuny_url: str) -> None:
     """Class change_state close parity: closing an unlocked foreign ticket makes
     the closer owner (RequiredLock on the close screen) and unlocks afterwards."""
