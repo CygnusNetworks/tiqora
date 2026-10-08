@@ -87,10 +87,10 @@ RUN gssapi_wheel_url=""; \
             echo "ERROR: GSSAPI_AMD64_WHEEL_URL points at gssapi $wheel_version but uv.lock pins $locked_version -- rebuild the wheel and update the URL in the Jenkinsfile" >&2; \
             exit 1; \
         fi; \
-        uv sync --no-dev --no-editable --extra kerberos --extra crypto --no-install-package gssapi \
+        uv sync --no-dev --no-editable --extra kerberos --extra crypto --extra saml --no-install-package gssapi \
         && uv pip install "$gssapi_wheel_url"; \
     else \
-        uv sync --no-dev --no-editable --extra kerberos --extra crypto; \
+        uv sync --no-dev --no-editable --extra kerberos --extra crypto --extra saml; \
     fi
 
 # ---------- Runtime ----------
@@ -106,6 +106,8 @@ RUN useradd --create-home --uid 10001 tiqora \
         libgssapi-krb5-2 \
         libkrb5-3 \
         openssl \
+        xmlsec1 \
+        libxmlsec1-openssl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=python-deps /app/backend/.venv /app/.venv

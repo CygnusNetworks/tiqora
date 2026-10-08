@@ -81,6 +81,9 @@ kerberos = [
 crypto = [
     "python-gnupg>=0.5.2",
 ]
+saml = [
+    "pysaml2>=7.5.5,<8",
+]
 dev = [
     "pytest>=8.3.0",
     "pytest-asyncio>=0.24.0",
@@ -166,6 +169,8 @@ module = [
     "docker.*",
     "psutil",
     "psutil.*",
+    "saml2",
+    "saml2.*",
 ]
 ignore_missing_imports = true
 
@@ -178,6 +183,8 @@ markers = [
     "search: integration tests that require Meilisearch (testcontainers)",
     "golden: golden-master tests comparing real Znuny vs Tiqora (GOLDEN=1, needs Docker, see tests/golden/)",
     "schema_matrix: multi-version OTRS/Znuny DDL Layer A (release anchors × MariaDB/Postgres)",
+    "saml: SAML tests that need pysaml2 + the xmlsec1 binary",
+    "keycloak: optional Keycloak integration tests (TIQORA_KEYCLOAK_TESTS=1, needs Docker)",
 ]
 
 [dependency-groups]
