@@ -17,6 +17,7 @@ from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION, ProcessDeploySettings
 from tiqora.deployed.watcher import deploy_from_tiqora
+from tiqora.domain.ownership import get_ownership_state
 from tiqora.settings_sections.store import load_section_values
 
 router = APIRouter(prefix="/deploy", tags=["admin:deploy"])
@@ -43,7 +44,7 @@ class DeployOut(BaseModel):
 async def post_deploy(
     body: DeployIn, admin: AdminUser, session: DbSession, settings: AppSettings
 ) -> DeployOut:
-    if not settings.schema_ownership:
+    if not (await get_ownership_state(session, settings)).active:
         values = ProcessDeploySettings.model_validate(
             (
                 await load_section_values(

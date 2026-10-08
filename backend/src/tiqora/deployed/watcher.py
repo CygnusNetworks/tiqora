@@ -233,6 +233,16 @@ async def _deploy_from_tiqora(
             # Drafts that net out to the live state still count as deployed.
             await clear_sync_table(session, kind)
             await session.commit()
+            logger.info(
+                "deploy_from_tiqora",
+                extra={
+                    "kind": kind,
+                    "user_id": user_id,
+                    "revision_id": latest.id,
+                    "checksum": checksum,
+                    "action": "unchanged",
+                },
+            )
             return DeployResult(kind, latest.id, checksum, "unchanged")
         info = await record_revision(session, kind, dump=dump, source="tiqora", deployed_by=user_id)
         await clear_sync_table(session, kind)

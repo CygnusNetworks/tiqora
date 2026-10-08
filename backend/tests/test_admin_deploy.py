@@ -27,6 +27,8 @@ from tiqora.deployed.sync_tables import pending_sync_count
 from tiqora.deployed.watcher import check_deploy_state, revision_write_lock
 from tiqora.domain import ticket_acl
 from tiqora.domain.auth import AuthenticatedUser
+from tiqora.domain.ownership import KEY_OWNERSHIP_ENABLED, VALUE_ENABLED
+from tiqora.domain.settings_store import set_setting
 from tiqora.settings_sections.store import save_section_values
 
 pytestmark = pytest.mark.db
@@ -66,7 +68,9 @@ def _to_async_url(sync_url: str) -> str:
 def _wipe(conn: Any) -> None:
     for stmt in _CLEANUP:
         conn.execute(text(stmt))
-    conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key == SETTING_KEY))
+    conn.execute(
+        delete(TiqoraSettings).where(TiqoraSettings.key.in_([SETTING_KEY, KEY_OWNERSHIP_ENABLED]))
+    )
 
 
 def _reset(sync_url: str) -> None:
@@ -161,6 +165,12 @@ async def _enable_setting(factory: async_sessionmaker[AsyncSession]) -> None:
         await s.commit()
 
 
+async def _enable_marker(factory: async_sessionmaker[AsyncSession]) -> None:
+    async with factory() as s:
+        await set_setting(s, KEY_OWNERSHIP_ENABLED, VALUE_ENABLED)
+        await s.commit()
+
+
 async def _edit_acl(factory: async_sessionmaker[AsyncSession], name: str) -> None:
     """What the ACL editor does: change the row and register it as unsynced."""
     async with factory() as s:
@@ -250,6 +260,7 @@ async def test_process_deploy_clears_pm_entity_sync(
             {"t": T0},
         )
         await s.commit()
+    await _enable_marker(factory)
     async with make_client(ownership=True) as client:
         resp = await client.post(URL, json={"kind": "process"})
     assert resp.status_code == 200 and resp.json()["action"] == "recorded"
@@ -269,10 +280,39 @@ async def test_schema_ownership_bypasses_setting(
     make_client: Make, factory: async_sessionmaker[AsyncSession]
 ) -> None:
     await _edit_acl(factory, "dep-acl-owned")
+    await _enable_marker(factory)
     async with make_client(ownership=True) as client:
         resp = await client.post(URL, json={"kind": "acl"})
     assert resp.status_code == 200 and resp.json()["action"] == "recorded"
     assert await _live_acl_names(factory) == ["dep-acl-owned"]
+
+
+async def test_env_flag_without_db_marker_is_409(
+    make_client: Make, factory: async_sessionmaker[AsyncSession]
+) -> None:
+    await _edit_acl(factory, "dep-acl-nomarker")
+    async with make_client(ownership=True) as client:
+        resp = await client.post(URL, json={"kind": "acl"})
+    assert resp.status_code == 409 and resp.json()["detail"] == GATE_DETAIL
+    assert await _count(factory, "tiqora_acl_revision") == 0
+
+
+async def test_failed_sync_clear_rolls_back_the_revision(
+    make_client: Make,
+    factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def boom(*_a: object, **_k: object) -> int:
+        raise RuntimeError("purge failed")
+
+    await _edit_acl(factory, "dep-acl-atomic")
+    await _enable_marker(factory)
+    monkeypatch.setattr(watcher_module, "clear_sync_table", boom)
+    async with make_client(ownership=True) as client:
+        with pytest.raises(RuntimeError, match="purge failed"):
+            await client.post(URL, json={"kind": "acl"})
+    assert await _count(factory, "tiqora_acl_revision") == 0
+    assert await _count(factory, "acl_sync") == 1
 
 
 async def test_non_admin_gets_403(
@@ -297,6 +337,7 @@ async def test_lock_held_elsewhere_returns_503(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(watcher_module, "_LOCK_TIMEOUT_SECONDS", 1)
+    await _enable_marker(factory)
     async with (
         factory() as holder,
         revision_write_lock(holder, "acl"),
