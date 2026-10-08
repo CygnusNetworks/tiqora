@@ -40,18 +40,32 @@ Deviations / decisions:
   its column width (``sanitize_id_filters``): an id that does not fit can never match, so it
   is dropped and never bound (asyncpg raises on out-of-range parameters instead of matching
   nothing). A list without any usable id is "no match" -> ``{}``.
+* Article text filters (``article_text_filters``): Znuny answers ``MIMEBase_*`` / ``Fulltext``
+  from ``article_search_index`` (tokenised, stop words, one row per word); Tiqora keeps
+  ``LOWER(article_data_mime.<col>) LIKE`` instead - a known approximation (no stop words,
+  no tokenisation, substring on the raw text). ``Fulltext`` also looks at the ticket title
+  like Znuny's ``ArticleSearchIndex::DB``. The GI sets ``ContentSearchPrefix/Suffix`` to
+  ``*``, so every value is wrapped (``Rech*`` is also a substring match), ``*`` -> ``%``,
+  ``%%`` collapses to ``%``; a value of only wildcards (any length) is skipped.
+  ``ContentSearch`` ``OR`` joins the conditions with OR (default AND; ``Fulltext`` forces OR
+  like the GI operation). ``MIMEBase_AttachmentName`` exists only when SysConfig
+  ``Ticket::Article::Backend::MIMEBase::IndexAttachmentNames`` is truthy.
+* A non-integer element in any id filter makes the whole search empty (Znuny logs
+  "The given param ... is invalid!" and returns nothing).
 * Pure SQL, no string JOINs between ``tiqora_*`` and Znuny tables.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.znuny.sysconfig import SysConfig
 
 _DATE_RE = re.compile(r"\A(\d{4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})\Z")
 
@@ -393,6 +407,9 @@ _ID_FILTERS: dict[str, tuple[int, str | None]] = {
 }
 
 
+_INTEGER_RE = re.compile(r"[+-]?\d+")
+
+
 def bounded_ids(raw: Any, max_value: int) -> list[int]:
     """Ids of ``raw`` (scalar or list) that fit a signed column of ``max_value``.
 
@@ -422,6 +439,8 @@ def sanitize_id_filters(data: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
         raw = data.get(key)
         if not _as_list(raw):
             continue
+        if any(not _INTEGER_RE.fullmatch(str(item)) for item in _as_list(raw)):
+            return out, True
         ids = bounded_ids(raw, limit)
         out[key] = ids
         if not ids and not (alternative and _as_list(data.get(alternative))):
@@ -435,3 +454,87 @@ def _as_list(value: Any) -> list[Any]:
     if isinstance(value, (list, tuple)):
         return [v for v in value if v is not None and v != ""]
     return [value]
+
+
+_MIME_COLUMNS = (
+    ("MIMEBase_From", "a_from"),
+    ("MIMEBase_To", "a_to"),
+    ("MIMEBase_Cc", "a_cc"),
+    ("MIMEBase_Bcc", "a_bcc"),
+    ("MIMEBase_Subject", "a_subject"),
+    ("MIMEBase_Body", "a_body"),
+)
+_INDEX_ATTACHMENT_NAMES = "Ticket::Article::Backend::MIMEBase::IndexAttachmentNames"
+
+
+def content_like_pattern(value: Any) -> str | None:
+    """LIKE pattern Znuny builds for an article text value, ``None`` = skip the filter.
+
+    Port of ``ArticleSearchIndex::DB::ArticleSearchIndexWhereCondition`` with the GI's
+    ``ContentSearchPrefix/Suffix`` ``*``: ``*`` -> ``%``, wildcard-only values are skipped,
+    the value is wrapped in ``%``, ``%%`` collapses to ``%`` and the match is lower-cased.
+    """
+    if value is None or isinstance(value, (dict, list, tuple)):
+        return None
+    text_value = str(value).strip().replace("*", "%")
+    if not text_value or re.fullmatch(r"%+", text_value):
+        return None
+    return ("%" + text_value + "%").replace("%%", "%").lower()
+
+
+async def article_text_filters(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    data: Mapping[str, Any],
+    conditions: list[str],
+    params: dict[str, Any],
+    add_join: Callable[[str, str], None],
+) -> None:
+    """Append the ``MIMEBase_*`` / ``Fulltext`` / ``ContentSearch`` filters.
+
+    ``session`` is unused (the SysConfig reader carries its own); kept for the interface.
+    Adds one parenthesised condition to ``conditions`` and its ``:mfN`` binds to
+    ``params``; the article joins go through ``add_join(sql, key)``.
+    """
+    del session
+    wanted: list[tuple[str, str]] = []  # (kind, pattern); kind = column or special
+    for field, col in _MIME_COLUMNS:
+        if (pat := content_like_pattern(data.get(field))) is not None:
+            wanted.append((col, pat))
+    index_names = _perl_true(await sysconfig.get(_INDEX_ATTACHMENT_NAMES, 0))
+    if index_names and (pat := content_like_pattern(data.get("MIMEBase_AttachmentName"))):
+        wanted.append(("__attachment__", pat))
+    fulltext = data.get("Fulltext")
+    fulltext_pat = content_like_pattern(fulltext) if _perl_true(fulltext) else None
+    if fulltext_pat is not None:
+        wanted.append(("__fulltext__", fulltext_pat))
+    if not wanted:
+        return
+
+    add_join(
+        "JOIN article a ON a.ticket_id = t.id JOIN article_data_mime adm ON adm.article_id = a.id",
+        "mime",
+    )
+    attachment = (
+        "EXISTS (SELECT 1 FROM article_data_mime_attachment ama"
+        " WHERE ama.article_id = adm.article_id AND LOWER(ama.filename) LIKE :mf{i})"
+    )
+    parts: list[str] = []
+    for i, (col, pat) in enumerate(wanted):
+        if col == "__attachment__":
+            parts.append(attachment.format(i=i))
+        elif col == "__fulltext__":
+            ors = [f"LOWER(adm.{c}) LIKE :mf{i}" for _, c in _MIME_COLUMNS]
+            ors.append(f"LOWER(t.title) LIKE :mf{i}")
+            if index_names:
+                ors.append(attachment.format(i=i))
+            parts.append("(" + " OR ".join(ors) + ")")
+        else:
+            parts.append(f"LOWER(adm.{col}) LIKE :mf{i}")
+        params[f"mf{i}"] = pat
+    joiner = (
+        " OR "
+        if fulltext_pat is not None or str(data.get("ContentSearch", "")).strip().upper() == "OR"
+        else " AND "
+    )
+    conditions.append("(" + joiner.join(parts) + ")")

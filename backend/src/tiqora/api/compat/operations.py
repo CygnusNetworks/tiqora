@@ -29,6 +29,7 @@ from tiqora.api.compat.article_input import (
 )
 from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.api.compat.search_filters import (
+    article_text_filters,
     create_time_settings,
     created_filters,
     sanitize_id_filters,
@@ -623,21 +624,6 @@ async def _agent_in_group(session: AsyncSession, user_id: int, group_name: str) 
     if row is None:
         return False
     return int(row[0]) in set(groups)
-
-
-def _content_pattern(val: Any) -> str | None:
-    """Article-content LIKE pattern as Znuny GI builds it (ContentSearchPrefix/Suffix '*').
-
-    ``*`` is a wildcard; the value is wrapped in ``%...%`` (substring match), ``%%`` is
-    collapsed and the match is case-insensitive. ``None`` = no filter (empty or only
-    wildcards, Znuny skips those).
-    """
-    if val is None or isinstance(val, (dict, list, tuple)):
-        return None
-    value = str(val).strip().replace("*", "%")
-    if not value or re.fullmatch(r"%{1,3}", value):
-        return None
-    return ("%" + value + "%").replace("%%", "%").lower()
 
 
 def _like_pattern(val: Any) -> str:
@@ -2368,38 +2354,8 @@ async def op_ticket_search(
         for i, tid_val in enumerate(tid_list):
             params[f"tid{i}"] = tid_val
 
-    # MIMEBase / Fulltext article filters via article_data_mime
-    mime_filters: list[tuple[str, str]] = []
-    for field, col in (
-        ("MIMEBase_From", "a_from"),
-        ("MIMEBase_To", "a_to"),
-        ("MIMEBase_Cc", "a_cc"),
-        ("MIMEBase_Subject", "a_subject"),
-        ("MIMEBase_Body", "a_body"),
-    ):
-        if (pat := _content_pattern(data.get(field))) is not None:
-            mime_filters.append((col, pat))
-    if (ft := _content_pattern(data.get("Fulltext"))) is not None:
-        mime_filters.append(("__fulltext__", ft))
-
-    if mime_filters:
-        _add_join(
-            "JOIN article a ON a.ticket_id = t.id"
-            " JOIN article_data_mime adm ON adm.article_id = a.id",
-            "mime",
-        )
-        mime_parts = []
-        for i, (col, pat) in enumerate(mime_filters):
-            if col == "__fulltext__":
-                mime_parts.append(
-                    f"(LOWER(adm.a_from) LIKE :mf{i} OR LOWER(adm.a_to) LIKE :mf{i}"
-                    f" OR LOWER(adm.a_cc) LIKE :mf{i} OR LOWER(adm.a_subject) LIKE :mf{i}"
-                    f" OR LOWER(adm.a_body) LIKE :mf{i} OR LOWER(t.title) LIKE :mf{i})"
-                )
-            else:
-                mime_parts.append(f"LOWER(adm.{col}) LIKE :mf{i}")
-            params[f"mf{i}"] = pat
-        conditions.append("(" + " AND ".join(mime_parts) + ")")
+    # MIMEBase / Fulltext / ContentSearch article filters (see search_filters)
+    await article_text_filters(session, SysConfig(session), data, conditions, params, _add_join)
 
     # Article create-time filters
     if any(
