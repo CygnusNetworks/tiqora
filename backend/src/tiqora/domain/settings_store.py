@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Final
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -165,12 +167,15 @@ KEY_AI_LLM_MAX_COMPLETION_TOKENS = "ai.llm.max_completion_tokens"
 KEY_AVATARS_GRAVATAR_ENABLED = "avatars.gravatar.enabled"
 KEY_AVATARS_FAVICON_ENABLED = "avatars.favicon.enabled"
 
+# Stored strings that read as true (shared with tiqora.settings_sections.store).
+SETTING_TRUTHY: Final = ("1", "true", "yes", "on")
+
 
 async def get_setting_bool(session: AsyncSession, key: str, default: bool = False) -> bool:
     raw = await get_setting(session, key)
     if raw is None or raw == "":
         return default
-    return raw.strip().lower() in ("1", "true", "yes", "on")
+    return raw.strip().lower() in SETTING_TRUTHY
 
 
 async def get_setting(session: AsyncSession, key: str) -> str | None:

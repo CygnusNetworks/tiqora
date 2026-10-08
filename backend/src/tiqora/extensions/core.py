@@ -17,6 +17,14 @@ def register_core(registry: Registry) -> None:
     for descriptor in core_channel_descriptors():
         registry.add(CHANNELS, descriptor)
 
+    from tiqora.avatars.settings import AVATARS_SECTION
+    from tiqora.jobs.settings import JOBS_SECTION
+    from tiqora.settings_sections.section import SETTINGS_SECTIONS, validate_section_schema
+
+    for section in (JOBS_SECTION, AVATARS_SECTION):
+        validate_section_schema(section)
+        registry.add(SETTINGS_SECTIONS, section)
+
 
 def get_registry() -> Registry:
     global _REGISTRY

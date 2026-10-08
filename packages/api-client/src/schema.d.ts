@@ -3254,6 +3254,41 @@ export interface paths {
         patch: operations["update_service_api_v1_admin_services__service_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/settings-sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Settings Sections */
+        get: operations["list_settings_sections_api_v1_admin_settings_sections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/settings-sections/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings Section */
+        get: operations["get_settings_section_api_v1_admin_settings_sections__key__get"];
+        /** Put Settings Section */
+        put: operations["put_settings_section_api_v1_admin_settings_sections__key__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/signatures": {
         parameters: {
             query?: never;
@@ -14807,6 +14842,41 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** SettingsSectionOut */
+        SettingsSectionOut: {
+            /** I18N Prefix */
+            i18n_prefix: string;
+            /** Json Schema */
+            json_schema: {
+                [key: string]: unknown;
+            };
+            /** Key */
+            key: string;
+            /** Secrets Set */
+            secrets_set: string[];
+            /** Title Key */
+            title_key: string;
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        /** SettingsSectionSummaryOut */
+        SettingsSectionSummaryOut: {
+            /** Key */
+            key: string;
+            /** Owner */
+            owner: string;
+            /** Title Key */
+            title_key: string;
+        };
+        /** SettingsSectionUpdate */
+        SettingsSectionUpdate: {
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
         /** SignKeyOptionOut */
         SignKeyOptionOut: {
             /** Backend */
@@ -26234,6 +26304,113 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_settings_sections_api_v1_admin_settings_sections_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsSectionSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_section_api_v1_admin_settings_sections__key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsSectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_settings_section_api_v1_admin_settings_sections__key__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsSectionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsSectionOut"];
                 };
             };
             /** @description Validation Error */

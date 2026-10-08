@@ -22,12 +22,11 @@ from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.channels.common import channel_enabled, encrypt_channel_secret, setting_key
 from tiqora.channels.registry import CHANNEL_CONFIG_KEYS
 from tiqora.domain.settings_store import get_setting, set_setting
+from tiqora.settings_sections.section import SECRET_MASK
 
 router = APIRouter(prefix="/channels", tags=["admin:channels"])
 
 _SECRET_KEY_MARKERS: Final[tuple[str, ...]] = ("secret", "token")
-# Placeholder returned on GET for secret keys; writing it back must not rotate.
-_SECRET_MASK: Final[str] = "********"
 
 
 def _is_secret_key(key: str) -> bool:
@@ -61,7 +60,7 @@ async def _read_config(session: DbSession, channel: str) -> ChannelConfigOut:
     for key in sorted(keys):
         value = await get_setting(session, setting_key(channel, key))
         if value and _is_secret_key(key):
-            value = _SECRET_MASK
+            value = SECRET_MASK
         config[key] = value
     return ChannelConfigOut(channel=channel, enabled=enabled, config=config)
 
@@ -102,7 +101,7 @@ async def update_channel(
         if _is_secret_key(key):
             # Ignore empty / masked writes so a re-save of the GET form does not
             # wipe or re-encrypt a placeholder.
-            if value in ("", _SECRET_MASK):
+            if value in ("", SECRET_MASK):
                 continue
             value = encrypt_channel_secret(settings.secret_key, value)
         await set_setting(session, setting_key(channel, key), value)
