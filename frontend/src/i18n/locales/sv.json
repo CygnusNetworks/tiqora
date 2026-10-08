@@ -2997,6 +2997,10 @@
           "name": "Förnyelse av S/MIME-kundcertifikat",
           "description": "Importerar förnyade kundcertifikat från kundbackend en gång om dagen (Znuny RenewCustomerSMIMECertificates; kräver SMIME::FetchFromCustomer)."
         },
+        "identity_metadata": {
+          "name": "Identity provider metadata refresh",
+          "description": "Re-downloads SAML identity provider metadata (certificates, endpoints) once a day; a failed download keeps the last working copy and shows a warning."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."

@@ -25,6 +25,7 @@ from tiqora.domain.settings_store import (
     KEY_GDPR_RETENTION_ENABLED,
     KEY_GENERIC_AGENT_ENABLED,
     KEY_GENERIC_AGENT_INTERVAL_SECONDS,
+    KEY_IDENTITY_METADATA_REFRESH_ENABLED,
     KEY_NOTIFICATIONS_ENABLED,
     KEY_NOTIFICATIONS_INTERVAL_SECONDS,
     KEY_OUTBOX_ENABLED,
@@ -207,6 +208,14 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="02:02",
+    ),
+    DaemonService(
+        slug="identity_metadata",
+        enabled_key=KEY_IDENTITY_METADATA_REFRESH_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="daily",
+        daily_at="04:30",
     ),
 )
 

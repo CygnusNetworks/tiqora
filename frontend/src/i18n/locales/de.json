@@ -3005,6 +3005,10 @@
           "name": "S/MIME-Kundenzertifikate erneuern",
           "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."
         },
+        "identity_metadata": {
+          "name": "Aktualisierung der Anmeldedienst-Metadaten",
+          "description": "Lädt die SAML-Metadaten der Anmeldedienste (Zertifikate, Adressen) einmal täglich neu; schlägt der Abruf fehl, bleibt die letzte funktionierende Fassung erhalten und es erscheint eine Warnung."
+        },
         "jobs": {
           "name": "Hintergrundaufgaben",
           "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."

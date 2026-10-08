@@ -2997,6 +2997,10 @@
           "name": "Обновление клиентских сертификатов S/MIME",
           "description": "Раз в день импортирует обновлённые сертификаты клиентов из клиентского бэкенда (Znuny RenewCustomerSMIMECertificates; требуется SMIME::FetchFromCustomer)."
         },
+        "identity_metadata": {
+          "name": "Identity provider metadata refresh",
+          "description": "Re-downloads SAML identity provider metadata (certificates, endpoints) once a day; a failed download keeps the last working copy and shows a warning."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."

@@ -2997,6 +2997,10 @@
           "name": "Ανανέωση πιστοποιητικών S/MIME πελατών",
           "description": "Εισάγει καθημερινά ανανεωμένα πιστοποιητικά πελατών από το backend πελατών (Znuny RenewCustomerSMIMECertificates· χρειάζεται SMIME::FetchFromCustomer)."
         },
+        "identity_metadata": {
+          "name": "Identity provider metadata refresh",
+          "description": "Re-downloads SAML identity provider metadata (certificates, endpoints) once a day; a failed download keeps the last working copy and shows a warning."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
