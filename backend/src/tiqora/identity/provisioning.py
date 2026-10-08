@@ -11,14 +11,28 @@ matches by e-mail and maps no login. An e-mail address is mandatory. Customers a
 always written to the ``customer_user`` table (a customer directory configured only in
 Znuny's Config.pm is never read by Tiqora). An agent created with ``match_by="login"``
 may share its e-mail address with another agent (Znuny ``UserAdd`` does not forbid it).
+
+Role/group sync (agents only) notes:
+
+* ``jit_defaults.initial_*`` are written without a managed mark. In ``authoritative`` mode
+  the next login strips any such role/group the rules do not grant (Znuny replace
+  semantics); use rules instead of initial roles for sites running that mode.
+* Switching ``sync_mode`` reclassifies nothing: managed marks stay as they are. Moving to
+  ``authoritative`` makes everything not granted by a rule go, marked or not; moving back
+  to ``managed`` keeps the remaining marks as the only removable set.
+* An admin granting (PUT) a role/group key that is already managed keeps the managed
+  mark: the grant is a no-op, so the rule still owns it and removes it when it stops
+  matching. Remove it by hand first (which drops the mark) and grant again to make it manual.
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.customer import CustomerUser
@@ -43,6 +57,8 @@ from tiqora.domain.user_provisioning import (
 from tiqora.identity.mapping import AssignmentDiff, AssignmentState, MappedProfile
 from tiqora.identity.store import ProviderRecord
 from tiqora.identity.types import SYSTEM_USER_ID, UserKind
+
+log = logging.getLogger(__name__)
 
 PROFILE_FIELDS = ("first_name", "last_name", "email", "mobile")
 
@@ -277,14 +293,9 @@ async def sync_profile(
         )
 
 
-async def load_assignment_state(
-    session: AsyncSession, *, provider_id: int, user_id: int
-) -> AssignmentState:
-    """Current role/group assignments of an agent plus the ones THIS provider manages.
-
-    Managed rows of other providers are not part of the state: a provider never
-    owns what another provider (or an admin) assigned.
-    """
+async def _managed_marks(
+    session: AsyncSession, provider_id: int, user_id: int
+) -> tuple[frozenset[int], frozenset[tuple[int, str]]]:
     rows = (
         await session.execute(
             select(
@@ -297,64 +308,104 @@ async def load_assignment_state(
             )
         )
     ).all()
+    return (
+        frozenset(int(t) for k, t, _ in rows if k == "role"),
+        frozenset((int(t), str(p)) for k, t, p in rows if k == "group"),
+    )
+
+
+async def load_assignment_state(
+    session: AsyncSession, *, provider_id: int, user_id: int
+) -> AssignmentState:
+    """Current role/group assignments of an agent plus the ones THIS provider manages.
+
+    Managed rows of other providers are not part of the state: a provider never
+    owns what another provider (or an admin) assigned.
+    """
+    managed_roles, managed_groups = await _managed_marks(session, provider_id, user_id)
     return AssignmentState(
         current_roles=await current_roles(session, user_id),
         current_group_perms=await current_group_perms(session, user_id),
-        managed_roles=frozenset(int(t) for k, t, _ in rows if k == "role"),
-        managed_group_perms=frozenset((int(t), str(p)) for k, t, p in rows if k == "group"),
+        managed_roles=managed_roles,
+        managed_group_perms=managed_groups,
     )
 
 
 async def apply_assignments(
-    session: AsyncSession, *, provider_id: int, user_id: int, diff: AssignmentDiff
+    session: AsyncSession,
+    *,
+    provider_id: int,
+    user_id: int,
+    diff: AssignmentDiff,
+    provider_slug: str | None = None,
 ) -> None:
     """Write a role/group diff for an agent (actor = system user); flush only.
 
     Roles are granted/revoked one by one. Group keys are written once per group from
     ``diff.final_group_keys`` (Znuny ``PermissionGroupUserAdd`` replaces the whole key
     set, ``rw`` alone), never as independent add/remove rows. Then the managed marks
-    are inserted/deleted. The system user (id 1) is never synced.
+    are inserted/deleted (a concurrent duplicate insert is ignored). Group keys are written
+    exactly as planned (no ``rw`` collapse beyond the desired set: a manual ``ro`` may sit
+    next to a managed ``rw``). Every grant/revoke is logged like Znuny's "sync ldap role"
+    notices. The system user (id 1) is never synced.
     """
     if user_id == SYSTEM_USER_ID or diff.empty:
         return
+    who = provider_slug or provider_id
     for role_id in sorted(diff.remove_roles):
-        await revoke_role(session, user_id=user_id, role_id=role_id)
+        if await revoke_role(session, user_id=user_id, role_id=role_id):
+            log.info("sync role revoke: user %s, provider %s, role %s", user_id, who, role_id)
     for role_id in sorted(diff.add_roles):
-        await grant_role(session, user_id=user_id, role_id=role_id, actor_id=SYSTEM_USER_ID)
+        if await grant_role(session, user_id=user_id, role_id=role_id, actor_id=SYSTEM_USER_ID):
+            log.info("sync role grant: user %s, provider %s, role %s", user_id, who, role_id)
     for group_id, keys in sorted(diff.final_group_keys.items()):
-        await set_group_permissions(
+        before = {k for g, k in diff.add_groups | diff.remove_groups if g == group_id}
+        if await set_group_permissions(
             session,
             user_id=user_id,
             group_id=group_id,
             permission_keys=keys,
             actor_id=SYSTEM_USER_ID,
-        )
+            collapse_rw=False,
+        ):
+            log.info(
+                "sync group set: user %s, provider %s, group %s, keys %s (changed %s)",
+                user_id,
+                who,
+                group_id,
+                sorted(keys),
+                sorted(before),
+            )
 
-    existing = await load_assignment_state(session, provider_id=provider_id, user_id=user_id)
+    _, existing_groups = await _managed_marks(session, provider_id, user_id)
+    existing_roles, _ = await _managed_marks(session, provider_id, user_id)
     for role_id in sorted(diff.drop_managed_roles):
         await _drop_mark(session, provider_id, user_id, "role", role_id, "")
     for group_id, key in sorted(diff.drop_managed_groups):
         await _drop_mark(session, provider_id, user_id, "group", group_id, key)
-    for role_id in sorted(diff.record_managed_roles - existing.managed_roles):
-        await record_managed_assignment(
-            session,
-            provider_id=provider_id,
-            user_kind="agent",
-            user_id=user_id,
-            kind="role",
-            target_id=role_id,
-            permission_key="",
-        )
-    for group_id, key in sorted(diff.record_managed_groups - existing.managed_group_perms):
-        await record_managed_assignment(
-            session,
-            provider_id=provider_id,
-            user_kind="agent",
-            user_id=user_id,
-            kind="group",
-            target_id=group_id,
-            permission_key=key,
-        )
+    for role_id in sorted(diff.record_managed_roles - existing_roles):
+        await _record_mark(session, provider_id, user_id, "role", role_id, "")
+    for group_id, key in sorted(diff.record_managed_groups - existing_groups):
+        await _record_mark(session, provider_id, user_id, "group", group_id, key)
+
+
+async def _record_mark(
+    session: AsyncSession, provider_id: int, user_id: int, kind: str, target_id: int, key: str
+) -> None:
+    """Insert a managed mark; a concurrent login that inserted it first is not an error."""
+    try:
+        async with session.begin_nested():
+            await record_managed_assignment(
+                session,
+                provider_id=provider_id,
+                user_kind="agent",
+                user_id=user_id,
+                kind=kind,
+                target_id=target_id,
+                permission_key=key,
+            )
+    except IntegrityError:
+        log.info("managed mark already present: user %s, %s %s", user_id, kind, target_id)
 
 
 async def _drop_mark(

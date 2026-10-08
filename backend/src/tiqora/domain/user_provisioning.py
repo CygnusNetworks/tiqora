@@ -280,15 +280,18 @@ async def set_group_permissions(
     group_id: int,
     permission_keys: frozenset[str] | set[str],
     actor_id: int,
+    collapse_rw: bool = True,
 ) -> bool:
     """``PermissionGroupUserAdd``: replace the whole key set of one (user, group) pair.
 
-    ``rw`` is stored alone (Znuny deletes everything else then). Keys are taken as given
+    ``rw`` is stored alone (Znuny deletes everything else then) unless ``collapse_rw`` is
+    False: identity sync passes the exact final set, because a manual ``ro`` next to a
+    managed ``rw`` is valid Znuny data and must not be absorbed. Keys are taken as given
     so site-defined permission types survive; callers validate new keys. Identical sets
     are a no-op.
     """
     wanted = set(permission_keys)
-    if "rw" in wanted:
+    if collapse_rw and "rw" in wanted:
         wanted = {"rw"}
     current = await _group_keys(session, user_id, group_id)
     if current == wanted:

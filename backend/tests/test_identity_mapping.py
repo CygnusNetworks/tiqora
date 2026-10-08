@@ -42,7 +42,8 @@ def test_normalize_attributes_odd_input_and_truncation() -> None:
     out = normalize_attributes(raw)
     assert out["long"] == ("x" * 2000,)
     assert out["mixed"] == ("a", "1.5", "False")
-    assert "blank" not in out and "empty" not in out
+    assert "blank" not in out  # a blank scalar is dropped ...
+    assert out["empty"] == ()  # ... an empty list claim stays present (sync fail-safe)
     assert normalize_attributes({"t": ("a", "b")}) == {"t": ("a", "b")}
     assert normalize_attributes({1: "x"}) == {"1": ("x",)}  # type: ignore[dict-item]
 
@@ -180,15 +181,16 @@ def test_no_rules_no_changes() -> None:
     assert AssignmentDiff().empty
 
 
-def test_group_add_replaces_whole_permission_set_per_group() -> None:
-    # Znuny PermissionGroupUserAdd replaces the full key set: granting rw must not stack on ro.
+def test_group_add_keeps_manual_keys_next_to_managed_rw() -> None:
+    # Managed mode never absorbs manual keys: rw is written next to the manual ro / note.
     desired = DesiredAssignments(frozenset(), frozenset({(2, "rw")}), False, True)
     state = AssignmentState(
         frozenset(), frozenset({(2, "ro"), (2, "note"), (9, "ro")}), frozenset(), frozenset()
     )
     d = diff_assignments(desired, state, mode="managed")
     assert d.add_groups == {(2, "rw")}
-    assert d.remove_groups == {(2, "ro"), (2, "note")}  # group 9 (no add needed) untouched
+    assert d.remove_groups == frozenset()  # group 9 untouched as well
+    assert d.final_group_keys == {2: frozenset({"rw", "ro", "note"})}
     assert d.record_managed_groups == {(2, "rw")}
 
 
@@ -247,16 +249,17 @@ def test_managed_manual_non_rw_keys_survive_new_managed_key() -> None:
     assert d.record_managed_groups == {(2, "ro")}
 
 
-def test_managed_new_rw_collapses_manual_keys() -> None:
+def test_managed_new_rw_does_not_absorb_manual_keys() -> None:
     d = diff_assignments(_gd((2, "rw")), _gs({(2, "ro"), (2, "note")}), mode="managed")
-    assert d.add_groups == {(2, "rw")} and d.remove_groups == {(2, "ro"), (2, "note")}
-    assert d.final_group_keys == {2: frozenset({"rw"})}
+    assert d.add_groups == {(2, "rw")} and d.remove_groups == frozenset()
+    assert d.final_group_keys == {2: frozenset({"rw", "ro", "note"})}
 
 
 def test_managed_stale_managed_key_removed_manual_kept() -> None:
     d = diff_assignments(_gd((2, "rw")), _gs({(2, "ro"), (2, "note")}, {(2, "ro")}), mode="managed")
-    # rw is new -> final collapses to rw; managed ro loses its mark
-    assert d.final_group_keys == {2: frozenset({"rw"})} and (2, "ro") in d.drop_managed_groups
+    # rw is new, stale managed ro goes, manual note stays
+    assert d.final_group_keys == {2: frozenset({"rw", "note"})}
+    assert (2, "ro") in d.drop_managed_groups
     d2 = diff_assignments(_gd(), _gs({(2, "ro"), (2, "note")}, {(2, "ro")}), mode="managed")
     assert d2.remove_groups == {(2, "ro")} and d2.final_group_keys == {2: frozenset({"note"})}
     assert d2.drop_managed_groups == {(2, "ro")}
@@ -295,3 +298,27 @@ def test_manual_rw_with_stale_managed_ro_and_nothing_desired() -> None:
     d = diff_assignments(_gd(), _gs({(2, "rw"), (2, "ro")}, {(2, "ro")}), mode="managed")
     assert d.remove_groups == {(2, "ro")} and d.final_group_keys == {2: frozenset({"rw"})}
     assert d.drop_managed_groups == {(2, "ro")}
+
+
+def test_authoritative_strips_only_valid_roles_and_groups() -> None:
+    desired = DesiredAssignments(frozenset({1}), frozenset({(2, "ro")}), True, True)
+    state = AssignmentState(
+        frozenset({1, 7, 8}),
+        frozenset({(2, "note"), (9, "rw"), (10, "rw")}),
+        frozenset(),
+        frozenset(),
+    )
+    d = diff_assignments(
+        desired, state, mode="authoritative", valid_role_ids={1, 7}, valid_group_ids={2, 9}
+    )
+    assert d.remove_roles == {7}  # 8 is invalid: left alone
+    assert d.remove_groups == {(2, "note"), (9, "rw")}  # group 10 is invalid: left alone
+    assert 10 not in d.final_group_keys
+
+
+def test_attribute_present_distinguishes_empty_from_absent() -> None:
+    from tiqora.identity.mapping import attribute_present
+
+    attrs = normalize_attributes({"groups": [], "Mail": "a@example.org"})
+    assert attribute_present(attrs, "groups") and attribute_present(attrs, "mail")
+    assert not attribute_present(attrs, "roles")

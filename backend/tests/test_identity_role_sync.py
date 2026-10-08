@@ -35,6 +35,7 @@ from tiqora.identity import provisioning
 from tiqora.identity.config_models import AttributeMap, GroupGrant, RoleRule
 from tiqora.identity.links import upsert_link
 from tiqora.identity.login import ExternalIdentity, apply_login, plan_login
+from tiqora.identity.mapping import AssignmentDiff
 from tiqora.identity.store import ProviderChanges, ProviderRecord, update_provider
 
 pytestmark = pytest.mark.db
@@ -56,20 +57,22 @@ _MARK: dict[str, int] = {}
 
 
 def _stmts(url: str) -> tuple[tuple[str, dict[str, object]], ...]:
-    rng = {"lo": BAND[0], "hi": HIGH[1]}
-    return (
-        ("DELETE FROM role_user WHERE user_id BETWEEN :lo AND :hi", rng),
-        ("DELETE FROM group_user WHERE user_id BETWEEN :lo AND :hi", rng),
-        ("DELETE FROM role_user WHERE role_id BETWEEN :lo AND :hi", rng),
-        ("DELETE FROM group_user WHERE group_id BETWEEN :lo AND :hi", rng),
-        ("DELETE FROM roles WHERE id BETWEEN :lo AND :hi", rng),
-        ("DELETE FROM permission_groups WHERE id BETWEEN :lo AND :hi", rng),
-        (
-            "DELETE FROM tiqora_cache_invalidation WHERE id > :mx",
-            {"mx": _MARK.get(url, 2**62)},
-        ),
-        *cleanup_statements(user_ids=BAND, slug_prefix=SLUG),
+    # Two blocks only: 47450-47479 belongs to Task 11 and must stay untouched.
+    out: list[tuple[str, dict[str, object]]] = []
+    for lo, hi in (BAND, HIGH):
+        rng = {"lo": lo, "hi": hi}
+        out += [
+            ("DELETE FROM role_user WHERE user_id BETWEEN :lo AND :hi", rng),
+            ("DELETE FROM group_user WHERE user_id BETWEEN :lo AND :hi", rng),
+            ("DELETE FROM role_user WHERE role_id BETWEEN :lo AND :hi", rng),
+            ("DELETE FROM group_user WHERE group_id BETWEEN :lo AND :hi", rng),
+            ("DELETE FROM roles WHERE id BETWEEN :lo AND :hi", rng),
+            ("DELETE FROM permission_groups WHERE id BETWEEN :lo AND :hi", rng),
+        ]
+    out.append(
+        ("DELETE FROM tiqora_cache_invalidation WHERE id > :mx", {"mx": _MARK.get(url, 2**62)})
     )
+    return (*out, *cleanup_statements(user_ids=BAND, slug_prefix=SLUG))
 
 
 def _clean(url: str) -> None:
@@ -178,12 +181,18 @@ class Env:
         return p
 
     async def login(
-        self, p: ProviderRecord, login: str, *groups: str, kind: str = "agent"
+        self,
+        p: ProviderRecord,
+        login: str,
+        *groups: str,
+        kind: str = "agent",
+        claim: str = "groups",
+        empty_claim: bool = False,
     ) -> tuple[int, str]:
         await self.s.commit()  # fresh snapshot (MariaDB repeatable read)
         attrs: dict[str, tuple[str, ...]] = {"preferred_username": (login,)}
-        if groups:
-            attrs["groups"] = tuple(groups)
+        if groups or empty_claim:
+            attrs[claim] = tuple(groups)
         ident = ExternalIdentity(provider_id=p.id, subject=f"sub-{login}", attributes=attrs)
         plan = await plan_login(self.s, p, ident, user_kind=kind, settings=SETTINGS)  # type: ignore[arg-type]
         return await apply_login(self.s, p, ident, plan, settings=SETTINGS)
@@ -242,7 +251,7 @@ async def env(request: pytest.FixtureRequest) -> AsyncIterator[Env]:
                 {"g": gid, "n": f"idp-group-{gid}", "t": NOW},
             )
         await session.commit()
-        for uid in range(47410, 47430):
+        for uid in range(47410, 47440):
             await seed_agent(session, uid, f"idp.sync.{uid}")
         await session.execute(
             text(
@@ -300,7 +309,7 @@ async def test_managed_role_removed_when_group_gone(env: Env) -> None:
     p = await env.provider("gone", [_rule(roles=[R1])])
     await env.login(p, login, "support")
     mark = await env.inval_mark()
-    await env.login(p, login)  # no groups claim at all
+    await env.login(p, login, empty_claim=True)  # `groups: []`
     assert await env.roles(uid) == set()
     assert await env.managed(uid) == set()
     for cache_type in ("DBRoleUserGet", "GroupPermissionUserGet", "GroupPermissionGroupGet"):
@@ -481,7 +490,8 @@ async def test_customer_login_is_not_synced(env: Env) -> None:
     assert plan.assignments.empty
     await apply_login(env.s, p, ident, plan, settings=SETTINGS)
     assert await env.managed(cid, p.id) == set()
-    assert await env.roles(cid) == set()
+    # Customer ids share the number space of agent ids: nothing may be written for either.
+    assert await env.rows("SELECT COUNT(*) FROM role_user WHERE role_id = :r", r=R1) == [(0,)]
 
 
 async def test_plan_reports_assignments_without_writing(env: Env) -> None:
@@ -555,3 +565,71 @@ async def test_sync_existing_retries_without_email_after_provisioning_error(
         )
         == []
     )
+
+
+async def test_managed_rw_keeps_manual_ro_as_separate_row(env: Env) -> None:
+    uid, login = _uid(47427)
+    await env.grant_keys(uid, G1, "ro")  # manual
+    p = await env.provider("rwro", [_rule(groups=[GroupGrant(group_id=G1, permissions=["rw"])])])
+    await env.login(p, login, "support")
+    assert await env.keys(uid, G1) == {"rw", "ro"}  # side by side, ro not absorbed
+    assert await env.managed(uid) == {("group", G1, "rw")}
+    await env.login(p, login, "other")  # rule stops: only the managed rw goes
+    assert await env.keys(uid, G1) == {"ro"}
+    assert await env.managed(uid) == set()
+
+
+async def test_authoritative_leaves_invalid_roles_alone(env: Env) -> None:
+    uid, login = _uid(47428)
+    await env.grant_role(uid, R_INVALID)
+    await env.grant_role(uid, R3)
+    p = await env.provider("authvalid", [_rule(roles=[R1])], mode="authoritative")
+    await env.login(p, login, "support")
+    assert await env.roles(uid) == {R1, R_INVALID}  # valid manual R3 replaced, invalid kept
+
+
+async def test_absent_claim_skips_sync_but_empty_claim_strips(
+    env: Env, caplog: pytest.LogCaptureFixture
+) -> None:
+    uid, login = _uid(47429)
+    await env.grant_role(uid, R3)
+    p = await env.provider("absent", [_rule(roles=[R1])], mode="authoritative")
+    await env.login(p, login, "support")
+    assert await env.roles(uid) == {R1}
+    await env.grant_role(uid, R3)
+    with caplog.at_level("WARNING", logger="tiqora.identity.login"):
+        await env.login(p, login, claim="memberOf", empty_claim=True)  # no `groups` claim
+    assert await env.roles(uid) == {R1, R3}  # nothing stripped
+    assert any("not released" in r.getMessage() for r in caplog.records)
+    await env.login(p, login, empty_claim=True)  # `groups: []` -> really no groups
+    assert await env.roles(uid) == set()
+
+
+async def test_sync_logs_grants_and_revokes(env: Env, caplog: pytest.LogCaptureFixture) -> None:
+    uid, login = _uid(47430)
+    p = await env.provider("log", [_rule(roles=[R1])])
+    with caplog.at_level("INFO", logger="tiqora.identity.provisioning"):
+        await env.login(p, login, "support")
+        await env.login(p, login, "other")
+    msgs = [r.getMessage() for r in caplog.records]
+    assert any("sync role grant" in m and f"role {R1}" in m and f"{SLUG}log" in m for m in msgs)
+    assert any("sync role revoke" in m and f"role {R1}" in m for m in msgs)
+
+
+async def test_concurrent_duplicate_managed_mark_is_tolerated(env: Env) -> None:
+    uid, _ = _uid(47431)
+    p = await env.provider("dup", [_rule(roles=[R1])])
+    # Another login inserted the mark between our read and our write.
+    await env.s.execute(
+        text(
+            "INSERT INTO tiqora_identity_managed_assignment (provider_id, user_id, kind,"
+            " target_id, permission_key, created) VALUES (:p, :u, 'role', :r, '', :t)"
+        ),
+        {"p": p.id, "u": uid, "r": R1, "t": NOW},
+    )
+    await env.s.commit()
+    diff = AssignmentDiff(add_roles=frozenset({R1}), record_managed_roles=frozenset({R1}))
+    await provisioning.apply_assignments(env.s, provider_id=p.id, user_id=uid, diff=diff)
+    await env.s.commit()
+    assert await env.roles(uid) == {R1}
+    assert await env.managed(uid) == {("role", R1, "")}

@@ -31,6 +31,7 @@ from tiqora.identity.mapping import (
     AssignmentDiff,
     AssignmentState,
     MappedProfile,
+    attribute_present,
     diff_assignments,
     evaluate_rules,
     map_profile,
@@ -360,11 +361,23 @@ async def _plan_assignments(
 
     if user_kind != "agent" or user_id == SYSTEM_USER_ID or not provider.role_rules:
         return AssignmentDiff()
+    for rule_attribute in {r.attribute.strip() for r in provider.role_rules}:
+        if not attribute_present(identity.attributes, rule_attribute):
+            # Fail safe: Entra group overage or a broken attribute release must not strip
+            # roles. A present but empty list still means "no groups".
+            log.warning(
+                "role sync skipped for provider %s: claim %r not released",
+                provider.slug,
+                rule_attribute,
+            )
+            return AssignmentDiff()
+    valid_roles = await valid_role_ids(session)
+    valid_groups = await valid_group_ids(session)
     desired = evaluate_rules(
         identity.attributes,
         provider.role_rules,
-        valid_role_ids=await valid_role_ids(session),
-        valid_group_ids=await valid_group_ids(session),
+        valid_role_ids=valid_roles,
+        valid_group_ids=valid_groups,
     )
     if user_id is None:
         state = AssignmentState(frozenset(), frozenset(), frozenset(), frozenset())
@@ -372,7 +385,13 @@ async def _plan_assignments(
         state = await provisioning.load_assignment_state(
             session, provider_id=provider.id, user_id=user_id
         )
-    return diff_assignments(desired, state, mode=provider.sync_mode)
+    return diff_assignments(
+        desired,
+        state,
+        mode=provider.sync_mode,
+        valid_role_ids=valid_roles,
+        valid_group_ids=valid_groups,
+    )
 
 
 async def plan_login(
@@ -569,8 +588,10 @@ async def apply_login(
     else:
         raise ValueError(f"unsupported login plan decision: {plan.decision}")
     if plan.user_kind == "agent" and provider.role_rules:
-        # Re-planned against the live state: JIT defaults (or a concurrent admin edit)
-        # may have changed it since ``plan_login``.
+        # Re-planned inside this transaction after the account writes above, so JIT
+        # defaults and the profile sync are visible. Under a repeatable-read snapshot
+        # (MariaDB) commits of concurrent requests are not; concurrent duplicate marks are
+        # tolerated by ``apply_assignments``.
         from tiqora.identity.provisioning import apply_assignments
 
         await apply_assignments(
@@ -578,6 +599,7 @@ async def apply_login(
             provider_id=provider.id,
             user_id=user_id,
             diff=await _plan_assignments(session, provider, identity, plan.user_kind, user_id),
+            provider_slug=provider.slug,
         )
     if _stores_links(provider):
         try:

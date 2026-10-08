@@ -47,7 +47,9 @@ def normalize_attributes(raw: Mapping[str, Any]) -> dict[str, tuple[str, ...]]:
             value if isinstance(value, (list, tuple, set, frozenset)) else (value,)
         )
         vals = tuple(s for s in (_scalar(x) for x in items_) if s is not None)
-        if vals:
+        # A list claim that is present but empty is kept (as ``()``): "no groups" differs
+        # from "claim not released" for role sync.
+        if vals or isinstance(value, (list, tuple, set, frozenset)):
             out[str(key)] = vals
     return out
 
@@ -59,6 +61,15 @@ def lookup(attributes: Attributes, name: str) -> tuple[str, ...]:
     folded = name.lower()
     hits = [k for k in attributes if k.lower() == folded]
     return tuple(attributes[hits[0]]) if len(hits) == 1 else ()
+
+
+def attribute_present(attributes: Attributes, name: str) -> bool:
+    """The claim exists (even with an empty value list): exact key, else a unique
+    case-insensitive key."""
+    if name in attributes:
+        return True
+    folded = name.lower()
+    return sum(1 for k in attributes if k.lower() == folded) == 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,13 +206,24 @@ class AssignmentDiff:
 
 
 def _diff_set[T](
-    desired: frozenset[T], current: frozenset[T], managed: frozenset[T], mode: SyncMode
+    desired: frozenset[T],
+    current: frozenset[T],
+    managed: frozenset[T],
+    mode: SyncMode,
+    strippable: frozenset[T] | None = None,
 ) -> tuple[frozenset[T], frozenset[T], frozenset[T], frozenset[T]]:
-    """Return (add, remove, record_managed, drop_managed) for one kind."""
+    """Return (add, remove, record_managed, drop_managed) for one kind.
+
+    ``strippable`` limits what authoritative mode may remove (Znuny's AuthSync only
+    lists VALID roles/groups); None = everything not desired.
+    """
     add = desired - current
     drop = managed - desired
     if mode == "authoritative":
-        return add, current - desired, desired - managed, drop
+        stale = current - desired
+        if strippable is not None:
+            stale &= strippable
+        return add, stale, desired - managed, drop
     return add, drop & current, add, drop
 
 
@@ -221,8 +243,9 @@ def _managed_group_diff(
 
     Per group: if the current keys already satisfy the desired ones (a present ``rw``
     covers every key) nothing is added. Otherwise the final key set is
-    desired ∪ current manual (unmanaged) keys, collapsed to ``{rw}`` when it holds
-    ``rw`` (Znuny stores ``rw`` alone). Managed keys no longer desired are removed.
+    desired ∪ current manual (unmanaged) keys as SEPARATE rows: a manual ``ro`` stays next
+    to a managed ``rw`` (valid Znuny data); the ``rw`` collapse applies only within the
+    desired (managed) keys. Managed keys no longer desired are removed.
     """
     add: set[tuple[int, str]] = set()
     rem: set[tuple[int, str]] = set()
@@ -235,12 +258,7 @@ def _managed_group_diff(
             managed - want
         )  # current keys minus stale managed ones (a stale managed rw covers nothing)
         satisfied = not want or "rw" in live or want <= live
-        if satisfied:
-            final = live
-        else:
-            final = want | (cur - managed)
-            if "rw" in final:
-                final = frozenset({"rw"})
+        final = live if satisfied else want | (cur - managed)
         add.update((gid, p) for p in final - cur)
         rem.update((gid, p) for p in cur - final)
     drop = state.managed_group_perms - desired.group_perms
@@ -248,14 +266,21 @@ def _managed_group_diff(
 
 
 def diff_assignments(
-    desired: DesiredAssignments, state: AssignmentState, *, mode: SyncMode
+    desired: DesiredAssignments,
+    state: AssignmentState,
+    *,
+    mode: SyncMode,
+    valid_role_ids: AbstractSet[int] | None = None,
+    valid_group_ids: AbstractSet[int] | None = None,
 ) -> AssignmentDiff:
     """Compute the changes that bring ``state`` to ``desired`` (see module doc for rule-less kinds).
 
     Group permissions follow Znuny ``PermissionGroupUserAdd``, which replaces the whole
     key set of a (user, group): apply ``final_group_keys`` once per group instead of the
-    add/remove rows. Managed mode keeps every unmanaged key (a manual ``rw`` is never
-    downgraded); authoritative mode makes the group's keys exactly the desired ones.
+    add/remove rows. Managed mode keeps every unmanaged key as its own row (a manual
+    ``rw`` is never downgraded, a manual ``ro`` is never absorbed by a managed ``rw``);
+    authoritative mode makes the group's keys exactly the desired ones, but only strips
+    VALID roles/groups when ``valid_*_ids`` are given (Znuny lists valid ones only).
 
     A group rule whose group ids are all invalid (e.g. the group was deleted) still
     counts as "group rules configured": desired is empty, so authoritative mode strips
@@ -264,7 +289,11 @@ def diff_assignments(
     kw: dict[str, Any] = {}
     if desired.has_role_rules:
         r_add, r_rem, r_rec, r_drop = _diff_set(
-            desired.role_ids, state.current_roles, state.managed_roles, mode
+            desired.role_ids,
+            state.current_roles,
+            state.managed_roles,
+            mode,
+            None if valid_role_ids is None else frozenset(valid_role_ids),
         )
         kw.update(
             add_roles=r_add,
@@ -275,7 +304,13 @@ def diff_assignments(
     if desired.has_group_rules:
         if mode == "authoritative":
             g_add, g_rem, g_rec, g_drop = _diff_set(
-                desired.group_perms, state.current_group_perms, state.managed_group_perms, mode
+                desired.group_perms,
+                state.current_group_perms,
+                state.managed_group_perms,
+                mode,
+                None
+                if valid_group_ids is None
+                else frozenset(p for p in state.current_group_perms if p[0] in valid_group_ids),
             )
         else:
             g_add, g_rem, g_rec, g_drop = _managed_group_diff(desired, state)
