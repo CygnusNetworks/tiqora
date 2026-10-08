@@ -450,7 +450,8 @@ async def test_session_id_auth_ticket_search(compat_mariadb: dict[str, Any]) -> 
 
     # Should return a list (possibly empty) without an Error key
     assert "Error" not in result, f"Got error instead of ticket IDs: {result}"
-    assert "TicketID" in result
+    # Znuny answers an empty hit list with an empty Data object (no TicketID key)
+    assert set(result) <= {"TicketID"}
     await engine.dispose()
 
 
@@ -873,7 +874,7 @@ async def test_ticket_search_state_type_singular(compat_mariadb: dict[str, Any])
         )
 
     assert "Error" not in result_closed
-    assert ticket_id not in result_closed["TicketID"], (
+    assert ticket_id not in result_closed.get("TicketID", []), (
         f"Ticket {ticket_id} should NOT appear in 'closed' StateType search"
     )
     await engine.dispose()
@@ -938,7 +939,7 @@ async def test_ticket_search_customer_user_login(compat_mariadb: dict[str, Any])
         )
 
     assert "Error" not in result2
-    assert ticket_id not in result2["TicketID"]
+    assert ticket_id not in result2.get("TicketID", [])
     await engine.dispose()
 
 
@@ -1015,7 +1016,7 @@ async def test_ticket_search_no_permission_returns_empty(compat_mariadb: dict[st
         )
 
     assert "Error" not in result
-    assert result["TicketID"] == []
+    assert result == {}
     await engine.dispose()
 
 

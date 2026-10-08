@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -28,6 +28,11 @@ from tiqora.api.compat.article_input import (
     send_gi_auto_response,
 )
 from tiqora.api.compat.mapping.perl import perl_truthy
+from tiqora.api.compat.search_filters import (
+    create_time_settings,
+    created_filters,
+    time_filters,
+)
 from tiqora.api.compat.ticket_get import (
     build_article_entries,
     build_ticket_entry,
@@ -565,8 +570,6 @@ def _parse_pending_time(raw: Any) -> datetime | None:
         return None
     if raw.get("Diff") is not None:
         try:
-            from datetime import timedelta
-
             return datetime.now(tz=UTC) + timedelta(minutes=int(raw["Diff"]))
         except (ValueError, TypeError):
             return None
@@ -1958,12 +1961,16 @@ async def op_ticket_search(
 
     Supports core Znuny TicketSearch filters: TicketNumber, Title, Queues,
     States, StateType (string or list), Priorities, Types, Locks, Services,
-    SLAs, OwnerIDs/ResponsibleIDs/WatchUserIDs, Customer*, create-time windows,
-    MIMEBase_* / Fulltext article filters, SortBy/OrderBy, UseSubQueues,
-    SearchInArchive, DynamicField_X (Equals/Like/comparison ops).
-    """
-    from datetime import timedelta
+    SLAs, OwnerIDs/ResponsibleIDs/WatchUserIDs, Customer*, TicketID, Created*
+    (NewTicket history row), ticket create/change/last-change/close/pending/escalation
+    time windows (see ``search_filters``), MIMEBase_* / Fulltext article filters,
+    SortBy/OrderBy, UseSubQueues, SearchInArchive, DynamicField_X (Equals/Like/
+    comparison ops). No hit answers ``{}`` like Znuny (no ``TicketID`` key).
 
+    ``Result`` (COUNT/ARRAY), ticket/article flag filters and mention filters are not
+    GenericInterface parameters in Znuny (the operation always uses ``Result => ARRAY``
+    and its ``_GetParams`` whitelist drops them), so they are ignored here as well.
+    """
     op = "TicketSearch"
 
     auth = await _auth_from_params(data, session, session_store, request=request, settings=settings)
@@ -1988,7 +1995,7 @@ async def op_ticket_search(
         scope = await customer_ticket_scope_filter(session, login=login, customer_id=company_id)
         owned_ids = set((await session.execute(select(Ticket.id).where(scope))).scalars().all())
         if not owned_ids:
-            return {"TicketID": []}
+            return {}
         o_list = list(owned_ids)
         o_ph = ",".join(f":own{i}" for i in range(len(o_list)))
         conditions.append(f"t.id IN ({o_ph})")
@@ -2015,7 +2022,7 @@ async def op_ticket_search(
         pe = PermissionEngine(session)
         allowed_groups = await pe.groups_for_permission(user_id, "ro")
         if not allowed_groups:
-            return {"TicketID": []}
+            return {}
 
         allowed_queue_rows = (
             (
@@ -2061,7 +2068,7 @@ async def op_ticket_search(
             queue_filter = queue_filter & req_queues
 
         if not queue_filter:
-            return {"TicketID": []}
+            return {}
 
         q_list = list(queue_filter)
         placeholders = ",".join(f":q{i}" for i in range(len(q_list)))
@@ -2116,7 +2123,7 @@ async def op_ticket_search(
         else:
             state_ids = all_type_sids
         if not state_ids:
-            return {"TicketID": []}
+            return {}
 
     # StateTypes (Tiqora extension) + StateTypeIDs
     if data.get("StateTypes"):
@@ -2128,7 +2135,7 @@ async def op_ticket_search(
         else:
             state_ids = all_type_sids
         if not state_ids:
-            return {"TicketID": []}
+            return {}
     if data.get("StateTypeIDs"):
         # Map type_ids → state ids
         type_id_list = [int(x) for x in _to_list(data["StateTypeIDs"])]
@@ -2147,7 +2154,7 @@ async def op_ticket_search(
         else:
             state_ids = type_sids
         if not state_ids:
-            return {"TicketID": []}
+            return {}
 
     if state_ids:
         s_list = list(state_ids)
@@ -2314,22 +2321,23 @@ async def op_ticket_search(
         if data.get("ArchiveFlags") is None and data.get("SearchInArchive") is None:
             conditions.append("t.archive_flag = 0")
 
-    # Ticket create-time filters
-    now_ts = datetime.now(tz=UTC)
-    if tct_newer_min := data.get("TicketCreateTimeNewerMinutes"):
-        cutoff = now_ts - timedelta(minutes=int(tct_newer_min))
-        conditions.append("t.create_time >= :ct_newer_min")
-        params["ct_newer_min"] = cutoff
-    if tct_older_min := data.get("TicketCreateTimeOlderMinutes"):
-        cutoff = now_ts - timedelta(minutes=int(tct_older_min))
-        conditions.append("t.create_time <= :ct_older_min")
-        params["ct_older_min"] = cutoff
-    if tct_newer := data.get("TicketCreateTimeNewerDate"):
-        conditions.append("t.create_time >= :ct_newer")
-        params["ct_newer"] = tct_newer
-    if tct_older := data.get("TicketCreateTimeOlderDate"):
-        conditions.append("t.create_time <= :ct_older")
-        params["ct_older"] = tct_older
+    # Ticket time windows (create / change / close / pending / escalation), Znuny semantics
+    now_naive = datetime.now(tz=UTC).replace(tzinfo=None)
+    time_data = create_time_settings(data, now=now_naive)
+    if not time_filters(time_data, conditions, params, joins, now=now_naive):
+        return {}
+    await created_filters(session, data, conditions, params)
+
+    # TicketID: limit the search to one id or a list of ids
+    if (tid_raw := data.get("TicketID")) not in (None, "", []):
+        try:
+            tid_list = [int(x) for x in _to_list(tid_raw)]
+        except (TypeError, ValueError):
+            return {}
+        ph = ",".join(f":tid{i}" for i in range(len(tid_list)))
+        conditions.append(f"t.id IN ({ph})")
+        for i, tid_val in enumerate(tid_list):
+            params[f"tid{i}"] = tid_val
 
     # MIMEBase / Fulltext article filters via article_data_mime
     mime_filters: list[tuple[str, str]] = []
@@ -2378,10 +2386,10 @@ async def op_ticket_search(
         _add_join("JOIN article a_ct ON a_ct.ticket_id = t.id", "article_ct")
         if m := data.get("ArticleCreateTimeNewerMinutes"):
             conditions.append("a_ct.create_time >= :act_nm")
-            params["act_nm"] = now_ts - timedelta(minutes=int(m))
+            params["act_nm"] = now_naive - timedelta(minutes=int(m))
         if m := data.get("ArticleCreateTimeOlderMinutes"):
             conditions.append("a_ct.create_time <= :act_om")
-            params["act_om"] = now_ts - timedelta(minutes=int(m))
+            params["act_om"] = now_naive - timedelta(minutes=int(m))
         if m := data.get("ArticleCreateTimeNewerDate"):
             conditions.append("a_ct.create_time >= :act_nd")
             params["act_nd"] = m
@@ -2474,13 +2482,17 @@ async def op_ticket_search(
     sort_list = _to_list(sort_raw)
     order_list = _to_list(order_raw)
     order_parts: list[str] = []
+    order_cols: list[str] = []
     for i, s in enumerate(sort_list):
         col = sort_map.get(str(s), "t.create_time")
         direction = str(order_list[i] if i < len(order_list) else order_list[-1]).lower()
         dir_sql = "ASC" if direction in ("up", "asc") else "DESC"
         order_parts.append(f"{col} {dir_sql}")
+        if col not in order_cols:
+            order_cols.append(col)
     if not order_parts:
         order_parts = ["t.create_time DESC"]
+        order_cols = ["t.create_time"]
     order_sql = ", ".join(order_parts)
 
     limit_raw = data.get("Limit") or 500
@@ -2492,7 +2504,9 @@ async def op_ticket_search(
     joins_sql = " ".join(joins)
     where_sql = " AND ".join(conditions) if conditions else "1=1"
     sql = (
-        f"SELECT DISTINCT t.id FROM ticket t {joins_sql}"
+        # PostgreSQL requires every ORDER BY expression in a SELECT DISTINCT list
+        f"SELECT DISTINCT t.id{''.join(', ' + c for c in order_cols if c != 't.id')}"
+        f" FROM ticket t {joins_sql}"
         f" WHERE {where_sql}"
         f" ORDER BY {order_sql}"
         f" LIMIT {limit}"
@@ -2501,6 +2515,8 @@ async def op_ticket_search(
     rows = (await session.execute(text(sql), params)).fetchall()
     ticket_ids = [int(r[0]) for r in rows]
 
+    if not ticket_ids:
+        return {}
     return {"TicketID": ticket_ids}
 
 
