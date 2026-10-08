@@ -29,6 +29,7 @@ export const demoUser = {
   email: "alex.turner@example.com",
   time_zone: null,
   default_time_zone: "Europe/Berlin",
+  sso_logout: false,
 };
 
 // ── Queues (agent tree with counts) ─────────────────────────────────────────
@@ -1561,7 +1562,14 @@ const demoExportJob = {
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Auth
-  if (p.endsWith("/auth/methods")) return { password: true, oidc: false, spnego: false, webauthn: true, ldap: false };
+  if (p.endsWith("/auth/methods")) return {
+    password: true, oidc: false, spnego: false, webauthn: true, ldap: false, saml: true,
+    providers: [
+      { slug: "demo-entra", kind: "oidc", label: "Mit Microsoft anmelden", icon: "microsoft" },
+      { slug: "demo-keycloak", kind: "oidc", label: "Mit Keycloak anmelden", icon: "key" },
+      { slug: "demo-adfs", kind: "saml", label: "Firmenkonto (SAML)", icon: "building" },
+    ],
+  };
   if (p.endsWith("/auth/me")) return demoUser;
   // The demo cannot read the body; saving keeps the browser-zone default.
   if (p.endsWith("/auth/me/time-zone") && method === "PUT") return demoUser;

@@ -5,6 +5,9 @@ import { useAuth } from "@/auth/AuthContext";
 import { logoUrl } from "@/lib/assets";
 import { getLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
 import { api, ApiError } from "@/lib/api";
+import { agentSsoLoginUrl, type LoginProvider } from "@/lib/identityApi";
+import { ssoErrorKey } from "@/lib/ssoErrors";
+import { SsoProviderButtons } from "@/components/auth/SsoProviderButtons";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { OtpInput } from "@/components/ui/OtpInput";
@@ -48,13 +51,14 @@ export function LoginPage() {
   const search = useSearch({ from: "/login" }) as {
     next?: string;
     sso_error?: string;
+    logged_out?: string;
   };
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [oidcEnabled, setOidcEnabled] = useState(false);
+  const [providers, setProviders] = useState<LoginProvider[]>([]);
   const [spnegoEnabled, setSpnegoEnabled] = useState(false);
   const [webauthnEnabled, setWebauthnEnabled] = useState(false);
 
@@ -70,12 +74,18 @@ export function LoginPage() {
     api
       .authMethods()
       .then((methods) => {
-        setOidcEnabled(Boolean(methods.oidc));
+        const list = methods.providers ?? [];
+        // Older backends only send the `oidc` flag: show the one env button.
+        setProviders(
+          list.length === 0 && methods.oidc
+            ? [{ slug: "env-oidc", kind: "oidc", label: "", icon: null }]
+            : list,
+        );
         setSpnegoEnabled(Boolean(methods.spnego));
         setWebauthnEnabled(Boolean(methods.webauthn));
       })
       .catch(() => {
-        setOidcEnabled(false);
+        setProviders([]);
         setSpnegoEnabled(false);
         setWebauthnEnabled(false);
       });
@@ -103,7 +113,9 @@ export function LoginPage() {
   // (set by a failed handshake) and the ref both prevent an auto-retry loop;
   // a plain visit to /login (no `next`) still shows the normal form with the
   // Kerberos button.
-  const ssoErrorFlag = search.sso_error === "1" || search.sso_error === "true";
+  // Any non-empty `sso_error` is an error (legacy "1" and unknown codes too).
+  const ssoErrorFlag = Boolean(search.sso_error);
+  const ssoErrorMessageKey = ssoErrorKey(search.sso_error);
   const autoSsoTriggered = useRef(false);
   const reauthNextRef = useRef<string | undefined>(undefined);
   const [kerberosReauthSeconds, setKerberosReauthSeconds] = useState<
@@ -495,8 +507,8 @@ export function LoginPage() {
     );
   }
 
-  const showSsoDivider = oidcEnabled || spnegoEnabled;
-  const ssoError = ssoErrorFlag;
+  const showSsoDivider = providers.length > 0 || spnegoEnabled;
+  const safeNext = isSafeNextPath(search.next) ? search.next : "/";
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-bg px-4">
@@ -514,13 +526,22 @@ export function LoginPage() {
         <p className="mt-1.5 text-center text-sm text-muted">
           {t("auth.signIn")}
         </p>
-        {ssoError && (
+        {search.logged_out && (
+          <p
+            className="mt-3 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-sm text-muted"
+            role="status"
+            data-testid="logged-out-note"
+          >
+            {t("auth.loggedOut")}
+          </p>
+        )}
+        {ssoErrorMessageKey && (
           <p
             className="mt-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
             role="alert"
             data-testid="sso-error"
           >
-            {t("auth.ssoFailed")}
+            {t(ssoErrorMessageKey)}
           </p>
         )}
         {kerberosReauthSeconds !== null && (
@@ -618,20 +639,11 @@ export function LoginPage() {
                   {t("auth.kerberosButton")}
                 </Button>
               )}
-              {oidcEnabled && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  data-testid="sso-login"
-                  onClick={() => {
-                    rememberLoginMethod("oidc");
-                    window.location.assign(api.oidcLoginUrl());
-                  }}
-                >
-                  {t("auth.ssoButton")}
-                </Button>
-              )}
+              <SsoProviderButtons
+                providers={providers}
+                hrefFor={(slug) => agentSsoLoginUrl(slug, safeNext)}
+                onBeforeNavigate={() => rememberLoginMethod("oidc")}
+              />
             </div>
           </>
         )}

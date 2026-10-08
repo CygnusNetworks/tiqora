@@ -21,7 +21,11 @@ let pendingFactors: { totp: boolean; passkey: boolean } | null = null;
 let mustEnroll2fa = false;
 let isAuthenticated = false;
 let isLoading = false;
-let searchParams: { next?: string; sso_error?: string } = {};
+let searchParams: {
+  next?: string;
+  sso_error?: string;
+  logged_out?: string;
+} = {};
 
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ history: { push: historyPush } }),
@@ -129,7 +133,7 @@ describe("LoginPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("kerberos-login")).toBeInTheDocument();
     });
-    expect(screen.queryByTestId("sso-login")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sso-provider-env-oidc")).not.toBeInTheDocument();
   });
 
   // jsdom's `location.assign` is non-configurable, so swap the whole object
@@ -238,6 +242,109 @@ describe("LoginPage", () => {
       expect(authMethods).toHaveBeenCalled();
     });
     expect(screen.queryByTestId("kerberos-login")).not.toBeInTheDocument();
+  });
+
+  it("shows an SSO button per provider and starts its login", async () => {
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: false,
+      ldap: false,
+      webauthn: false,
+      providers: [
+        { slug: "entra", kind: "oidc", label: "Mit Microsoft anmelden", icon: "microsoft" },
+        { slug: "adfs", kind: "saml", label: "Firmenkonto", icon: "building" },
+      ],
+    });
+    const loc = stubLocationAssign();
+    renderPage();
+    const btn = await screen.findByTestId("sso-provider-entra");
+    expect(screen.getByTestId("sso-provider-adfs")).toBeInTheDocument();
+    fireEvent.click(btn);
+    expect(loc.assign).toHaveBeenCalledWith(
+      "/api/v1/auth/sso/entra/login?next=%2F",
+    );
+    expect(localStorage.getItem("tiqora-login-method")).toBe("oidc");
+    loc.restore();
+  });
+
+  it("passes a safe next target on to the provider login", async () => {
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: false,
+      ldap: false,
+      webauthn: false,
+      providers: [{ slug: "entra", kind: "oidc", label: "x", icon: null }],
+    });
+    searchParams = { next: "/agent/tickets?x=1" };
+    const loc = stubLocationAssign();
+    renderPage();
+    fireEvent.click(await screen.findByTestId("sso-provider-entra"));
+    expect(loc.assign).toHaveBeenCalledWith(
+      "/api/v1/auth/sso/entra/login?next=%2Fagent%2Ftickets%3Fx%3D1",
+    );
+    loc.restore();
+  });
+
+  it("legacy oidc flag with the env-oidc provider shows exactly one SSO button", async () => {
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: true,
+      spnego: false,
+      ldap: false,
+      webauthn: false,
+      providers: [{ slug: "env-oidc", kind: "oidc", label: "", icon: null }],
+    });
+    renderPage();
+    const btn = await screen.findByTestId("sso-provider-env-oidc");
+    expect(btn).toHaveTextContent(i18n.t("auth.providers.defaultLabel"));
+    expect(screen.queryByTestId("sso-login")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(/^sso-provider-/)).toHaveLength(1);
+  });
+
+  it("maps a backend sso_error code to its German message", async () => {
+    searchParams = { sso_error: "no_match" };
+    renderPage();
+    const el = await screen.findByTestId("sso-error");
+    expect(el).toHaveTextContent(i18n.t("auth.ssoErrors.no_match"));
+    expect(el).not.toHaveTextContent(i18n.t("auth.ssoFailed"));
+  });
+
+  it("treats an unknown sso_error as a generic failure", async () => {
+    searchParams = { sso_error: "whatever" };
+    renderPage();
+    expect(await screen.findByTestId("sso-error")).toHaveTextContent(
+      i18n.t("auth.ssoFailed"),
+    );
+  });
+
+  it("does not auto-start Kerberos after any sso_error", async () => {
+    vi.useFakeTimers();
+    localStorage.setItem("tiqora-login-method", "spnego");
+    authMethods.mockResolvedValue({
+      password: true,
+      oidc: false,
+      spnego: true,
+      ldap: false,
+      webauthn: false,
+      providers: [],
+    });
+    searchParams = { next: "/agent/tickets", sso_error: "no_match" };
+    renderPage();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("kerberos-reauth-banner")).not.toBeInTheDocument();
+  });
+
+  it("shows a note after logout", async () => {
+    searchParams = { logged_out: "1" };
+    renderPage();
+    expect(await screen.findByTestId("logged-out-note")).toHaveTextContent(
+      i18n.t("auth.loggedOut"),
+    );
   });
 
   it("shows SSO failure hint when sso_error query is set", async () => {

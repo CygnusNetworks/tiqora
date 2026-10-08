@@ -16,6 +16,7 @@ import {
 } from "@simplewebauthn/browser";
 import { api, ApiError, type UserMe } from "@/lib/api";
 import { clearLoginMethod, rememberLoginMethod } from "@/lib/loginMethod";
+import { submitSsoLogout } from "@/lib/ssoLogout";
 import { setDisplayTimeZone } from "@/lib/timeZone";
 import { resolveLocaleCode, setAppLanguage } from "@/i18n";
 
@@ -193,6 +194,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Sessions started through an identity provider end via the SSO logout
+    // endpoint (a form POST the browser follows to the provider's logout or
+    // back to the login page); everyone else uses the plain API logout.
+    if (meQuery.data?.sso_logout) {
+      clearLoginMethod();
+      // The page is about to be replaced: keep the cached session untouched so
+      // no guard redirects to /login and cancels the pending navigation.
+      submitSsoLogout("/api/v1/auth/sso/logout");
+      return;
+    }
     try {
       await api.logout();
     } catch {
@@ -206,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearLoginMethod();
     queryClient.setQueryData(["auth", "me"], null);
     queryClient.clear();
-  }, [queryClient]);
+  }, [queryClient, meQuery.data?.sso_logout]);
 
   const refresh = useCallback(async () => {
     await meQuery.refetch();

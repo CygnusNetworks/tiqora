@@ -138,14 +138,22 @@ const indexRoute = createRoute({
   component: HomeRedirect,
 });
 
+function searchFlag(v: unknown): string | undefined {
+  return typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+    ? String(v)
+    : undefined;
+}
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { next?: string; sso_error?: string } => ({
+  ): { next?: string; sso_error?: string; logged_out?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
-    sso_error: typeof s.sso_error === "string" ? s.sso_error : undefined,
+    // The router JSON-parses search values: `?sso_error=1` arrives as a number.
+    sso_error: searchFlag(s.sso_error),
+    logged_out: searchFlag(s.logged_out),
   }),
   component: LoginPage,
 });

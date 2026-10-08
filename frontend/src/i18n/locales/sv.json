@@ -237,7 +237,30 @@
       "hint": "2FA krävs för det här kontot – ställ in det nu.",
       "startError": "Kunde inte starta 2FA-installationen. Försök igen eller kontakta en administratör.",
       "confirmError": "Ogiltig kod – försök igen."
-    }
+    },
+    "providers": {
+      "defaultLabel": "Sign in with SSO",
+      "or": "or"
+    },
+    "ssoErrors": {
+      "no_subject": "The sign-in service did not send a unique identifier. Please contact your administrator.",
+      "no_match": "There is no access for this account here. Please contact your administrator.",
+      "user_invalid": "The linked user account is disabled or deleted.",
+      "sso_not_enabled": "Sign-in through the sign-in service is not enabled for your account.",
+      "email_unverified": "The sign-in service did not report your e-mail address as verified.",
+      "ambiguous_email": "Your e-mail address belongs to several user accounts. Please contact your administrator.",
+      "login_taken": "The username is already taken by another user account.",
+      "jit_missing_fields": "The sign-in service did not send the details needed to create your account.",
+      "provider_disabled": "This sign-in service is disabled.",
+      "unknown_provider": "This sign-in service is not known.",
+      "config": "Sign-in through this service is not fully set up yet.",
+      "saml_unavailable": "SAML sign-in is not available on this server.",
+      "state": "The sign-in took too long or was started in another window. Please try again.",
+      "saml_invalid": "The response of the sign-in service was invalid. Please try again.",
+      "oidc_failed": "Signing in with the sign-in service failed. Please try again.",
+      "idp_error": "The sign-in service rejected the sign-in."
+    },
+    "loggedOut": "You have been signed out."
   },
   "security": {
     "title": "Säkerhet",

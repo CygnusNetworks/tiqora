@@ -265,6 +265,11 @@ export function AccountMenu({ logoutTestId = "logout-btn" }: { logoutTestId?: st
         icon={<LogOutIcon />}
         testId={logoutTestId}
         onSelect={() => {
+          // SSO sessions leave the SPA through the logout redirect instead.
+          if (user?.sso_logout) {
+            void logout();
+            return;
+          }
           void logout().then(() => navigate({ to: "/login" }));
         }}
       >

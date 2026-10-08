@@ -237,7 +237,30 @@
       "hint": "2FA ist für dieses Konto erforderlich — bitte jetzt einrichten.",
       "startError": "2FA-Einrichtung konnte nicht gestartet werden. Bitte erneut versuchen oder einen Admin kontaktieren.",
       "confirmError": "Ungültiger Code — bitte erneut versuchen."
-    }
+    },
+    "providers": {
+      "defaultLabel": "Mit SSO anmelden",
+      "or": "oder"
+    },
+    "ssoErrors": {
+      "no_subject": "Der Anmeldedienst hat keine eindeutige Kennung übermittelt. Bitte wenden Sie sich an die Administration.",
+      "no_match": "Zu diesem Konto gibt es hier keinen Zugang. Bitte wenden Sie sich an die Administration.",
+      "user_invalid": "Das verknüpfte Benutzerkonto ist deaktiviert oder gelöscht.",
+      "sso_not_enabled": "Für Ihr Konto ist die Anmeldung über den Anmeldedienst nicht freigeschaltet.",
+      "email_unverified": "Der Anmeldedienst hat Ihre E-Mail-Adresse nicht als bestätigt gemeldet.",
+      "ambiguous_email": "Ihre E-Mail-Adresse gehört zu mehreren Benutzerkonten. Bitte wenden Sie sich an die Administration.",
+      "login_taken": "Der Anmeldename ist bereits für ein anderes Benutzerkonto vergeben.",
+      "jit_missing_fields": "Für die automatische Anlage Ihres Kontos fehlen Angaben vom Anmeldedienst.",
+      "provider_disabled": "Dieser Anmeldedienst ist deaktiviert.",
+      "unknown_provider": "Dieser Anmeldedienst ist nicht bekannt.",
+      "config": "Die Anmeldung über diesen Anmeldedienst ist noch nicht vollständig eingerichtet.",
+      "saml_unavailable": "Die Anmeldung über SAML ist auf diesem Server nicht verfügbar.",
+      "state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Fenster begonnen. Bitte erneut versuchen.",
+      "saml_invalid": "Die Antwort des Anmeldedienstes war ungültig. Bitte erneut versuchen.",
+      "oidc_failed": "Die Anmeldung beim Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen.",
+      "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt."
+    },
+    "loggedOut": "Sie wurden abgemeldet."
   },
   "security": {
     "title": "Sicherheit",
