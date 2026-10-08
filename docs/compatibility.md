@@ -403,9 +403,10 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Link overview / link-type admin | missing | Ticket links can be listed and created; no delete, overview page or FAQ/appointment targets |
 | Note to linked tickets (`AgentTicketNoteToLinkedTicket`) | missing | |
 | Stats framework | partial | Fixed reports under `/api/v1/stats` (volume, open snapshot, SLA, workload, backlog) with CSV export; no configurable statistics, no scheduled delivery |
+| Ticket export | partial | `GET /tickets/export.csv` (synchronous) plus `POST /tickets/export-jobs` which runs the export as a background job with progress, cancel and download; no Znuny equivalent (Znuny has CSV via stats only) |
 | Bulk action | partial | State, priority, owner, queue, lock only |
 | Preferences | partial | Language, TOTP/passkeys; no queue favourites, ticket-list options or notification matrix |
-| Free-text edit screen | partial | Dynamic fields shown in header and on new-ticket screens |
+| Free-text edit screen (`AgentTicketFreeText`) | partial | Dynamic fields are editable in ticket zoom, limited to the fields enabled in `Ticket::Frontend::AgentTicketFreeText###DynamicField` (stock Znuny enables none, so the "edit" button only appears once configured); ACL-filtered options; types Text, TextArea, Dropdown, Multiselect, Checkbox, Date, DateTime. Writes use Znuny's typed columns, no-op and history rules. Other types (e.g. ticket/article references) stay read-only |
 
 ### Admin
 
@@ -450,3 +451,20 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Znuny feature | Status | Note |
 |---|---|---|
 | Hybrid (vector + keyword) retrieval for KB/RAG | missing | Planned |
+
+## Upgrade notes (next release)
+
+- **DateTime dynamic fields are now stored in UTC.** Values entered through the
+  phone and new-ticket forms (and the ticket-zoom editor) are converted from the
+  agent's time zone to UTC wall time, exactly as Znuny stores them. DateTime
+  values written by earlier Tiqora versions from those forms were stored as
+  local time and therefore display shifted by the zone offset (1-2 h in
+  Europe/Berlin); correct them by hand if it matters. Date fields are unaffected.
+- **Dynamic-field writes use Znuny's typed columns** (`value_text`,
+  `value_date`, `value_int`) and follow Znuny's rules: unchanged values are
+  no-ops (no history entry, no `change_time` bump), an empty Checkbox stores
+  `0`, invalid input is rejected with 422. Existing rows are not rewritten.
+- New background-job tables (`tiqora_job`, `tiqora_job_file`) are created by the
+  regular Tiqora migration; the `worker` process must be running for exports.
+- Editing dynamic fields in ticket zoom requires enabling them in
+  `Ticket::Frontend::AgentTicketFreeText###DynamicField` (SysConfig).

@@ -22,7 +22,7 @@ full design rationale, see [specs/2026-07-19-tiqora-design.md](./specs/2026-07-1
 | Process | Image / command | Responsibility |
 |---|---|---|
 | `tiqora-api` | `api` | HTTP: agent/portal/admin BFF, `/api/v1`, compat routes, `/health`, `/ready`, `/metrics` |
-| `tiqora-worker` | `worker` | Plain asyncio tick loops (no external scheduler or task queue): Znuny-write poller, outbox drain, postmaster/escalation/notifications/GA/unlock-timeout/pending-check (feature-flagged), Telegram poller, housekeeping |
+| `tiqora-worker` | `worker` | Plain asyncio tick loops (no external scheduler or task queue): Znuny-write poller, outbox drain, background-job runner (`tiqora.jobs`), postmaster/escalation/notifications/GA/unlock-timeout/pending-check (feature-flagged), Telegram poller, housekeeping |
 | `tiqora-ai-worker` | `ai-worker` | AI subsystem loop: new-ticket triage (queue routing), auto-reply worker + auto-summary scan, isolated so a hung LLM call never stalls the main worker. Inert unless `daemon.ai_worker.enabled`; triage and auto-reply additionally require `operation_mode=tiqora_primary` (auto-reply is exempt on Tiqora-only channels, currently Telegram) |
 | `tiqora-mcp` | `mcp` | FastMCP over streamable HTTP; imports `domain/` directly (no second business layer) |
 
@@ -539,6 +539,106 @@ compares; common TransitionAction modules including Type/Service/SLA set,
 TicketCreate, Watch, LinkAdd, …) — see
 [docs/process-management.md](process-management.md) for the full
 supported-vs-deferred breakdown and REST endpoint list.
+
+### Shared foundations
+
+Cross-cutting building blocks that features compose instead of re-implementing.
+Each lives in its own package; features never import each other through the
+registry.
+
+**Extension registry** (`tiqora.extensions`). A generic, typed registry: an
+`ExtensionPoint[T]` (dotted key `<owner>.<area>.<thing>`, an `item_key`
+function, a description) and `Registry.add/get/require/items/registrations`.
+Points are declared next to the feature that owns them, never in
+`extensions/`: `CHANNELS` (`tiqora.channels.registry`), `SETTINGS_SECTIONS`
+(`tiqora.settings_sections.section`), `JOB_HANDLERS` (`tiqora.jobs.registry`).
+`tiqora.extensions.core.register_core` is the only place core items are
+registered (imports happen inside the function, no import-time side effects);
+`get_registry()` builds, registers and freezes the process-wide registry once.
+A duplicate key raises `DuplicateExtensionError`, adding after freeze raises
+`RegistryFrozenError`. Every point is `sdk_stable=False` for now; a later
+plugin loader will call the same `registry.add(point, item, owner="<plugin id>")`.
+Admin view: `GET /api/v1/admin/extensions`. The frontend has a counterpart,
+`frontend/src/extensions/registry.ts` (e.g. the `FIELD_KINDS` point).
+
+**Settings sections** (`tiqora.settings_sections`). A `SettingsSection` binds a
+Pydantic model (every field has a default) to `tiqora_settings` rows under the
+storage prefix `<section.key>.<field>`; existing legacy keys are reused only
+through an explicit `storage_keys` map. Models are limited to a JSON-schema
+subset (bool, int, float, str, `SecretStr`, `Literal`/`StrEnum`, `list[str]`,
+and `X | None` of these) checked by `validate_section_schema`; the generic
+admin screen `/admin/settings/<section>` renders the form from the schema
+(`SchemaForm`, `frontend/src/components/fields/jsonSchema.ts`). Secret
+contract: GET never returns plaintext (set secrets read as the mask
+`********`); on save, an omitted field or the mask leaves the stored
+ciphertext untouched, `""`/`null` removes it, any other string is encrypted
+anew. The frontend therefore holds `null` for an untouched secret, `""` for
+"remove" and a string for a new value, and omits untouched secrets from the
+PUT. `save_section_values` only flushes (the route commits), unlike the legacy
+`settings_store.set_setting`, which commits by itself. API:
+`/api/v1/admin/settings-sections`. Registered sections: `jobs`, `avatars`
+(the latter keeps `/api/v1/admin/avatars` and its old keys).
+
+**Background jobs** (`tiqora.jobs`). Long-running work (first consumer:
+ticket CSV export, `core.ticket_export`) runs as a `tiqora_job` row executed by
+the `worker` process, never inside an API request (the reverse proxy cuts
+requests at 90 s). A feature route validates permissions, calls `enqueue_job`
+(optional `dedupe_key` returns an already active job) and answers
+`202 {job_id, status}`; there is deliberately no generic "create job"
+endpoint. The UI polls `GET /api/v1/jobs/{id}` (1 s for the first 30 s, then
+3 s). Handlers (`JobHandler`: `kind`, `payload_model`, `run`, `timeout_seconds`)
+get a `JobContext` for throttled `progress()`, cooperative `check_cancelled()`
+and `add_file()` (result files live in `tiqora_job_file`, up to 200 MiB). The
+`JobRunner` claims queued rows with a conditional `UPDATE` (several worker
+replicas are safe), honours `jobs.max_concurrency`, heartbeats every 30 s and
+reaps `running` rows without a heartbeat for 180 s as failed ("interrupted").
+Failure mapping: `JobFailed(msg)` shows `msg`; a timeout or any other
+exception ends the job `failed` with a plain German message while details go to
+the worker log (no traceback ever reaches the UI); the loop keeps running.
+Finished jobs and files are purged after `jobs.retention_days`. Visibility:
+the creator or an admin; for everybody else all `/jobs/{id}` routes answer
+404. All `tiqora_job*` timestamps are application-written naive UTC. The loop
+is a daemon-catalog service `jobs` (Admin -> Dienste; not toggleable) and polls
+every `TIQORA_JOBS_POLL_INTERVAL_SECONDS` seconds (default 2).
+
+**Filter model** (`tiqora.filters`). A versioned JSON filter language
+(`{"version": 1, "where": {...}}`) with `all` / `any` / `not` nodes and
+conditions `{field, op, value}`. Operators per field type live in
+`catalog.OPS_BY_TYPE`; `validate_filter` enforces depth, condition-count and
+`in`-list limits and returns the JSON path of the offending node. Dynamic
+fields are addressed as `df.<Name>`. The ticket compiler
+(`tiqora.filters.tickets.compile_ticket_filter`) turns a filter into a
+`select(Ticket)` that is **always** scoped to the agent's `ro` queues first;
+the filter can only narrow, never widen (an `any` branch or a queue the agent
+may not read changes nothing). Relative times are computed in Python against
+UTC, never with the database clock. `filters.ticket_params` bridges the
+existing `GET /tickets` list parameters to a filter (parity-tested) and
+`/api/v1/ticket-filters` exposes the field catalog, validation and counting.
+Moving the main ticket list onto the compiler, saved searches and a
+filter-builder UI are later work.
+
+**Field engine** (`frontend/src/components/fields`). One typed field system for
+forms: `FieldDef` + `FieldKind` (a registry point, so new kinds can be
+added), `FieldInput`, `FieldsForm`, validation, and adapters. Znuny dynamic
+fields map through `dynamicFields.ts` into `DynamicFieldsForm` (phone, new
+ticket and the ticket-zoom editor); JSON-schema settings map through
+`jsonSchema.ts` into `SchemaForm`. Option lists for ticket attributes and
+dynamic fields come from `POST /api/v1/reference/field-options`
+(`tiqora.domain.field_options`), which applies Znuny ACLs (action, current
+form values) so the form offers only what Znuny would. Dynamic-field writes
+(`tiqora.domain.dynamic_field_values`) are behaviourally identical to Znuny's
+`ValueSet`: typed columns (`value_text`, `value_date`, `value_int`), an
+unchanged value writes nothing (no history row, no `change_time` bump),
+invalid input (Date with a time part, Checkbox other than 0/1, several values
+for a single-value type) answers 422 and writes nothing, an empty Checkbox
+stores `0`, DateTime history lines carry seconds, history values are cut with
+Znuny's 166-character rule, and the GenericInterface/process readers use
+Znuny's date format. `PATCH /tickets/{id}` accepts `dynamic_fields` for several
+fields in one transaction. DateTime values entered in the UI are converted
+from the agent's zone to UTC wall time (Znuny stores UTC) and shown back in
+the agent's zone. In ticket zoom a dynamic field is editable only if Znuny's
+`Ticket::Frontend::AgentTicketFreeText###DynamicField` setting enables it
+(stock Znuny enables none, so sites must configure it) and the agent has `rw`.
 
 ### Events and workers
 
