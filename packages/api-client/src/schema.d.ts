@@ -4464,6 +4464,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/saml/{slug}/sls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SAML single logout service (redirect binding)
+         * @description The IdP's LogoutResponse; bound to a stored request id, always ends on the login page.
+         */
+        get: operations["saml_sls_get_api_v1_auth_saml__slug__sls_get"];
+        put?: never;
+        /**
+         * SAML single logout service (POST binding)
+         * @description Same as the GET form; CSRF-exempt because the IdP posts cross-site.
+         */
+        post: operations["saml_sls_post_api_v1_auth_saml__slug__sls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/spnego": {
         parameters: {
             query?: never;
@@ -4485,6 +4509,26 @@ export interface paths {
         get: operations["spnego_api_v1_auth_spnego_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log out of Tiqora and, where supported, of the identity provider
+         * @description Ends the local session first, then redirects to the IdP logout or the login page.
+         */
+        post: operations["sso_logout_route_api_v1_auth_sso_logout_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11278,6 +11322,11 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /**
+             * Sso Logout
+             * @default false
+             */
+            sso_logout: boolean;
         };
         /** CustomerPgpKeyIn */
         CustomerPgpKeyIn: {
@@ -17061,6 +17110,11 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /**
+             * Sso Logout
+             * @default false
+             */
+            sso_logout: boolean;
             /** Time Zone */
             time_zone?: string | null;
         };
@@ -30109,6 +30163,68 @@ export interface operations {
             };
         };
     };
+    saml_sls_get_api_v1_auth_saml__slug__sls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_sls_post_api_v1_auth_saml__slug__sls_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     spnego_api_v1_auth_spnego_get: {
         parameters: {
             query?: {
@@ -30138,6 +30254,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_logout_route_api_v1_auth_sso_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

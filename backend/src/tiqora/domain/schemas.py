@@ -53,6 +53,9 @@ class UserMe(BaseModel):
     first_name: str
     last_name: str
     auth_method: str
+    # True when logging out also ends the identity provider session (SAML SLO / OIDC
+    # end-session); the UI then posts to ``/auth/sso/logout`` instead of ``/auth/logout``.
+    sso_logout: bool = False
     # Znuny user_preferences.UserEmail when set; used for Gravatar.
     email: str | None = None
     # Best-effort OIDC/Google ``picture`` claim captured at SSO login.
@@ -627,6 +630,7 @@ class CustomerMe(BaseModel):
     customer_id: str
     first_name: str
     last_name: str
+    sso_logout: bool = False
 
 
 class CustomerLoginResponse(BaseModel):

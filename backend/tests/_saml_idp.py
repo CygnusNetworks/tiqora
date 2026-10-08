@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import zlib
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -202,6 +203,21 @@ class SamlTestIdp:
         )
         return self._redirect(str(req), sp_slo_url, response=False)
 
+    def parse_logout_request(self, url: str) -> ParsedLogoutRequest:
+        """Decode the SAMLRequest of an SP-initiated logout redirect; require a signed redirect."""
+        q = parse_qs(urlparse(url).query)
+        assert "Signature" in q and "SigAlg" in q, "logout redirect must be signed"
+        xml = zlib.decompress(base64.b64decode(q["SAMLRequest"][0]), -15).decode()
+        req_id = re.search(r'\bID="([^"]+)"', xml)
+        name_id = re.search(r"<(?:\w+:)?NameID\b[^>]*>([^<]*)</", xml)
+        index = re.search(r"<(?:\w+:)?SessionIndex\b[^>]*>([^<]*)</", xml)
+        assert req_id is not None and name_id is not None, xml
+        return ParsedLogoutRequest(
+            request_id=req_id.group(1),
+            name_id=name_id.group(1),
+            session_index=index.group(1) if index else None,
+        )
+
     def logout_response_redirect(self, *, sp_slo_url: str, in_response_to: str) -> str:
         from saml2 import samlp  # noqa: PLC0415
 
@@ -214,6 +230,13 @@ class SamlTestIdp:
             destination=sp_slo_url,
         )
         return self._redirect(str(resp), sp_slo_url, response=True)
+
+
+@dataclass(frozen=True)
+class ParsedLogoutRequest:
+    request_id: str
+    name_id: str
+    session_index: str | None
 
 
 def saml_record(*, slug: str, idp: SamlTestIdp, settings: Settings, **cfg: Any) -> ProviderRecord:

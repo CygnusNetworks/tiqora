@@ -3,7 +3,9 @@
 One-shot keys are read with GET + DELETE ("pop"). The SAML request state is read
 non-destructively first (``get_saml_request``) and only deleted once the response
 signature has been verified, so a forged response naming a request id cannot burn
-the genuine user's login. Logout keys arrive with Task 11.
+the genuine user's login. SAML logout requests (SP-initiated) are stored by request id and
+bound to the provider: the redirect-binding LogoutResponse carries a signature pysaml2 cannot
+check for us, so a response only counts when it answers a request we issued.
 """
 
 from __future__ import annotations
@@ -23,6 +25,8 @@ OIDC_STATE_TTL = 300
 SAML_REQUEST_PREFIX = "tiqora:saml:req:"
 SAML_REQUEST_TTL = 600
 SAML_SEEN_PREFIX = "tiqora:saml:seen:"
+LOGOUT_REQUEST_PREFIX = "tiqora:saml:logout:"
+LOGOUT_REQUEST_TTL = 600
 TEST_PREFIX = "tiqora:idp:test:"
 TEST_TTL = 900
 
@@ -36,6 +40,12 @@ class LoginState:
     code_verifier: str | None = None
     nonce: str | None = None
     legacy: bool = False  # pre-upgrade env-oidc value
+
+
+@dataclass(frozen=True, slots=True)
+class LogoutState:
+    provider_id: int
+    user_kind: UserKind
 
 
 def _text(raw: Any) -> str:
@@ -153,6 +163,43 @@ async def mark_assertion_seen(redis: Any, provider_id: int, assertion_id: str, t
     digest = hashlib.sha256(assertion_id.encode()).hexdigest()
     key = f"{SAML_SEEN_PREFIX}{provider_id}:{digest}"
     return bool(await redis.set(key, "1", ex=max(ttl, 60), nx=True))
+
+
+async def put_logout_request(redis: Any, request_id: str, st: LogoutState) -> None:
+    payload = {"p": st.provider_id, "a": st.user_kind}
+    await redis.set(
+        f"{LOGOUT_REQUEST_PREFIX}{request_id}", json.dumps(payload), ex=LOGOUT_REQUEST_TTL
+    )
+
+
+async def pop_logout_request(
+    redis: Any, request_id: str, *, provider_id: int
+) -> LogoutState | None:
+    """The stored logout request *request_id* of *provider_id*, consumed (one shot).
+
+    Another provider's request id is neither returned nor deleted; garbage is dropped.
+    """
+    key = f"{LOGOUT_REQUEST_PREFIX}{request_id}"
+    raw = await redis.get(key)
+    if raw is None:
+        return None
+    try:
+        data = json.loads(_text(raw))
+        stored_provider, user_kind = data["p"], data["a"]
+    except (ValueError, KeyError, TypeError):
+        await redis.delete(key)
+        return None
+    if (
+        not isinstance(stored_provider, int)
+        or isinstance(stored_provider, bool)
+        or user_kind not in ("agent", "customer")
+    ):
+        await redis.delete(key)
+        return None
+    if stored_provider != provider_id:
+        return None
+    await redis.delete(key)
+    return LogoutState(provider_id=stored_provider, user_kind=user_kind)
 
 
 class TestResultData(BaseModel):

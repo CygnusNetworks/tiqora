@@ -15,7 +15,7 @@ import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Final
-from urllib.parse import quote
+from urllib.parse import quote, urlencode, urlsplit
 
 import defusedxml
 import defusedxml.ElementTree as safe_et
@@ -43,8 +43,10 @@ from tiqora.identity.env_providers import (
     runtime_config,
     sync_env_providers,
 )
-from tiqora.identity.flow_state import LoginState, TestResultData, TestRun
+from tiqora.identity.flow_state import LoginState, LogoutState, TestResultData, TestRun
 from tiqora.identity.http import (
+    clear_session_cookie,
+    logged_out_path,
     login_error_redirect,
     login_landing_response,
     safe_next,
@@ -61,10 +63,14 @@ from tiqora.identity.login import (
     plan_to_dict,
 )
 from tiqora.identity.mapping import normalize_attributes
-from tiqora.identity.saml_metadata import SamlMetadataError
+from tiqora.identity.saml_metadata import (
+    SamlMetadataError,
+    effective_metadata_xml,
+    parse_idp_metadata,
+)
 from tiqora.identity.saml_runtime import SamlUnavailable, saml_availability
 from tiqora.identity.saml_sp import SamlResponseInvalid, SamlServiceProvider
-from tiqora.identity.sso_sessions import SsoSessionInfo
+from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso
 from tiqora.identity.store import ProviderRecord, get_provider_by_slug
 from tiqora.identity.types import (
     ENV_OIDC_SLUG,
@@ -688,7 +694,14 @@ async def _complete_login(
         from tiqora.domain.schemas import LoginResponse
 
         body = LoginResponse(
-            user=await _user_me(session, agent_user, extra={"avatar_url": avatar_url})
+            user=await _user_me(
+                session,
+                agent_user,
+                extra={
+                    "avatar_url": avatar_url,
+                    "sso_logout": sso_logout_available(sso, record),
+                },
+            )
         )
         response = JSONResponse(body.model_dump(mode="json"))
     elif landing_html:
@@ -912,3 +925,246 @@ def saml_metadata_response(record: ProviderRecord, settings: Settings) -> Respon
         media_type=SAML_METADATA_TYPE,
         headers={"Cache-Control": "no-store"},
     )
+
+
+# ---------------------------------------------------------------------------- logout
+
+
+def sso_logout_available(info: SsoSessionInfo | None, record: ProviderRecord | None) -> bool:
+    """Whether a logout of this session would also end the IdP session (drives ``/me``)."""
+    if info is None or record is None or record.id != info.provider_id:
+        return False
+    if record.kind == "saml":
+        if not info.name_id or not isinstance(record.config, SamlProviderConfig):
+            return False
+        try:
+            xml = effective_metadata_xml(record)
+            if not xml:
+                return False
+            meta = parse_idp_metadata(xml, entity_id=record.config.idp_entity_id or None)
+        except Exception:  # noqa: BLE001 - /me must never fail on a broken provider
+            return False
+        return bool(meta.slo_redirect_url)
+    if record.kind == "oidc":
+        return bool(info.id_token_hint)
+    return False
+
+
+async def session_sso_state(
+    redis: Any,
+    session: AsyncSession,
+    settings: Settings,
+    token: str | None,
+    *,
+    user_kind: UserKind,
+) -> bool:
+    """``sso_logout`` flag of the session *token*; False on any lookup trouble."""
+    if not token:
+        return False
+    try:
+        info = await load_sso(redis, "a" if user_kind == "agent" else "c", token)
+        if info is None:
+            return False
+        record = await get_provider_by_slug(session, info.slug, secret_key=settings.secret_key)
+        return sso_logout_available(info, record)
+    except Exception:  # noqa: BLE001
+        logger.debug("sso_logout_flag_failed")
+        return False
+
+
+async def sso_logout(
+    request: Request,
+    *,
+    user_kind: UserKind,
+    session: AsyncSession,
+    settings: Settings,
+) -> Response:
+    """End the Tiqora session first, then (best effort) send the browser to the IdP.
+
+    The local logout never depends on the IdP: every failure after the session is gone
+    lands on the login page.
+    """
+    login_page = logged_out_path(user_kind)
+    cookie = (
+        settings.session_cookie_name
+        if user_kind == "agent"
+        else settings.customer_session_cookie_name
+    )
+    token = request.cookies.get(cookie)
+    info: SsoSessionInfo | None = None
+    redis = None
+    if token:
+        try:
+            redis = await get_redis(request)
+            info = await load_sso(redis, "a" if user_kind == "agent" else "c", token)
+        except Exception:  # noqa: BLE001
+            logger.warning("sso_logout_session_lookup_failed")
+        try:
+            if redis is not None:
+                store = (
+                    SessionStore(redis, settings)
+                    if user_kind == "agent"
+                    else CustomerSessionStore(redis, settings)
+                )
+                await store.delete(token)
+        except Exception:  # noqa: BLE001 - the cookie is cleared regardless
+            logger.warning("sso_logout_session_delete_failed")
+
+    target = await _idp_logout_target(
+        request, info=info, user_kind=user_kind, session=session, settings=settings
+    )
+    response = RedirectResponse(target or login_page, status_code=status.HTTP_303_SEE_OTHER)
+    clear_session_cookie(response, settings, user_kind=user_kind)
+    return response
+
+
+async def _idp_logout_target(
+    request: Request,
+    *,
+    info: SsoSessionInfo | None,
+    user_kind: UserKind,
+    session: AsyncSession,
+    settings: Settings,
+) -> str | None:
+    """URL of the IdP logout, or None (-> login page). Never raises."""
+    if info is None:
+        return None
+    try:
+        record = await _load_provider(session, settings, info.slug)
+        if record is None or record.id != info.provider_id:
+            return None
+        if record.kind == "saml":
+            return await _saml_logout_url(request, record, info, user_kind, settings)
+        if record.kind == "oidc":
+            return await _oidc_logout_url(record, info, user_kind, settings)
+    except Exception as exc:  # noqa: BLE001 - IdP trouble must not block the local logout
+        logger.warning("sso_idp_logout_failed", slug=info.slug, error=type(exc).__name__)
+    return None
+
+
+async def _saml_logout_url(
+    request: Request,
+    record: ProviderRecord,
+    info: SsoSessionInfo,
+    user_kind: UserKind,
+    settings: Settings,
+) -> str | None:
+    if not saml_availability().available:
+        return None
+    redirect = await SamlServiceProvider(record, settings=settings).logout_redirect(
+        info, relay_state=secrets.token_urlsafe(16)
+    )
+    if redirect is None:
+        return None
+    redis = await get_redis(request)
+    await flow_state.put_logout_request(
+        redis, redirect.request_id, LogoutState(provider_id=record.id, user_kind=user_kind)
+    )
+    return redirect.url
+
+
+async def _oidc_logout_url(
+    record: ProviderRecord, info: SsoSessionInfo, user_kind: UserKind, settings: Settings
+) -> str | None:
+    cfg = runtime_config(record, settings)
+    if not isinstance(cfg, OidcProviderConfig):
+        return None
+    client_config = oidc_client_config(
+        cfg, redirect_uri=_redirect_uri(settings, record, cfg, user_kind)
+    )
+    endpoint = await new_oidc_service(client_config).end_session_endpoint()
+    if not endpoint or urlsplit(endpoint).scheme not in ("https", "http"):
+        return None
+    params: dict[str, str] = {"client_id": client_config.client_id}
+    if info.id_token_hint:
+        params["id_token_hint"] = info.id_token_hint
+    try:
+        urls = provider_urls(settings, record)
+    except IdentityUrlsUnavailable:
+        urls = None
+    post_logout = ""
+    if urls is not None:
+        post_logout = (
+            urls.agent_post_logout_url if user_kind == "agent" else (urls.customer_post_logout_url)
+        )
+    if post_logout:
+        params["post_logout_redirect_uri"] = post_logout
+    joiner = "&" if urlsplit(endpoint).query else "?"
+    return f"{endpoint}{joiner}{urlencode(params)}"
+
+
+_BINDING_REDIRECT = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+_BINDING_POST = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+
+
+def _text_field(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+async def handle_sls(
+    request: Request,
+    *,
+    slug: str,
+    session: AsyncSession,
+    settings: Settings,
+) -> Response:
+    """SAML single logout service (GET redirect binding, POST binding).
+
+    A ``SAMLResponse`` is the IdP's answer to our LogoutRequest. The local session is already
+    gone, so every outcome lands on the login page. A response only matters when it names a
+    request id we stored for THIS provider (a redirect-binding signature cannot be verified
+    here), and it is one-shot. A ``SAMLRequest`` (IdP-initiated logout) arrives with Task 21.
+    """
+    fields: Any = request.query_params
+    binding = _BINDING_REDIRECT
+    if request.method == "POST":
+        binding = _BINDING_POST
+        try:
+            fields = await request.form()
+        except Exception:  # noqa: BLE001 - malformed body: treat as empty
+            fields = {}
+    saml_response = _text_field(fields.get("SAMLResponse"))
+    saml_request = _text_field(fields.get("SAMLRequest"))
+    if saml_response:
+        state = await _consume_logout_response(
+            request,
+            slug=slug,
+            saml_response=saml_response,
+            binding=binding,
+            settings=settings,
+            session=session,
+        )
+        user_kind: UserKind = state.user_kind if state is not None else "agent"
+        return RedirectResponse(logged_out_path(user_kind), status_code=status.HTTP_303_SEE_OTHER)
+    if saml_request:
+        # Task 21 implements IdP-initiated single logout.
+        return JSONResponse(
+            {"detail": "IdP-initiated logout not supported yet"},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return RedirectResponse(logged_out_path("agent"), status_code=status.HTTP_303_SEE_OTHER)
+
+
+async def _consume_logout_response(
+    request: Request,
+    *,
+    slug: str,
+    saml_response: str,
+    binding: str,
+    settings: Settings,
+    session: AsyncSession,
+) -> LogoutState | None:
+    try:
+        record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+        if record is None or record.kind != "saml" or not saml_availability().available:
+            return None
+        in_response_to = await SamlServiceProvider(record, settings=settings).parse_logout_response(
+            saml_response, binding=binding
+        )
+        if not in_response_to:
+            return None
+        redis = await get_redis(request)
+        return await flow_state.pop_logout_request(redis, in_response_to, provider_id=record.id)
+    except Exception as exc:  # noqa: BLE001 - a bad response changes nothing: session is gone
+        logger.info("saml_logout_response_ignored", slug=slug, error=type(exc).__name__)
+        return None

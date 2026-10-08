@@ -97,3 +97,25 @@ def set_session_cookie(
         max_age=settings.session_ttl_seconds,
         path="/",
     )
+
+
+def clear_session_cookie(response: Response, settings: Settings, *, user_kind: UserKind) -> None:
+    """Delete the session cookie with the flags it was set with."""
+    name = (
+        settings.session_cookie_name
+        if user_kind == "agent"
+        else settings.customer_session_cookie_name
+    )
+    samesite: Any = settings.session_cookie_samesite
+    response.delete_cookie(
+        key=name,
+        path="/",
+        secure=settings.session_cookie_secure,
+        httponly=True,
+        samesite=samesite,
+    )
+
+
+def logged_out_path(user_kind: UserKind) -> str:
+    """Login page shown after a logout (relative, same-site)."""
+    return "/login?logged_out=1" if user_kind == "agent" else "/portal/login?logged_out=1"

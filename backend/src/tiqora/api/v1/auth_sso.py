@@ -14,8 +14,10 @@ from tiqora.identity.saml_runtime import saml_availability
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
     finish_saml_acs,
+    handle_sls,
     resolve_admin_id,
     saml_metadata_response,
+    sso_logout,
     start_sso_login,
 )
 from tiqora.identity.store import get_provider_by_slug
@@ -120,3 +122,40 @@ async def saml_metadata(slug: str, settings: AppSettings, session: DbSession) ->
     return await asyncio.get_running_loop().run_in_executor(
         None, saml_metadata_response, record, settings
     )
+
+
+@router.post(
+    "/sso/logout",
+    response_model=None,
+    status_code=status.HTTP_303_SEE_OTHER,
+    summary="Log out of Tiqora and, where supported, of the identity provider",
+)
+async def sso_logout_route(request: Request, settings: AppSettings, session: DbSession) -> Response:
+    """Ends the local session first, then redirects to the IdP logout or the login page."""
+    return await sso_logout(request, user_kind="agent", session=session, settings=settings)
+
+
+@router.get(
+    "/saml/{slug}/sls",
+    response_model=None,
+    status_code=status.HTTP_303_SEE_OTHER,
+    summary="SAML single logout service (redirect binding)",
+)
+async def saml_sls_get(
+    slug: str, request: Request, settings: AppSettings, session: DbSession
+) -> Response:
+    """The IdP's LogoutResponse; bound to a stored request id, always ends on the login page."""
+    return await handle_sls(request, slug=slug, session=session, settings=settings)
+
+
+@router.post(
+    "/saml/{slug}/sls",
+    response_model=None,
+    status_code=status.HTTP_303_SEE_OTHER,
+    summary="SAML single logout service (POST binding)",
+)
+async def saml_sls_post(
+    slug: str, request: Request, settings: AppSettings, session: DbSession
+) -> Response:
+    """Same as the GET form; CSRF-exempt because the IdP posts cross-site."""
+    return await handle_sls(request, slug=slug, session=session, settings=settings)

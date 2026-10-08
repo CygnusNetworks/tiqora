@@ -72,7 +72,11 @@ from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.identity.env_providers import ensure_env_providers
 from tiqora.identity.http import safe_next as _safe_next
 from tiqora.identity.saml_runtime import saml_availability
-from tiqora.identity.sso_routes import finish_oidc_callback, start_sso_login
+from tiqora.identity.sso_routes import (
+    finish_oidc_callback,
+    session_sso_state,
+    start_sso_login,
+)
 from tiqora.identity.store import ProviderRecord, provider_from_row
 from tiqora.identity.types import ENV_OIDC_SLUG, audience_includes
 from tiqora.permissions.engine import PermissionEngine
@@ -478,14 +482,34 @@ async def login(
     return LoginResponse(user=await _user_me(session, user))
 
 
+async def _sso_logout_extra(
+    request: Request, session: AsyncSession, settings: AppSettings
+) -> dict[str, Any]:
+    """``{"sso_logout": bool}`` for the current agent session (False without SSO info)."""
+    token = getattr(request.state, "session_token", None) or request.cookies.get(
+        settings.session_cookie_name
+    )
+    try:
+        redis = await get_redis(request)
+    except Exception:  # noqa: BLE001 - never fail /me for the logout hint
+        return {"sso_logout": False}
+    return {
+        "sso_logout": await session_sso_state(redis, session, settings, token, user_kind="agent")
+    }
+
+
 @router.get("/me", response_model=UserMe)
-async def me(user: CurrentUser, session: DbSession) -> UserMe:
-    return await _user_me(session, user)
+async def me(
+    request: Request, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> UserMe:
+    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
 
 
 @router.put("/me/language", response_model=UserMe)
 async def set_my_language(
     body: UserLanguageUpdate,
+    request: Request,
+    settings: AppSettings,
     user: CurrentUser,
     session: DbSession,
     auth: Annotated[AuthService, Depends(get_auth_service)],
@@ -498,12 +522,14 @@ async def set_my_language(
             detail=f"Unsupported language code: {body.language!r}",
         )
     await auth.set_user_language(user.id, code)
-    return await _user_me(session, user)
+    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
 
 
 @router.put("/me/time-zone", response_model=UserMe)
 async def set_my_time_zone(
     body: UserTimeZoneUpdate,
+    request: Request,
+    settings: AppSettings,
     user: CurrentUser,
     session: DbSession,
     auth: Annotated[AuthService, Depends(get_auth_service)],
@@ -518,7 +544,7 @@ async def set_my_time_zone(
                 detail=f"Unknown time zone: {body.time_zone!r}",
             )
     await auth.set_user_time_zone(user.id, zone)
-    return await _user_me(session, user)
+    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
