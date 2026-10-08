@@ -154,9 +154,19 @@ smaller items fit into the waves as filler:
 - **Plugin API lock-in**: once SDK 1.0 is public, internal refactors must
   keep it stable — hence dogfooding before 1.0.
 
-## Open decisions (for the product owner, none blocks wave 0–1)
+## Decisions
 
-- Public plugin marketplace from the start, or custom repositories only.
-- First CMDB discovery connector (NetBox, Snipe-IT, i-doit, Entra/Intune).
-- Whether ITSM Mode B (Tiqora-led CMDB) becomes the default for new
-  installs immediately, or only after a pilot site has switched.
+Taken 2026-10-08:
+
+- **Plugin repositories**: custom repositories only for now; a public
+  marketplace stays addable later without changes to plugins or sites
+  (plugin design §8a).
+- **First CMDB connector**: NetBox, as a first-party plugin, lowest priority
+  in ITSM phase 4 (not used by the product owner; chosen for fit with the
+  self-hosted audience).
+
+Still open (product owner; does not block waves 0–3):
+
+- Default ITSM mode for parallel-operation sites running Znuny ITSM —
+  Mode A (Znuny leads, read-through) or Mode B (Tiqora leads) after import.
+  Built as a setting either way; needed before the ITSM wave-4 release.

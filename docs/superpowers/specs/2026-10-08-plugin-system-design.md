@@ -202,6 +202,31 @@ Frontend (`@tiqora/plugin-sdk`, contributions declared in `web/manifest.json`):
   (like OPM online repositories), configurable in the admin UI or by env for
   air-gapped sites (file:// or internal HTTPS mirror).
 - Update notifications on the plugin page and the Daemons/System page.
+- **Decision 2026-10-08: start with custom repositories only** — no public
+  marketplace run by the project for now. Sites configure their own
+  repositories (internal HTTPS, file://); first-party plugins ship in the
+  image or from a project repository URL that is just another entry.
+
+### 8a. Marketplace later — what keeps it a pure add-on
+
+A public marketplace must be addable without changing plugins, packages or
+installed sites. Therefore, from phase 2 on:
+
+- The repository index format is versioned (`index_version`) and already
+  carries everything a marketplace needs: publisher id + keys, categories,
+  screenshots/icon URLs, licence, homepage, support contact, per-version
+  changelog and compatibility. Unused fields are allowed to be empty.
+- Publisher identity and trust levels (§7) are part of the package and the
+  index, not of a central service — a marketplace is "a repository whose
+  publisher keys are verified by us".
+- The admin plugin page lists plugins **per configured repository** with
+  search and categories; a marketplace is one more repository URL plus an
+  optional "Entdecken" tab on the same page.
+- Package ids are reverse-DNS from day one, so no renaming when a central
+  catalogue appears.
+- Nothing in Tiqora phones home; adding the marketplace is an opt-in setting.
+- Marketplace-only concerns (publisher sign-up, review process, web catalogue,
+  paid plugins) live outside the Tiqora codebase.
 
 ### 9. Apps (tier 2)
 
@@ -271,5 +296,5 @@ Frontend (`@tiqora/plugin-sdk`, contributions declared in `web/manifest.json`):
   a core React major upgrade becomes an SDK major.
 - Runtime install writes to a volume; sites with a read-only root keep using
   the baked-image path only (documented).
-- **Open:** whether to run a public repository/marketplace ourselves from day
-  one or start with "custom repositories only".
+- Marketplace: decided — custom repositories only for now; §8a keeps the
+  marketplace a later add-on.

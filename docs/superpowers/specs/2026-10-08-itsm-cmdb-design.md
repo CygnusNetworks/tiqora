@@ -329,7 +329,7 @@ shapes on the compat layer, mapped to the Tiqora model; process action
 | 1 | ITSM core + incident/problem: types/states/DFs, priority matrix, service meta, editable DFs in zoom, link admin + note to linked tickets, problem/known error/major incident; **Mode A read-through adapter** (CIs visible + linkable in Tiqora while Znuny leads) | 3–4 weeks |
 | 2 | CMDB (Mode B): model, class designer, CI CRUD/versions/search/import-export, links + propagation + impact graph, ticket + portal integration, Znuny ITSM importer, GI `ConfigItem*`, `ConfigItemUpdate` action, MCP tools, Znuny add-on `TiqoraITSM` (widgets), `docs/itsm.md` coexistence chapter | 6–7 weeks |
 | 3 | Change + catalogue: approval engine (if not built yet), change templates, risk checks, change calendar + freeze, CAB, tasks, portal catalogue + request forms, legacy change archive | 4–5 weeks |
-| 4 | Beyond: discovery/sync connectors (first target open — NetBox, Snipe-IT, i-doit or Entra/Intune devices), AI problem detection from incident clusters, AI change risk, QR labels | 3 weeks |
+| 4 | Beyond: AI problem detection from incident clusters, AI change risk, QR labels; first discovery/sync connector **NetBox**, built as a first-party plugin (lowest priority in this phase) | 3 weeks |
 
 ## Risks / open
 
@@ -341,4 +341,18 @@ shapes on the compat layer, mapped to the Tiqora model; process action
   to reading and is covered by the task-0 survey and golden ITSM peers.
 - CMDB size: 100k+ CIs with many versions → attribute index and version
   table need paging and an archive policy for old versions.
-- **Open:** first discovery connector — depends on what pilot sites use.
+- First discovery connector: **NetBox** (decided 2026-10-08 by the
+  engineering side; the product owner does not use any of the candidates).
+  Reasons: open source and self-hosted like Tiqora's audience, a clean REST
+  API, and its DCIM/IPAM data (devices, racks, sites, IP addresses, circuits)
+  maps directly onto default CMDB classes. Built as a first-party **plugin**
+  on the plugin system's CMDB extension point, so it doubles as proof that
+  connectors can be third-party; the generic CSV/XLSX and REST import covers
+  everything else. Further connectors (Snipe-IT, i-doit, Entra/Intune) only on
+  demand.
+- **Open (product owner):** default ITSM mode. Note the scope: a fresh
+  install without Znuny ITSM can only use Mode B, so the question concerns
+  parallel-operation sites that run Znuny ITSM. Implementation does not
+  depend on the answer — the mode is an admin setting `itsm.mode`
+  (`off` | `znuny_readthrough` | `tiqora`) — only the default and the docs'
+  recommendation do. Decide before the ITSM wave-4 release.
