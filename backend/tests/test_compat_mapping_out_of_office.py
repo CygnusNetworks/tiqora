@@ -165,10 +165,26 @@ def test_date_without_time_is_left_alone() -> None:
     assert entry["StartDate"] == "01.03.2026"
 
 
-def test_blank_rows_skipped_and_quoted_newline_kept() -> None:
+def test_blank_line_yields_empty_first_column_entry_like_perl() -> None:
     csv_string = 'UserSearch,Enabled\n\n"a\nb",yes\n'
     out = OutOfOfficeMapper({}).map({"OutOfOfficeEntriesCSVString": csv_string})
-    assert [e["UserSearch"] for e in out["OutOfOfficeEntries"]] == ["a\nb"]
+    assert out["OutOfOfficeEntries"] == [
+        _entry(UserSearch=""),
+        _entry(UserSearch="a\nb", OutOfOffice=1),
+    ]
+
+
+def test_comment_strip_only_after_real_newline() -> None:
+    # \x0b is a splitlines() boundary but not a Perl line start
+    out = OutOfOfficeMapper({}).map({"OutOfOfficeEntriesCSVString": "a\x0b#x\n1\n"})
+    assert out["OutOfOfficeEntries"] == [_entry()]
+    out = OutOfOfficeMapper({}).map({"OutOfOfficeEntriesCSVString": "UserLogin\n#c\njdoe\n"})
+    assert out["OutOfOfficeEntries"] == [_entry(UserLogin="jdoe")]
+
+
+def test_unterminated_quote_is_parse_error() -> None:
+    with pytest.raises(MappingError, match="Error while parsing CSV string"):
+        OutOfOfficeMapper({}).map({"OutOfOfficeEntriesCSVString": 'UserLogin\n"abc\n'})
 
 
 def test_registered_in_factories() -> None:

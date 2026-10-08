@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from tiqora.api.compat.mapping import DataInclude, MappingError
@@ -25,8 +26,11 @@ _ENTRY_KEYS = ("UserLogin", "UserSearch", "UserEmail", "StartDate", "EndDate", "
 def _csv_rows(text: str) -> list[list[str]]:
     """Text::CSV (binary, sep ",", quote/escape ``"``, no loose quotes/escapes) over ``text``.
 
-    A bare quote inside an unquoted field, junk after a closing quote and an unterminated quote
-    are errors (Text::CSV returns false, CSV2Array undef). Empty lines yield an empty row.
+    A bare quote inside an unquoted field and junk after a closing quote are errors (Text::CSV
+    returns false, CSV2Array undef). A blank line yields ``[""]``.
+
+    Deliberate deviation: an unterminated quote raises too. Znuny's bundled CSV_PP silently
+    truncates there; raising avoids ingesting partial data.
     """
     rows: list[list[str]] = []
     row: list[str] = []
@@ -62,8 +66,7 @@ def _csv_rows(text: str) -> list[list[str]]:
             row.append("".join(field))
             field, closed, started = [], False, True
         elif ch == "\n":
-            if started:
-                row.append("".join(field))
+            row.append("".join(field))  # a blank line yields [""] like Text::CSV
             rows.append(row)
             row, field, closed, started = [], [], False, False
         elif closed:
@@ -91,7 +94,7 @@ class OutOfOfficeMapper:
         text = perl_str(raw).replace("\r\n", "\n").replace("\r", "\n")
         text = text.rstrip("\n") + "\n"
         # Remove comment lines (Perl: s{^#.*\n}{}gm)
-        text = "".join(line for line in text.splitlines(keepends=True) if not line.startswith("#"))
+        text = re.sub(r"^#.*\n", "", text, flags=re.MULTILINE)
 
         rows = _csv_rows(text)
         if not rows:
@@ -99,8 +102,6 @@ class OutOfOfficeMapper:
         header = rows[0]
         csv_entries: list[dict[str, str | None]] = []
         for row in rows[1:]:
-            if not row:
-                continue
             csv_entries.append(
                 {col: (row[i] if i < len(row) else None) for i, col in enumerate(header)}
             )
