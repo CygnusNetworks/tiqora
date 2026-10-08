@@ -51,6 +51,14 @@ _candidate: dict[str, str] = {}
 
 
 @dataclass(frozen=True, slots=True)
+class DeployResult:
+    kind: RevisionKind
+    revision_id: int
+    checksum: str
+    action: Literal["recorded", "unchanged"]
+
+
+@dataclass(frozen=True, slots=True)
 class WatchOutcome:
     kind: RevisionKind
     action: WatchAction
@@ -186,6 +194,59 @@ async def _check_deploy_state(
         await session.commit()
         logger.info("deploy_watch_snapshot", extra={"kind": kind, "source": source, "id": info.id})
         return WatchOutcome(kind, "snapshot", info.id, 0 if ownership_active else pending)
+
+
+async def deploy_from_tiqora(
+    session: AsyncSession, kind: RevisionKind, *, user_id: int
+) -> DeployResult:
+    """Admin deploy: make the current ``pm_*``/``acl`` rows (drafts) the live revision.
+
+    Znuny's deploy DB effect is "dump goes live, sync table is purged"
+    (AdminProcessManagement.pm ProcessSync -> EntitySyncStatePurge, Entity.pm:324-345;
+    AdminACL.pm ACLDeploy -> ACLsNeedSyncReset, ACL.pm:795-815). Single tick, no
+    two-tick confirmation: the admin asked for exactly this state. Like
+    :func:`check_deploy_state` this OWNS its transaction (commit, or rollback when it
+    raises) and the caller must not have pending writes. Raises ``TimeoutError``
+    when another writer holds the revision lock.
+    """
+    try:
+        result = await _deploy_from_tiqora(session, kind, user_id=user_id)
+    except BaseException:
+        await session.rollback()
+        raise
+    await session.commit()
+    return result
+
+
+async def _deploy_from_tiqora(
+    session: AsyncSession, kind: RevisionKind, *, user_id: int
+) -> DeployResult:
+    async with revision_write_lock(session, kind):
+        # Fresh snapshot (MariaDB REPEATABLE READ) so the checksum re-check sees
+        # revisions committed by another writer while we waited for the lock.
+        await session.commit()
+        latest = await latest_revision_info(session, kind)
+        dump = await _build_dump(session, kind)
+        checksum = dump_checksum(dump)
+        _candidate.pop(kind, None)
+        if latest is not None and latest.checksum == checksum:
+            # Drafts that net out to the live state still count as deployed.
+            await clear_sync_table(session, kind)
+            await session.commit()
+            return DeployResult(kind, latest.id, checksum, "unchanged")
+        info = await record_revision(session, kind, dump=dump, source="tiqora", deployed_by=user_id)
+        await clear_sync_table(session, kind)
+        await session.commit()
+        logger.info(
+            "deploy_from_tiqora",
+            extra={
+                "kind": kind,
+                "user_id": user_id,
+                "revision_id": info.id,
+                "checksum": info.checksum,
+            },
+        )
+        return DeployResult(kind, info.id, info.checksum, "recorded")
 
 
 async def run_deploy_watch_tick(

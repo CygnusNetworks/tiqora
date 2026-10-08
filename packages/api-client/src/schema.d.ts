@@ -2087,6 +2087,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/deploy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Deploy */
+        post: operations["post_deploy_api_v1_admin_deploy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/dynamic-fields": {
         parameters: {
             query?: never;
@@ -8132,7 +8149,7 @@ export interface paths {
         put?: never;
         /**
          * Admin Reload Routes
-         * @description Re-mount dynamic webservice routes without restart (authenticated).
+         * @description Reload the webservice registry from ``gi_webservice_config`` (admin only).
          */
         post: operations["admin_reload_routes_znuny_compat_admin_reload_post"];
         delete?: never;
@@ -8152,15 +8169,7 @@ export interface paths {
         put?: never;
         /**
          * Canonical Soap Endpoint
-         * @description Canonical always-available SOAP provider endpoint.
-         *
-         *     Unlike REST, SOAP has no per-operation route mapping in Znuny — a single
-         *     endpoint per webservice accepts any operation, dispatched from the SOAP
-         *     Body wrapper element name. This fallback route uses the default Znuny
-         *     ``NameSpace`` (``http://www.otrs.org/TicketConnector/``); webservices
-         *     configured in ``gi_webservice_config`` with their own NameSpace are
-         *     additionally mounted at ``/Webservice/{name}`` and ``/WebserviceID/{id}``
-         *     (see :func:`_load_soap_webservices` / :func:`build_soap_router`).
+         * @description Canonical always-available SOAP provider endpoint (default NameSpace, no mapping).
          */
         post: operations["canonical_soap_endpoint_znuny_compat_soap__webservice__post"];
         delete?: never;
@@ -11638,6 +11647,31 @@ export interface components {
             size_bytes?: number | null;
             /** Version */
             version?: string | null;
+        };
+        /** DeployIn */
+        DeployIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "process" | "acl";
+        };
+        /** DeployOut */
+        DeployOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "recorded" | "unchanged";
+            /** Checksum */
+            checksum: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "process" | "acl";
+            /** Revision Id */
+            revision_id: number;
         };
         /** DialOut */
         DialOut: {
@@ -22803,6 +22837,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DaemonServiceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_deploy_api_v1_admin_deploy_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeployIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployOut"];
                 };
             };
             /** @description Validation Error */

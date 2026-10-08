@@ -25,6 +25,7 @@ from tiqora.api.v1.admin import (
     customer_links,
     customers,
     daemons,
+    deploy,
     dynamic_fields,
     extensions,
     feature_grants,
@@ -74,6 +75,7 @@ admin_router.include_router(auto_responses.router)
 admin_router.include_router(dynamic_fields.router)
 admin_router.include_router(postmaster_filters.router)
 admin_router.include_router(acl.router)
+admin_router.include_router(deploy.router)
 admin_router.include_router(ticket_attribute_relations.router)
 admin_router.include_router(readonly.router)
 admin_router.include_router(system_addresses.router)

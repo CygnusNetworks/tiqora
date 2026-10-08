@@ -11006,6 +11006,59 @@
         "title": "DbStatusOut",
         "type": "object"
       },
+      "DeployIn": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "process",
+              "acl"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "DeployIn",
+        "type": "object"
+      },
+      "DeployOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "recorded",
+              "unchanged"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "checksum": {
+            "title": "Checksum",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "process",
+              "acl"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "revision_id": {
+            "title": "Revision Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "revision_id",
+          "checksum",
+          "action"
+        ],
+        "title": "DeployOut",
+        "type": "object"
+      },
       "DialOut": {
         "properties": {
           "call_id": {
@@ -39705,6 +39758,81 @@
         "summary": "Update Daemon",
         "tags": [
           "admin:daemons"
+        ]
+      }
+    },
+    "/api/v1/admin/deploy": {
+      "post": {
+        "operationId": "post_deploy_api_v1_admin_deploy_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Deploy",
+        "tags": [
+          "admin:deploy"
         ]
       }
     },
@@ -74018,7 +74146,7 @@
     },
     "/znuny-compat/admin/reload": {
       "post": {
-        "description": "Re-mount dynamic webservice routes without restart (authenticated).",
+        "description": "Reload the webservice registry from ``gi_webservice_config`` (admin only).",
         "operationId": "admin_reload_routes_znuny_compat_admin_reload_post",
         "parameters": [
           {
@@ -74086,7 +74214,7 @@
     },
     "/znuny-compat/soap/{webservice}": {
       "post": {
-        "description": "Canonical always-available SOAP provider endpoint.\n\nUnlike REST, SOAP has no per-operation route mapping in Znuny \u2014 a single\nendpoint per webservice accepts any operation, dispatched from the SOAP\nBody wrapper element name. This fallback route uses the default Znuny\n``NameSpace`` (``http://www.otrs.org/TicketConnector/``); webservices\nconfigured in ``gi_webservice_config`` with their own NameSpace are\nadditionally mounted at ``/Webservice/{name}`` and ``/WebserviceID/{id}``\n(see :func:`_load_soap_webservices` / :func:`build_soap_router`).",
+        "description": "Canonical always-available SOAP provider endpoint (default NameSpace, no mapping).",
         "operationId": "canonical_soap_endpoint_znuny_compat_soap__webservice__post",
         "parameters": [
           {

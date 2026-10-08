@@ -3776,6 +3776,15 @@
             "help": "Icon der Website zur Mail-Domain bzw. Firmen-URL. Nie für Freemail-Domains wie gmail.com."
           }
         }
+      },
+      "process": {
+        "title": "Prozesse und ACLs",
+        "fields": {
+          "deploy_from_tiqora": {
+            "label": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)",
+            "help": "Nur einschalten, wenn Znuny nicht mehr parallel läuft. Sonst zeigt Znuny weiter den alten Stand an."
+          }
+        }
       }
     }
   },

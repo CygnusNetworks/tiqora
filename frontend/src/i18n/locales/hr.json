@@ -3768,6 +3768,15 @@
             "help": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com."
           }
         }
+      },
+      "process": {
+        "title": "Processes and ACLs",
+        "fields": {
+          "deploy_from_tiqora": {
+            "label": "Deploy processes and ACLs in Tiqora (Znuny no longer runs)",
+            "help": "Only turn this on when Znuny no longer runs in parallel. Otherwise Znuny keeps showing the old state."
+          }
+        }
       }
     }
   },
