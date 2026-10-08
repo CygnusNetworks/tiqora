@@ -15,6 +15,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.api.compat.webservices import WebserviceRegistry, get_registry, load_fingerprint
+from tiqora.znuny.sysconfig import SysConfig
 
 pytestmark = pytest.mark.db
 
@@ -167,7 +168,7 @@ async def test_registry_loads_valid_rows_and_fingerprint_changes(sync_url: str) 
 
 
 async def test_registry_skips_unparsable_row(sync_url: str) -> None:
-    _insert(sync_url, BROKEN_ID, "RegistryBroken", b"::: not yaml [")
+    _insert(sync_url, BROKEN_ID, "RegistryBroken", b"Provider: {a: [1, 2}")
     registry = WebserviceRegistry()
 
     async def run(session: AsyncSession) -> None:
@@ -179,16 +180,84 @@ async def test_registry_skips_unparsable_row(sync_url: str) -> None:
     await _with_session(sync_url, run)
 
 
-async def test_registry_skips_yaml_syntax_error(sync_url: str) -> None:
-    _insert(sync_url, BROKEN_ID, "RegistrySyntax", b"Provider: [unclosed")
+async def test_row_without_provider_is_kept_with_empty_transport(sync_url: str) -> None:
+    _insert(sync_url, BROKEN_ID, "RegistryNoProvider", b"::: not yaml [")  # valid YAML mapping
     registry = WebserviceRegistry()
 
     async def run(session: AsyncSession) -> None:
         await registry.refresh(session)
-        assert registry.by_id(BROKEN_ID) is None
-        assert registry.by_id(VALID_ID) is not None
+        ws = registry.by_id(BROKEN_ID)
+        assert ws is not None and ws.transport == "" and ws.routes == ()
+        assert registry.by_name("RegistryNoProvider").id == BROKEN_ID  # type: ignore[union-attr]
+        assert "RegistryNoProvider" in registry.names()
 
     await _with_session(sync_url, run)
+
+
+async def test_sysconfig_failure_keeps_previous_snapshot_and_fingerprint(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = WebserviceRegistry()
+
+    async def first(session: AsyncSession) -> None:
+        await registry.refresh(session)
+
+    await _with_session(sync_url, first)
+    old_fp, old_ws = registry.fingerprint, registry.by_name("RegistryRest")
+    assert old_ws is not None
+
+    cfg = yaml.safe_load(yaml.safe_dump(REST_CFG))
+    cfg["Provider"]["Transport"]["Config"]["Base"] = "https://<OTRS_CONFIG_FQDN>/x"
+    _insert(sync_url, MAPPING_ID, "RegistryPlaceholder", yaml.safe_dump(cfg).encode())
+
+    original = SysConfig.get
+
+    async def boom(self: SysConfig, name: str, default: Any = None) -> Any:
+        if name == "FQDN":
+            raise RuntimeError("db went away")
+        return await original(self, name, default)
+
+    monkeypatch.setattr(SysConfig, "get", boom)
+
+    async def second(session: AsyncSession) -> None:
+        with pytest.raises(RuntimeError):
+            await registry.refresh(session)
+
+    await _with_session(sync_url, second)
+    assert registry.fingerprint == old_fp
+    assert registry.by_name("RegistryRest") is old_ws
+    assert registry.by_name("RegistryPlaceholder") is None
+    monkeypatch.undo()
+
+    async def third(session: AsyncSession) -> None:
+        assert await registry.refresh(session) is True  # recovers on the next tick
+        assert registry.by_name("RegistryPlaceholder") is not None
+
+    await _with_session(sync_url, third)
+
+
+async def test_same_second_edit_of_another_row_changes_fingerprint(sync_url: str) -> None:
+    _insert(sync_url, MAPPING_ID, "RegistryOther", yaml.safe_dump(REST_CFG).encode())
+
+    async def fp(session: AsyncSession) -> Any:
+        return await load_fingerprint(session)
+
+    before = await _with_session(sync_url, fp)
+    # a lower-id row changes to a time that is NOT the newest: max(change_time) alone would miss it
+    _exec(
+        sync_url,
+        "UPDATE gi_webservice_config SET change_time = :t WHERE id = :id",
+        t=T0.replace(minute=5),
+        id=VALID_ID,
+    )
+    after = await _with_session(sync_url, fp)
+    assert before != after
+    # valid_id values that trade places keep count, max(id) and sum(valid_id) - digest still differs
+    _exec(sync_url, "UPDATE gi_webservice_config SET valid_id = 2 WHERE id = :id", id=VALID_ID)
+    _exec(sync_url, "UPDATE gi_webservice_config SET valid_id = 1 WHERE id = :id", id=DISABLED_ID)
+    swapped = await _with_session(sync_url, fp)
+    assert swapped[0] == after[0] and swapped[2:] == after[2:]
+    assert swapped != after
 
 
 async def test_registry_skips_non_mapping_yaml(sync_url: str) -> None:

@@ -20,6 +20,7 @@ from tiqora.api.compat.rest_request import (
     znuny_json_decode,
 )
 from tiqora.api.compat.webservices import (
+    RouteMatchError,
     Webservice,
     match_rest_route,
     parse_webservice,
@@ -240,10 +241,45 @@ async def test_slow_mapper_does_not_block_the_event_loop() -> None:
     assert await task == "done"
 
 
-@pytest.mark.parametrize("max_length", ["100", 100, " 100"])
-def test_max_length_integer_forms(max_length: Any) -> None:
+@pytest.mark.parametrize(
+    ("max_length", "expected"),
+    [
+        ("100", 100),
+        (100, 100),
+        (0, 0),
+        ("0", 0),
+        ("-5", -5),
+        (" 100", None),
+        ("01", None),
+        ("1.5", None),
+        ("abc", None),
+        (None, None),
+        ("", None),
+    ],
+)
+def test_max_length_follows_znuny_is_integer(max_length: Any, expected: int | None) -> None:
     ws = _ws(_rest_cfg({}, MaxLength=max_length))
-    assert ws.max_length == (100 if max_length != " 100" else None)
+    assert ws.max_length == expected
+
+
+async def test_max_length_zero_rejects_any_body() -> None:
+    with pytest.raises(RestRequestError) as err:
+        await build_rest_request_data(_request(body=b"{}"), _rest_ws(MaxLength=0), {})
+    assert err.value.status == 413
+
+
+def test_route_regex_timeout_fails_instead_of_falling_through() -> None:
+    ws = _ws(
+        _rest_cfg(
+            {
+                "A": {"Route": "/(a|aa)+", "RequestMethod": ["GET"]},
+                "B": {"Route": "/:Rest", "RequestMethod": ["GET"]},
+            }
+        )
+    )
+    with pytest.raises(RouteMatchError):
+        match_rest_route(ws, "/" + "a" * 40 + "b", "GET")
+    assert match_rest_route(ws, "/ok", "GET") == ("B", {"Rest": "ok"})
 
 
 def test_query_string_rules() -> None:
@@ -260,7 +296,9 @@ def test_query_string_znuny_quirks() -> None:
     assert parse_query_string("a=b=c") == {"a": "b"}
     assert parse_query_string("z=0") == {"z": ""}
     assert parse_query_string("z=1&z=0") == {"z": ["1", "0"]}
-    assert parse_query_string("a=1&&b=2") == {"a": "1", "b": "2"}
+    # an empty part is stored as key "" (Perl: split yields no pieces, undef key)
+    assert parse_query_string("a=1&&b=2") == {"a": "1", "": "", "b": "2"}
+    assert parse_query_string("a=1&&") == {"a": "1"}  # trailing empty fields are dropped
     assert parse_query_string("k%20ey=a%2Bb") == {"k ey": "a+b"}  # "+" only mapped in values
 
 
@@ -313,6 +351,14 @@ async def test_placeholders_numbers_nested_and_non_strings(fake_sysconfig: SysCo
         "u": "tiqora.example.org:8080/tiqora.example.org",
         "n": {"deep": ["x  y"], "keep": 5, "none": None},
     }
+
+
+async def test_placeholder_lookup_errors_propagate() -> None:
+    async def _fail(name: str) -> Any:
+        raise RuntimeError("db down")
+
+    with pytest.raises(RuntimeError):
+        await replace_config_placeholders({"a": "<OTRS_CONFIG_FQDN>"}, SysConfig(fetch=_fail))
 
 
 # ---------------------------------------------------------------------------
@@ -469,11 +515,12 @@ async def test_bom_and_latin1_charset_are_handled() -> None:
     assert await build_rest_request_data(utf8, _rest_ws(), {}) == {"n": "Grüße"}
 
 
-async def test_unknown_charset_is_decode_error() -> None:
-    request = _request(body=b"{}", headers={"content-type": "application/json; charset=nope-9"})
-    with pytest.raises(RestRequestError) as err:
-        await build_rest_request_data(request, _rest_ws(), {})
-    assert err.value.status == 500
+async def test_unknown_charset_falls_back_to_latin1_like_znuny() -> None:
+    request = _request(
+        body='{"n": "Grüße"}'.encode("iso-8859-1"),
+        headers={"content-type": "application/json; charset=nope-9"},
+    )
+    assert await build_rest_request_data(request, _rest_ws(), {}) == {"n": "Grüße"}
 
 
 # ---------------------------------------------------------------------------

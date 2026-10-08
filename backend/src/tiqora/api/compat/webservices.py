@@ -8,14 +8,17 @@ Mappers are built once per registry snapshot; one broken webservice never takes 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import unquote
 
 import regex
 import structlog
 import yaml
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.compat.mapping import DataInclude, Mapper, MappingError, build_mapper
@@ -46,7 +49,7 @@ OPERATION_TYPES: dict[str, str] = {  # Znuny operation Type -> op handler key
 
 _ROUTE_VAR = re.compile(r":([^/]+)")
 _PLACEHOLDER = re.compile(r"(?:<|&lt;)OTRS_CONFIG_(.+?)(?:>|&gt;)")
-_INTEGER = re.compile(r"[+-]?\d+")
+_INTEGER = re.compile(r"-?(?:0|[1-9]\d*)")  # Kernel::System::Main IsInteger
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,6 +82,10 @@ class Webservice:
     routes: tuple[RouteMapping, ...]  # sorted by operation name (Znuny iterates sorted keys)
     operations: dict[str, OperationConfig]
     config: dict[str, Any]  # full parsed YAML after placeholder replacement
+
+
+class RouteMatchError(Exception):
+    """Route matching hit a regex timeout: the request fails, no later route is tried."""
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -158,7 +165,7 @@ def parse_webservice(
     max_length_raw = transport_config.get("MaxLength")
     max_length = (
         int(perl_str(max_length_raw))
-        if _INTEGER.fullmatch(perl_str(max_length_raw or ""))
+        if max_length_raw is not None and _INTEGER.fullmatch(perl_str(max_length_raw))
         else None
     )
     namespace = transport_config.get("NameSpace")
@@ -186,8 +193,6 @@ def match_rest_route(ws: Webservice, path: str, method: str) -> tuple[str, dict[
     *path* is the RAW request path after ``/Webservice/<name>`` (starts with ``/``, no query);
     captured variables are percent-decoded once, like ``URI::Escape::uri_unescape``.
     """
-    from urllib.parse import unquote
-
     for route in ws.routes:
         if route.methods and method not in route.methods:
             continue
@@ -195,9 +200,9 @@ def match_rest_route(ws: Webservice, path: str, method: str) -> tuple[str, dict[
             continue
         try:
             found = route.pattern.fullmatch(path, timeout=REGEX_TIMEOUT_SECONDS)
-        except TimeoutError:
+        except TimeoutError as exc:
             logger.warning("compat_route_timeout", operation=route.operation, route=route.route)
-            continue
+            raise RouteMatchError(f"Route '{route.route}' timed out while matching") from exc
         if found is None:
             continue
         variables = {
@@ -209,26 +214,41 @@ def match_rest_route(ws: Webservice, path: str, method: str) -> tuple[str, dict[
     return None
 
 
+def _placeholder_names(value: Any, names: set[str]) -> None:
+    if isinstance(value, str):
+        names.update(m.group(1) for m in _PLACEHOLDER.finditer(value))
+    elif isinstance(value, list):
+        for entry in value:
+            _placeholder_names(entry, names)
+    elif isinstance(value, dict):
+        for entry in value.values():
+            _placeholder_names(entry, names)
+
+
+def _apply_placeholders(value: Any, resolved: dict[str, str]) -> Any:
+    if isinstance(value, str):
+        return _PLACEHOLDER.sub(lambda m: resolved[m.group(1)], value) if resolved else value
+    if isinstance(value, list):
+        return [_apply_placeholders(entry, resolved) for entry in value]
+    if isinstance(value, dict):
+        return {key: _apply_placeholders(entry, resolved) for key, entry in value.items()}
+    return value
+
+
+async def _resolve_placeholders(names: set[str], sysconfig: SysConfig) -> dict[str, str]:
+    resolved: dict[str, str] = {}
+    for config_name in sorted(names):
+        raw = await sysconfig.get(config_name)
+        # non-scalar SysConfig values (hashes, arrays) become ""
+        resolved[config_name] = perl_str(raw) if isinstance(raw, (str, int, float)) else ""
+    return resolved
+
+
 async def replace_config_placeholders(value: Any, sysconfig: SysConfig) -> Any:
     """``WebserviceConfigReplace``: ``<OTRS_CONFIG_x>`` (or ``&lt;..&gt;``) -> SysConfig x."""
-    if isinstance(value, str):
-        names = {m.group(1) for m in _PLACEHOLDER.finditer(value)}
-        if not names:
-            return value
-        resolved: dict[str, str] = {}
-        for config_name in names:
-            raw = await sysconfig.get(config_name)
-            resolved[config_name] = (
-                perl_str(raw) if isinstance(raw, (str, int, float)) and raw is not None else ""
-            )
-        return _PLACEHOLDER.sub(lambda m: resolved[m.group(1)], value)
-    if isinstance(value, list):
-        return [await replace_config_placeholders(entry, sysconfig) for entry in value]
-    if isinstance(value, dict):
-        return {
-            key: await replace_config_placeholders(entry, sysconfig) for key, entry in value.items()
-        }
-    return value
+    names: set[str] = set()
+    _placeholder_names(value, names)
+    return _apply_placeholders(value, await _resolve_placeholders(names, sysconfig))
 
 
 async def run_mapper(mapper: Mapper, data: Any, data_include: DataInclude | None = None) -> Any:
@@ -236,32 +256,91 @@ async def run_mapper(mapper: Mapper, data: Any, data_include: DataInclude | None
     return await asyncio.to_thread(mapper.map, data, data_include)
 
 
-Fingerprint = tuple[int, str, int, int]  # (count, max(change_time) iso, max(id), sum(valid_id))
+Fingerprint = tuple[
+    int, str, int, int
+]  # (count, digest of (id, change_time, valid_id), max(id), sum(valid_id))
 
 
 async def load_fingerprint(session: AsyncSession) -> Fingerprint:
-    row = (
+    """Cheap change detector over ALL rows; the digest also catches same-second edits to
+    different rows and valid_id flips that cancel out in a sum."""
+    rows = (
         await session.execute(
             select(
-                func.count(),
-                func.max(GiWebserviceConfig.change_time),
-                func.max(GiWebserviceConfig.id),
-                func.sum(GiWebserviceConfig.valid_id),
-            )
+                GiWebserviceConfig.id, GiWebserviceConfig.change_time, GiWebserviceConfig.valid_id
+            ).order_by(GiWebserviceConfig.id)
         )
-    ).one()
-    changed = row[1]
+    ).all()
+    digest = hashlib.sha256()
+    for ws_id, changed, valid_id in rows:
+        stamp = changed.isoformat() if changed is not None else ""
+        digest.update(f"{ws_id}|{stamp}|{valid_id};".encode())
     return (
-        int(row[0] or 0),
-        changed.isoformat() if changed is not None else "",
-        int(row[2] or 0),
-        int(row[3] or 0),
+        len(rows),
+        digest.hexdigest(),
+        max((int(r[0]) for r in rows), default=0),
+        sum(int(r[2] or 0) for r in rows),
     )
 
 
 def _config_text(blob: bytes | memoryview | str) -> str:
     """``config`` is a BLOB on MariaDB and may come back as text on PostgreSQL."""
     return blob if isinstance(blob, str) else bytes(blob).decode("utf-8")
+
+
+_PARSE_ERRORS = (
+    yaml.YAMLError,
+    ValueError,  # includes UnicodeDecodeError
+    TypeError,
+    RecursionError,
+    MappingError,
+    regex.error,
+)
+
+
+def _load_yaml_rows(rows: Sequence[Any]) -> list[tuple[int, str, dict[str, Any] | None]]:
+    out: list[tuple[int, str, dict[str, Any] | None]] = []
+    for ws_id, ws_name, blob in rows:
+        try:
+            parsed = yaml.safe_load(_config_text(blob))
+            if not isinstance(parsed, dict):
+                raise ValueError("webservice config is not a YAML mapping")
+        except _PARSE_ERRORS as exc:
+            logger.warning(
+                "compat_webservice_invalid",
+                webservice_id=ws_id,
+                webservice_name=ws_name,
+                error=str(exc),
+            )
+            out.append((ws_id, ws_name, None))
+            continue
+        out.append((ws_id, ws_name, parsed))
+    return out
+
+
+def _build_snapshot(
+    rows: list[tuple[int, str, dict[str, Any] | None]], resolved: dict[str, str], huge_xml: bool
+) -> tuple[dict[str, Webservice], dict[int, Webservice]]:
+    by_name: dict[str, Webservice] = {}
+    by_id: dict[int, Webservice] = {}
+    for ws_id, ws_name, parsed in rows:
+        if parsed is None:
+            continue
+        try:
+            ws = parse_webservice(
+                ws_id, ws_name, _apply_placeholders(parsed, resolved), huge_xml=huge_xml
+            )
+        except _PARSE_ERRORS as exc:
+            logger.warning(
+                "compat_webservice_invalid",
+                webservice_id=ws_id,
+                webservice_name=ws_name,
+                error=str(exc),
+            )
+            continue
+        by_name[ws.name] = ws
+        by_id[ws.id] = ws
+    return by_name, by_id
 
 
 class WebserviceRegistry:
@@ -288,6 +367,8 @@ class WebserviceRegistry:
         return self._snapshot[1].get(ws_id)
 
     async def refresh(self, session: AsyncSession, *, force: bool = False) -> bool:
+        """Reload when the fingerprint changed. DB errors propagate and leave the previous
+        snapshot and fingerprint untouched; only per-row parse errors skip that row."""
         async with self._lock:
             fingerprint = await load_fingerprint(session)
             if not force and self._loaded and fingerprint == self._fingerprint:
@@ -303,31 +384,20 @@ class WebserviceRegistry:
                     .order_by(GiWebserviceConfig.id)
                 )
             ).all()
-            by_name: dict[str, Webservice] = {}
-            by_id: dict[int, Webservice] = {}
-            for ws_id, ws_name, blob in rows:
-                try:
-                    parsed = yaml.safe_load(_config_text(blob))
-                    if not isinstance(parsed, dict) or not isinstance(parsed.get("Provider"), dict):
-                        raise ValueError("webservice config has no Provider section")
-                    replaced = await replace_config_placeholders(parsed, sysconfig)
-                    ws = await asyncio.to_thread(
-                        parse_webservice, ws_id, ws_name, replaced, huge_xml=huge_xml
-                    )
-                except Exception as exc:  # one broken row must not take the others down
-                    logger.warning(
-                        "compat_webservice_invalid",
-                        webservice_id=ws_id,
-                        webservice_name=ws_name,
-                        error=str(exc),
-                    )
-                    continue
-                by_name[ws.name] = ws
-                by_id[ws.id] = ws
-            self._snapshot = (by_name, by_id)
+            parsed_rows = await asyncio.to_thread(_load_yaml_rows, rows)
+            names: set[str] = set()
+            for _ws_id, _ws_name, parsed in parsed_rows:
+                _placeholder_names(parsed, names)
+            resolved = await _resolve_placeholders(names, sysconfig)  # DB errors abort the reload
+            snapshot = await asyncio.to_thread(_build_snapshot, parsed_rows, resolved, huge_xml)
+            self._snapshot = snapshot
             self._fingerprint = fingerprint
             self._loaded = True
             return True
+
+    def names(self) -> list[str]:
+        """Names of all valid webservices in the current snapshot, sorted."""
+        return sorted(self._snapshot[0])
 
     async def ensure_loaded(self, session: AsyncSession) -> None:
         if not self._loaded:

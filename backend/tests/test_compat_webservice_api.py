@@ -28,7 +28,7 @@ NOW = datetime(2026, 3, 1, 12, 0, 0)
 PASSWORD = "wsmap-secret"
 LOGIN = "wsmap.agent"
 AGENT_ID, GROUP_ID, QUEUE_ID = 8920, 8921, 8922
-MAP_ID, BROKEN_ID, SOAP_ID, PLAIN_ID = 8923, 8924, 8925, 8926
+MAP_ID, BROKEN_ID, SOAP_ID, PLAIN_ID, NOPROV_ID = 8923, 8924, 8925, 8926, 8927
 
 _OUT_XSLT = (
     '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
@@ -123,6 +123,7 @@ _WEBSERVICES = {
     BROKEN_ID: ("BrokenREST", BROKEN_CFG),
     SOAP_ID: ("MapSOAP", SOAP_CFG),
     PLAIN_ID: ("PlainREST", PLAIN_CFG),
+    NOPROV_ID: ("NoProviderSvc", {"Description": "requester only", "Requester": {}}),
 }
 
 _TICKET_SCOPE = f"(SELECT id FROM ticket WHERE queue_id = {QUEUE_ID})"
@@ -143,7 +144,7 @@ def _seed_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
         (f"DELETE FROM article WHERE ticket_id IN {_TICKET_SCOPE}", {}),
         (f"DELETE FROM ticket_history WHERE ticket_id IN {_TICKET_SCOPE}", {}),
         (f"DELETE FROM ticket WHERE queue_id = {QUEUE_ID}", {}),
-        ("DELETE FROM gi_webservice_config WHERE id BETWEEN 8923 AND 8926", {}),
+        ("DELETE FROM gi_webservice_config WHERE id BETWEEN 8923 AND 8927", {}),
         (f"DELETE FROM queue WHERE id = {QUEUE_ID}", {}),
         (f"DELETE FROM group_user WHERE group_id = {GROUP_ID}", {}),
         (f"DELETE FROM permission_groups WHERE id = {GROUP_ID}", {}),
@@ -340,6 +341,16 @@ async def test_unknown_webservice_404_and_unmatched_route_500(sync_url: str) -> 
         wrong_method = await client.get("/znuny-compat/Webservice/MapREST/Make")
         assert wrong_method.status_code == 500
         assert wrong_method.headers["content-type"].startswith("text/plain")
+    await engine.dispose()
+
+
+async def test_webservice_without_provider_answers_transport_fault(sync_url: str) -> None:
+    client, engine = await _client_for(sync_url)
+    async with client:
+        resp = await client.get("/znuny-compat/Webservice/NoProviderSvc/Anything")
+        assert resp.status_code == 500
+        assert resp.json()["faultstring"] == "Transport '' is not supported by Tiqora"
+        assert (await client.get("/znuny-compat/Webservice/MapREST/Nothing")).status_code == 500
     await engine.dispose()
 
 

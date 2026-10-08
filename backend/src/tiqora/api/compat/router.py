@@ -67,6 +67,7 @@ from tiqora.api.compat.soap import (
 from tiqora.api.compat.webservices import (
     OPERATION_TYPES,
     OperationConfig,
+    RouteMatchError,
     Webservice,
     get_registry,
     match_rest_route,
@@ -475,7 +476,10 @@ async def _serve_webservice(
         return _fault_response(f"Transport '{ws.transport}' is not supported by Tiqora", 500)
 
     path = rest_request_path(request)
-    matched = match_rest_route(ws, path, request.method)
+    try:
+        matched = match_rest_route(ws, path, request.method)
+    except RouteMatchError as exc:
+        return _text_error(500, f"HTTP::REST Error while determine Operation: {exc}")
     if matched is None:
         return _text_error(
             500, f"HTTP::REST Error while determine Operation for request URI '{path}'."
@@ -537,7 +541,7 @@ async def admin_reload_routes(
     """Reload the webservice registry from ``gi_webservice_config`` (admin only)."""
     registry = get_registry(request.app)
     await registry.refresh(session, force=True)
-    names = sorted(registry._snapshot[0])  # noqa: SLF001
+    names = registry.names()
     logger.info("compat_webservices_reloaded", count=len(names), user=current_user.login)
     return {"status": "ok", "webservices_loaded": len(names), "webservices": names}
 
