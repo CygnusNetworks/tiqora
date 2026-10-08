@@ -52,7 +52,7 @@ from __future__ import annotations
 import base64
 import calendar
 import re
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
@@ -553,8 +553,13 @@ async def build_article_entries(
     get_attachment_contents: bool,
     html_body_as_attachment: bool,
     ctx: TicketGetContext | None = None,
+    only_article_ids: Collection[int] | None = None,
 ) -> list[dict[str, Any]]:
-    """The ``Article[]`` entries of one ticket exactly as ``TicketGet.pm`` assembles them."""
+    """The ``Article[]`` entries of one ticket exactly as ``TicketGet.pm`` assembles them.
+
+    ``only_article_ids`` restricts the answer to those articles (``IncludeTicketData`` of
+    TicketCreate / TicketUpdate); ``ArticleNumber`` keeps the position in the whole ticket.
+    """
     metas = (
         (
             await session.execute(
@@ -573,6 +578,9 @@ async def build_article_entries(
     numbered: list[tuple[int, Any]] = list(enumerate(metas, start=1))
     if customer_only:
         numbered = [(n, m) for n, m in numbered if int(m["is_visible_for_customer"] or 0) == 1]
+    if only_article_ids is not None:
+        wanted = {int(a) for a in only_article_ids}
+        numbered = [(n, m) for n, m in numbered if int(m["id"]) in wanted]
 
     if ctx is None:
         ctx = await load_ticket_get_context(session, dynamic_fields=dynamic_fields, articles=True)

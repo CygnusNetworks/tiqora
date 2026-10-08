@@ -13,8 +13,9 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+import structlog
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.api.compat.mapping.perl import perl_is_string, perl_str, perl_truthy
 from tiqora.domain.dynamic_field_values import (
@@ -36,6 +37,8 @@ _USER_LIST_KEYS = (
     "ExcludeNotificationToUserID",
     "ExcludeMuteNotificationToUserID",
 )
+
+logger = structlog.get_logger(__name__)
 
 
 def _err(code: str, message: str) -> dict[str, Any]:
@@ -415,3 +418,50 @@ async def parse_gi_articles(
             )
         )
     return out
+
+
+async def send_gi_auto_response(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    sysconfig: SysConfig,
+    *,
+    ticket_id: int,
+    queue_id: int,
+    auto_response_type: str,
+    from_header: str,
+    subject: str,
+    body: str,
+    user_id: int,
+) -> int | None:
+    """The queue's auto response for a request article (Znuny ``ArticleCreate`` →
+    ``SendAutoResponse``, ``OrigHeader`` = the article's From / Subject / Body).
+
+    Only for articles stored with ``add_article``; the caller does not call it for
+    ``ArticleSend``. Sent through the configured outbound relay; without one nothing is
+    sent (never the localhost:25 fallback from a request). Caller commits. Returns the
+    id of the stored auto-response article, or ``None`` when nothing was sent.
+    """
+    from tiqora.channels.email.autoresponse import send_auto_response
+    from tiqora.domain import mail_outbound
+
+    if not (await mail_outbound.resolve_outbound_smtp(session)).enabled:
+        logger.info("compat_auto_response_no_outbound_relay", ticket_id=ticket_id)
+        return None
+    sender = await mail_outbound.build_outbound_sender(
+        session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
+    )
+    return await send_auto_response(
+        session,
+        session_factory,
+        sysconfig,
+        sender,
+        ticket_id=ticket_id,
+        queue_id=queue_id,
+        auto_response_type=auto_response_type,
+        recipient_from_header=from_header,
+        orig_subject=subject,
+        orig_body=body,
+        orig_message_id=None,
+        orig_x_otrs_loop=None,
+        user_id=user_id,
+    )

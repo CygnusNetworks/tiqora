@@ -24,6 +24,7 @@ from tiqora.api.compat.article_input import (
     normalize_article_list,
     parse_gi_articles,
     parse_gi_dynamic_fields,
+    send_gi_auto_response,
 )
 from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.api.compat.ticket_get import (
@@ -1024,7 +1025,7 @@ async def op_ticket_create(
     *,
     request: Any | None = None,
     settings: Settings | None = None,
-    operation_config: OperationConfig | None = None,  # noqa: ARG001 - used from Task 11
+    operation_config: OperationConfig | None = None,
 ) -> dict[str, Any]:
     """TicketCreate operation."""
     op = "TicketCreate"
@@ -1162,6 +1163,15 @@ async def op_ticket_create(
                     article_id=article_id,
                     user_id=write_user_id,
                 )
+            await _send_gi_auto_responses(
+                session,
+                session_factory,
+                sysconfig,
+                articles,
+                article_ids,
+                ticket_id=ticket_id,
+                user_id=write_user_id,
+            )
         await session.commit()
     except TicketAccessDenied:
         await session.rollback()
@@ -1173,11 +1183,116 @@ async def op_ticket_create(
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
-    return article_id_result(
-        {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
-        article_ids,
+    return await _with_ticket_data(
+        article_id_result(
+            {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+            article_ids,
+            op=op,
+        ),
+        session,
+        operation_config,
         op=op,
+        ticket_id=ticket_id,
+        article_ids=article_ids,
+        attachments=bool(data.get("Attachment")),
     )
+
+
+async def _send_gi_auto_responses(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    sysconfig: SysConfig,
+    articles: list[GiArticle],
+    article_ids: list[int],
+    *,
+    ticket_id: int,
+    user_id: int,
+) -> None:
+    """Auto reply / auto follow up for every request article stored with ``add_article``.
+
+    Znuny sends them from ``ArticleCreate`` (never for ``ArticleSend``); a failing mail
+    never fails the ticket call. Each attempt is its own savepoint.
+    """
+    for gi, _article_id in zip(articles, article_ids, strict=True):
+        if not gi.auto_response_type or gi.send:
+            continue
+        queue_id = (
+            await session.execute(
+                text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).scalar_one()
+        try:
+            async with session.begin_nested():
+                await send_gi_auto_response(
+                    session,
+                    session_factory,
+                    sysconfig,
+                    ticket_id=ticket_id,
+                    queue_id=int(queue_id),
+                    auto_response_type=gi.auto_response_type,
+                    from_header=gi.article.from_address or "",
+                    subject=gi.article.subject,
+                    body=gi.article.body,
+                    user_id=user_id,
+                )
+        except Exception:
+            logger.warning(
+                "compat_auto_response_failed",
+                ticket_id=ticket_id,
+                type=gi.auto_response_type,
+                exc_info=True,
+            )
+
+
+async def _with_ticket_data(
+    result: dict[str, Any],
+    session: AsyncSession,
+    operation_config: OperationConfig | None,
+    *,
+    op: str,
+    ticket_id: int,
+    article_ids: list[int],
+    attachments: bool,
+) -> dict[str, Any]:
+    """``IncludeTicketData`` of the webservice operation: answer with ``Ticket``.
+
+    ``TicketGet`` (with dynamic fields) plus the ``ArticleGet`` of just the articles this call
+    created. TicketCreate lists them under ``Article`` always and with attachments only when
+    the request had a top-level ``Attachment`` (``attachments``); TicketUpdate uses ``Article``
+    (a hash) for one, ``Articles`` for several, and always includes attachments.
+    """
+    if operation_config is None or not operation_config.include_ticket_data:
+        return result
+    now = datetime.now(UTC).replace(tzinfo=None)
+    ctx = await load_ticket_get_context(session, dynamic_fields=True, articles=bool(article_ids))
+    ticket = await build_ticket_entry(
+        session, ticket_id, dynamic_fields=True, extended=False, now=now, ctx=ctx
+    )
+    if ticket is None:
+        return result
+    if article_ids:
+        entries = await build_article_entries(
+            session,
+            ticket_id,
+            customer_only=False,
+            sender_types=None,
+            order="ASC",
+            limit=0,
+            dynamic_fields=True,
+            attachments=attachments,
+            get_attachment_contents=True,
+            html_body_as_attachment=False,
+            ctx=ctx,
+            only_article_ids=article_ids,
+        )
+        if entries:
+            if op == "TicketCreate":
+                ticket["Article"] = entries
+            elif len(article_ids) == 1:
+                ticket["Article"] = entries[0]
+            else:
+                ticket["Articles"] = entries
+    return {**result, "Ticket": ticket}
 
 
 async def _get_tn(session: AsyncSession, ticket_id: int) -> str:
@@ -1203,7 +1318,7 @@ async def op_ticket_update(
     *,
     request: Any | None = None,
     settings: Settings | None = None,
-    operation_config: OperationConfig | None = None,  # noqa: ARG001 - used from Task 11
+    operation_config: OperationConfig | None = None,
 ) -> dict[str, Any]:
     """TicketUpdate operation."""
     op = "TicketUpdate"
@@ -1295,6 +1410,15 @@ async def op_ticket_update(
                             user_id=PORTAL_SYSTEM_USER_ID,
                         )
                     )
+                await _send_gi_auto_responses(
+                    session,
+                    session_factory,
+                    sysconfig,
+                    follow_ups,
+                    article_ids,
+                    ticket_id=ticket_id,
+                    user_id=PORTAL_SYSTEM_USER_ID,
+                )
             await session.commit()
         except TicketNotFound:
             await session.rollback()
@@ -1305,10 +1429,18 @@ async def op_ticket_update(
         except InvalidInput as e:
             await session.rollback()
             return _err(f"{op}.InvalidParameter", str(e))
-        return article_id_result(
-            {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
-            article_ids,
+        return await _with_ticket_data(
+            article_id_result(
+                {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+                article_ids,
+                op=op,
+            ),
+            session,
+            operation_config,
             op=op,
+            ticket_id=ticket_id,
+            article_ids=article_ids,
+            attachments=True,
         )
 
     pe = PermissionEngine(session)
@@ -1567,6 +1699,15 @@ async def op_ticket_update(
                     article_id=article_ids[0],
                     user_id=user_id,
                 )
+            await _send_gi_auto_responses(
+                session,
+                session_factory,
+                sysconfig,
+                articles,
+                article_ids,
+                ticket_id=ticket_id,
+                user_id=user_id,
+            )
 
         await session.commit()
     except TicketNotFound:
@@ -1582,10 +1723,18 @@ async def op_ticket_update(
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
-    return article_id_result(
-        {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
-        article_ids,
+    return await _with_ticket_data(
+        article_id_result(
+            {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+            article_ids,
+            op=op,
+        ),
+        session,
+        operation_config,
         op=op,
+        ticket_id=ticket_id,
+        article_ids=article_ids,
+        attachments=True,
     )
 
 
