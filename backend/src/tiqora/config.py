@@ -362,6 +362,12 @@ class Settings(BaseSettings):
         default=False, validation_alias="TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP"
     )
 
+    # GI SessionCreate writes Znuny ``sessions`` rows (valid in both systems, Znuny's idle
+    # and absolute expiry) instead of a Redis token. Off when Tiqora owns the schema.
+    compat_session_write_znuny: bool = Field(
+        default=True, validation_alias="TIQORA_COMPAT_SESSION_WRITE_ZNUNY"
+    )
+
     # How often every API process polls gi_webservice_config for changes made in
     # Znuny (rename / disable / edit) so compat webservices reload without a restart.
     compat_webservice_reload_seconds: int = Field(

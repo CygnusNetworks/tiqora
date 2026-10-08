@@ -56,6 +56,12 @@ _SNAPSHOTS: dict[str, dict[str, int]] = {}
 def _seed_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
     return (
         (f"DELETE FROM gi_webservice_config WHERE id = {WS_ID}", {}),
+        (
+            "DELETE FROM sessions WHERE session_id IN (SELECT session_id FROM"
+            " (SELECT session_id FROM sessions WHERE data_key = 'UserLogin'"
+            " AND data_value = 'hot.agent') s)",
+            {},
+        ),
         (f"DELETE FROM users WHERE id = {AGENT_ID}", {}),
     )
 

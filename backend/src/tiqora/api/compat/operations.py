@@ -9,6 +9,7 @@ Ports request/response semantics from:
 
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -27,7 +28,10 @@ from tiqora.api.compat.article_input import (
     parse_gi_dynamic_fields,
     send_gi_auto_response,
 )
-from tiqora.api.compat.mapping.perl import perl_truthy
+from tiqora.api.compat.history_at import queue_at
+from tiqora.api.compat.mapping import MappingError
+from tiqora.api.compat.mapping.out_of_office import OutOfOfficeMapper
+from tiqora.api.compat.mapping.perl import perl_str, perl_truthy
 from tiqora.api.compat.search_filters import (
     article_text_filters,
     create_time_settings,
@@ -39,9 +43,17 @@ from tiqora.api.compat.ticket_get import (
     build_article_entries,
     build_ticket_entry,
     load_ticket_get_context,
+    znuny_num,
     znuny_ts,
 )
 from tiqora.api.compat.webservices import OperationConfig
+from tiqora.api.compat.znuny_session import (
+    SESSION_GET_ALLOWED_KEYS,
+    write_znuny_session,
+    znuny_agent_user_data,
+    znuny_customer_user_data,
+    znuny_session_writes_enabled,
+)
 from tiqora.channels.email.outbound_reply import OutboundMailError as _OutboundMailError
 from tiqora.channels.email.outbound_reply import (
     PendingAgentEmail,
@@ -436,13 +448,28 @@ async def _lookup_session(
             return None
     # Customer sessions: never treat UserID as an agent principal for ACL.
     if user_type == _CUSTOMER_USER_TYPE:
+        if not await _principal_is_valid(session, user_login, customer=True):
+            return None
         return (_CUSTOMER_SENTINEL_USER_ID, user_login, _CUSTOMER_USER_TYPE)
     if not user_id_s:
         return None
     try:
-        return (int(user_id_s), user_login, user_type or _AGENT_USER_TYPE)
+        agent_id = int(user_id_s)
     except ValueError:
         return None
+    if not await _principal_is_valid(session, agent_id, customer=False):
+        return None
+    return (agent_id, user_login, user_type or _AGENT_USER_TYPE)
+
+
+async def _principal_is_valid(session: AsyncSession, who: int | str, *, customer: bool) -> bool:
+    """A disabled account must not keep working through a still-live session row."""
+    if customer:
+        stmt = select(CustomerUser.valid_id).where(CustomerUser.login == who)
+    else:
+        stmt = select(Users.valid_id).where(Users.id == who)
+    valid_id = (await session.execute(stmt)).scalars().first()
+    return valid_id == 1
 
 
 # ---------------------------------------------------------------------------
@@ -631,8 +658,11 @@ def _like_pattern(val: Any) -> str:
 
 
 async def _set_user_preference(session: AsyncSession, user_id: int, key: str, value: str) -> None:
-    """Upsert a user_preferences row (value stored as UTF-8 bytes)."""
-    raw = value.encode("utf-8")
+    """Upsert a user_preferences row (UTF-8 bytes; plain text on PostgreSQL's TEXT column)."""
+    bind = session.get_bind()
+    raw: bytes | str = (
+        value if bind is not None and bind.dialect.name == "postgresql" else value.encode("utf-8")
+    )
     existing = (
         await session.execute(
             text(
@@ -896,6 +926,26 @@ async def op_session_create(
             auth_method="session",
         )
 
+    sysconfig = SysConfig(session)
+    if await znuny_session_writes_enabled(cfg, sysconfig):
+        if user_login:
+            user_data = await znuny_agent_user_data(session, user.id, sysconfig=sysconfig)
+            user_type = _AGENT_USER_TYPE
+        else:
+            user_data = await znuny_customer_user_data(session, customer_login)
+            user_type = _CUSTOMER_USER_TYPE
+        headers = getattr(request, "headers", None)
+        session_id = await write_znuny_session(
+            session,
+            user_data=user_data,
+            user_type=user_type,
+            remote_addr=_peer_addr(request) or "none",
+            user_agent=(headers.get("user-agent") if headers is not None else "") or "none",
+            now_epoch=int(datetime.now(UTC).timestamp()),
+        )
+        await session.commit()
+        return {"SessionID": session_id}
+
     token = await session_store.create(user.id, user.login)
     return {"SessionID": token}
 
@@ -929,7 +979,7 @@ async def op_session_get(
         session_data: list[dict[str, Any]] = []
         for key, val, serialized in rows:
             k = str(key)
-            if k in ("UserPw", "UserChallengeToken"):
+            if k not in SESSION_GET_ALLOWED_KEYS:
                 continue
             entry: dict[str, Any] = {"Key": k, "Value": val if val is not None else ""}
             if serialized:
@@ -2643,6 +2693,16 @@ async def op_ticket_history_get(
 # ---------------------------------------------------------------------------
 
 
+def _parse_znuny_datetime(raw: Any) -> datetime | None:
+    value = str(raw).strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt)  # noqa: DTZ007 - Znuny timestamps are naive UTC
+        except ValueError:
+            continue
+    return None
+
+
 async def op_time_accounting_get(
     data: dict[str, Any],
     session: AsyncSession,
@@ -2676,21 +2736,23 @@ async def op_time_accounting_get(
     if target_id is None:
         return {"TimeAccountingResult": []}
 
-    start = data["TimeAccountingStart"]
-    end = data["TimeAccountingEnd"]
+    # PostgreSQL (asyncpg) refuses strings for timestamp bounds: bind datetimes on both dialects.
+    start = _parse_znuny_datetime(data["TimeAccountingStart"])
+    end = _parse_znuny_datetime(data["TimeAccountingEnd"])
+    if start is None or end is None:
+        return {}
 
     rows = (
         (
             await session.execute(
                 text(
                     "SELECT t.id AS ticket_id, t.tn, t.customer_id, t.title,"
-                    " ta.time_unit, ta.create_time, q.name AS queue_name"
+                    " ta.time_unit, ta.create_time"
                     " FROM time_accounting ta"
                     " JOIN ticket t ON t.id = ta.ticket_id"
-                    " LEFT JOIN queue q ON q.id = t.queue_id"
                     " WHERE ta.create_by = :uid"
                     " AND ta.create_time BETWEEN :start AND :end"
-                    " ORDER BY ta.create_time ASC, t.id ASC"
+                    " ORDER BY ta.create_time ASC, t.id ASC, ta.id ASC"
                 ),
                 {"uid": target_id, "start": start, "end": end},
             )
@@ -2699,15 +2761,15 @@ async def op_time_accounting_get(
         .all()
     )
 
+    # Znuny reports the queue the ticket was in when the time was booked (no TicketID key).
     entries = [
         {
-            "TicketID": r["ticket_id"],
             "TicketNumber": r["tn"],
             "TicketCustomerID": r["customer_id"],
             "TicketTitle": r["title"],
-            "TimeUnit": r["time_unit"],
-            "Created": r["create_time"].isoformat() if r["create_time"] else None,
-            "Queue": r["queue_name"],
+            "TimeUnit": perl_str(znuny_num(r["time_unit"])),
+            "Created": znuny_ts(r["create_time"]),
+            "Queue": await queue_at(session, int(r["ticket_id"]), r["create_time"]),
         }
         for r in rows
     ]
@@ -2741,6 +2803,16 @@ async def op_out_of_office(
         return _err(f"{op}.AuthFail", f"{op}: User needs to be an agent.")
     if not await _agent_in_group(session, user_id, "admin"):
         return _err(f"{op}.AuthFail", f"{op}: User needs to be in group admin.")
+
+    # Same result as a webservice with `MappingInbound: {Type: OutOfOffice}`.
+    if (
+        data.get("OutOfOfficeEntriesCSVString") is not None
+        and data.get("OutOfOfficeEntries") is None
+    ):
+        try:
+            data = await asyncio.to_thread(OutOfOfficeMapper().map, data)
+        except MappingError as exc:
+            return _err(f"{op}.WrongInputStructure", str(exc))
 
     entries = data.get("OutOfOfficeEntries")
     if not isinstance(entries, list) or not entries:

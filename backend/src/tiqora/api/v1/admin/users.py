@@ -9,6 +9,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy import select
 
+from tiqora.api.compat.znuny_session import delete_znuny_agent_sessions
 from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.common import (
     USER_CACHE_TYPES,
@@ -292,6 +293,8 @@ async def update_user(
             revoked = await SessionStore(await get_redis(request), settings).revoke_user_sessions(
                 user_id
             )
+            await delete_znuny_agent_sessions(session, user_id)
+            await session.commit()
             logger.info(
                 "admin.users.sessions_revoked",
                 user_id=user_id,

@@ -148,6 +148,12 @@ def _seed_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
         (f"DELETE FROM queue WHERE id = {QUEUE_ID}", {}),
         (f"DELETE FROM group_user WHERE group_id = {GROUP_ID}", {}),
         (f"DELETE FROM permission_groups WHERE id = {GROUP_ID}", {}),
+        (
+            "DELETE FROM sessions WHERE session_id IN (SELECT session_id FROM"
+            " (SELECT session_id FROM sessions WHERE data_key = 'UserLogin'"
+            " AND data_value = 'wsmap.agent') s)",
+            {},
+        ),
         (f"DELETE FROM users WHERE id = {AGENT_ID}", {}),
     )
 

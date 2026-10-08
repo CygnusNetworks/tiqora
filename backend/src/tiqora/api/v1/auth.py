@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.compat.znuny_session import delete_znuny_agent_sessions
 from tiqora.api.deps import (
     AppSettings,
     CurrentUser,
@@ -367,6 +368,8 @@ async def complete_password_setup(
     # any session that predates the new credential (security review M-2).
     try:
         await SessionStore(redis_client, settings).revoke_user_sessions(user_id)
+        await delete_znuny_agent_sessions(session, user_id)
+        await session.commit()
     except Exception as exc:  # noqa: BLE001 — password already committed
         logger.warning("password_setup_session_revoke_failed", user_id=user_id, error=str(exc))
     await limiter.reset(login="__password_setup__", ip=ip)
