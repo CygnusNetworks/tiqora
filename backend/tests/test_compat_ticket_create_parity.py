@@ -24,6 +24,7 @@ from tiqora.api.compat.operations import (
     op_ticket_create,
     op_ticket_get,
     op_ticket_history_get,
+    op_ticket_update,
 )
 from tiqora.domain.auth import SessionStore
 from tiqora.znuny.sysconfig import SysConfig
@@ -202,7 +203,7 @@ async def _call(sync_url: str, func: Any, params: dict[str, Any]) -> dict[str, A
                 return None
 
             sysconfig = SysConfig(fetch=_no_row)
-            if func is op_ticket_create:
+            if func in (op_ticket_create, op_ticket_update):
                 return await func(payload, session, factory, store, sysconfig)  # type: ignore[no-any-return]
             return await func(payload, session, store)  # type: ignore[no-any-return]
     finally:
@@ -515,3 +516,56 @@ async def test_out_of_office_answers_success_only(sync_url: str) -> None:
             u=AGENT,
             g=admin_gid,
         )
+
+
+# --- review round 1 -------------------------------------------------------------------------
+
+
+@pytest.mark.db
+@pytest.mark.parametrize("bad_id", ["abc", "Search", "0", "", "1;2", "-5"])
+async def test_ticket_update_bad_ticket_id_is_access_denied(sync_url: str, bad_id: str) -> None:
+    res = await _call(sync_url, op_ticket_update, {"TicketID": bad_id, "Ticket": {"Title": "x"}})
+    assert res == {  # TicketUpdate.pm:416-436, no 500
+        "Error": {
+            "ErrorCode": "TicketUpdate.AccessDenied",
+            "ErrorMessage": "TicketUpdate: User does not have access to the ticket!",
+        }
+    }
+
+
+@pytest.mark.db
+async def test_owner_id_zero_string_means_no_owner(sync_url: str) -> None:
+    res = await _create(sync_url, "GI8900 owner zero", OwnerID="0")
+    row = _ticket_row(sync_url, res["TicketID"])
+    assert (int(row[0]), int(row[1])) == (AGENT, 1)  # calling agent, unlocked, no owner lock
+    assert "Lock" not in _types(_history(sync_url, res["TicketID"]))
+
+
+@pytest.mark.db
+async def test_tmp_lock_is_a_lock_set_with_history(sync_url: str) -> None:
+    res = await _create(sync_url, "GI8900 tmp lock", LockID=3)
+    row = _ticket_row(sync_url, res["TicketID"])
+    assert int(row[1]) == 3
+    history = _history(sync_url, res["TicketID"])
+    assert ("Misc", "%%tmp_lock") in history  # Ticket.pm:4235: other lock types are Misc rows
+    assert _types(history).index("NewTicket") < _types(history).index("Misc")
+
+
+@pytest.mark.db
+async def test_responsible_is_set_after_create_with_history(sync_url: str) -> None:
+    res = await _create(
+        sync_url, "GI8900 responsible", Owner="gi8900.owner", ResponsibleID=OWNER_TO_BE
+    )
+    resp = _query(
+        sync_url,
+        "SELECT responsible_user_id FROM ticket WHERE id = :t",
+        t=res["TicketID"],
+    )[0][0]
+    assert int(resp) == OWNER_TO_BE
+    history = _history(sync_url, res["TicketID"])
+    assert ("ResponsibleUpdate", f"%%gi8900.owner%%{OWNER_TO_BE}") in history
+    # TicketCreate.pm:1853-1883: owner, lock, then responsible
+    assert _types(history)[-3:] == ["OwnerUpdate", "Lock", "ResponsibleUpdate"]
+    # the creation default (root) writes no ResponsibleUpdate
+    plain = await _create(sync_url, "GI8900 no responsible")
+    assert "ResponsibleUpdate" not in _types(_history(sync_url, plain["TicketID"]))

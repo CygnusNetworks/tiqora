@@ -1788,6 +1788,47 @@ async def lock_ticket(
     await _emit_event(session, "TicketLockUpdate", ticket_id, {"lock": "lock"})
 
 
+async def set_ticket_lock(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    lock_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """``TicketLockSet`` for an arbitrary lock type (e.g. tmp_lock); no-op if unchanged.
+
+    History type follows Ticket.pm:4226-4241 (Lock / Unlock, else Misc) with ``%%<name>``.
+    """
+    if lock_id == 1:
+        await unlock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        return
+    if lock_id == 2:
+        await lock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        return
+    t = await _ticket_must_exist(session, ticket_id)
+    if int(t["ticket_lock_id"]) == lock_id:
+        return
+    name_row = (
+        await session.execute(
+            text("SELECT name FROM ticket_lock_type WHERE id = :i"), {"i": lock_id}
+        )
+    ).first()
+    if name_row is None:
+        raise InvalidInput(f"Unknown ticket lock id: {lock_id!r}")
+    await session.execute(
+        text(
+            "UPDATE ticket SET ticket_lock_id = :l, change_time = current_timestamp,"
+            " change_by = :uid WHERE id = :tid"
+        ),
+        {"l": lock_id, "uid": user_id, "tid": ticket_id},
+    )
+    await add_lock(session, ticket_id=ticket_id, lock=str(name_row[0]), user_id=user_id)
+    await ticket_accelerator_update(session, ticket_id, sysconfig)
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "TicketLockUpdate", ticket_id, {"lock": str(name_row[0])})
+
+
 async def unlock_ticket(
     session: AsyncSession,
     *,

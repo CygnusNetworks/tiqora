@@ -100,6 +100,7 @@ from tiqora.domain.ticket_write_service import (
     lock_ticket,
     move_queue,
     set_customer,
+    set_ticket_lock,
     unlock_ticket,
 )
 from tiqora.domain.totp import TOTPService
@@ -1124,7 +1125,7 @@ async def op_ticket_create(
 
     requested_owner_id = await _resolve_user_id(session, ticket.get("Owner"), ticket.get("OwnerID"))
     # Znuny: an owner given in the request means "no agent mail for the first article".
-    has_owner = bool(requested_owner_id)
+    has_owner = perl_truthy(requested_owner_id)  # TicketCreate.pm:1862: "0" is no owner
 
     responsible_id = await _resolve_user_id(
         session, ticket.get("Responsible"), ticket.get("ResponsibleID")
@@ -1191,8 +1192,8 @@ async def op_ticket_create(
         # TicketCreate.pm:1396 creates with OwnerID 1 and unlocked; owner and lock follow as
         # TicketOwnerSet / TicketLockSet so the history matches (see below)
         owner_id=1,
-        lock_id=lock_id if lock_id not in (1, 2) else 1,
-        responsible_id=responsible_id,
+        lock_id=1,
+        responsible_id=None,
         customer_id=customer_id_val,
         customer_user_id=customer_user_val,
         type_id=type_id,
@@ -1212,6 +1213,14 @@ async def op_ticket_create(
                 # TicketCreate.pm:1417-1426: explicit Lock is a TicketLockSet after the create
                 await lock_ticket(
                     session, ticket_id=ticket_id, user_id=write_user_id, sysconfig=sysconfig
+                )
+            elif lock_id != 1:
+                await set_ticket_lock(
+                    session,
+                    ticket_id=ticket_id,
+                    lock_id=lock_id,
+                    user_id=write_user_id,
+                    sysconfig=sysconfig,
                 )
             if closed_state and lock_id != 1:
                 await unlock_ticket(
@@ -1265,7 +1274,7 @@ async def op_ticket_create(
                     article_id=article_id,
                     user_id=write_user_id,
                 )
-            final_owner_id = requested_owner_id or write_user_id
+            final_owner_id = int(requested_owner_id or 0) if has_owner else write_user_id
             # TicketCreate.pm:1853-1880: TicketOwnerSet after the articles, to the requested
             # owner, else (no notification) to the calling user; then the lock for an owner
             await assign_owner(
@@ -1279,6 +1288,15 @@ async def op_ticket_create(
                 # then locked (even a closed ticket)
                 await lock_ticket(
                     session, ticket_id=ticket_id, user_id=write_user_id, sysconfig=sysconfig
+                )
+            # TicketCreate.pm:1883: TicketResponsibleSet after owner and lock (a no-op when
+            # it is the creation default, root)
+            if responsible_id and int(responsible_id) != 1:
+                await assign_responsible(
+                    session,
+                    ticket_id=ticket_id,
+                    new_responsible_id=int(responsible_id),
+                    user_id=write_user_id,
                 )
             # Ticket::EventModulePost###9990-EscalationIndex (TicketCreate, ArticleCreate; runs
             # as a transaction handler, i.e. once after everything above) rebuilds the
@@ -1548,7 +1566,12 @@ async def op_ticket_update(
 
     ticket_id: int
     if ticket_id_raw is not None:
-        ticket_id = int(ticket_id_raw)
+        # TicketUpdate.pm:416-436: an id that is not a ticket (empty, "0", not a number) fails
+        # the TicketGet with AccessDenied
+        raw_id = perl_str(ticket_id_raw).strip()
+        if not perl_truthy(ticket_id_raw) or not re.fullmatch(r"[0-9]{1,18}", raw_id):
+            return _err(f"{op}.AccessDenied", f"{op}: User does not have access to the ticket!")
+        ticket_id = int(raw_id)
     else:
         row = (
             await session.execute(
