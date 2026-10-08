@@ -35,7 +35,7 @@ def test_import_saml2_raises_unavailable_when_missing(monkeypatch: pytest.Monkey
 
 
 def test_require_saml_fails_hard_when_required(monkeypatch: pytest.MonkeyPatch) -> None:
-    from _saml_idp import require_saml
+    from tests._saml_idp import require_saml
 
     monkeypatch.setattr("shutil.which", lambda name: None)
     monkeypatch.setenv("TIQORA_REQUIRE_SAML_TESTS", "1")
