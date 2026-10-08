@@ -626,3 +626,69 @@ def test_webhook_plain_df_event_subscription_matches_per_field_events() -> None:
         '["TicketDynamicFieldUpdate_Bar"]', "TicketDynamicFieldUpdate_Foo"
     )
     assert not webhook_matches_event('["TicketCreate"]', "TicketDynamicFieldUpdate_Foo")
+
+
+def _set_possible_values(url: str, name: str, config: str) -> None:
+    _query(url, "UPDATE dynamic_field SET config = :c WHERE id = :i", c=config, i=DFS[name][0])
+
+
+_POSSIBLE = "---\nPossibleValues:\n  a: Alpha\n  b: Beta\n  3: Drei\n"
+
+
+@pytest.mark.db
+async def test_patch_unknown_dynamic_field_is_422_and_atomic(env: Any) -> None:
+    url, factory = env
+    async with _client(factory, AGENT_RW) as client:
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"dynamic_fields": {"WaveText": ["neu"], "NoSuchField": ["x"]}},
+        )
+        single = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"field_name": "NoSuchField", "field_values": ["x"]},
+        )
+    assert resp.status_code == 422, resp.text
+    assert "NoSuchField" in resp.text
+    assert single.status_code == 422, single.text
+    assert _rows(url, "WaveText") == []
+
+
+@pytest.mark.db
+async def test_patch_dropdown_value_must_be_a_possible_value(env: Any) -> None:
+    url, factory = env
+    _set_possible_values(url, "WaveDrop", _POSSIBLE)
+    _set_possible_values(url, "WaveMulti", _POSSIBLE)
+    async with _client(factory, AGENT_RW) as client:
+        bad = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["zzz"]}}
+        )
+        bad_multi = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"dynamic_fields": {"WaveMulti": ["a", "zzz"]}},
+        )
+        bad_single = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"field_name": "WaveDrop", "field_values": ["zzz"]},
+        )
+        ok = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"dynamic_fields": {"WaveDrop": ["b"], "WaveMulti": ["a", "3"]}},
+        )
+        cleared = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": [""]}}
+        )
+    assert bad.status_code == bad_multi.status_code == bad_single.status_code == 422
+    assert "zzz" in bad.text
+    assert ok.status_code == 204, ok.text
+    assert _rows(url, "WaveMulti") == [("a", None, None), ("3", None, None)]
+    assert cleared.status_code == 204, cleared.text
+    assert _rows(url, "WaveDrop") == []
+
+
+@pytest.mark.db
+async def test_internal_set_ticket_dynamic_field_is_not_value_validated(env: Any) -> None:
+    """Only the agent-facing PATCH validates PossibleValues (process engine etc. do not)."""
+    url, factory = env
+    _set_possible_values(url, "WaveDrop", _POSSIBLE)
+    assert await _set(factory, "WaveDrop", ["not-listed"]) is True
+    assert _rows(url, "WaveDrop") == [("not-listed", None, None)]

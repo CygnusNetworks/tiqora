@@ -1865,6 +1865,51 @@ async def update_dynamic_field(
         raise InvalidInput(f"{field_name}: {exc}") from exc
 
 
+async def update_dynamic_fields_strict(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    values: Mapping[str, list[str]],
+    user_id: int,
+) -> None:
+    """Agent-facing dynamic-field write (PATCH): like AgentTicketFreeText / GI TicketUpdate.
+
+    Unlike :func:`update_dynamic_field` (silent for unknown names, used by internal
+    callers such as process management), an unknown field is rejected and
+    Dropdown / Multiselect values must be keys of the field's ``PossibleValues``
+    (``BaseSelect.pm::EditFieldValueValidate``; empty values pass). Raises
+    :class:`InvalidInput` before anything is written for the offending field; the
+    caller's transaction rolls earlier fields back.
+    """
+    from sqlalchemy import select
+
+    from tiqora.api.v1.admin.dynamic_fields import config_from_yaml
+    from tiqora.db.legacy.dynamic_field import DynamicField
+
+    for field_name, field_values in values.items():
+        field = await load_ticket_dynamic_field(session, field_name)
+        if field is None:
+            raise InvalidInput(f"Unbekanntes Feld „{field_name}“.")
+        if field.field_type in ("Dropdown", "Multiselect"):
+            raw_config = (
+                await session.execute(
+                    select(DynamicField.config).where(DynamicField.id == field.id)
+                )
+            ).scalar_one_or_none()
+            possible = config_from_yaml(raw_config).get("PossibleValues")
+            allowed = {str(k) for k in possible} if isinstance(possible, dict) else set()
+            for v in field_values:
+                if v != "" and v not in allowed:
+                    raise InvalidInput(f"{field_name}: „{v}“ ist kein erlaubter Wert.")
+        await update_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            field_name=field_name,
+            values=field_values,
+            user_id=user_id,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Sub-task 4: merge_tickets — exact port of TicketMerge
 # ---------------------------------------------------------------------------
@@ -2670,12 +2715,8 @@ class TicketWriteService:
     ) -> None:
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
-        await update_dynamic_field(
-            self._session,
-            ticket_id=ticket_id,
-            field_name=field_name,
-            values=values,
-            user_id=user_id,
+        await update_dynamic_fields_strict(
+            self._session, ticket_id=ticket_id, values={field_name: values}, user_id=user_id
         )
 
     async def update_dynamic_fields(
@@ -2691,14 +2732,9 @@ class TicketWriteService:
         """
         t = await _ticket_must_exist(self._session, ticket_id)
         await self._assert_rw(user_id, int(t["queue_id"]))
-        for field_name, field_values in values.items():
-            await update_dynamic_field(
-                self._session,
-                ticket_id=ticket_id,
-                field_name=field_name,
-                values=field_values,
-                user_id=user_id,
-            )
+        await update_dynamic_fields_strict(
+            self._session, ticket_id=ticket_id, values=values, user_id=user_id
+        )
 
     async def merge_tickets(self, user_id: int, main_ticket_id: int, merge_ticket_id: int) -> None:
         main = await _ticket_must_exist(self._session, main_ticket_id)
@@ -3006,5 +3042,6 @@ __all__ = [
     "unlock_ticket",
     "unwatch_ticket",
     "update_dynamic_field",
+    "update_dynamic_fields_strict",
     "watch_ticket",
 ]
