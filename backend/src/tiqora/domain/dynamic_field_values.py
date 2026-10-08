@@ -1,0 +1,242 @@
+"""Znuny-identical dynamic-field writes for tickets.
+
+Port of ``Kernel/System/DynamicField/Backend.pm`` (``ValueSet``,
+``ValueIsDifferent``), the ``Driver/*`` ``ValueSet`` methods, the generic
+``Kernel/System/DynamicFieldValue.pm::ValueSet`` and
+``Kernel/System/DynamicField/ObjectType/Ticket.pm::PostValueSet``:
+
+* Date / DateTime values live in ``value_date``, Checkbox in ``value_int``,
+  everything else in ``value_text``.
+* An unchanged value writes nothing (no history row, no ``change_time`` bump).
+* A change bumps ``ticket.change_time`` and writes a ``TicketDynamicFieldUpdate``
+  history row with Znuny's 166-character truncation rule.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
+from tiqora.znuny.history import add_dynamic_field_update
+
+DF_TEXT_TYPES = frozenset({"Text", "TextArea", "Dropdown", "Multiselect"})
+DF_EDITABLE_TYPES = frozenset(
+    {"Text", "TextArea", "Dropdown", "Multiselect", "Checkbox", "Date", "DateTime"}
+)
+HISTORY_MAX_CHARS = 166
+
+_SINGLE_VALUE_TYPES = frozenset({"Text", "TextArea", "Dropdown", "Date", "DateTime", "Checkbox"})
+_DATE_RE = re.compile(r"\A(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?\Z")
+
+
+class DynamicFieldValueError(ValueError):
+    """Invalid value for a dynamic field (plain German message)."""
+
+
+@dataclass(frozen=True, slots=True)
+class DynamicFieldConfig:
+    id: int
+    name: str
+    field_type: str
+
+
+def _parse_datetime(raw: str) -> datetime | None:
+    m = _DATE_RE.match(raw.strip())
+    if m is None:
+        return None
+    day, hh, mm, ss = m.groups()
+    try:
+        return datetime.fromisoformat(f"{day} {hh or '00'}:{mm or '00'}:{ss or '00'}")
+    except ValueError:
+        return None
+
+
+def normalize_df_values(field_type: str, values: Sequence[str]) -> list[str]:
+    """Normalise ``values`` for ``field_type`` (Znuny driver ``ValueSet`` rules)."""
+    vals = [v for v in values if v != ""]
+    if field_type in _SINGLE_VALUE_TYPES and len(vals) > 1:
+        raise DynamicFieldValueError("Dieses Feld erlaubt nur einen Wert.")
+    if field_type == "Date":
+        out: list[str] = []
+        for v in vals:
+            dt = _parse_datetime(v)
+            if dt is None or (dt.hour, dt.minute, dt.second) != (0, 0, 0):
+                raise DynamicFieldValueError(
+                    "Bitte ein gültiges Datum im Format JJJJ-MM-TT angeben (ohne Uhrzeit)."
+                )
+            out.append(dt.strftime("%Y-%m-%d %H:%M:%S"))
+        return out
+    if field_type == "DateTime":
+        out = []
+        for v in vals:
+            dt = _parse_datetime(v)
+            if dt is None or len(v.strip()) <= 10:
+                raise DynamicFieldValueError(
+                    "Bitte Datum und Uhrzeit im Format JJJJ-MM-TT HH:MM angeben."
+                )
+            out.append(dt.strftime("%Y-%m-%d %H:%M:%S"))
+        return out
+    if field_type == "Checkbox":
+        for v in vals:
+            if v not in ("0", "1"):
+                raise DynamicFieldValueError("Ein Kontrollkästchen akzeptiert nur 0 oder 1.")
+        return vals
+    return vals
+
+
+async def load_ticket_dynamic_field(session: AsyncSession, name: str) -> DynamicFieldConfig | None:
+    row = (
+        await session.execute(
+            text(
+                "SELECT id, name, field_type FROM dynamic_field"
+                " WHERE name = :n AND object_type = 'Ticket' AND valid_id = 1 LIMIT 1"
+            ),
+            {"n": name},
+        )
+    ).first()
+    if row is None:
+        return None
+    return DynamicFieldConfig(id=int(row[0]), name=str(row[1]), field_type=str(row[2]))
+
+
+async def get_df_values(
+    session: AsyncSession, field: DynamicFieldConfig, object_id: int
+) -> list[str]:
+    rows = (
+        await session.execute(
+            text(
+                "SELECT value_text, value_int, value_date FROM dynamic_field_value"
+                " WHERE field_id = :fid AND object_id = :oid ORDER BY id"
+            ),
+            {"fid": field.id, "oid": object_id},
+        )
+    ).fetchall()
+    out: list[str] = []
+    for vt, vi, vd in rows:
+        if vt is not None:
+            out.append(str(vt))
+        elif vi is not None:
+            out.append(str(int(vi)))
+        elif vd is not None:
+            out.append(vd.strftime("%Y-%m-%d %H:%M:%S") if isinstance(vd, datetime) else str(vd))
+    return out
+
+
+def df_values_differ(old: Sequence[str], new: Sequence[str]) -> bool:
+    """``Driver/Base.pm::ValueIsDifferent``: both empty is not different."""
+    if not old and not new:
+        return False
+    return list(old) != list(new)
+
+
+def readable_history_value(field_type: str, values: Sequence[str]) -> str:
+    """``ReadableValueRender`` as used for the history row."""
+    if field_type == "Multiselect":
+        return ", ".join(values)
+    first = values[0] if values else ""
+    if field_type == "Date":
+        return first[:10]
+    if field_type == "DateTime":
+        return first[:16]
+    return first
+
+
+def truncate_history_parts(field_name: str, value: str, old_value: str) -> tuple[str, str, str]:
+    """Exact port of the 166-char rule in ``ObjectType/Ticket.pm::PostValueSet``."""
+    limit = HISTORY_MAX_CHARS
+    if len(field_name) + len(value) + len(old_value) <= limit:
+        return field_name, value, old_value
+    if len(old_value) > 55:
+        old_value = old_value[:50] + "[...]"
+    name_len = (limit - len(old_value)) // 2
+    value_len = name_len
+    if len(field_name) > name_len:
+        if len(value) > value_len:
+            name_len -= 5
+            field_name = field_name[: max(name_len, 0)] + "[...]"
+            value_len -= 5
+            value = value[: max(value_len, 0)] + "[...]"
+        else:
+            name_len = limit - len(old_value) - len(value) - 5
+            field_name = field_name[: max(name_len, 0)] + "[...]"
+    else:
+        value_len = limit - len(old_value) - len(field_name) - 5
+        if len(value) > value_len:
+            value = value[: max(value_len, 0)] + "[...]"
+    return field_name, value, old_value
+
+
+async def set_ticket_dynamic_field(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    field: DynamicFieldConfig,
+    values: Sequence[str],
+    user_id: int,
+) -> bool:
+    """Write ``values``; returns False (and writes nothing) when unchanged."""
+    from tiqora.domain.ticket_write_service import _emit_event
+
+    new = normalize_df_values(field.field_type, values)
+    old = await get_df_values(session, field, ticket_id)
+    if not df_values_differ(old, new):
+        return False
+
+    await session.execute(
+        text("DELETE FROM dynamic_field_value WHERE field_id = :fid AND object_id = :oid"),
+        {"fid": field.id, "oid": ticket_id},
+    )
+    for v in new:
+        params: dict[str, Any] = {
+            "fid": field.id,
+            "oid": ticket_id,
+            "vt": None,
+            "vd": None,
+            "vi": None,
+        }
+        if field.field_type in ("Date", "DateTime"):
+            params["vd"] = datetime.strptime(v, "%Y-%m-%d %H:%M:%S")
+        elif field.field_type == "Checkbox":
+            params["vi"] = int(v)
+        else:
+            params["vt"] = v
+        await session.execute(
+            text(
+                "INSERT INTO dynamic_field_value (field_id, object_id, value_text, value_date,"
+                " value_int) VALUES (:fid, :oid, :vt, :vd, :vi)"
+            ),
+            params,
+        )
+
+    await session.execute(
+        text("UPDATE ticket SET change_time = current_timestamp, change_by = :uid WHERE id = :tid"),
+        {"uid": user_id, "tid": ticket_id},
+    )
+    name, value, old_value = truncate_history_parts(
+        field.name,
+        readable_history_value(field.field_type, new),
+        readable_history_value(field.field_type, old),
+    )
+    await add_dynamic_field_update(
+        session,
+        ticket_id=ticket_id,
+        field_name=name,
+        value=value,
+        old_value=old_value,
+        user_id=user_id,
+    )
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(
+        session,
+        "TicketDynamicFieldUpdate",
+        ticket_id,
+        {"field": field.name, "values": new},
+    )
+    return True

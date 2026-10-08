@@ -215,6 +215,8 @@ class MutationRequest(BaseModel):
     pending_time: datetime | None = None
     field_name: str | None = None
     field_values: list[str] | None = None
+    # Several dynamic fields at once (one transaction; any invalid value -> 422).
+    dynamic_fields: dict[str, list[str]] | None = None
     watcher_user_id: int | None = None
     unwatch_user_id: int | None = None
 
@@ -1724,6 +1726,8 @@ async def patch_ticket(
                     field_name=body.field_name,
                     values=body.field_values,
                 )
+            if body.dynamic_fields:
+                await svc.update_dynamic_fields(user.id, ticket_id, body.dynamic_fields)
             # Watch/unwatch are personal preferences — no permission gate.
             if body.watcher_user_id is not None:
                 from tiqora.domain.ticket_write_service import watch_ticket

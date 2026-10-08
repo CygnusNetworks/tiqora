@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import secrets
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Final
@@ -43,6 +43,11 @@ from tiqora.ai.handoff import (
 )
 from tiqora.channels.telegram.messages import ButtonSpec
 from tiqora.db.utf8mb3 import replace_non_bmp
+from tiqora.domain.dynamic_field_values import (
+    DynamicFieldValueError,
+    load_ticket_dynamic_field,
+    set_ticket_dynamic_field,
+)
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
 from tiqora.znuny.escalation import escalation_index_build
@@ -57,7 +62,6 @@ from tiqora.znuny.history import (
     add_archive_flag_update,
     add_article_history,
     add_customer_update,
-    add_dynamic_field_update,
     add_lock,
     add_merged,
     add_move,
@@ -379,19 +383,6 @@ async def _channel_id(session: AsyncSession, name: str) -> int:
         # Fallback: use id=1 (Internal) if unknown
         return 1
     return int(row[0])
-
-
-async def _dynamic_field_id(session: AsyncSession, field_name: str) -> int | None:
-    row = (
-        await session.execute(
-            text(
-                "SELECT id FROM dynamic_field WHERE name = :n AND object_type = 'Ticket'"
-                " AND valid_id = 1 LIMIT 1"
-            ),
-            {"n": field_name},
-        )
-    ).first()
-    return int(row[0]) if row else None
 
 
 async def _ticket_must_exist(session: AsyncSession, ticket_id: int) -> dict[str, Any]:
@@ -1857,60 +1848,21 @@ async def update_dynamic_field(
     values: list[str],
     user_id: int,
 ) -> None:
-    """Set a dynamic field to new values (multivalue: delete + insert).
+    """Set a dynamic field like Znuny (typed columns, no-op when unchanged).
 
-    Znuny: DynamicFieldValueSet deletes all existing values then inserts new ones.
-    Old value read before delete for history.
+    Delegates to :func:`tiqora.domain.dynamic_field_values.set_ticket_dynamic_field`.
+    Unknown field names are silently ignored (Znuny behaviour); an invalid
+    value for the field type raises :class:`InvalidInput` and writes nothing.
     """
-    field_id = await _dynamic_field_id(session, field_name)
-    if field_id is None:
+    field = await load_ticket_dynamic_field(session, field_name)
+    if field is None:
         return  # Silently ignore unknown fields (Znuny behaviour)
-
-    # Read old values for history
-    old_rows = (
-        await session.execute(
-            text(
-                "SELECT COALESCE(value_text, CAST(value_int AS CHAR), '') as v"
-                " FROM dynamic_field_value WHERE field_id = :fid AND object_id = :oid"
-                " ORDER BY id"
-            ),
-            {"fid": field_id, "oid": ticket_id},
+    try:
+        await set_ticket_dynamic_field(
+            session, ticket_id=ticket_id, field=field, values=values, user_id=user_id
         )
-    ).fetchall()
-    old_value = ", ".join(str(r[0]) for r in old_rows if r[0] is not None)
-
-    # Delete existing
-    await session.execute(
-        text("DELETE FROM dynamic_field_value WHERE field_id = :fid AND object_id = :oid"),
-        {"fid": field_id, "oid": ticket_id},
-    )
-
-    # Insert new values
-    for v in values:
-        await session.execute(
-            text(
-                "INSERT INTO dynamic_field_value (field_id, object_id, value_text)"
-                " VALUES (:fid, :oid, :val)"
-            ),
-            {"fid": field_id, "oid": ticket_id, "val": v},
-        )
-
-    new_value = ", ".join(values)
-    await add_dynamic_field_update(
-        session,
-        ticket_id=ticket_id,
-        field_name=field_name,
-        value=new_value,
-        old_value=old_value,
-        user_id=user_id,
-    )
-    await invalidate_ticket_cache(session, ticket_id)
-    await _emit_event(
-        session,
-        "TicketDynamicFieldUpdate",
-        ticket_id,
-        {"field": field_name, "values": values},
-    )
+    except DynamicFieldValueError as exc:
+        raise InvalidInput(f"{field_name}: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -2725,6 +2677,28 @@ class TicketWriteService:
             values=values,
             user_id=user_id,
         )
+
+    async def update_dynamic_fields(
+        self,
+        user_id: int,
+        ticket_id: int,
+        values: Mapping[str, list[str]],
+    ) -> None:
+        """Set several dynamic fields; ``rw`` is asserted once.
+
+        Raises :class:`InvalidInput` on the first bad value; the caller's
+        transaction (``session.begin()``) then rolls every field back.
+        """
+        t = await _ticket_must_exist(self._session, ticket_id)
+        await self._assert_rw(user_id, int(t["queue_id"]))
+        for field_name, field_values in values.items():
+            await update_dynamic_field(
+                self._session,
+                ticket_id=ticket_id,
+                field_name=field_name,
+                values=field_values,
+                user_id=user_id,
+            )
 
     async def merge_tickets(self, user_id: int, main_ticket_id: int, merge_ticket_id: int) -> None:
         main = await _ticket_must_exist(self._session, main_ticket_id)

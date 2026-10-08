@@ -13302,6 +13302,10 @@ export interface components {
             customer_id?: string | null;
             /** Customer User Id */
             customer_user_id?: string | null;
+            /** Dynamic Fields */
+            dynamic_fields?: {
+                [key: string]: string[];
+            } | null;
             /** Field Name */
             field_name?: string | null;
             /** Field Values */

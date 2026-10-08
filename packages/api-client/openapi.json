@@ -15890,6 +15890,23 @@
             ],
             "title": "Customer User Id"
           },
+          "dynamic_fields": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dynamic Fields"
+          },
           "field_name": {
             "anyOf": [
               {

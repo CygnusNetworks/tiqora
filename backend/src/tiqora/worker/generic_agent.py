@@ -62,6 +62,7 @@ from tiqora.db.engine import get_session_factory
 from tiqora.domain.settings_store import KEY_GENERIC_AGENT_ENABLED, get_setting_bool
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
+    InvalidInput,
     add_article,
     archive_ticket,
     assign_owner,
@@ -476,9 +477,25 @@ async def apply_actions(
         applied.append("NoteBody")
 
     for field_name, value in job.dynamic_field_actions.items():
-        await update_dynamic_field(
-            session, ticket_id=ticket_id, field_name=field_name, values=[value], user_id=user_id
-        )
+        try:
+            await update_dynamic_field(
+                session,
+                ticket_id=ticket_id,
+                field_name=field_name,
+                values=[value],
+                user_id=user_id,
+            )
+        except InvalidInput as exc:
+            # A bad job configuration (e.g. "yes" for a Checkbox) must not stop
+            # the job: skip this field, keep going with the next one.
+            logger.warning(
+                "generic_agent_df_invalid",
+                ticket_id=ticket_id,
+                job=job.name,
+                field=field_name,
+                error=str(exc),
+            )
+            continue
         applied.append(f"DynamicField_{field_name}")
 
     if actions.get("Delete") and actions["Delete"] not in ("0", ""):

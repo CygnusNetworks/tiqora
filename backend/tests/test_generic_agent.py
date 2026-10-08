@@ -465,3 +465,69 @@ async def test_archive_job_replays_znuny_archive_semantics(mariadb_znuny_url: st
         assert result2["matched"] == 0
     finally:
         await engine.dispose()
+
+
+@pytest.mark.db
+async def test_invalid_dynamic_field_action_is_skipped_and_job_continues(
+    mariadb_znuny_url: str,
+) -> None:
+    """A bad job config (``yes`` for a Checkbox) is logged and skipped; the
+    next dynamic-field action and the ticket's other actions still run."""
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    field_ids = (92591, 92592)
+    try:
+        async with factory() as session:
+            await _seed_tiqora_tables(session)
+            await session.execute(text("DELETE FROM generic_agent_jobs"))
+            queue_id = await _insert_queue(session, "ga-df-invalid-queue")
+            ticket_id = await _insert_ticket(
+                session, "GA_DF_INVALID", state_id=1, queue_id=queue_id
+            )
+            for fid, name, ftype in (
+                (field_ids[0], "GaBadFlag", "Checkbox"),
+                (field_ids[1], "GaGoodText", "Text"),
+            ):
+                await session.execute(
+                    text(
+                        "INSERT INTO dynamic_field (id, internal_field, name, label, field_order,"
+                        " field_type, object_type, config, valid_id, create_time, create_by,"
+                        " change_time, change_by) VALUES (:id, 0, :n, :n, :id, :ft, 'Ticket',"
+                        " '---', 1, current_timestamp, 1, current_timestamp, 1)"
+                    ),
+                    {"id": fid, "n": name, "ft": ftype},
+                )
+            await _seed_always_due_job(
+                session, "ga-df-invalid", state_id=1, actions={"NoteBody": "still applied"}
+            )
+            await _insert_job_row(session, "ga-df-invalid", "QueueIDs", str(queue_id))
+            await _insert_job_row(session, "ga-df-invalid", "DynamicField_GaBadFlag", "yes")
+            await _insert_job_row(session, "ga-df-invalid", "DynamicField_GaGoodText", "ok")
+            await session.commit()
+            await set_setting(session, KEY_GENERIC_AGENT_ENABLED, "1")
+
+        result = await run_generic_agent_tick(session_factory=factory)
+        assert result["matched"] == 1
+        assert result["acted"] == 1
+
+        async with factory() as session:
+            rows = (
+                await session.execute(
+                    text(
+                        "SELECT field_id, value_text, value_int FROM dynamic_field_value"
+                        " WHERE object_id = :t"
+                    ),
+                    {"t": ticket_id},
+                )
+            ).fetchall()
+            assert [(int(r[0]), r[1], r[2]) for r in rows] == [(field_ids[1], "ok", None)]
+            assert await _history_count(session, ticket_id, "AddNote") == 1
+    finally:
+        async with factory() as session:
+            await session.execute(
+                text("DELETE FROM dynamic_field_value WHERE field_id IN (92591, 92592)")
+            )
+            await session.execute(text("DELETE FROM dynamic_field WHERE id IN (92591, 92592)"))
+            await session.execute(text("DELETE FROM generic_agent_jobs"))
+            await session.commit()
+        await engine.dispose()

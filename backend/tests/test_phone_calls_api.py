@@ -525,3 +525,20 @@ async def test_phone_screen_dynamic_fields_follow_the_screen_config(
     assert resp.status_code == 200, resp.text
     assert [(f["name"], f["required"]) for f in resp.json()] == [("PhoneCallTopic", True)]
     assert bad.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_invalid_dynamic_field_value_is_422_and_no_article(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    """Two values for a single-value field: 422, the article rolls back too."""
+    url, factory = db
+    _seed(url)
+    before = _query(url, "SELECT COUNT(*) FROM article WHERE ticket_id = :t", t=TICKET_ID)[0][0]
+    payload = _call(dynamic_fields={"PhoneCallTopic": ["a", "b"]})
+    async with _client(factory, AGENT_RW) as client:
+        resp = await client.post(URL, json=payload)
+    assert resp.status_code == 422, resp.text
+    assert "PhoneCallTopic" in resp.json()["detail"]
+    after = _query(url, "SELECT COUNT(*) FROM article WHERE ticket_id = :t", t=TICKET_ID)[0][0]
+    assert after == before

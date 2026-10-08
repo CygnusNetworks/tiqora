@@ -1489,3 +1489,62 @@ async def test_session_remote_ip_binding_is_opt_in(compat_mariadb: dict[str, Any
         assert ok is not None
 
     await engine.dispose()
+
+
+@pytest.mark.db
+async def test_ticket_create_invalid_dynamic_field_value_is_invalid_parameter(
+    compat_mariadb: dict[str, Any],
+) -> None:
+    """A Checkbox value of "yes" maps to the compat InvalidParameter fault and
+    rolls the whole TicketCreate back (no ticket row)."""
+    engine = create_async_engine(compat_mariadb["async_url"])
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = _make_session_store()
+    sysconfig = _make_sysconfig()
+    title = "DF invalid value compat"
+
+    async with factory() as session:
+        await _create_tiqora_tables(session)
+        await session.execute(
+            text(
+                "INSERT INTO dynamic_field (id, internal_field, name, label, field_order,"
+                " field_type, object_type, config, valid_id, create_time, create_by,"
+                " change_time, change_by) VALUES (92598, 0, 'CompatBadFlag', 'CompatBadFlag',"
+                " 92598, 'Checkbox', 'Ticket', '---', 1, current_timestamp, 1,"
+                " current_timestamp, 1)"
+            )
+        )
+        await session.commit()
+    try:
+        async with factory() as session:
+            result = await op_ticket_create(
+                {
+                    "UserLogin": "compat.agent",
+                    "Password": "testpass",
+                    "Ticket": {
+                        "Title": title,
+                        "QueueID": compat_mariadb["queue_id"],
+                        "StateID": compat_mariadb["state_id"],
+                        "PriorityID": compat_mariadb["priority_id"],
+                    },
+                    "DynamicField": [{"Name": "CompatBadFlag", "Value": "yes"}],
+                },
+                session,
+                factory,
+                store,
+                sysconfig,
+            )
+        assert result["Error"]["ErrorCode"].endswith(".InvalidParameter"), result
+        assert "CompatBadFlag" in result["Error"]["ErrorMessage"]
+        async with factory() as session:
+            n = (
+                await session.execute(
+                    text("SELECT COUNT(*) FROM ticket WHERE title = :t"), {"t": title}
+                )
+            ).scalar_one()
+        assert n == 0
+    finally:
+        async with factory() as session:
+            await session.execute(text("DELETE FROM dynamic_field WHERE id = 92598"))
+            await session.commit()
+        await engine.dispose()
