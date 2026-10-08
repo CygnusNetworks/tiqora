@@ -1815,7 +1815,7 @@ async def _load_dynamic_fields_gi(session: AsyncSession, ticket_id: int) -> list
         elif v.value_int is not None:
             val = v.value_int
         elif v.value_date is not None:
-            val = v.value_date.isoformat()
+            val = v.value_date.strftime("%Y-%m-%d %H:%M:%S")
         else:
             continue
         grouped.setdefault(v.field_id, []).append(val)

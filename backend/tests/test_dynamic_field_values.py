@@ -36,7 +36,8 @@ from tiqora.domain.dynamic_field_values import (
         ("DateTime", ["2026-02-01T10:30"], ["2026-02-01 10:30:00"]),
         ("DateTime", ["2026-02-01 10:30:15"], ["2026-02-01 10:30:15"]),
         ("Checkbox", ["1"], ["1"]),
-        ("Checkbox", [""], []),
+        ("Checkbox", [""], ["0"]),
+        ("Checkbox", [], []),
         ("Multiselect", ["a", "", "b"], ["a", "b"]),
         ("Text", [""], []),
         # Process-management fields etc. keep working as free text.
@@ -66,7 +67,7 @@ def test_normalize_rejects(ftype: str, raw: list[str]) -> None:
 
 def test_readable_history_value() -> None:
     assert readable_history_value("Date", ["2026-02-01 00:00:00"]) == "2026-02-01"
-    assert readable_history_value("DateTime", ["2026-02-01 10:30:00"]) == "2026-02-01 10:30"
+    assert readable_history_value("DateTime", ["2026-02-01 10:30:00"]) == "2026-02-01 10:30:00"
     assert readable_history_value("Multiselect", ["a", "b"]) == "a, b"
     assert readable_history_value("Text", []) == ""
 
@@ -204,7 +205,8 @@ def _seed(sync_url: str) -> None:
 def _query(sync_url: str, sql: str, **params: Any) -> list[Any]:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
-        rows = conn.execute(text(sql), params).fetchall()
+        result = conn.execute(text(sql), params)
+        rows = result.fetchall() if result.returns_rows else []
     engine.dispose()
     return rows
 
@@ -280,7 +282,7 @@ async def test_datetime_is_written_to_value_date(env: Any) -> None:
     url, factory = env
     await _set(factory, "WaveWhen", ["2026-02-01 10:30:00"])
     assert _rows(url, "WaveWhen") == [(None, datetime(2026, 2, 1, 10, 30), None)]
-    assert _history(url) == ["%%FieldName%%WaveWhen%%Value%%2026-02-01 10:30%%OldValue%%"]
+    assert _history(url) == ["%%FieldName%%WaveWhen%%Value%%2026-02-01 10:30:00%%OldValue%%"]
 
 
 @pytest.mark.db
@@ -304,11 +306,11 @@ async def test_unchanged_value_writes_nothing(env: Any) -> None:
     url, factory = env
     assert await _set(factory, "WaveText", ["a"]) is True
     hist = _history(url)
-    ct = _change_time(url)
+    _query(url, "UPDATE ticket SET change_time = :n WHERE id = :t", n=NOW, t=TICKET_ID)
     assert await _set(factory, "WaveText", ["a"]) is False
     assert await _set(factory, "WaveDue", []) is False  # empty -> empty
     assert _history(url) == hist
-    assert _change_time(url) == ct
+    assert _change_time(url) == NOW
 
 
 @pytest.mark.db
@@ -429,3 +431,32 @@ def test_process_surfaces_map_invalid_input_to_400() -> None:
     ):
         assert mapper(InvalidInput("x")).status_code == 400
         assert InvalidInput in getattr(mod, tuple_name)
+
+
+@pytest.mark.db
+async def test_checkbox_empty_value_is_stored_as_zero(env: Any) -> None:
+    url, factory = env
+    assert await _set(factory, "WaveFlag", [""]) is True
+    assert _rows(url, "WaveFlag") == [(None, None, 0)]
+    assert _history(url) == ["%%FieldName%%WaveFlag%%Value%%0%%OldValue%%"]
+    assert await _set(factory, "WaveFlag", []) is True
+    assert _rows(url, "WaveFlag") == []
+
+
+@pytest.mark.db
+async def test_znuny_format_readers_return_space_separated_dates(env: Any) -> None:
+    """Compat GI and process conditions read value_date as "YYYY-MM-DD HH:MM:SS"."""
+    from tiqora.api.compat.operations import _load_dynamic_fields_gi
+    from tiqora.process.engine import _evaluate_field, get_ticket_attrs
+
+    url, factory = env
+    await _set(factory, "WaveDue", ["2026-02-01"])
+    await _set(factory, "WaveWhen", ["2026-02-01 10:30:00"])
+    async with factory() as session:
+        gi = {d["Name"]: d["Value"] for d in await _load_dynamic_fields_gi(session, TICKET_ID)}
+        attrs = await get_ticket_attrs(session, TICKET_ID)
+    assert gi["WaveDue"] == "2026-02-01 00:00:00"
+    assert gi["WaveWhen"] == "2026-02-01 10:30:00"
+    assert attrs["DynamicField_WaveDue"] == "2026-02-01 00:00:00"
+    assert _evaluate_field("2026-02-01 00:00:00", "String", attrs["DynamicField_WaveDue"])
+    assert _evaluate_field("2026-01-31 00:00:00", "GreaterThan", attrs["DynamicField_WaveDue"])

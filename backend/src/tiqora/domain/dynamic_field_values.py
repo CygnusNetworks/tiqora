@@ -84,6 +84,10 @@ def normalize_df_values(field_type: str, values: Sequence[str]) -> list[str]:
             out.append(dt.strftime("%Y-%m-%d %H:%M:%S"))
         return out
     if field_type == "Checkbox":
+        # Checkbox.pm ValueSet: a defined-but-empty value is stored as 0;
+        # only "no value at all" ([]) deletes the row.
+        if values and not vals:
+            return ["0"]
         for v in vals:
             if v not in ("0", "1"):
                 raise DynamicFieldValueError("Ein Kontrollkästchen akzeptiert nur 0 oder 1.")
@@ -143,8 +147,6 @@ def readable_history_value(field_type: str, values: Sequence[str]) -> str:
     first = values[0] if values else ""
     if field_type == "Date":
         return first[:10]
-    if field_type == "DateTime":
-        return first[:16]
     return first
 
 

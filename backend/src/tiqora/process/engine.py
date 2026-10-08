@@ -248,7 +248,7 @@ async def get_ticket_attrs(session: AsyncSession, ticket_id: int) -> dict[str, s
         elif v.value_int is not None:
             val = str(v.value_int)
         elif v.value_date is not None:
-            val = v.value_date.isoformat()
+            val = v.value_date.strftime("%Y-%m-%d %H:%M:%S")
         if val is not None:
             grouped.setdefault(v.field_id, []).append(val)
 
