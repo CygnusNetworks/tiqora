@@ -194,7 +194,7 @@ async def sync_env_providers(session: AsyncSession, settings: Settings) -> list[
                 kind="ldap",
                 name=name,
                 audience=audience,
-                config=LdapProviderConfig(),
+                config=LdapProviderConfig(port=389),
                 sort=1000,
             )
 
