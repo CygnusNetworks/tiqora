@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -54,6 +54,10 @@ export function TicketDynamicFields({ ticket }: { ticket: TicketDetail }) {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [open, setOpen] = useState(false);
+  // Ticket values when editing began: a refetch meanwhile must not make
+  // another agent's newer value look like this agent's change.
+  const [snapshot, setSnapshot] = useState<DynamicFieldValues>({});
 
   const defsQ = useQuery({
     queryKey: ["reference", "dynamic-fields", SCREEN],
@@ -94,8 +98,16 @@ export function TicketDynamicFields({ ticket }: { ticket: TicketDetail }) {
     setSaved(true);
   });
 
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 4000);
+    return () => clearTimeout(timer);
+  }, [saved]);
+
   const startEdit = () => {
     setDraft(baseline);
+    setSnapshot(baseline);
+    setOpen(true);
     setErrors({});
     setServerError(null);
     setSaved(false);
@@ -112,7 +124,7 @@ export function TicketDynamicFields({ ticket }: { ticket: TicketDetail }) {
     const changed: DynamicFieldValues = {};
     for (const d of engineDefs) {
       const now = draft[d.key] ?? [];
-      if (JSON.stringify(now) !== JSON.stringify(baseline[d.key] ?? [])) changed[d.key] = now;
+      if (JSON.stringify(now) !== JSON.stringify(snapshot[d.key] ?? [])) changed[d.key] = now;
     }
     if (Object.keys(changed).length === 0) {
       setEditing(false);
@@ -131,7 +143,8 @@ export function TicketDynamicFields({ ticket }: { ticket: TicketDetail }) {
   return (
     <details
       className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm"
-      open={editing || undefined}
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
       data-testid="ticket-df"
     >
       <summary className="cursor-pointer font-medium text-muted">{t("ticket.dynamicFields")}</summary>
@@ -165,7 +178,10 @@ export function TicketDynamicFields({ ticket }: { ticket: TicketDetail }) {
               type="button"
               data-testid="ticket-df-cancel"
               disabled={patch.isPending}
-              onClick={() => setEditing(false)}
+              onClick={() => {
+                setEditing(false);
+                setSaved(false);
+              }}
               className="rounded border border-hairline px-3 py-1 text-xs"
             >
               {t("ticket.dynamicFieldsEdit.cancel")}

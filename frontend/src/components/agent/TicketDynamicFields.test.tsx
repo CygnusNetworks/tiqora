@@ -41,15 +41,16 @@ const DEFS = [
 
 function renderIt(ticket: TicketDetail) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  const invalidate = vi.spyOn(qc, "invalidateQueries");
-  render(
+  const ui = (tk: TicketDetail) => (
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
-        <TicketDynamicFields ticket={ticket} />
+        <TicketDynamicFields ticket={tk} />
       </I18nextProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { invalidate };
+  const invalidate = vi.spyOn(qc, "invalidateQueries");
+  const { rerender } = render(ui(ticket));
+  return { invalidate, rerenderWith: (tk: TicketDetail) => rerender(ui(tk)) };
 }
 
 beforeEach(() => {
@@ -169,5 +170,49 @@ describe("TicketDynamicFields", () => {
     fireEvent.click(screen.getByTestId("ticket-df-cancel"));
     expect(screen.queryByTestId("ticket-df-save")).not.toBeInTheDocument();
     expect(patchTicket).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite a value another agent set while editing", async () => {
+    screenDynamicFields.mockResolvedValue(DEFS);
+    const { rerenderWith } = renderIt(makeTicket());
+    fireEvent.click(await screen.findByTestId("ticket-df-edit"));
+    // a refetch brings in someone else's new Area value
+    rerenderWith(
+      makeTicket({ dynamic_fields: [{ name: "Area", label: "Bereich", field_type: "Dropdown", values: ["tv"] }] }),
+    );
+    fireEvent.change(screen.getByTestId("ticket-df-Due"), { target: { value: "2026-02-01" } });
+    fireEvent.click(screen.getByTestId("ticket-df-save"));
+    await waitFor(() =>
+      expect(patchTicket).toHaveBeenCalledWith(7, { dynamic_fields: { Due: ["2026-02-01 00:00:00"] } }),
+    );
+  });
+
+  it("clears a field with an empty list and patches several fields at once", async () => {
+    screenDynamicFields.mockResolvedValue(DEFS);
+    renderIt(
+      makeTicket({
+        dynamic_fields: [
+          { name: "Area", label: "Bereich", field_type: "Dropdown", values: ["net"] },
+          { name: "Due", label: "Fällig", field_type: "Date", values: ["2026-01-05 00:00:00"] },
+        ],
+      }),
+    );
+    fireEvent.click(await screen.findByTestId("ticket-df-edit"));
+    fireEvent.change(screen.getByTestId("ticket-df-Due"), { target: { value: "" } });
+    fireEvent.click(screen.getByTestId("ticket-df-Area"));
+    fireEvent.click(await screen.findByTestId("ticket-df-Area-menu-option-tv"));
+    fireEvent.click(screen.getByTestId("ticket-df-save"));
+    await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { dynamic_fields: { Area: ["tv"], Due: [] } }));
+  });
+
+  it("keeps the section open and shows Gespeichert after saving", async () => {
+    screenDynamicFields.mockResolvedValue(DEFS);
+    renderIt(makeTicket());
+    fireEvent.click(await screen.findByTestId("ticket-df-edit"));
+    fireEvent.change(screen.getByTestId("ticket-df-Due"), { target: { value: "2026-02-01" } });
+    fireEvent.click(screen.getByTestId("ticket-df-save"));
+    const saved = await screen.findByTestId("ticket-df-saved");
+    expect(saved).toBeVisible();
+    expect(screen.getByTestId("ticket-df")).toHaveAttribute("open");
   });
 });
