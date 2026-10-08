@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.api.compat.operations import op_ticket_get, op_ticket_history_get
@@ -180,7 +180,7 @@ def test_inline_images_only_when_referenced() -> None:
 AGENT_ID, GROUP_ID, QUEUE_ID, SERVICE_ID, SLA_ID = 8950, 8950, 8951, 8950, 8950
 TICKET, TICKET_NO_SVC, TICKET_FR = 8950, 8955, 8956
 ART_MAIL, ART_NOTE, ART_AGENT = 8950, 8951, 8953
-DF_TEXT, DF_ARTICLE, DF_MULTI, DF_EMPTY = 8950, 8951, 8952, 8953
+DF_TEXT, DF_ARTICLE, DF_MULTI, DF_EMPTY, DF_ARTICLE_EMPTY = 8950, 8951, 8952, 8953, 8954
 AGENT_SESSION, CUST_SESSION = "GI8950AGENTSESSION", "GI8950CUSTSESSION"
 CUST_LOGIN = "gi8950.cust"
 PLAIN, HTML, PDF = b"plain body", b"<p>html body</p>", b"%PDF-1.4 fake"
@@ -309,6 +309,11 @@ def _async_url(sync_url: str) -> str:
     if sync_url.startswith("postgresql://"):
         return sync_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return sync_url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
+
+
+def _cfg(conn: Any, yaml_text: str) -> bytes | str:
+    # PostgreSQL stores dynamic_field.config as TEXT, MariaDB as a blob
+    return yaml_text if conn.dialect.name == "postgresql" else yaml_text.encode()
 
 
 def _ticket_insert(conn: Any, tid: int, tn: str, service: int | None, sla: int | None) -> None:
@@ -499,6 +504,7 @@ def _seed(sync_url: str) -> None:
             (DF_MULTI, "Gi8950Multi", "Multiselect", "Ticket"),
             (DF_EMPTY, "Gi8950Empty", "Text", "Ticket"),
             (DF_ARTICLE, "Gi8950Art", "Text", "Article"),
+            (DF_ARTICLE_EMPTY, "Gi8950ArtNoCfg", "Text", "Article"),
         ):
             conn.execute(
                 text(
@@ -507,7 +513,17 @@ def _seed(sync_url: str) -> None:
                     " change_time, change_by)"
                     " VALUES (:id, 0, :n, :n, :id, :ft, :ot, :cfg, 1, :t, 1, :t, 1)"
                 ),
-                {"id": fid, "n": name, "ft": ftype, "ot": otype, "cfg": b"---", "t": T0},
+                {
+                    "id": fid,
+                    "n": name,
+                    "ft": ftype,
+                    "ot": otype,
+                    # an empty YAML document is not "config with data" for Znuny
+                    "cfg": _cfg(
+                        conn, "---" if fid == DF_ARTICLE_EMPTY else "---\nDefaultValue: ''\n"
+                    ),
+                    "t": T0,
+                },
             )
         for fid, oid, val in (
             (DF_TEXT, TICKET, "hello"),
@@ -557,8 +573,20 @@ class _FakeSettings:
     session_cookie_name = "tiqora_session"
 
 
-async def _get(sync_url: str, params: dict[str, Any], *, customer: bool = False) -> dict[str, Any]:
+async def _get(
+    sync_url: str,
+    params: dict[str, Any],
+    *,
+    customer: bool = False,
+    statements: list[str] | None = None,
+) -> dict[str, Any]:
     engine = create_async_engine(_async_url(sync_url))
+    if statements is not None:
+
+        @event.listens_for(engine.sync_engine, "before_cursor_execute")
+        def _capture(conn: Any, cursor: Any, statement: str, *rest: Any) -> None:
+            statements.append(statement)
+
     factory = async_sessionmaker(engine, expire_on_commit=False)
     store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
     try:
@@ -760,3 +788,98 @@ async def test_history_get_timestamp_format(sync_url: str) -> None:
         "2024-06-01 12:00:05",
         "2024-06-01 12:00:07",
     ]
+
+
+@pytest.mark.db
+async def test_any_inaccessible_ticket_fails_the_whole_call(sync_url: str) -> None:
+    # accessible + unknown id -> AccessDenied, no data
+    mixed = await _get(sync_url, {"TicketID": [TICKET, 8969]})
+    assert "Ticket" not in mixed
+    assert mixed["Error"]["ErrorCode"] == "TicketGet.AccessDenied"
+    assert mixed["Error"]["ErrorMessage"] == "TicketGet: User does not have access to the ticket!"
+    unknown = await _get(sync_url, {"TicketID": 8969})
+    assert unknown["Error"]["ErrorCode"] == "TicketGet.AccessDenied"
+    # a customer asking for a ticket outside its scope together with an own one
+    other_queue = await _get(sync_url, {"TicketID": f"{TICKET},{TICKET_NO_SVC}"}, customer=True)
+    assert "Ticket" in other_queue  # both belong to GI8950: sanity that the happy path works
+    foreign = await _get(sync_url, {"TicketID": [TICKET, 1]}, customer=True)
+    assert foreign["Error"]["ErrorCode"] == "TicketGet.AccessDenied"
+
+
+@pytest.mark.db
+async def test_html_body_flag_uses_perl_truthiness(sync_url: str) -> None:
+    params: dict[str, Any] = {"TicketID": TICKET, "AllArticles": 1, "Attachments": 1}
+
+    def names(result: dict[str, Any]) -> list[str]:
+        return [a["Filename"] for a in result["Ticket"][0]["Article"][0]["Attachment"]]
+
+    assert names(await _get(sync_url, {**params, "HTMLBodyAsAttachment": "0"})) == ["report.pdf"]
+    assert names(await _get(sync_url, {**params, "HTMLBodyAsAttachment": ""})) == ["report.pdf"]
+    assert names(await _get(sync_url, {**params, "HTMLBodyAsAttachment": "1"})) == [
+        "file-2",
+        "report.pdf",
+    ]
+
+
+@pytest.mark.db
+async def test_attachment_blobs_are_read_only_when_needed(sync_url: str) -> None:
+    params: dict[str, Any] = {"TicketID": TICKET, "AllArticles": 1, "Attachments": 1}
+
+    def reads_content_column(statements: list[str]) -> bool:
+        for stmt in statements:
+            low = " ".join(stmt.lower().split())
+            if "from article_data_mime_attachment" not in low:
+                continue
+            select_list = low.split(" from ")[0]
+            if re.search(r"\bcontent\b(?!_)", select_list):
+                return True
+        return False
+
+    without: list[str] = []
+    result = await _get(sync_url, {**params, "GetAttachmentContents": 0}, statements=without)
+    assert result["Ticket"][0]["Article"][0]["Attachment"][0]["Content"] == ""
+    assert any("article_data_mime_attachment" in s for s in without)
+    assert not reads_content_column(without)
+
+    with_contents: list[str] = []
+    await _get(sync_url, params, statements=with_contents)
+    assert reads_content_column(with_contents)
+    # the content query is restricted to the surviving rows (by primary key)
+    content_stmts = [
+        " ".join(s.lower().split()) for s in with_contents if reads_content_column([s])
+    ]
+    assert len(content_stmts) == 1
+    assert "where article_data_mime_attachment.id in" in content_stmts[0] or (
+        " where id in " in content_stmts[0]
+    )
+
+
+@pytest.mark.db
+async def test_empty_sender_type_entry_means_no_filter(sync_url: str) -> None:
+    base: dict[str, Any] = {"TicketID": TICKET, "AllArticles": 1}
+    result = await _get(sync_url, {**base, "ArticleSenderType": [""]})
+    assert [a["ArticleID"] for a in result["Ticket"][0]["Article"]] == [ART_MAIL, ART_NOTE]
+
+
+@pytest.mark.db
+async def test_article_df_without_config_is_skipped(sync_url: str) -> None:
+    result = await _get(sync_url, {"TicketID": TICKET, "AllArticles": 1, "DynamicFields": 1})
+    for article in result["Ticket"][0]["Article"]:
+        assert [d["Name"] for d in article["DynamicField"]] == ["Gi8950Art"]
+
+
+@pytest.mark.db
+async def test_lookups_are_loaded_once_for_many_tickets(sync_url: str) -> None:
+    statements: list[str] = []
+    await _get(
+        sync_url,
+        {"TicketID": [TICKET, TICKET_NO_SVC, TICKET_FR], "AllArticles": 1, "DynamicFields": 1},
+        statements=statements,
+    )
+    lowered = [" ".join(s.lower().split()) for s in statements]
+    assert sum("from article_sender_type" in s and "ast." not in s for s in lowered) == 1
+    assert sum("from communication_channel" in s for s in lowered) == 1
+    df_config_queries = [
+        s for s in lowered if "from dynamic_field" in s and "dynamic_field_value" not in s
+    ]
+    assert len(df_config_queries) == 2  # Ticket + Article objects, once per request

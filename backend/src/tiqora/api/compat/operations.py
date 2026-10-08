@@ -18,7 +18,13 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.api.compat.ticket_get import build_article_entries, build_ticket_entry, znuny_ts
+from tiqora.api.compat.mapping.perl import perl_truthy
+from tiqora.api.compat.ticket_get import (
+    build_article_entries,
+    build_ticket_entry,
+    load_ticket_get_context,
+    znuny_ts,
+)
 from tiqora.api.compat.webservices import OperationConfig
 from tiqora.channels.email.outbound_reply import OutboundMailError as _OutboundMailError
 from tiqora.config import Settings, get_settings
@@ -1639,12 +1645,12 @@ async def op_ticket_get(
         pe = PermissionEngine(session)
         allowed_groups = set(await pe.groups_for_permission(user_id, "ro"))
 
-    html_body_as_attachment = bool(data.get("HTMLBodyAsAttachment"))
+    html_body_as_attachment = perl_truthy(data.get("HTMLBodyAsAttachment"))
     now = datetime.now(UTC).replace(tzinfo=None)
 
-    tickets_out: list[dict[str, Any]] = []
+    # TicketGet.pm checks every requested ticket first; the first one the caller may not
+    # read (unknown ids included) fails the whole call.
     for tid in ticket_ids:
-        # Permission check first (one cheap query) so inaccessible tickets cost nothing more.
         q_group = (
             await session.execute(
                 text(
@@ -1655,18 +1661,28 @@ async def op_ticket_get(
             )
         ).scalar_one_or_none()
         if q_group is None:
-            continue
-
-        if is_customer:
-            if not await customer_can_access_ticket(
+            allowed = False
+        elif is_customer:
+            allowed = await customer_can_access_ticket(
                 session, login=login, customer_id=customer_company, ticket_id=tid
-            ):
-                continue
-        elif q_group not in allowed_groups:
-            continue
+            )
+        else:
+            allowed = q_group in allowed_groups
+        if not allowed:
+            return _err(f"{op}.AccessDenied", f"{op}: User does not have access to the ticket!")
 
+    ctx = await load_ticket_get_context(
+        session, dynamic_fields=with_dynamic_fields, articles=all_articles
+    )
+    tickets_out: list[dict[str, Any]] = []
+    for tid in ticket_ids:
         ticket_dict = await build_ticket_entry(
-            session, tid, dynamic_fields=with_dynamic_fields, extended=extended, now=now
+            session,
+            tid,
+            dynamic_fields=with_dynamic_fields,
+            extended=extended,
+            now=now,
+            ctx=ctx,
         )
         if ticket_dict is None:
             continue
@@ -1683,6 +1699,7 @@ async def op_ticket_get(
                 attachments=with_attachments,
                 get_attachment_contents=get_attachment_contents,
                 html_body_as_attachment=html_body_as_attachment,
+                ctx=ctx,
             )
             if articles:
                 ticket_dict["Article"] = articles

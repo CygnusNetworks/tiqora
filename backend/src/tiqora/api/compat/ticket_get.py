@@ -21,7 +21,8 @@ Ticket (``Kernel/System/Ticket.pm`` ``TicketGet``, called without ``UserID`` det
 Known gaps (documented, not faked): the working-time based keys ``FirstResponseInMin``,
 ``FirstResponseDiffInMin``, ``SolutionInMin``, ``SolutionDiffInMin`` and the escalation detail
 keys of ``TicketEscalationDateCalculation`` (``EscalationDestinationIn`` ...) need a calendar
-working-time calculation that Tiqora does not have; ``EscalationTime`` keeps the stored column.
+working-time calculation that Tiqora does not have; ``EscalationTime`` and the other
+escalation base values are the stored columns, not recomputed.
 
 Article (``Article.pm`` ``_MetaArticleList`` + ``MIMEBase.pm`` ``ArticleGet``; the GenericInterface
 never passes ``RealNames``, so there are no ``*Realname`` keys)::
@@ -52,14 +53,16 @@ import base64
 import calendar
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
+import yaml
 from sqlalchemy import bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.domain.dynamic_field_values import DynamicFieldConfig, get_df_values_bulk
 from tiqora.storage.backend import _as_bytes  # same driver normalisation as DbMimeStorage
 from tiqora.znuny.perl_format import perl_num
@@ -170,20 +173,74 @@ def attachment_index(
 # ---------------------------------------------------------------------------
 
 
-async def _load_df_configs(session: AsyncSession, object_type: str) -> list[DynamicFieldConfig]:
+def _config_has_data(raw: Any) -> bool:
+    """``IsHashRefWithData`` of the YAML config (empty ``---`` documents are not data)."""
+    if raw is None:
+        return False
+    try:
+        loaded = yaml.safe_load(raw if isinstance(raw, str) else bytes(raw))
+    except yaml.YAMLError:
+        return True  # unreadable here (e.g. Perl-specific tags): do not hide the field
+    return isinstance(loaded, dict) and bool(loaded)
+
+
+async def _load_df_configs(
+    session: AsyncSession, object_type: str, *, require_config: bool = False
+) -> list[DynamicFieldConfig]:
     rows = (
         await session.execute(
             text(
-                "SELECT id, name, field_type FROM dynamic_field"
+                "SELECT id, name, field_type, config FROM dynamic_field"
                 " WHERE object_type = :ot AND valid_id = 1"
             ),
             {"ot": object_type},
         )
     ).fetchall()
     return sorted(
-        (DynamicFieldConfig(id=int(r[0]), name=str(r[1]), field_type=str(r[2])) for r in rows),
+        (
+            DynamicFieldConfig(id=int(r[0]), name=str(r[1]), field_type=str(r[2]))
+            for r in rows
+            if not require_config or _config_has_data(r[3])
+        ),
         key=lambda f: f.name,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class TicketGetContext:
+    """Lookups that do not depend on the ticket; load once per request."""
+
+    ticket_fields: list[DynamicFieldConfig]
+    article_fields: list[DynamicFieldConfig]
+    sender_names: dict[int, str]
+    channel_names: dict[int, str]
+
+
+async def load_ticket_get_context(
+    session: AsyncSession, *, dynamic_fields: bool, articles: bool
+) -> TicketGetContext:
+    ticket_fields: list[DynamicFieldConfig] = []
+    article_fields: list[DynamicFieldConfig] = []
+    sender_names: dict[int, str] = {}
+    channel_names: dict[int, str] = {}
+    if dynamic_fields:
+        ticket_fields = await _load_df_configs(session, "Ticket")
+        if articles:
+            article_fields = await _load_df_configs(session, "Article", require_config=True)
+    if articles:
+        sender_names = {
+            int(r[0]): str(r[1])
+            for r in (
+                await session.execute(text("SELECT id, name FROM article_sender_type"))
+            ).fetchall()
+        }
+        channel_names = {
+            int(r[0]): str(r[1])
+            for r in (
+                await session.execute(text("SELECT id, name FROM communication_channel"))
+            ).fetchall()
+        }
+    return TicketGetContext(ticket_fields, article_fields, sender_names, channel_names)
 
 
 def _df_value(field: DynamicFieldConfig, values: Sequence[str]) -> Any:
@@ -272,6 +329,7 @@ async def build_ticket_entry(
     dynamic_fields: bool,
     extended: bool,
     now: datetime,
+    ctx: TicketGetContext | None = None,
 ) -> dict[str, Any] | None:
     """The ``Ticket[]`` entry for one ticket (without ``Article``); ``None`` when unknown.
 
@@ -351,7 +409,9 @@ async def build_ticket_entry(
     entry["TimeUnit"] = znuny_num(sum((Decimal(str(u[0])) for u in units), Decimal(0)))
 
     if dynamic_fields:
-        fields = await _load_df_configs(session, "Ticket")
+        if ctx is None:
+            ctx = await load_ticket_get_context(session, dynamic_fields=True, articles=False)
+        fields = ctx.ticket_fields
         values = await get_df_values_bulk(session, fields, [ticket_id])
         df_entries = [
             {"Name": f.name, "Value": _df_value(f, values[(f.id, ticket_id)])}
@@ -400,46 +460,67 @@ def _default_disposition(filename: str, content_type: str, content_id: str) -> s
     return "attachment"
 
 
-async def _load_attachments(
+async def _load_attachment_index(
     session: AsyncSession, article_ids: Sequence[int]
-) -> dict[int, list[AttachmentRow]]:
+) -> tuple[dict[int, list[AttachmentRow]], dict[tuple[int, int], int]]:
+    """Index columns only (no blobs). Second result maps (article_id, file_id) -> row id."""
     stmt = text(
-        "SELECT article_id, filename, content_type, content_size, content_id,"
-        " content_alternative, disposition, content FROM article_data_mime_attachment"
+        "SELECT id, article_id, filename, content_type, content_size, content_id,"
+        " content_alternative, disposition FROM article_data_mime_attachment"
         " WHERE article_id IN :ids ORDER BY article_id, filename, id"
     ).bindparams(bindparam("ids", expanding=True))
     rows = (await session.execute(stmt, {"ids": list(article_ids)})).fetchall()
     out: dict[int, list[AttachmentRow]] = {}
-    for article_id, filename, ctype, size, cid, alt, disposition, content in rows:
+    db_ids: dict[tuple[int, int], int] = {}
+    for row_id, article_id, filename, ctype, size, cid, alt, disposition in rows:
         items = out.setdefault(int(article_id), [])
         fname = str(filename or "")
         ctype_s = str(ctype or "")
         cid_s = str(cid or "")
+        file_id = len(items) + 1
+        db_ids[(int(article_id), file_id)] = int(row_id)
         items.append(
             AttachmentRow(
-                file_id=len(items) + 1,
+                file_id=file_id,
                 filename=fname,
                 content_type=ctype_s,
                 content_id=cid_s,
                 content_alternative=str(alt or ""),
                 disposition=str(disposition or _default_disposition(fname, ctype_s, cid_s)),
                 content_size=int(perl_num(size)),
-                content=_as_bytes(content) if content is not None else None,
+                content=None,
             )
         )
-    return out
+    return out, db_ids
 
 
-def _attachment_entries(
-    rows: Sequence[AttachmentRow], *, with_contents: bool, html_body_as_attachment: bool
-) -> list[dict[str, Any]]:
-    kept = attachment_index(
+async def _load_attachment_contents(
+    session: AsyncSession, row_ids: Sequence[int]
+) -> dict[int, bytes]:
+    if not row_ids:
+        return {}
+    stmt = text("SELECT id, content FROM article_data_mime_attachment WHERE id IN :ids").bindparams(
+        bindparam("ids", expanding=True)
+    )
+    rows = (await session.execute(stmt, {"ids": list(row_ids)})).fetchall()
+    return {int(r[0]): _as_bytes(r[1]) for r in rows}
+
+
+def _surviving_attachments(
+    rows: Sequence[AttachmentRow], *, html_body_as_attachment: bool
+) -> list[AttachmentRow]:
+    return attachment_index(
         rows,
         exclude_plain_text=True,
         exclude_html_body=not html_body_as_attachment,
         exclude_inline=False,
         html_body=None,
     )
+
+
+def _attachment_entries(
+    kept: Sequence[AttachmentRow], *, with_contents: bool
+) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for r in sorted(kept, key=lambda r: str(r.file_id)):
         out.append(
@@ -471,6 +552,7 @@ async def build_article_entries(
     attachments: bool,
     get_attachment_contents: bool,
     html_body_as_attachment: bool,
+    ctx: TicketGetContext | None = None,
 ) -> list[dict[str, Any]]:
     """The ``Article[]`` entries of one ticket exactly as ``TicketGet.pm`` assembles them."""
     metas = (
@@ -492,27 +574,21 @@ async def build_article_entries(
     if customer_only:
         numbered = [(n, m) for n, m in numbered if int(m["is_visible_for_customer"] or 0) == 1]
 
-    sender_names = {
-        int(r[0]): str(r[1])
-        for r in (
-            await session.execute(text("SELECT id, name FROM article_sender_type"))
-        ).fetchall()
-    }
-    channel_names = {
-        int(r[0]): str(r[1])
-        for r in (
-            await session.execute(text("SELECT id, name FROM communication_channel"))
-        ).fetchall()
-    }
+    if ctx is None:
+        ctx = await load_ticket_get_context(session, dynamic_fields=dynamic_fields, articles=True)
+    sender_names = ctx.sender_names
+    channel_names = ctx.channel_names
 
     selected: list[tuple[int, Any]]
     if sender_types:
         selected = []
         for sender_type in sender_types:
+            # ArticleList only filters on a true SenderType; "" / "0" mean "no filter".
             selected.extend(
                 (n, m)
                 for n, m in numbered
-                if sender_names.get(int(m["article_sender_type_id"])) == sender_type
+                if not perl_truthy(sender_type)
+                or sender_names.get(int(m["article_sender_type_id"])) == sender_type
             )
     else:
         selected = numbered
@@ -546,12 +622,25 @@ async def build_article_entries(
     df_fields: list[DynamicFieldConfig] = []
     df_values: dict[tuple[int, int], list[str]] = {}
     if dynamic_fields:
-        df_fields = await _load_df_configs(session, "Article")
+        df_fields = ctx.article_fields
         df_values = await get_df_values_bulk(session, df_fields, article_ids)
 
-    atts_by_article: dict[int, list[AttachmentRow]] = {}
+    kept_by_article: dict[int, list[AttachmentRow]] = {}
     if attachments:
-        atts_by_article = await _load_attachments(session, article_ids)
+        index, db_ids = await _load_attachment_index(session, article_ids)
+        kept_by_article = {
+            aid: _surviving_attachments(rows, html_body_as_attachment=html_body_as_attachment)
+            for aid, rows in index.items()
+        }
+        if get_attachment_contents:
+            contents = await _load_attachment_contents(
+                session,
+                [db_ids[(aid, r.file_id)] for aid, rows in kept_by_article.items() for r in rows],
+            )
+            kept_by_article = {
+                aid: [replace(r, content=contents.get(db_ids[(aid, r.file_id)])) for r in rows]
+                for aid, rows in kept_by_article.items()
+            }
 
     out: list[dict[str, Any]] = []
     for number, meta in selected:
@@ -604,9 +693,7 @@ async def build_article_entries(
             ]
         if attachments:
             files = _attachment_entries(
-                atts_by_article.get(aid, []),
-                with_contents=get_attachment_contents,
-                html_body_as_attachment=html_body_as_attachment,
+                kept_by_article.get(aid, []), with_contents=get_attachment_contents
             )
             if files:
                 entry["Attachment"] = files
