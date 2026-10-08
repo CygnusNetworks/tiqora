@@ -1,9 +1,9 @@
-"""Login planning and application for external identities (D7, phase-1 subset).
+"""Login planning and application for external identities (D7).
 
 ``plan_login`` only reads. Matching order: link (no fallback when the linked
 account is gone/invalid) -> login (exact first, then a unique case-insensitive hit)
--> e-mail. JIT (step 5), profile changes (7) and role sync (8) arrive with later tasks;
-until then step 5 answers ``no_match`` and 7/8 are empty.
+-> e-mail -> just-in-time creation (step 5, ``jit_enabled``). Profile changes (7) are
+planned for every login; role sync (8) arrives with a later task and is empty.
 
 Every lookup is by id/login/e-mail of ONE Znuny table; nothing joins ``tiqora_*``
 with Znuny tables on strings (mixed collations on production MariaDB).
@@ -11,11 +11,13 @@ with Znuny tables on strings (mixed collations on production MariaDB).
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
@@ -27,6 +29,11 @@ from tiqora.identity.links import LinkConflictError, find_link, upsert_link
 from tiqora.identity.mapping import AssignmentDiff, MappedProfile, map_profile
 from tiqora.identity.store import ProviderRecord
 from tiqora.identity.types import SSO_KINDS, UserKind, audience_includes
+
+log = logging.getLogger(__name__)
+# NOTE: ``tiqora.identity.provisioning`` / ``tiqora.domain.user_provisioning`` are imported
+# inside the functions that need them: ``user_provisioning`` pulls in ``tiqora.api.v1``,
+# which imports ``identity.http`` -> this module (circular at import time).
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +67,8 @@ RejectCode = Literal[
     "ambiguous_email",
     "login_taken",
     "jit_missing_fields",
+    "email_invalid",
+    "email_in_use",
     "provider_disabled",
 ]
 
@@ -74,6 +83,8 @@ REJECT_MESSAGES: Final[dict[str, str]] = {
     "ambiguous_email": "Die E-Mail-Adresse gehört zu mehreren Benutzerkonten.",
     "login_taken": "Der Anmeldename ist bereits für ein anderes Benutzerkonto vergeben.",
     "jit_missing_fields": "Für die automatische Anlage fehlen Angaben vom Anmeldedienst.",
+    "email_invalid": "Die E-Mail-Adresse vom Anmeldedienst ist für ein neues Konto nicht zulässig.",
+    "email_in_use": "Die E-Mail-Adresse wird bereits von einem anderen Kundenkonto verwendet.",
     "provider_disabled": "Dieser Anmeldedienst ist deaktiviert.",
 }
 
@@ -90,6 +101,7 @@ class LoginPlan:
     profile_changes: Mapping[str, tuple[str | None, str]]
     assignments: AssignmentDiff
     link_exists: bool
+    reject_detail: str | None = None  # replaces the generic reject message (e.g. missing fields)
 
 
 class LoginRejected(ValueError):  # noqa: N818 - a reject, not a failure
@@ -107,7 +119,12 @@ class _Account:
 
 
 def _reject(
-    user_kind: UserKind, profile: MappedProfile, code: RejectCode, *, link_exists: bool = False
+    user_kind: UserKind,
+    profile: MappedProfile,
+    code: RejectCode,
+    *,
+    link_exists: bool = False,
+    detail: str | None = None,
 ) -> LoginPlan:
     return LoginPlan(
         user_kind=user_kind,
@@ -120,6 +137,7 @@ def _reject(
         profile_changes={},
         assignments=AssignmentDiff(),
         link_exists=link_exists,
+        reject_detail=detail,
     )
 
 
@@ -217,6 +235,85 @@ async def _match_email(
     return (next(iter(accounts.values())) if accounts else None), False
 
 
+async def _login_in_use(session: AsyncSession, user_kind: UserKind, login: str) -> bool:
+    """Any account (valid or not) already owns this login, as ``UserAdd`` checks it."""
+    column = Users.login if user_kind == "agent" else CustomerUser.login
+    stmt = select(column).where(func.lower(column) == login.lower()).limit(1)
+    return (await session.execute(stmt)).first() is not None
+
+
+async def _plan_jit(
+    session: AsyncSession,
+    provider: ProviderRecord,
+    identity: ExternalIdentity,
+    profile: MappedProfile,
+    user_kind: UserKind,
+) -> LoginPlan:
+    """Step 5: nothing matched. Create the account when the provider allows it. Reads only."""
+    from tiqora.domain.user_provisioning import check_email
+    from tiqora.identity import provisioning
+
+    if not provider.jit_enabled:
+        return _reject(user_kind, profile, "no_match")
+    if user_kind == "customer" and not await provisioning.customer_backend_is_db(session):
+        return _reject(user_kind, profile, "no_match")
+    cfg = provider.config
+    if (
+        provider.kind == "oidc"
+        and isinstance(cfg, OidcProviderConfig)
+        and cfg.email_must_be_verified
+        and identity.email_verified is not True
+    ):
+        return _reject(user_kind, profile, "email_unverified")
+    account, missing = provisioning.resolve_new_account(provider, profile, user_kind)
+    if account is None:
+        return _reject(
+            user_kind,
+            profile,
+            "jit_missing_fields",
+            detail="Es fehlen: " + ", ".join(missing),
+        )
+    if await _login_in_use(session, user_kind, account.login):
+        return _reject(user_kind, profile, "login_taken")
+    if not await check_email(session, account.email):
+        return _reject(user_kind, profile, "email_invalid")
+    return LoginPlan(
+        user_kind=user_kind,
+        decision="create",
+        matched_by="jit",
+        user_id=None,
+        login=account.login,
+        reject_code=None,
+        profile=profile,
+        profile_changes={},
+        assignments=AssignmentDiff(),
+        link_exists=False,
+    )
+
+
+async def _plan_profile_changes(
+    session: AsyncSession,
+    provider: ProviderRecord,
+    profile: MappedProfile,
+    user_kind: UserKind,
+    user_id: int,
+) -> dict[str, tuple[str | None, str]]:
+    """Step 7: fields the IdP sent that differ from the account. A new e-mail address
+    Znuny would refuse is left out (the sign-in itself must not fail over it)."""
+    from tiqora.domain.user_provisioning import check_email
+    from tiqora.identity import provisioning
+
+    if not provider.jit_defaults.update_profile_on_login:
+        return {}
+    changes = provisioning.diff_profile(
+        profile, await provisioning.current_profile(session, user_kind, user_id)
+    )
+    new_email = changes.get("email")
+    if new_email is not None and not await check_email(session, new_email[1]):
+        del changes["email"]
+    return changes
+
+
 async def _sso_eligible(session: AsyncSession, user_id: int) -> bool:
     flag = (
         await session.execute(
@@ -271,8 +368,7 @@ async def plan_login(
                 return _reject(user_kind, profile, "ambiguous_email")
 
     if account is None:
-        # Step 5 (JIT) arrives with Task 17.
-        return _reject(user_kind, profile, "no_match")
+        return await _plan_jit(session, provider, identity, profile, user_kind)
 
     if (
         user_kind == "agent"
@@ -290,7 +386,9 @@ async def plan_login(
         login=account.login,
         reject_code=None,
         profile=profile,
-        profile_changes={},
+        profile_changes=await _plan_profile_changes(
+            session, provider, profile, user_kind, account.id
+        ),
         assignments=AssignmentDiff(),
         link_exists=link is not None,
     )
@@ -306,6 +404,62 @@ def _stores_links(provider: ProviderRecord) -> bool:
     )
 
 
+_PROVISIONING_REJECTS: Final[dict[str, RejectCode]] = {
+    "email_invalid": "email_invalid",
+    "email_in_use": "email_in_use",
+    "login_exists": "login_taken",
+    "jit_missing_fields": "jit_missing_fields",
+    "email_required": "jit_missing_fields",
+    "name_required": "jit_missing_fields",
+}
+
+
+async def _create_account(
+    session: AsyncSession, provider: ProviderRecord, plan: LoginPlan
+) -> tuple[int, str]:
+    from tiqora.domain.user_provisioning import ProvisioningError
+    from tiqora.identity import provisioning
+
+    try:
+        if plan.user_kind == "agent":
+            user = await provisioning.provision_agent(session, provider, plan.profile)
+            return user.id, user.login
+        customer = await provisioning.provision_customer(session, provider, plan.profile)
+        return customer.id, customer.login
+    except ProvisioningError as exc:
+        await session.rollback()
+        code = _PROVISIONING_REJECTS.get(exc.code)
+        if code is None:
+            raise
+        raise LoginRejected(code) from exc
+    except IntegrityError as exc:  # concurrent first login created the same login
+        await session.rollback()
+        raise LoginRejected("login_taken") from exc
+
+
+async def _sync_existing(session: AsyncSession, plan: LoginPlan, user_id: int) -> None:
+    from tiqora.domain.user_provisioning import ProvisioningError
+    from tiqora.identity.provisioning import sync_profile
+
+    try:
+        await sync_profile(
+            session, user_kind=plan.user_kind, user_id=user_id, changes=plan.profile_changes
+        )
+    except ProvisioningError as exc:
+        if exc.code not in ("email_invalid", "email_in_use"):
+            raise
+        # The new e-mail address is refused (changed since planning, or taken by another
+        # customer): keep the old one, still sync the rest, never fail the sign-in.
+        log.warning(
+            "profile sync skipped the e-mail address of %s %s: %s",
+            plan.user_kind,
+            user_id,
+            exc.code,
+        )
+        rest = {k: v for k, v in plan.profile_changes.items() if k != "email"}
+        await sync_profile(session, user_kind=plan.user_kind, user_id=user_id, changes=rest)
+
+
 async def apply_login(
     session: AsyncSession,
     provider: ProviderRecord,
@@ -314,10 +468,19 @@ async def apply_login(
     *,
     settings: Settings,
 ) -> tuple[int, str]:
-    """Persist the link for a ``login`` plan and commit. Returns (user_id, login)."""
+    """Create (JIT) or sync the account, store the link and commit. Returns (user_id, login).
+
+    Order: create -> flush -> profile sync -> (role sync, later) -> link -> commit.
+    """
     if plan.decision == "reject":
         raise LoginRejected(plan.reject_code or "no_match")
-    if plan.decision != "login" or plan.user_id is None or plan.login is None:
+    if plan.decision == "create":
+        user_id, login = await _create_account(session, provider, plan)
+        await session.flush()
+    elif plan.decision == "login" and plan.user_id is not None and plan.login is not None:
+        user_id, login = plan.user_id, plan.login
+        await _sync_existing(session, plan, user_id)
+    else:
         raise ValueError(f"unsupported login plan decision: {plan.decision}")
     if _stores_links(provider):
         try:
@@ -326,15 +489,15 @@ async def apply_login(
                 provider_id=provider.id,
                 user_kind=plan.user_kind,
                 subject=identity.subject,
-                user_id=plan.user_id,
-                user_login=plan.login,
+                user_id=user_id,
+                user_login=login,
             )
         except LinkConflictError:
             # The subject got linked to another account since planning (race): link wins.
             await session.rollback()
             raise LoginRejected("user_invalid") from None
     await session.commit()
-    return plan.user_id, plan.login
+    return user_id, login
 
 
 def plan_to_dict(plan: LoginPlan) -> dict[str, Any]:
@@ -347,7 +510,8 @@ def plan_to_dict(plan: LoginPlan) -> dict[str, Any]:
         "user_id": plan.user_id,
         "login": plan.login,
         "reject_code": plan.reject_code,
-        "reject_message": REJECT_MESSAGES.get(plan.reject_code) if plan.reject_code else None,
+        "reject_message": plan.reject_detail
+        or (REJECT_MESSAGES.get(plan.reject_code) if plan.reject_code else None),
         "profile": {
             "login": plan.profile.login,
             "email": plan.profile.email,

@@ -12,6 +12,8 @@ export const SSO_ERROR_CODES: readonly string[] = [
   "ambiguous_email",
   "login_taken",
   "jit_missing_fields",
+  "email_invalid",
+  "email_in_use",
   "provider_disabled",
   "unknown_provider",
   "config",

@@ -251,6 +251,8 @@
       "ambiguous_email": "Your e-mail address belongs to several user accounts. Please contact your administrator.",
       "login_taken": "The username is already taken by another user account.",
       "jit_missing_fields": "The sign-in service did not send the details needed to create your account.",
+      "email_invalid": "The e-mail address sent by the sign-in service is not accepted for a new account. Please contact your administrator.",
+      "email_in_use": "The e-mail address is already used by another customer account. Please contact your administrator.",
       "provider_disabled": "This sign-in service is disabled.",
       "unknown_provider": "This sign-in service is not known.",
       "config": "Sign-in through this service is not fully set up yet.",

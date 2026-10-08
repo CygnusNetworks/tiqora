@@ -1,0 +1,288 @@
+"""Just-in-time account creation and profile sync for external identities (D7 steps 5, 7).
+
+Every write goes through ``tiqora.domain.user_provisioning`` (the one Znuny-identical
+write path). Nothing here commits; ``login.apply_login`` owns the transaction.
+
+New accounts get an unusable random password (the IdP is the only way in) and, for
+agents, ``sso_eligible``. Znuny requires a first and a last name (``UserAdd``); when the
+IdP sends none, documented fallbacks are used: first name = local part of the e-mail
+address, last name = the login. The login falls back to the e-mail address when a provider
+matches by e-mail and maps no login. An e-mail address is mandatory.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from tiqora.db.legacy.customer import CustomerUser
+from tiqora.db.legacy.user import UserPreferences, Users
+from tiqora.db.tiqora.models import TiqoraUserAuthConfig
+from tiqora.domain.password_setup import unusable_password_hash
+from tiqora.domain.user_provisioning import (
+    ProvisioningError,
+    create_agent,
+    create_customer_user,
+    grant_role,
+    set_group_permissions,
+    update_agent_profile,
+    update_customer_profile,
+    valid_group_ids,
+    valid_role_ids,
+)
+from tiqora.identity.mapping import MappedProfile
+from tiqora.identity.store import ProviderRecord
+from tiqora.identity.types import SYSTEM_USER_ID, UserKind
+from tiqora.znuny.sysconfig import SysConfig
+
+PROFILE_FIELDS = ("first_name", "last_name", "email", "mobile")
+_DB_CUSTOMER_MODULE = "Kernel::System::CustomerUser::DB"
+
+
+@dataclass(frozen=True, slots=True)
+class NewAccount:
+    login: str
+    email: str
+    first_name: str
+    last_name: str
+    customer_id: str
+    mobile: str | None
+
+
+def is_db_customer_module(module: object) -> bool:
+    """Znuny's customer backend ``Module``; unset means the default DB backend."""
+    return module in (None, "", _DB_CUSTOMER_MODULE)
+
+
+async def customer_backend_is_db(session: AsyncSession) -> bool:
+    """JIT customers are only created when ``CustomerUser`` is the DB backend (an
+    LDAP/other directory owns its users; a row we add there would never be consulted)."""
+    cfg = await SysConfig(session).get("CustomerUser")
+    return is_db_customer_module(cfg.get("Module") if isinstance(cfg, dict) else None)
+
+
+def resolve_new_account(
+    provider: ProviderRecord, profile: MappedProfile, user_kind: UserKind
+) -> tuple[NewAccount | None, tuple[str, ...]]:
+    """(account fields with fallbacks, German names of the missing mandatory fields)."""
+    email = (profile.email or "").strip()
+    login = (profile.login or "").strip() or (email if provider.match_by == "email" else "")
+    missing = tuple(
+        label for label, value in (("Anmeldename", login), ("E-Mail", email)) if not value
+    )
+    if missing:
+        return None, missing
+    first = (profile.first_name or "").strip() or email.split("@", 1)[0]
+    last = (profile.last_name or "").strip() or login
+    customer_id = ""
+    if user_kind == "customer":
+        customer_id = (
+            (profile.customer_id or "").strip()
+            or provider.jit_defaults.customer_id.strip()
+            or email
+        )
+    return (
+        NewAccount(
+            login=login,
+            email=email,
+            first_name=first,
+            last_name=last,
+            customer_id=customer_id,
+            mobile=(profile.mobile or "").strip() or None,
+        ),
+        (),
+    )
+
+
+def _require_account(
+    provider: ProviderRecord, profile: MappedProfile, user_kind: UserKind
+) -> NewAccount:
+    account, missing = resolve_new_account(provider, profile, user_kind)
+    if account is None:
+        raise ProvisioningError("jit_missing_fields", "Es fehlen: " + ", ".join(missing))
+    return account
+
+
+async def provision_agent(
+    session: AsyncSession, provider: ProviderRecord, profile: MappedProfile
+) -> Users:
+    """Create an agent from the IdP profile. Raises ``ProvisioningError`` (e-mail refused,
+    login taken, mandatory field missing); flushes, never commits."""
+    acc = _require_account(provider, profile, "agent")
+    user = await create_agent(
+        session,
+        login=acc.login,
+        first_name=acc.first_name,
+        last_name=acc.last_name,
+        email=acc.email,
+        mobile=acc.mobile,
+        title=None,
+        pw_hash=unusable_password_hash(),
+        valid_id=1,
+        actor_id=SYSTEM_USER_ID,
+        require_email=True,
+    )
+    defaults = provider.jit_defaults
+    valid_roles = await valid_role_ids(session)
+    for role_id in dict.fromkeys(defaults.initial_role_ids):
+        if role_id in valid_roles:
+            await grant_role(session, user_id=user.id, role_id=role_id, actor_id=SYSTEM_USER_ID)
+    valid_groups = await valid_group_ids(session)
+    wanted: dict[int, set[str]] = {}
+    for grant in defaults.initial_groups:
+        if grant.group_id in valid_groups:
+            wanted.setdefault(grant.group_id, set()).update(grant.permissions)
+    for group_id, keys in wanted.items():
+        await set_group_permissions(
+            session,
+            user_id=user.id,
+            group_id=group_id,
+            permission_keys=keys,
+            actor_id=SYSTEM_USER_ID,
+        )
+    # Inserted directly: AuthConfigService.set commits.
+    session.add(TiqoraUserAuthConfig(user_id=user.id, sso_eligible=True))
+    await session.flush()
+    return user
+
+
+async def provision_customer(
+    session: AsyncSession, provider: ProviderRecord, profile: MappedProfile
+) -> CustomerUser:
+    """Create a customer user (DB backend only; the caller checks). customer_id =
+    mapped value, else ``jit_defaults.customer_id``, else the e-mail address."""
+    acc = _require_account(provider, profile, "customer")
+    return await create_customer_user(
+        session,
+        login=acc.login,
+        email=acc.email,
+        customer_id=acc.customer_id,
+        first_name=acc.first_name,
+        last_name=acc.last_name,
+        pw_hash=unusable_password_hash(),
+        actor_id=SYSTEM_USER_ID,
+        mobile=acc.mobile,
+    )
+
+
+async def current_profile(
+    session: AsyncSession, user_kind: UserKind, user_id: int
+) -> dict[str, str | None]:
+    """Current first/last name, e-mail and mobile of an account (one Znuny table each)."""
+    if user_kind == "agent":
+        row = (
+            await session.execute(
+                select(Users.first_name, Users.last_name).where(Users.id == user_id)
+            )
+        ).first()
+        prefs = {
+            str(k): _text(v)
+            for k, v in (
+                await session.execute(
+                    select(
+                        UserPreferences.preferences_key, UserPreferences.preferences_value
+                    ).where(
+                        UserPreferences.user_id == user_id,
+                        UserPreferences.preferences_key.in_(("UserEmail", "UserMobile")),
+                    )
+                )
+            ).all()
+        }
+        return {
+            "first_name": row[0] if row else None,
+            "last_name": row[1] if row else None,
+            "email": prefs.get("UserEmail"),
+            "mobile": prefs.get("UserMobile"),
+        }
+    crow = (
+        await session.execute(
+            select(
+                CustomerUser.first_name,
+                CustomerUser.last_name,
+                CustomerUser.email,
+                CustomerUser.mobile,
+            ).where(CustomerUser.id == user_id)
+        )
+    ).first()
+    return dict(zip(PROFILE_FIELDS, crow, strict=True)) if crow else dict.fromkeys(PROFILE_FIELDS)
+
+
+def _text(raw: bytes | str | None) -> str | None:
+    if raw is None:
+        return None
+    return raw if isinstance(raw, str) else bytes(raw).decode("utf-8", errors="replace")
+
+
+def diff_profile(
+    profile: MappedProfile, current: Mapping[str, str | None]
+) -> dict[str, tuple[str | None, str]]:
+    """Only fields the IdP actually sent (mapped, non-empty) and that differ."""
+    changes: dict[str, tuple[str | None, str]] = {}
+    for field in PROFILE_FIELDS:
+        new = (getattr(profile, field) or "").strip()
+        if not new:
+            continue
+        old = current.get(field)
+        same = (
+            (old or "").strip().casefold() == new.casefold()
+            if field == "email"
+            else (old or "").strip() == new
+        )
+        if not same:
+            changes[field] = (old, new)
+    return changes
+
+
+async def sync_profile(
+    session: AsyncSession,
+    *,
+    user_kind: UserKind,
+    user_id: int,
+    changes: Mapping[str, tuple[str | None, str]],
+) -> None:
+    """Apply planned changes (``change_by`` = system user). No-op for an empty set."""
+    if not changes:
+        return
+    new = {k: v[1] for k, v in changes.items()}
+    if user_kind == "agent":
+        user = await session.get(Users, user_id)
+        if user is None:
+            return
+        await update_agent_profile(
+            session,
+            user,
+            first_name=new.get("first_name"),
+            last_name=new.get("last_name"),
+            email=new.get("email"),
+            mobile=new.get("mobile"),
+            actor_id=SYSTEM_USER_ID,
+        )
+    else:
+        cu = await session.get(CustomerUser, user_id)
+        if cu is None:
+            return
+        await update_customer_profile(
+            session,
+            cu,
+            first_name=new.get("first_name"),
+            last_name=new.get("last_name"),
+            email=new.get("email"),
+            mobile=new.get("mobile"),
+            actor_id=SYSTEM_USER_ID,
+        )
+
+
+__all__ = [
+    "NewAccount",
+    "current_profile",
+    "customer_backend_is_db",
+    "diff_profile",
+    "is_db_customer_module",
+    "provision_agent",
+    "provision_customer",
+    "resolve_new_account",
+    "sync_profile",
+]

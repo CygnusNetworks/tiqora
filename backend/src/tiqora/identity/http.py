@@ -4,8 +4,9 @@ Browser login failures redirect to ``/login`` (agent) or ``/portal/login`` (cust
 ``?sso_error=<code>&next=<path>``. The complete list of codes is ``SSO_ERROR_CODES``:
 every ``RejectCode`` of ``identity.login`` (no_subject, no_match, user_invalid,
 sso_not_enabled, email_unverified, ambiguous_email, login_taken, jit_missing_fields,
-provider_disabled) plus unknown_provider, config, saml_unavailable, state, saml_invalid,
-oidc_failed, idp_error. The legacy value ``1`` (SPNEGO) stays a generic failure.
+email_invalid, email_in_use, provider_disabled) plus unknown_provider, config,
+saml_unavailable, state, saml_invalid, oidc_failed, idp_error. The legacy value ``1``
+(SPNEGO) stays a generic failure.
 The frontend mirrors this list.
 """
 
