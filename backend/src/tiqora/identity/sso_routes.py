@@ -724,6 +724,13 @@ def _peek_in_response_to(raw: bytes) -> str | None:
         raise SamlResponseInvalid("xml") from exc
     value = root.get("InResponseTo")
     if value is None:
+        # Root attribute stripped: the signed SubjectConfirmationData value still marks the
+        # response as solicited (cookie binding, stored request). SP verifies it afterwards.
+        for data in root.iter("{urn:oasis:names:tc:SAML:2.0:assertion}SubjectConfirmationData"):
+            value = data.get("InResponseTo")
+            if value is not None:
+                break
+    if value is None:
         return None
     if not value or len(value) > _MAX_REQUEST_ID:
         raise SamlResponseInvalid("in_response_to")

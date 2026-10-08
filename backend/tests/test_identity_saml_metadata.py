@@ -148,3 +148,23 @@ async def test_fetch_redirect_not_followed(monkeypatch: pytest.MonkeyPatch) -> N
         await fetch_idp_metadata(
             "https://idp.example.org/md", allow_private_network=False, transport=transport
         )
+
+
+async def test_fetch_total_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+
+    import tiqora.identity.saml_metadata as md
+
+    _public_dns(monkeypatch)
+    monkeypatch.setattr(md, "TOTAL_FETCH_TIMEOUT", 0.05)
+
+    async def slow(_request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(2)
+        return httpx.Response(200, text="<x/>")
+
+    with pytest.raises(SamlMetadataError, match="rechtzeitig"):
+        await fetch_idp_metadata(
+            "https://idp.example.org/md",
+            allow_private_network=False,
+            transport=httpx.MockTransport(slow),
+        )

@@ -45,6 +45,10 @@ def require_saml() -> None:
 IDP_ENTITY_ID = "https://idp.example.org/saml"
 IDP_SSO_URL = "https://idp.example.org/saml/sso"
 IDP_SLO_URL = "https://idp.example.org/saml/slo"
+SIG_RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+DIGEST_SHA256 = "http://www.w3.org/2001/04/xmlenc#sha256"
+SIG_RSA_SHA1 = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
+DIGEST_SHA1 = "http://www.w3.org/2000/09/xmldsig#sha1"
 NAMEID_FORMAT_PERSISTENT = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
 
 
@@ -96,6 +100,8 @@ class SamlTestIdp:
             "cert_file": str(self.cert_path),
             "service": {
                 "idp": {
+                    "signing_algorithm": SIG_RSA_SHA256,
+                    "digest_algorithm": DIGEST_SHA256,
                     "endpoints": {
                         "single_sign_on_service": [(IDP_SSO_URL, BINDING_HTTP_REDIRECT)],
                         "single_logout_service": [(IDP_SLO_URL, BINDING_HTTP_REDIRECT)],
@@ -158,10 +164,14 @@ class SamlTestIdp:
         sign_assertion: bool = True,
         sign_response: bool = False,
         encrypt_for_cert: str | None = None,
+        sha1: bool = False,
     ) -> str:
         from saml2.saml import NameID  # noqa: PLC0415
 
         kwargs: dict[str, Any] = {}
+        if sha1:
+            kwargs["sign_alg"] = SIG_RSA_SHA1
+            kwargs["digest_alg"] = DIGEST_SHA1
         if encrypt_for_cert is not None:
             kwargs["encrypt_assertion"] = True
             kwargs["encrypt_assertion_self_contained"] = True
@@ -182,16 +192,26 @@ class SamlTestIdp:
         )
         return base64.b64encode(str(response).encode()).decode()
 
-    def _redirect(self, msg: str, destination: str, *, response: bool) -> str:
+    def _redirect(
+        self, msg: str, destination: str, *, response: bool, sigalg: str | None = None
+    ) -> str:
         from saml2 import BINDING_HTTP_REDIRECT  # noqa: PLC0415
 
         info = self._server.apply_binding(
-            BINDING_HTTP_REDIRECT, msg, destination, relay_state="", response=response, sign=True
+            BINDING_HTTP_REDIRECT,
+            msg,
+            destination,
+            relay_state="",
+            response=response,
+            sign=True,
+            sigalg=sigalg,
         )
         headers = dict(info["headers"])
         return str(headers["Location"])
 
-    def logout_request_redirect(self, *, sp_slo_url: str, name_id: str, session_index: str) -> str:
+    def logout_request_redirect(
+        self, *, sp_slo_url: str, name_id: str, session_index: str, sigalg: str | None = None
+    ) -> str:
         from saml2.saml import NameID  # noqa: PLC0415
 
         req_id, req = self._server.create_logout_request(
@@ -201,7 +221,7 @@ class SamlTestIdp:
             session_indexes=[session_index],
             sign=False,
         )
-        return self._redirect(str(req), sp_slo_url, response=False)
+        return self._redirect(str(req), sp_slo_url, response=False, sigalg=sigalg)
 
     def parse_logout_request(self, url: str) -> ParsedLogoutRequest:
         """Decode the SAMLRequest of an SP-initiated logout redirect; require a signed redirect."""
@@ -218,13 +238,21 @@ class SamlTestIdp:
             session_index=index.group(1) if index else None,
         )
 
-    def logout_response_redirect(self, *, sp_slo_url: str, in_response_to: str) -> str:
+    def logout_response_redirect(
+        self, *, sp_slo_url: str, in_response_to: str, success: bool = True
+    ) -> str:
         from saml2 import samlp  # noqa: PLC0415
+
+        status = None
+        if not success:
+            status = samlp.Status(
+                status_code=samlp.StatusCode(value="urn:oasis:names:tc:SAML:2.0:status:Responder")
+            )
 
         resp = self._server._status_response(
             samlp.LogoutResponse,
             self._server._issuer(),
-            None,
+            status,
             False,
             in_response_to=in_response_to,
             destination=sp_slo_url,

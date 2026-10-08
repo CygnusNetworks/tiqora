@@ -42,6 +42,7 @@ class SamlProviderConfig(BaseModel):
     sign_requests: bool = True
     want_response_signed: bool = False  # assertions are ALWAYS required to be signed
     allow_idp_initiated: bool = False
+    allow_sha1_signatures: bool = False  # legacy IdPs only; SHA-1 is broken, admin UI warns
     clock_skew_seconds: int = Field(120, ge=0, le=600)
     allow_private_network: bool = False
     sp_certificate: str = Field("", json_schema_extra={"x-widget": "textarea"})

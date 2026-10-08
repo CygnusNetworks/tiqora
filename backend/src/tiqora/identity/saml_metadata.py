@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from tiqora.identity.store import ProviderRecord
 from tiqora.security.outbound import OutboundURLError, pin_outbound_url
 
 MAX_METADATA_BYTES = 5 * 1024 * 1024
+TOTAL_FETCH_TIMEOUT = 15.0  # wall clock for connect + body, on top of httpx's per-phase timeout
 _MD = "{urn:oasis:names:tc:SAML:2.0:metadata}"
 _DS = "{http://www.w3.org/2000/09/xmldsig#}"
 _REDIRECT = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
@@ -153,6 +155,7 @@ async def fetch_idp_metadata(
     headers = pinned.request_headers({"Accept": "application/samlmetadata+xml, application/xml"})
     try:
         async with (
+            asyncio.timeout(TOTAL_FETCH_TIMEOUT),
             httpx.AsyncClient(
                 timeout=timeout, follow_redirects=False, transport=transport
             ) as client,
@@ -169,6 +172,8 @@ async def fetch_idp_metadata(
                 body.extend(chunk)
                 if len(body) > MAX_METADATA_BYTES:
                     raise SamlMetadataError("Die Metadaten sind zu groß (über 5 MB).")
+    except TimeoutError as exc:
+        raise SamlMetadataError("Die Metadaten konnten nicht rechtzeitig geladen werden.") from exc
     except httpx.HTTPError as exc:
         raise SamlMetadataError(
             f"Die Metadaten konnten nicht geladen werden ({type(exc).__name__})."

@@ -26,6 +26,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, TypeVar
+from urllib.parse import unquote_plus, urlencode
 
 import defusedxml
 import defusedxml.ElementTree as safe_et
@@ -61,6 +62,16 @@ NS_ASSERTION = "urn:oasis:names:tc:SAML:2.0:assertion"
 BINDING_REDIRECT = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
 BINDING_POST = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
 CM_BEARER = "urn:oasis:names:tc:SAML:2.0:cm:bearer"
+NS_DSIG = "http://www.w3.org/2000/09/xmldsig#"
+SIG_RSA_SHA256 = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
+DIGEST_SHA256 = "http://www.w3.org/2001/04/xmlenc#sha256"
+STATUS_SUCCESS = "urn:oasis:names:tc:SAML:2.0:status:Success"
+# Redirect-binding SigAlg values we verify; anything else (rsa-sha1, dsa, ...) is refused first.
+REDIRECT_SIGALGS: dict[str, str] = {
+    "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256": "SHA256",
+    "http://www.w3.org/2001/04/xmldsig-more#rsa-sha384": "SHA384",
+    "http://www.w3.org/2001/04/xmldsig-more#rsa-sha512": "SHA512",
+}
 
 NAME_ID_FORMATS: dict[str, str] = {
     "unspecified": "urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified",
@@ -128,15 +139,16 @@ def _sp_conf(
         "only_use_keys_in_metadata": True,
         "service": {
             "sp": {
+                # Read per service section (context sensitive); the pysaml2 default is SHA-1.
+                "signing_algorithm": SIG_RSA_SHA256,
+                "digest_algorithm": DIGEST_SHA256,
                 "endpoints": {
                     "assertion_consumer_service": [
                         (urls.agent_acs_url, saml2.BINDING_HTTP_POST),
                         (urls.customer_acs_url, saml2.BINDING_HTTP_POST),
                     ],
-                    "single_logout_service": [
-                        (urls.slo_url, saml2.BINDING_HTTP_REDIRECT),
-                        (urls.slo_url, saml2.BINDING_HTTP_POST),
-                    ],
+                    # Only the redirect binding is implemented; advertise nothing else.
+                    "single_logout_service": [(urls.slo_url, saml2.BINDING_HTTP_REDIRECT)],
                 },
                 "want_assertions_signed": True,
                 "want_response_signed": cfg.want_response_signed,
@@ -156,8 +168,24 @@ def _cfg(record: ProviderRecord) -> SamlProviderConfig:
     return cfg
 
 
-def _expect_xml_safe(raw: bytes) -> None:
-    """DTD/entity pre-check and the single-assertion rule on the raw bytes pysaml2 will see."""
+def _weak_algorithms(root: Any) -> list[str]:
+    """SHA-1/MD5 signature or digest algorithms used by any ``ds:SignedInfo`` under *root*.
+
+    Only ``SignedInfo`` is inspected: the digest inside ``xenc:EncryptionMethod``
+    (RSA-OAEP) is not a signature.
+    """
+    weak: list[str] = []
+    for signed_info in root.iter(f"{{{NS_DSIG}}}SignedInfo"):
+        for tag in ("SignatureMethod", "DigestMethod"):
+            for el in signed_info.iter(f"{{{NS_DSIG}}}{tag}"):
+                alg = (el.get("Algorithm") or "").lower()
+                if alg.endswith("sha1") or "md5" in alg:
+                    weak.append(alg)
+    return weak
+
+
+def _expect_xml_safe(raw: bytes, *, allow_sha1: bool) -> None:
+    """DTD/entity pre-check, single-assertion rule and weak-signature rule on the raw bytes."""
     try:
         root = safe_et.fromstring(raw, forbid_dtd=True, forbid_entities=True, forbid_external=True)
     except defusedxml.DefusedXmlException as exc:
@@ -171,6 +199,8 @@ def _expect_xml_safe(raw: bytes) -> None:
     )
     if count != 1:
         raise SamlResponseInvalid("assertion_count")
+    if not allow_sha1 and _weak_algorithms(root):
+        raise SamlResponseInvalid("sha1_signature")
 
 
 def _decode_b64(b64: str) -> bytes:
@@ -298,12 +328,8 @@ class SamlServiceProvider:
         self, saml_response_b64: str, *, outstanding: Mapping[str, str], expected_acs: str
     ) -> SamlAssertionResult:
         raw = _decode_b64(saml_response_b64)
-        _expect_xml_safe(raw)
-        canonical = base64.b64encode(raw).decode("ascii")  # pysaml2 sees exactly what we checked
         try:
-            return await self._run(
-                self._parse_login_sync, canonical, dict(outstanding), expected_acs
-            )
+            return await self._run(self._parse_login_sync, raw, dict(outstanding), expected_acs)
         except SamlResponseInvalid:
             raise
         except Exception as exc:
@@ -316,10 +342,14 @@ class SamlServiceProvider:
             raise SamlResponseInvalid(_reason_for(exc), str(exc)[:300]) from exc
 
     def _parse_login_sync(
-        self, b64: str, outstanding: dict[str, str], expected_acs: str
+        self, raw: bytes, outstanding: dict[str, str], expected_acs: str
     ) -> SamlAssertionResult:
         from saml2 import BINDING_HTTP_POST  # noqa: PLC0415
 
+        allow_sha1 = self._cfg.allow_sha1_signatures
+        _expect_xml_safe(raw, allow_sha1=allow_sha1)
+        # pysaml2 sees exactly the bytes that were checked.
+        b64 = base64.b64encode(raw).decode("ascii")
         client = self._ensure()
         resp = client.parse_authn_request_response(b64, BINDING_HTTP_POST, outstanding=outstanding)
         if resp is None:
@@ -331,17 +361,32 @@ class SamlServiceProvider:
         # pysaml2 enforces want_assertions_signed; assert it again (also after decryption).
         if not getattr(assertion, "signature", None):
             raise SamlResponseInvalid("assertion_unsigned")
-        if _text(resp.issuer()) != self._idp_id() and _text(assertion.issuer) != self._idp_id():
+        if not allow_sha1 and _weak_algorithms(_parse_trusted(assertion.to_string())):
+            raise SamlResponseInvalid("sha1_signature")  # e.g. inside an encrypted assertion
+        # The signed assertion must come from the configured IdP (aggregate metadata may
+        # hold other IdPs whose keys would verify); a response issuer, if any, must match too.
+        idp_id = self._idp_id()
+        if _text(assertion.issuer) != idp_id:
+            raise SamlResponseInvalid("issuer_mismatch")
+        response_issuer = _text(getattr(resp.response, "issuer", None))
+        if response_issuer is not None and response_issuer != idp_id:
             raise SamlResponseInvalid("issuer_mismatch")
 
-        in_response_to = getattr(resp, "in_response_to", None) or None
-        if in_response_to is not None and in_response_to not in outstanding:
-            raise SamlResponseInvalid("unknown_request")
         destination = getattr(resp.response, "destination", None) or None
         if destination is not None and destination != expected_acs:
             raise SamlResponseInvalid("destination_mismatch")
-        if not _recipient_matches(assertion, expected_acs):
+        confirmation = _matching_confirmation(assertion, expected_acs)
+        if confirmation is None:
             raise SamlResponseInvalid("recipient_mismatch")
+        # The InResponseTo inside the signed SubjectConfirmationData is authoritative; the
+        # unsigned root attribute may only agree with it. Any value must be an outstanding request.
+        root_irt = getattr(resp, "in_response_to", None) or None
+        signed_irt = getattr(confirmation, "in_response_to", None) or None
+        if signed_irt is not None and root_irt is not None and signed_irt != root_irt:
+            raise SamlResponseInvalid("in_response_to_mismatch")
+        in_response_to = signed_irt or root_irt
+        if in_response_to is not None and in_response_to not in outstanding:
+            raise SamlResponseInvalid("unknown_request")
 
         name_id_obj = getattr(resp, "name_id", None)
         name_id = _text(name_id_obj)
@@ -413,6 +458,9 @@ class SamlServiceProvider:
         resp = client.parse_logout_request_response(saml_response, binding)
         if resp is None:
             raise SamlResponseInvalid("no_response")
+        status = getattr(getattr(resp.response, "status", None), "status_code", None)
+        if getattr(status, "value", None) != STATUS_SUCCESS:
+            raise SamlResponseInvalid("logout_status")
         return getattr(resp, "in_response_to", None) or None
 
     async def handle_logout_request(
@@ -423,10 +471,22 @@ class SamlServiceProvider:
         relay_state: str | None,
         sigalg: str | None,
         signature: str | None,
+        raw_query: str | None = None,
     ) -> tuple[LogoutRequestData, str]:
+        """Verify and answer an IdP LogoutRequest (redirect binding only).
+
+        ``raw_query`` is the request's undecoded query string: the signature covers the
+        original URL-encoded octets (SAML Bindings 3.4.4.1), so pass it whenever available.
+        """
         try:
             return await self._run(
-                self._handle_logout_sync, saml_request, binding, relay_state, sigalg, signature
+                self._handle_logout_sync,
+                saml_request,
+                binding,
+                relay_state,
+                sigalg,
+                signature,
+                raw_query,
             )
         except SamlResponseInvalid:
             raise
@@ -441,9 +501,9 @@ class SamlServiceProvider:
         relay_state: str | None,
         sigalg: str | None,
         signature: str | None,
+        raw_query: str | None,
     ) -> tuple[LogoutRequestData, str]:
         from saml2 import BINDING_HTTP_REDIRECT  # noqa: PLC0415
-        from saml2.sigver import verify_redirect_signature  # noqa: PLC0415
 
         client = self._ensure()
         if binding != BINDING_HTTP_REDIRECT:
@@ -452,6 +512,8 @@ class SamlServiceProvider:
         # set, which an SP config never has: verify it here and refuse unsigned requests.
         if not sigalg or not signature:
             raise SamlResponseInvalid("logout_unsigned")
+        if sigalg not in REDIRECT_SIGALGS:
+            raise SamlResponseInvalid("logout_sigalg")
         req = client.parse_logout_request(
             saml_request,
             binding,
@@ -464,14 +526,11 @@ class SamlServiceProvider:
         issuer = _text(req.message.issuer)
         if issuer != self._idp_id():
             raise SamlResponseInvalid("issuer_mismatch")
-        signed_msg = {"SAMLRequest": saml_request, "Signature": signature, "SigAlg": sigalg}
-        if relay_state is not None:
-            signed_msg["RelayState"] = relay_state
         certs = client.metadata.certs(issuer, "any", "signing")
-        if not any(
-            verify_redirect_signature(signed_msg, client.sec.sec_backend, cert)
-            for _name, cert in certs
-        ):
+        signed = _redirect_signed_octets(
+            "SAMLRequest", saml_request, relay_state, sigalg, raw_query
+        )
+        if not any(_rsa_verify(cert, signed, signature, sigalg) for _name, cert in certs):
             raise SamlResponseInvalid("logout_signature")
         name_id = _text(req.message.name_id)
         if not name_id:
@@ -496,6 +555,57 @@ def _reason_for(exc: Exception) -> str:
     return type(exc).__name__
 
 
+def _redirect_signed_octets(
+    param: str, value: str, relay_state: str | None, sigalg: str, raw_query: str | None
+) -> bytes:
+    """``PARAM=..&RelayState=..&SigAlg=..`` exactly as the IdP signed it.
+
+    With the raw query the original percent-encoding is reused verbatim; the decoded
+    fallback re-encodes (which only matches IdPs that encode like Python).
+    """
+    if raw_query is not None:
+        raw: dict[str, str] = {}
+        for pair in raw_query.split("&"):
+            key, sep, val = pair.partition("=")
+            if sep and key in (param, "RelayState", "SigAlg") and key not in raw:
+                raw[key] = val
+        if param not in raw or "SigAlg" not in raw:
+            raise SamlResponseInvalid("logout_signature")
+        if unquote_plus(raw["SigAlg"]) != sigalg:
+            raise SamlResponseInvalid("logout_signature")
+        parts = [f"{param}={raw[param]}"]
+        if "RelayState" in raw:
+            parts.append(f"RelayState={raw['RelayState']}")
+        parts.append(f"SigAlg={raw['SigAlg']}")
+        return "&".join(parts).encode("ascii")
+    parts = [urlencode({param: value})]
+    if relay_state is not None:
+        parts.append(urlencode({"RelayState": relay_state}))
+    parts.append(urlencode({"SigAlg": sigalg}))
+    return "&".join(parts).encode("ascii")
+
+
+def _as_bytes(value: str | bytes) -> bytes:
+    return value if isinstance(value, bytes) else value.encode("ascii")
+
+
+def _rsa_verify(cert_b64: str, signed: bytes, signature_b64: str, sigalg: str) -> bool:
+    from cryptography import x509  # noqa: PLC0415
+    from cryptography.hazmat.primitives import hashes  # noqa: PLC0415
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa  # noqa: PLC0415
+    from saml2.sigver import pem_format  # noqa: PLC0415
+
+    try:
+        key = x509.load_pem_x509_certificate(_as_bytes(pem_format(cert_b64))).public_key()
+        if not isinstance(key, rsa.RSAPublicKey):
+            return False
+        digest = getattr(hashes, REDIRECT_SIGALGS[sigalg])()
+        key.verify(base64.b64decode(signature_b64), signed, padding.PKCS1v15(), digest)
+    except Exception:  # InvalidSignature, bad cert/base64: all mean "not verified"
+        return False
+    return True
+
+
 def _first_slo(client: Any, entity_id: str) -> str:
     from saml2 import BINDING_HTTP_REDIRECT  # noqa: PLC0415
 
@@ -505,16 +615,20 @@ def _first_slo(client: Any, entity_id: str) -> str:
     return str(urls[0]["location"])
 
 
-def _recipient_matches(assertion: Any, expected_acs: str) -> bool:
-    """A bearer SubjectConfirmationData inside the (signed) assertion must name this ACS."""
+def _parse_trusted(xml: str) -> Any:
+    return safe_et.fromstring(xml, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+
+
+def _matching_confirmation(assertion: Any, expected_acs: str) -> Any | None:
+    """The bearer SubjectConfirmationData (inside the signed assertion) naming this ACS."""
     subject = getattr(assertion, "subject", None)
     for confirmation in getattr(subject, "subject_confirmation", None) or []:
         if getattr(confirmation, "method", None) != CM_BEARER:
             continue
         data = getattr(confirmation, "subject_confirmation_data", None)
         if data is not None and getattr(data, "recipient", None) == expected_acs:
-            return True
-    return False
+            return data
+    return None
 
 
 def _location(http_info: Mapping[str, Any]) -> str:

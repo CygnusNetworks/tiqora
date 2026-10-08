@@ -176,6 +176,10 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+filterwarnings = [
+    # pysaml2 7.5 still imports CFB from the old cryptography location
+    "ignore:CFB has been moved:cryptography.utils.CryptographyDeprecationWarning",
+]
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
