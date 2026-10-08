@@ -231,9 +231,12 @@ def _managed_group_diff(
         want = _keys(desired.group_perms, gid)
         cur = _keys(state.current_group_perms, gid)
         managed = _keys(state.managed_group_perms, gid)
-        satisfied = not want or "rw" in cur or want <= cur
+        live = cur - (
+            managed - want
+        )  # current keys minus stale managed ones (a stale managed rw covers nothing)
+        satisfied = not want or "rw" in live or want <= live
         if satisfied:
-            final = cur - (managed - want)
+            final = live
         else:
             final = want | (cur - managed)
             if "rw" in final:

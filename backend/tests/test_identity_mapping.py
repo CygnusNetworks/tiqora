@@ -277,3 +277,21 @@ def test_invalid_group_in_only_rule_strips_group_perms_in_authoritative() -> Non
     d = diff_assignments(desired, state, mode="authoritative")
     assert d.remove_groups == {(2, "rw")} and d.final_group_keys == {2: frozenset()}
     assert diff_assignments(desired, state, mode="managed").empty
+
+
+def test_managed_rw_downgraded_by_rule_to_ro() -> None:
+    d = diff_assignments(_gd((2, "ro")), _gs({(2, "rw")}, {(2, "rw")}), mode="managed")
+    assert d.final_group_keys == {2: frozenset({"ro"})}
+    assert d.add_groups == {(2, "ro")} and d.remove_groups == {(2, "rw")}
+    assert d.record_managed_groups == {(2, "ro")} and d.drop_managed_groups == {(2, "rw")}
+
+
+def test_managed_rw_downgraded_by_rule_to_ro_and_note() -> None:
+    d = diff_assignments(_gd((2, "ro"), (2, "note")), _gs({(2, "rw")}, {(2, "rw")}), mode="managed")
+    assert d.final_group_keys == {2: frozenset({"ro", "note"})}
+
+
+def test_manual_rw_with_stale_managed_ro_and_nothing_desired() -> None:
+    d = diff_assignments(_gd(), _gs({(2, "rw"), (2, "ro")}, {(2, "ro")}), mode="managed")
+    assert d.remove_groups == {(2, "ro")} and d.final_group_keys == {2: frozenset({"rw"})}
+    assert d.drop_managed_groups == {(2, "ro")}
