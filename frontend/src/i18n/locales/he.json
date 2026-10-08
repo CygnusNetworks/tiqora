@@ -2123,7 +2123,8 @@
       "ticketAttributeRelations": "יחסי תכונות",
       "pgp": "PGP",
       "smime": "S/MIME",
-      "aiModels": "מודלים"
+      "aiModels": "מודלים",
+      "identityProviders": "Identity providers"
     },
     "table": {
       "id": "ID",
@@ -3197,7 +3198,8 @@
       "reset2fa": "אפס את 2FA",
       "resetConfirmTitle": "לאפס אימות דו-שלבי?",
       "resetConfirmBody": "זה משבית את 2FA עבור {{login}}. הם יצטרכו להירשם שוב אם האכיפה עדיין חלה.",
-      "empty": "לא נמצאו סוכנים."
+      "empty": "לא נמצאו סוכנים.",
+      "identityLink": "Set up sign-in through Microsoft, Google, SAML or LDAP"
     },
     "gdpr": {
       "title": "פרטיות / GDPR",
@@ -3398,7 +3400,8 @@
       "pgp": "הפעלה וכיבוי של PGP, ניהול מפתחות וביטויי סיסמה, והגדרת אפשרויות חתימה ואחסון.",
       "smime": "הפעלה וכיבוי של S/MIME, ניהול אישורים, מפתחות פרטיים וקשרי חותם, והגדרת מיקומי אחסון.",
       "aiModels": "מודלים אצל הספקים, פרופילים עם מודלי חלופה, ואיזה פרופיל מטפל באיזו משימה.",
-      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept."
+      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept.",
+      "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP."
     },
     "types": {
       "title_plural": "סוגי פניות",
@@ -3788,6 +3791,299 @@
           "favicon_enabled": {
             "label": "Website icons",
             "help": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com."
+          }
+        }
+      }
+    },
+    "identity": {
+      "title": "Identity providers",
+      "description": "Set up which sign-in services (Microsoft, Google, SAML, LDAP …) agents and customers may use to sign in.",
+      "add": "Add",
+      "empty": "No identity provider set up yet. Use “Add” to create the first one.",
+      "loadError": "The identity providers could not be loaded.",
+      "deleteTitle": "Delete identity provider?",
+      "deleteBody": "“{{name}}” will be deleted, along with {{count}} link(s) between users and this sign-in service. The user accounts themselves are kept.",
+      "deleteError": "The identity provider could not be deleted.",
+      "deleteAria": "Delete {{name}}",
+      "envBadge": "from environment variables, cannot be changed here",
+      "copy": "Copy",
+      "copied": "Copied",
+      "saveError": "The changes could not be saved.",
+      "placeholder": "This area will be added in a later step.",
+      "columns": {
+        "name": "Name",
+        "kind": "Type",
+        "audience": "Applies to",
+        "state": "State"
+      },
+      "kind": {
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "LDAP / Active Directory"
+      },
+      "audience": {
+        "agent": "Agents only",
+        "customer": "Customers only",
+        "both": "Agents and customers"
+      },
+      "state": {
+        "enabled": "Active",
+        "disabled": "Disabled",
+        "metadataError": "Metadata faulty"
+      },
+      "preset": {
+        "entra_id": "Microsoft Entra ID",
+        "google_workspace": "Google Workspace",
+        "keycloak": "Keycloak",
+        "authentik": "authentik",
+        "adfs": "AD FS (Active Directory Federation Services)",
+        "generic_saml": "SAML (generic)",
+        "generic_oidc": "OpenID Connect (generic)",
+        "ldap": "LDAP directory",
+        "active_directory": "Active Directory (LDAP)"
+      },
+      "presetDialog": {
+        "title": "Add identity provider",
+        "description": "Pick a template. You enter the connection details in the next step.",
+        "choose": "Choose a template",
+        "create": "Create",
+        "createError": "The identity provider could not be created."
+      },
+      "tabs": {
+        "connection": "Connection",
+        "mapping": "Mapping",
+        "roles": "Roles from the sign-in service",
+        "test": "Test sign-in",
+        "links": "Links"
+      },
+      "sections": {
+        "general": "General",
+        "connection": "Connection"
+      },
+      "common": {
+        "name": "Name",
+        "slug": "Short name",
+        "slugHelp": "Part of the sign-in address; lowercase letters, digits and hyphen only.",
+        "audience": "Applies to",
+        "enabled": "Active",
+        "enabledHelp": "Only active providers appear on the sign-in page.",
+        "buttonLabel": "Sign-in button label",
+        "buttonLabelHelp": "Leave empty to use the name.",
+        "buttonIcon": "Sign-in button icon",
+        "sort": "Order",
+        "sortHelp": "Smaller numbers come first."
+      },
+      "icons": {
+        "microsoft": "Microsoft",
+        "google": "Google",
+        "key": "Key",
+        "shield": "Shield",
+        "building": "Building",
+        "directory": "Directory"
+      },
+      "saml": {
+        "unavailable": {
+          "package": "SAML is not set up on this server: the Python package “pysaml2” is missing. SAML sign-ins are only possible after it is installed.",
+          "xmlsec1": "SAML is not set up on this server: the program “xmlsec1” is missing. SAML sign-ins are only possible after it is installed."
+        },
+        "sha1Warning": "Warning: SHA-1 signatures are considered broken. Only accept them for legacy sign-in services that cannot do anything else.",
+        "copyCertificate": "Copy certificate",
+        "refresh": "Reload metadata",
+        "refreshError": "The metadata could not be loaded.",
+        "fetchedAt": "Last loaded: {{when}}"
+      },
+      "endpoints": {
+        "title": "Addresses for the sign-in service",
+        "hint": "Enter these addresses in the sign-in service's administration.",
+        "baseUrlMissing": "This server's public address is not set, so the addresses are missing. Please set the public address (TIQORA_PUBLIC_BASE_URL) first.",
+        "labels": {
+          "agent_redirect_uri": "Redirect address for agents",
+          "customer_redirect_uri": "Redirect address for customers",
+          "backchannel_logout_url": "Address for sign-out by the sign-in service",
+          "sp_entity_id": "Entity ID of this server",
+          "agent_acs_url": "Response address (ACS) for agents",
+          "customer_acs_url": "Response address (ACS) for customers",
+          "sp_metadata_url": "Metadata of this server",
+          "slo_url": "Sign-out address"
+        }
+      },
+      "test": {
+        "intro": "A test sign-in shows which values the sign-in service sends and what a real sign-in would do. Nothing is created and nobody is signed in.",
+        "ldapHint": "There is no browser test sign-in for LDAP. Check the connection by signing in on the login page with a directory account.",
+        "audience": "Test as",
+        "audiences": {
+          "agent": "Agent",
+          "customer": "Customer"
+        },
+        "draftHint": "Unsaved connection changes are used for this test.",
+        "start": "Start test sign-in",
+        "startError": "The test sign-in could not be started.",
+        "resultHeading": "Result of the test sign-in",
+        "loadError": "The result could not be loaded.",
+        "waiting": "Waiting for the sign-in …",
+        "timeout": "No result arrived within two minutes. Please start the test sign-in again.",
+        "subject": "Identifier",
+        "attributesHeading": "Values sent by the sign-in service"
+      },
+      "plan": {
+        "rejected": "The sign-in would be rejected:",
+        "create": "Will be created on first sign-in",
+        "newLogin": "New login name: {{login}}",
+        "loginAs": "Sign-in as {{login}}",
+        "matchedBy": {
+          "link": "Found through an existing link",
+          "login": "Found by login name",
+          "email": "Found by e-mail address",
+          "jit": "Will be created automatically"
+        },
+        "profileChanges": "Profile changes",
+        "rolesAdd": "Roles to be added",
+        "rolesRemove": "Roles to be removed",
+        "groupsAdd": "Group permissions to be added",
+        "groupsRemove": "Group permissions to be removed"
+      },
+      "config": {
+        "oidc": {
+          "fields": {
+            "issuer": {
+              "label": "Sign-in service address (issuer)",
+              "help": "e.g. https://login.example.org/realms/company. “/.well-known/openid-configuration” is appended automatically."
+            },
+            "client_id": {
+              "label": "Client ID"
+            },
+            "client_secret": {
+              "label": "Client secret"
+            },
+            "scopes": {
+              "label": "Requested scopes",
+              "help": "Separated by spaces."
+            },
+            "redirect_uri": {
+              "label": "Redirect address",
+              "help": "Leave empty to compute it from the public address."
+            },
+            "pkce": {
+              "label": "PKCE",
+              "options": {
+                "auto": "Automatic",
+                "always": "Always",
+                "never": "Never"
+              }
+            },
+            "email_must_be_verified": {
+              "label": "E-mail address must be verified",
+              "help": "Needed when users are found or created by e-mail address."
+            },
+            "allow_private_network": {
+              "label": "Allow internal networks",
+              "help": "Only for sign-in services on your own network (e.g. self-hosted Keycloak)."
+            },
+            "backchannel_logout": {
+              "label": "Accept sign-out by the sign-in service"
+            }
+          }
+        },
+        "saml": {
+          "fields": {
+            "idp_metadata_url": {
+              "label": "Metadata address of the sign-in service",
+              "help": "Reloaded daily."
+            },
+            "idp_metadata_xml": {
+              "label": "Metadata as XML",
+              "help": "Alternative to the address: paste the metadata here."
+            },
+            "idp_entity_id": {
+              "label": "Entity ID of the sign-in service",
+              "help": "Only needed if the metadata contains several sign-in services."
+            },
+            "name_id_format": {
+              "label": "User identifier format",
+              "options": {
+                "unspecified": "Unspecified",
+                "emailAddress": "E-mail address",
+                "persistent": "Persistent",
+                "transient": "Transient"
+              }
+            },
+            "sign_requests": {
+              "label": "Sign sign-in requests"
+            },
+            "want_response_signed": {
+              "label": "Whole response must be signed",
+              "help": "The sign-in service's assertion must always be signed."
+            },
+            "allow_idp_initiated": {
+              "label": "Allow sign-in started at the sign-in service"
+            },
+            "allow_sha1_signatures": {
+              "label": "Accept insecure SHA-1 signatures",
+              "help": "Only for legacy sign-in services. SHA-1 is considered broken."
+            },
+            "clock_skew_seconds": {
+              "label": "Allowed clock difference (seconds)"
+            },
+            "allow_private_network": {
+              "label": "Allow internal networks",
+              "help": "Only for metadata addresses on your own network."
+            },
+            "sp_certificate": {
+              "label": "Certificate of this server",
+              "help": "Generated automatically. Store it at the sign-in service if requests are signed."
+            },
+            "sp_private_key": {
+              "label": "Private key of this server"
+            }
+          }
+        },
+        "ldap": {
+          "fields": {
+            "host": {
+              "label": "Server"
+            },
+            "port": {
+              "label": "Port"
+            },
+            "use_ssl": {
+              "label": "Connect encrypted (LDAPS)"
+            },
+            "use_starttls": {
+              "label": "Encrypt with StartTLS"
+            },
+            "base_dn": {
+              "label": "Search base (base DN)"
+            },
+            "bind_dn": {
+              "label": "User for the search (bind DN)"
+            },
+            "bind_password": {
+              "label": "Password for the search"
+            },
+            "uid_attr": {
+              "label": "Login name attribute"
+            },
+            "always_filter": {
+              "label": "Additional search filter"
+            },
+            "group_dn": {
+              "label": "Group that may sign in (group DN)",
+              "help": "Leave empty to let every user found sign in."
+            },
+            "access_attr": {
+              "label": "Group membership attribute"
+            },
+            "user_attr": {
+              "label": "Users in the group as",
+              "options": {
+                "DN": "DN",
+                "UID": "Login name"
+              }
+            },
+            "subject_attr": {
+              "label": "Unique identifier",
+              "help": "For Active Directory: objectGUID."
+            }
           }
         }
       }

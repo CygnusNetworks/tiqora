@@ -2123,7 +2123,8 @@
       "ticketAttributeRelations": "Attribut­beziehungen",
       "pgp": "PGP",
       "smime": "S/MIME",
-      "aiModels": "Modelle"
+      "aiModels": "Modelle",
+      "identityProviders": "Identitätsanbieter"
     },
     "table": {
       "id": "ID",
@@ -3205,7 +3206,8 @@
       "reset2fa": "2FA zurücksetzen",
       "resetConfirmTitle": "Zwei-Faktor-Authentifizierung zurücksetzen?",
       "resetConfirmBody": "Dies deaktiviert 2FA für {{login}}. Bei weiterhin geltender Erzwingung muss erneut eingerichtet werden.",
-      "empty": "Keine Agenten gefunden."
+      "empty": "Keine Agenten gefunden.",
+      "identityLink": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten"
     },
     "gdpr": {
       "title": "Datenschutz / DSGVO",
@@ -3406,7 +3408,8 @@
       "pgp": "PGP ein- und ausschalten, Schlüssel und Passphrasen verwalten, Signatur und Speicherort einstellen.",
       "smime": "S/MIME ein- und ausschalten, Zertifikate, private Schlüssel und Signer-Beziehungen verwalten, Speicherorte einstellen.",
       "aiModels": "Modelle bei den Providern, Profile mit Ausweichmodellen und welches Profil welche Aufgabe übernimmt.",
-      "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben."
+      "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben.",
+      "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -3796,6 +3799,299 @@
           "favicon_enabled": {
             "label": "Website-Icons",
             "help": "Icon der Website zur Mail-Domain bzw. Firmen-URL. Nie für Freemail-Domains wie gmail.com."
+          }
+        }
+      }
+    },
+    "identity": {
+      "title": "Identitätsanbieter",
+      "description": "Hier richten Sie ein, über welche Anmeldedienste (Microsoft, Google, SAML, LDAP …) sich Agenten und Kunden anmelden dürfen.",
+      "add": "Hinzufügen",
+      "empty": "Noch kein Identitätsanbieter eingerichtet. Mit „Hinzufügen“ legen Sie den ersten an.",
+      "loadError": "Die Identitätsanbieter konnten nicht geladen werden.",
+      "deleteTitle": "Identitätsanbieter löschen?",
+      "deleteBody": "„{{name}}“ wird gelöscht, ebenso {{count}} Verknüpfung(en) von Benutzern mit diesem Anmeldedienst. Die Benutzerkonten selbst bleiben erhalten.",
+      "deleteError": "Der Identitätsanbieter konnte nicht gelöscht werden.",
+      "deleteAria": "{{name}} löschen",
+      "envBadge": "aus Umgebungsvariablen, hier nicht änderbar",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "saveError": "Die Änderungen konnten nicht gespeichert werden.",
+      "placeholder": "Dieser Bereich wird in einem späteren Schritt ergänzt.",
+      "columns": {
+        "name": "Name",
+        "kind": "Art",
+        "audience": "Gilt für",
+        "state": "Zustand"
+      },
+      "kind": {
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "LDAP / Active Directory"
+      },
+      "audience": {
+        "agent": "Nur Agenten",
+        "customer": "Nur Kunden",
+        "both": "Agenten und Kunden"
+      },
+      "state": {
+        "enabled": "Aktiv",
+        "disabled": "Deaktiviert",
+        "metadataError": "Metadaten fehlerhaft"
+      },
+      "preset": {
+        "entra_id": "Microsoft Entra ID",
+        "google_workspace": "Google Workspace",
+        "keycloak": "Keycloak",
+        "authentik": "authentik",
+        "adfs": "AD FS (Active Directory Federation Services)",
+        "generic_saml": "SAML (allgemein)",
+        "generic_oidc": "OpenID Connect (allgemein)",
+        "ldap": "LDAP-Verzeichnis",
+        "active_directory": "Active Directory (LDAP)"
+      },
+      "presetDialog": {
+        "title": "Identitätsanbieter hinzufügen",
+        "description": "Wählen Sie eine Vorlage. Die Verbindungsdaten tragen Sie im nächsten Schritt ein.",
+        "choose": "Vorlage wählen",
+        "create": "Anlegen",
+        "createError": "Der Identitätsanbieter konnte nicht angelegt werden."
+      },
+      "tabs": {
+        "connection": "Verbindung",
+        "mapping": "Zuordnung",
+        "roles": "Rollen aus dem Anmeldedienst",
+        "test": "Testanmeldung",
+        "links": "Verknüpfungen"
+      },
+      "sections": {
+        "general": "Allgemein",
+        "connection": "Verbindung"
+      },
+      "common": {
+        "name": "Name",
+        "slug": "Kurzname",
+        "slugHelp": "Kommt in die Anmeldeadresse; nur Kleinbuchstaben, Ziffern und Bindestrich.",
+        "audience": "Gilt für",
+        "enabled": "Aktiv",
+        "enabledHelp": "Nur aktive Anmeldedienste erscheinen auf der Anmeldeseite.",
+        "buttonLabel": "Beschriftung der Anmeldetaste",
+        "buttonLabelHelp": "Leer lassen, dann wird der Name verwendet.",
+        "buttonIcon": "Symbol der Anmeldetaste",
+        "sort": "Reihenfolge",
+        "sortHelp": "Kleinere Zahlen stehen weiter oben."
+      },
+      "icons": {
+        "microsoft": "Microsoft",
+        "google": "Google",
+        "key": "Schlüssel",
+        "shield": "Schild",
+        "building": "Gebäude",
+        "directory": "Verzeichnis"
+      },
+      "saml": {
+        "unavailable": {
+          "package": "SAML ist auf diesem Server nicht eingerichtet: Das Python-Paket „pysaml2“ fehlt. Anmeldungen über SAML sind erst nach der Installation möglich.",
+          "xmlsec1": "SAML ist auf diesem Server nicht eingerichtet: Das Programm „xmlsec1“ fehlt. Anmeldungen über SAML sind erst nach der Installation möglich."
+        },
+        "sha1Warning": "Achtung: SHA-1-Signaturen gelten als gebrochen. Aktivieren Sie die Annahme nur für ältere Anmeldedienste, die nichts anderes können.",
+        "copyCertificate": "Zertifikat kopieren",
+        "refresh": "Metadaten neu laden",
+        "refreshError": "Die Metadaten konnten nicht geladen werden.",
+        "fetchedAt": "Zuletzt geladen: {{when}}"
+      },
+      "endpoints": {
+        "title": "Adressen für den Anmeldedienst",
+        "hint": "Diese Adressen tragen Sie in der Verwaltung des Anmeldedienstes ein.",
+        "baseUrlMissing": "Die öffentliche Adresse dieses Servers ist nicht eingestellt, deshalb fehlen die Adressen. Bitte zuerst die öffentliche Adresse (TIQORA_PUBLIC_BASE_URL) setzen.",
+        "labels": {
+          "agent_redirect_uri": "Rücksprung-Adresse für Agenten",
+          "customer_redirect_uri": "Rücksprung-Adresse für Kunden",
+          "backchannel_logout_url": "Adresse für Abmeldung durch den Anmeldedienst",
+          "sp_entity_id": "Entity-ID dieses Servers",
+          "agent_acs_url": "Antwort-Adresse (ACS) für Agenten",
+          "customer_acs_url": "Antwort-Adresse (ACS) für Kunden",
+          "sp_metadata_url": "Metadaten dieses Servers",
+          "slo_url": "Abmelde-Adresse"
+        }
+      },
+      "test": {
+        "intro": "Mit einer Testanmeldung sehen Sie, welche Werte der Anmeldedienst übermittelt und was bei einer echten Anmeldung passieren würde. Es wird nichts angelegt und niemand angemeldet.",
+        "ldapHint": "Für LDAP gibt es keine Testanmeldung über den Browser. Prüfen Sie die Verbindung, indem Sie sich auf der Anmeldeseite mit einem Verzeichniskonto anmelden.",
+        "audience": "Testen als",
+        "audiences": {
+          "agent": "Agent",
+          "customer": "Kunde"
+        },
+        "draftHint": "Ungespeicherte Änderungen der Verbindung werden für diesen Test verwendet.",
+        "start": "Testanmeldung starten",
+        "startError": "Die Testanmeldung konnte nicht gestartet werden.",
+        "resultHeading": "Ergebnis der Testanmeldung",
+        "loadError": "Das Ergebnis konnte nicht geladen werden.",
+        "waiting": "Warte auf die Anmeldung …",
+        "timeout": "Das Ergebnis ist nach zwei Minuten nicht eingetroffen. Bitte die Testanmeldung erneut starten.",
+        "subject": "Kennung",
+        "attributesHeading": "Vom Anmeldedienst übermittelte Werte"
+      },
+      "plan": {
+        "rejected": "Die Anmeldung würde abgelehnt:",
+        "create": "Wird beim ersten Anmelden angelegt",
+        "newLogin": "Neuer Anmeldename: {{login}}",
+        "loginAs": "Anmeldung als {{login}}",
+        "matchedBy": {
+          "link": "Gefunden über eine bestehende Verknüpfung",
+          "login": "Gefunden über den Anmeldenamen",
+          "email": "Gefunden über die E-Mail-Adresse",
+          "jit": "Wird automatisch angelegt"
+        },
+        "profileChanges": "Änderungen am Profil",
+        "rolesAdd": "Rollen, die hinzukommen",
+        "rolesRemove": "Rollen, die entfallen",
+        "groupsAdd": "Gruppenrechte, die hinzukommen",
+        "groupsRemove": "Gruppenrechte, die entfallen"
+      },
+      "config": {
+        "oidc": {
+          "fields": {
+            "issuer": {
+              "label": "Adresse des Anmeldedienstes (Issuer)",
+              "help": "z. B. https://login.example.org/realms/firma. „/.well-known/openid-configuration“ wird automatisch ergänzt."
+            },
+            "client_id": {
+              "label": "Client-ID"
+            },
+            "client_secret": {
+              "label": "Client-Geheimnis"
+            },
+            "scopes": {
+              "label": "Angeforderte Bereiche",
+              "help": "Durch Leerzeichen getrennt."
+            },
+            "redirect_uri": {
+              "label": "Rücksprung-Adresse",
+              "help": "Leer lassen, dann wird sie aus der öffentlichen Adresse berechnet."
+            },
+            "pkce": {
+              "label": "PKCE",
+              "options": {
+                "auto": "Automatisch",
+                "always": "Immer",
+                "never": "Nie"
+              }
+            },
+            "email_must_be_verified": {
+              "label": "E-Mail-Adresse muss bestätigt sein",
+              "help": "Nötig, wenn Benutzer über ihre E-Mail-Adresse gefunden oder angelegt werden."
+            },
+            "allow_private_network": {
+              "label": "Interne Netzwerke erlauben",
+              "help": "Nur für Anmeldedienste im eigenen Netz (z. B. selbst betriebenes Keycloak)."
+            },
+            "backchannel_logout": {
+              "label": "Abmeldung durch den Anmeldedienst annehmen"
+            }
+          }
+        },
+        "saml": {
+          "fields": {
+            "idp_metadata_url": {
+              "label": "Metadaten-Adresse des Anmeldedienstes",
+              "help": "Wird täglich neu geladen."
+            },
+            "idp_metadata_xml": {
+              "label": "Metadaten als XML",
+              "help": "Alternative zur Adresse: Metadaten hier einfügen."
+            },
+            "idp_entity_id": {
+              "label": "Entity-ID des Anmeldedienstes",
+              "help": "Nur nötig, wenn die Metadaten mehrere Anmeldedienste enthalten."
+            },
+            "name_id_format": {
+              "label": "Format der Benutzerkennung",
+              "options": {
+                "unspecified": "Nicht festgelegt",
+                "emailAddress": "E-Mail-Adresse",
+                "persistent": "Dauerhaft",
+                "transient": "Einmalig"
+              }
+            },
+            "sign_requests": {
+              "label": "Anmeldeanfragen signieren"
+            },
+            "want_response_signed": {
+              "label": "Gesamte Antwort muss signiert sein",
+              "help": "Die Zusicherung des Anmeldedienstes muss immer signiert sein."
+            },
+            "allow_idp_initiated": {
+              "label": "Anmeldung direkt vom Anmeldedienst aus erlauben"
+            },
+            "allow_sha1_signatures": {
+              "label": "Unsichere SHA-1-Signaturen akzeptieren",
+              "help": "Nur für ältere Anmeldedienste. SHA-1 gilt als gebrochen."
+            },
+            "clock_skew_seconds": {
+              "label": "Erlaubte Zeitabweichung (Sekunden)"
+            },
+            "allow_private_network": {
+              "label": "Interne Netzwerke erlauben",
+              "help": "Nur für Metadaten-Adressen im eigenen Netz."
+            },
+            "sp_certificate": {
+              "label": "Zertifikat dieses Servers",
+              "help": "Wird automatisch erzeugt. Im Anmeldedienst hinterlegen, wenn Anfragen signiert werden."
+            },
+            "sp_private_key": {
+              "label": "Privater Schlüssel dieses Servers"
+            }
+          }
+        },
+        "ldap": {
+          "fields": {
+            "host": {
+              "label": "Server"
+            },
+            "port": {
+              "label": "Port"
+            },
+            "use_ssl": {
+              "label": "Verschlüsselt verbinden (LDAPS)"
+            },
+            "use_starttls": {
+              "label": "Verschlüsselung mit StartTLS"
+            },
+            "base_dn": {
+              "label": "Suchbasis (Base DN)"
+            },
+            "bind_dn": {
+              "label": "Benutzer für die Suche (Bind DN)"
+            },
+            "bind_password": {
+              "label": "Passwort für die Suche"
+            },
+            "uid_attr": {
+              "label": "Attribut des Anmeldenamens"
+            },
+            "always_filter": {
+              "label": "Zusätzlicher Suchfilter"
+            },
+            "group_dn": {
+              "label": "Gruppe, die anmelden darf (Group DN)",
+              "help": "Leer lassen, dann dürfen alle gefundenen Benutzer sich anmelden."
+            },
+            "access_attr": {
+              "label": "Mitglieds-Attribut der Gruppe"
+            },
+            "user_attr": {
+              "label": "Benutzer in der Gruppe als",
+              "options": {
+                "DN": "DN",
+                "UID": "Anmeldename"
+              }
+            },
+            "subject_attr": {
+              "label": "Eindeutige Kennung",
+              "help": "Bei Active Directory: objectGUID."
+            }
           }
         }
       }

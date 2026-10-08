@@ -115,6 +115,11 @@ import { QueueCustomerLinksPage } from "@/routes/admin/QueueCustomerLinksPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
 import { AuthConfigPage } from "@/routes/admin/AuthConfigPage";
+import { IdentityProvidersPage } from "@/routes/admin/IdentityProvidersPage";
+import {
+  IdentityProviderPage,
+  type IdentityProviderSearch,
+} from "@/routes/admin/IdentityProviderPage";
 import { GdprPage, type GdprSearch } from "@/routes/admin/GdprPage";
 import { AiSettingsPage } from "@/routes/admin/AiSettingsPage";
 import { AiProvidersPage } from "@/routes/admin/AiProvidersPage";
@@ -656,6 +661,29 @@ const adminAuthConfigRoute = createRoute({
   component: AuthConfigPage,
 });
 
+const adminIdentityProvidersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/identity-providers",
+  component: IdentityProvidersPage,
+});
+
+const adminIdentityProviderRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/identity-providers/$providerId",
+  validateSearch: (s: Record<string, unknown>): IdentityProviderSearch => ({
+    tab:
+      s.tab === "connection" ||
+      s.tab === "mapping" ||
+      s.tab === "roles" ||
+      s.tab === "test" ||
+      s.tab === "links"
+        ? s.tab
+        : undefined,
+    test: typeof s.test === "string" && s.test ? s.test : undefined,
+  }),
+  component: IdentityProviderPage,
+});
+
 const adminGroupsRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/groups",
@@ -1073,6 +1101,8 @@ const routeTree = rootRoute.addChildren([
     adminIndexRoute,
     adminUsersRoute,
     adminAuthConfigRoute,
+    adminIdentityProvidersRoute,
+    adminIdentityProviderRoute,
     adminGroupsRoute,
     adminRolesRoute,
     adminAgentRolesRoute,

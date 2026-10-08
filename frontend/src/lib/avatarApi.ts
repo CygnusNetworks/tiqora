@@ -103,6 +103,11 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   if (typeof body === "string") return body.trim() && !body.trim().startsWith("<") ? body.trim() : fallback;
   const inner = body && typeof body === "object" ? body.detail : null;
   if (typeof inner === "string" && inner) return inner;
+  // `{"detail": {"message": "…", "errors": {…}}}` (admin identity API).
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+    const message = (inner as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+  }
   if (Array.isArray(inner)) {
     const msg = (inner[0] as { msg?: unknown } | undefined)?.msg;
     if (typeof msg === "string" && msg) return msg;
