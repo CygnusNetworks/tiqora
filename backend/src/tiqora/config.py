@@ -386,6 +386,10 @@ class Settings(BaseSettings):
     telegram_poller_interval_seconds: int = Field(
         default=5, validation_alias="TIQORA_TELEGRAM_POLLER_INTERVAL"
     )
+    # Background job runner (tiqora.jobs): how often the worker looks for queued jobs.
+    jobs_poll_interval_seconds: int = Field(
+        default=2, ge=1, le=60, validation_alias="TIQORA_JOBS_POLL_INTERVAL_SECONDS"
+    )
     # Outbound SMTP. Disabled by default so agent email replies store the
     # article without 502ing when no relay is configured (prod often has no
     # TIQORA_SMTP_HOST). Set TIQORA_SMTP_ENABLED=1 once a real relay is wired.

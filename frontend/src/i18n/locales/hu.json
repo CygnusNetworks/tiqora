@@ -2987,6 +2987,10 @@
         "smime_customer_renew": {
           "name": "Ügyfél S/MIME-tanúsítványainak megújítása",
           "description": "Naponta egyszer átveszi a megújított ügyféltanúsítványokat az ügyfél-háttérrendszerből (Znuny RenewCustomerSMIMECertificates; kell hozzá: SMIME::FetchFromCustomer)."
+        },
+        "jobs": {
+          "name": "Background tasks",
+          "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
       "takeoverBadge": "Átvétel"

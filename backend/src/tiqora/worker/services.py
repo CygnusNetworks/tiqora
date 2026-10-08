@@ -39,6 +39,7 @@ from tiqora.domain.settings_store import (
     KEY_UNLOCK_TIMEOUT_ENABLED,
     KEY_UNLOCK_TIMEOUT_INTERVAL_SECONDS,
 )
+from tiqora.jobs.runner import STATUS_EVERY_SECONDS
 
 ScheduleKind = Literal["interval", "daily"]
 
@@ -186,6 +187,18 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="04:00",
+    ),
+    # Job runner (tiqora.jobs.runner): always on; records its status at most every
+    # STATUS_EVERY_SECONDS, which the "stale" threshold has to allow for.
+    DaemonService(
+        slug="jobs",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="interval",
+        interval_key=None,
+        interval_settings_attr="jobs_poll_interval_seconds",
+        tick_timeout_seconds=STATUS_EVERY_SECONDS,
     ),
     DaemonService(
         slug="smime_customer_renew",

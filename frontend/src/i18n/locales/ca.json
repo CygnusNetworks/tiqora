@@ -2987,6 +2987,10 @@
         "smime_customer_renew": {
           "name": "Renovació dels certificats S/MIME de client",
           "description": "Importa un cop al dia els certificats de client renovats des del backend de clients (Znuny RenewCustomerSMIMECertificates; cal SMIME::FetchFromCustomer)."
+        },
+        "jobs": {
+          "name": "Background tasks",
+          "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
       "takeoverBadge": "Adquisició"

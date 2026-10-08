@@ -2987,6 +2987,10 @@
         "smime_customer_renew": {
           "name": "Obnova S/MIME certifikata kupca",
           "description": "Jednom dnevno preuzima obnovljene certifikate kupca iz pozadinskog sustava kupaca (Znuny RenewCustomerSMIMECertificates; treba SMIME::FetchFromCustomer)."
+        },
+        "jobs": {
+          "name": "Background tasks",
+          "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
       "takeoverBadge": "Preuzimanje"

@@ -2995,6 +2995,10 @@
         "smime_customer_renew": {
           "name": "S/MIME-Kundenzertifikate erneuern",
           "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."
+        },
+        "jobs": {
+          "name": "Hintergrundaufgaben",
+          "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."
         }
       },
       "takeoverBadge": "Übernahme"

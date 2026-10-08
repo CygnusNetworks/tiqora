@@ -2995,6 +2995,10 @@
         "smime_customer_renew": {
           "name": "S/MIME顧客証明書の更新",
           "description": "更新された顧客証明書を、顧客バックエンドから1日1回取り込みます（Znuny RenewCustomerSMIMECertificates。SMIME::FetchFromCustomer が必要です）。"
+        },
+        "jobs": {
+          "name": "Background tasks",
+          "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
       "takeoverBadge": "乗っ取り"

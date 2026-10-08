@@ -2987,6 +2987,10 @@
         "smime_customer_renew": {
           "name": "Оновлення сертифікатів S/MIME замовників",
           "description": "Раз на добу переймає оновлені сертифікати замовників із бекенду замовників (Znuny RenewCustomerSMIMECertificates; потребує SMIME::FetchFromCustomer)."
+        },
+        "jobs": {
+          "name": "Background tasks",
+          "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
       "takeoverBadge": "Поглинання"
