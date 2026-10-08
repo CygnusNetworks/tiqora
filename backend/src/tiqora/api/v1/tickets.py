@@ -50,11 +50,11 @@ from tiqora.domain.schemas import (
     TicketDetail,
     TicketLinkCreateRequest,
     TicketLinkTargetOut,
-    TicketListItem,
     UtcDateTime,
     as_naive_utc,
 )
 from tiqora.domain.search import SearchIndexService
+from tiqora.domain.ticket_csv import CSV_HEADER, EchoWriter, ticket_csv_row
 from tiqora.domain.ticket_service import (
     TicketAccessDenied,
     TicketNotFound,
@@ -75,6 +75,10 @@ from tiqora.domain.ticket_write_service import (
     TicketNotFound as WriteNotFound,
 )
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
+from tiqora.filters.ticket_params import TicketListParams, filter_from_list_params
+from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB, TicketExportPayload
+from tiqora.jobs.schemas import JobAccepted
+from tiqora.jobs.service import enqueue_job
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -614,47 +618,6 @@ async def search_tickets(
     return [TicketSearchHitOut(**h) for h in hits]
 
 
-class _EchoWriter:
-    """File-like shim so ``csv.writer`` yields each row as a string.
-
-    ``csv.writer(target).writerow(...)`` calls ``target.write(row_string)``
-    and returns whatever ``write`` returns — echoing the string back turns
-    the writer into a per-row string generator instead of one requiring a
-    real (buffering) file object, which is what lets the CSV export stream
-    row-by-row instead of materializing the whole file in memory.
-    """
-
-    def write(self, value: str) -> str:
-        return value
-
-
-_CSV_HEADER = [
-    "Number",
-    "Title",
-    "Queue",
-    "State",
-    "Priority",
-    "Owner",
-    "Customer",
-    "Created",
-    "Changed",
-]
-
-
-def _ticket_csv_row(item: TicketListItem) -> list[str]:
-    return [
-        item.tn,
-        item.title or "",
-        item.queue_name or "",
-        item.state or "",
-        item.priority or "",
-        item.owner_login or item.owner_name or "",
-        item.customer_id or "",
-        item.create_time.isoformat(),
-        item.change_time.isoformat(),
-    ]
-
-
 async def _export_tickets_csv_stream(
     svc: TicketService,
     user_id: int,
@@ -677,11 +640,11 @@ async def _export_tickets_csv_stream(
     order: str,
     include_archived: bool = False,
 ) -> AsyncGenerator[bytes, None]:
-    writer = csv.writer(_EchoWriter(), delimiter=";")
+    writer = csv.writer(EchoWriter(), delimiter=";")
     # UTF-8 BOM first, so Excel opens the file as UTF-8 instead of guessing
     # the system codepage.
     yield b"\xef\xbb\xbf"
-    yield writer.writerow(_CSV_HEADER).encode("utf-8")
+    yield writer.writerow(CSV_HEADER).encode("utf-8")
     async for item in svc.iter_tickets_for_export(
         user_id,
         queue_id=queue_id,
@@ -702,7 +665,7 @@ async def _export_tickets_csv_stream(
         order=order,
         include_archived=include_archived,
     ):
-        yield writer.writerow(_ticket_csv_row(item)).encode("utf-8")
+        yield writer.writerow(ticket_csv_row(item)).encode("utf-8")
 
 
 @router.get("/export.csv")
@@ -765,6 +728,43 @@ async def export_tickets_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="tickets.csv"'},
     )
+
+
+class TicketExportJobIn(BaseModel):
+    """Body of ``POST /tickets/export-jobs``: the same filters as ``GET /tickets``."""
+
+    params: TicketListParams = Field(default_factory=lambda: TicketListParams.model_validate({}))
+    sort: str = Field("age", description=_SORT_DESC)
+    order: Literal["asc", "desc"] = "desc"
+
+
+@router.post("/export-jobs", status_code=status.HTTP_202_ACCEPTED, response_model=JobAccepted)
+async def start_ticket_export_job(
+    body: TicketExportJobIn, user: CurrentUser, session: DbSession
+) -> JobAccepted:
+    """Queue the CSV export as a background job; poll ``GET /jobs/{id}`` for the file.
+
+    Registered before ``/{ticket_id}``. Permissions are evaluated again when
+    the worker runs the job. ``include_archived`` is honoured for admins only.
+    """
+    include_archived = body.params.include_archived
+    if include_archived and not await PermissionEngine(session).is_admin(user.id):
+        include_archived = False
+    payload = TicketExportPayload(
+        user_id=user.id,
+        filter=filter_from_list_params(body.params),
+        include_archived=include_archived,
+        sort=body.sort,
+        order=body.order,
+    )
+    job = await enqueue_job(
+        session,
+        kind=TICKET_EXPORT_JOB.kind,
+        payload=payload.model_dump(mode="json", by_alias=True, exclude_none=True),
+        created_by=user.id,
+    )
+    await session.commit()
+    return JobAccepted(job_id=job.id, status="queued")
 
 
 class TimeAccountingReportEntry(BaseModel):

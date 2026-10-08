@@ -1061,7 +1061,24 @@ class TicketService:
         )
         if stmt is None:
             return
+        async for item in self.iter_ticket_items(
+            stmt, sort=sort, order=order, batch_size=batch_size
+        ):
+            yield item
 
+    async def iter_ticket_items(
+        self,
+        stmt: Select[tuple[Ticket]],
+        *,
+        sort: str,
+        order: str,
+        batch_size: int = 500,
+    ) -> AsyncGenerator[TicketListItem, None]:
+        """Stream the tickets of an already permission-scoped ``stmt`` as list items.
+
+        Server-side streamed (``yield_per``) so a large result set is never
+        buffered in memory. The caller owns permission scoping.
+        """
         ordered = self._order_by(stmt, sort, order).execution_options(yield_per=batch_size)
         maps = await self._lookup_maps()
         result = await self._session.stream(ordered)

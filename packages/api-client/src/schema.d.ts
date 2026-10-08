@@ -6573,6 +6573,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/export-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Ticket Export Job
+         * @description Queue the CSV export as a background job; poll ``GET /jobs/{id}`` for the file.
+         *
+         *     Registered before ``/{ticket_id}``. Permissions are evaluated again when
+         *     the worker runs the job. ``include_archived`` is honoured for admins only.
+         */
+        post: operations["start_ticket_export_job_api_v1_tickets_export_jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/export.csv": {
         parameters: {
             query?: never;
@@ -12450,6 +12473,19 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /**
+         * JobAccepted
+         * @description 202 body of every feature endpoint that starts a job.
+         */
+        JobAccepted: {
+            /** Job Id */
+            job_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running";
+        };
         /** JobFileOut */
         JobFileOut: {
             /** Content Type */
@@ -16210,6 +16246,25 @@ export interface components {
             until_time: number;
         };
         /**
+         * TicketExportJobIn
+         * @description Body of ``POST /tickets/export-jobs``: the same filters as ``GET /tickets``.
+         */
+        TicketExportJobIn: {
+            /**
+             * Order
+             * @default desc
+             * @enum {string}
+             */
+            order: "asc" | "desc";
+            params?: components["schemas"]["TicketListParams"];
+            /**
+             * Sort
+             * @description age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).
+             * @default age
+             */
+            sort: string;
+        };
+        /**
          * TicketFacetChannels
          * @description Ticket counts per channel chip (every filter except ``channel``).
          */
@@ -16507,6 +16562,44 @@ export interface components {
             ticket_id: number;
             /** Tn */
             tn: string;
+        };
+        /** TicketListParams */
+        TicketListParams: {
+            /** Ai Escalated */
+            ai_escalated?: boolean | null;
+            /** Channel */
+            channel?: ("email" | "telegram" | "webchat" | "phone")[] | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Customer User Id */
+            customer_user_id?: string | null;
+            /** Escalated */
+            escalated?: boolean | null;
+            /** Escalating Within */
+            escalating_within?: number | null;
+            /**
+             * Include Archived
+             * @default false
+             */
+            include_archived: boolean;
+            /** Locked */
+            locked?: boolean | null;
+            /** Owner Id */
+            owner_id?: number | null;
+            /** Queue Id */
+            queue_id?: number | null;
+            /** Responsible Id */
+            responsible_id?: number | null;
+            /** Service Id */
+            service_id?: number | null;
+            /** State Id */
+            state_id?: number | null;
+            /** State Type */
+            state_type?: string | null;
+            /** Unassigned */
+            unassigned?: boolean | null;
+            /** Watcher User Id */
+            watcher_user_id?: number | null;
         };
         /**
          * TicketPermissions
@@ -34514,6 +34607,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_ticket_export_job_api_v1_tickets_export_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketExportJobIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
                 };
             };
             /** @description Validation Error */

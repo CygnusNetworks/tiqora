@@ -25,6 +25,11 @@ def register_core(registry: Registry) -> None:
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 
+    from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
+    from tiqora.jobs.registry import JOB_HANDLERS
+
+    registry.add(JOB_HANDLERS, TICKET_EXPORT_JOB)
+
 
 def get_registry() -> Registry:
     global _REGISTRY

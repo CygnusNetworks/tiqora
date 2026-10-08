@@ -13298,6 +13298,29 @@
         "title": "HostOut",
         "type": "object"
       },
+      "JobAccepted": {
+        "description": "202 body of every feature endpoint that starts a job.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "running"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "JobAccepted",
+        "type": "object"
+      },
       "JobFileOut": {
         "properties": {
           "content_type": {
@@ -24868,6 +24891,31 @@
         "title": "TicketDetail",
         "type": "object"
       },
+      "TicketExportJobIn": {
+        "description": "Body of ``POST /tickets/export-jobs``: the same filters as ``GET /tickets``.",
+        "properties": {
+          "order": {
+            "default": "desc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Order",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/TicketListParams"
+          },
+          "sort": {
+            "default": "age",
+            "description": "age | created | changed | tn | title | priority | activity (newest article's create_time, falling back to the ticket's create_time) | deadline (nearest SLA deadline that is set; tickets without one last when ascending).",
+            "title": "Sort",
+            "type": "string"
+          }
+        },
+        "title": "TicketExportJobIn",
+        "type": "object"
+      },
       "TicketFacetChannels": {
         "description": "Ticket counts per channel chip (every filter except ``channel``).",
         "properties": {
@@ -25572,6 +25620,192 @@
           "link_type"
         ],
         "title": "TicketListLink",
+        "type": "object"
+      },
+      "TicketListParams": {
+        "properties": {
+          "ai_escalated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Escalated"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "email",
+                    "telegram",
+                    "webchat",
+                    "phone"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
+          "escalated": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalated"
+          },
+          "escalating_within": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Escalating Within"
+          },
+          "include_archived": {
+            "default": false,
+            "title": "Include Archived",
+            "type": "boolean"
+          },
+          "locked": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Locked"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          },
+          "queue_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queue Id"
+          },
+          "responsible_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responsible Id"
+          },
+          "service_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Service Id"
+          },
+          "state_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Id"
+          },
+          "state_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State Type"
+          },
+          "unassigned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unassigned"
+          },
+          "watcher_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watcher User Id"
+          }
+        },
+        "title": "TicketListParams",
         "type": "object"
       },
       "TicketPermissions": {
@@ -67103,6 +67337,82 @@
           }
         },
         "summary": "Dashboard Summary",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/export-jobs": {
+      "post": {
+        "description": "Queue the CSV export as a background job; poll ``GET /jobs/{id}`` for the file.\n\nRegistered before ``/{ticket_id}``. Permissions are evaluated again when\nthe worker runs the job. ``include_archived`` is honoured for admins only.",
+        "operationId": "start_ticket_export_job_api_v1_tickets_export_jobs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketExportJobIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Ticket Export Job",
         "tags": [
           "tickets"
         ]
