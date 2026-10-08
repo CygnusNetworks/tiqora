@@ -5,9 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import (
+    CHAR,
     BigInteger,
     Boolean,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     LargeBinary,
@@ -886,3 +888,116 @@ class TiqoraJobFile(TiqoraBase):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     __table_args__ = (Index("ix_tiqora_job_file_job", "job_id"),)
+
+
+#: SAML IdP metadata documents can exceed 64 KiB: ``MEDIUMTEXT`` on MariaDB.
+IDENTITY_METADATA_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
+
+
+class TiqoraIdentityProvider(TiqoraBase):
+    """A configured sign-in provider (OIDC, SAML or LDAP). Timestamps are app-written naive UTC.
+
+    ``config`` holds the non-secret fields of the kind's config model as JSON;
+    secrets live encrypted in ``secrets_enc``.
+    """
+
+    __tablename__ = "tiqora_identity_provider"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    audience: Mapped[str] = mapped_column(String(16), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    sort: Mapped[int] = mapped_column(Integer, nullable=False)
+    button_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    button_icon: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    preset: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    config: Mapped[str] = mapped_column(Text, nullable=False)
+    secrets_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    match_by: Mapped[str] = mapped_column(String(16), nullable=False)
+    require_sso_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    attribute_map: Mapped[str] = mapped_column(Text, nullable=False)
+    jit_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    jit_defaults: Mapped[str] = mapped_column(Text, nullable=False)
+    role_rules: Mapped[str] = mapped_column(Text, nullable=False)
+    sync_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    metadata_xml: Mapped[str | None] = mapped_column(IDENTITY_METADATA_TEXT, nullable=True)
+    metadata_fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    metadata_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    create_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_tiqora_identity_provider_slug"),
+        Index("ix_tiqora_identity_provider_enabled", "enabled", "sort"),
+    )
+
+
+class TiqoraIdentityLink(TiqoraBase):
+    """Binds an IdP subject to a local account. Compared by ``subject_hash`` (sha256 hex),
+    never by the collated ``subject`` column; ``user_id`` is a soft reference."""
+
+    __tablename__ = "tiqora_identity_link"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(
+            "tiqora_identity_provider.id",
+            ondelete="CASCADE",
+            name="fk_tiqora_identity_link_provider",
+        ),
+        nullable=False,
+    )
+    user_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    subject_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    subject: Mapped[str] = mapped_column(String(512), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_login: Mapped[str] = mapped_column(String(200), nullable=False)
+    first_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_id", "user_kind", "subject_hash", name="uq_tiqora_identity_link_subject"
+        ),
+        Index("ix_tiqora_identity_link_user", "user_kind", "user_id"),
+    )
+
+
+class TiqoraIdentityManagedAssignment(TiqoraBase):
+    """A role/group assignment created by a provider's role rule (so sync may remove it)."""
+
+    __tablename__ = "tiqora_identity_managed_assignment"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(
+            "tiqora_identity_provider.id",
+            ondelete="CASCADE",
+            name="fk_tiqora_identity_managed_provider",
+        ),
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    permission_key: Mapped[str] = mapped_column(String(20), nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_id",
+            "user_id",
+            "kind",
+            "target_id",
+            "permission_key",
+            name="uq_tiqora_identity_managed",
+        ),
+        Index("ix_tiqora_identity_managed_user", "user_id"),
+    )

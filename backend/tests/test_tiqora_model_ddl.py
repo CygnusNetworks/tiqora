@@ -57,3 +57,13 @@ def test_job_file_data_and_result_fit_large_payloads_on_mariadb() -> None:
     assert "LONGBLOB" in _column_ddl(TiqoraJobFile.__table__, "data", mysql.dialect())
     assert "BYTEA" in _column_ddl(TiqoraJobFile.__table__, "data", postgresql.dialect())
     assert "MEDIUMTEXT" in _column_ddl(TiqoraJob.__table__, "result", mysql.dialect())
+
+
+def test_identity_metadata_xml_fits_large_documents_on_mariadb() -> None:
+    """SAML IdP metadata can exceed 64 KiB: ``MEDIUMTEXT`` on MariaDB, plain
+    ``TEXT`` on PostgreSQL (same as migration ``20261008_0062``)."""
+    from tiqora.db.tiqora.models import TiqoraIdentityProvider
+
+    table = TiqoraIdentityProvider.__table__
+    assert "MEDIUMTEXT" in _column_ddl(table, "metadata_xml", mysql.dialect())
+    assert "MEDIUMTEXT" not in _column_ddl(table, "metadata_xml", postgresql.dialect())
