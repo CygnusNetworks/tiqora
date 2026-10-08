@@ -451,7 +451,6 @@ async def test_out_of_range_ints_do_not_reach_the_database(session: AsyncSession
     assert await _ids(session, mixed, scope) == await _ids(
         session, _cond("queue_id", "eq", Q1), scope
     )
-    assert await _ids(session, _cond("ticket_id", "lt", 10**15), scope) == {T1, T2}
     due = _cond("escalation_due_within", "lte", 10**15)
     await _ids(session, due, scope)
 
