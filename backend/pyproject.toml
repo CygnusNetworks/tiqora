@@ -58,6 +58,8 @@ dependencies = [
     # AI attachment text extraction (tiqora.ai.attachments) — runs inside the
     # agent runtime/summary render path, must ship in the prod image.
     "pypdf>=5",
+    # GenericInterface XSLT mapping + XML::Simple port (tiqora.api.compat.mapping).
+    "lxml>=6.1.1",
     "python-docx>=1.1",
     "openpyxl>=3.1",
     "odfpy>=1.4",
@@ -166,6 +168,8 @@ module = [
     "docker.*",
     "psutil",
     "psutil.*",
+    "lxml",
+    "lxml.*",
 ]
 ignore_missing_imports = true
 
