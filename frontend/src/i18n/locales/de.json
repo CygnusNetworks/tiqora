@@ -4317,5 +4317,30 @@
       "changed": "Geändert",
       "pending_until": "Erinnerung am"
     }
+  },
+  "jobs": {
+    "status": {
+      "queued": "Wartet",
+      "running": "Läuft",
+      "succeeded": "Fertig",
+      "failed": "Fehlgeschlagen",
+      "cancelled": "Abgebrochen"
+    },
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "download": "{{name}} herunterladen",
+    "progressOf": "{{done}} von {{total}}",
+    "elapsed": "Dauer: {{duration}}",
+    "cancelRequested": "Wird abgebrochen …",
+    "loadError": "Der Stand dieser Aufgabe konnte nicht geladen werden.",
+    "kinds": {
+      "core": {
+        "ticket_export": "Ticket-Export"
+      }
+    },
+    "ticketExport": {
+      "title": "Tickets als CSV exportieren",
+      "startFailed": "Der Export konnte nicht gestartet werden."
+    }
   }
 }

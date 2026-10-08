@@ -4309,5 +4309,30 @@
       "changed": "Changed",
       "pending_until": "Reminder on"
     }
+  },
+  "jobs": {
+    "status": {
+      "queued": "Waiting",
+      "running": "Running",
+      "succeeded": "Done",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "cancel": "Cancel",
+    "close": "Close",
+    "download": "Download {{name}}",
+    "progressOf": "{{done}} of {{total}}",
+    "elapsed": "Elapsed: {{duration}}",
+    "cancelRequested": "Cancelling…",
+    "loadError": "The status of this task could not be loaded.",
+    "kinds": {
+      "core": {
+        "ticket_export": "Ticket export"
+      }
+    },
+    "ticketExport": {
+      "title": "Export tickets as CSV",
+      "startFailed": "The export could not be started."
+    }
   }
 }

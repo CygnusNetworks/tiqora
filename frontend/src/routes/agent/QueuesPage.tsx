@@ -38,6 +38,9 @@ import {
 import { TICKET_CHANNEL_KEYS, TICKET_CHANNELS } from "@/lib/ticketChannel";
 import { runConcurrent } from "@/lib/bulk";
 import { cn } from "@/lib/cn";
+import { jobsApi } from "@/lib/jobsApi";
+import { apiErrorMessage } from "@/lib/avatarApi";
+import { JobDialog } from "@/components/jobs/JobDialog";
 import { priorityLabel } from "@/lib/priority";
 import { stateLabel } from "@/lib/status";
 
@@ -225,6 +228,8 @@ export function QueuesPage() {
   // soon as something is selected. No separate "selection mode".
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [fullSelection, setFullSelection] = useState(false);
+  const [exportJobId, setExportJobId] = useState<number | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [fullIds, setFullIds] = useState<number[]>([]);
   const [fetchingAll, setFetchingAll] = useState(false);
   const lastToggled = useRef<number | null>(null);
@@ -594,8 +599,17 @@ export function QueuesPage() {
     { key: "unassigned", icon: <UserDashedIcon />, label: t("queue.flags.unassigned") },
   ];
 
-  const exportCsv = () => {
-    window.location.href = api.exportTicketsCsvUrl({ ...filterParams, sort, order });
+  const exportCsv = async () => {
+    try {
+      const accepted = await jobsApi.startTicketExport({
+        params: { ...filterParams, include_archived: includeArchived },
+        sort,
+        order,
+      });
+      setExportJobId(accepted.job_id);
+    } catch (err) {
+      setExportError(apiErrorMessage(err, t("jobs.ticketExport.startFailed")));
+    }
   };
 
   // A queue view already names its queue in the title; only the cross-queue
@@ -609,6 +623,12 @@ export function QueuesPage() {
 
   return (
     <div className="relative flex min-h-0 flex-1" data-testid="queues-page">
+      <JobDialog
+        jobId={exportJobId}
+        title={t("jobs.ticketExport.title")}
+        onClose={() => setExportJobId(null)}
+        testId="queue-export-job"
+      />
       <div className="min-w-0 flex-1 space-y-3 p-3">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -724,11 +744,20 @@ export function QueuesPage() {
                 {t("queue.showArchived")}
               </MenuItem>
             )}
-            <MenuItem testId="queue-export-csv" onSelect={exportCsv}>
+            <MenuItem testId="queue-export-csv" onSelect={() => {
+                setExportError(null);
+                void exportCsv();
+              }}>
               {t("queue.exportCsv")}
             </MenuItem>
           </Menu>
         </div>
+
+        {exportError && (
+          <p className="text-xs text-danger" role="alert" data-testid="queue-export-error">
+            {exportError}
+          </p>
+        )}
 
         <div
           className="flex flex-wrap items-center gap-1.5"

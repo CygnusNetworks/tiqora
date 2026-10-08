@@ -1531,6 +1531,24 @@ function cryptoOptionsFor(ticketId: number | null) {
   };
 }
 
+const demoExportJob = {
+  id: 9101,
+  kind: "core.ticket_export",
+  status: "succeeded",
+  title_key: "jobs.kinds.core.ticket_export",
+  progress_done: 3,
+  progress_total: 3,
+  progress_message: null,
+  cancel_requested: false,
+  error: null,
+  result: null,
+  files: [{ id: 1, name: "tickets.csv", content_type: "text/csv; charset=utf-8", size_bytes: 64 }],
+  created_by: 1,
+  created_at: "2026-10-08T09:00:00Z",
+  started_at: "2026-10-08T09:00:01Z",
+  finished_at: "2026-10-08T09:00:02Z",
+};
+
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Auth
@@ -1562,6 +1580,11 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/reference/phone-config")) return { dial_scheme: "tel" };
   if (p.endsWith("/api/v1/phone/calls/active")) return [];
   if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;
+  // Background jobs: the ticket CSV export finishes at once in the demo.
+  if (p.endsWith("/api/v1/tickets/export-jobs") && method === "POST") return { job_id: 9101, status: "queued" };
+  if (p.endsWith("/api/v1/jobs/9101/cancel") && method === "POST") return { ...demoExportJob, status: "cancelled" };
+  if (p.endsWith("/api/v1/jobs/9101")) return demoExportJob;
+  if (p.endsWith("/api/v1/jobs")) return [];
   // Agent
   if (p.endsWith("/api/v1/queues")) return agentQueues;
   // Reference lookups (flat lists behind name/id joins — e.g. the queue names

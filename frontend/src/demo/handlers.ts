@@ -27,6 +27,17 @@ export const handlers = [
   // No pictures in the demo: the avatar proxy "has nothing", so every
   // avatar shows its initials (the catch-all's JSON would be a broken image).
   http.get("*/api/v1/avatars/*", () => new HttpResponse(null, { status: 404 })),
+  // Job result download (the shared resolver only speaks JSON).
+  http.get(
+    "*/api/v1/jobs/*/files/*",
+    () =>
+      new HttpResponse("Ticket;Titel;Status\n2026100801;Beispiel;offen\n", {
+        headers: {
+          "content-type": "text/csv",
+          "content-disposition": 'attachment; filename="tickets.csv"',
+        },
+      }),
+  ),
   http.all("*/api/*", ({ request }) => {
     const url = new URL(request.url);
     if (url.pathname.endsWith("/events/stream")) {

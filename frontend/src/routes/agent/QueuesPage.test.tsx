@@ -28,7 +28,8 @@ const {
   listReferenceStates,
   listReferencePriorities,
   listReferenceAgents,
-  exportTicketsCsvUrl,
+  startTicketExport,
+  jobGet,
   ticketFacets,
 } = vi.hoisted(() => ({
   listQueues: vi.fn(),
@@ -37,9 +38,15 @@ const {
   listReferenceStates: vi.fn(),
   listReferencePriorities: vi.fn(),
   listReferenceAgents: vi.fn(),
-  exportTicketsCsvUrl: vi.fn(() => "/export.csv"),
+  startTicketExport: vi.fn(),
+  jobGet: vi.fn(),
   ticketFacets: vi.fn(),
 }));
+
+vi.mock("@/lib/jobsApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/jobsApi")>("@/lib/jobsApi");
+  return { ...actual, jobsApi: { ...actual.jobsApi, startTicketExport, get: jobGet } };
+});
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -52,7 +59,6 @@ vi.mock("@/lib/api", async () => {
       listReferenceStates,
       listReferencePriorities,
       listReferenceAgents,
-      exportTicketsCsvUrl,
       ticketFacets,
     },
   };
@@ -168,7 +174,8 @@ function resetMocks() {
   listReferencePriorities.mockReset();
   listReferenceAgents.mockReset();
   ticketFacets.mockReset();
-  exportTicketsCsvUrl.mockClear();
+  startTicketExport.mockReset();
+  jobGet.mockReset();
   void i18n.changeLanguage("de");
 
   listQueues.mockResolvedValue([]);
@@ -605,21 +612,52 @@ describe("QueuesPage more-actions menu", () => {
     });
   });
 
-  it("exports the current view as CSV", async () => {
-    const assign = vi.spyOn(window, "location", "get");
-    const loc = { href: "" } as Location;
-    assign.mockReturnValue(loc);
+  it("exports the current view as a background job and opens its dialog", async () => {
+    startTicketExport.mockResolvedValue({ job_id: 9101, status: "queued" });
+    jobGet.mockResolvedValue({
+      id: 9101,
+      kind: "core.ticket_export",
+      status: "running",
+      title_key: "jobs.kinds.core.ticket_export",
+      progress_done: 2,
+      progress_total: 5,
+      progress_message: null,
+      cancel_requested: false,
+      error: null,
+      result: null,
+      files: [],
+      created_by: 5,
+      created_at: "2026-10-08T10:00:00Z",
+      started_at: null,
+      finished_at: null,
+    });
     await renderQueuesPage({ state_type: "pending" });
     await screen.findByTestId("ticket-row-101");
 
     fireEvent.click(screen.getByTestId("queue-more-actions"));
     fireEvent.click(await screen.findByTestId("queue-export-csv"));
 
-    expect(exportTicketsCsvUrl).toHaveBeenCalledWith(
-      expect.objectContaining({ state_type: "pending", sort: "activity" }),
+    expect(await screen.findByTestId("queue-export-job-progress")).toHaveTextContent("2 von 5");
+    expect(startTicketExport).toHaveBeenCalledWith({
+      params: expect.objectContaining({ state_type: "pending" }),
+      sort: "activity",
+      order: "desc",
+    });
+    expect(jobGet).toHaveBeenCalledWith(9101, expect.anything());
+  });
+
+  it("shows an error instead of the dialog when the export cannot be started", async () => {
+    startTicketExport.mockRejectedValue(new Error("boom"));
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    fireEvent.click(screen.getByTestId("queue-more-actions"));
+    fireEvent.click(await screen.findByTestId("queue-export-csv"));
+
+    expect(await screen.findByTestId("queue-export-error")).toHaveTextContent(
+      "Der Export konnte nicht gestartet werden.",
     );
-    expect(loc.href).toBe("/export.csv");
-    assign.mockRestore();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 
