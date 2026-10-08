@@ -8,6 +8,7 @@ issued to the same browser.
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 from dataclasses import dataclass
 from typing import Any
@@ -18,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
 from tiqora.db.legacy.customer import CustomerUser
+from tiqora.identity.sso_sessions import SsoSessionInfo, drop_sso, load_sso, store_sso
 from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, verify_password
 
 CUSTOMER_SESSION_KEY_PREFIX = "tiqora:csession:"
@@ -62,13 +64,51 @@ class CustomerSessionStore:
     def _born_key(self, token: str) -> str:
         return f"{self._born_prefix}{token}"
 
-    async def create(self, customer_id: int, login: str) -> str:
+    def _user_index_key(self, customer_id: int) -> str:
+        return f"{self._prefix}user:{customer_id}"
+
+    async def create(
+        self, customer_id: int, login: str, *, sso: SsoSessionInfo | None = None
+    ) -> str:
         token = secrets.token_urlsafe(32)
         payload = f"{customer_id}:{login}"
         await self._client.set(self._key(token), payload, ex=self._ttl)
         # Absolute-lifetime marker, never renewed by touch() (security review L-2).
         await self._client.set(self._born_key(token), "1", ex=self._absolute_ttl)
+        # Per-customer reverse index for revoke_customer_sessions().
+        with contextlib.suppress(Exception):
+            index_key = self._user_index_key(customer_id)
+            await self._client.sadd(index_key, token)
+            await self._client.expire(index_key, self._absolute_ttl)
+        if sso is not None:
+            await store_sso(self._client, "c", token, sso, self._absolute_ttl)
         return token
+
+    async def get_sso(self, token: str) -> SsoSessionInfo | None:
+        return await load_sso(self._client, "c", token)
+
+    async def revoke_customer_sessions(
+        self, customer_id: int, *, keep_token: str | None = None
+    ) -> int:
+        """Delete every live session of *customer_id*; return how many were removed."""
+        index_key = self._user_index_key(customer_id)
+        try:
+            members = await self._client.smembers(index_key)
+        except Exception:  # noqa: BLE001 — a missing index must not break the write
+            return 0
+        removed = 0
+        for raw in members or set():
+            token = raw.decode("utf-8") if isinstance(raw, bytes) else str(raw)
+            if keep_token is not None and token == keep_token:
+                continue
+            await self.delete(token)
+            removed += 1
+        with contextlib.suppress(Exception):
+            await self._client.delete(index_key)
+            if keep_token is not None:
+                await self._client.sadd(index_key, keep_token)
+                await self._client.expire(index_key, self._absolute_ttl)
+        return removed
 
     async def get(self, token: str) -> tuple[int, str] | None:
         if not await self._client.get(self._born_key(token)):
@@ -90,6 +130,7 @@ class CustomerSessionStore:
 
     async def delete(self, token: str) -> None:
         await self._client.delete(self._key(token), self._born_key(token))
+        await drop_sso(self._client, "c", token)
 
 
 class CustomerAuthService:
@@ -133,8 +174,10 @@ class CustomerAuthService:
                 await self._session.rollback()
         return _to_authenticated(user)
 
-    async def create_session(self, customer: AuthenticatedCustomer) -> str:
-        return await self._sessions.create(customer.id, customer.login)
+    async def create_session(
+        self, customer: AuthenticatedCustomer, *, sso: SsoSessionInfo | None = None
+    ) -> str:
+        return await self._sessions.create(customer.id, customer.login, sso=sso)
 
     async def resolve_session(self, token: str) -> AuthenticatedCustomer | None:
         data = await self._sessions.get(token)

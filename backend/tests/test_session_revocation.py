@@ -118,3 +118,17 @@ async def test_seconds_since_auth_survives_a_corrupt_marker(store: SessionStore)
     token = await store.create(7, "agent.seven")
     await store._client.set(store._auth_at_key(token), "not-a-number")  # noqa: SLF001
     assert await store.seconds_since_auth(token) is None
+
+
+async def test_revoke_customer_sessions_spares_other_customers() -> None:
+    from tiqora.domain.customer_auth import CustomerSessionStore
+
+    customers = CustomerSessionStore(_FakeRedis(), Settings(secret_key="unit-test-secret-key"))  # type: ignore[arg-type]
+    a = await customers.create(5, "c.five")
+    b = await customers.create(5, "c.five")
+    other = await customers.create(6, "c.six")
+
+    assert await customers.revoke_customer_sessions(5) == 2
+    assert await customers.get(a) is None
+    assert await customers.get(b) is None
+    assert await customers.get(other) is not None
