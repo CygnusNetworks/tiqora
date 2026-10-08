@@ -385,7 +385,7 @@ async def test_admin_customer_user_create_and_soft_delete(
         created = await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=f"newcust.{ns}@example.com",
-                email=f"newcust.{ns}@example.com",
+                email=f"newcust.{ns}@example.test",
                 customer_id=f"CUST-{ns}",
                 first_name="New",
                 last_name="Customer",
@@ -431,7 +431,7 @@ async def test_admin_customer_user_list_pagination_and_valid_filter(
             cu = await admin_customers.create_customer_user(
                 CustomerUserAdminCreate(
                     login=f"pageuser.{i:02d}.{ns}@example.com",
-                    email=f"pageuser.{i:02d}.{ns}@example.com",
+                    email=f"pageuser.{i:02d}.{ns}@example.test",
                     customer_id=cust,
                     first_name="Page",
                     last_name=f"User{i:02d}",
@@ -500,7 +500,7 @@ async def test_admin_customer_user_list_search(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=f"alice.srch.{ns}@example.com",
-                email=f"alice.mail.{ns}@example.com",
+                email=f"alice.mail.{ns}@example.test",
                 customer_id=cust,
                 first_name="Alice",
                 last_name=f"Wonder{ns}",
@@ -511,7 +511,7 @@ async def test_admin_customer_user_list_search(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=f"bob.srch.{ns}@example.com",
-                email=f"bob.mail.{ns}@example.com",
+                email=f"bob.mail.{ns}@example.test",
                 customer_id=cust,
                 first_name="Bob",
                 last_name=f"Builder{ns}",
@@ -522,7 +522,7 @@ async def test_admin_customer_user_list_search(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=f"carol.srch.{ns}@example.com",
-                email=f"carol.mail.{ns}@example.com",
+                email=f"carol.mail.{ns}@example.test",
                 customer_id=cust,
                 first_name="Carol",
                 last_name=f"Singer{ns}",
@@ -597,7 +597,7 @@ async def test_admin_customer_user_list_search_regex(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=f"alice.rx.{ns}@example.com",
-                email=f"alice.mail.{ns}@example.com",
+                email=f"alice.mail.{ns}@example.test",
                 customer_id=cust,
                 first_name="Alice",
                 last_name=f"Wonder{ns}",
@@ -609,7 +609,7 @@ async def test_admin_customer_user_list_search_regex(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=f"bob.rx.{ns}@example.com",
-                email=f"bob.mail.{ns}@example.com",
+                email=f"bob.mail.{ns}@example.test",
                 customer_id=cust,
                 first_name="Bob",
                 last_name=f"Builder{ns}",
@@ -706,7 +706,7 @@ async def test_admin_customer_user_bulk_update(
             cu = await admin_customers.create_customer_user(
                 CustomerUserAdminCreate(
                     login=f"bulk.{i}.{ns}@example.com",
-                    email=f"bulk.{i}.{ns}@example.com",
+                    email=f"bulk.{i}.{ns}@example.test",
                     customer_id=cust_a,
                     first_name="Bulk",
                     last_name=f"User{i}",
@@ -1121,7 +1121,7 @@ async def test_admin_customer_user_customer_assignment_roundtrip(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=login,
-                email=login,
+                email=login.replace("@example.com", "@example.test"),
                 customer_id=f"HOME-964-{ns}",
                 first_name="Cust",
                 last_name="User",
@@ -1400,7 +1400,7 @@ async def test_admin_customer_user_group_assignment_roundtrip(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=login,
-                email=login,
+                email=login.replace("@example.com", "@example.test"),
                 customer_id=f"CUG-HOME-{ns}",
                 first_name="Cu",
                 last_name="Group",
@@ -1770,7 +1770,7 @@ async def test_admin_group_customer_users_reverse_get_roundtrip(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=login,
-                email=login,
+                email=login.replace("@example.com", "@example.test"),
                 customer_id=f"REV-GCU-HOME-{ns}",
                 first_name="Rev",
                 last_name="Gcu",
@@ -1824,7 +1824,7 @@ async def test_admin_customer_company_users_reverse_get_roundtrip(
         await admin_customers.create_customer_user(
             CustomerUserAdminCreate(
                 login=login,
-                email=login,
+                email=login.replace("@example.com", "@example.test"),
                 customer_id=f"REV-CCU-HOME-{ns}",
                 first_name="Rev",
                 last_name="Ccu",
@@ -2179,7 +2179,7 @@ async def test_admin_customer_user_list_large_page_size(
             await admin_customers.create_customer_user(
                 CustomerUserAdminCreate(
                     login=f"alle.{i}.{ns}@example.com",
-                    email=f"alle.{i}.{ns}@example.com",
+                    email=f"alle.{i}.{ns}@example.test",
                     customer_id=f"ALLE-{ns}",
                     first_name="Alle",
                     last_name=f"User{i}",
@@ -2230,7 +2230,7 @@ async def test_admin_customer_user_list_sort(
             await admin_customers.create_customer_user(
                 CustomerUserAdminCreate(
                     login=f"{login_prefix}.sort.{ns}@example.com",
-                    email=f"{email_prefix}.sort.{ns}@example.com",
+                    email=f"{email_prefix}.sort.{ns}@example.test",
                     customer_id=cust,
                     first_name=first,
                     last_name=f"Sort{ns}",
@@ -2293,9 +2293,9 @@ async def test_admin_customer_user_list_sort(
             search=ns,
         )
         assert [i.email for i in email_asc.items] == [
-            f"a.sort.{ns}@example.com",
-            f"m.sort.{ns}@example.com",
-            f"z.sort.{ns}@example.com",
+            f"a.sort.{ns}@example.test",
+            f"m.sort.{ns}@example.test",
+            f"z.sort.{ns}@example.test",
         ]
 
         email_desc = await admin_customers.list_customer_users(
@@ -2305,9 +2305,9 @@ async def test_admin_customer_user_list_sort(
             search=ns,
         )
         assert [i.email for i in email_desc.items] == [
-            f"z.sort.{ns}@example.com",
-            f"m.sort.{ns}@example.com",
-            f"a.sort.{ns}@example.com",
+            f"z.sort.{ns}@example.test",
+            f"m.sort.{ns}@example.test",
+            f"a.sort.{ns}@example.test",
         ]
 
         change_asc = await admin_customers.list_customer_users(

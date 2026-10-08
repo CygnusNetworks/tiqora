@@ -970,7 +970,10 @@ class TiqoraIdentityLink(TiqoraBase):
 
 
 class TiqoraIdentityManagedAssignment(TiqoraBase):
-    """A role/group assignment created by a provider's role rule (so sync may remove it)."""
+    """A role/group assignment created by a provider's role rule (so sync may remove it).
+
+    Agents only (no ``user_kind``): write through ``user_provisioning.record_managed_assignment``.
+    """
 
     __tablename__ = "tiqora_identity_managed_assignment"
 

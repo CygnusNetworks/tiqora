@@ -1,7 +1,8 @@
 """One write path for Znuny agents, roles, groups and customers (wave 1, Task 16).
 
 DB, both dialects. Seed band 47300-47349 (agent ids, group/role ids), customer logins
-``idp.prov-*@example.org``. Invalidation rows are counted before/after (shared table).
+``idp.prov-*@example.test`` (company ``prov-co``; example.org is rejected by Znuny's default
+CheckEmailInvalidAddress). Invalidation rows are counted before/after (shared table).
 """
 
 from __future__ import annotations
@@ -11,33 +12,43 @@ from datetime import datetime, timedelta
 
 import pytest
 import pytest_asyncio
+from fastapi import HTTPException
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._identity_helpers import make_provider
 from tests.test_identity_store import _to_async_url
+from tiqora.api.v1.admin import customers as admin_customers
+from tiqora.api.v1.admin import users as admin_users
 from tiqora.api.v1.admin.common import (
     CUSTOMER_USER_CACHE_TYPES,
     USER_CACHE_TYPES,
     USER_GROUP_CACHE_TYPES,
     USER_ROLE_CACHE_TYPES,
 )
+from tiqora.api.v1.admin.schemas import (
+    CustomerUserAdminCreate,
+    GroupAssignment,
+    UserCreate,
+    UserUpdate,
+)
 from tiqora.config import Settings
 from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain import user_provisioning as up
+from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.user_delete import delete_user_rows
 from tiqora.gdpr.erasure import run_erasure
 from tiqora.identity.links import upsert_link
 
 pytestmark = pytest.mark.db
 
-NOW = datetime(2026, 10, 8, 12, 0, 0)
+NOW = datetime(2020, 1, 1, 12, 0, 0)
 BAND = (47300, 47349)
 ACTOR = 47300
 ROLE_OK, ROLE_OFF = 47301, 47302
 GROUP_A, GROUP_B = 47303, 47304
-CUSTOMER_LIKE = "idp.prov-%@example.org"
+CUSTOMER_LIKE = "idp.prov-%@example.test"
 _URLS: set[str] = set()
 _INVAL_MARK: dict[str, int] = {}  # url -> MAX(id) of tiqora_cache_invalidation before the module
 
@@ -178,7 +189,7 @@ async def _agent(session: AsyncSession, login: str, **kw: object) -> Users:
         "login": login,
         "first_name": "Ada",
         "last_name": "Example",
-        "email": f"{login}@example.org",
+        "email": f"{login}@example.test",
         "mobile": None,
         "title": None,
         "pw_hash": "x",
@@ -221,7 +232,7 @@ async def test_create_agent_writes_row_email_and_invalidation(session: AsyncSess
         ).all()
     )
     assert {k: (v.decode() if isinstance(v, bytes) else v) for k, v in prefs.items()} == {
-        "UserEmail": "prov-one@example.org",
+        "UserEmail": "prov-one@example.test",
         "UserMobile": "+49 30 1",
     }
     assert await _inval(session, USER_CACHE_TYPES) - before == len(set(USER_CACHE_TYPES))
@@ -341,7 +352,7 @@ async def test_update_agent_profile_identical_values_is_noop(session: AsyncSessi
         user,
         first_name="Ada",
         last_name="Example",
-        email="prov-upd@example.org",
+        email="prov-upd@example.test",
         mobile="123",
         actor_id=ACTOR,
     )
@@ -371,8 +382,8 @@ async def test_create_customer_user_writes_row_and_invalidates(session: AsyncSes
     before = await _inval(session, CUSTOMER_USER_CACHE_TYPES)
     cu = await up.create_customer_user(
         session,
-        login="idp.prov-1@example.org",
-        email="idp.prov-1@example.org",
+        login="idp.prov-1@example.test",
+        email="idp.prov-1@example.test",
         customer_id="prov-co",
         first_name="Kim",
         last_name="Kunde",
@@ -395,7 +406,7 @@ async def test_create_customer_user_writes_row_and_invalidates(session: AsyncSes
         .one()
     )
     assert dict(row) == {
-        "email": "idp.prov-1@example.org",
+        "email": "idp.prov-1@example.test",
         "customer_id": "prov-co",
         "phone": "+49 1",
         "pw": None,
@@ -464,7 +475,7 @@ async def test_user_delete_purges_identity_links_and_managed_assignments(
         user_kind="customer",
         subject="s-cust",
         user_id=user.id,
-        user_login="idp.prov-x@example.org",
+        user_login="idp.prov-x@example.test",
     )
     await session.execute(
         text(
@@ -492,7 +503,7 @@ async def test_user_delete_purges_identity_links_and_managed_assignments(
 
 @pytest.mark.parametrize("mode", ["anonymize", "delete"])
 async def test_customer_erasure_purges_identity_links(session: AsyncSession, mode: str) -> None:
-    login = f"idp.prov-{mode}@example.org"
+    login = f"idp.prov-{mode}@example.test"
     cu = await up.create_customer_user(
         session,
         login=login,
@@ -541,3 +552,289 @@ async def test_customer_erasure_purges_identity_links(session: AsyncSession, mod
 
     await session.rollback()
     assert await _link_counts(session, rec.id) == {"agent": 1, "customer": 0}
+
+
+# --- e-mail rules (Znuny CheckItem::CheckEmail driven by SysConfig) ---------------------
+
+
+class _Cfg:
+    """Stand-in for SysConfig with explicit values; absent names fall back to the call default."""
+
+    values: dict[str, object] = {}
+
+    def __init__(self, session: object) -> None:
+        pass
+
+    async def get(self, name: str, default: object = None) -> object:
+        return self.values.get(name, default)
+
+
+@pytest.fixture
+def cfg(monkeypatch: pytest.MonkeyPatch) -> type[_Cfg]:
+    _Cfg.values = {}
+    monkeypatch.setattr(up, "SysConfig", _Cfg)
+    return _Cfg
+
+
+@pytest.mark.parametrize(
+    ("address", "ok"),
+    [
+        ("agent@example.test", True),
+        ("first.last@mail.example.test", True),
+        ("root@localhost", True),  # CheckEmailValidAddress default whitelist
+        ("ADMIN@LOCALHOST", True),  # whitelist is case-insensitive
+        ("plain", False),
+        ("a@b", False),  # no dotted domain
+        ("a..b@example.test", False),  # Znuny rule (\.\.)
+        ("a.@example.test", False),  # Znuny rule (\.@)
+        (".a@example.test", False),  # leading dot
+        ("a b@example.test", False),
+        ("a@@example.test", False),
+        ("x@example.org", False),  # CheckEmailInvalidAddress default @(example)\.(..|...)$
+        ("x@example.com", False),
+        ("x@sub.example.de", True),
+    ],
+)
+async def test_check_email_defaults(cfg: type[_Cfg], address: str, ok: bool) -> None:
+    assert await up.check_email(None, address) is ok  # type: ignore[arg-type]
+
+
+async def test_check_email_switch_off_and_custom_patterns(cfg: type[_Cfg]) -> None:
+    cfg.values = {"CheckEmailAddresses": 0}
+    assert await up.check_email(None, "not an address") is True  # type: ignore[arg-type]
+    cfg.values = {"CheckEmailAddresses": "0"}
+    assert await up.check_email(None, "x@example.org") is True  # type: ignore[arg-type]
+    cfg.values = {"CheckEmailValidAddress": r"^svc@intranet$"}
+    assert await up.check_email(None, "svc@intranet") is True  # type: ignore[arg-type]
+    assert await up.check_email(None, "root@localhost") is False  # type: ignore[arg-type]
+    cfg.values = {"CheckEmailInvalidAddress": r"@blocked\.test$"}
+    assert await up.check_email(None, "x@example.org") is True  # type: ignore[arg-type]
+    assert await up.check_email(None, "x@BLOCKED.test") is False  # type: ignore[arg-type]
+
+
+async def test_email_is_validated_and_stored_trimmed(session: AsyncSession) -> None:
+    user = await _agent(session, "prov-trim", email="  prov-trim@example.test ")
+    prefs = (
+        await session.execute(
+            text(
+                "SELECT preferences_value FROM user_preferences"
+                " WHERE user_id=:i AND preferences_key='UserEmail'"
+            ),
+            {"i": user.id},
+        )
+    ).scalar_one()
+    assert (prefs.decode() if isinstance(prefs, bytes) else prefs) == "prov-trim@example.test"
+
+
+async def test_create_agent_requires_names(session: AsyncSession) -> None:
+    for kw in ({"first_name": ""}, {"last_name": "  "}):
+        with pytest.raises(up.ProvisioningError) as exc:
+            await _agent(session, "prov-noname", **kw)
+        assert exc.value.code == "name_required"
+    await session.rollback()
+
+
+# --- customers: e-mail uniqueness --------------------------------------------------------
+
+
+async def _customer(session: AsyncSession, login: str, email: str, **kw: object) -> object:
+    return await up.create_customer_user(
+        session,
+        login=login,
+        email=email,
+        customer_id="prov-co",
+        first_name="K",
+        last_name="U",
+        pw_hash=None,
+        actor_id=ACTOR,
+        **kw,  # type: ignore[arg-type]
+    )
+
+
+async def test_customer_email_must_be_unique_even_for_invalid_users(
+    session: AsyncSession,
+) -> None:
+    await _customer(session, "idp.prov-u1@example.test", "Shared@example.test", valid_id=2)
+    await session.commit()
+    with pytest.raises(up.ProvisioningError) as exc:
+        await _customer(session, "idp.prov-u2@example.test", "shared@EXAMPLE.test")
+    assert exc.value.code == "email_in_use"
+    assert "bereits" in str(exc.value)
+    await session.rollback()
+    other = await _customer(session, "idp.prov-u3@example.test", "other@example.test")
+    with pytest.raises(up.ProvisioningError):  # update path checks too, excluding itself
+        await up.update_customer_profile(
+            session,
+            other,
+            first_name=None,
+            last_name=None,  # type: ignore[arg-type]
+            email="shared@example.test",
+            mobile=None,
+            actor_id=ACTOR,
+        )
+    await session.rollback()
+
+
+async def test_customer_email_uniqueness_honours_setting(
+    session: AsyncSession, cfg: type[_Cfg]
+) -> None:
+    await _customer(session, "idp.prov-s1@example.test", "dup@example.test")
+    await session.commit()
+    cfg.values = {"CustomerUser": {"CustomerUserEmailUniqCheck": 0}}
+    await _customer(session, "idp.prov-s2@example.test", "dup@example.test")
+    await session.commit()
+
+
+# --- group keys: custom permission types survive -----------------------------------------
+
+
+async def test_grant_keeps_custom_keys_and_rejects_unknown_new_key(
+    session: AsyncSession,
+) -> None:
+    user = await _agent(session, "prov-custom")
+    await session.execute(
+        text(
+            "INSERT INTO group_user (user_id, group_id, permission_key, create_time, create_by,"
+            " change_time, change_by) VALUES (:u, :g, 'site_key', :t, 1, :t, 1)"
+        ),
+        {"u": user.id, "g": GROUP_A, "t": NOW},
+    )
+    await session.commit()
+    assert await up.grant_group_permission(
+        session, user_id=user.id, group_id=GROUP_A, permission_key="ro", actor_id=ACTOR
+    )
+    assert await up.current_group_perms(session, user.id) == frozenset(
+        {(GROUP_A, "site_key"), (GROUP_A, "ro")}
+    )
+    with pytest.raises(up.ProvisioningError):
+        await up.grant_group_permission(
+            session, user_id=user.id, group_id=GROUP_A, permission_key="bogus", actor_id=ACTOR
+        )
+    await session.rollback()
+
+
+# --- managed assignments are agent-only ----------------------------------------------------
+
+
+async def test_managed_assignment_rejects_customers(session: AsyncSession) -> None:
+    rec = await make_provider(session, slug="prov-mgd", settings=Settings(secret_key="k" * 40))
+    with pytest.raises(up.ProvisioningError) as exc:
+        await up.record_managed_assignment(
+            session,
+            provider_id=rec.id,
+            user_kind="customer",
+            user_id=5,
+            kind="role",
+            target_id=ROLE_OK,
+            permission_key="",
+        )
+    assert exc.value.code == "managed_agent_only"
+    row = await up.record_managed_assignment(
+        session,
+        provider_id=rec.id,
+        user_kind="agent",
+        user_id=ACTOR,
+        kind="role",
+        target_id=ROLE_OK,
+        permission_key="",
+    )
+    assert row.id
+    await session.commit()
+
+
+# --- HTTP-level behaviour of the refactored admin routes -----------------------------------
+
+
+def _admin() -> AuthenticatedUser:
+    return AuthenticatedUser(
+        id=ACTOR, login="prov-actor", first_name="A", last_name="B", auth_method="session"
+    )
+
+
+def _create(login: str, email: str) -> UserCreate:
+    return UserCreate(
+        login=login, password="s3cret-pw-1234", first_name="Ro", last_name="Ute", email=email
+    )
+
+
+async def test_route_duplicate_login_is_409_and_invalid_email_is_422(
+    session: AsyncSession,
+) -> None:
+    settings = Settings(secret_key="k" * 40)
+    created = await admin_users.create_user(
+        _create("prov-http", "prov-http@example.test"), _admin(), session, settings
+    )
+    assert created.id
+    with pytest.raises(HTTPException) as dup:
+        await admin_users.create_user(
+            _create("PROV-HTTP", "other@example.test"), _admin(), session, settings
+        )
+    assert dup.value.status_code == 409
+    await session.rollback()
+    with pytest.raises(HTTPException) as bad:
+        await admin_users.create_user(
+            _create("prov-http2", "x@example.org"), _admin(), session, settings
+        )
+    assert bad.value.status_code == 422
+    await session.rollback()
+    with pytest.raises(HTTPException) as upd:
+        await admin_users.update_user(
+            created.id,
+            UserUpdate(email="nope"),
+            None,
+            _admin(),
+            session,
+            settings,  # type: ignore[arg-type]
+        )
+    assert upd.value.status_code == 422
+    await session.rollback()
+
+
+async def test_route_update_user_enqueues_user_invalidation_once(session: AsyncSession) -> None:
+    settings = Settings(secret_key="k" * 40)
+    created = await admin_users.create_user(
+        _create("prov-once", "prov-once@example.test"), _admin(), session, settings
+    )
+    before = await _inval(session, ("User",))
+    await admin_users.update_user(
+        created.id,
+        UserUpdate(first_name="Changed"),
+        None,
+        _admin(),
+        session,
+        settings,  # type: ignore[arg-type]
+    )
+    assert await _inval(session, ("User",)) - before == 1
+
+
+async def test_route_put_groups_rw_collapses_stacked_keys(session: AsyncSession) -> None:
+    created = await admin_users.create_user(
+        _create("prov-grp", "prov-grp@example.test"),
+        _admin(),
+        session,
+        Settings(secret_key="k" * 40),
+    )
+    for key in ("ro", "note", "rw"):
+        await admin_users.assign_group(
+            created.id, GroupAssignment(group_id=GROUP_A, permission_key=key), _admin(), session
+        )
+    assert await up.current_group_perms(session, created.id) == frozenset({(GROUP_A, "rw")})
+
+
+async def test_route_customer_duplicate_email_is_409(session: AsyncSession) -> None:
+    def body(login: str) -> CustomerUserAdminCreate:
+        return CustomerUserAdminCreate(
+            login=login,
+            email="same@example.test",
+            customer_id="prov-co",
+            first_name="K",
+            last_name="U",
+        )
+
+    await admin_customers.create_customer_user(body("idp.prov-h1@example.test"), _admin(), session)
+    with pytest.raises(HTTPException) as exc:
+        await admin_customers.create_customer_user(
+            body("idp.prov-h2@example.test"), _admin(), session
+        )
+    assert exc.value.status_code == 409
+    await session.rollback()

@@ -35,13 +35,23 @@ from tiqora.api.v1.admin.common import (
 from tiqora.channels.phone.cti import PHONE_EXTENSION_PREF
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.user import GroupUser, PermissionGroups, Roles, RoleUser, Users
+from tiqora.db.tiqora.models import TiqoraIdentityManagedAssignment
 from tiqora.domain.user_preferences import get_preference, set_preference
 from tiqora.permissions.engine import PERMISSION_KEYS
+from tiqora.znuny.sysconfig import SysConfig
 
 VALID_ID = 1
 
-# Znuny CheckItem::CheckEmail without the MX/DNS options: local part, "@", dotted domain.
-_EMAIL_RE = re.compile(r"^[^@\s,;<>()\[\]\\\"]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z0-9-]{2,}$")
+# Defaults.pm / Framework.xml values of the settings CheckEmail reads.
+_DEFAULT_VALID_ADDRESS = r"^(root@localhost|admin@localhost)$"
+_DEFAULT_INVALID_ADDRESS = r"@(example)\.(..|...)$"
+
+_ATOM = r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+"
+_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+# addr-spec: dot-atom local part, dotted domain (or IP literal). A bare "user@host" is
+# rejected like Email::Valid does without -allow_localhost.
+_SYNTAX_RE = re.compile(rf"^{_ATOM}(?:\.{_ATOM})*@(?:(?:{_LABEL}\.)+{_LABEL}|\[[0-9.]+\])$")
+_TRAILING_COMMENT_RE = re.compile(r"\s*\([^()]*\)\s*$")
 
 
 class ProvisioningError(ValueError):
@@ -52,15 +62,62 @@ class ProvisioningError(ValueError):
         self.code = code
 
 
-def check_email(address: str) -> bool:
-    """Syntax check like Znuny's ``CheckEmail`` (no DNS lookups)."""
-    return bool(_EMAIL_RE.match(address.strip()))
+def _perl_true(value: object) -> bool:
+    """Perl truthiness of a SysConfig value ("", "0", 0, None are false)."""
+    return value not in (None, "", "0", 0, False)
 
 
-def _require_valid_email(address: str, valid_id: int) -> None:
+def _perl_match(pattern: object, text_: str) -> bool:
+    if not isinstance(pattern, str) or not pattern:
+        return False
+    try:
+        return re.search(pattern, text_, re.IGNORECASE) is not None
+    except re.error:
+        return False
+
+
+async def check_email(session: AsyncSession, address: str) -> bool:
+    """Port of Znuny ``CheckItem::CheckEmail`` driven by SysConfig (DB, Znuny defaults).
+
+    Order as in Znuny: ``CheckEmailAddresses`` off -> accept; ``CheckEmailValidAddress``
+    whitelist -> accept; syntax (plus the ``(\\.\\.)|(\\.@)`` rule); then
+    ``CheckEmailInvalidAddress`` -> reject. The MX/DNS lookup (``CheckMXRecord``) is
+    deliberately NOT performed (no network access from a request handler).
+    """
+    sysconfig = SysConfig(session)
+    if not _perl_true(await sysconfig.get("CheckEmailAddresses", 1)):
+        return True
+    if _perl_match(await sysconfig.get("CheckEmailValidAddress", _DEFAULT_VALID_ADDRESS), address):
+        return True
+    candidate = _TRAILING_COMMENT_RE.sub("", address)
+    if not _SYNTAX_RE.match(candidate) or re.search(r"(\.\.)|(\.@)", candidate):
+        return False
+    return not _perl_match(
+        await sysconfig.get("CheckEmailInvalidAddress", _DEFAULT_INVALID_ADDRESS), candidate
+    )
+
+
+async def _require_valid_email(session: AsyncSession, address: str, valid_id: int) -> None:
     # UserAdd / CustomerUserAdd only check accounts that are going to be valid.
-    if valid_id == VALID_ID and not check_email(address):
+    if valid_id == VALID_ID and not await check_email(session, address):
         raise ProvisioningError("email_invalid", f"Email address ({address}) not valid")
+
+
+async def _customer_email_in_use(
+    session: AsyncSession, address: str, *, exclude_id: int | None = None
+) -> bool:
+    """``CustomerUserEmailUniqCheck`` (Znuny default on): any customer user, valid or not."""
+    cfg = await SysConfig(session).get("CustomerUser")
+    enabled = cfg.get("CustomerUserEmailUniqCheck", 1) if isinstance(cfg, dict) else 1
+    if not _perl_true(enabled):
+        return False
+    stmt = select(CustomerUser.id).where(func.lower(CustomerUser.email) == address.lower())
+    if exclude_id is not None:
+        stmt = stmt.where(CustomerUser.id != exclude_id)
+    return (await session.execute(stmt.limit(1))).first() is not None
+
+
+_EMAIL_IN_USE = "Diese E-Mail-Adresse wird bereits von einem anderen Kundenbenutzer verwendet."
 
 
 async def create_agent(
@@ -84,10 +141,14 @@ async def create_agent(
     admin route keeps allowing a password-only account without address, so it is opt-in
     there and on for provisioning.
     """
+    first_name, last_name, login = first_name.strip(), last_name.strip(), login.strip()
+    if not first_name or not last_name:
+        raise ProvisioningError("name_required", "Need UserFirstname and UserLastname!")
+    email = email.strip() if email else email
     if require_email and not email:
         raise ProvisioningError("email_required", "Need UserEmail!")
     if email:
-        _require_valid_email(email, valid_id)
+        await _require_valid_email(session, email, valid_id)
     exists = (
         await session.execute(select(Users.id).where(func.lower(Users.login) == login.lower()))
     ).first()
@@ -149,11 +210,12 @@ async def update_agent_profile(
     for key, value in (("UserEmail", email), ("UserMobile", mobile)):
         if value is None:
             continue
+        value = value.strip()
         current = await get_preference(session, user.id, key)
         if (current or "") == value:
             continue
         if key == "UserEmail" and value:
-            _require_valid_email(value, user.valid_id)
+            await _require_valid_email(session, value, user.valid_id)
         await set_preference(session, user.id, key, value)
         changed = True
     if changed:
@@ -219,9 +281,11 @@ async def set_group_permissions(
 ) -> bool:
     """``PermissionGroupUserAdd``: replace the whole key set of one (user, group) pair.
 
-    ``rw`` is stored alone; unknown keys are ignored. Identical sets are a no-op.
+    ``rw`` is stored alone (Znuny deletes everything else then). Keys are taken as given
+    so site-defined permission types survive; callers validate new keys. Identical sets
+    are a no-op.
     """
-    wanted = {k for k in permission_keys if k in PERMISSION_KEYS}
+    wanted = set(permission_keys)
     if "rw" in wanted:
         wanted = {"rw"}
     current = await _group_keys(session, user_id, group_id)
@@ -253,6 +317,8 @@ async def grant_group_permission(
 ) -> bool:
     """Add one key to the pair's set (Znuny semantics: ``rw`` collapses the set to ``rw``,
     and any key under an existing ``rw`` is already included)."""
+    if permission_key not in PERMISSION_KEYS:
+        raise ProvisioningError("permission_unknown", f"Unknown permission key {permission_key!r}")
     current = await _group_keys(session, user_id, group_id)
     return await set_group_permissions(
         session,
@@ -323,8 +389,11 @@ async def create_customer_user(
     unknown = set(optional) - allowed
     if unknown:
         raise TypeError(f"unknown customer fields: {sorted(unknown)}")
+    login, email = login.strip(), email.strip()
     if email:
-        _require_valid_email(email, valid_id)
+        await _require_valid_email(session, email, valid_id)
+        if await _customer_email_in_use(session, email):
+            raise ProvisioningError("email_in_use", _EMAIL_IN_USE)
     ts: datetime = now()
     cu = CustomerUser(
         login=login,
@@ -366,8 +435,13 @@ async def update_customer_profile(
     ):
         if value is None or getattr(cu, field) == value:
             continue
+        value = value.strip()
+        if getattr(cu, field) == value:
+            continue
         if field == "email" and value:
-            _require_valid_email(value, cu.valid_id)
+            await _require_valid_email(session, value, cu.valid_id)
+            if await _customer_email_in_use(session, value, exclude_id=cu.id):
+                raise ProvisioningError("email_in_use", _EMAIL_IN_USE)
         setattr(cu, field, value)
         changed = True
     if changed:
@@ -376,3 +450,36 @@ async def update_customer_profile(
         await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
         await session.flush()
     return changed
+
+
+async def record_managed_assignment(
+    session: AsyncSession,
+    *,
+    provider_id: int,
+    user_kind: str,
+    user_id: int,
+    kind: str,
+    target_id: int,
+    permission_key: str,
+) -> TiqoraIdentityManagedAssignment:
+    """Mark a role/group assignment as created by a provider rule.
+
+    Managed assignments exist for agents only: ``tiqora_identity_managed_assignment`` has
+    no ``user_kind`` column, so a customer id would be indistinguishable from an agent
+    id (and ``user_delete`` purges rows by ``user_id`` alone). Customers are rejected.
+    """
+    if user_kind != "agent":
+        raise ProvisioningError(
+            "managed_agent_only", "Managed assignments are only supported for agents"
+        )
+    row = TiqoraIdentityManagedAssignment(
+        provider_id=provider_id,
+        user_id=user_id,
+        kind=kind,
+        target_id=target_id,
+        permission_key=permission_key,
+        created=now(),
+    )
+    session.add(row)
+    await session.flush()
+    return row

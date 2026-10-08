@@ -70,7 +70,7 @@ PermissionKey = Literal["ro", "move_into", "create", "note", "owner", "priority"
 def _provisioning_http_error(exc: provisioning.ProvisioningError) -> HTTPException:
     code = (
         status.HTTP_409_CONFLICT
-        if exc.code == "login_exists"
+        if exc.code in ("login_exists", "email_in_use")
         else status.HTTP_422_UNPROCESSABLE_ENTITY
     )
     return HTTPException(status_code=code, detail=str(exc))
@@ -272,7 +272,7 @@ async def update_user(
     for field, value in data.items():
         setattr(user, field, value)
     try:
-        await provisioning.update_agent_profile(
+        profile_changed = await provisioning.update_agent_profile(
             session,
             user,
             first_name=first_name,
@@ -290,7 +290,8 @@ async def update_user(
     if extension_set:
         await set_preference(session, user_id, PHONE_EXTENSION_PREF, extension)
 
-    await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
+    if not profile_changed:
+        await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(user)
 

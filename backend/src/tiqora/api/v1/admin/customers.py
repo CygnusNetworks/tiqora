@@ -206,9 +206,6 @@ async def get_customer_user(
 async def create_customer_user(
     body: CustomerUserAdminCreate, admin: AdminUser, session: DbSession
 ) -> CustomerUser:
-    data = body.model_dump(
-        exclude={"password", "login", "email", "customer_id", "first_name", "last_name"}
-    )
     try:
         cu = await provisioning.create_customer_user(
             session,
@@ -219,11 +216,25 @@ async def create_customer_user(
             last_name=body.last_name,
             pw_hash=hash_password(body.password) if body.password else None,
             actor_id=admin.id,
-            **data,
+            valid_id=body.valid_id,
+            title=body.title,
+            phone=body.phone,
+            fax=body.fax,
+            mobile=body.mobile,
+            street=body.street,
+            zip=body.zip,
+            city=body.city,
+            country=body.country,
+            comments=body.comments,
         )
     except provisioning.ProvisioningError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if exc.code == "email_in_use"
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=str(exc),
         ) from exc
     await session.commit()
     await session.refresh(cu)
