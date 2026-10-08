@@ -31,6 +31,7 @@ from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.api.compat.search_filters import (
     create_time_settings,
     created_filters,
+    sanitize_id_filters,
     time_filters,
 )
 from tiqora.api.compat.ticket_get import (
@@ -622,6 +623,21 @@ async def _agent_in_group(session: AsyncSession, user_id: int, group_name: str) 
     if row is None:
         return False
     return int(row[0]) in set(groups)
+
+
+def _content_pattern(val: Any) -> str | None:
+    """Article-content LIKE pattern as Znuny GI builds it (ContentSearchPrefix/Suffix '*').
+
+    ``*`` is a wildcard; the value is wrapped in ``%...%`` (substring match), ``%%`` is
+    collapsed and the match is case-insensitive. ``None`` = no filter (empty or only
+    wildcards, Znuny skips those).
+    """
+    if val is None or isinstance(val, (dict, list, tuple)):
+        return None
+    value = str(val).strip().replace("*", "%")
+    if not value or re.fullmatch(r"%{1,3}", value):
+        return None
+    return ("%" + value + "%").replace("%%", "%").lower()
 
 
 def _like_pattern(val: Any) -> str:
@@ -1987,6 +2003,11 @@ async def op_ticket_search(
     user_id, login, user_type = auth
     is_customer = user_type == _CUSTOMER_USER_TYPE
 
+    # an id outside its column width can never match: no match, never bound
+    data, no_id_match = sanitize_id_filters(data)
+    if no_id_match:
+        return {}
+
     conditions: list[str] = []
     params: dict[str, Any] = {}
     joins: list[str] = []
@@ -2356,10 +2377,9 @@ async def op_ticket_search(
         ("MIMEBase_Subject", "a_subject"),
         ("MIMEBase_Body", "a_body"),
     ):
-        if data.get(field):
-            mime_filters.append((col, _like_pattern(data[field])))
-    if data.get("Fulltext"):
-        ft = _like_pattern(data["Fulltext"])
+        if (pat := _content_pattern(data.get(field))) is not None:
+            mime_filters.append((col, pat))
+    if (ft := _content_pattern(data.get("Fulltext"))) is not None:
         mime_filters.append(("__fulltext__", ft))
 
     if mime_filters:
@@ -2372,12 +2392,12 @@ async def op_ticket_search(
         for i, (col, pat) in enumerate(mime_filters):
             if col == "__fulltext__":
                 mime_parts.append(
-                    f"(adm.a_from LIKE :mf{i} OR adm.a_to LIKE :mf{i}"
-                    f" OR adm.a_cc LIKE :mf{i} OR adm.a_subject LIKE :mf{i}"
-                    f" OR adm.a_body LIKE :mf{i} OR t.title LIKE :mf{i})"
+                    f"(LOWER(adm.a_from) LIKE :mf{i} OR LOWER(adm.a_to) LIKE :mf{i}"
+                    f" OR LOWER(adm.a_cc) LIKE :mf{i} OR LOWER(adm.a_subject) LIKE :mf{i}"
+                    f" OR LOWER(adm.a_body) LIKE :mf{i} OR LOWER(t.title) LIKE :mf{i})"
                 )
             else:
-                mime_parts.append(f"adm.{col} LIKE :mf{i}")
+                mime_parts.append(f"LOWER(adm.{col}) LIKE :mf{i}")
             params[f"mf{i}"] = pat
         conditions.append("(" + " AND ".join(mime_parts) + ")")
 
@@ -2484,24 +2504,38 @@ async def op_ticket_search(
         "SLA": "t.sla_id",
         "PendingTime": "t.until_time",
         "EscalationTime": "t.escalation_time",
+        "EscalationUpdateTime": "t.escalation_update_time",
+        "EscalationResponseTime": "t.escalation_response_time",
+        "EscalationSolutionTime": "t.escalation_solution_time",
     }
-    sort_raw = data.get("SortBy") or "Age"
-    order_raw = data.get("OrderBy") or "Down"
-    sort_list = _to_list(sort_raw)
-    order_list = _to_list(order_raw)
+    # tickets without pending/escalation time store 0: always sort them last (Znuny)
+    zero_last = {
+        "PendingTime",
+        "EscalationTime",
+        "EscalationUpdateTime",
+        "EscalationResponseTime",
+        "EscalationSolutionTime",
+    }
+    sort_list = _to_list(data.get("SortBy") or "Age")
+    order_list = _to_list(data.get("OrderBy") or "Down")
     order_parts: list[str] = []
-    order_cols: list[str] = []
-    for i, s in enumerate(sort_list):
-        col = sort_map.get(str(s), "t.create_time")
+    select_cols: list[str] = []  # PostgreSQL: ORDER BY expressions must be in the DISTINCT list
+    for i, sort_key in enumerate(sort_list):
+        col = sort_map.get(str(sort_key), "t.create_time")
         direction = str(order_list[i] if i < len(order_list) else order_list[-1]).lower()
         dir_sql = "ASC" if direction in ("up", "asc") else "DESC"
+        if str(sort_key) in zero_last:
+            flag = f"zero_{len(select_cols)}"
+            select_cols.append(f"(CASE WHEN {col} = 0 THEN 1 ELSE 0 END) AS {flag}")
+            order_parts.append(f"{flag} ASC")
         order_parts.append(f"{col} {dir_sql}")
-        if col not in order_cols:
-            order_cols.append(col)
+        if col not in select_cols:
+            select_cols.append(col)
     if not order_parts:
         order_parts = ["t.create_time DESC"]
-        order_cols = ["t.create_time"]
+        select_cols = ["t.create_time"]
     order_sql = ", ".join(order_parts)
+    order_cols = select_cols
 
     limit_raw = data.get("Limit") or 500
     try:

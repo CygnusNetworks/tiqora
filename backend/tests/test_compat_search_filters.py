@@ -184,3 +184,24 @@ def test_no_time_params_adds_nothing() -> None:
     conditions: list[str] = []
     assert time_filters({"Title": "x"}, conditions, {}, [], now=NOW)
     assert conditions == []
+
+
+def test_bounded_ids_drops_out_of_range_and_garbage() -> None:
+    from tiqora.api.compat.search_filters import SMALLINT_MAX, bounded_ids
+
+    assert bounded_ids([1, "2", 40000, "x", 2**70], SMALLINT_MAX) == [1, 2]
+    assert bounded_ids(32767, SMALLINT_MAX) == [32767]
+    assert bounded_ids(32768, SMALLINT_MAX) == []
+    assert bounded_ids(None, SMALLINT_MAX) == []
+
+
+def test_sanitize_id_filters_no_match_unless_names_can_still_match() -> None:
+    from tiqora.api.compat.search_filters import sanitize_id_filters
+
+    out, no_match = sanitize_id_filters({"StateIDs": [40000]})
+    assert no_match is True
+    assert out["StateIDs"] == []
+    out, no_match = sanitize_id_filters({"StateIDs": [40000], "States": ["new"]})
+    assert no_match is False
+    out, no_match = sanitize_id_filters({"QueueIDs": ["5", 2**40], "Title": "x"})
+    assert (out["QueueIDs"], no_match) == ([5], False)

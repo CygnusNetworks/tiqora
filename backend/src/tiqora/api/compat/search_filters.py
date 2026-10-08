@@ -25,7 +25,7 @@ TicketPendingTime*                             ``ticket.until_time`` (epoch), re
                                                ``pending auto`` states
 =============================================  ==========================================
 
-Deviations / decisions (all documented in the task report):
+Deviations / decisions:
 
 * Every Newer/Older bound of the history families gets its OWN history join (controller
   ruling); Znuny shares one alias per family, so both bounds must hit the same row there.
@@ -36,6 +36,10 @@ Deviations / decisions (all documented in the task report):
   now / after Older) and the operation answers with an empty ``Data`` -> ``time_filters``
   returns ``False`` and the caller answers ``{}``.
 * ``TicketLastCloseTime*`` is not on the GI whitelist (``_GetParams``) and is not supported.
+* Every id filter (TicketID, QueueIDs, StateIDs, ... Created*IDs) is range-checked against
+  its column width (``sanitize_id_filters``): an id that does not fit can never match, so it
+  is dropped and never bound (asyncpg raises on out-of-range parameters instead of matching
+  nothing). A list without any usable id is "no match" -> ``{}``.
 * Pure SQL, no string JOINs between ``tiqora_*`` and Znuny tables.
 """
 
@@ -360,6 +364,69 @@ async def created_filters(
         " AND th0.history_type_id = (SELECT id FROM ticket_history_type WHERE name = 'NewTicket')"
         " AND " + " AND ".join(parts) + ")"
     )
+
+
+SMALLINT_MAX = 2**15 - 1
+INT_MAX = 2**31 - 1
+BIGINT_MAX = 2**63 - 1
+
+# id filter -> (column width (signed max), alternative name filter or None)
+# widths follow the Znuny schema (ticket / ticket_history / ticket_watcher)
+_ID_FILTERS: dict[str, tuple[int, str | None]] = {
+    "TicketID": (BIGINT_MAX, None),
+    "QueueIDs": (INT_MAX, "Queues"),
+    "StateIDs": (SMALLINT_MAX, "States"),
+    "StateTypeIDs": (SMALLINT_MAX, None),
+    "PriorityIDs": (SMALLINT_MAX, "Priorities"),
+    "TypeIDs": (SMALLINT_MAX, "Types"),
+    "ServiceIDs": (INT_MAX, "Services"),
+    "SLAIDs": (INT_MAX, "SLAs"),
+    "LockIDs": (SMALLINT_MAX, "Locks"),
+    "OwnerIDs": (INT_MAX, None),
+    "ResponsibleIDs": (INT_MAX, None),
+    "WatchUserIDs": (INT_MAX, None),
+    "CreatedUserIDs": (INT_MAX, None),
+    "CreatedQueueIDs": (INT_MAX, "CreatedQueues"),
+    "CreatedStateIDs": (SMALLINT_MAX, "CreatedStates"),
+    "CreatedPriorityIDs": (SMALLINT_MAX, "CreatedPriorities"),
+    "CreatedTypeIDs": (SMALLINT_MAX, "CreatedTypes"),
+}
+
+
+def bounded_ids(raw: Any, max_value: int) -> list[int]:
+    """Ids of ``raw`` (scalar or list) that fit a signed column of ``max_value``.
+
+    Non-numeric and out-of-range values can never match a row, so they are dropped and
+    never bound (asyncpg raises on out-of-range parameters instead of matching nothing).
+    """
+    out: list[int] = []
+    for item in _as_list(raw):
+        try:
+            number = int(str(item).strip())
+        except (TypeError, ValueError):
+            continue
+        if -max_value - 1 <= number <= max_value:
+            out.append(number)
+    return out
+
+
+def sanitize_id_filters(data: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
+    """Range-check every id filter; returns ``(clean data, no_match)``.
+
+    An id list that was given but has no usable id is "no match" (``True``) unless the
+    same filter also has a name alternative (``Queues`` next to ``QueueIDs``): Znuny merges
+    both, so the names can still match.
+    """
+    out = dict(data)
+    for key, (limit, alternative) in _ID_FILTERS.items():
+        raw = data.get(key)
+        if not _as_list(raw):
+            continue
+        ids = bounded_ids(raw, limit)
+        out[key] = ids
+        if not ids and not (alternative and _as_list(data.get(alternative))):
+            return out, True
+    return out, False
 
 
 def _as_list(value: Any) -> list[Any]:

@@ -21,6 +21,8 @@ from tiqora.domain.auth import SessionStore
 SESSION = "GI7670AGENT"
 Q_A, Q_B = 7670, 7671
 T_A, T_B, T_C, T_D = 7670, 7671, 7672, 7673
+T_X = 7674  # in a queue the agent has no ro permission for
+Q_X = 7672
 ALL_QUEUES = [Q_A, Q_B]
 
 _SEEDED: list[str] = []
@@ -43,8 +45,8 @@ def _cleanup_statements() -> tuple[str, ...]:
         "DELETE FROM ticket WHERE id BETWEEN 7670 AND 7689",
         "DELETE FROM sessions WHERE session_id LIKE 'GI7670%'",
         "DELETE FROM queue WHERE id BETWEEN 7670 AND 7689",
-        "DELETE FROM group_user WHERE group_id = 7670",
-        "DELETE FROM permission_groups WHERE id = 7670",
+        "DELETE FROM group_user WHERE group_id BETWEEN 7670 AND 7671",
+        "DELETE FROM permission_groups WHERE id BETWEEN 7670 AND 7671",
         "DELETE FROM users WHERE id = 7670",
     )
 
@@ -158,6 +160,11 @@ def _seed(sync_url: str) -> None:
             "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
             " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
             " change_time, change_by) VALUES (7670, 'Q7670', 7670, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)",
+            "INSERT INTO permission_groups (id, name, valid_id, create_time, create_by,"
+            " change_time, change_by) VALUES (7671, 'gi7670-other', 1, :t, 1, :t, 1)",
+            "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+            " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
+            " change_time, change_by) VALUES (7672, 'Q7672', 7671, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)",
             "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
             " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
             " change_time, change_by) VALUES (7671, 'Q7671', 7670, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)",
@@ -214,6 +221,7 @@ def _seed(sync_url: str) -> None:
             changed=_ago(days=30),
             until=_epoch(_NOW + timedelta(hours=2)),
         )
+        _ticket(conn, T_X, queue=Q_X, state="new", created=_ago(days=1), changed=_ago(days=1))
         # articles: A has two matching ones (duplicate rows through the MIME join), B one
         _article(conn, 7670, T_A, "needle one", _ago(days=9))
         _article(conn, 7671, T_A, "needle two", _ago(days=8))
@@ -352,3 +360,49 @@ async def test_sort_with_distinct_on_postgres(sync_url: str) -> None:
 
 async def test_empty_result_is_empty_object(sync_url: str) -> None:
     assert await _search(sync_url, {"Title": "no such title 7670"}) == {}
+
+
+async def test_ticket_id_in_queue_without_permission_is_not_found(sync_url: str) -> None:
+    only_x = await _search(sync_url, {"QueueIDs": None, "TicketID": T_X})
+    assert only_x == {}
+    mixed = await _search(sync_url, {"QueueIDs": None, "TicketID": [T_A, T_X]})
+    assert mixed == {"TicketID": [T_A]}
+
+
+async def test_out_of_range_ids_match_nothing_and_are_not_bound(sync_url: str) -> None:
+    assert await _search(sync_url, {"CreatedStateIDs": 40000}) == {}
+    assert await _search(sync_url, {"TicketID": 2**70}) == {}
+    assert await _search(sync_url, {"QueueIDs": 2**40}) == {}
+    assert await _search(sync_url, {"StateIDs": [40000]}) == {}
+    assert await _search(sync_url, {"PriorityIDs": "70000"}) == {}
+    assert await _search(sync_url, {"OwnerIDs": [2**31]}) == {}
+    assert await _search(sync_url, {"LockIDs": ["x"]}) == {}
+    assert await _search(sync_url, {"CreatedQueueIDs": 2**33}) == {}
+    # valid ids next to invalid ones still match
+    assert await _ids(sync_url, {"TicketID": [T_A, 2**70]}) == [T_A]
+    assert await _ids(sync_url, {"StateIDs": [40000], "States": ["new"]}) == [T_A]
+
+
+async def test_content_filters_are_substring_and_case_insensitive(sync_url: str) -> None:
+    # Znuny GI sets ContentSearchPrefix/Suffix '*': no wildcards needed
+    assert await _ids(sync_url, {"MIMEBase_Subject": "needle"}) == [T_A, T_B]
+    assert await _ids(sync_url, {"MIMEBase_Subject": "NEEDLE two"}) == [T_A]
+    assert await _ids(sync_url, {"MIMEBase_From": "max@example"}) == [T_A, T_B]
+    assert await _ids(sync_url, {"Fulltext": "Needle"}) == [T_A, T_B]
+    assert await _ids(sync_url, {"Fulltext": "no-such-text-7670"}) == []
+    # only wildcards: Znuny skips the filter
+    assert (await _ids(sync_url, {"MIMEBase_Subject": "*"})) == [T_A, T_B, T_C, T_D]
+
+
+async def test_sort_by_pending_and_escalation_puts_zero_last(sync_url: str) -> None:
+    up = await _search(sync_url, {"SortBy": "PendingTime", "OrderBy": "Up"})
+    assert up["TicketID"][:2] == [T_C, T_D]
+    down = await _search(sync_url, {"SortBy": "PendingTime", "OrderBy": "Down"})
+    assert down["TicketID"][:2] == [T_D, T_C]
+    assert set(down["TicketID"][2:]) == {T_A, T_B}
+    for order in ("Up", "Down"):
+        esc = await _search(sync_url, {"SortBy": "EscalationTime", "OrderBy": order})
+        assert esc["TicketID"][0] == T_C
+    for key in ("EscalationUpdateTime", "EscalationResponseTime", "EscalationSolutionTime"):
+        every = await _search(sync_url, {"SortBy": key})
+        assert sorted(every["TicketID"]) == [T_A, T_B, T_C, T_D]
