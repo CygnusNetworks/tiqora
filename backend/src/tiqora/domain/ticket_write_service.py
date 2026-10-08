@@ -24,6 +24,7 @@ Key Znuny semantics honoured:
 
 from __future__ import annotations
 
+import base64
 import re
 import secrets
 import time
@@ -773,9 +774,12 @@ async def add_article(
         },
     )
 
-    # Store attachments
+    # Store attachments. Znuny keeps the bytes in a LONGBLOB on MySQL but as
+    # base64 text in the TEXT column on PostgreSQL (ArticleStorageDB, no DirectBlob).
+    postgres = session.get_bind().dialect.name == "postgresql"
     for filename, content_type, content in article.attachments:
         size_str = str(len(content))
+        stored: bytes | str = base64.b64encode(content).decode("ascii") if postgres else content
         await session.execute(
             text(
                 "INSERT INTO article_data_mime_attachment"
@@ -790,7 +794,7 @@ async def add_article(
                 "fn": filename,
                 "sz": size_str,
                 "ct": content_type,
-                "content": content,
+                "content": stored,
                 "uid": user_id,
             },
         )

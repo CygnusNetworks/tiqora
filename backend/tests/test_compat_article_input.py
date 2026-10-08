@@ -100,3 +100,28 @@ def test_sysconfig_defaults_of_the_gi_article_settings() -> None:
     assert D[update + "AutoResponseType"] == "auto follow up"
     assert D["Ticket::Frontend::AccountTime"] == 1
     assert D["Ticket::Frontend::NeedAccountedTime"] == 0
+
+
+def test_plain_signature_behind_an_html_body_is_escaped_with_line_breaks() -> None:
+    from tiqora.channels.email.outbound_reply import _signature_for_body
+
+    html_body = "text/html; charset=utf-8"
+    assert (
+        _signature_for_body("Team <b>&\nAmt", "text/plain", html_body)
+        == "Team &lt;b&gt;&amp;<br/>\nAmt"
+    )
+    assert _signature_for_body("Team", None, html_body) == "Team"
+
+
+def test_html_signature_behind_a_plain_body_becomes_text() -> None:
+    from tiqora.channels.email.outbound_reply import _signature_for_body
+
+    out = _signature_for_body("<p>Team <b>Amt</b></p>", "text/html", "text/plain; charset=utf-8")
+    assert "<" not in out and "Team" in out and "Amt" in out
+
+
+def test_matching_signature_and_body_formats_are_left_alone() -> None:
+    from tiqora.channels.email.outbound_reply import _signature_for_body
+
+    assert _signature_for_body("<i>x</i>", "text/html", "text/html") == "<i>x</i>"
+    assert _signature_for_body("a\nb", "text/plain", "text/plain") == "a\nb"

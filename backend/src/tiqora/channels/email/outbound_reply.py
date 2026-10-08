@@ -25,9 +25,9 @@ import secrets
 import socket
 import time
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from email.message import EmailMessage
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy import text
@@ -161,6 +161,22 @@ def append_signature(body: str, signature: str, *, content_type: str) -> str:
     return (body or "").rstrip() + "\n\n-- \n" + sig
 
 
+def _signature_for_body(signature: str, signature_content_type: str | None, body_ct: str) -> str:
+    """The signature in the body's format (Znuny sets RichText per article before ``Signature``).
+
+    Plain signature behind an HTML body: escaped, line breaks as ``<br/>``; HTML
+    signature behind a plain body: converted to text.
+    """
+    sig_is_html = _is_html(signature_content_type or "")
+    if _is_html(body_ct) and not sig_is_html:
+        return _html_escape(signature).replace("\n", "<br/>\n")
+    if not _is_html(body_ct) and sig_is_html:
+        from tiqora.domain.quoting import html_to_plaintext
+
+        return html_to_plaintext(signature)
+    return signature
+
+
 def _html_escape(value: str) -> str:
     return (
         value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
@@ -237,7 +253,7 @@ async def prepare_outgoing_agent_email(
     article: ArticleIn,
 ) -> ArticleIn:
     """Return a copy of *article* ready to send and store (sig, From, Message-ID, visibility)."""
-    from_line, queue_name, sig_text, _sig_ct = await _queue_outbound_meta(session, queue_id)
+    from_line, queue_name, sig_text, sig_ct = await _queue_outbound_meta(session, queue_id)
 
     body = article.body or ""
     if article.append_signature and sig_text and sig_text.strip():
@@ -255,6 +271,7 @@ async def prepare_outgoing_agent_email(
             customer_email_lines=[],
         )
         if article.signature_directly_after_body:
+            expanded = _signature_for_body(expanded, sig_ct, article.content_type)
             body = body + expanded if expanded else body
         else:
             body = append_signature(body, expanded, content_type=article.content_type)
@@ -644,6 +661,130 @@ async def deliver_agent_email_reply(
     return article_id
 
 
+@dataclass(frozen=True)
+class PendingAgentEmail:
+    """An agent email that is stored but not yet sent (see :func:`dispatch_pending_agent_email`)."""
+
+    article_id: int
+    ticket_id: int
+    prepared: ArticleIn
+    message: EmailMessage | None
+    extra_headers: Mapping[str, str]
+    queue_name: str | None
+
+
+async def store_agent_email_for_dispatch(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    *,
+    ticket_id: int,
+    queue_id: int,
+    user_id: int,
+    article: ArticleIn,
+) -> PendingAgentEmail:
+    """Prepare, secure and STORE an agent email; the mail itself is sent later.
+
+    For callers that must commit their database work before any mail leaves (the
+    GenericInterface ``ArticleSend``): a mail whose ticket or article could still roll
+    back is never sent. Send it with :func:`dispatch_pending_agent_email` after the commit.
+    """
+    prepared = await prepare_outgoing_agent_email(
+        session,
+        sysconfig,
+        ticket_id=ticket_id,
+        queue_id=queue_id,
+        user_id=user_id,
+        article=article,
+    )
+    prepared = await _apply_queue_security(session, prepared, queue_id)
+    banner = await sysconfig.mail_banner_headers()
+    secured: SecuredMessage | None = None
+    if prepared.email_security is not None and prepared.email_security.active:
+        secured = await secure_agent_email(
+            session,
+            prepared,
+            build_agent_email_message(prepared, extra_headers=banner),
+        )
+    try:
+        _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
+    except Exception:
+        queue_name = None
+    article_id = await add_article(
+        session, ticket_id=ticket_id, article=prepared, user_id=user_id, sysconfig=sysconfig
+    )
+    await store_security(session, article_id, secured, user_id)
+    return PendingAgentEmail(
+        article_id=article_id,
+        ticket_id=ticket_id,
+        prepared=prepared,
+        message=secured.message if secured is not None else None,
+        extra_headers=banner,
+        queue_name=queue_name,
+    )
+
+
+async def dispatch_pending_agent_email(
+    session: AsyncSession, sysconfig: SysConfig, pending: PendingAgentEmail
+) -> None:
+    """Send a stored agent email (after the commit) and record the outcome in the mail log.
+
+    Without an outbound relay nothing is sent and a ``queued`` row is logged. A send
+    failure is logged to ``tiqora_mail_log`` and raised as :class:`OutboundMailError`;
+    the stored article stays.
+    """
+    from tiqora.domain import mail_outbound
+
+    prepared = pending.prepared
+    common: dict[str, Any] = {
+        "direction": "out",
+        "from_addr": prepared.from_address or "",
+        "to_addr": prepared.to_address or "",
+        "cc_addr": prepared.cc,
+        "subject": prepared.subject or "",
+        "message_id": prepared.message_id,
+        "ticket_id": pending.ticket_id,
+        "article_id": pending.article_id,
+        "queue": pending.queue_name,
+    }
+    resolved = await mail_outbound.resolve_outbound_smtp(session)
+    if not resolved.enabled:
+        logger.warning(
+            "agent_email_not_dispatched",
+            reason="smtp_disabled",
+            ticket_id=pending.ticket_id,
+            article_id=pending.article_id,
+        )
+        await write_mail_log(session, status="queued", detail="smtp_disabled", **common)
+        return
+    sender = await mail_outbound.build_outbound_sender(
+        session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
+    )
+    t0 = time.perf_counter()
+    try:
+        await send_prepared_agent_email(
+            sender, prepared, extra_headers=pending.extra_headers, message=pending.message
+        )
+    except OutboundMailError as exc:
+        await write_mail_log(
+            session,
+            status="failed",
+            detail=str(exc),
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+            **common,
+        )
+        raise
+    smtp_code = getattr(sender, "last_smtp_code", None)
+    smtp_detail = getattr(sender, "last_smtp_detail", None)
+    await write_mail_log(
+        session,
+        status="sent",
+        smtp_code=smtp_code if isinstance(smtp_code, int) else None,
+        detail=str(smtp_detail) if smtp_detail else None,
+        duration_ms=int((time.perf_counter() - t0) * 1000),
+        **common,
+    )
+
+
 # Public alias so callers outside this module (e.g. the reference compose-context
 # endpoint, which needs the same From/signature resolution for a preview) don't
 # have to reach into a leading-underscore name.
@@ -651,6 +792,9 @@ queue_outbound_meta = _queue_outbound_meta
 
 __all__ = [
     "OutboundMailError",
+    "PendingAgentEmail",
+    "dispatch_pending_agent_email",
+    "store_agent_email_for_dispatch",
     "append_signature",
     "build_agent_email_message",
     "build_references_chain",

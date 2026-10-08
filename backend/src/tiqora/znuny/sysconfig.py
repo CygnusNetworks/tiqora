@@ -71,6 +71,8 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     # Send the queue's "auto reply" for tickets an agent opens from the phone
     # screen (AgentTicketPhone) -- Ticket.xml default on.
     "AutoResponseForWebTickets": 1,
+    # No auto response to these senders (Ticket.xml).
+    "SendNoAutoResponseRegExp": r"(MAILER-DAEMON|postmaster|abuse)@.+?\..+?",
     # Time accounting (Ticket.xml): booking is on, but not mandatory.
     "Ticket::Frontend::AccountTime": 1,
     "Ticket::Frontend::NeedAccountedTime": 0,

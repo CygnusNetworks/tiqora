@@ -23,7 +23,7 @@ from tiqora.domain.dynamic_field_values import (
     DynamicFieldValueError,
     load_dynamic_field,
     normalize_df_values,
-    values_outside_possible_values,
+    possible_values_of,
 )
 from tiqora.domain.ticket_write_service import ArticleIn
 from tiqora.znuny.sysconfig import SysConfig
@@ -101,6 +101,29 @@ def _df_values(value: Any) -> list[str] | None:
     return None
 
 
+async def _value_is_valid(
+    session: AsyncSession, config: DynamicFieldConfig, raw_value: Any, values: list[str]
+) -> bool:
+    """Znuny ``FieldValueValidate``: storable value, and for selects a PossibleValues key.
+
+    ``Dropdown.pm`` / ``Multiselect.pm``: the field needs PossibleValues; a list is no
+    Dropdown value; an empty scalar passes, every element of a Multiselect list must
+    be a key (``""`` only when it is one).
+    """
+    try:
+        normalize_df_values(config.field_type, values)
+    except DynamicFieldValueError:
+        return False
+    if config.field_type not in ("Dropdown", "Multiselect"):
+        return True
+    allowed = await possible_values_of(session, config)
+    if not allowed:
+        return False
+    if isinstance(raw_value, list):
+        return config.field_type == "Multiselect" and all(v in allowed for v in values)
+    return values[0] == "" or values[0] in allowed
+
+
 def split_dynamic_fields(
     items: Any, article_field_names: frozenset[str]
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
@@ -157,7 +180,8 @@ async def parse_gi_dynamic_fields(
                     f"{op}: DynamicField->{needed}{gap}parameter is missing!",
                 )
         config = await load_dynamic_field(session, name) if isinstance(name, str) else None
-        if config is None:
+        # the database may match case-insensitively; Znuny's lookup is an exact hash key
+        if config is None or config.name != name:
             return _err(f"{op}.InvalidParameter", f"{op}: DynamicField->Name parameter is invalid!")
         if op == "TicketUpdate" and config.object_type == "Article" and not articles_present:
             return _err(
@@ -165,14 +189,7 @@ async def parse_gi_dynamic_fields(
                 f"{op}: To create an article DynamicField an article is required!",
             )
         values = _df_values(value)
-        valid = values is not None
-        if values is not None:
-            try:
-                normalize_df_values(config.field_type, values)
-            except DynamicFieldValueError:
-                valid = False
-            else:
-                valid = not await values_outside_possible_values(session, config, values)
+        valid = values is not None and await _value_is_valid(session, config, value, values)
         if not valid:
             return _err(
                 f"{op}.InvalidParameter", f"{op}: DynamicField->Value parameter is invalid!"

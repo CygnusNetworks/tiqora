@@ -367,3 +367,30 @@ async def test_signature_directly_after_body_for_generic_interface(env: Any) -> 
     assert len(direct) > len("Thanks for writing in.")
     # the same signature text, appended as is (the composer strips a leading "-- " line)
     assert composer.split("\n\n-- \n", 1)[1].strip() in direct
+
+
+async def test_signature_is_converted_to_an_html_body(env: Any) -> None:
+    """Znuny renders the signature with RichText per article: plain signature -> HTML."""
+    _url, factory = env
+    async with factory() as session:
+        prepared = await prepare_outgoing_agent_email(
+            session,
+            _sysconfig(),
+            ticket_id=TICKET_ID,
+            queue_id=QUEUE_ID,
+            user_id=ACTOR,
+            article=ArticleIn(
+                sender_type="agent",
+                is_visible_for_customer=True,
+                subject="Re: x",
+                body="<p>Thanks</p>",
+                content_type="text/html; charset=utf-8",
+                channel="email",
+                to_address="alice@example.org",
+                signature_directly_after_body=True,
+            ),
+        )
+    assert prepared.body.startswith("<p>Thanks</p>")
+    tail = prepared.body[len("<p>Thanks</p>") :]
+    assert "<br/>" in tail and "\n\n-- \n" not in tail
+    assert "Your Ticket-Team" in tail

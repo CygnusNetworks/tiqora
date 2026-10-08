@@ -26,7 +26,7 @@ from tiqora.znuny.sysconfig import SysConfig
 
 T0 = datetime(2024, 6, 1, 12, 0, 0)
 AGENT, INVALID_AGENT, GROUP, QUEUE = 7630, 7632, 7630, 7631
-DF_TICKET, DF_ART, DF_DROP, DF_MULTI = 7630, 7631, 7632, 7633
+DF_TICKET, DF_ART, DF_DROP, DF_MULTI, DF_BARE = 7630, 7631, 7632, 7633, 7634
 AGENT_SESSION, CUST_SESSION = "GI7630AGENTSESSION", "GI7630CUSTSESSION"
 CUST_LOGIN = "gi7630.cust"
 TIME_REQUIRED = "Ticket::Frontend::NeedAccountedTime"
@@ -149,6 +149,7 @@ def _seed(sync_url: str) -> None:
             (DF_ART, "Gi7630Art", "Multiselect", "Article", possible_ab),
             (DF_DROP, "Gi7630Drop", "Dropdown", "Ticket", possible_num),
             (DF_MULTI, "Gi7630Multi", "Multiselect", "Ticket", possible_ab),
+            (DF_BARE, "Gi7630Bare", "Dropdown", "Ticket", "---\nDefaultValue: ''\n"),
         ):
             conn.execute(
                 text(
@@ -918,3 +919,122 @@ async def test_update_article_own_dynamic_field_lands_on_that_article(sync_url: 
     )
     assert bad["Error"]["ErrorMessage"] == "TicketUpdate: DynamicField->Value parameter is invalid!"
     assert len(_article_ids(sync_url, ticket_id)) == 3
+
+
+@pytest.mark.db
+async def test_dynamic_field_name_must_match_exactly(sync_url: str) -> None:
+    # MariaDB's collation would find "gi7630ticket"; Znuny's lookup is an exact hash key
+    for operation, params in (
+        ("create", {"Ticket": _ticket("GI7630 case"), "Article": _article("x")}),
+        ("update", {"TicketID": (await _new_ticket(sync_url, "GI7630 case upd"))[0]}),
+    ):
+        result = await _call(
+            sync_url,
+            operation,
+            {**params, "DynamicField": {"Name": "gi7630TICKET", "Value": "x"}},
+        )
+        op = "TicketCreate" if operation == "create" else "TicketUpdate"
+        assert result == {
+            "Error": {
+                "ErrorCode": f"{op}.InvalidParameter",
+                "ErrorMessage": f"{op}: DynamicField->Name parameter is invalid!",
+            }
+        }
+
+
+@pytest.mark.db
+async def test_select_field_values_follow_znuny_field_value_validate(sync_url: str) -> None:
+    invalid = "TicketCreate: DynamicField->Value parameter is invalid!"
+    cases: list[tuple[dict[str, Any], bool]] = [
+        ({"Name": "Gi7630Multi", "Value": [""]}, False),  # "" is not a PossibleValues key
+        ({"Name": "Gi7630Multi", "Value": ""}, True),  # an empty scalar passes, clears the field
+        ({"Name": "Gi7630Multi", "Value": []}, True),
+        ({"Name": "Gi7630Drop", "Value": ["1"]}, False),  # a list is no Dropdown value
+        ({"Name": "Gi7630Drop", "Value": "1"}, True),
+        ({"Name": "Gi7630Bare", "Value": "x"}, False),  # a Dropdown without PossibleValues
+        ({"Name": "Gi7630Bare", "Value": ""}, False),
+    ]
+    for item, ok in cases:
+        title = f"GI7630 select {item}"
+        result = await _call(
+            sync_url,
+            "create",
+            {"Ticket": _ticket(title), "Article": _article("x"), "DynamicField": item},
+        )
+        if ok:
+            assert "Error" not in result, (item, result)
+        else:
+            assert result["Error"]["ErrorMessage"] == invalid, (item, result)
+            assert _ticket_count(sync_url, title) == 0
+
+
+@pytest.mark.db
+async def test_owner_without_lock_locks_the_new_ticket(sync_url: str) -> None:
+    def _lock(ticket_id: int) -> int:
+        row = _query(sync_url, "SELECT ticket_lock_id FROM ticket WHERE id = :t", t=ticket_id)
+        return int(row[0][0])
+
+    owned = await _call(
+        sync_url,
+        "create",
+        {"Ticket": _ticket("GI7630 lock owner", OwnerID=AGENT), "Article": _article("x")},
+    )
+    assert _lock(owned["TicketID"]) == 2
+    explicit = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket("GI7630 lock explicit", OwnerID=AGENT, LockID=1),
+            "Article": _article("x"),
+        },
+    )
+    assert _lock(explicit["TicketID"]) == 1
+    nobody = await _call(
+        sync_url, "create", {"Ticket": _ticket("GI7630 lock none"), "Article": _article("x")}
+    )
+    assert _lock(nobody["TicketID"]) == 1
+
+
+@pytest.mark.db
+async def test_attachment_bytes_are_stored_and_read_back_on_both_dialects(sync_url: str) -> None:
+    import base64
+
+    payload = bytes(range(256)) * 3
+    result = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket("GI7630 attachment"),
+            "Article": _article(
+                "x",
+                Attachment={
+                    "Filename": "a.bin",
+                    "ContentType": "application/octet-stream",
+                    "Content": base64.b64encode(payload).decode(),
+                },
+            ),
+        },
+    )
+    assert "Error" not in result, result
+    from tiqora.api.compat.operations import op_ticket_get
+
+    engine = create_async_engine(_async_url(sync_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
+    try:
+        async with factory() as session:
+            got = await op_ticket_get(
+                {
+                    "SessionID": AGENT_SESSION,
+                    "TicketID": result["TicketID"],
+                    "AllArticles": 1,
+                    "Attachments": 1,
+                },
+                session,
+                store,
+            )
+    finally:
+        await engine.dispose()
+    attachment = got["Ticket"][0]["Article"][0]["Attachment"][0]
+    assert base64.b64decode(attachment["Content"]) == payload
+    assert attachment["FilesizeRaw"] == len(payload)

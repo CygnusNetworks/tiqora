@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -64,6 +65,11 @@ def _as_bytes(value: bytes | memoryview | str | None) -> bytes:
                 return bytes.fromhex(value[2:])
             except ValueError:
                 return value.encode("utf-8")
+        # Znuny's PostgreSQL TEXT column holds the attachment as base64
+        try:
+            return base64.b64decode(value, validate=True)
+        except ValueError:
+            pass
         return value.encode("utf-8")
     return bytes(value)
 

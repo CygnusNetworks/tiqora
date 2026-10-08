@@ -97,35 +97,16 @@ def normalize_df_values(field_type: str, values: Sequence[str]) -> list[str]:
     return vals
 
 
-async def load_ticket_dynamic_field(session: AsyncSession, name: str) -> DynamicFieldConfig | None:
-    row = (
-        await session.execute(
-            text(
-                "SELECT id, name, field_type FROM dynamic_field"
-                " WHERE name = :n AND object_type = 'Ticket' AND valid_id = 1 LIMIT 1"
-            ),
-            {"n": name},
-        )
-    ).first()
-    if row is None:
-        return None
-    return DynamicFieldConfig(id=int(row[0]), name=str(row[1]), field_type=str(row[2]))
-
-
-async def load_dynamic_field(session: AsyncSession, name: str) -> DynamicFieldConfig | None:
-    """The valid dynamic field *name* of object type ``Ticket`` or ``Article`` (or None).
-
-    Znuny's GenericInterface ``DynamicFieldLookup`` covers exactly those two
-    object types.
-    """
+async def _load_field(
+    session: AsyncSession, name: str, object_types: tuple[str, ...]
+) -> DynamicFieldConfig | None:
     row = (
         await session.execute(
             text(
                 "SELECT id, name, field_type, object_type FROM dynamic_field"
-                " WHERE name = :n AND object_type IN ('Ticket', 'Article') AND valid_id = 1"
-                " LIMIT 1"
-            ),
-            {"n": name},
+                " WHERE name = :n AND object_type IN :ot AND valid_id = 1 LIMIT 1"
+            ).bindparams(bindparam("ot", expanding=True)),
+            {"n": name, "ot": list(object_types)},
         )
     ).first()
     if row is None:
@@ -135,22 +116,37 @@ async def load_dynamic_field(session: AsyncSession, name: str) -> DynamicFieldCo
     )
 
 
+async def load_ticket_dynamic_field(session: AsyncSession, name: str) -> DynamicFieldConfig | None:
+    return await _load_field(session, name, ("Ticket",))
+
+
+async def load_dynamic_field(session: AsyncSession, name: str) -> DynamicFieldConfig | None:
+    """The valid dynamic field *name* of object type ``Ticket`` or ``Article`` (or None).
+
+    Znuny's GenericInterface ``DynamicFieldLookup`` covers exactly those two
+    object types. The name match follows the database collation (case-insensitive
+    on MariaDB); callers that need the exact spelling compare ``config.name``.
+    """
+    return await _load_field(session, name, ("Ticket", "Article"))
+
+
 async def load_article_dynamic_field(session: AsyncSession, name: str) -> DynamicFieldConfig | None:
     """The valid dynamic field *name* of object type ``Article`` (or None)."""
-    row = (
-        await session.execute(
-            text(
-                "SELECT id, name, field_type FROM dynamic_field"
-                " WHERE name = :n AND object_type = 'Article' AND valid_id = 1 LIMIT 1"
-            ),
-            {"n": name},
-        )
-    ).first()
-    if row is None:
-        return None
-    return DynamicFieldConfig(
-        id=int(row[0]), name=str(row[1]), field_type=str(row[2]), object_type="Article"
-    )
+    return await _load_field(session, name, ("Article",))
+
+
+async def possible_values_of(session: AsyncSession, field: DynamicFieldConfig) -> dict[str, Any]:
+    """``PossibleValues`` of a Dropdown / Multiselect, keys as strings (YAML reads ``1`` as int)."""
+    from sqlalchemy import select
+
+    from tiqora.db.legacy.dynamic_field import DynamicField
+    from tiqora.domain.dynamic_field_config import config_from_yaml
+
+    raw_config = (
+        await session.execute(select(DynamicField.config).where(DynamicField.id == field.id))
+    ).scalar_one_or_none()
+    possible = config_from_yaml(raw_config).get("PossibleValues")
+    return {str(k): v for k, v in possible.items()} if isinstance(possible, dict) else {}
 
 
 async def values_outside_possible_values(
@@ -158,21 +154,12 @@ async def values_outside_possible_values(
 ) -> list[str]:
     """Non-empty ``values`` that are not keys of a Dropdown / Multiselect's PossibleValues.
 
-    ``BaseSelect.pm::EditFieldValueValidate``: the keys compare as strings (YAML
-    may have read ``1`` as an integer). Other field types never restrict.
+    ``BaseSelect.pm::EditFieldValueValidate``: the keys compare as strings.
+    Other field types never restrict.
     """
-    from sqlalchemy import select
-
-    from tiqora.db.legacy.dynamic_field import DynamicField
-    from tiqora.domain.dynamic_field_config import config_from_yaml
-
     if field.field_type not in ("Dropdown", "Multiselect"):
         return []
-    raw_config = (
-        await session.execute(select(DynamicField.config).where(DynamicField.id == field.id))
-    ).scalar_one_or_none()
-    possible = config_from_yaml(raw_config).get("PossibleValues")
-    allowed = {str(k) for k in possible} if isinstance(possible, dict) else set()
+    allowed = await possible_values_of(session, field)
     return [v for v in values if v != "" and v not in allowed]
 
 

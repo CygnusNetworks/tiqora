@@ -32,6 +32,11 @@ AR_REPLY, AR_FOLLOW_UP = 7650, 7651
 SESSION = "GI7650AGENTSESSION"
 CUSTOMER_MAIL = "kim7650@example.org"
 CUSTOMER_FROM = f"Kim Kunde <{CUSTOMER_MAIL}>"
+CUST_SESSION = "GI7650CUSTSESSION"
+CUST_LOGIN = "gi7650.cust"
+CUST_MAIL = "cust7650@example.org"
+SYSADDR, SYSADDR_MAIL = 7652, "gi7650-system@example.org"
+DAEMON_MAIL = "MAILER-DAEMON@example.org"
 TITLE = "GI7650 ticket"
 
 _SEEDED: list[str] = []
@@ -52,7 +57,10 @@ def _cleanup_statements() -> tuple[str, ...]:
         f"DELETE FROM article_data_mime WHERE article_id IN {_IN_QUEUE_ARTICLES}",
         f"DELETE FROM article WHERE ticket_id IN {_IN_QUEUE}",
         f"DELETE FROM ticket WHERE queue_id = {QUEUE}",
-        f"DELETE FROM ticket_loop_protection WHERE sent_to = '{CUSTOMER_MAIL}'",
+        "DELETE FROM ticket_loop_protection WHERE sent_to IN"
+        f" ('{CUSTOMER_MAIL}', '{DAEMON_MAIL}', '{CUST_MAIL}', 'someone@example.org')",
+        f"DELETE FROM system_address WHERE id = {SYSADDR}",
+        f"DELETE FROM customer_user WHERE login = '{CUST_LOGIN}'",
         f"DELETE FROM queue_auto_response WHERE queue_id = {QUEUE}",
         f"DELETE FROM auto_response WHERE id IN ({AR_REPLY}, {AR_FOLLOW_UP})",
         "DELETE FROM sessions WHERE session_id LIKE 'GI7650%'",
@@ -120,26 +128,34 @@ def _seed(sync_url: str) -> None:
             f" VALUES ({AR_FOLLOW_UP}, 3, 1, 'gi7650 follow up',"
             " 'Nachfrage: <OTRS_CUSTOMER_SUBJECT>',"
             " 'Wir haben Ihre Nachricht erhalten.', 'text/plain', 'test', 1, 1, :t, 1, :t)",
+            "INSERT INTO system_address (id, value0, value1, queue_id, valid_id, create_time,"
+            f" create_by, change_time, change_by) VALUES ({SYSADDR}, '{SYSADDR_MAIL}', 'Sys', 1,"
+            " 1, :t, 1, :t, 1)",
+            "INSERT INTO customer_user (login, email, customer_id, pw, first_name, last_name,"
+            f" valid_id, create_time, create_by, change_time, change_by) VALUES ('{CUST_LOGIN}',"
+            f" '{CUST_MAIL}', 'GI7650', 'x', 'Kim', 'Kunde', 1, :t, 1, :t, 1)",
             "INSERT INTO queue_auto_response (queue_id, auto_response_id, create_time, create_by,"
             f" change_time, change_by) VALUES ({QUEUE}, {AR_REPLY}, :t, 1, :t, 1)",
             "INSERT INTO queue_auto_response (queue_id, auto_response_id, create_time, create_by,"
             f" change_time, change_by) VALUES ({QUEUE}, {AR_FOLLOW_UP}, :t, 1, :t, 1)",
         ):
             conn.execute(text(stmt), {"t": T0})
-        for key, val in {
-            "UserID": str(AGENT),
-            "UserLogin": "gi7650.agent",
-            "UserType": "User",
-            "UserLastRequest": str(now),
-            "UserSessionStart": str(now),
-        }.items():
-            conn.execute(
-                text(
-                    "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
-                    " VALUES (:sid, :k, :v, 0)"
-                ),
-                {"sid": SESSION, "k": key, "v": val},
-            )
+        for sid, extra in (
+            (SESSION, {"UserID": str(AGENT), "UserLogin": "gi7650.agent", "UserType": "User"}),
+            (CUST_SESSION, {"UserLogin": CUST_LOGIN, "UserType": "Customer"}),
+        ):
+            for key, val in {
+                **extra,
+                "UserLastRequest": str(now),
+                "UserSessionStart": str(now),
+            }.items():
+                conn.execute(
+                    text(
+                        "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
+                        " VALUES (:sid, :k, :v, 0)"
+                    ),
+                    {"sid": sid, "k": key, "v": val},
+                )
     engine.dispose()
 
 
@@ -230,12 +246,13 @@ async def _call(
     params: dict[str, Any],
     *,
     operation_config: OperationConfig | None = None,
+    customer: bool = False,
 ) -> dict[str, Any]:
     engine = create_async_engine(_async_url(sync_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
     func = op_ticket_create if operation == "create" else op_ticket_update
-    payload = {"SessionID": SESSION, **params}
+    payload = {"SessionID": CUST_SESSION if customer else SESSION, **params}
     try:
         async with factory() as session:
 
@@ -343,25 +360,8 @@ async def test_no_relay_no_auto_response(sync_url: str, no_relay: CapturingMailS
 
 @pytest.mark.db
 async def test_article_send_never_triggers_auto_response(
-    sync_url: str, relay: CapturingMailSender, monkeypatch: pytest.MonkeyPatch
+    sync_url: str, relay: CapturingMailSender
 ) -> None:
-    from tiqora.api.compat import operations
-    from tiqora.domain.ticket_write_service import add_article
-
-    delivered: list[int] = []
-
-    async def _fake_deliver(
-        session: Any, sysconfig: Any, ticket_id: int, queue_id: int, user_id: int, article: Any
-    ) -> int:
-        # the real path would talk SMTP; store the article like deliver_agent_email_reply does
-        article_id = await add_article(
-            session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
-        )
-        delivered.append(article_id)
-        return article_id
-
-    monkeypatch.setattr(operations, "_deliver_article", _fake_deliver)
-
     result = await _call(
         sync_url,
         "create",
@@ -380,8 +380,8 @@ async def test_article_send_never_triggers_auto_response(
     assert "Error" not in result, result
     ticket_id = result["TicketID"]
 
-    assert delivered == [result["ArticleID"]]
-    assert relay.sent == []  # ArticleSend goes through the (faked) delivery only
+    # exactly the ArticleSend mail went out, no auto reply on top of it
+    assert [m["To"] for m in relay.sent] == [CUSTOMER_MAIL]
     assert _article_count(sync_url, ticket_id) == 1
     assert "SendAutoReply" not in _history_names(sync_url, ticket_id)
 
@@ -517,9 +517,6 @@ async def test_include_ticket_data_lists_only_new_articles_on_update(
 async def test_include_ticket_data_on_update_carries_attachments(
     sync_url: str, no_relay: CapturingMailSender
 ) -> None:
-    if sync_url.startswith("postgres"):
-        # add_article binds attachment bytes as text through asyncpg (pre-existing, not GI-specific)
-        pytest.skip("attachment storage through add_article fails on asyncpg")
     content = base64.b64encode(b"hallo").decode()
     created = await _call(
         sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article("Mit Anhang")}
@@ -556,3 +553,325 @@ async def test_canonical_route_never_includes_ticket_data(
         assert "Error" not in result, result
         assert "Ticket" not in result
         assert sorted(result) == ["ArticleID", "TicketID", "TicketNumber"]
+
+
+# ---------------------------------------------------------------------------
+# Mails are sent after the commit (ArticleSend and auto responses)
+# ---------------------------------------------------------------------------
+
+
+class _ScriptedSender:
+    """Records mails; the n-th send (1-based) listed in ``fail_on`` raises like an SMTP outage."""
+
+    def __init__(self, fail_on: tuple[int, ...] = ()) -> None:
+        self.sent: list[Any] = []
+        self.attempts = 0
+        self.fail_on = fail_on
+        self.last_smtp_code: int | None = 250
+        self.last_smtp_detail: str | None = "250 OK"
+
+    async def send(self, message: Any, *, envelope_from: str | None = None) -> None:
+        self.attempts += 1
+        if self.attempts in self.fail_on:
+            raise OSError("connection refused")
+        self.sent.append(message)
+
+
+def _use_relay(monkeypatch: pytest.MonkeyPatch, sender: Any) -> None:
+    async def _enabled(session: Any, settings: Any = None) -> Any:
+        return mail_outbound.ResolvedOutboundSmtp(
+            enabled=True,
+            host="smtp.example.org",
+            port=25,
+            security="none",
+            auth_type="none",
+            auth_user="",
+            auth_password="",
+            from_default="",
+            timeout_seconds=5,
+            source="db",
+        )
+
+    async def _build(session: Any, **kwargs: Any) -> Any:
+        return sender
+
+    monkeypatch.setattr(mail_outbound, "resolve_outbound_smtp", _enabled)
+    monkeypatch.setattr(mail_outbound, "build_outbound_sender", _build)
+
+
+def _send_article(subject: str) -> dict[str, Any]:
+    return {
+        "Subject": subject,
+        "Body": f"{subject} body",
+        "From": "Agent <agent@example.org>",
+        "To": CUSTOMER_MAIL,
+        "ArticleSend": 1,
+    }
+
+
+def _mail_log(sync_url: str) -> list[tuple[str, int | None]]:
+    rows = _query(
+        sync_url,
+        "SELECT status, article_id FROM tiqora_mail_log WHERE ticket_id IN "
+        f"{_IN_QUEUE} ORDER BY id",
+    )
+    return [(str(r[0]), None if r[1] is None else int(r[1])) for r in rows]
+
+
+@pytest.mark.db
+async def test_second_article_send_failure_keeps_the_committed_data(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender(fail_on=(2,))
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url,
+        "create",
+        {"Ticket": _ticket(), "Article": [_send_article("Eins"), _send_article("Zwei")]},
+    )
+    assert result == {
+        "Error": {
+            "ErrorCode": "TicketCreate.OperationFailed",
+            "ErrorMessage": (
+                "TicketCreate: Article could not be created, please contact the system"
+                " administrator"
+            ),
+        }
+    }
+    # ticket and both articles persist, the first mail went out, the failure is in the log
+    tickets = _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE)
+    assert len(tickets) == 1
+    ids = _article_ids(sync_url, int(tickets[0][0]))
+    assert len(ids) == 2
+    assert [str(m["Subject"]).endswith("Eins") for m in sender.sent] == [True]
+    assert _mail_log(sync_url) == [("sent", ids[0]), ("failed", ids[1])]
+
+
+@pytest.mark.db
+async def test_article_send_mail_waits_for_the_commit(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    seen_at_send: list[int] = []
+
+    original_send = sender.send
+
+    async def _send(message: Any, *, envelope_from: str | None = None) -> None:
+        # a second connection must already see the committed ticket and article
+        seen_at_send.append(
+            int(
+                _query(
+                    sync_url,
+                    "SELECT COUNT(*) FROM article a JOIN ticket t ON t.id = a.ticket_id"
+                    " WHERE t.title = :t",
+                    t=TITLE,
+                )[0][0]
+            )
+        )
+        await original_send(message, envelope_from=envelope_from)
+
+    sender.send = _send  # type: ignore[method-assign]
+    result = await _call(
+        sync_url,
+        "create",
+        {"Ticket": _ticket(), "Article": [_send_article("Eins"), _send_article("Zwei")]},
+    )
+    assert "Error" not in result, result
+    assert seen_at_send == [2, 2]
+    assert _mail_log(sync_url) == [
+        ("sent", result["ArticleID"][0]),
+        ("sent", result["ArticleID"][1]),
+    ]
+
+
+@pytest.mark.db
+async def test_no_mail_when_validation_fails(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket(),
+            "Article": [_send_article("Gut"), {**_send_article("Schlecht"), "HistoryType": "Nope"}],
+        },
+    )
+    assert result["Error"]["ErrorMessage"].endswith("HistoryType parameter is invalid!")
+    assert sender.sent == [] and sender.attempts == 0
+    assert _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE) == []
+
+
+@pytest.mark.db
+async def test_failing_auto_response_never_fails_the_call(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender(fail_on=(1,))
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article("Defekt")}
+    )
+    assert "Error" not in result, result
+    ticket_id = result["TicketID"]
+    assert sender.attempts == 1 and sender.sent == []
+    assert _article_count(sync_url, ticket_id) == 1  # no partial auto reply row
+    assert "SendAutoReply" not in _history_names(sync_url, ticket_id)
+    assert (
+        _query(sync_url, "SELECT 1 FROM ticket_loop_protection WHERE sent_to = :a", a=CUSTOMER_MAIL)
+        == []
+    )
+
+
+@pytest.mark.db
+async def test_raising_add_article_in_auto_response_leaves_no_partial_rows(
+    sync_url: str, relay: CapturingMailSender, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.channels.email import autoresponse
+
+    async def _boom(*args: Any, **kwargs: Any) -> int:
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr(autoresponse, "add_article", _boom)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article("Boom")}
+    )
+    assert "Error" not in result, result
+    ticket_id = result["TicketID"]
+    assert _article_count(sync_url, ticket_id) == 1
+    assert "SendAutoReply" not in _history_names(sync_url, ticket_id)
+    assert (
+        _query(sync_url, "SELECT 1 FROM ticket_loop_protection WHERE sent_to = :a", a=CUSTOMER_MAIL)
+        == []
+    )
+
+
+@pytest.mark.db
+async def test_queue_without_auto_response_sends_nothing(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    _query(sync_url, f"DELETE FROM queue_auto_response WHERE queue_id = {QUEUE}")
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article("Leer")}
+    )
+    assert "Error" not in result, result
+    assert relay.sent == []
+    assert _article_count(sync_url, result["TicketID"]) == 1
+
+
+@pytest.mark.db
+async def test_closed_ticket_gets_no_auto_reply(sync_url: str, relay: CapturingMailSender) -> None:
+    ticket = {**_ticket(), "StateID": 2}
+    result = await _call(sync_url, "create", {"Ticket": ticket, "Article": _customer_article("Zu")})
+    assert "Error" not in result, result
+    assert relay.sent == []
+    names = _query(
+        sync_url,
+        "SELECT h.name FROM ticket_history h JOIN ticket_history_type t ON t.id = h.history_type_id"
+        " WHERE h.ticket_id = :t AND t.name = 'Misc'",
+        t=result["TicketID"],
+    )
+    assert [r[0] for r in names] == ["Sent no auto response because ticket is state-type 'closed'!"]
+
+
+@pytest.mark.db
+async def test_no_auto_response_to_daemons_and_system_addresses(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    daemon = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket(),
+            "Article": _customer_article("Bounce", From=f"Mail Delivery <{DAEMON_MAIL}>"),
+        },
+    )
+    own = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket(),
+            "Article": _customer_article("Eigen", From=f"System <{SYSADDR_MAIL.upper()}>"),
+        },
+    )
+    assert "Error" not in daemon and "Error" not in own
+    assert relay.sent == []
+    misc = _query(
+        sync_url,
+        "SELECT h.name FROM ticket_history h JOIN ticket_history_type t ON t.id = h.history_type_id"
+        " WHERE h.ticket_id = :t AND t.name = 'Misc'",
+        t=daemon["TicketID"],
+    )
+    assert [r[0] for r in misc] == [
+        f"Sent no auto response to '{DAEMON_MAIL}', SendNoAutoResponseRegExp matched."
+    ]
+    assert _article_count(sync_url, daemon["TicketID"]) == 1
+    assert _article_count(sync_url, own["TicketID"]) == 1
+
+
+@pytest.mark.db
+async def test_missing_from_is_the_customer_user_like_znuny(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    known = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": {**_ticket(), "CustomerUser": CUST_LOGIN},
+            "Article": {"Subject": "Ohne Absender", "Body": "Hallo", "SenderType": "customer"},
+        },
+    )
+    assert "Error" not in known, known
+    assert len(relay.sent) == 1 and CUST_MAIL in str(relay.sent[0]["To"])
+    from_header = _query(
+        sync_url,
+        "SELECT a_from FROM article_data_mime WHERE article_id = :a",
+        a=known["ArticleID"],
+    )[0][0]
+    assert from_header == f'"Kim Kunde" <{CUST_MAIL}>'
+
+    # an unknown customer user is used as given (Znuny: it should be an address)
+    unknown = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": {**_ticket(), "CustomerUser": "someone@example.org"},
+            "Article": {"Subject": "Roh", "Body": "Hallo", "SenderType": "customer"},
+        },
+    )
+    raw_from = _query(
+        sync_url,
+        "SELECT a_from FROM article_data_mime WHERE article_id = :a",
+        a=unknown["ArticleID"],
+    )[0][0]
+    assert raw_from == "someone@example.org"
+
+
+@pytest.mark.db
+async def test_customer_follow_up_gets_the_auto_follow_up_and_ticket_data(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    created = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": {**_ticket(), "CustomerUser": CUST_LOGIN},
+            "Article": _customer_article("Start"),
+        },
+    )
+    ticket_id = created["TicketID"]
+    relay.sent.clear()
+    result = await _call(
+        sync_url,
+        "update",
+        {"TicketID": ticket_id, "Article": {"Subject": "Nachfrage", "Body": "Noch da?"}},
+        customer=True,
+        operation_config=_operation_config("Ticket::TicketUpdate", include="1"),
+    )
+    assert "Error" not in result, result
+    assert len(relay.sent) == 1
+    assert CUST_MAIL in str(relay.sent[0]["To"])
+    assert "Nachfrage" in str(relay.sent[0]["Subject"])
+    assert _history_names(sync_url, ticket_id).count("SendAutoFollowUp") == 1
+    assert result["Ticket"]["Article"]["ArticleID"] == result["ArticleID"]
