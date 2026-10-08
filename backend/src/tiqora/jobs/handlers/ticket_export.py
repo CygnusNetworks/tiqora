@@ -10,9 +10,9 @@ from pydantic import BaseModel
 
 from tiqora.domain.ticket_csv import CSV_HEADER, EchoWriter, ticket_csv_row
 from tiqora.domain.ticket_service import TicketService
-from tiqora.filters import Filter
+from tiqora.filters import Filter, FilterError
 from tiqora.filters.tickets import compile_ticket_filter, count_tickets, ticket_query_scope
-from tiqora.jobs.context import JobContext
+from tiqora.jobs.context import JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
 
 PROGRESS_EVERY_ROWS = 500
@@ -32,7 +32,11 @@ async def run_ticket_export(ctx: JobContext, payload: TicketExportPayload) -> di
         scope = await ticket_query_scope(
             session, payload.user_id, include_archived=payload.include_archived
         )
-        total = await count_tickets(session, payload.filter, scope)
+        try:
+            total = await count_tickets(session, payload.filter, scope)
+            stmt = await compile_ticket_filter(session, payload.filter, scope)
+        except FilterError as exc:
+            raise JobFailed(f"Der Filter ist nicht mehr gültig: {exc.message}") from exc
         await ctx.progress(0, total, "Tickets werden gelesen …")
         out = io.BytesIO()
         # UTF-8 BOM first, so Excel opens the file as UTF-8.
@@ -40,7 +44,6 @@ async def run_ticket_export(ctx: JobContext, payload: TicketExportPayload) -> di
         writer = csv.writer(EchoWriter(), delimiter=";")
         out.write(writer.writerow(CSV_HEADER).encode("utf-8"))
         rows = 0
-        stmt = await compile_ticket_filter(session, payload.filter, scope)
         if stmt is not None:
             async for item in TicketService(session).iter_ticket_items(
                 stmt, sort=payload.sort, order=payload.order

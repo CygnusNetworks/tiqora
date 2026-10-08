@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import binascii
 import csv
+import hashlib
+import json
 import re
 from collections.abc import AsyncGenerator
 from datetime import datetime
@@ -75,10 +77,12 @@ from tiqora.domain.ticket_write_service import (
     TicketNotFound as WriteNotFound,
 )
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
+from tiqora.filters import FilterError
 from tiqora.filters.ticket_params import TicketListParams, filter_from_list_params
 from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB, TicketExportPayload
+from tiqora.filters.tickets import compile_ticket_filter, ticket_query_scope
 from tiqora.jobs.schemas import JobAccepted
-from tiqora.jobs.service import enqueue_job
+from tiqora.jobs.service import count_active_jobs, enqueue_job, find_active_job
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -732,6 +736,9 @@ async def export_tickets_csv(
     )
 
 
+MAX_ACTIVE_EXPORTS_PER_USER = 2
+
+
 class TicketExportJobIn(BaseModel):
     """Body of ``POST /tickets/export-jobs``: the same filters as ``GET /tickets``."""
 
@@ -759,14 +766,40 @@ async def start_ticket_export_job(
         sort=body.sort,
         order=body.order,
     )
-    job = await enqueue_job(
+    # Invalid filters are answered now (422), not by a failed job later.
+    scope = await ticket_query_scope(session, user.id, include_archived=include_archived)
+    try:
+        await compile_ticket_filter(session, payload.filter, scope)
+    except FilterError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"message": exc.message, "path": exc.path},
+        ) from exc
+    job_payload = payload.model_dump(mode="json", by_alias=True, exclude_none=True)
+    # The same export asked twice while one is pending joins the pending job; a user
+    # may only have a few different exports in flight.
+    digest = hashlib.sha256(json.dumps(job_payload, sort_keys=True).encode()).hexdigest()[:32]
+    dedupe_key = f"ticket_export:{user.id}:{digest}"
+    existing = await find_active_job(session, kind=TICKET_EXPORT_JOB.kind, dedupe_key=dedupe_key)
+    if existing is None and (
+        await count_active_jobs(session, kind=TICKET_EXPORT_JOB.kind, created_by=user.id)
+        >= MAX_ACTIVE_EXPORTS_PER_USER
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "message": "Es laufen bereits zwei Exporte. Bitte warte, bis einer fertig ist."
+            },
+        )
+    job = existing or await enqueue_job(
         session,
         kind=TICKET_EXPORT_JOB.kind,
-        payload=payload.model_dump(mode="json", by_alias=True, exclude_none=True),
+        payload=job_payload,
         created_by=user.id,
+        dedupe_key=dedupe_key,
     )
     await session.commit()
-    return JobAccepted(job_id=job.id, status="queued")
+    return JobAccepted(job_id=job.id, status="running" if job.status == "running" else "queued")
 
 
 class TimeAccountingReportEntry(BaseModel):

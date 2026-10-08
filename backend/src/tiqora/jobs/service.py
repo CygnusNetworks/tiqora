@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
@@ -80,6 +80,42 @@ async def enqueue_job(
     session.add(job)
     await session.flush()
     return job
+
+
+async def count_active_jobs(session: AsyncSession, *, kind: str, created_by: int) -> int:
+    """Queued or running jobs of ``kind`` started by ``created_by``."""
+    return int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(TiqoraJob)
+                .where(
+                    TiqoraJob.kind == kind,
+                    TiqoraJob.created_by == created_by,
+                    TiqoraJob.status.in_(ACTIVE_STATUSES),
+                )
+            )
+        ).scalar_one()
+    )
+
+
+async def find_active_job(session: AsyncSession, *, kind: str, dedupe_key: str) -> TiqoraJob | None:
+    return (
+        (
+            await session.execute(
+                select(TiqoraJob)
+                .where(
+                    TiqoraJob.kind == kind,
+                    TiqoraJob.dedupe_key == dedupe_key,
+                    TiqoraJob.status.in_(ACTIVE_STATUSES),
+                )
+                .order_by(TiqoraJob.id)
+                .limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
 
 
 async def get_job(session: AsyncSession, job_id: int) -> TiqoraJob | None:
