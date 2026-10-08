@@ -50,6 +50,7 @@ from tiqora.domain.dynamic_field_values import (
     DynamicFieldValueError,
     load_ticket_dynamic_field,
     set_ticket_dynamic_field,
+    values_outside_possible_values,
 )
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
@@ -182,6 +183,10 @@ class ArticleIn:
     exclude_notification_user_ids: tuple[int, ...] = ()
     exclude_mute_notification_user_ids: tuple[int, ...] = ()
     append_signature: bool = True
+    # GenericInterface ArticleSend: the signature goes directly behind the body
+    # (``Body . $Signature``, TicketCreate.pm) -- no "-- " separator, no
+    # "already present" check like the agent reply composer does.
+    signature_directly_after_body: bool = False
 
 
 @dataclass
@@ -2004,26 +2009,12 @@ async def update_dynamic_fields_strict(
     :class:`InvalidInput` before anything is written for the offending field; the
     caller's transaction rolls earlier fields back.
     """
-    from sqlalchemy import select
-
-    from tiqora.db.legacy.dynamic_field import DynamicField
-    from tiqora.domain.dynamic_field_config import config_from_yaml
-
     for field_name, field_values in values.items():
         field = await load_ticket_dynamic_field(session, field_name)
         if field is None:
             raise InvalidInput(f"Unbekanntes Feld „{field_name}“.")
-        if field.field_type in ("Dropdown", "Multiselect"):
-            raw_config = (
-                await session.execute(
-                    select(DynamicField.config).where(DynamicField.id == field.id)
-                )
-            ).scalar_one_or_none()
-            possible = config_from_yaml(raw_config).get("PossibleValues")
-            allowed = {str(k) for k in possible} if isinstance(possible, dict) else set()
-            for v in field_values:
-                if v != "" and v not in allowed:
-                    raise InvalidInput(f"{field_name}: „{v}“ ist kein erlaubter Wert.")
+        for v in await values_outside_possible_values(session, field, field_values):
+            raise InvalidInput(f"{field_name}: „{v}“ ist kein erlaubter Wert.")
         await update_dynamic_field(
             session,
             ticket_id=ticket_id,

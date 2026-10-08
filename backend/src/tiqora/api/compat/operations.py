@@ -9,7 +9,6 @@ Ports request/response semantics from:
 
 from __future__ import annotations
 
-import base64
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -18,6 +17,14 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.api.compat.article_input import (
+    GiArticle,
+    GiDynamicFields,
+    article_id_result,
+    normalize_article_list,
+    parse_gi_articles,
+    parse_gi_dynamic_fields,
+)
 from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.api.compat.ticket_get import (
     build_article_entries,
@@ -40,6 +47,10 @@ from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraUserPasskey
 from tiqora.domain.auth import AuthenticatedUser, SessionStore
 from tiqora.domain.auth_config import AuthConfigService
+from tiqora.domain.dynamic_field_values import (
+    set_article_dynamic_field,
+    set_ticket_dynamic_field,
+)
 from tiqora.domain.portal_ticket_service import (
     PORTAL_SYSTEM_USER_ID,
     customer_can_access_ticket,
@@ -52,6 +63,7 @@ from tiqora.domain.ticket_write_service import (
     TicketIn,
     TicketNotFound,
     add_article,
+    add_time_accounting,
     assign_owner,
     assign_responsible,
     change_priority,
@@ -62,7 +74,6 @@ from tiqora.domain.ticket_write_service import (
     move_queue,
     set_customer,
     unlock_ticket,
-    update_dynamic_field,
 )
 from tiqora.domain.totp import TOTPService
 from tiqora.permissions.engine import PermissionEngine
@@ -637,85 +648,8 @@ async def _set_user_preference(session: AsyncSession, user_id: int, key: str, va
 
 
 # ---------------------------------------------------------------------------
-# Article payload builder
+# Article delivery helpers (the article payload itself: compat/article_input.py)
 # ---------------------------------------------------------------------------
-
-
-def _build_article_in(art_data: dict[str, Any], user_type: str) -> ArticleIn:
-    """Build ArticleIn from GenericInterface article sub-object.
-
-    Znuny defaults (TicketCreate.pm lines 547-554):
-    - CommunicationChannel defaults to 'Internal' if not given
-    - IsVisibleForCustomer defaults from config (usually 1 for agent)
-    - SenderType defaults to 'agent' for User, 'customer' for Customer
-
-    For TicketUpdate notes (not email/phone), IsVisibleForCustomer should
-    default to 0 (internal) — per the Znuny TicketUpdate op behaviour.
-    """
-    channel_raw = (art_data.get("CommunicationChannel") or "Internal").strip()
-    # Map Znuny channel names to our internal names
-    channel_map = {
-        "Internal": "note",
-        "Email": "email",
-        "Phone": "phone",
-        "Chat": "note",
-    }
-    channel = channel_map.get(channel_raw, "note")
-
-    # IsVisibleForCustomer: explicit value wins; fallback: 0 (internal) for notes
-    is_visible_raw = art_data.get("IsVisibleForCustomer")
-    if is_visible_raw is not None:
-        is_visible = bool(int(is_visible_raw))
-    else:
-        # For email channel from agent, default visible; for notes default internal
-        is_visible = channel == "email" and user_type == _AGENT_USER_TYPE
-
-    sender_type_raw = art_data.get("SenderType")
-    if not sender_type_raw:
-        sender_type = "agent" if user_type == _AGENT_USER_TYPE else "customer"
-    else:
-        sender_type = sender_type_raw.lower()
-
-    # Attachments: list of {Filename, ContentType, Content(base64)}
-    attachments: list[tuple[str, str, bytes]] = []
-    for att in art_data.get("Attachment") or []:
-        if not isinstance(att, dict):
-            continue
-        try:
-            content_b64 = att.get("Content") or ""
-            content_bytes = base64.b64decode(content_b64)
-        except Exception:
-            content_bytes = b""
-        attachments.append(
-            (
-                att.get("Filename") or "attachment",
-                att.get("ContentType") or "application/octet-stream",
-                content_bytes,
-            )
-        )
-
-    return ArticleIn(
-        sender_type=sender_type,
-        is_visible_for_customer=is_visible,
-        subject=art_data.get("Subject") or "",
-        body=art_data.get("Body") or "",
-        content_type=art_data.get("ContentType") or "text/plain; charset=utf-8",
-        from_address=art_data.get("From"),
-        to_address=art_data.get("To"),
-        cc=art_data.get("Cc"),
-        bcc=art_data.get("Bcc"),
-        message_id=art_data.get("MessageID"),
-        in_reply_to=art_data.get("InReplyTo"),
-        references=art_data.get("References"),
-        channel=channel,
-        attachments=attachments,
-    )
-
-
-def _wants_article_send(art_data: dict[str, Any], user_type: str) -> bool:
-    """Znuny ``Article->ArticleSend``: send the article by email (agents only)."""
-    flag = art_data.get("ArticleSend")
-    return user_type == _AGENT_USER_TYPE and str(flag or "").strip() not in ("", "0")
 
 
 def _as_send_article(article_in: ArticleIn, art_data: dict[str, Any]) -> ArticleIn:
@@ -754,6 +688,77 @@ async def _deliver_article(
         user_id=user_id,
         article=article,
     )
+
+
+async def _write_gi_article(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    settings: Settings | None,
+    gi: GiArticle,
+    *,
+    ticket_id: int,
+    user_id: int,
+) -> int:
+    """Store (or send, ArticleSend) one request article and book its TimeUnit."""
+    if gi.send:
+        queue_row = (
+            await session.execute(
+                text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).first()
+        article_id = await _deliver_article(
+            session,
+            sysconfig,
+            ticket_id,
+            int(queue_row[0]) if queue_row else 0,
+            user_id,
+            _as_send_article(gi.article, gi.raw),
+        )
+    else:
+        article_id = await add_article(
+            session,
+            ticket_id=ticket_id,
+            article=await _apply_stored_email_security(gi.article, gi.raw, sysconfig, settings),
+            user_id=user_id,
+            sysconfig=sysconfig,
+        )
+    if gi.time_unit is not None:
+        await add_time_accounting(
+            session,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            time_unit=gi.time_unit,
+            user_id=user_id,
+        )
+    return article_id
+
+
+async def _write_ticket_dynamic_fields(
+    session: AsyncSession, fields: GiDynamicFields, *, ticket_id: int, user_id: int
+) -> None:
+    for name, values in fields.ticket.items():
+        await set_ticket_dynamic_field(
+            session, ticket_id=ticket_id, field=fields.configs[name], values=values, user_id=user_id
+        )
+
+
+async def _write_article_dynamic_fields(
+    session: AsyncSession,
+    fields: GiDynamicFields,
+    *,
+    ticket_id: int,
+    article_id: int,
+    user_id: int,
+) -> None:
+    for name, values in fields.article.items():
+        await set_article_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            field=fields.configs[name],
+            values=values,
+            user_id=user_id,
+        )
 
 
 async def _apply_stored_email_security(
@@ -1053,6 +1058,8 @@ async def op_ticket_create(
         return _err(f"{op}.MissingParameter", f"{op}: Ticket->Priority or PriorityID is missing!")
 
     owner_id = await _resolve_user_id(session, ticket.get("Owner"), ticket.get("OwnerID"))
+    # Znuny: an owner given in the request means "no agent mail for the first article".
+    has_owner = owner_id is not None
     if owner_id is None:
         owner_id = PORTAL_SYSTEM_USER_ID if is_customer else 1
 
@@ -1083,49 +1090,25 @@ async def op_ticket_create(
         customer_user_val = ticket.get("CustomerUser")
         write_user_id = user_id
 
-    # Dynamic fields
-    dynamic_fields: dict[str, list[str]] = {}
-    for df in data.get("DynamicField") or []:
-        if isinstance(df, dict):
-            fname = df.get("Name") or ""
-            val = df.get("Value")
-            if fname:
-                dynamic_fields[fname] = [str(val)] if val is not None else []
+    # Everything is validated before the first write (Run + _CheckArticle + _CheckDynamicField).
+    articles = await parse_gi_articles(
+        data.get("Article"),
+        op=op,
+        user_type=user_type,
+        has_owner=has_owner,
+        session=session,
+        sysconfig=sysconfig,
+    )
+    if isinstance(articles, dict):
+        return articles
+    fields = await parse_gi_dynamic_fields(
+        data.get("DynamicField"), op=op, articles_present=True, session=session
+    )
+    if isinstance(fields, dict):
+        return fields
 
-    # Build optional article (single dict or first of list)
-    article_in: ArticleIn | None = None
-    send_article: ArticleIn | None = None
-    art_data = data.get("Article")
-    if isinstance(art_data, list) and art_data:
-        art_data = art_data[0]
-    if art_data and isinstance(art_data, dict):
-        # MimeType + Charset → ContentType when ContentType omitted
-        if not art_data.get("ContentType") and art_data.get("MimeType"):
-            charset = art_data.get("Charset") or "utf-8"
-            art_data = {
-                **art_data,
-                "ContentType": f"{art_data['MimeType']}; charset={charset}",
-            }
-        # Attachment may be a single dict
-        att = art_data.get("Attachment")
-        if isinstance(att, dict):
-            art_data = {**art_data, "Attachment": [att]}
-        article_in = _build_article_in(art_data, user_type)
-        if _wants_article_send(art_data, user_type):
-            # Znuny ArticleSend: sent by SMTP (EmailSecurity applied on the
-            # wire) right after the ticket exists — see below.
-            send_article = _as_send_article(article_in, art_data)
-            if not (send_article.to_address or "").strip():
-                return _err(
-                    f"{op}.InvalidParameter",
-                    f"{op}: Article->To parameter must be a valid email address"
-                    " when Article->ArticleSend is set!",
-                )
-            article_in = None
-        else:
-            article_in = await _apply_stored_email_security(
-                article_in, art_data, sysconfig, settings
-            )
+    # A closed ticket is never created locked (TicketCreate.pm: forced unlock).
+    closed_state = state_id in await _state_ids_for_type(session, "closed")
 
     ticket_in = TicketIn(
         title=title,
@@ -1140,8 +1123,8 @@ async def op_ticket_create(
         type_id=type_id,
         service_id=service_id,
         sla_id=sla_id,
-        dynamic_fields=dynamic_fields,
-        article=article_in,
+        dynamic_fields={},
+        article=None,
     )
 
     try:
@@ -1149,6 +1132,10 @@ async def op_ticket_create(
             ticket_id = await create_ticket(
                 session, session_factory, sysconfig, params=ticket_in, user_id=write_user_id
             )
+            if closed_state and lock_id != 1:
+                await unlock_ticket(
+                    session, ticket_id=ticket_id, user_id=write_user_id, sysconfig=sysconfig
+                )
             # PendingTime on create: set until_time via change_state with same state.
             if pending_time is not None:
                 await change_state(
@@ -1159,9 +1146,21 @@ async def op_ticket_create(
                     sysconfig=sysconfig,
                     pending_time=pending_time,
                 )
-            if send_article is not None:
-                await _deliver_article(
-                    session, sysconfig, ticket_id, queue_id, write_user_id, send_article
+            await _write_ticket_dynamic_fields(
+                session, fields, ticket_id=ticket_id, user_id=write_user_id
+            )
+            article_ids: list[int] = []
+            for gi in articles:
+                article_id = await _write_gi_article(
+                    session, sysconfig, settings, gi, ticket_id=ticket_id, user_id=write_user_id
+                )
+                article_ids.append(article_id)
+                await _write_article_dynamic_fields(
+                    session,
+                    fields,
+                    ticket_id=ticket_id,
+                    article_id=article_id,
+                    user_id=write_user_id,
                 )
         await session.commit()
     except TicketAccessDenied:
@@ -1174,7 +1173,11 @@ async def op_ticket_create(
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
-    return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
+    return article_id_result(
+        {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+        article_ids,
+        op=op,
+    )
 
 
 async def _get_tn(session: AsyncSession, ticket_id: int) -> str:
@@ -1263,24 +1266,35 @@ async def op_ticket_update(
                 f"{op}.AccessDenied",
                 f"{op}: Customers may only add follow-up articles, not change ticket fields!",
             )
-        if not art_data or not isinstance(art_data, dict):
+        if not normalize_article_list(art_data):
             return _err(
                 f"{op}.MissingParameter",
                 f"{op}: Article is required for customer follow-up!",
             )
+        follow_ups = await parse_gi_articles(
+            art_data,
+            op=op,
+            user_type=user_type,
+            has_owner=False,
+            session=session,
+            sysconfig=sysconfig,
+        )
+        if isinstance(follow_ups, dict):
+            return follow_ups
+        article_ids: list[int] = []
         try:
             async with session.begin_nested():
-                article_in = _build_article_in(
-                    {**art_data, "IsVisibleForCustomer": art_data.get("IsVisibleForCustomer", 1)},
-                    user_type,
-                )
-                await add_article(
-                    session,
-                    ticket_id=ticket_id,
-                    article=article_in,
-                    user_id=PORTAL_SYSTEM_USER_ID,
-                    sysconfig=sysconfig,
-                )
+                for gi in follow_ups:
+                    article_ids.append(
+                        await _write_gi_article(
+                            session,
+                            sysconfig,
+                            settings,
+                            gi,
+                            ticket_id=ticket_id,
+                            user_id=PORTAL_SYSTEM_USER_ID,
+                        )
+                    )
             await session.commit()
         except TicketNotFound:
             await session.rollback()
@@ -1291,12 +1305,42 @@ async def op_ticket_update(
         except InvalidInput as e:
             await session.rollback()
             return _err(f"{op}.InvalidParameter", str(e))
-        return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
+        return article_id_result(
+            {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+            article_ids,
+            op=op,
+        )
 
     pe = PermissionEngine(session)
     if not await pe.check(user_id, queue_id, "rw"):
         return _err(f"{op}.AccessDenied", f"{op}: No permission to update ticket!")
 
+    # Everything is validated before the first write (Run + _CheckArticle + _CheckDynamicField).
+    articles = await parse_gi_articles(
+        art_data,
+        op=op,
+        user_type=user_type,
+        has_owner=False,
+        session=session,
+        sysconfig=sysconfig,
+    )
+    if isinstance(articles, dict):
+        return articles
+    fields = await parse_gi_dynamic_fields(
+        data.get("DynamicField"), op=op, articles_present=bool(articles), session=session
+    )
+    if isinstance(fields, dict):
+        return fields
+    article_fields: list[GiDynamicFields] = []
+    for gi in articles:
+        own = await parse_gi_dynamic_fields(
+            gi.raw.get("DynamicField"), op=op, articles_present=True, session=session
+        )
+        if isinstance(own, dict):
+            return own
+        article_fields.append(own)
+
+    article_ids = []
     try:
         async with session.begin_nested():
             # Title
@@ -1498,71 +1542,31 @@ async def op_ticket_update(
                     user_id=user_id,
                 )
 
-            # Dynamic fields
-            for df in data.get("DynamicField") or []:
-                if isinstance(df, dict):
-                    fname = df.get("Name") or ""
-                    val = df.get("Value")
-                    if fname:
-                        values = [str(val)] if val is not None else []
-                        await update_dynamic_field(
-                            session,
-                            ticket_id=ticket_id,
-                            field_name=fname,
-                            values=values,
-                            user_id=user_id,
-                        )
-
-            # Article
-            art_data = data.get("Article")
-            if isinstance(art_data, list) and art_data:
-                art_data = art_data[0]
-            if art_data and isinstance(art_data, dict):
-                # TicketUpdate note: IsVisibleForCustomer defaults to 0 (internal)
-                if art_data.get("IsVisibleForCustomer") is None:
-                    art_data = {**art_data, "IsVisibleForCustomer": 0}
-                if not art_data.get("ContentType") and art_data.get("MimeType"):
-                    charset = art_data.get("Charset") or "utf-8"
-                    art_data = {
-                        **art_data,
-                        "ContentType": f"{art_data['MimeType']}; charset={charset}",
-                    }
-                att = art_data.get("Attachment")
-                if isinstance(att, dict):
-                    art_data = {**art_data, "Attachment": [att]}
-                article_in = _build_article_in(art_data, user_type)
-                if _wants_article_send(art_data, user_type):
-                    send_article = _as_send_article(article_in, art_data)
-                    if not (send_article.to_address or "").strip():
-                        raise InvalidInput(
-                            f"{op}: Article->To parameter must be a valid email address"
-                            " when Article->ArticleSend is set!"
-                        )
-                    queue_row = (
-                        await session.execute(
-                            text("SELECT queue_id FROM ticket WHERE id = :tid"),
-                            {"tid": ticket_id},
-                        )
-                    ).first()
-                    await _deliver_article(
-                        session,
-                        sysconfig,
-                        ticket_id,
-                        int(queue_row[0]) if queue_row else 0,
-                        user_id,
-                        send_article,
-                    )
-                else:
-                    article_in = await _apply_stored_email_security(
-                        article_in, art_data, sysconfig, settings
-                    )
-                    await add_article(
-                        session,
-                        ticket_id=ticket_id,
-                        article=article_in,
-                        user_id=user_id,
-                        sysconfig=sysconfig,
-                    )
+            # Articles first, then the request's dynamic fields (TicketUpdate.pm: Article
+            # fields land on the first article, Ticket fields on the ticket).
+            article_ids = []
+            for gi, own_fields in zip(articles, article_fields, strict=True):
+                article_id = await _write_gi_article(
+                    session, sysconfig, settings, gi, ticket_id=ticket_id, user_id=user_id
+                )
+                article_ids.append(article_id)
+                await _write_ticket_dynamic_fields(
+                    session, own_fields, ticket_id=ticket_id, user_id=user_id
+                )
+                await _write_article_dynamic_fields(
+                    session, own_fields, ticket_id=ticket_id, article_id=article_id, user_id=user_id
+                )
+            await _write_ticket_dynamic_fields(
+                session, fields, ticket_id=ticket_id, user_id=user_id
+            )
+            if article_ids:
+                await _write_article_dynamic_fields(
+                    session,
+                    fields,
+                    ticket_id=ticket_id,
+                    article_id=article_ids[0],
+                    user_id=user_id,
+                )
 
         await session.commit()
     except TicketNotFound:
@@ -1578,7 +1582,11 @@ async def op_ticket_update(
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
-    return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
+    return article_id_result(
+        {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+        article_ids,
+        op=op,
+    )
 
 
 # ---------------------------------------------------------------------------

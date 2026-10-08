@@ -71,6 +71,19 @@ ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
     # Send the queue's "auto reply" for tickets an agent opens from the phone
     # screen (AgentTicketPhone) -- Ticket.xml default on.
     "AutoResponseForWebTickets": 1,
+    # Time accounting (Ticket.xml): booking is on, but not mandatory.
+    "Ticket::Frontend::AccountTime": 1,
+    "Ticket::Frontend::NeedAccountedTime": 0,
+    # GenericInterface TicketCreate / TicketUpdate article defaults
+    # (Kernel/Config/Files/XML/GenericInterface.xml).
+    "GenericInterface::Operation::TicketCreate###IsVisibleForCustomer": 1,
+    "GenericInterface::Operation::TicketCreate###HistoryType": "NewTicket",
+    "GenericInterface::Operation::TicketCreate###HistoryComment": "%%GenericInterface Create",
+    "GenericInterface::Operation::TicketCreate###AutoResponseType": "auto reply",
+    "GenericInterface::Operation::TicketUpdate###IsVisibleForCustomer": 1,
+    "GenericInterface::Operation::TicketUpdate###HistoryType": "AddNote",
+    "GenericInterface::Operation::TicketUpdate###HistoryComment": "%%GenericInterface Note",
+    "GenericInterface::Operation::TicketUpdate###AutoResponseType": "auto follow up",
 }
 
 # New-ticket screen (API wire value) → QueueDefault sysconfig key (a queue name).

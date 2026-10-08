@@ -254,7 +254,10 @@ async def prepare_outgoing_agent_email(
             customer_subject=article.subject or "",
             customer_email_lines=[],
         )
-        body = append_signature(body, expanded, content_type=article.content_type)
+        if article.signature_directly_after_body:
+            body = body + expanded if expanded else body
+        else:
+            body = append_signature(body, expanded, content_type=article.content_type)
 
     in_reply_to = article.in_reply_to
     references = article.references

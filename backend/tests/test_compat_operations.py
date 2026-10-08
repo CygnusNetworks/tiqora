@@ -644,7 +644,11 @@ async def test_ticket_create_auth_fail(compat_mariadb: dict[str, Any]) -> None:
 
 @pytest.mark.db
 async def test_ticket_update_note_stays_internal(compat_mariadb: dict[str, Any]) -> None:
-    """TicketUpdate: article note without explicit IsVisibleForCustomer defaults to 0 (internal)."""
+    """TicketUpdate: an explicit IsVisibleForCustomer=0 keeps the note internal.
+
+    Without the field Znuny uses the SysConfig default 1 (see
+    ``test_compat_create_update_articles``).
+    """
     engine = create_async_engine(compat_mariadb["async_url"])
     factory = async_sessionmaker(engine, expire_on_commit=False)
     store = _make_session_store()
@@ -684,7 +688,7 @@ async def test_ticket_update_note_stays_internal(compat_mariadb: dict[str, Any])
                     "Subject": "Internal Note",
                     "Body": "This should be internal",
                     "CommunicationChannel": "Internal",
-                    # IsVisibleForCustomer NOT specified — should default to 0
+                    "IsVisibleForCustomer": 0,
                 },
             },
             session,
@@ -1535,7 +1539,9 @@ async def test_ticket_create_invalid_dynamic_field_value_is_invalid_parameter(
                 sysconfig,
             )
         assert result["Error"]["ErrorCode"].endswith(".InvalidParameter"), result
-        assert "CompatBadFlag" in result["Error"]["ErrorMessage"]
+        assert result["Error"]["ErrorMessage"] == (
+            "TicketCreate: DynamicField->Value parameter is invalid!"
+        )
         async with factory() as session:
             n = (
                 await session.execute(
