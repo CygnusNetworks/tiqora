@@ -157,12 +157,19 @@ def _runtime_record(record: ProviderRecord, settings: Settings) -> ProviderRecor
     )
 
 
+async def _rollback(session: AsyncSession) -> None:
+    try:
+        await session.rollback()
+    except Exception:  # noqa: BLE001 - a broken session still means "no directory", not a 500
+        logger.debug("ldap_login_rollback_failed")
+
+
 async def _ensure_env(session: AsyncSession, settings: Settings) -> None:
     try:
         await ensure_env_providers(session, settings)
     except Exception as exc:  # noqa: BLE001 - a failed sync must not break password login
         logger.warning("env_provider_sync_failed", error=str(exc))
-        await session.rollback()
+        await _rollback(session)
 
 
 async def _enabled(
@@ -175,7 +182,7 @@ async def _enabled(
         )
     except Exception as exc:  # noqa: BLE001 - a failed password login stays a failed login
         logger.warning("ldap_providers_unavailable", error=str(exc))
-        await session.rollback()
+        await _rollback(session)
         return []
 
 
@@ -196,7 +203,7 @@ async def ldap_providers(
             await sync_env_providers(session, settings)
         except Exception as exc:  # noqa: BLE001
             logger.warning("env_provider_sync_failed", error=str(exc))
-            await session.rollback()
+            await _rollback(session)
         records = await _enabled(session, settings, user_kind)
     out: list[ProviderRecord] = []
     for rec in records:
