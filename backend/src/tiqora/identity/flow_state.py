@@ -17,6 +17,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
+from tiqora.crypto.secret import decrypt_secret, encrypt_secret
 from tiqora.identity.store import ProviderChanges
 from tiqora.identity.types import UserKind
 
@@ -220,15 +221,26 @@ class TestRun(BaseModel):
     result: TestResultData | None = None
 
 
-async def put_test(redis: Any, test_id: str, data: TestRun) -> None:
-    await redis.set(f"{TEST_PREFIX}{test_id}", data.model_dump_json(), ex=TEST_TTL)
+async def put_test(redis: Any, test_id: str, data: TestRun, *, secret_key: str) -> None:
+    """Store a test run. The draft may carry secrets (client secret): it is Fernet-encrypted."""
+    payload = data.model_dump(mode="json", exclude={"draft"})
+    if data.draft is not None:
+        payload["draft_enc"] = encrypt_secret(secret_key, data.draft.model_dump_json())
+    await redis.set(f"{TEST_PREFIX}{test_id}", json.dumps(payload), ex=TEST_TTL)
 
 
-async def get_test(redis: Any, test_id: str) -> TestRun | None:
+async def get_test(redis: Any, test_id: str, *, secret_key: str) -> TestRun | None:
     raw = await redis.get(f"{TEST_PREFIX}{test_id}")
     if raw is None:
         return None
     try:
-        return TestRun.model_validate_json(_text(raw))
-    except ValidationError:
+        payload = json.loads(_text(raw))
+        draft_enc = payload.pop("draft_enc", None)
+        if draft_enc is not None:
+            plain = decrypt_secret(secret_key, draft_enc) if isinstance(draft_enc, str) else None
+            if plain is None:
+                return None
+            payload["draft"] = json.loads(plain)
+        return TestRun.model_validate(payload)
+    except (ValueError, ValidationError, AttributeError):
         return None

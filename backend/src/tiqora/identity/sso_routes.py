@@ -72,7 +72,12 @@ from tiqora.identity.saml_sp import (
     decode_saml_b64,
 )
 from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso
-from tiqora.identity.store import ProviderRecord, get_provider_by_slug
+from tiqora.identity.store import (
+    ProviderRecord,
+    ProviderValidationError,
+    get_provider_by_slug,
+    record_with_changes,
+)
 from tiqora.identity.types import (
     ENV_OIDC_SLUG,
     SSO_KINDS,
@@ -190,12 +195,19 @@ def _admin_test_redirect(provider_id: int, test_id: str) -> RedirectResponse:
 
 
 async def _load_test(
-    redis: Any, test_id: str, record: ProviderRecord, user_kind: UserKind
+    redis: Any, test_id: str, record: ProviderRecord, user_kind: UserKind, settings: Settings
 ) -> TestRun | None:
-    run = await flow_state.get_test(redis, test_id)
+    run = await flow_state.get_test(redis, test_id, secret_key=settings.secret_key)
     if run is None or run.provider_id != record.id or run.audience != user_kind:
         return None
     return run
+
+
+def _with_draft(record: ProviderRecord, run: TestRun | None) -> ProviderRecord:
+    """The admin's unsaved draft applied in memory (a disabled provider stays testable)."""
+    if run is None or run.draft is None:
+        return record
+    return record_with_changes(record, run.draft)
 
 
 def _redirect_uri(
@@ -244,14 +256,20 @@ async def start_sso_login(
     redis = await get_redis(request)
     run: TestRun | None = None
     if test_id:
-        run = await _load_test(redis, test_id, record, user_kind)
+        run = await _load_test(redis, test_id, record, user_kind, settings)
         if (
             run is None
             or run.status != "started"
             or current_admin_id is None
             or run.admin_id != current_admin_id
         ):
-            return fail("state")
+            # A disabled provider is only testable by the admin who started the test; anyone
+            # else sees the plain "disabled" answer and learns nothing about the test run.
+            return fail("state" if record.enabled else "provider_disabled")
+        try:
+            record = _with_draft(record, run)
+        except ProviderValidationError:
+            return fail("config")
     if not record.enabled and run is None:
         return fail("provider_disabled")
 
@@ -476,9 +494,20 @@ async def _finish_oidc_callback(
 
     run: TestRun | None = None
     if login_state.test_id:
-        run = await _load_test(redis, login_state.test_id, record, user_kind)
+        run = await _load_test(redis, login_state.test_id, record, user_kind, settings)
         if run is None or run.status != "started":
             return fail(state_fail, next_path)
+        try:
+            record = _with_draft(record, run)
+        except ProviderValidationError:
+            return fail(
+                _Fail(
+                    "config",
+                    http_status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="SSO unavailable",
+                ),
+                next_path,
+            )
     if not record.enabled and run is None:
         return fail(
             _Fail(
@@ -493,7 +522,9 @@ async def _finish_oidc_callback(
         if run is not None and login_state.test_id:
             run.status = "failed"
             run.error = exc.code
-            await flow_state.put_test(redis, login_state.test_id, run)
+            await flow_state.put_test(
+                redis, login_state.test_id, run, secret_key=settings.secret_key
+            )
             return _admin_test_redirect(record.id, login_state.test_id)
         return fail(exc, next_path)
 
@@ -634,7 +665,7 @@ async def _complete_login(
 
     if test_id:
         # Admin test: show what WOULD happen; never apply, never create a session.
-        run = await _load_test(redis, test_id, record, user_kind)
+        run = await _load_test(redis, test_id, record, user_kind, settings)
         if run is None:
             raise _Fail(
                 "state", http_status=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state"
@@ -645,7 +676,7 @@ async def _complete_login(
             attributes={k: list(v) for k, v in identity.attributes.items()},
             plan=plan_to_dict(plan),
         )
-        await flow_state.put_test(redis, test_id, run)
+        await flow_state.put_test(redis, test_id, run, secret_key=settings.secret_key)
         return _admin_test_redirect(record.id, test_id)
 
     if plan.decision == "reject":
@@ -849,9 +880,15 @@ async def _finish_saml_acs(
 
     run: TestRun | None = None
     if test_id:
-        run = await _load_test(redis, test_id, record, user_kind)
+        run = await _load_test(redis, test_id, record, user_kind, settings)
         if run is None or run.status != "started":
             return fail("state", next_path)
+        try:
+            record = _with_draft(record, run)
+        except ProviderValidationError:
+            return fail("config", next_path)
+        if isinstance(record.config, SamlProviderConfig):
+            cfg = record.config
     if not record.enabled and run is None:
         return fail("provider_disabled", next_path)
 
@@ -859,7 +896,7 @@ async def _finish_saml_acs(
         if run is not None and test_id:
             run.status = "failed"
             run.error = code
-            await flow_state.put_test(redis, test_id, run)
+            await flow_state.put_test(redis, test_id, run, secret_key=settings.secret_key)
             return _admin_test_redirect(record.id, test_id)
         return fail(code, next_path)
 

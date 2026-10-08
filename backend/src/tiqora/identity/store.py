@@ -8,6 +8,7 @@ Functions flush only; the caller owns the transaction.
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -69,7 +70,9 @@ __all__ = [
     "list_providers",
     "merge_config",
     "provider_from_row",
+    "record_with_changes",
     "update_provider",
+    "validate_changes",
 ]
 
 _NULLABLE_FIELDS = frozenset({"button_label", "button_icon"})
@@ -567,6 +570,54 @@ async def update_provider(
     row.change_time = utc_now()
     await _flush_unique_slug(session)
     return provider_from_row(row, secret_key=secret_key)
+
+
+async def validate_changes(session: AsyncSession, changes: ProviderChanges) -> None:
+    """Role/group ids of *changes* must exist (``ProviderValidationError``). Reads only."""
+    await _validate_assignments(
+        session, role_rules=changes.role_rules, jit_defaults=changes.jit_defaults
+    )
+
+
+def record_with_changes(record: ProviderRecord, changes: ProviderChanges) -> ProviderRecord:
+    """*record* with *changes* applied in memory only (admin test-login drafts).
+
+    Same merge rules as :func:`update_provider` (secret mask, read-only fields) but nothing is
+    persisted. Env rows are returned unchanged: they are rebuilt from ``Settings``.
+    Raises ``ProviderValidationError`` for an invalid config.
+    """
+    if record.read_only:
+        return record
+    config = record.config
+    secrets = record.secrets_set
+    if changes.config is not None:
+        try:
+            config = merge_config(record.kind, record.config, changes.config)
+        except ValidationError as exc:
+            raise _config_errors(exc) from exc
+        secrets = frozenset(_secret_values(record.kind, config))
+    sent = changes.model_fields_set
+    simple: dict[str, Any] = {}
+    for name in (
+        "name",
+        "audience",
+        "enabled",
+        "sort",
+        "button_label",
+        "button_icon",
+        "match_by",
+        "require_sso_opt_in",
+        "jit_enabled",
+        "sync_mode",
+        "attribute_map",
+        "jit_defaults",
+    ):
+        value = getattr(changes, name)
+        if name in sent and (value is not None or name in _NULLABLE_FIELDS):
+            simple[name] = value
+    if changes.role_rules is not None:
+        simple["role_rules"] = tuple(changes.role_rules)
+    return dataclasses.replace(record, config=config, secrets_set=secrets, **simple)
 
 
 async def delete_provider(session: AsyncSession, provider_id: int) -> None:

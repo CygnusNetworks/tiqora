@@ -402,3 +402,63 @@ async def test_replay_ttl_is_bounded_by_assertion_expiry(env: Env) -> None:
     assert ok.status_code == 200
     (key,) = [k for k in env.redis.store if k.startswith("tiqora:saml:seen:")]
     assert 60 <= env.redis.ttls[key] <= 15 * 60 + 120 + 5
+
+
+async def test_saml_admin_test_run_on_disabled_provider_applies_draft_and_writes_nothing(
+    env: Env,
+) -> None:
+    from tiqora.identity import flow_state
+    from tiqora.identity.store import ProviderChanges, update_provider
+
+    admin_id = 47110
+    await _agent(env, admin_id, "idp.saml.47110")
+    rec = await _provider(env)
+    await update_provider(
+        env.session,
+        rec.id,
+        ProviderChanges(enabled=False),
+        secret_key=KEY,
+        actor_id=1,
+    )
+    await env.session.commit()
+    token = await SessionStore(env.redis, env.settings).create(admin_id, "idp.saml.47110")
+    run = flow_state.TestRun(
+        provider_id=rec.id,
+        admin_id=admin_id,
+        audience="agent",
+        # The IdP sends the login in "alt"; only the unsaved draft knows that.
+        draft=ProviderChanges(attribute_map=AttributeMap(login=["alt"])),
+    )
+    await flow_state.put_test(env.redis, "tid-47110", run, secret_key=KEY)
+
+    # No admin cookie, or a disabled provider without a test: refused.
+    anon = await env.client.get(f"{LOGIN_PATH}?test=tid-47110")
+    assert _error(anon) == "provider_disabled"
+    plain = await env.client.get(LOGIN_PATH)
+    assert _error(plain) == "provider_disabled"
+
+    resp = await env.client.get(
+        f"{LOGIN_PATH}?test=tid-47110", headers={"Cookie": f"tiqora_session={token}"}
+    )
+    assert resp.status_code == 302, resp.text
+    assert resp.headers["location"].startswith(IDP_SSO_URL)
+    req_id, _acs, relay = env.idp.parse_login_redirect(resp.headers["location"])
+    env.client.cookies.clear()
+
+    body = env.response_for(req_id, attributes={"uid": ["nobody.47199"], "alt": ["idp.saml.47110"]})
+    done = await env.acs(body, req_id=req_id, relay=relay)
+    assert done.status_code == 302, done.text
+    assert done.headers["location"] == f"/admin/identity-providers/{rec.id}?test=tid-47110"
+    assert not any(c.startswith("tiqora_session=") for c in done.headers.get_list("set-cookie"))
+
+    stored = await flow_state.get_test(env.redis, "tid-47110", secret_key=KEY)
+    assert stored is not None and stored.status == "done" and stored.result is not None
+    assert stored.result.plan["decision"] == "login"
+    assert stored.result.plan["user_id"] == admin_id
+    links = (
+        await env.session.execute(
+            text("SELECT COUNT(*) FROM tiqora_identity_link WHERE provider_id = :p"),
+            {"p": rec.id},
+        )
+    ).scalar_one()
+    assert links == 0
