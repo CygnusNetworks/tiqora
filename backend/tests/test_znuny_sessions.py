@@ -113,14 +113,15 @@ async def test_purge_deletes_only_expired_sessions(sync_url: str) -> None:
         async with async_sessionmaker(engine)() as s:
             deleted = await purge_expired_sessions(s, now=int(time.time()), sysconfig=SysConfig(s))
             await s.commit()
-        assert deleted >= 4
+        assert deleted >= 3
     finally:
         await engine.dispose()
     left = await _ids(sync_url)
-    assert left == {"GI8961FRESH", "GI8961CUST", "GI8961CUST2", "GI8961TRICK"}
+    # A row-set without any stamp is invisible to Znuny's query and stays.
+    assert left == {"GI8961FRESH", "GI8961NOSTAMP", "GI8961CUST", "GI8961CUST2", "GI8961TRICK"}
 
 
-async def test_purge_boundary_is_strict_like_znuny(sync_url: str) -> None:
+async def test_purge_boundary_is_inclusive_like_znuny(sync_url: str) -> None:
     now = int(time.time())
     engine = create_engine(sync_url)
     with engine.begin() as conn:
@@ -138,7 +139,7 @@ async def test_purge_boundary_is_strict_like_znuny(sync_url: str) -> None:
             await s.commit()
     finally:
         await aengine.dispose()
-    assert "GI8961EDGE" in await _ids(sync_url)
+    assert "GI8961EDGE" not in await _ids(sync_url)  # DB.pm: ValidIdleTime <= 0
 
 
 async def test_customer_revocation_is_exact_and_type_scoped(sync_url: str) -> None:
@@ -178,7 +179,7 @@ async def test_worker_tick_runs_purge(sync_url: str, monkeypatch: pytest.MonkeyP
         result = await tick_mod.run_znuny_session_purge_tick()
     finally:
         await engine.dispose()
-    assert result["deleted"] >= 4
+    assert result["deleted"] >= 3
     assert "GI8961IDLE" not in await _ids(sync_url)
     assert "GI8961FRESH" in await _ids(sync_url)
 
@@ -192,3 +193,72 @@ def test_purge_is_registered_in_worker_and_catalog() -> None:
     svc = DAEMON_SERVICES_BY_SLUG["znuny_session_purge"]
     assert (svc.toggleable, svc.enabled_key, svc.default_enabled) == (False, None, True)
     assert 'interval_loop(\n            "znuny_session_purge"' in inspect.getsource(worker_main)
+
+
+async def _purge(sync_url: str, now: int, chunk: int | None = None) -> tuple[int, int]:
+    from tiqora.znuny import sessions as mod
+
+    engine = create_async_engine(_async_url(sync_url))
+    commits = 0
+    old_chunk = mod._CHUNK
+    if chunk:
+        mod._CHUNK = chunk
+    try:
+        async with async_sessionmaker(engine)() as s:
+            real_commit = s.commit
+
+            async def counting() -> None:
+                nonlocal commits
+                commits += 1
+                await real_commit()
+
+            s.commit = counting  # type: ignore[method-assign]
+            deleted = await purge_expired_sessions(s, now=now, sysconfig=SysConfig(s))
+    finally:
+        mod._CHUNK = old_chunk
+        await engine.dispose()
+    return deleted, commits
+
+
+async def test_zero_or_empty_stamp_counts_as_now_not_expired(sync_url: str) -> None:
+    now = int(time.time())
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        _put(conn, "GI8961ZERO", UserSessionStart="0", UserLastRequest=str(now - 60))
+        _put(conn, "GI8961EMPTY", UserSessionStart="", UserLastRequest="")
+        _put(conn, "GI8961ONLYIDLE", UserLastRequest=str(now - MAX_IDLE - 1))
+    engine.dispose()
+    await _purge(sync_url, now)
+    left = await _ids(sync_url)
+    assert {"GI8961ZERO", "GI8961EMPTY"} <= left
+    assert "GI8961ONLYIDLE" not in left  # real idle stamp, start missing -> now
+
+
+async def test_last_row_per_key_wins(sync_url: str) -> None:
+    now = int(time.time())
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        for sid, order in (
+            ("GI8961DUPOK", (now - MAX_IDLE - 9, now - 5)),
+            ("GI8961DUPOLD", (now - 5, now - MAX_IDLE - 9)),
+        ):
+            for val in order:
+                _put(conn, sid, UserLastRequest=str(val))
+    engine.dispose()
+    await _purge(sync_url, now)
+    left = await _ids(sync_url)
+    assert "GI8961DUPOK" in left
+    assert "GI8961DUPOLD" not in left
+
+
+async def test_purge_commits_after_every_chunk(sync_url: str) -> None:
+    now = int(time.time())
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        for i in range(5):
+            _put(conn, f"GI8961BULK{i}", UserLastRequest=str(now - MAX_IDLE - 1))
+    engine.dispose()
+    deleted, commits = await _purge(sync_url, now, chunk=2)
+    assert deleted >= 5
+    assert commits >= 1 + 3  # read transaction + one per chunk of 2 (5 -> 3 chunks)
+    assert not {f"GI8961BULK{i}" for i in range(5)} & await _ids(sync_url)

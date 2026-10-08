@@ -7,6 +7,7 @@ selects from the table it deletes from, and the tables mix collations in prod.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 
 from sqlalchemy import bindparam, text
@@ -52,45 +53,48 @@ async def delete_customer_sessions(session: AsyncSession, login: str) -> int:
     return len(ids)
 
 
-def _epoch(raw: str | None) -> int:
-    try:
-        return int(str(raw).strip())
-    except (TypeError, ValueError):
-        return 0
+_NUM_PREFIX = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)")
+
+
+def _perl_epoch(raw: str | None, now: int) -> float:
+    """``$value || $TimeNow`` then Perl numification (leading number, else 0)."""
+    if raw is None or raw == "" or raw == "0":
+        return now
+    m = _NUM_PREFIX.match(str(raw))
+    return float(m.group(1)) if m else 0.0
 
 
 async def purge_expired_sessions(session: AsyncSession, *, now: int, sysconfig: SysConfig) -> int:
-    """Port of ``AuthSession::DB GetExpiredSessionIDs`` + ``Maint::Session::DeleteExpired``.
+    """Exact port of ``AuthSession::DB GetExpiredSessionIDs`` + ``Maint::Session::DeleteExpired``.
 
-    Expired: ``UserSessionStart + SessionMaxTime < now`` or
-    ``UserLastRequest + SessionMaxIdleTime < now``; a missing or unreadable stamp counts as 0.
-    The caller commits.
+    Rows are read ``ORDER BY id`` (last row per key wins). A missing, empty or ``"0"`` stamp
+    counts as *now* (not expired); a session is expired when
+    ``UserSessionStart + SessionMaxTime - now <= 0`` or
+    ``UserLastRequest + SessionMaxIdleTime - now <= 0``. Commits after every delete chunk so
+    a big backlog never holds long locks.
     """
     max_time = await sysconfig.session_max_time()
     max_idle = await sysconfig.session_max_idle_time()
     rows = await session.execute(
         text(
             "SELECT session_id, data_key, data_value FROM sessions"
-            " WHERE data_key IN ('UserSessionStart', 'UserLastRequest')"
+            " WHERE data_key = 'UserSessionStart' OR data_key = 'UserLastRequest'"
+            " ORDER BY id ASC"
         )
     )
-    stamps: dict[str, dict[str, int]] = {}
+    data: dict[str, dict[str, str | None]] = {}
     for sid, key, value in rows.all():
-        stamps.setdefault(str(sid), {})[str(key)] = _epoch(value)
-    # Row-sets that carry neither stamp are invisible to the query above; Znuny treats them as
-    # expired as well.
-    stampless = await session.execute(
-        text(
-            "SELECT DISTINCT session_id FROM sessions WHERE session_id NOT IN"
-            " (SELECT session_id FROM sessions"
-            "  WHERE data_key IN ('UserSessionStart', 'UserLastRequest'))"
-        )
-    )
-    expired = [str(r[0]) for r in stampless.all()]
-    for sid, data in stamps.items():
-        start = data.get("UserSessionStart", 0)
-        last = data.get("UserLastRequest", 0)
-        if start + max_time < now or last + max_idle < now:
+        if not sid or not key:
+            continue
+        data.setdefault(str(sid), {})[str(key)] = None if value is None else str(value)
+    await session.commit()  # end the read transaction before the deletes
+    expired: list[str] = []
+    for sid in sorted(data):
+        start = _perl_epoch(data[sid].get("UserSessionStart"), now)
+        last = _perl_epoch(data[sid].get("UserLastRequest"), now)
+        if start + max_time - now <= 0 or last + max_idle - now <= 0:
             expired.append(sid)
-    await _delete_ids(session, expired)
+    for i in range(0, len(expired), _CHUNK):
+        await _delete_ids(session, expired[i : i + _CHUNK])
+        await session.commit()
     return len(expired)

@@ -23,7 +23,6 @@ async def run_znuny_session_purge_tick() -> dict[str, int]:
             deleted = await purge_expired_sessions(
                 session, now=int(time.time()), sysconfig=SysConfig(session)
             )
-            await session.commit()
         except Exception:
             await session.rollback()
             raise

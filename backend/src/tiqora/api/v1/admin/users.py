@@ -295,6 +295,7 @@ async def update_user(
             await session.commit()
         except Exception as exc:  # noqa: BLE001 — password already changed
             await session.rollback()
+            await session.refresh(user)  # rollback expires loaded attributes
             logger.warning(
                 "admin.users.znuny_session_revoke_failed", user_id=user_id, error=str(exc)
             )

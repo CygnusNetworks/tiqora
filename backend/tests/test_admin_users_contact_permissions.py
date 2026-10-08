@@ -1019,6 +1019,52 @@ async def test_admin_password_reset_deletes_znuny_sessions_even_if_redis_fails(
         await engine.dispose()
 
 
+async def test_admin_password_reset_redis_revoke_runs_when_db_delete_fails(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Other direction: a failing DB delete is rolled back and Redis revocation still runs."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    redis = _FakeRedis()
+    settings = _settings()
+
+    async def _boom(session: Any, user_id: int) -> int:
+        raise RuntimeError("sessions table unavailable")
+
+    monkeypatch.setattr(admin_users, "delete_agent_sessions", _boom)
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="revoke.znuny",
+                    password="s3cret-pw-1234",
+                    first_name="Rev",
+                    last_name="Znuny",
+                ),
+                _root_user(),
+                session,
+                settings,
+            )
+            store = SessionStore(redis, settings)  # type: ignore[arg-type]
+            victim = await store.create(created.id, "revoke.znuny")
+
+            await admin_users.update_user(
+                created.id,
+                UserUpdate(password="a-brand-new-pw-5678"),
+                _fake_request(redis),
+                _root_user(),
+                session,
+                settings,
+            )
+
+            assert await store.get(victim) is None
+            # The session is still usable afterwards (no aborted transaction).
+            assert (await session.execute(text("SELECT 1"))).scalar_one() == 1
+    finally:
+        await engine.dispose()
+
+
 async def test_admin_update_without_password_keeps_sessions(mariadb_znuny_url: str) -> None:
     """Editing a name or email is not a credential change and must not log
     the agent out of every device."""
