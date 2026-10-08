@@ -25,6 +25,7 @@ from tiqora.domain.ticket_write_service import (
     TicketIn,
     TicketWriteService,
     acquire_lock,
+    assign_owner,
     create_ticket,
     lock_ticket,
     unlock_ticket,
@@ -159,6 +160,15 @@ async def _ticket_row(factory: async_sessionmaker[AsyncSession], ticket_id: int)
         ).first()
         assert row is not None
         return int(row[0]), int(row[1])
+
+
+async def _outbox_types(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> list[str]:
+    async with factory() as session:
+        rows = await session.execute(
+            text("SELECT event_type FROM tiqora_event_outbox WHERE ticket_id = :tid ORDER BY id"),
+            {"tid": ticket_id},
+        )
+        return [str(r[0]) for r in rows]
 
 
 async def _history_types(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> list[str]:
@@ -351,6 +361,65 @@ async def test_lock_resets_unlock_timeout_mariadb(mariadb_znuny_url: str) -> Non
     assert misc == ["Reset of unlock time."]
     history = await _history_types(factory, ticket_id)
     assert history[-2:] == ["Lock", "Misc"]
+    # Ticket.pm:1960 fires TicketUnlockTimeoutUpdate once, with the history row
+    assert (await _outbox_types(factory, ticket_id)).count("TicketUnlockTimeoutUpdate") == 1
+
+    await engine.dispose()
+
+
+@pytest.mark.db
+async def test_assign_owner_with_lock_resets_unlock_timeout_mariadb(mariadb_znuny_url: str) -> None:
+    """assign_owner(lock=True) is TicketOwnerSet + TicketLockSet: the lock restarts the unlock
+    timeout (Misc row, TicketUnlockTimeoutUpdate event); a repeated call writes nothing."""
+    import time
+
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    sysconfig = _make_sysconfig()
+
+    async with factory() as session:
+        await _seed(session)
+    ticket_id = await _make_ticket(factory, sysconfig, "Owner Lock Timeout")
+    async with factory() as session, session.begin():
+        await session.execute(
+            text("UPDATE ticket SET timeout = 5 WHERE id = :tid"), {"tid": ticket_id}
+        )
+
+    before = int(time.time())
+    async with factory() as session, session.begin():
+        await assign_owner(
+            session,
+            ticket_id=ticket_id,
+            new_owner_id=_UID_ALICE,
+            user_id=_UID_ALICE,
+            sysconfig=sysconfig,
+            lock=True,
+        )
+    after = int(time.time())
+
+    async with factory() as session:
+        timeout = (
+            await session.execute(
+                text("SELECT timeout FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+            )
+        ).scalar_one()
+    assert before <= int(timeout) <= after
+    assert (await _ticket_row(factory, ticket_id)) == (2, _UID_ALICE)
+    history = await _history_types(factory, ticket_id)
+    assert history[-3:] == ["OwnerUpdate", "Lock", "Misc"]
+    assert (await _outbox_types(factory, ticket_id)).count("TicketUnlockTimeoutUpdate") == 1
+
+    # same owner again: Znuny's TicketOwnerSet is a no-op, nothing new is written
+    async with factory() as session, session.begin():
+        await assign_owner(
+            session,
+            ticket_id=ticket_id,
+            new_owner_id=_UID_ALICE,
+            user_id=_UID_ALICE,
+            sysconfig=sysconfig,
+            lock=True,
+        )
+    assert await _history_types(factory, ticket_id) == history
 
     await engine.dispose()
 

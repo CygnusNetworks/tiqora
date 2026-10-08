@@ -1751,6 +1751,9 @@ async def ticket_unlock_timeout_update(
         name="Reset of unlock time.",
         user_id=user_id,
     )
+    # Ticket.pm:1960 clears the ticket cache and fires TicketUnlockTimeoutUpdate
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "TicketUnlockTimeoutUpdate", ticket_id)
 
 
 async def lock_ticket(

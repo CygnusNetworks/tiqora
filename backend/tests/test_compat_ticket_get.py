@@ -633,6 +633,39 @@ async def test_ticket_keys_and_formats(sync_url: str) -> None:
 
 
 @pytest.mark.db
+async def test_escalation_time_is_seconds_to_the_nearest_destination(sync_url: str) -> None:
+    """Ticket.pm:1430 + 2898-2909: EscalationTime = nearest destination epoch - now."""
+    now = int(time.time())
+    engine = create_engine(sync_url)
+    try:
+
+        def _set(update: int, solution: int, total: int) -> None:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE ticket SET escalation_update_time = :u,"
+                        " escalation_solution_time = :s, escalation_time = :e WHERE id = :t"
+                    ),
+                    {"u": update, "s": solution, "e": total, "t": TICKET},
+                )
+
+        _set(now + 600, now + 5000, now + 600)
+        ticket = (await _get(sync_url, {"TicketID": TICKET}))["Ticket"][0]
+        assert 590 <= ticket["EscalationTime"] <= 600  # not the stored column
+        assert ticket["EscalationUpdateTime"] == now + 600  # base columns stay as stored
+
+        _set(0, now - 120, now - 120)  # already over time: negative seconds
+        ticket = (await _get(sync_url, {"TicketID": TICKET}))["Ticket"][0]
+        assert -125 <= ticket["EscalationTime"] <= -120
+
+        _set(0, 0, 0)
+        ticket = (await _get(sync_url, {"TicketID": TICKET}))["Ticket"][0]
+        assert ticket["EscalationTime"] == 0
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.db
 async def test_service_and_sla_keys_omitted_when_empty(sync_url: str) -> None:
     result = await _get(sync_url, {"TicketID": TICKET_NO_SVC})
     ticket = result["Ticket"][0]

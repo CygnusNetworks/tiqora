@@ -10,12 +10,12 @@ called as ``POST /Ticket/Search`` on both sides exactly as the shipped YAML rout
 
 from __future__ import annotations
 
-import contextlib
+import re
 
 import httpx
 import pytest
 import pytest_asyncio
-from _helpers import tiqora_http_client, znuny_console
+from _helpers import tiqora_http_client, znuny_console, znuny_perl_eval
 
 pytestmark = pytest.mark.golden
 
@@ -36,12 +36,44 @@ def _ensure_webservice() -> None:
     Idempotent-ish: re-running ``Admin::WebService::Add`` with the same name
     fails loudly if it already exists — that failure is swallowed here.
     """
-    with contextlib.suppress(RuntimeError):
+    try:
         znuny_console(
             "Admin::WebService::Add",
             f"--name={WEBSERVICE_NAME}",
             f"--source-path={_WEBSERVICE_YML}",
         )
+    except RuntimeError as exc:
+        # only a webservice left by an earlier run is fine; any other failure must surface
+        if "already exists" not in str(exc):
+            raise
+
+
+_CREATE_NEW_TICKET_PERL = r"""
+use lib qw(/opt/otrs /opt/otrs/Kernel/cpan-lib /opt/otrs/Custom);
+use Kernel::System::ObjectManager;
+local $Kernel::OM = Kernel::System::ObjectManager->new(
+    'Kernel::System::Log' => {LogPrefix => 'golden-conformance'},
+);
+my $ID = $Kernel::OM->Get('Kernel::System::Ticket')->TicketCreate(
+    Title => 'Golden conformance new ticket', Queue => 'Golden', Lock => 'unlock',
+    Priority => '3 normal', State => 'new', OwnerID => 1, UserID => 1,
+);
+print $ID ? "id=$ID\n" : "failed\n";
+"""
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _ensure_new_ticket() -> None:
+    """A fresh seeded stack has no ticket of state type ``new`` and the seeded agent is only in
+    group admin (the Golden queue belongs to ``users``); the search test needs both."""
+    for permission in ("ro", "move_into", "create", "owner", "priority", "rw"):
+        znuny_console(
+            "Admin::Group::UserLink",
+            "--user-name=golden.agent",
+            "--group-name=users",
+            f"--permission={permission}",
+        )
+    assert re.fullmatch(r"id=\d+", znuny_perl_eval(_CREATE_NEW_TICKET_PERL).strip())
 
 
 class _FakeRedis:
@@ -172,15 +204,6 @@ async def test_empty_search_returns_structured_result_not_404(tiqora_client) -> 
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "GET /Ticket/Search: Znuny answers TicketGet.WrongStructure "
-        "(Operation/Ticket/TicketGet.pm, 'Invalid ticket ID parameter(s) found!'); Tiqora "
-        "crashes with ValueError int('Search') in op_ticket_get (operations.py:1913), "
-        "fix pending"
-    ),
-)
 async def test_get_ticket_search_quirk_is_a_ticket_get_error(tiqora_client) -> None:
     """``GET /Ticket/Search`` matches the ``GET /Ticket/:TicketID`` route with TicketID
     ``Search``: both sides answer with a TicketGet error, not with a search result."""

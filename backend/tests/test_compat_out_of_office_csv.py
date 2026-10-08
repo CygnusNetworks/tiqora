@@ -161,7 +161,7 @@ def _prefs(sync_url: str, uid: int) -> dict[str, str]:
 async def test_out_of_office_csv_on_canonical_route(sync_url: str) -> None:
     res = await _post(sync_url, {"OutOfOfficeEntriesCSVString": CSV})
     assert "Error" not in res, res
-    assert [e["UserLogin"] for e in res["OutOfOfficeEntries"]] == ["gi8991.agent", "gi8992.agent"]
+    assert res == {"Success": 1}  # OutOfOffice.pm:260-264
     on, off = _prefs(sync_url, 8991), _prefs(sync_url, 8992)
     assert on["OutOfOffice"] == "1"
     assert (on["OutOfOfficeStartYear"], on["OutOfOfficeStartMonth"], on["OutOfOfficeStartDay"]) == (
@@ -188,7 +188,8 @@ async def test_explicit_entries_win_over_csv_string(sync_url: str) -> None:
         },
     )
     assert "Error" not in res, res
-    assert [e["UserLogin"] for e in res["OutOfOfficeEntries"]] == ["gi8991.agent"]
+    assert res == {"Success": 1}
+    assert _prefs(sync_url, 8991)["OutOfOffice"] == "0"
 
 
 async def test_bad_csv_is_wrong_input_structure(sync_url: str) -> None:
@@ -201,7 +202,7 @@ async def test_csv_row_resolved_by_email(sync_url: str) -> None:
     csv = "UserEmail,StartDate,EndDate,OutOfOffice\ngi8992@example.test,2026-05-01,2026-05-03,yes\n"
     res = await _post(sync_url, {"OutOfOfficeEntriesCSVString": csv})
     assert "Error" not in res, res
-    assert res["OutOfOfficeEntries"] == [{"OutOfOffice": 1, "UserLogin": "gi8992.agent"}]
+    assert res == {"Success": 1}
     prefs = _prefs(sync_url, 8992)
     assert prefs["OutOfOffice"] == "1"
     assert (prefs["OutOfOfficeStartMonth"], prefs["OutOfOfficeEndDay"]) == ("05", "03")
