@@ -124,8 +124,18 @@ class JitDefaults(BaseModel):
     @field_validator("allowed_email_domains")
     @classmethod
     def _normalize_domains(cls, value: list[str]) -> list[str]:
-        cleaned = (d.strip().lower().lstrip("@") for d in value)
-        return list(dict.fromkeys(d for d in cleaned if d))
+        out: list[str] = []
+        for raw in value:
+            domain = raw.strip().lower().rstrip(".")
+            if not domain:
+                continue
+            if "@" in domain or any(ch.isspace() for ch in domain):
+                raise ValueError(
+                    f"E-Mail-Domain {raw.strip()!r} ungültig: nur der Teil nach dem @, "
+                    "ohne Leerzeichen."
+                )
+            out.append(domain)
+        return list(dict.fromkeys(out))
 
 
 def secret_fields(kind: ProviderKind) -> frozenset[str]:

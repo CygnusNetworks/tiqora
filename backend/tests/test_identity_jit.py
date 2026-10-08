@@ -410,7 +410,7 @@ async def test_jit_customer_email_preflight_in_plan(env: AsyncSession) -> None:
 async def test_jit_domain_gate(env: AsyncSession) -> None:
     s = env
     p = await _jit_provider(
-        s, "domain", defaults=JitDefaults(allowed_email_domains=[" @Example.Test ", "", "a.test"])
+        s, "domain", defaults=JitDefaults(allowed_email_domains=[" Example.Test. ", "", "a.test"])
     )
     assert p.jit_defaults.allowed_email_domains == ["example.test", "a.test"]
     ok = _ident(p.id, "d1", preferred_username="idp.dom.47370", email="Wer@EXAMPLE.test")

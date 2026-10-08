@@ -386,6 +386,14 @@ async def revoke_group(
     await provisioning.revoke_group_permission(
         session, user_id=user_id, group_id=group_id, permission_key=permission_key
     )
+    # A hand-removed assignment is manual from now on (a rule may re-add it at next login).
+    await provisioning.drop_managed_assignments(
+        session,
+        user_id=user_id,
+        kind="group",
+        target_id=group_id,
+        permission_key=permission_key,
+    )
     await session.commit()
 
 
@@ -416,6 +424,9 @@ async def assign_role(
 async def revoke_role(user_id: int, role_id: int, admin: AdminUser, session: DbSession) -> None:
     _ = admin
     await provisioning.revoke_role(session, user_id=user_id, role_id=role_id)
+    await provisioning.drop_managed_assignments(
+        session, user_id=user_id, kind="role", target_id=role_id
+    )
     await session.commit()
 
 

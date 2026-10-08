@@ -485,3 +485,31 @@ async def record_managed_assignment(
     session.add(row)
     await session.flush()
     return row
+
+
+async def drop_managed_assignments(
+    session: AsyncSession,
+    *,
+    user_id: int,
+    kind: str,
+    target_id: int,
+    permission_key: str | None = None,
+    provider_id: int | None = None,
+) -> int:
+    """Delete the "managed" marks of a role/group assignment (every provider unless
+    ``provider_id`` is given; every key of a group unless ``permission_key`` is given).
+
+    Used when an admin removes an assignment by hand: from then on it counts as manual.
+    Managed rows exist for agents only, so ``user_id`` is an agent id.
+    """
+    stmt = delete(TiqoraIdentityManagedAssignment).where(
+        TiqoraIdentityManagedAssignment.user_id == user_id,
+        TiqoraIdentityManagedAssignment.kind == kind,
+        TiqoraIdentityManagedAssignment.target_id == target_id,
+    )
+    if permission_key is not None:
+        stmt = stmt.where(TiqoraIdentityManagedAssignment.permission_key == permission_key)
+    if provider_id is not None:
+        stmt = stmt.where(TiqoraIdentityManagedAssignment.provider_id == provider_id)
+    result = await session.execute(stmt)
+    return int(result.rowcount or 0)  # type: ignore[attr-defined]

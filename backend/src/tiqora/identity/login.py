@@ -3,7 +3,8 @@
 ``plan_login`` only reads. Matching order: link (no fallback when the linked
 account is gone/invalid) -> login (exact first, then a unique case-insensitive hit)
 -> e-mail -> just-in-time creation (step 5, ``jit_enabled``). Profile changes (7) are
-planned for every login; role sync (8) arrives with a later task and is empty.
+planned for every login; role/group sync (8) is planned for agents only (managed
+assignments are agent-only) and never touches the system user (id 1).
 
 Every lookup is by id/login/e-mail of ONE Znuny table; nothing joins ``tiqora_*``
 with Znuny tables on strings (mixed collations on production MariaDB).
@@ -26,9 +27,16 @@ from tiqora.db.legacy.user import UserPreferences, Users
 from tiqora.db.tiqora.models import TiqoraUserAuthConfig
 from tiqora.identity.config_models import OidcProviderConfig, SamlProviderConfig
 from tiqora.identity.links import LinkConflictError, find_link, upsert_link
-from tiqora.identity.mapping import AssignmentDiff, MappedProfile, map_profile
+from tiqora.identity.mapping import (
+    AssignmentDiff,
+    AssignmentState,
+    MappedProfile,
+    diff_assignments,
+    evaluate_rules,
+    map_profile,
+)
 from tiqora.identity.store import ProviderRecord
-from tiqora.identity.types import SSO_KINDS, UserKind, audience_includes
+from tiqora.identity.types import SSO_KINDS, SYSTEM_USER_ID, UserKind, audience_includes
 
 log = logging.getLogger(__name__)
 # NOTE: ``tiqora.identity.provisioning`` / ``tiqora.domain.user_provisioning`` are imported
@@ -297,7 +305,7 @@ async def _plan_jit(
         reject_code=None,
         profile=profile,
         profile_changes={},
-        assignments=AssignmentDiff(),
+        assignments=await _plan_assignments(session, provider, identity, user_kind, None),
         link_exists=False,
     )
 
@@ -336,6 +344,35 @@ async def _sso_eligible(session: AsyncSession, user_id: int) -> bool:
         )
     ).scalar_one_or_none()
     return bool(flag)
+
+
+async def _plan_assignments(
+    session: AsyncSession,
+    provider: ProviderRecord,
+    identity: ExternalIdentity,
+    user_kind: UserKind,
+    user_id: int | None,
+) -> AssignmentDiff:
+    """Step 8: roles/groups the provider's rules grant. Agents only, never the system
+    user; a not yet existing account (JIT preview) is diffed against an empty state."""
+    from tiqora.domain.user_provisioning import valid_group_ids, valid_role_ids
+    from tiqora.identity import provisioning
+
+    if user_kind != "agent" or user_id == SYSTEM_USER_ID or not provider.role_rules:
+        return AssignmentDiff()
+    desired = evaluate_rules(
+        identity.attributes,
+        provider.role_rules,
+        valid_role_ids=await valid_role_ids(session),
+        valid_group_ids=await valid_group_ids(session),
+    )
+    if user_id is None:
+        state = AssignmentState(frozenset(), frozenset(), frozenset(), frozenset())
+    else:
+        state = await provisioning.load_assignment_state(
+            session, provider_id=provider.id, user_id=user_id
+        )
+    return diff_assignments(desired, state, mode=provider.sync_mode)
 
 
 async def plan_login(
@@ -398,7 +435,7 @@ async def plan_login(
         profile_changes=await _plan_profile_changes(
             session, provider, identity, profile, user_kind, account.id
         ),
-        assignments=AssignmentDiff(),
+        assignments=await _plan_assignments(session, provider, identity, user_kind, account.id),
         link_exists=link is not None,
     )
 
@@ -454,9 +491,14 @@ async def _create_account(
 
 async def _sync_existing(session: AsyncSession, plan: LoginPlan, user_id: int) -> None:
     """One ``sync_profile`` call. A new e-mail address is vetted first (Znuny CheckEmail,
-    customer uniqueness) and dropped when refused, so a refusal never leaves half-applied
-    ORM state behind and never fails the sign-in."""
-    from tiqora.domain.user_provisioning import check_email, customer_email_in_use
+    customer uniqueness) and dropped when refused. If the provisioning layer still refuses
+    it (a concurrent change slipped in after the pre-check), the sync is retried once
+    without the e-mail; every attempt runs in a savepoint so no partial write survives."""
+    from tiqora.domain.user_provisioning import (
+        ProvisioningError,
+        check_email,
+        customer_email_in_use,
+    )
     from tiqora.identity.provisioning import sync_profile
 
     changes = dict(plan.profile_changes)
@@ -470,7 +512,21 @@ async def _sync_existing(session: AsyncSession, plan: LoginPlan, user_id: int) -
         if refused:
             log.warning("profile sync skipped the e-mail address of %s %s", plan.user_kind, user_id)
             del changes["email"]
-    await sync_profile(session, user_kind=plan.user_kind, user_id=user_id, changes=changes)
+    try:
+        async with session.begin_nested():
+            await sync_profile(session, user_kind=plan.user_kind, user_id=user_id, changes=changes)
+    except ProvisioningError as exc:
+        if "email" not in changes or exc.code not in ("email_in_use", "email_invalid"):
+            raise
+        log.warning(
+            "profile sync dropped the e-mail address of %s %s: %s",
+            plan.user_kind,
+            user_id,
+            exc.code,
+        )
+        del changes["email"]
+        async with session.begin_nested():
+            await sync_profile(session, user_kind=plan.user_kind, user_id=user_id, changes=changes)
 
 
 async def apply_login(
@@ -484,7 +540,7 @@ async def apply_login(
 ) -> tuple[int, str]:
     """Create (JIT) or sync the account, store the link and commit. Returns (user_id, login).
 
-    Order: create -> flush -> profile sync -> (role sync, later) -> link -> commit.
+    Order: create -> flush -> profile sync -> role/group sync (agents) -> link -> commit.
     Losing a race against a concurrent first login re-plans once (the other request's
     committed link/login then matches); otherwise ``login_taken``.
     """
@@ -512,6 +568,17 @@ async def apply_login(
         await _sync_existing(session, plan, user_id)
     else:
         raise ValueError(f"unsupported login plan decision: {plan.decision}")
+    if plan.user_kind == "agent" and provider.role_rules:
+        # Re-planned against the live state: JIT defaults (or a concurrent admin edit)
+        # may have changed it since ``plan_login``.
+        from tiqora.identity.provisioning import apply_assignments
+
+        await apply_assignments(
+            session,
+            provider_id=provider.id,
+            user_id=user_id,
+            diff=await _plan_assignments(session, provider, identity, plan.user_kind, user_id),
+        )
     if _stores_links(provider):
         try:
             await upsert_link(

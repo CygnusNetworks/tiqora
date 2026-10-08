@@ -18,25 +18,29 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.user import UserPreferences, Users
-from tiqora.db.tiqora.models import TiqoraUserAuthConfig
+from tiqora.db.tiqora.models import TiqoraIdentityManagedAssignment, TiqoraUserAuthConfig
 from tiqora.domain.password_setup import unusable_password_hash
 from tiqora.domain.user_provisioning import (
     ProvisioningError,
     create_agent,
     create_customer_user,
+    current_group_perms,
+    current_roles,
     grant_role,
+    record_managed_assignment,
+    revoke_role,
     set_group_permissions,
     update_agent_profile,
     update_customer_profile,
     valid_group_ids,
     valid_role_ids,
 )
-from tiqora.identity.mapping import MappedProfile
+from tiqora.identity.mapping import AssignmentDiff, AssignmentState, MappedProfile
 from tiqora.identity.store import ProviderRecord
 from tiqora.identity.types import SYSTEM_USER_ID, UserKind
 
@@ -273,8 +277,104 @@ async def sync_profile(
         )
 
 
+async def load_assignment_state(
+    session: AsyncSession, *, provider_id: int, user_id: int
+) -> AssignmentState:
+    """Current role/group assignments of an agent plus the ones THIS provider manages.
+
+    Managed rows of other providers are not part of the state: a provider never
+    owns what another provider (or an admin) assigned.
+    """
+    rows = (
+        await session.execute(
+            select(
+                TiqoraIdentityManagedAssignment.kind,
+                TiqoraIdentityManagedAssignment.target_id,
+                TiqoraIdentityManagedAssignment.permission_key,
+            ).where(
+                TiqoraIdentityManagedAssignment.provider_id == provider_id,
+                TiqoraIdentityManagedAssignment.user_id == user_id,
+            )
+        )
+    ).all()
+    return AssignmentState(
+        current_roles=await current_roles(session, user_id),
+        current_group_perms=await current_group_perms(session, user_id),
+        managed_roles=frozenset(int(t) for k, t, _ in rows if k == "role"),
+        managed_group_perms=frozenset((int(t), str(p)) for k, t, p in rows if k == "group"),
+    )
+
+
+async def apply_assignments(
+    session: AsyncSession, *, provider_id: int, user_id: int, diff: AssignmentDiff
+) -> None:
+    """Write a role/group diff for an agent (actor = system user); flush only.
+
+    Roles are granted/revoked one by one. Group keys are written once per group from
+    ``diff.final_group_keys`` (Znuny ``PermissionGroupUserAdd`` replaces the whole key
+    set, ``rw`` alone), never as independent add/remove rows. Then the managed marks
+    are inserted/deleted. The system user (id 1) is never synced.
+    """
+    if user_id == SYSTEM_USER_ID or diff.empty:
+        return
+    for role_id in sorted(diff.remove_roles):
+        await revoke_role(session, user_id=user_id, role_id=role_id)
+    for role_id in sorted(diff.add_roles):
+        await grant_role(session, user_id=user_id, role_id=role_id, actor_id=SYSTEM_USER_ID)
+    for group_id, keys in sorted(diff.final_group_keys.items()):
+        await set_group_permissions(
+            session,
+            user_id=user_id,
+            group_id=group_id,
+            permission_keys=keys,
+            actor_id=SYSTEM_USER_ID,
+        )
+
+    existing = await load_assignment_state(session, provider_id=provider_id, user_id=user_id)
+    for role_id in sorted(diff.drop_managed_roles):
+        await _drop_mark(session, provider_id, user_id, "role", role_id, "")
+    for group_id, key in sorted(diff.drop_managed_groups):
+        await _drop_mark(session, provider_id, user_id, "group", group_id, key)
+    for role_id in sorted(diff.record_managed_roles - existing.managed_roles):
+        await record_managed_assignment(
+            session,
+            provider_id=provider_id,
+            user_kind="agent",
+            user_id=user_id,
+            kind="role",
+            target_id=role_id,
+            permission_key="",
+        )
+    for group_id, key in sorted(diff.record_managed_groups - existing.managed_group_perms):
+        await record_managed_assignment(
+            session,
+            provider_id=provider_id,
+            user_kind="agent",
+            user_id=user_id,
+            kind="group",
+            target_id=group_id,
+            permission_key=key,
+        )
+
+
+async def _drop_mark(
+    session: AsyncSession, provider_id: int, user_id: int, kind: str, target_id: int, key: str
+) -> None:
+    await session.execute(
+        delete(TiqoraIdentityManagedAssignment).where(
+            TiqoraIdentityManagedAssignment.provider_id == provider_id,
+            TiqoraIdentityManagedAssignment.user_id == user_id,
+            TiqoraIdentityManagedAssignment.kind == kind,
+            TiqoraIdentityManagedAssignment.target_id == target_id,
+            TiqoraIdentityManagedAssignment.permission_key == key,
+        )
+    )
+
+
 __all__ = [
     "NewAccount",
+    "apply_assignments",
+    "load_assignment_state",
     "current_profile",
     "diff_profile",
     "email_domain_allowed",

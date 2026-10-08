@@ -117,3 +117,22 @@ def test_generated_certificate_properties() -> None:
     cn = cert.subject.get_attributes_for_oid(x509.NameOID.COMMON_NAME)[0].value
     assert cn == "idp-test.example.org"
     assert cert.not_valid_before_utc.replace(tzinfo=None) < utc_now()
+
+
+def test_allowed_email_domains_are_normalised() -> None:
+    from tiqora.identity.config_models import JitDefaults
+
+    got = JitDefaults(allowed_email_domains=[" Example.Test. ", "", "A.test", "a.test"])
+    assert got.allowed_email_domains == ["example.test", "a.test"]
+
+
+@pytest.mark.parametrize(
+    "bad", ["@example.test", "user@example.test", "exa mple.test", "a.test\tb"]
+)
+def test_allowed_email_domains_reject_malformed_entries(bad: str) -> None:
+    from pydantic import ValidationError
+
+    from tiqora.identity.config_models import JitDefaults
+
+    with pytest.raises(ValidationError):
+        JitDefaults(allowed_email_domains=[bad])
