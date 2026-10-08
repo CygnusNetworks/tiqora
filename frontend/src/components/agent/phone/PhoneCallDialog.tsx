@@ -31,7 +31,7 @@ import { RefineDiffView } from "../RefineDiffView";
 import { useRefineReview } from "../useRefineReview";
 import { AttachmentChips } from "../telegram/ComposerChips";
 import { useChatAttachments } from "../telegram/useChatAttachments";
-import { DynamicFieldInputs, type DynamicFieldValues } from "./DynamicFieldInputs";
+import { DynamicFieldsForm, type DynamicFieldValues } from "@/components/fields";
 import { PendingTimeInput } from "./PendingTimeInput";
 import { useCallTimer } from "./useCallTimer";
 import { useDialledCall } from "./useDialledCall";
@@ -500,7 +500,7 @@ export function PhoneCallDialog({
           <details className="rounded border border-hairline px-2 py-1.5" open={missing.length > 0}>
             <summary className="cursor-pointer text-xs text-muted">{t("phone.fields")}</summary>
             <div className="mt-2">
-              <DynamicFieldInputs
+              <DynamicFieldsForm
                 fields={fields}
                 values={dfValues}
                 onChange={(name, values) => setDfValues((prev) => ({ ...prev, [name]: values }))}

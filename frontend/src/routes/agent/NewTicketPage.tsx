@@ -31,7 +31,7 @@ import { CallerLookup } from "@/components/agent/phone/CallerLookup";
 import { PhoneTicketFields } from "@/components/agent/phone/PhoneTicketFields";
 import { PhoneCallStrip } from "@/components/agent/phone/PhoneCallStrip";
 import { PhoneNoteFooter } from "@/components/agent/phone/PhoneNoteFooter";
-import { DynamicFieldInputs } from "@/components/agent/phone/DynamicFieldInputs";
+import { DynamicFieldsForm } from "@/components/fields";
 import { PendingTimeInput } from "@/components/agent/phone/PendingTimeInput";
 import {
   EMPTY_PHONE_TICKET_FIELDS,
@@ -865,7 +865,7 @@ export function NewTicketPage() {
             )}
 
             {ticketType === "phone" && (
-              <DynamicFieldInputs
+              <DynamicFieldsForm
                 fields={requiredDfs}
                 values={phoneFields.dfValues}
                 onChange={(name, values) =>

@@ -7,7 +7,7 @@ import type { PhoneTicketFieldsValue } from "./phoneTicketValue";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { cn } from "@/lib/cn";
-import { DynamicFieldInputs } from "./DynamicFieldInputs";
+import { DynamicFieldsForm } from "@/components/fields";
 
 const SELECT_TRIGGER_CLASS =
   "flex w-full items-center justify-between gap-2 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-left text-[13.5px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent";
@@ -164,7 +164,7 @@ export function PhoneTicketFields({
               />
             )}
           </div>
-          <DynamicFieldInputs
+          <DynamicFieldsForm
             fields={fields}
             values={value.dfValues}
             onChange={(name, values) => set({ dfValues: { ...value.dfValues, [name]: values } })}

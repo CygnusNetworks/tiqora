@@ -337,7 +337,8 @@ describe("PhoneCallDialog", () => {
     expect(screen.getByTestId("phone-df-Topic")).toHaveValue("alt");
     expect(screen.getByTestId("phone-save")).toBeDisabled();
     expect(screen.getByTestId("phone-df-missing")).toHaveTextContent("Area");
-    fireEvent.change(area, { target: { value: "tv" } });
+    fireEvent.click(area);
+    fireEvent.click(await screen.findByTestId("phone-df-Area-menu-option-tv"));
     fireEvent.click(screen.getByTestId("phone-save"));
     await waitFor(() => expect(logPhoneCall).toHaveBeenCalled());
     expect(logPhoneCall.mock.calls[0][1].dynamic_fields).toEqual({ Area: ["tv"] });
