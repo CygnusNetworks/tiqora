@@ -105,3 +105,34 @@ def test_valid_filter_at_depth_limit_and_iter_paths() -> None:
     paths = [p for p, _ in iter_conditions(flt.where)]
     assert paths == ["where" + ".not" * (MAX_DEPTH - 1)]
     assert list(iter_conditions(None)) == []
+
+
+@pytest.mark.parametrize(
+    "cond",
+    [
+        {"field": "created", "op": "within_last", "value": {"amount": 10**12, "unit": "week"}},
+        {"field": "created", "op": "older_than", "value": {"amount": 10**6 + 1, "unit": "day"}},
+        {"field": "created", "op": "before", "value": "0001-01-01T00:00:00+05:00"},
+        {"field": "created", "op": "after", "value": "9999-12-31T23:59:59-05:00"},
+        {"field": "queue_id", "op": "eq", "value": 10**30},
+        {"field": "queue_id", "op": "in", "value": [1, -(10**30)]},
+        {"field": "title", "op": "contains", "value": "x" * 1001},
+    ],
+)
+def test_extreme_values_are_filter_errors_not_crashes(cond: dict[str, Any]) -> None:
+    with pytest.raises(FilterError) as exc:
+        _validate({"where": {"all": [cond]}})
+    assert exc.value.path.startswith("where.all[0].value")
+
+
+def test_boundary_values_are_accepted() -> None:
+    _validate({"where": {"field": "queue_id", "op": "eq", "value": 2**63 - 1}})
+    _validate({"where": {"field": "title", "op": "eq", "value": "x" * 1000}})
+    delta = relative_delta({"amount": 10**6, "unit": "week"}, path="p")
+    assert delta == timedelta(weeks=10**6)
+
+
+def test_field_spec_rejects_ops_outside_its_type() -> None:
+    with pytest.raises(ValueError, match="locked"):
+        FilterFieldSpec(key="locked", type="bool", ops=frozenset({"is_true", "eq"}))
+    assert FilterFieldSpec(key="n", type="int", ops=frozenset({"lte"})).allowed_ops() == {"lte"}

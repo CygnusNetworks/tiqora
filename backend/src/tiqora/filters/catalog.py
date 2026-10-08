@@ -34,6 +34,10 @@ _RELATIVE_OPS = frozenset({"within_last", "older_than"})
 _SCALAR_OPS = frozenset(
     {"eq", "neq", "contains", "starts_with", "lt", "lte", "gt", "gte", "before", "after"}
 )
+MAX_STRING_LENGTH = 1000
+MAX_RELATIVE_AMOUNT = 10**6
+_INT64_MIN = -(2**63)
+_INT64_MAX = 2**63 - 1
 _UNIT_SECONDS = {"minute": 60, "hour": 3600, "day": 86400, "week": 604800}
 
 
@@ -46,6 +50,11 @@ class FilterFieldSpec:
     ops: frozenset[str] | None = None  # None -> OPS_BY_TYPE[type]
     enum_values: tuple[str, ...] = ()
     options_source: str | None = None  # key for POST /reference/field-options
+
+    def __post_init__(self) -> None:
+        if self.ops is not None and not self.ops <= OPS_BY_TYPE[self.type]:
+            extra = ", ".join(sorted(self.ops - OPS_BY_TYPE[self.type]))
+            raise ValueError(f"Feld {self.key}: Operatoren nicht für Typ {self.type}: {extra}")
 
     def allowed_ops(self) -> frozenset[str]:
         return self.ops if self.ops is not None else OPS_BY_TYPE[self.type]
@@ -64,10 +73,11 @@ def parse_datetime_value(value: Any, *, path: str) -> datetime:
         raise FilterError("Bitte ein Datum im Format JJJJ-MM-TT angeben.", path=path)
     try:
         parsed = datetime.fromisoformat(value.strip())
-    except ValueError:
-        raise FilterError(f"„{value}“ ist kein gültiges Datum.", path=path) from None
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+    except (ValueError, OverflowError):
+        shown = value if len(value) <= 40 else value[:40] + "…"
+        raise FilterError(f"„{shown}“ ist kein gültiges Datum.", path=path) from None
     return parsed
 
 
@@ -77,15 +87,18 @@ def relative_delta(value: Any, *, path: str) -> timedelta:
         or set(value) != {"amount", "unit"}
         or isinstance(value["amount"], bool)
         or not isinstance(value["amount"], int)
-        or value["amount"] < 1
+        or not 1 <= value["amount"] <= MAX_RELATIVE_AMOUNT
         or value["unit"] not in _UNIT_SECONDS
     ):
         raise FilterError(
-            "Bitte eine Anzahl (mindestens 1) und eine Einheit "
+            f"Bitte eine Anzahl (1 bis {MAX_RELATIVE_AMOUNT}) und eine Einheit "
             "(Minute, Stunde, Tag oder Woche) angeben.",
             path=path,
         )
-    return timedelta(seconds=value["amount"] * _UNIT_SECONDS[value["unit"]])
+    try:
+        return timedelta(seconds=value["amount"] * _UNIT_SECONDS[value["unit"]])
+    except OverflowError:
+        raise FilterError("Der Zeitraum ist zu groß.", path=path) from None
 
 
 def iter_conditions(
@@ -127,9 +140,15 @@ def _check_item(spec: FilterFieldSpec, v: Any, path: str) -> None:
     if spec.type in ("id", "int"):
         if not _is_int(v):
             raise FilterError("Bitte eine ganze Zahl angeben.", path=path)
+        if not _INT64_MIN <= v <= _INT64_MAX:
+            raise FilterError("Die Zahl ist zu groß.", path=path)
     elif spec.type == "string":
         if not isinstance(v, str):
             raise FilterError("Bitte einen Text angeben.", path=path)
+        if len(v) > MAX_STRING_LENGTH:
+            raise FilterError(
+                f"Der Text ist zu lang (höchstens {MAX_STRING_LENGTH} Zeichen).", path=path
+            )
     elif spec.type == "enum":
         if v not in spec.enum_values:
             raise FilterError(
