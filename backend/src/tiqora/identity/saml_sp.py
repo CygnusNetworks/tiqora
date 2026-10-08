@@ -203,7 +203,7 @@ def _expect_xml_safe(raw: bytes, *, allow_sha1: bool) -> None:
         raise SamlResponseInvalid("sha1_signature")
 
 
-def _decode_b64(b64: str) -> bytes:
+def decode_saml_b64(b64: str) -> bytes:
     if len(b64) > MAX_RESPONSE_BYTES * 4 // 3 + 16:
         raise SamlResponseInvalid("too_large")
     try:
@@ -327,7 +327,7 @@ class SamlServiceProvider:
     async def parse_login_response(
         self, saml_response_b64: str, *, outstanding: Mapping[str, str], expected_acs: str
     ) -> SamlAssertionResult:
-        raw = _decode_b64(saml_response_b64)
+        raw = decode_saml_b64(saml_response_b64)
         try:
             return await self._run(self._parse_login_sync, raw, dict(outstanding), expected_acs)
         except SamlResponseInvalid:
@@ -397,12 +397,24 @@ class SamlServiceProvider:
         if statements:
             session_index = getattr(statements[0], "session_index", None) or None
         conditions = getattr(assertion, "conditions", None)
+        # Earliest signed expiry (Conditions or bearer SCD) bounds the replay cache; an
+        # assertion without any would never expire from it.
+        expiries = [
+            e
+            for e in (
+                _instant(getattr(conditions, "not_on_or_after", None)),
+                _instant(getattr(confirmation, "not_on_or_after", None)),
+            )
+            if e is not None
+        ]
+        if not expiries:
+            raise SamlResponseInvalid("no_expiry")
         attributes = normalize_attributes(dict(getattr(resp, "ava", None) or {}))
         attributes["saml:name_id"] = (name_id,)
         return SamlAssertionResult(
             in_response_to=in_response_to,
             assertion_id=str(assertion.id),
-            not_on_or_after=_instant(getattr(conditions, "not_on_or_after", None)),
+            not_on_or_after=min(expiries),
             name_id=name_id,
             name_id_format=getattr(name_id_obj, "format", None) or None,
             name_qualifier=getattr(name_id_obj, "name_qualifier", None) or None,

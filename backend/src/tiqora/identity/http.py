@@ -43,6 +43,9 @@ def safe_next(next_path: str | None, *, default: str = "/") -> str:
         and next_path.startswith("/")
         and not next_path.startswith("//")
         and not next_path.startswith("/\\")
+        and "\\" not in next_path
+        # control chars (tab/CR/LF are stripped by browsers: "/\t/evil" becomes "//evil")
+        and not any(ord(c) < 0x20 or ord(c) == 0x7F for c in next_path)
     ):
         return next_path
     return default
@@ -68,7 +71,8 @@ def login_landing_response(target: str) -> HTMLResponse:
     A 302 straight after a cross-site POST would not carry ``SameSite=Lax``
     cookies; this page navigates same-site so the new session cookie is sent.
     """
-    href = escape(target, quote=True)
+    # Percent-quote anything unsafe first (keeps "/ ? & = % #" and friends intact), then escape.
+    href = escape(quote(target, safe="/?&=%#:@+,;~!*'()[]$-._"), quote=True)
     body = (
         '<!doctype html><html lang="de"><head><meta charset="utf-8">'
         f'<meta http-equiv="refresh" content="0;url={href}">'

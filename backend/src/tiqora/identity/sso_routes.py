@@ -8,8 +8,6 @@ login and issues the session. SAML adds ``finish_saml_acs`` (the POSTed response
 
 from __future__ import annotations
 
-import base64
-import binascii
 import contextlib
 import secrets
 from collections.abc import Callable
@@ -17,7 +15,6 @@ from datetime import UTC, datetime
 from typing import Any, Final
 from urllib.parse import quote, urlencode, urlsplit
 
-import defusedxml
 import defusedxml.ElementTree as safe_et
 import httpx
 import structlog
@@ -69,7 +66,11 @@ from tiqora.identity.saml_metadata import (
     parse_idp_metadata,
 )
 from tiqora.identity.saml_runtime import SamlUnavailable, saml_availability
-from tiqora.identity.saml_sp import SamlResponseInvalid, SamlServiceProvider
+from tiqora.identity.saml_sp import (
+    SamlResponseInvalid,
+    SamlServiceProvider,
+    decode_saml_b64,
+)
 from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso
 from tiqora.identity.store import ProviderRecord, get_provider_by_slug
 from tiqora.identity.types import (
@@ -86,7 +87,6 @@ logger = structlog.get_logger(__name__)
 OIDC_STATE_COOKIE = "tiqora_oidc_state"
 SAML_REQUEST_COOKIE: Final = "tiqora_saml_req"
 SAML_METADATA_TYPE = "application/samlmetadata+xml"
-_MAX_ACS_BODY = 4 * 1024 * 1024
 _MAX_REQUEST_ID = 256
 
 
@@ -720,7 +720,7 @@ def _peek_in_response_to(raw: bytes) -> str | None:
     the signed response is verified against it afterwards."""
     try:
         root = safe_et.fromstring(raw, forbid_dtd=True, forbid_entities=True, forbid_external=True)
-    except (defusedxml.DefusedXmlException, Exception) as exc:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001 - DTD/entity refusal and malformed XML alike
         raise SamlResponseInvalid("xml") from exc
     value = root.get("InResponseTo")
     if value is None:
@@ -737,9 +737,15 @@ def _peek_in_response_to(raw: bytes) -> str | None:
     return value
 
 
+async def _stored_next(redis: Any, request_id: str, user_kind: UserKind) -> str | None:
+    """``next`` of a stored request, for error redirects (never consumes the state)."""
+    state = await flow_state.get_saml_request(redis, request_id)
+    return state.next_path if state and state.user_kind == user_kind else None
+
+
 def _assertion_ttl(not_on_or_after: datetime | None, skew: int) -> int:
     if not_on_or_after is None:
-        return 3600
+        return 86400 + skew
     remaining = (not_on_or_after - datetime.now(UTC)).total_seconds()
     return max(60, int(remaining) + skew)
 
@@ -806,7 +812,7 @@ async def _finish_saml_acs(
     redis = await get_redis(request)
     try:
         urls = provider_urls(settings, record)
-        raw = _decode_response(saml_response)
+        raw = decode_saml_b64(saml_response)
         in_response_to = _peek_in_response_to(raw)
     except IdentityUrlsUnavailable:
         return fail("config")
@@ -815,12 +821,14 @@ async def _finish_saml_acs(
         return fail("saml_invalid")
     expected_acs = urls.agent_acs_url if user_kind == "agent" else urls.customer_acs_url
 
-    # Browser binding: an SP-initiated response must come back in the browser that started
-    # it. Only possible with SameSite=None cookies, i.e. when session cookies are Secure too.
-    if in_response_to is not None and settings.session_cookie_secure:
+    # Browser binding (login-CSRF defence): a solicited response (InResponseTo, root or signed
+    # SubjectConfirmationData) must come back in the browser that started it. Always enforced;
+    # only opt-in IdP-initiated logins are unbound. Limitation: one cookie per browser, so two
+    # parallel login tabs overwrite each other and the older tab fails with ``state``.
+    if in_response_to is not None:
         cookie = request.cookies.get(SAML_REQUEST_COOKIE)
         if not cookie or not secrets.compare_digest(cookie, in_response_to):
-            return fail("state")
+            return fail("state", await _stored_next(redis, in_response_to, user_kind))
 
     state: LoginState | None = None
     outstanding: dict[str, str] = {}
@@ -903,18 +911,6 @@ async def _finish_saml_acs(
         settings=settings,
         landing_html=True,
     )
-
-
-def _decode_response(b64: str) -> bytes:
-    if len(b64) > _MAX_ACS_BODY:
-        raise SamlResponseInvalid("too_large")
-    try:
-        raw = base64.b64decode(b64.encode("ascii", "ignore"))
-    except (binascii.Error, ValueError) as exc:
-        raise SamlResponseInvalid("base64") from exc
-    if not raw.strip():
-        raise SamlResponseInvalid("empty")
-    return raw
 
 
 def saml_metadata_response(record: ProviderRecord, settings: Settings) -> Response:

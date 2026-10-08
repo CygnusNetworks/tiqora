@@ -150,11 +150,11 @@ async def get_saml_request(redis: Any, request_id: str) -> LoginState | None:
 
 
 async def pop_saml_request(redis: Any, request_id: str) -> LoginState | None:
+    """Atomic consume: only the caller whose DELETE removes the key gets the state."""
     key = f"{SAML_REQUEST_PREFIX}{request_id}"
     raw = await redis.get(key)
-    if raw is None:
+    if raw is None or await redis.delete(key) != 1:
         return None
-    await redis.delete(key)
     return _parse_saml_state(_text(raw))
 
 

@@ -6,11 +6,11 @@ import asyncio
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
-from starlette.datastructures import UploadFile
 
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.identity.http import login_error_redirect
 from tiqora.identity.saml_runtime import saml_availability
+from tiqora.identity.saml_sp import MAX_RESPONSE_BYTES
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
     finish_saml_acs,
@@ -21,8 +21,6 @@ from tiqora.identity.sso_routes import (
     start_sso_login,
 )
 from tiqora.identity.store import get_provider_by_slug
-
-MAX_ACS_BODY = 4 * 1024 * 1024
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -86,14 +84,14 @@ async def saml_acs(
     and the per-browser cookie authenticate it. Every failure redirects to ``/login``.
     """
     declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MAX_ACS_BODY:
+    if declared.isdigit() and int(declared) > MAX_RESPONSE_BYTES * 2:
         return login_error_redirect("agent", "saml_invalid", "/")
     try:
         form = await request.form()
     except Exception:  # noqa: BLE001 - malformed/oversized form bodies are a failed login
         return login_error_redirect("agent", "saml_invalid", "/")
     saml_response = _form_text(form.get("SAMLResponse"))
-    if not saml_response or isinstance(form.get("SAMLResponse"), UploadFile):
+    if not saml_response:
         return login_error_redirect("agent", "saml_invalid", "/")
     return await finish_saml_acs(
         request,

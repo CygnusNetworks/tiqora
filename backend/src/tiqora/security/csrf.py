@@ -26,8 +26,8 @@ _PROTECTED_PREFIXES = ("/api/v1", "/api/portal")
 # a Redis-held request id and (ACS) a per-browser cookie, not by the session cookie.
 # Nothing else is exempt (the OIDC back-channel POST is server-to-server, cookie-less).
 _CSRF_EXEMPT = (
-    re.compile(r"^/api/v1/auth/saml/[a-z0-9-]+/(acs|sls)$"),
-    re.compile(r"^/api/portal/auth/saml/[a-z0-9-]+/acs$"),
+    re.compile(r"/api/v1/auth/saml/[a-z0-9-]+/(acs|sls)"),
+    re.compile(r"/api/portal/auth/saml/[a-z0-9-]+/acs"),
 )
 
 
@@ -84,7 +84,7 @@ def csrf_check_required(request: Request, settings: Settings) -> bool:
     path = request.url.path
     if not any(path == p or path.startswith(p + "/") for p in _PROTECTED_PREFIXES):
         return False
-    if any(rx.match(path) for rx in _CSRF_EXEMPT):
+    if any(rx.fullmatch(path) for rx in _CSRF_EXEMPT):
         return False
     # API-key / Bearer clients are CSRF-immune.
     if request_has_authorization(request):

@@ -9,7 +9,7 @@ import base64
 import shutil
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 import httpx
 import pytest
@@ -253,13 +253,16 @@ async def test_saml_cookie_binding_enforced_when_secure(env: Env) -> None:
     )
     assert _error(wrong) == "state"
 
+    # Binding does not depend on session_cookie_secure: plain-HTTP setups are bound too.
     await env.use(_settings(session_cookie_secure=False))
     req_id, relay, start = await env.start()
     assert "tiqora_saml_req" in start.headers["set-cookie"]  # cookie flags follow the URL scheme
-    ok = await env.acs(
-        env.response_for(req_id, attributes=attrs), req_id=req_id, relay=relay, cookies=False
-    )
-    assert ok.status_code == 200, ok.text  # binding skipped without Secure session cookies
+    body = env.response_for(req_id, attributes=attrs)
+    unbound = await env.acs(body, req_id=req_id, relay=relay, cookies=False)
+    assert _error(unbound) == "state"
+    assert parse_qs(urlparse(unbound.headers["location"]).query)["next"] == ["/tickets"]
+    ok = await env.acs(body, req_id=req_id, relay=relay)
+    assert ok.status_code == 200, ok.text
 
 
 async def test_saml_invalid_response_lands_on_login(env: Env) -> None:
@@ -337,6 +340,7 @@ async def test_sp_metadata_endpoint(env: Env) -> None:
     assert f"{BASE}/api/portal/auth/saml/{PROVIDER}/acs" in resp.text
     cert_body = "".join(rec.config.sp_certificate.splitlines()[1:-1])
     assert cert_body in resp.text.replace("\n", "")
+    assert "PRIVATE KEY" not in resp.text
     assert (await env.client.get("/api/v1/auth/saml/idptest-saml-nope/metadata")).status_code == 404
     await make_provider(
         env.session,
@@ -353,3 +357,48 @@ async def test_base_url_missing(env: Env) -> None:
     await env.use(_settings(public_base_url="", cors_origins=""))
     resp = await env.client.get(LOGIN_PATH)
     assert _error(resp) == "config"
+
+
+@pytest.mark.parametrize("nxt", ["/%09/evil.example.net", "/%0a/evil.example.net", "/%5Cevil"])
+async def test_next_control_chars_and_backslash_never_redirect_off_site(env: Env, nxt: str) -> None:
+    await _agent(env, 47109, "idp.saml.47109")
+    await _provider(env, allow_idp_initiated=True)
+    req_id, relay, _ = await env.start(f"{LOGIN_PATH}?next={nxt}")
+    ok = await env.acs(
+        env.response_for(req_id, attributes={"uid": ["idp.saml.47109"]}), req_id=req_id
+    )
+    assert ok.status_code == 200 and 'url=/"' in ok.text
+    # IdP-initiated RelayState goes through the same filter
+    decoded = unquote(nxt)
+    idp = await env.acs(
+        env.response_for(None, attributes={"uid": ["idp.saml.47109"]}),
+        req_id=None,
+        relay=decoded,
+    )
+    assert idp.status_code == 200 and 'url=/"' in idp.text
+
+
+async def test_assertion_without_expiry_is_rejected(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _agent(env, 47110, "idp.saml.47110")
+    await _provider(env)
+    req_id, _relay, _ = await env.start()
+    body = env.response_for(req_id, attributes={"uid": ["idp.saml.47110"]})
+    # a signed expiry cannot be stripped from a real response, so make the SP see none
+    monkeypatch.setattr("tiqora.identity.saml_sp._instant", lambda _v: None)
+    resp = await env.acs(body, req_id=req_id)
+    assert _error(resp) == "saml_invalid"
+    assert not any(k.startswith("tiqora:saml:seen:") for k in env.redis.store)
+
+
+async def test_replay_ttl_is_bounded_by_assertion_expiry(env: Env) -> None:
+    await _agent(env, 47111, "idp.saml.47111")
+    await _provider(env, clock_skew_seconds=120)
+    req_id, relay, _ = await env.start()
+    ok = await env.acs(
+        env.response_for(req_id, attributes={"uid": ["idp.saml.47111"]}), req_id=req_id
+    )
+    assert ok.status_code == 200
+    (key,) = [k for k in env.redis.store if k.startswith("tiqora:saml:seen:")]
+    assert 60 <= env.redis.ttls[key] <= 15 * 60 + 120 + 5
