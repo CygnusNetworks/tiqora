@@ -8,6 +8,7 @@ the SPA (same-origin) and non-browser tools keep working (SECURITY M-02).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Awaitable, Callable
 from urllib.parse import urlparse
 
@@ -20,6 +21,14 @@ CallNext = Callable[[Request], Awaitable[Response]]
 
 _UNSAFE = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _PROTECTED_PREFIXES = ("/api/v1", "/api/portal")
+# Cross-site form POSTs by design: the IdP's browser POST to the SAML ACS / SLS can carry
+# either session cookie and a foreign Origin. Each is authenticated by its XML signature,
+# a Redis-held request id and (ACS) a per-browser cookie, not by the session cookie.
+# Nothing else is exempt (the OIDC back-channel POST is server-to-server, cookie-less).
+_CSRF_EXEMPT = (
+    re.compile(r"^/api/v1/auth/saml/[a-z0-9-]+/(acs|sls)$"),
+    re.compile(r"^/api/portal/auth/saml/[a-z0-9-]+/acs$"),
+)
 
 
 def _origin_host(value: str) -> str | None:
@@ -74,6 +83,8 @@ def csrf_check_required(request: Request, settings: Settings) -> bool:
         return False
     path = request.url.path
     if not any(path == p or path.startswith(p + "/") for p in _PROTECTED_PREFIXES):
+        return False
+    if any(rx.match(path) for rx in _CSRF_EXEMPT):
         return False
     # API-key / Bearer clients are CSRF-immune.
     if request_has_authorization(request):

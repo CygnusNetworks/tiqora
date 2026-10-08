@@ -4424,6 +4424,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/saml/{slug}/acs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SAML assertion consumer service
+         * @description Receives the IdP's browser POST (``SAMLResponse``, ``RelayState``).
+         *
+         *     CSRF-exempt by design (cross-site form POST); the XML signature, the stored request id
+         *     and the per-browser cookie authenticate it. Every failure redirects to ``/login``.
+         */
+        post: operations["saml_acs_api_v1_auth_saml__slug__acs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/saml/{slug}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SAML service provider metadata */
+        get: operations["saml_metadata_api_v1_auth_saml__slug__metadata_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/spnego": {
         parameters: {
             query?: never;
@@ -29993,6 +30033,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PasswordSetupCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_acs_api_v1_auth_saml__slug__acs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_metadata_api_v1_auth_saml__slug__metadata_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/samlmetadata+xml": unknown;
                 };
             };
             /** @description Validation Error */

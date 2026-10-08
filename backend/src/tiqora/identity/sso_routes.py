@@ -2,16 +2,23 @@
 
 ``start_sso_login`` sends the browser to the IdP, ``finish_oidc_callback`` turns the
 IdP answer into an :class:`ExternalIdentity`, and ``complete_login`` plans/applies the
-login and issues the session. The SAML branch arrives with Task 10.
+login and issues the session. SAML adds ``finish_saml_acs`` (the POSTed response) and
+``saml_metadata_response`` (SP metadata).
 """
 
 from __future__ import annotations
 
+import base64
+import binascii
 import contextlib
 import secrets
-from typing import Any
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any, Final
 from urllib.parse import quote
 
+import defusedxml
+import defusedxml.ElementTree as safe_et
 import httpx
 import structlog
 from fastapi import HTTPException, Request, status
@@ -30,7 +37,7 @@ from tiqora.domain.oidc import (
     oidc_client_config,
 )
 from tiqora.identity import flow_state
-from tiqora.identity.config_models import OidcProviderConfig
+from tiqora.identity.config_models import OidcProviderConfig, SamlProviderConfig
 from tiqora.identity.env_providers import (
     ensure_env_providers,
     runtime_config,
@@ -54,6 +61,9 @@ from tiqora.identity.login import (
     plan_to_dict,
 )
 from tiqora.identity.mapping import normalize_attributes
+from tiqora.identity.saml_metadata import SamlMetadataError
+from tiqora.identity.saml_runtime import SamlUnavailable, saml_availability
+from tiqora.identity.saml_sp import SamlResponseInvalid, SamlServiceProvider
 from tiqora.identity.sso_sessions import SsoSessionInfo
 from tiqora.identity.store import ProviderRecord, get_provider_by_slug
 from tiqora.identity.types import (
@@ -63,11 +73,15 @@ from tiqora.identity.types import (
     audience_includes,
     subject_hash,
 )
-from tiqora.identity.urls import IdentityUrlsUnavailable, provider_urls
+from tiqora.identity.urls import IdentityUrlsUnavailable, base_url, provider_urls
 
 logger = structlog.get_logger(__name__)
 
 OIDC_STATE_COOKIE = "tiqora_oidc_state"
+SAML_REQUEST_COOKIE: Final = "tiqora_saml_req"
+SAML_METADATA_TYPE = "application/samlmetadata+xml"
+_MAX_ACS_BODY = 4 * 1024 * 1024
+_MAX_REQUEST_ID = 256
 
 
 def new_oidc_service(config: OidcClientConfig) -> OIDCService:
@@ -236,7 +250,15 @@ async def start_sso_login(
         return fail("provider_disabled")
 
     if record.kind == "saml":
-        return fail("saml_unavailable")  # SAML start: Task 10
+        return await _start_saml_login(
+            request,
+            record=record,
+            user_kind=user_kind,
+            target=target,
+            test_id=test_id,
+            settings=settings,
+            fail=fail,
+        )
 
     cfg = runtime_config(record, settings)
     if not isinstance(cfg, OidcProviderConfig):
@@ -281,6 +303,67 @@ async def start_sso_login(
         secure=settings.session_cookie_secure,
         samesite="lax",  # sent on the top-level IdP -> callback redirect
         max_age=flow_state.OIDC_STATE_TTL,
+        path="/",
+    )
+    return resp
+
+
+def _saml_cookie_flags(settings: Settings) -> tuple[bool, str]:
+    """``(secure, samesite)`` of the SAML request cookie, from the public URL scheme.
+
+    The ACS is a cross-site POST, so the cookie must be ``SameSite=None`` (which needs
+    ``Secure``); that is only possible when the site is served over HTTPS.
+    """
+    try:
+        secure = base_url(settings).lower().startswith("https://")
+    except IdentityUrlsUnavailable:
+        secure = False
+    return secure, ("none" if secure else "lax")
+
+
+async def _start_saml_login(
+    request: Request,
+    *,
+    record: ProviderRecord,
+    user_kind: UserKind,
+    target: str,
+    test_id: str | None,
+    settings: Settings,
+    fail: Callable[[str], Response],
+) -> Response:
+    if not saml_availability().available:
+        return fail("saml_unavailable")
+    try:
+        redirect = await SamlServiceProvider(record, settings=settings).login_redirect(
+            relay_state=secrets.token_urlsafe(16), user_kind=user_kind
+        )
+    except IdentityUrlsUnavailable:
+        return fail("config")
+    except SamlUnavailable:
+        return fail("saml_unavailable")
+    except (SamlMetadataError, SamlResponseInvalid, TypeError, ValueError, KeyError) as exc:
+        logger.warning("saml_login_start_failed", slug=record.slug, error=str(exc)[:200])
+        return fail("config")
+    except Exception as exc:  # noqa: BLE001 - pysaml2/xmlsec failures must land on /login
+        logger.warning("saml_login_start_failed", slug=record.slug, error=type(exc).__name__)
+        return fail("idp_error")
+    redis = await get_redis(request)
+    await flow_state.put_saml_request(
+        redis,
+        redirect.request_id,
+        LoginState(provider_id=record.id, next_path=target, user_kind=user_kind, test_id=test_id),
+    )
+    resp = RedirectResponse(redirect.url, status_code=status.HTTP_302_FOUND)
+    secure, samesite = _saml_cookie_flags(settings)
+    if not secure:
+        logger.warning("saml_cookie_binding_disabled_http", slug=record.slug)
+    resp.set_cookie(
+        key=SAML_REQUEST_COOKIE,
+        value=redirect.request_id,
+        httponly=True,
+        secure=secure,
+        samesite=samesite,  # type: ignore[arg-type]
+        max_age=flow_state.SAML_REQUEST_TTL,
         path="/",
     )
     return resp
@@ -614,3 +697,218 @@ async def _complete_login(
         response = RedirectResponse(next_path, status_code=status.HTTP_302_FOUND)
     set_session_cookie(response, settings, token, user_kind=user_kind)
     return response
+
+
+# ---------------------------------------------------------------------------- SAML ACS
+
+
+def _peek_in_response_to(raw: bytes) -> str | None:
+    """``InResponseTo`` of the root element (DTD/entities refused). Only a lookup key:
+    the signed response is verified against it afterwards."""
+    try:
+        root = safe_et.fromstring(raw, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+    except (defusedxml.DefusedXmlException, Exception) as exc:  # noqa: BLE001
+        raise SamlResponseInvalid("xml") from exc
+    value = root.get("InResponseTo")
+    if value is None:
+        return None
+    if not value or len(value) > _MAX_REQUEST_ID:
+        raise SamlResponseInvalid("in_response_to")
+    return value
+
+
+def _assertion_ttl(not_on_or_after: datetime | None, skew: int) -> int:
+    if not_on_or_after is None:
+        return 3600
+    remaining = (not_on_or_after - datetime.now(UTC)).total_seconds()
+    return max(60, int(remaining) + skew)
+
+
+async def finish_saml_acs(
+    request: Request,
+    *,
+    slug: str,
+    user_kind: UserKind,
+    saml_response: str,
+    relay_state: str | None,
+    session: AsyncSession,
+    settings: Settings,
+) -> Response:
+    """Validate a POSTed SAMLResponse and log the user in; failures redirect to the login page."""
+    response = await _finish_saml_acs(
+        request,
+        slug=slug,
+        user_kind=user_kind,
+        saml_response=saml_response,
+        relay_state=relay_state,
+        session=session,
+        settings=settings,
+    )
+    secure, samesite = _saml_cookie_flags(settings)
+    response.delete_cookie(
+        SAML_REQUEST_COOKIE,
+        path="/",
+        secure=secure,
+        httponly=True,
+        samesite=samesite,  # type: ignore[arg-type]
+    )
+    return response
+
+
+async def _finish_saml_acs(
+    request: Request,
+    *,
+    slug: str,
+    user_kind: UserKind,
+    saml_response: str,
+    relay_state: str | None,
+    session: AsyncSession,
+    settings: Settings,
+) -> Response:
+    default_next = _default_next(user_kind, None)
+
+    def fail(code: str, next_path: str | None = None) -> Response:
+        return login_error_redirect(user_kind, code, next_path or default_next)
+
+    if not saml_availability().available:
+        return fail("saml_unavailable")
+    try:
+        record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sso_provider_lookup_failed", slug=slug, error=str(exc))
+        return fail("config")
+    if record is None or record.kind != "saml" or not audience_includes(record.audience, user_kind):
+        return fail("unknown_provider")
+    cfg = record.config
+    if not isinstance(cfg, SamlProviderConfig):
+        return fail("config")
+
+    redis = await get_redis(request)
+    try:
+        urls = provider_urls(settings, record)
+        raw = _decode_response(saml_response)
+        in_response_to = _peek_in_response_to(raw)
+    except IdentityUrlsUnavailable:
+        return fail("config")
+    except SamlResponseInvalid as exc:
+        logger.warning("saml_response_rejected", slug=slug, reason=exc.reason)
+        return fail("saml_invalid")
+    expected_acs = urls.agent_acs_url if user_kind == "agent" else urls.customer_acs_url
+
+    # Browser binding: an SP-initiated response must come back in the browser that started
+    # it. Only possible with SameSite=None cookies, i.e. when session cookies are Secure too.
+    if in_response_to is not None and settings.session_cookie_secure:
+        cookie = request.cookies.get(SAML_REQUEST_COOKIE)
+        if not cookie or not secrets.compare_digest(cookie, in_response_to):
+            return fail("state")
+
+    state: LoginState | None = None
+    outstanding: dict[str, str] = {}
+    if in_response_to is not None:
+        # An InResponseTo always needs its stored request, even with IdP-initiated allowed.
+        state = await flow_state.get_saml_request(redis, in_response_to)
+        if state is None:
+            logger.warning("saml_response_rejected", slug=slug, reason="unknown_request")
+            return fail("saml_invalid")
+        if state.provider_id != record.id or state.user_kind != user_kind:
+            return fail("state")
+        outstanding = {in_response_to: expected_acs}
+    elif not cfg.allow_idp_initiated:
+        logger.warning("saml_response_rejected", slug=slug, reason="unsolicited")
+        return fail("saml_invalid")
+    next_path = state.next_path if state else _default_next(user_kind, relay_state)
+    test_id = state.test_id if state else None
+
+    run: TestRun | None = None
+    if test_id:
+        run = await _load_test(redis, test_id, record, user_kind)
+        if run is None or run.status != "started":
+            return fail("state", next_path)
+    if not record.enabled and run is None:
+        return fail("provider_disabled", next_path)
+
+    async def failed(code: str) -> Response:
+        if run is not None and test_id:
+            run.status = "failed"
+            run.error = code
+            await flow_state.put_test(redis, test_id, run)
+            return _admin_test_redirect(record.id, test_id)
+        return fail(code, next_path)
+
+    try:
+        result = await SamlServiceProvider(record, settings=settings).parse_login_response(
+            saml_response, outstanding=outstanding, expected_acs=expected_acs
+        )
+    except SamlResponseInvalid as exc:
+        logger.warning("saml_response_rejected", slug=slug, reason=exc.reason)
+        return await failed("saml_invalid")
+    except SamlUnavailable:
+        return await failed("saml_unavailable")
+    except (IdentityUrlsUnavailable, SamlMetadataError):
+        return await failed("config")
+    if result.in_response_to != in_response_to:
+        return await failed("saml_invalid")
+
+    # Verified: consume the request exactly once (a parallel replay loses this race).
+    if (
+        in_response_to is not None
+        and await flow_state.pop_saml_request(redis, in_response_to) is None
+    ):
+        return await failed("saml_invalid")
+    ttl = _assertion_ttl(result.not_on_or_after, cfg.clock_skew_seconds)
+    if not await flow_state.mark_assertion_seen(redis, record.id, result.assertion_id, ttl):
+        logger.warning("saml_response_rejected", slug=slug, reason="replay")
+        return await failed("saml_invalid")
+
+    identity = ExternalIdentity(
+        provider_id=record.id,
+        subject=result.name_id,
+        attributes=result.attributes,
+        sso=SsoSessionDraft(
+            session_index=result.session_index,
+            name_id=result.name_id,
+            name_id_format=result.name_id_format,
+            name_qualifier=result.name_qualifier,
+            sp_name_qualifier=result.sp_name_qualifier,
+        ),
+    )
+    return await complete_login(
+        request,
+        record=record,
+        identity=identity,
+        user_kind=user_kind,
+        next_path=next_path,
+        test_id=test_id,
+        session=session,
+        settings=settings,
+        landing_html=True,
+    )
+
+
+def _decode_response(b64: str) -> bytes:
+    if len(b64) > _MAX_ACS_BODY:
+        raise SamlResponseInvalid("too_large")
+    try:
+        raw = base64.b64decode(b64.encode("ascii", "ignore"))
+    except (binascii.Error, ValueError) as exc:
+        raise SamlResponseInvalid("base64") from exc
+    if not raw.strip():
+        raise SamlResponseInvalid("empty")
+    return raw
+
+
+def saml_metadata_response(record: ProviderRecord, settings: Settings) -> Response:
+    """SP metadata XML of a SAML provider. Blocking (pysaml2): call it in the executor."""
+    try:
+        xml = SamlServiceProvider(record, settings=settings).sp_metadata_xml()
+    except IdentityUrlsUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Public base URL not set") from exc
+    except SamlUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "SAML unavailable") from exc
+    except SamlMetadataError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    return Response(
+        content=xml,
+        media_type=SAML_METADATA_TYPE,
+        headers={"Cache-Control": "no-store"},
+    )

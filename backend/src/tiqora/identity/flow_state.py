@@ -1,11 +1,14 @@
 """Short-lived Redis state of SSO flows (D10): OIDC state and admin test runs.
 
-All one-shot keys are read with GET + DELETE ("pop"). SAML request / assertion
-replay / logout keys arrive with the SAML tasks.
+One-shot keys are read with GET + DELETE ("pop"). The SAML request state is read
+non-destructively first (``get_saml_request``) and only deleted once the response
+signature has been verified, so a forged response naming a request id cannot burn
+the genuine user's login. Logout keys arrive with Task 11.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -17,6 +20,9 @@ from tiqora.identity.types import UserKind
 
 OIDC_STATE_PREFIX = "tiqora:oidc:state:"
 OIDC_STATE_TTL = 300
+SAML_REQUEST_PREFIX = "tiqora:saml:req:"
+SAML_REQUEST_TTL = 600
+SAML_SEEN_PREFIX = "tiqora:saml:seen:"
 TEST_PREFIX = "tiqora:idp:test:"
 TEST_TTL = 900
 
@@ -98,6 +104,55 @@ async def pop_oidc_state(
         return None
     await redis.delete(key)
     return _parse_state(_text(raw), env_oidc_provider_id=env_oidc_provider_id)
+
+
+async def put_saml_request(redis: Any, request_id: str, st: LoginState) -> None:
+    payload = {"p": st.provider_id, "n": st.next_path, "a": st.user_kind, "t": st.test_id}
+    await redis.set(f"{SAML_REQUEST_PREFIX}{request_id}", json.dumps(payload), ex=SAML_REQUEST_TTL)
+
+
+def _parse_saml_state(raw: str) -> LoginState | None:
+    try:
+        data = json.loads(raw)
+        provider_id, user_kind, next_path = data["p"], data["a"], data.get("n") or "/"
+    except (ValueError, KeyError, TypeError):
+        return None
+    test_id = data.get("t")
+    if (
+        not isinstance(provider_id, int)
+        or isinstance(provider_id, bool)
+        or user_kind not in ("agent", "customer")
+        or not isinstance(next_path, str)
+    ):
+        return None
+    return LoginState(
+        provider_id=provider_id,
+        next_path=next_path,
+        user_kind=user_kind,
+        test_id=test_id if isinstance(test_id, str) else None,
+    )
+
+
+async def get_saml_request(redis: Any, request_id: str) -> LoginState | None:
+    """Non-destructive read; pair with :func:`pop_saml_request` after verification."""
+    raw = await redis.get(f"{SAML_REQUEST_PREFIX}{request_id}")
+    return None if raw is None else _parse_saml_state(_text(raw))
+
+
+async def pop_saml_request(redis: Any, request_id: str) -> LoginState | None:
+    key = f"{SAML_REQUEST_PREFIX}{request_id}"
+    raw = await redis.get(key)
+    if raw is None:
+        return None
+    await redis.delete(key)
+    return _parse_saml_state(_text(raw))
+
+
+async def mark_assertion_seen(redis: Any, provider_id: int, assertion_id: str, ttl: int) -> bool:
+    """Record an assertion id; False when it was already seen (replay)."""
+    digest = hashlib.sha256(assertion_id.encode()).hexdigest()
+    key = f"{SAML_SEEN_PREFIX}{provider_id}:{digest}"
+    return bool(await redis.set(key, "1", ex=max(ttl, 60), nx=True))
 
 
 class TestResultData(BaseModel):
