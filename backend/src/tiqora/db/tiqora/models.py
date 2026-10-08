@@ -19,7 +19,7 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.dialects import mysql
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, deferred, mapped_column
 
 from tiqora.db.tiqora.base import TiqoraBase
 
@@ -829,3 +829,60 @@ class TiqoraAvatar(TiqoraBase):
     __table_args__ = (
         UniqueConstraint("kind", "subject_key", name="uq_tiqora_avatar_kind_subject"),
     )
+
+
+#: Handler results are JSON up to 1 MB: plain ``TEXT`` stops at 64 KiB on MariaDB.
+JOB_RESULT_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
+#: Files a job produced (up to 200 MiB): ``LONGBLOB`` on MariaDB, ``BYTEA`` on PostgreSQL.
+JOB_FILE_BLOB = LargeBinary().with_variant(mysql.LONGBLOB(), "mysql", "mariadb")
+
+
+class TiqoraJob(TiqoraBase):
+    """A background job (see :mod:`tiqora.jobs`). Timestamps are app-written naive UTC."""
+
+    __tablename__ = "tiqora_job"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    result: Mapped[str | None] = mapped_column(JOB_RESULT_TEXT, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progress_done: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    progress_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    progress_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    cancel_requested: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    dedupe_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    worker_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_tiqora_job_status_created", "status", "created_at"),
+        Index("ix_tiqora_job_created_by", "created_by", "created_at"),
+        Index("ix_tiqora_job_kind_dedupe", "kind", "dedupe_key"),
+        Index("ix_tiqora_job_finished", "finished_at"),
+    )
+
+
+class TiqoraJobFile(TiqoraBase):
+    """A file a job produced; ``job_id`` is a soft reference to ``tiqora_job.id``."""
+
+    __tablename__ = "tiqora_job_file"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    job_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    data: Mapped[bytes] = deferred(mapped_column(JOB_FILE_BLOB, nullable=False))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_job_file_job", "job_id"),)

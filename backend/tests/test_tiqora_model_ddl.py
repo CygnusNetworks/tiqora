@@ -47,3 +47,13 @@ def test_avatar_data_fits_more_than_64_kib_on_mariadb() -> None:
     table = TiqoraAvatar.__table__
     assert "MEDIUMBLOB" in _column_ddl(table, "data", mysql.dialect())
     assert "BYTEA" in _column_ddl(table, "data", postgresql.dialect())
+
+
+def test_job_file_data_and_result_fit_large_payloads_on_mariadb() -> None:
+    """Job results (up to 1 MB of JSON) need ``MEDIUMTEXT`` and file blobs
+    (up to 200 MiB) ``LONGBLOB`` on MariaDB, same as the jobs migration."""
+    from tiqora.db.tiqora.models import TiqoraJob, TiqoraJobFile
+
+    assert "LONGBLOB" in _column_ddl(TiqoraJobFile.__table__, "data", mysql.dialect())
+    assert "BYTEA" in _column_ddl(TiqoraJobFile.__table__, "data", postgresql.dialect())
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraJob.__table__, "result", mysql.dialect())
