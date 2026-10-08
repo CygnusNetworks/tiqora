@@ -117,6 +117,11 @@ VIEW_STATE_TYPES: dict[str, frozenset[str]] = {
 #: root" is how "unassigned" is expressed.
 UNASSIGNED_OWNER_ID = 1
 
+#: ``ticket_lock_type.name`` values that count as "locked" (``unlock`` is the
+#: only unlocked one) — shared by the ticket list and the filter compiler.
+LOCKED_LOCK_TYPE_NAMES: frozenset[str] = frozenset({"lock", "tmp_lock"})
+UNLOCK_TYPE_NAME = "unlock"
+
 
 #: The ticket list's "channel". Znuny has no per-ticket channel, so a ticket
 #: that has a message on one of these conversational channels is listed as
@@ -188,12 +193,16 @@ def _escalation_due_before(deadline: int, cols: Sequence[Any] | None = None) -> 
 
 
 def _escalated_condition(
-    id_col: Any, ai_escalated_ids: set[int], cols: Sequence[Any] | None = None
+    id_col: Any,
+    ai_escalated_ids: set[int],
+    cols: Sequence[Any] | None = None,
+    *,
+    now: int | None = None,
 ) -> ColumnElement[bool]:
     """The inbox's "escalated" flag: an SLA deadline has passed, or the AI
     handed the ticket to a human (``ai_escalated_ids``) — both mean a human
-    has to act now."""
-    sla = _escalation_due_before(int(time.time()), cols)
+    has to act now. ``now`` (epoch seconds) defaults to the wall clock."""
+    sla = _escalation_due_before(int(time.time()) if now is None else now, cols)
     return or_(sla, id_col.in_(ai_escalated_ids)) if ai_escalated_ids else sla
 
 
@@ -488,8 +497,8 @@ class TicketService:
         if locked is not None:
             lock_rows = await self._session.execute(select(TicketLockType.id, TicketLockType.name))
             lock_map = {name: lid for lid, name in lock_rows.all()}
-            locked_ids = {lid for name, lid in lock_map.items() if name in {"lock", "tmp_lock"}}
-            unlock_id = lock_map.get("unlock")
+            locked_ids = {lid for name, lid in lock_map.items() if name in LOCKED_LOCK_TYPE_NAMES}
+            unlock_id = lock_map.get(UNLOCK_TYPE_NAME)
             if locked:
                 if not locked_ids:
                     return None

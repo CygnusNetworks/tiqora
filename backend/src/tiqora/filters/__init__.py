@@ -1,4 +1,8 @@
-"""JSON filter language (pure: model, catalog, validation)."""
+"""JSON filter language (model, catalog, validation; ``tickets`` compiles to SQL).
+
+The ticket compiler lives in :mod:`tiqora.filters.tickets` and is imported from
+there (it needs the database layer, this package root stays import-light).
+"""
 
 from tiqora.filters.catalog import (
     MAX_CONDITIONS,
