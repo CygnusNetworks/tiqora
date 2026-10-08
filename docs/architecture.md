@@ -745,12 +745,27 @@ would use an executor helper.
 Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
 
 - **Canonical routes** always available (see `docs/compatibility.md`).
-- **Dynamic routes** loaded from `gi_webservice_config` at startup via
-  `mount_dynamic_compat_routes()` called in the lifespan.
+- **Webservice registry** (`api/compat/webservices.py`): `gi_webservice_config`
+  rows are parsed into an immutable snapshot (routes, operations, mappers);
+  one broken row is skipped without affecting the others. Routes are matched
+  per request on the raw path (catch-all `Webservice(ID)` routes), not mounted
+  at startup.
+- **Provider pipeline** (`api/compat/provider.py`, `rest_request.py`): REST
+  request-data rules, inbound mapping, operation dispatch by `Type`, outbound
+  mapping, JSON/text response. Mappers are pure and run in worker threads.
+- **Mapping package** (`api/compat/mapping/`): `Simple`, `XSLT` (lxml, sandboxed,
+  bundled `OTRSFunctions.xsl`), `OutOfOffice`; regexes on the `regex` package.
+- **Reloader** (`api/compat/reload.py`): a background task in `tiqora-api`
+  polls a fingerprint of `gi_webservice_config` every
+  `TIQORA_COMPAT_WEBSERVICE_RELOAD_SECONDS` and also listens on a Redis channel
+  for immediate wake-ups after `/admin/reload`.
+- **Sessions**: `SessionCreate` writes Znuny `sessions` rows
+  (`api/compat/znuny_session.py`); the worker loop `znuny_session_purge`
+  removes expired rows.
 - Auth: UserLogin+Password, CustomerUserLogin+Password, or Znuny SessionID
   (validated against `sessions` key-value table).
 - Error shape: `{"Error": {"ErrorCode": "Op.ErrorType", "ErrorMessage": "..."}}`.
-- Parameter merging: query string + JSON body, body wins.
+- Parameter merging: URI/query values win over the JSON body (Znuny REST rules).
 - **SOAP transport** (`api/compat/soap.py`): a second wire codec for the
   same supported operations/dispatch table — parses `HTTP::SOAP` envelopes
   (Body wrapper element name → operation, via `defusedxml` to prevent XXE)

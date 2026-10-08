@@ -190,13 +190,23 @@ def _events(url: str) -> list[tuple[str, dict[str, Any]]]:
     return [(str(r[0]), json.loads(r[1])) for r in rows]
 
 
+def _event_types(url: str) -> list[str]:
+    return [e for e, _ in _events(url)]
+
+
 async def test_no_agent_notify_suppresses_legacy_event(env: Any) -> None:
     url, factory = env
     await _add(factory)
-    assert [e for e, _ in _events(url)] == ["NotificationAddNote", "ArticleCreate"]
+    # An agent article resets the unlock timeout, which emits its own Znuny event.
+    assert _event_types(url) == [
+        "TicketUnlockTimeoutUpdate",
+        "NotificationAddNote",
+        "ArticleCreate",
+    ]
     _query(url, "DELETE FROM tiqora_event_outbox WHERE ticket_id = :t", t=TICKET_ID)
     await _add(factory, no_agent_notify=True)
-    assert [e for e, _ in _events(url)] == ["ArticleCreate"]
+    # the timeout is already reset, so the second call only creates the article
+    assert _event_types(url) == ["ArticleCreate"]
 
 
 async def test_exclude_lists_extend_skip_user_ids(env: Any) -> None:

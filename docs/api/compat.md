@@ -35,9 +35,9 @@ deviations: [`../compatibility.md`](../compatibility.md).
 
 ## Routing model
 
-Routes are mounted **dynamically** at startup from each valid
-`gi_webservice_config` row's `Provider.Transport.Config.RouteOperationMapping`
-(YAML), under two prefixes:
+Webservice routes are matched **at request time** against the valid
+`gi_webservice_config` rows (`Provider.Transport.Config.RouteOperationMapping`,
+YAML), under two prefixes:
 
 ```
 /znuny-compat/Webservice/{webservice_name}{route}
@@ -59,6 +59,20 @@ webservice configured:
 | GET | `/znuny-compat/Ticket/History/{ticket_id}` | TicketHistoryGet |
 | GET | `/znuny-compat/TimeAccountingGet` | TimeAccountingGet |
 | POST | `/znuny-compat/OutOfOffice` | OutOfOffice |
+
+Matching follows Znuny: the first route (operations in name order) whose
+method list and pattern accept the raw path wins, and **URI and query values
+win over the same key in the JSON body**. Operations are dispatched by their
+configured `Type`, and `MappingInbound` / `MappingOutbound` (`Simple`, `XSLT`,
+`OutOfOffice`) run around the operation.
+
+Webservice changes made in Znuny (add, rename, edit, disable) are picked up
+without a restart: every API process polls every
+`TIQORA_COMPAT_WEBSERVICE_RELOAD_SECONDS` seconds (default 10), and
+`POST /znuny-compat/admin/reload` (admin) refreshes at once.
+`TIQORA_COMPAT_SESSION_WRITE_ZNUNY` (default `true`) lets `SessionCreate` write
+Znuny `sessions` rows; see [`../compatibility.md`](../compatibility.md#session-handling)
+for expiry, purge and the `SessionCheckRemoteIP` caveat.
 
 This means operators can keep the exact webservice URL paths their
 integrators already call, pointed at Tiqora after a reverse-proxy cutover —
@@ -130,9 +144,10 @@ Short list — full tables with rationale live in
 
 - Requester/outbound GenericInterface (Provider only)
 - Custom OPM operations; Package Manager
-- `ArticleSend` / notification override flags on TicketCreate·Update
-- Multi-article payloads (first article only); `TimeUnit` accounting rows
-- Several TicketSearch edge filters and full HistoryTicketGet-style TA queue snapshots
+- `Mapping::Znuny` and `Mapping::Test` (500 fault "not supported")
+- `Force*`/`Exclude*` notification user ids are validated but not applied (as in Znuny)
+- Escalation detail keys in TicketGet; `SortOutbound`
 
 See [`../compatibility.md`](../compatibility.md) for parameter-level gaps,
-session dual-store behaviour, and golden-master coverage notes.
+the list of [changes for existing clients](../compatibility.md#changes-for-existing-genericinterface-clients),
+and golden-master coverage notes.

@@ -28,18 +28,94 @@ the REST-style `HTTP::REST` connector, and `HTTP::SOAP` (see
 
 ## Routing model
 
-Operations are **fixed implementations** in `api/compat/`. Routes are mounted
-**dynamically** from `gi_webservice_config` (`RouteOperationMapping`), with
-sensible default routes as fallback when no webservice is configured.
+Operations are **fixed implementations** in `api/compat/`. Webservice routes
+are matched **per request** against the webservices in `gi_webservice_config`
+(`RouteOperationMapping`), with sensible default routes as fallback when no
+webservice is configured. Nothing is mounted at startup, so a webservice
+that is added, renamed, edited or disabled in Znuny is picked up without a
+restart (see [Hot reload](#hot-reload)).
 
 This mirrors Znuny’s flexibility: operators can keep their existing webservice
 URL paths pointing at Tiqora after a reverse-proxy cutover.
+
+## Mappings
+
+A webservice operation may carry an inbound and an outbound mapping
+(`MappingInbound` / `MappingOutbound`). Tiqora runs them on the request data
+before the operation and on the answer after it, like Znuny's provider.
+
+| Mapping type | Supported | Notes |
+|---|---|---|
+| `Simple` | yes | Port of `Mapping::Simple`, checked against Znuny's own unit-test vectors |
+| `XSLT` | yes | See the security note below |
+| `OutOfOffice` | yes | CSV bulk entries (`OutOfOfficeEntriesCSVString`) |
+| `Znuny`, `Test` | no | The operation answers with a 500 fault "Mapping type '...' is not supported by Tiqora" (kept on purpose; the recursive `Znuny` mapper belongs to `WebserviceDropdown` fields) |
+
+Mapping regular expressions from webservice configs run on the `regex`
+package with a per-match time limit (0.2 s) and are compiled when the
+webservice is loaded. A pattern that Python cannot compile (Perl-only syntax)
+makes that one webservice answer with a 500 fault naming the problem;
+other webservices keep working. A pattern that runs into the time limit
+fails the request with a mapping error. Small semantic differences from Perl
+regexes are possible. Every mapping runs in a worker thread, so a slow
+mapping never blocks other requests.
+
+**XSLT security note.** Templates run in a sandbox: no file access and no
+network access, no `document()`, no `exsl:document`. The only external
+file a template can import is `OTRSFunctions.xsl`; any href ending in that
+name (`/opt/otrs/Kernel/...`, `/opt/znuny/Kernel/...`, relative `Kernel/...`)
+is served from the copy bundled with Tiqora, so templates written for Znuny
+keep working. Every other import or include fails with a readable error. The
+output is capped at 256 MB. libxslt cannot be interrupted, so a template has no
+wall-clock timeout; templates are written by the administrator and are
+trusted. Documents above 10 MB per text node need the Znuny setting
+`LibXML::EnableHugeXMLDataSupport`, exactly as in Znuny.
+
+## Hot reload
+
+Every `tiqora-api` process polls `gi_webservice_config` every 10 seconds
+(`TIQORA_COMPAT_WEBSERVICE_RELOAD_SECONDS`) and compares a fingerprint of the
+rows; only a change triggers a rebuild. `POST /znuny-compat/admin/reload` (admin
+only) refreshes at once and wakes the other processes through Redis; polling
+alone is enough if that message is lost. A webservice that is renamed or
+disabled stops answering (404) after the next tick and the new name works;
+requests already running finish on the old snapshot. A database error during a
+refresh keeps the previous snapshot. A broken row (invalid YAML, unknown
+mapping type, bad regex) only affects its own webservice.
 
 ## Session handling
 
 - Prefer validating SessionID against Znuny’s `sessions` table so a session
   created in Znuny still works when traffic is split or cut over.
 - Tiqora-native sessions remain Redis-backed for `/api/v1` and the UI.
+- **SessionCreate writes Znuny session rows.** By default the compat
+  `SessionCreate` returns a Znuny-format 32-character SessionID backed by
+  rows in the Znuny `sessions` table (the keys of Znuny's `AuthSession::DB`),
+  with no Redis entry. The ID therefore works in Znuny and in Tiqora, with
+  Znuny's idle and absolute expiry (`SessionMaxIdleTime`, `SessionMaxTime`).
+  Set `TIQORA_COMPAT_SESSION_WRITE_ZNUNY=false` to fall back to Redis tokens;
+  no rows are written either once Tiqora owns the schema. The password hash
+  (`UserPw`) is deliberately not copied into the row, and preference rows are
+  copied from an allow-list only (no 2FA seeds, tokens or API keys).
+  Calls made through the GI do not refresh `UserLastRequest`.
+- **Purge.** Expired `sessions` rows are removed by the worker loop
+  `znuny_session_purge` (every 300 s, always on, interval
+  `TIQORA_ZNUNY_SESSION_PURGE_INTERVAL_SECONDS`). It is a port of Znuny's
+  `GetExpiredSessionIDs` (session start + `SessionMaxTime` or last request +
+  `SessionMaxIdleTime` is in the past), the same job as Znuny's
+  `Maint::Session::DeleteExpired`; running both is harmless.
+- **Revocation.** Disabling an account, a password reset or setup, a customer
+  password change in the portal and GDPR erasure delete the person's Znuny
+  session rows (database first, then Redis).
+- **`SessionCheckRemoteIP` caveat.** Znuny's `SessionCheckRemoteIP` defaults
+  to `1`. A session created by Tiqora stores the address Tiqora itself saw
+  (the socket peer, or the trusted-proxy address), which can differ from what
+  Znuny's web server sees for the same client. Znuny then rejects the session
+  as coming from a different IP. If you let clients create a session on Tiqora
+  and use it on Znuny, either set `SessionCheckRemoteIP` to `0` in Znuny or make
+  sure both systems see the same client address (same reverse proxy,
+  `TIQORA_TRUSTED_PROXIES`). Tiqora's own check is off by default
+  (`TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP=false`) for the same reason.
 - Password verification must accept all Znuny hash schemes in use on the dump.
 
 ## Known gotchas (regression-tested)
@@ -73,30 +149,39 @@ core operations including the gotchas above with seeded MariaDB data.
 | GET | `/znuny-compat/Ticket/History/{ticket_id}` | TicketHistoryGet |
 | GET | `/znuny-compat/TimeAccountingGet` | TimeAccountingGet |
 | POST | `/znuny-compat/OutOfOffice` | OutOfOffice |
-| POST | `/znuny-compat/admin/reload` | Re-mount dynamic routes (auth required) |
+| POST | `/znuny-compat/admin/reload` | Refresh the webservice registry now (admin only) |
 
 ### Dynamic routes (from `gi_webservice_config`)
 
-On startup, Tiqora reads all valid `gi_webservice_config` rows, YAML-parses
-`Provider.Transport.Config.RouteOperationMapping`, and registers routes under:
+Tiqora reads all valid `gi_webservice_config` rows, YAML-parses
+`Provider.Transport.Config` (`RouteOperationMapping`, `Operation` mappings) into
+an in-memory registry, and answers requests under:
 
 ```
 /znuny-compat/Webservice/{webservice_name}{route}
 /znuny-compat/WebserviceID/{webservice_id}{route}
 ```
 
-Unsupported operation types (not in the supported set above) return HTTP 501.
-Znuny `:VariableName` path segments are converted to FastAPI `{VariableName}`.
+The route is matched at request time against the raw request path, the way
+Znuny does (the path is unescaped once, so `%2F` and `%2520` work). The first
+route, in operation-name order, whose method list and pattern accept the
+request wins; an empty or missing `RequestMethod` matches any method, and a
+bare string instead of a list also matches any method. Operations are
+dispatched by their `Type`; an unsupported `Type` returns HTTP 501.
+Znuny `:VariableName` path segments become request parameters.
 
-Query-string AND JSON body parameters are merged (body wins on collision),
-matching Znuny `HTTP::REST` transport behaviour.
+Values from the URI and the query string win over the same key in the JSON
+body (Znuny `HTTP::REST` behaviour; this is the reverse of what Tiqora did
+before). `X-OTRS-Header-*` request headers override both. A first query value
+of `0` becomes an empty string, JSON booleans become `1`/`0`, and numbers are
+normalised like Perl. Transport errors (no matching route, body too large,
+undecodable body) are answered as `text/plain`, like Znuny.
 
 ### Admin reload
 
-`POST /znuny-compat/admin/reload` (requires tiqora auth) re-validates and logs
-the current webservice configuration (REST routes and SOAP webservices). A
-full restart is required to actually hot-reload dynamic routes in running
-processes.
+`POST /znuny-compat/admin/reload` (requires an admin) refreshes the webservice
+registry immediately and wakes the other API processes through Redis. See
+[Hot reload](#hot-reload); no restart is needed.
 
 ## SOAP transport
 
@@ -238,27 +323,38 @@ framework. Items below are intentionally incomplete or out of scope.
 | Package Manager remote install | Deploy/admin concern, not ticket integrator wire |
 | WSDL auto-serving | Znuny does not serve one either — see [SOAP transport](#soap-transport) |
 
-### TicketCreate / TicketUpdate — deferred side-effects
+### TicketCreate / TicketUpdate
 
-`ArticleSend: 1` (agents, TicketCreate and TicketUpdate) sends the article as e-mail through the same outbound path as agent replies (`deliver_agent_email_reply`), including `EmailSecurity` — see [crypto.md](crypto.md).
+`ArticleSend: 1` (agents, TicketCreate and TicketUpdate) sends the article as e-mail through the same outbound path as agent replies (`deliver_agent_email_reply`), including `EmailSecurity` — see [crypto.md](crypto.md). Multiple `Article` entries, `TimeUnit`, `AutoResponseType`, `HistoryType`/`HistoryComment`, article dynamic fields and `NoAgentNotify` are implemented like Znuny.
 
-| Gap | Why deferred |
+| Gap | Behaviour |
 |-----|----------------|
-| Notification overrides (`NoAgentNotify`, `ForceNotificationToUserID`, …) | Bound to the notification event stack; incorrect stubs look like “no mail was sent” bugs |
-| `TimeUnit` → `time_accounting` row on article | Small follow-up; table exists, not yet wired on the compat article path |
-| Multiple `Article` entries per request | Znuny accepts an array; Tiqora uses the **first** element only |
-| AutoResponseType / HistoryType overrides / AppendSignatureToBody | Niche; tight coupling to Znuny mail/history semantics |
+| `ForceNotificationToUserID`, `ExcludeNotificationToUserID`, `ExcludeMuteNotificationToUserID` | Validated with Znuny's messages but, as in Znuny's GI, not passed on to the article creation |
+| `SortOutbound` (operation config) | Not applied; response JSON keys are always sorted |
+| `TicketCreate` without `Article` | Accepted (Znuny rejects it); existing Tiqora clients rely on it |
 
 ### TicketGet / Search / Session / TimeAccounting — partial fidelity
 
 | Gap | Why deferred / current behaviour |
 |-----|-----------------------------------|
-| `HTMLBodyAsAttachment` | Flag accepted; no separate HTML-body attachment synthesis |
-| Article-level DynamicFields on TicketGet | Ticket DFs yes; per-article DFs not loaded |
-| TimeAccounting queue “as of entry date” | Znuny uses HistoryTicketGet snapshot; we return the ticket’s **current** queue name |
-| SessionCreate writes only Redis (not Znuny `sessions` rows) | Avoid dual-writer races in parallel-op; SessionGet/auth still **read** both stores |
-| TicketSearch: Created\* filters, TicketFlag/ArticleFlag/Mention, attachment filename search, Result=COUNT | Low traffic on GenericTicketConnector; core filters (queue/state/owner/MIME/sort/DF ops) are in |
-| OutOfOffice CSV bulk (`OutOfOfficeEntriesCSVString`) | JSON `OutOfOfficeEntries` list is implemented; CSV path is bulk-admin only |
+| Escalation detail keys in TicketGet (`EscalationDestination*`, `FirstResponseTime*`, `UpdateTime*`, `SolutionTime*`) and the `*InMin` working-time keys | Not returned; `EscalationTime` itself is |
+| TicketSearch `Result=COUNT`, `TicketFlag`, `ArticleFlag`, mentions | Not Znuny GenericInterface parameters (`TicketSearch.pm` drops them and hard-codes `Result => 'ARRAY'`), so Tiqora ignores them too |
+| Scalar types in responses | Tiqora returns integers where Znuny returns Perl strings for database values |
+
+### Deviations kept on purpose
+
+| Topic | Tiqora | Znuny |
+|---|---|---|
+| `TimeUnit` formatting | `"1.5"` (number normalised like Perl) | `"1.50"` |
+| TimeAccountingGet queue when the history has no `NewTicket` row | the ticket's current queue | n/a (Znuny's snapshot has none) |
+| Article text search (`MIMEBase_*`, `Fulltext`) | `LOWER(column) LIKE` on the article columns: no stop words, no tokenisation, no word index | search index (`article_search_index`) with tokenisation and stop words |
+| Non-integer element in a TicketSearch id filter | whole search returns empty (as Znuny) | empty |
+| Operation errors | keep Tiqora's `ErrorCode` to HTTP status mapping (401, 403, 400, 5xx), computed before the outbound mapping | HTTP 200 for operation errors |
+| Unknown webservice | 404 JSON fault | bare 500 |
+| SessionCreate | does not copy `UserPw` into the `sessions` row | copies it |
+| OutOfOffice CSV with an unterminated quote | rejected with "Error while parsing" | silently truncated |
+| Mapping regexes | `regex` package, compiled at load, 0.2 s per-match limit | Perl, lazily compiled, no limit |
+| Request charset unknown | falls back to ISO-8859-1 (as Znuny) | same |
 
 ### Golden-master coverage
 
@@ -270,6 +366,135 @@ before cutover of history/time-accounting/OutOfOffice clients.
 
 Integrators needing full Znuny behaviour for deferred items should keep
 traffic on Znuny GI or migrate to `/api/v1` / MCP.
+
+## Changes for existing GenericInterface clients
+
+Clients that already talk to Tiqora's `/znuny-compat` layer see the following
+changes; each makes the answer or the side effect match Znuny. Check your
+client against the list before updating.
+
+**Routing and transport**
+
+- Operations of a webservice are dispatched by their configured `Type`, and
+  responses are JSON with sorted keys. Adjust clients that depended on key order.
+- Values from the URI and query string now win over the same key in the JSON
+  body (before: the body won).
+- REST transport errors (no matching route, body too large, undecodable body)
+  are `text/plain` instead of a JSON fault. Parse the status code rather than a body.
+- An unknown webservice answers 404 with a JSON fault.
+- `POST /znuny-compat/admin/reload` requires an admin (before: any
+  authenticated user), and it now refreshes the webservice registry.
+
+**TicketGet**
+
+- Ticket keys follow Znuny: `CreateTime`/`ChangeTime` are now `Created`/`Changed`,
+  both as `YYYY-MM-DD HH:MM:SS`. New keys: `Age`, `ChangeBy`, `CreateBy`,
+  `GroupID`, `RealTillTimeNotUsed`, `UnlockTimeout`, `EscalationTime`, `TimeUnit`
+  (always, not only with `Extended`). `UntilTime` is computed like Znuny.
+  `Service`/`SLA` keys are left out when unset; `ResponsibleID`/`TypeID` fall back to 1.
+- `EscalationTime` is the number of seconds to the nearest escalation destination
+  time (before: the stored column).
+- `DynamicField` lists only fields that have stored values, sorted by name;
+  a Multiselect value is always a list. `Extended=1` returns
+  `FirstResponse`/`Closed`/`FirstLock` in Znuny format (no `*InMin` keys).
+- Articles gain `ArticleNumber`, `Bcc`, `ReplyTo`, `InReplyTo`, `References`,
+  `IncomingTime`, `Charset`, `MimeType`, `CommunicationChannel`,
+  `ChangeBy`/`ChangeTime`, `TimeUnit` and their dynamic fields; `CreateTime`
+  uses the Znuny format.
+- Attachments use `Content`, `ContentAlternative`, `ContentID`, `ContentType`,
+  `Disposition`, `FileID`, `Filename`, `FilesizeRaw`. `ContentSize` is gone. The
+  plain-text and HTML body parts are no longer listed as attachments (send
+  `HTMLBodyAsAttachment=1` to get the HTML part back). The `Attachment` key is
+  absent when there are none.
+- Customers only receive customer-visible articles. `ArticleSenderType`
+  matches case-sensitively and groups per requested type. `ArticleOrder: DESC`
+  only applies together with `ArticleLimit` (a Znuny quirk). Flags such as
+  `AllArticles` use Perl truthiness (`"0"` and `""` are false).
+- If any requested `TicketID` is unknown or not readable, the whole call fails with
+  `TicketGet.AccessDenied` ("TicketGet: User does not have access to the
+  ticket!") instead of returning only the readable tickets. A missing
+  `TicketID` answers "TicketGet: TicketID parameter is missing!", and an invalid
+  one answers `TicketGet.WrongStructure` (it was a 500).
+- `TicketHistoryGet`: `CreateTime` is `YYYY-MM-DD HH:MM:SS` instead of
+  ISO-8601; a non-numeric `TicketID` answers `AccessDenied` for that id (was a 500).
+
+**TicketCreate / TicketUpdate**
+
+- `TicketCreate` with several articles creates all of them; `ArticleID` becomes a
+  list. Both operations answer `ArticleID` / `ArticleIDs` like Znuny. Webservice
+  operations with `IncludeTicketData` also answer `Ticket` (and the created articles).
+- Article history type and comment come from SysConfig
+  (`GenericInterface::Operation::TicketCreate/TicketUpdate`: `NewTicket`/`AddNote`,
+  `%%GenericInterface Create|Note`). A default GI TicketCreate therefore no
+  longer fires `NotificationNewTicket`, as in Znuny.
+- `TicketUpdate`: an article's `IsVisibleForCustomer` defaults to the SysConfig
+  value (`1`), it was `0`. Send `0` explicitly for internal notes.
+- Unknown dynamic field names (matched exactly, case-sensitive) and invalid
+  values are rejected with `<Operation>.InvalidParameter` instead of being ignored.
+  A Multiselect list is stored as separate values (before: `"['a', 'b']"`).
+- `TimeUnit` is validated and booked as time accounting, `NoAgentNotify` defaults
+  to 1 on TicketCreate when an owner is given. Time accounting (in every caller)
+  now bumps the ticket change time, writes a `TimeAccounting` history row and
+  normalises the unit like Znuny (`0,256` becomes `0.25`).
+- The queue's auto reply or auto follow up is sent (when an outbound relay is
+  configured), as Znuny does; never for `ArticleSend` articles. Clients that
+  relied on silence must turn the queue's auto response off.
+- `ArticleSend`: the mail leaves after the commit. If it fails, the call
+  returns Znuny's error text while the ticket and articles stay. The signature
+  is converted to the article's content type and appended directly behind the
+  body. Remaining mails are still sent after a failure.
+- `TicketCreate` without `Owner` makes the calling agent the owner, unlocked
+  (before: `root@localhost`), with an `OwnerUpdate` history row. With an
+  `Owner` and no `Lock`/`LockID` the ticket is created locked, history
+  `OwnerUpdate` then `Lock`. A `Lock` on a ticket created in a closed state ends
+  unlocked (history `Lock` then `Unlock`); a closed ticket with an owner and no
+  `Lock` ends locked. `OwnerID` `"0"` means no owner. A `LockID` other than
+  lock/unlock is written after creation with a history row. `Responsible` /
+  `ResponsibleID` writes a `ResponsibleUpdate` history row after owner and lock.
+- `TicketCreate` with `CustomerUser`: `CustomerID` defaults to the customer
+  user's company, and the user is also found by e-mail address. The article `To`
+  is the queue name unless `ArticleSend`; request `To`/`Cc`/`Bcc` are dropped for
+  articles without `ArticleSend`. A missing `From` is filled from the customer user.
+  The escalation columns are set at creation.
+- `TicketCreate` without permission on the queue answers "TicketCreate: Can not
+  create tickets in given Queue or QueueID!". `TicketUpdate` with an empty,
+  non-numeric or `"0"` `TicketID` answers `TicketUpdate.AccessDenied` (was a 500).
+- Locking a ticket (and assigning an owner with lock) resets the unlock timeout
+  and writes the `Misc` history row "Reset of unlock time.".
+
+**TicketSearch**
+
+- No hit answers `{}` (no `TicketID` key) instead of `{"TicketID": []}`.
+- A non-integer element in any id filter makes the whole search return empty
+  (Znuny); an id outside its column range matches nothing instead of failing.
+- `MIMEBase_*` and `Fulltext` match substrings case-insensitively (Znuny GI wraps the
+  value in `*`); a value made only of `*` is ignored. `MIMEBase_Bcc` and, when
+  `Ticket::Article::Backend::MIMEBase::IndexAttachmentNames` is on,
+  `MIMEBase_AttachmentName` can be searched.
+- New `Created*` filters and the time-window filters (`TicketCreate*`,
+  `TicketChange*`, `TicketLastChange*`, `TicketClose*`, `TicketPending*`,
+  escalation times) and sort keys. `SortBy` `PendingTime` / `EscalationTime` sorts
+  0 last. Pending filters apply to pending states only.
+
+**Sessions, time accounting, out of office**
+
+- `SessionCreate` returns a Znuny-format 32-character `SessionID` backed by Znuny
+  `sessions` rows (no Redis token) unless
+  `TIQORA_COMPAT_SESSION_WRITE_ZNUNY=false` or Tiqora owns the schema; see
+  [Session handling](#session-handling) for expiry, purge and the remote-IP caveat.
+  GI calls do not refresh `UserLastRequest`, so the session ends at Znuny's idle limit.
+- `SessionGet` returns only an allow-list of non-secret keys (no password hash,
+  tokens or secrets).
+- Sessions of disabled accounts stop authenticating; password reset, setup and
+  change, and GDPR erasure delete the account's Znuny session rows.
+- `TimeAccountingGet`: entries carry no `TicketID`; `Queue` is the queue at
+  booking time (falling back to the current queue when the history has no
+  `NewTicket` row); `TimeUnit` is a normalised string (`"1.5"`, Znuny shows
+  `"1.50"`); `Created` is `YYYY-MM-DD HH:MM:SS`. Unparsable
+  `TimeAccountingStart`/`End` answer `{}`.
+- `OutOfOffice` answers `{"Success": 1}`; the per-entry result of
+  `OutOfOfficeEntries` is gone and unknown entries are skipped. It accepts
+  `OutOfOfficeEntriesCSVString` on the canonical route.
 
 ## Migration guidance
 
@@ -309,9 +534,8 @@ MariaDB and validated:
 - **Attachment storage**: Attachments are stored inline in `article_data_mime_attachment`
   (DB storage), not offloaded to a file backend. For large attachments this may
   be a performance concern.
-- **Hot-reload**: Dynamic webservice routes require a process restart to take effect.
-  The `/admin/reload` endpoint logs and validates but cannot actually re-register
-  FastAPI routes in a running process without a restart.
+- **Hot-reload**: Webservice changes are picked up without a restart, see
+  [Hot reload](#hot-reload).
 - **SOAP `SOAPAction` strict validation**: Znuny's `SOAPActionScheme` config
   (validating the header against an expected `NameSpace#Operation` string) is
   not enforced — see [SOAP transport differences](#differences-vs-znunys-soap-transport-documented-deviations).
@@ -426,9 +650,13 @@ narrower than Znuny), **by design** (deliberate platform choice).
 |---|---|---|
 | Webservice admin / editor | by design | Webservices are loaded from the database; no editor |
 | Requester side / invokers | by design | See [What is not emulated](#what-is-not-emulated-and-why) |
-| `TimeUnit`, multiple articles in TicketCreate/Update | partial | See [TicketCreate / TicketUpdate](#ticketcreate--ticketupdate--deferred-side-effects) |
+| Mappings `Simple`, `XSLT`, `OutOfOffice` | yes | `Znuny` and `Test` mappings are not supported, see [Mappings](#mappings) |
+| Hot reload of webservice configs | yes | Polling, no restart, see [Hot reload](#hot-reload) |
+| `TimeUnit`, multiple articles in TicketCreate/Update | yes | See [TicketCreate / TicketUpdate](#ticketcreate--ticketupdate) |
 | `ArticleSend` (outbound e-mail on create/update) | yes | Agents only, like Znuny |
-| TicketSearch `Created*`, flags, attachment search, `Result=COUNT` | partial | See [partial fidelity](#ticketget--search--session--timeaccounting--partial-fidelity) |
+| TicketSearch `Created*`, time-window and escalation filters, article text filters | yes | Article text uses LIKE, see [deviations](#deviations-kept-on-purpose); `Result=COUNT`, flags and mentions are not GI parameters |
+| SessionCreate writes Znuny `sessions` rows | yes | See [Session handling](#session-handling) |
+| OutOfOffice CSV bulk (`OutOfOfficeEntriesCSVString`) | yes | |
 
 ### Processes, daemon, calendar
 
