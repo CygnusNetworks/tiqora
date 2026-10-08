@@ -4288,5 +4288,34 @@
     "removeValue": "Remove {{label}}",
     "secretCleared": "Will be removed on save",
     "secretKeep": "Keep"
+  },
+  "ticketFilter": {
+    "fields": {
+      "ticket_id": "Ticket ID",
+      "tn": "Ticket number",
+      "title": "Title",
+      "queue_id": "Queue",
+      "state_id": "State",
+      "state_type": "State type",
+      "priority_id": "Priority",
+      "type_id": "Type",
+      "service_id": "Service",
+      "sla_id": "SLA",
+      "owner_id": "Owner",
+      "responsible_id": "Responsible",
+      "customer_id": "Customer",
+      "customer_user_id": "Customer user",
+      "locked": "Locked",
+      "watched_by": "Watched by",
+      "unassigned": "Unassigned",
+      "escalated": "Escalated",
+      "ai_escalated": "Handed over by AI",
+      "escalation_due_within": "Escalating within",
+      "channel": "Channel",
+      "archived": "Archived",
+      "created": "Created",
+      "changed": "Changed",
+      "pending_until": "Reminder on"
+    }
   }
 }

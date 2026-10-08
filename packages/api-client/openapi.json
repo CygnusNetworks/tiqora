@@ -4225,6 +4225,68 @@
         "title": "AiUsagePageOut",
         "type": "object"
       },
+      "AllOf": {
+        "additionalProperties": false,
+        "properties": {
+          "all": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AllOf"
+                },
+                {
+                  "$ref": "#/components/schemas/AnyOf"
+                },
+                {
+                  "$ref": "#/components/schemas/Not"
+                },
+                {
+                  "$ref": "#/components/schemas/Condition"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "All",
+            "type": "array"
+          }
+        },
+        "required": [
+          "all"
+        ],
+        "title": "AllOf",
+        "type": "object"
+      },
+      "AnyOf": {
+        "additionalProperties": false,
+        "properties": {
+          "any": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AllOf"
+                },
+                {
+                  "$ref": "#/components/schemas/AnyOf"
+                },
+                {
+                  "$ref": "#/components/schemas/Not"
+                },
+                {
+                  "$ref": "#/components/schemas/Condition"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Any",
+            "type": "array"
+          }
+        },
+        "required": [
+          "any"
+        ],
+        "title": "AnyOf",
+        "type": "object"
+      },
       "ApiKeyCreate": {
         "properties": {
           "expires_at": {
@@ -7782,6 +7844,51 @@
           "from_address"
         ],
         "title": "ComposeContextOut",
+        "type": "object"
+      },
+      "Condition": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Field",
+            "type": "string"
+          },
+          "op": {
+            "enum": [
+              "eq",
+              "neq",
+              "in",
+              "not_in",
+              "contains",
+              "starts_with",
+              "is_empty",
+              "is_not_empty",
+              "lt",
+              "lte",
+              "gt",
+              "gte",
+              "between",
+              "before",
+              "after",
+              "within_last",
+              "older_than",
+              "is_true",
+              "is_false"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value"
+          }
+        },
+        "required": [
+          "field",
+          "op"
+        ],
+        "title": "Condition",
         "type": "object"
       },
       "ContainerOut": {
@@ -11897,6 +12004,118 @@
         "title": "FeatureGrantsUpdate",
         "type": "object"
       },
+      "Filter": {
+        "additionalProperties": false,
+        "description": "Serialise with ``model_dump(by_alias=True, exclude_none=True)``.",
+        "properties": {
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          },
+          "where": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllOf"
+              },
+              {
+                "$ref": "#/components/schemas/AnyOf"
+              },
+              {
+                "$ref": "#/components/schemas/Not"
+              },
+              {
+                "$ref": "#/components/schemas/Condition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Where"
+          }
+        },
+        "title": "Filter",
+        "type": "object"
+      },
+      "FilterFieldOut": {
+        "properties": {
+          "enum_values": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Enum Values",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "label_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Key"
+          },
+          "ops": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ops",
+            "type": "array"
+          },
+          "options_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options Source"
+          },
+          "type": {
+            "enum": [
+              "id",
+              "string",
+              "int",
+              "datetime",
+              "bool",
+              "enum"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "type",
+          "ops",
+          "label_key",
+          "label",
+          "enum_values",
+          "options_source"
+        ],
+        "title": "FilterFieldOut",
+        "type": "object"
+      },
       "FollowUpPossibleOut": {
         "description": "Reference row for resolving ``queue.follow_up_id`` to a name.\n\nStock Znuny names: ``possible``, ``reject``, ``new ticket``.",
         "properties": {
@@ -15919,6 +16138,33 @@
           "body"
         ],
         "title": "NewTicketPhoneCallIn",
+        "type": "object"
+      },
+      "Not": {
+        "additionalProperties": false,
+        "properties": {
+          "not": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AllOf"
+              },
+              {
+                "$ref": "#/components/schemas/AnyOf"
+              },
+              {
+                "$ref": "#/components/schemas/Not"
+              },
+              {
+                "$ref": "#/components/schemas/Condition"
+              }
+            ],
+            "title": "Not"
+          }
+        },
+        "required": [
+          "not"
+        ],
+        "title": "Not",
         "type": "object"
       },
       "NotificationEventOut": {
@@ -24788,6 +25034,36 @@
           }
         },
         "title": "TicketFieldOptionsOut",
+        "type": "object"
+      },
+      "TicketFilterCountIn": {
+        "properties": {
+          "filter": {
+            "$ref": "#/components/schemas/Filter"
+          },
+          "include_archived": {
+            "default": false,
+            "title": "Include Archived",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "filter"
+        ],
+        "title": "TicketFilterCountIn",
+        "type": "object"
+      },
+      "TicketFilterCountOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "title": "TicketFilterCountOut",
         "type": "object"
       },
       "TicketLinkCreateRequest": {
@@ -66034,6 +66310,150 @@
         "summary": "Update Template",
         "tags": [
           "templates"
+        ]
+      }
+    },
+    "/api/v1/ticket-filters/count": {
+      "post": {
+        "operationId": "count_filtered_tickets_api_v1_ticket_filters_count_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketFilterCountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketFilterCountOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Count Filtered Tickets",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/ticket-filters/fields": {
+      "get": {
+        "operationId": "list_filter_fields_api_v1_ticket_filters_fields_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FilterFieldOut"
+                  },
+                  "title": "Response List Filter Fields Api V1 Ticket Filters Fields Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Filter Fields",
+        "tags": [
+          "tickets"
         ]
       }
     },

@@ -6469,6 +6469,40 @@ export interface paths {
         patch: operations["update_template_api_v1_templates__template_id__patch"];
         trace?: never;
     };
+    "/api/v1/ticket-filters/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Count Filtered Tickets */
+        post: operations["count_filtered_tickets_api_v1_ticket_filters_count_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ticket-filters/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Filter Fields */
+        get: operations["list_filter_fields_api_v1_ticket_filters_fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets": {
         parameters: {
             query?: never;
@@ -9438,6 +9472,16 @@ export interface components {
             /** Total Prompt Tokens */
             total_prompt_tokens: number;
         };
+        /** AllOf */
+        AllOf: {
+            /** All */
+            all: (components["schemas"]["AllOf"] | components["schemas"]["AnyOf"] | components["schemas"]["Not"] | components["schemas"]["Condition"])[];
+        };
+        /** AnyOf */
+        AnyOf: {
+            /** Any */
+            any: (components["schemas"]["AllOf"] | components["schemas"]["AnyOf"] | components["schemas"]["Not"] | components["schemas"]["Condition"])[];
+        };
         /** ApiKeyCreate */
         ApiKeyCreate: {
             /** Expires At */
@@ -10619,6 +10663,18 @@ export interface components {
              * @default false
              */
             signature_is_html: boolean;
+        };
+        /** Condition */
+        Condition: {
+            /** Field */
+            field: string;
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "eq" | "neq" | "in" | "not_in" | "contains" | "starts_with" | "is_empty" | "is_not_empty" | "lt" | "lte" | "gt" | "gte" | "between" | "before" | "after" | "within_last" | "older_than" | "is_true" | "is_false";
+            /** Value */
+            value?: unknown;
         };
         /**
          * ContainerOut
@@ -11904,6 +11960,40 @@ export interface components {
              * @default []
              */
             user_ids: number[];
+        };
+        /**
+         * Filter
+         * @description Serialise with ``model_dump(by_alias=True, exclude_none=True)``.
+         */
+        Filter: {
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            /** Where */
+            where?: components["schemas"]["AllOf"] | components["schemas"]["AnyOf"] | components["schemas"]["Not"] | components["schemas"]["Condition"] | null;
+        };
+        /** FilterFieldOut */
+        FilterFieldOut: {
+            /** Enum Values */
+            enum_values: string[];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string | null;
+            /** Label Key */
+            label_key: string | null;
+            /** Ops */
+            ops: string[];
+            /** Options Source */
+            options_source: string | null;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "id" | "string" | "int" | "datetime" | "bool" | "enum";
         };
         /**
          * FollowUpPossibleOut
@@ -13249,6 +13339,11 @@ export interface components {
             subject?: string | null;
             /** Time Unit */
             time_unit?: number | null;
+        };
+        /** Not */
+        Not: {
+            /** Not */
+            not: components["schemas"]["AllOf"] | components["schemas"]["AnyOf"] | components["schemas"]["Not"] | components["schemas"]["Condition"];
         };
         /** NotificationEventOut */
         NotificationEventOut: {
@@ -16216,6 +16311,20 @@ export interface components {
             type: {
                 [key: string]: string;
             };
+        };
+        /** TicketFilterCountIn */
+        TicketFilterCountIn: {
+            filter: components["schemas"]["Filter"];
+            /**
+             * Include Archived
+             * @default false
+             */
+            include_archived: boolean;
+        };
+        /** TicketFilterCountOut */
+        TicketFilterCountOut: {
+            /** Count */
+            count: number;
         };
         /** TicketLinkCreateRequest */
         TicketLinkCreateRequest: {
@@ -34163,6 +34272,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StandardTemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    count_filtered_tickets_api_v1_ticket_filters_count_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketFilterCountIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketFilterCountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_filter_fields_api_v1_ticket_filters_fields_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilterFieldOut"][];
                 };
             };
             /** @description Validation Error */

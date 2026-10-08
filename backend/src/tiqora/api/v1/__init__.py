@@ -28,6 +28,7 @@ from tiqora.api.v1 import (
     search,
     stats,
     templates,
+    ticket_filters,
     tickets,
     tickets_crypto,
     tickets_telegram,
@@ -43,6 +44,7 @@ api_v1_router.include_router(calendar.router)
 api_v1_router.include_router(queues.router)
 # Before tickets.router: /tickets/crypto-options must not hit /tickets/{ticket_id}.
 api_v1_router.include_router(tickets_crypto.router)
+api_v1_router.include_router(ticket_filters.router)
 api_v1_router.include_router(tickets.router)
 api_v1_router.include_router(tickets_telegram.router)
 api_v1_router.include_router(phone_calls.router)
