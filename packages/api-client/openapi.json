@@ -74018,7 +74018,7 @@
     },
     "/znuny-compat/admin/reload": {
       "post": {
-        "description": "Re-mount dynamic webservice routes without restart (authenticated).",
+        "description": "Reload the webservice registry from ``gi_webservice_config`` (admin only).",
         "operationId": "admin_reload_routes_znuny_compat_admin_reload_post",
         "parameters": [
           {
@@ -74086,7 +74086,7 @@
     },
     "/znuny-compat/soap/{webservice}": {
       "post": {
-        "description": "Canonical always-available SOAP provider endpoint.\n\nUnlike REST, SOAP has no per-operation route mapping in Znuny \u2014 a single\nendpoint per webservice accepts any operation, dispatched from the SOAP\nBody wrapper element name. This fallback route uses the default Znuny\n``NameSpace`` (``http://www.otrs.org/TicketConnector/``); webservices\nconfigured in ``gi_webservice_config`` with their own NameSpace are\nadditionally mounted at ``/Webservice/{name}`` and ``/WebserviceID/{id}``\n(see :func:`_load_soap_webservices` / :func:`build_soap_router`).",
+        "description": "Canonical always-available SOAP provider endpoint (default NameSpace, no mapping).",
         "operationId": "canonical_soap_endpoint_znuny_compat_soap__webservice__post",
         "parameters": [
           {

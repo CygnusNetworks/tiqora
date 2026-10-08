@@ -1,45 +1,35 @@
-"""Dynamic route mounting for Znuny GenericInterface compatibility.
+"""Znuny GenericInterface compatibility routes.
 
-On startup reads `gi_webservice_config` rows, YAML-parses
-Provider.Transport.Config.RouteOperationMapping, and registers REST routes
-under:
-  /znuny-compat/Webservice/{name}{route}
-  /znuny-compat/WebserviceID/{id}{route}
+Canonical routes (always available, no webservice, no mapping):
+  POST   /znuny-compat/Session              -> SessionCreate
+  GET    /znuny-compat/Session/:SessionID   -> SessionGet
+  DELETE /znuny-compat/Session/:SessionID   -> SessionRemove
+  POST   /znuny-compat/Ticket               -> TicketCreate
+  GET    /znuny-compat/Ticket/:TicketID     -> TicketGet
+  PATCH  /znuny-compat/Ticket/:TicketID     -> TicketUpdate
+  GET    /znuny-compat/TicketSearch         -> TicketSearch
+  GET    /znuny-compat/Ticket/History/:id   -> TicketHistoryGet
+  GET    /znuny-compat/TimeAccountingGet    -> TimeAccountingGet
+  POST   /znuny-compat/OutOfOffice          -> OutOfOffice
+  POST   /znuny-compat/soap/{webservice}    -> SOAP, dispatched via Body wrapper
 
-SOAP webservices (Provider.Transport.Type == 'HTTP::SOAP') get one endpoint
-each (SOAP has no per-operation route mapping — the operation is dispatched
-from the SOAP Body wrapper element, see api/compat/soap.py):
-  POST /znuny-compat/Webservice/{name}      (SOAP, that webservice's NameSpace)
-  POST /znuny-compat/WebserviceID/{id}      (SOAP, that webservice's NameSpace)
+Webservice routes are resolved per request from the in-memory
+:class:`~tiqora.api.compat.webservices.WebserviceRegistry` (no route mounting at startup):
+  /znuny-compat/Webservice/{name}[/{route}]
+  /znuny-compat/WebserviceID/{id}[/{route}]
 
-Fallback canonical routes (always available):
-  POST   /znuny-compat/Session              → SessionCreate
-  GET    /znuny-compat/Session/:SessionID   → SessionGet
-  DELETE /znuny-compat/Session/:SessionID   → SessionRemove
-  POST   /znuny-compat/Ticket              → TicketCreate
-  GET    /znuny-compat/Ticket/:TicketID     → TicketGet
-  PATCH  /znuny-compat/Ticket/:TicketID     → TicketUpdate
-  GET    /znuny-compat/TicketSearch         → TicketSearch
-  GET    /znuny-compat/Ticket/History/:id   → TicketHistoryGet
-  GET    /znuny-compat/TimeAccountingGet    → TimeAccountingGet
-  POST   /znuny-compat/OutOfOffice          → OutOfOffice
-  POST   /znuny-compat/soap/{webservice}    → SOAP, dispatched via Body wrapper
+Admin reload endpoint: POST /znuny-compat/admin/reload (admin only).
 
-Admin reload endpoint: POST /znuny-compat/admin/reload (requires tiqora auth).
-
-Query-string AND JSON-body parameters are merged (body takes precedence).
+On the canonical routes query-string AND JSON-body parameters are merged (body wins).
 """
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 import structlog
-import yaml
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.compat.operations import (
@@ -54,6 +44,18 @@ from tiqora.api.compat.operations import (
     op_ticket_update,
     op_time_accounting_get,
 )
+from tiqora.api.compat.provider import (
+    ProviderOutcome,
+    error_status_code,
+    render_rest,
+    rest_fault_body,
+    run_provider,
+)
+from tiqora.api.compat.rest_request import (
+    RestRequestError,
+    build_rest_request_data,
+    rest_request_path,
+)
 from tiqora.api.compat.soap import (
     DEFAULT_NAMESPACE,
     SoapCodecError,
@@ -62,42 +64,26 @@ from tiqora.api.compat.soap import (
     content_type_for_version,
     parse_soap_request,
 )
-from tiqora.api.deps import CurrentUser, DbSession, get_db, get_session_store
-from tiqora.db.legacy.config import GiWebserviceConfig
+from tiqora.api.compat.webservices import (
+    OPERATION_TYPES,
+    OperationConfig,
+    Webservice,
+    get_registry,
+    match_rest_route,
+)
+from tiqora.api.deps import DbSession, get_session_store
+from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.domain.auth import SessionStore
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
-# ---------------------------------------------------------------------------
-# Supported operation types → handler mapping
-# ---------------------------------------------------------------------------
-
-# Maps webservice operation name → canonical handler key.
-# SessionDelete is an alias used by GenericTicketConnectorREST (Type Session::SessionRemove).
-_SUPPORTED_OPS: dict[str, str] = {
-    "SessionCreate": "SessionCreate",
-    "SessionGet": "SessionGet",
-    "SessionRemove": "SessionRemove",
-    "SessionDelete": "SessionRemove",
-    "TicketCreate": "TicketCreate",
-    "TicketUpdate": "TicketUpdate",
-    "TicketGet": "TicketGet",
-    "TicketSearch": "TicketSearch",
-    "TicketHistoryGet": "TicketHistoryGet",
-    "TimeAccountingGet": "TimeAccountingGet",
-    "OutOfOffice": "OutOfOffice",
-}
-
-# ---------------------------------------------------------------------------
-# Main compat router
-# ---------------------------------------------------------------------------
+# Handler keys the canonical SOAP route accepts. SessionDelete is an alias used by
+# GenericTicketConnectorREST-style configs (Type Session::SessionRemove).
+_OPERATION_ALIASES: dict[str, str] = {"SessionDelete": "SessionRemove"}
+_CANONICAL_OPS: frozenset[str] = frozenset(OPERATION_TYPES.values()) | frozenset(_OPERATION_ALIASES)
 
 compat_router = APIRouter(prefix="/znuny-compat", tags=["znuny-compat"])
-
-# Dynamic routes are stored here (rebuilt on admin/reload)
-_dynamic_router: APIRouter = APIRouter()
-_dynamic_routes_registered: bool = False
 
 
 async def _merge_params(request: Request) -> dict[str, Any]:
@@ -118,12 +104,13 @@ async def _dispatch_operation(
     session: AsyncSession,
     session_store: SessionStore,
     request: Request,
+    operation_config: OperationConfig | None = None,
 ) -> dict[str, Any]:
-    """Route an operation name to the right handler."""
+    """Route a handler key (``OPERATION_TYPES`` value or alias) to the right ``op_*`` handler."""
     sysconfig = SysConfig(session)
     settings = getattr(request.app.state, "settings", None)
     # Normalize aliases (e.g. SessionDelete → SessionRemove).
-    operation = _SUPPORTED_OPS.get(operation, operation)
+    operation = _OPERATION_ALIASES.get(operation, operation)
 
     if operation == "SessionCreate":
         return await op_session_create(
@@ -154,6 +141,7 @@ async def _dispatch_operation(
             sysconfig,
             request=request,
             settings=settings,
+            operation_config=operation_config,
         )
 
     if operation == "TicketUpdate":
@@ -170,6 +158,7 @@ async def _dispatch_operation(
             sysconfig,
             request=request,
             settings=settings,
+            operation_config=operation_config,
         )
 
     if operation == "TicketGet":
@@ -204,24 +193,8 @@ async def _dispatch_operation(
 
 
 def _error_status_code(result: dict[str, Any]) -> int:
-    """Map a Znuny-style ``{"Error": {"ErrorCode": ...}}`` result to an HTTP status.
-
-    Returns 200 when ``result`` carries no ``Error`` key. Shared between the
-    JSON (REST) and SOAP transports so both emit the same status semantics.
-    """
-    if "Error" in result:
-        ec: str = result["Error"].get("ErrorCode", "")
-        if "NotImplemented" in ec:
-            return status.HTTP_501_NOT_IMPLEMENTED
-        if "RateLimited" in ec:
-            return status.HTTP_429_TOO_MANY_REQUESTS
-        if "AuthFail" in ec:
-            return status.HTTP_401_UNAUTHORIZED
-        if "AccessDenied" in ec:
-            return status.HTTP_403_FORBIDDEN
-        if "MissingParameter" in ec or "InvalidParameter" in ec:
-            return status.HTTP_400_BAD_REQUEST
-    return status.HTTP_200_OK
+    """Status for a Znuny-style ``{"Error": ...}`` result (shared by REST and SOAP)."""
+    return error_status_code(result)
 
 
 def _json_or_501(result: dict[str, Any]) -> JSONResponse:
@@ -365,16 +338,25 @@ async def canonical_out_of_office(
 # ---------------------------------------------------------------------------
 
 
+def _soap_response(content: bytes, version: str, status_code: int) -> Response:
+    return Response(
+        content=content, media_type=content_type_for_version(version), status_code=status_code
+    )
+
+
 async def _handle_soap_request(
     request: Request,
     session: AsyncSession,
     session_store: SessionStore,
     *,
     namespace: str,
+    webservice: Webservice | None = None,
 ) -> Response:
-    """Decode a SOAP envelope, dispatch to the shared operation handler
-    (same code path as REST — the codec only adapts wire format), and
-    encode the result back into a SOAP response or Fault envelope.
+    """Decode a SOAP envelope, run it, and encode a SOAP response or Fault envelope.
+
+    Without ``webservice`` (canonical ``/soap/{name}`` route) the operation is dispatched by
+    its name with no mapping. With a webservice the operation name selects the configured
+    operation (type + mapping) through the provider pipeline.
     """
     body_bytes = await request.body()
     soap_action = request.headers.get("SOAPAction") or request.headers.get("soapaction")
@@ -383,44 +365,56 @@ async def _handle_soap_request(
         parsed = parse_soap_request(body_bytes, soap_action)
     except SoapCodecError as exc:
         fault = build_soap_fault(str(exc), fault_code="Client")
-        return Response(
-            content=fault,
-            media_type=content_type_for_version("1.1"),
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+        return _soap_response(fault, "1.1", status.HTTP_400_BAD_REQUEST)
 
-    if parsed.operation not in _SUPPORTED_OPS:
+    if webservice is not None:
+
+        async def _run(handler: str, data: dict[str, Any], op: OperationConfig) -> dict[str, Any]:
+            return await _dispatch_operation(
+                handler, data, session, session_store, request, operation_config=op
+            )
+
+        outcome = await run_provider(webservice, parsed.operation, parsed.data, run_operation=_run)
+        return _render_soap(outcome, parsed.operation, parsed.version, namespace)
+
+    if parsed.operation not in _CANONICAL_OPS:
         logger.warning("compat_soap_unsupported_operation", operation=parsed.operation)
         fault = build_soap_fault(
             f"Operation {parsed.operation!r} is not supported by Tiqora compat layer",
             fault_code="Client",
             version=parsed.version,
         )
-        return Response(
-            content=fault,
-            media_type=content_type_for_version(parsed.version),
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        )
+        return _soap_response(fault, parsed.version, status.HTTP_501_NOT_IMPLEMENTED)
 
     result = await _dispatch_operation(
         parsed.operation, parsed.data, session, session_store, request
     )
-    status_code = _error_status_code(result)
+    return _render_soap(
+        ProviderOutcome(_error_status_code(result), result, {}, None),
+        parsed.operation,
+        parsed.version,
+        namespace,
+    )
 
-    if "Error" in result:
-        err = result["Error"]
+
+def _render_soap(
+    outcome: ProviderOutcome, operation: str, version: str, namespace: str
+) -> Response:
+    body = outcome.body
+    if outcome.fault is not None:
+        xml = build_soap_fault(outcome.fault, fault_code="Server", version=version)
+        return _soap_response(xml, version, outcome.status_code)
+    if isinstance(body, dict) and isinstance(body.get("Error"), dict):
+        err = body["Error"]
         fault_string = f"{err.get('ErrorCode', 'Error')}: {err.get('ErrorMessage', '')}"
-        xml = build_soap_fault(fault_string, fault_code="Client", version=parsed.version)
+        xml = build_soap_fault(fault_string, fault_code="Client", version=version)
     else:
         xml = build_soap_response(
-            parsed.operation, result, namespace=namespace, version=parsed.version
+            operation, body if isinstance(body, dict) else {}, namespace=namespace, version=version
         )
-
-    return Response(
-        content=xml,
-        media_type=content_type_for_version(parsed.version),
-        status_code=status_code,
-    )
+    response = _soap_response(xml, version, outcome.status_code)
+    response.headers.update(outcome.headers)
+    return response
 
 
 @compat_router.post("/soap/{webservice}")
@@ -430,249 +424,103 @@ async def canonical_soap_endpoint(
     session: DbSession,
     session_store: SessionStore = Depends(get_session_store),  # noqa: B008
 ) -> Response:
-    """Canonical always-available SOAP provider endpoint.
-
-    Unlike REST, SOAP has no per-operation route mapping in Znuny — a single
-    endpoint per webservice accepts any operation, dispatched from the SOAP
-    Body wrapper element name. This fallback route uses the default Znuny
-    ``NameSpace`` (``http://www.otrs.org/TicketConnector/``); webservices
-    configured in ``gi_webservice_config`` with their own NameSpace are
-    additionally mounted at ``/Webservice/{name}`` and ``/WebserviceID/{id}``
-    (see :func:`_load_soap_webservices` / :func:`build_soap_router`).
-    """
+    """Canonical always-available SOAP provider endpoint (default NameSpace, no mapping)."""
     return await _handle_soap_request(request, session, session_store, namespace=DEFAULT_NAMESPACE)
 
 
 # ---------------------------------------------------------------------------
-# Dynamic route helpers
+# Webservice routes (resolved per request from the registry)
 # ---------------------------------------------------------------------------
 
-
-def _parse_webservice_config(raw_config: bytes) -> dict[str, Any] | None:
-    """Parse YAML gi_webservice_config blob, return dict or None on error."""
-    try:
-        decoded = raw_config.decode("utf-8", errors="replace")
-        parsed = yaml.safe_load(decoded)
-        if isinstance(parsed, dict):
-            return parsed
-    except (yaml.YAMLError, UnicodeDecodeError, AttributeError):
-        pass
-    return None
+_WS_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"]
 
 
-def _extract_route_mapping(config: dict[str, Any]) -> dict[str, dict[str, str]]:
-    """Extract RouteOperationMapping from parsed webservice config.
-
-    Returns {operation_name: {"Route": "...", "RequestMethod": "..."}}
-    """
-    try:
-        transport_cfg = config.get("Provider", {}).get("Transport", {}).get("Config", {})
-        mapping = transport_cfg.get("RouteOperationMapping", {})
-        if isinstance(mapping, dict):
-            return mapping
-    except (AttributeError, TypeError):
-        pass
-    return {}
+def _fault_response(message: str, status_code: int) -> JSONResponse:
+    return JSONResponse(rest_fault_body(message), status_code=status_code)
 
 
-def _normalize_request_methods(raw: Any) -> list[str]:
-    """Normalize a RouteOperationMapping RequestMethod to a list of HTTP verbs.
-
-    Znuny stores it as a YAML list (``["POST"]``); tolerate a bare string too.
-    Falls back to ``["GET"]`` when empty/missing.
-    """
-    if isinstance(raw, str):
-        methods = [raw]
-    elif isinstance(raw, list):
-        methods = [str(m) for m in raw if m]
-    else:
-        methods = []
-    normalized = [m.upper() for m in methods if m]
-    return normalized or ["GET"]
+def _text_error(status_code: int, message: str) -> Response:
+    """Znuny's REST transport errors are ``text/plain`` (``REST.pm`` ``_Output``)."""
+    return Response(content=message, status_code=status_code, media_type="text/plain")
 
 
-def _convert_route_pattern(znuny_route: str) -> str:
-    """Convert Znuny REST route pattern to FastAPI path pattern.
-
-    Znuny uses :VariableName, FastAPI uses {variable_name}.
-    """
-    return re.sub(r":([A-Za-z][A-Za-z0-9_]*)", r"{\1}", znuny_route)
-
-
-async def _load_webservice_routes(
+async def _serve_webservice(
+    request: Request,
     session: AsyncSession,
-) -> list[tuple[int, str, str, str, str]]:
-    """Load all valid webservice route mappings.
+    session_store: SessionStore,
+    *,
+    ws_name: str | None,
+    ws_id: int | None,
+) -> Response:
+    registry = get_registry(request.app)
+    await registry.ensure_loaded(session)
+    ws = registry.by_id(ws_id) if ws_id is not None else registry.by_name(ws_name or "")
+    if ws is None:
+        return _fault_response(
+            f"Could not find valid web service for query string '{request.url.path}'",
+            status.HTTP_404_NOT_FOUND,
+        )
 
-    Returns list of (ws_id, ws_name, operation, route, method).
-    """
-    rows = (
-        (await session.execute(select(GiWebserviceConfig).where(GiWebserviceConfig.valid_id == 1)))
-        .scalars()
-        .all()
-    )
-
-    entries: list[tuple[int, str, str, str, str]] = []
-    for ws in rows:
-        cfg = _parse_webservice_config(ws.config)
-        if cfg is None:
-            continue
-        mapping = _extract_route_mapping(cfg)
-        for op_name, op_cfg in mapping.items():
-            if not isinstance(op_cfg, dict):
-                continue
-            route = op_cfg.get("Route") or ""
-            if not route:
-                continue
-            # Znuny's RouteOperationMapping RequestMethod is normally a LIST
-            # (e.g. ["POST"]) but some configs use a bare string. Accept both
-            # and emit one entry per method so each is registered.
-            for method in _normalize_request_methods(op_cfg.get("RequestMethod")):
-                entries.append((ws.id, ws.name, op_name, route, method))
-
-    return entries
-
-
-def build_dynamic_router(routes: list[tuple[int, str, str, str, str]]) -> APIRouter:
-    """Build a new APIRouter with dynamic routes from webservice config."""
-    router = APIRouter(tags=["znuny-compat-dynamic"])
-
-    def _make_handler(operation: str, path_var: str | None = None) -> Any:
-        async def handler(
-            request: Request,
-            session: AsyncSession = Depends(get_db),  # noqa: B008
-            session_store: SessionStore = Depends(get_session_store),  # noqa: B008
-        ) -> Response:
-            data = await _merge_params(request)
-            # Inject path variable if present
-            if path_var and path_var in request.path_params:
-                data[path_var] = request.path_params[path_var]
-            if operation in _SUPPORTED_OPS:
-                result = await _dispatch_operation(operation, data, session, session_store, request)
-            else:
-                result = {
-                    "Error": {
-                        "ErrorCode": "Operation.NotImplemented",
-                        "ErrorMessage": f"Operation {operation!r} is not implemented",
-                    }
-                }
-            return _json_or_501(result)
-
-        return handler
-
-    registered: set[tuple[str, str]] = set()
-    for ws_id, ws_name, op_name, znuny_route, method in routes:
-        fp_route = _convert_route_pattern(znuny_route)
-
-        # Extract path variable if any (e.g. {TicketID})
-        pvar_match = re.search(r"\{([A-Za-z][A-Za-z0-9_]*)\}", fp_route)
-        path_var = pvar_match.group(1) if pvar_match else None
-
-        for prefix in [
-            f"/Webservice/{ws_name}",
-            f"/WebserviceID/{ws_id}",
-        ]:
-            full_route = f"{prefix}{fp_route}"
-            key = (method, full_route)
-            if key in registered:
-                continue
-            registered.add(key)
-            router.add_api_route(
-                full_route,
-                _make_handler(op_name, path_var),
-                methods=[method],
-                response_class=JSONResponse,
+    if ws.transport == "HTTP::SOAP":
+        if request.method != "POST" or rest_request_path(request) != "/":
+            return _fault_response(
+                f"Could not find valid web service for query string '{request.url.path}'",
+                status.HTTP_404_NOT_FOUND,
             )
-            if op_name not in _SUPPORTED_OPS:
-                logger.warning(
-                    "compat_unsupported_operation",
-                    operation=op_name,
-                    webservice=ws_name,
-                    route=full_route,
-                )
+        return await _handle_soap_request(
+            request, session, session_store, namespace=ws.namespace, webservice=ws
+        )
 
-    return router
+    if ws.transport != "HTTP::REST":
+        return _fault_response(f"Transport '{ws.transport}' is not supported by Tiqora", 500)
 
-
-# ---------------------------------------------------------------------------
-# SOAP dynamic webservice helpers
-# ---------------------------------------------------------------------------
-
-
-def _extract_soap_namespace(config: dict[str, Any]) -> str | None:
-    """Return the configured NameSpace if this webservice is HTTP::SOAP.
-
-    Returns ``None`` for non-SOAP (e.g. HTTP::REST) webservices so callers
-    can filter them out. Falls back to :data:`DEFAULT_NAMESPACE` when the
-    webservice is SOAP but has no explicit ``NameSpace`` set (Znuny requires
-    one in practice, but we stay permissive).
-    """
+    path = rest_request_path(request)
+    matched = match_rest_route(ws, path, request.method)
+    if matched is None:
+        return _text_error(
+            500, f"HTTP::REST Error while determine Operation for request URI '{path}'."
+        )
+    operation, uri_data = matched
     try:
-        transport = config.get("Provider", {}).get("Transport", {})
-        if transport.get("Type") != "HTTP::SOAP":
-            return None
-        namespace = transport.get("Config", {}).get("NameSpace")
-        return str(namespace) if namespace else DEFAULT_NAMESPACE
-    except (AttributeError, TypeError):
-        return None
+        data = await build_rest_request_data(request, ws, uri_data)
+    except RestRequestError as exc:
+        return _text_error(exc.status, exc.message)
+
+    async def _run(handler: str, op_data: dict[str, Any], op: OperationConfig) -> dict[str, Any]:
+        return await _dispatch_operation(
+            handler, op_data, session, session_store, request, operation_config=op
+        )
+
+    outcome = await run_provider(ws, operation, data, run_operation=_run)
+    return render_rest(outcome)
 
 
-async def _load_soap_webservices(session: AsyncSession) -> list[tuple[int, str, str]]:
-    """Load all valid HTTP::SOAP webservice configs.
-
-    Returns list of (ws_id, ws_name, namespace).
-    """
-    rows = (
-        (await session.execute(select(GiWebserviceConfig).where(GiWebserviceConfig.valid_id == 1)))
-        .scalars()
-        .all()
-    )
-
-    entries: list[tuple[int, str, str]] = []
-    for ws in rows:
-        cfg = _parse_webservice_config(ws.config)
-        if cfg is None:
-            continue
-        namespace = _extract_soap_namespace(cfg)
-        if namespace is None:
-            continue
-        entries.append((ws.id, ws.name, namespace))
-
-    return entries
+@compat_router.api_route("/Webservice/{ws_name}", methods=_WS_METHODS, include_in_schema=False)
+@compat_router.api_route(
+    "/Webservice/{ws_name}/{subpath:path}", methods=_WS_METHODS, include_in_schema=False
+)
+async def webservice_by_name(
+    ws_name: str,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+    subpath: str = "",  # noqa: ARG001 - the raw path is re-read from the ASGI scope
+) -> Response:
+    return await _serve_webservice(request, session, session_store, ws_name=ws_name, ws_id=None)
 
 
-def build_soap_router(webservices: list[tuple[int, str, str]]) -> APIRouter:
-    """Build a new APIRouter mounting one SOAP endpoint per webservice.
-
-    Unlike REST's ``build_dynamic_router``, SOAP has no per-operation route
-    mapping to iterate — one POST endpoint per webservice accepts any
-    supported operation, dispatched from the SOAP Body wrapper element.
-    """
-    router = APIRouter(tags=["znuny-compat-dynamic-soap"])
-
-    def _make_handler(namespace: str) -> Any:
-        async def handler(
-            request: Request,
-            session: AsyncSession = Depends(get_db),  # noqa: B008
-            session_store: SessionStore = Depends(get_session_store),  # noqa: B008
-        ) -> Response:
-            return await _handle_soap_request(request, session, session_store, namespace=namespace)
-
-        return handler
-
-    registered: set[str] = set()
-    for ws_id, ws_name, namespace in webservices:
-        for path in (f"/Webservice/{ws_name}", f"/WebserviceID/{ws_id}"):
-            if path in registered:
-                continue
-            registered.add(path)
-            router.add_api_route(
-                path,
-                _make_handler(namespace),
-                methods=["POST"],
-            )
-
-    return router
+@compat_router.api_route("/WebserviceID/{ws_id:int}", methods=_WS_METHODS, include_in_schema=False)
+@compat_router.api_route(
+    "/WebserviceID/{ws_id:int}/{subpath:path}", methods=_WS_METHODS, include_in_schema=False
+)
+async def webservice_by_id(
+    ws_id: int,
+    request: Request,
+    session: DbSession,
+    session_store: SessionStore = Depends(get_session_store),  # noqa: B008
+    subpath: str = "",  # noqa: ARG001 - the raw path is re-read from the ASGI scope
+) -> Response:
+    return await _serve_webservice(request, session, session_store, ws_name=None, ws_id=ws_id)
 
 
 # ---------------------------------------------------------------------------
@@ -683,53 +531,15 @@ def build_soap_router(webservices: list[tuple[int, str, str]]) -> APIRouter:
 @compat_router.post("/admin/reload")
 async def admin_reload_routes(
     request: Request,
-    current_user: CurrentUser,
+    current_user: AdminUser,
     session: DbSession,
 ) -> dict[str, Any]:
-    """Re-mount dynamic webservice routes without restart (authenticated)."""
-    routes = await _load_webservice_routes(session)
-    build_dynamic_router(routes)  # validate; full hot-reload needs restart
-    soap_webservices = await _load_soap_webservices(session)
-    build_soap_router(soap_webservices)  # validate; full hot-reload needs restart
-
-    # Full reload requires app restart; we log and return the new route count.
-    logger.info(
-        "compat_routes_reloaded",
-        route_count=len(routes),
-        soap_webservice_count=len(soap_webservices),
-        user=current_user.login,
-    )
-    return {
-        "status": "ok",
-        "routes_loaded": len(routes),
-        "soap_webservices_loaded": len(soap_webservices),
-        "message": "Dynamic routes refreshed in-memory. Full restart required for hot-reload.",
-    }
+    """Reload the webservice registry from ``gi_webservice_config`` (admin only)."""
+    registry = get_registry(request.app)
+    await registry.refresh(session, force=True)
+    names = sorted(registry._snapshot[0])  # noqa: SLF001
+    logger.info("compat_webservices_reloaded", count=len(names), user=current_user.login)
+    return {"status": "ok", "webservices_loaded": len(names), "webservices": names}
 
 
-async def mount_dynamic_compat_routes(app: Any, session: AsyncSession) -> None:
-    """Called from application lifespan to mount dynamic routes."""
-    try:
-        routes = await _load_webservice_routes(session)
-        dynamic = build_dynamic_router(routes)
-        # Include into the main app under /znuny-compat
-        app.include_router(dynamic, prefix="/znuny-compat")
-        logger.info("compat_dynamic_routes_mounted", count=len(routes))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("compat_dynamic_routes_failed", error=str(exc))
-
-    try:
-        soap_webservices = await _load_soap_webservices(session)
-        soap_dynamic = build_soap_router(soap_webservices)
-        app.include_router(soap_dynamic, prefix="/znuny-compat")
-        logger.info("compat_dynamic_soap_routes_mounted", count=len(soap_webservices))
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("compat_dynamic_soap_routes_failed", error=str(exc))
-
-
-__all__ = [
-    "compat_router",
-    "mount_dynamic_compat_routes",
-    "build_dynamic_router",
-    "build_soap_router",
-]
+__all__ = ["compat_router"]

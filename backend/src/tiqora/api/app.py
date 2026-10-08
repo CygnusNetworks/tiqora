@@ -12,7 +12,7 @@ from starlette.requests import Request
 from starlette.responses import Response as StarletteResponse
 
 from tiqora import __version__
-from tiqora.api.compat.router import compat_router, mount_dynamic_compat_routes
+from tiqora.api.compat.router import compat_router
 from tiqora.api.portal import portal_router
 from tiqora.api.portal.deps import require_portal_enabled
 from tiqora.api.spa import mount_spa, spa_is_available
@@ -160,12 +160,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         app.state.legacy_schema_profile = None
 
-    # Mount dynamic GenericInterface compat routes from webservice config
-    try:
-        async with app.state.session_factory() as _compat_session:
-            await mount_dynamic_compat_routes(app, _compat_session)
-    except Exception as _exc:  # noqa: BLE001
-        logger.warning("compat_mount_skipped", error=str(_exc))
     await _crypto_self_check(app, settings)
     yield
     redis_client = getattr(app.state, "redis", None)

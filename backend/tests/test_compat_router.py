@@ -1,43 +1,50 @@
-"""Unit tests for the GenericInterface-compat dynamic route mounting.
+"""Unit tests for GenericInterface route matching used by the request-time webservice routes.
 
-Regression: Znuny's RouteOperationMapping stores RequestMethod as a YAML
-*list* (e.g. ``["POST"]``). The dynamic-route loader used to call
-``.upper()`` on it directly, crashing startup with
-``'list' object has no attribute 'upper'`` and silently dropping all
-webservice-config-driven routes (seen in production api logs as
-``compat_dynamic_routes_failed``).
+Regression: Znuny's RouteOperationMapping stores RequestMethod as a YAML *list* (e.g.
+``["POST"]``). An older route loader called ``.upper()`` on it directly and crashed startup
+with ``'list' object has no attribute 'upper'``, silently dropping every webservice route.
 """
 
 from __future__ import annotations
 
-from tiqora.api.compat.router import (
-    _normalize_request_methods,
-    build_dynamic_router,
-)
+from typing import Any
+
+from tiqora.api.compat.webservices import match_rest_route, parse_webservice
 
 
-def test_normalize_request_methods_list() -> None:
-    assert _normalize_request_methods(["POST"]) == ["POST"]
-    assert _normalize_request_methods(["get", "post"]) == ["GET", "POST"]
+def _ws(routes: dict[str, Any]) -> Any:
+    return parse_webservice(
+        1,
+        "GenericTicketConnectorREST",
+        {
+            "Provider": {
+                "Transport": {"Type": "HTTP::REST", "Config": {"RouteOperationMapping": routes}},
+                "Operation": {name: {"Type": "Ticket::TicketGet"} for name in routes},
+            }
+        },
+        huge_xml=False,
+    )
 
 
-def test_normalize_request_methods_string() -> None:
-    assert _normalize_request_methods("patch") == ["PATCH"]
+def test_list_request_method_is_matched_not_crashing() -> None:
+    ws = _ws(
+        {
+            "TicketCreate": {"Route": "/Ticket", "RequestMethod": ["POST"]},
+            "TicketGet": {"Route": "/Ticket/:TicketID", "RequestMethod": ["GET"]},
+        }
+    )
+    assert match_rest_route(ws, "/Ticket", "POST") == ("TicketCreate", {})
+    assert match_rest_route(ws, "/Ticket/7", "GET") == ("TicketGet", {"TicketID": "7"})
+    assert match_rest_route(ws, "/Ticket/7", "POST") is None
 
 
-def test_normalize_request_methods_empty_defaults_to_get() -> None:
-    assert _normalize_request_methods(None) == ["GET"]
-    assert _normalize_request_methods([]) == ["GET"]
-    assert _normalize_request_methods("") == ["GET"]
-
-
-def test_build_dynamic_router_registers_list_methods() -> None:
-    """A route whose method came from a YAML list must be mounted, not crash."""
-    routes = [
-        (1, "GenericTicketConnectorREST", "TicketCreate", "/Ticket", "POST"),
-        (1, "GenericTicketConnectorREST", "TicketGet", "/Ticket/:TicketID", "GET"),
-    ]
-    router = build_dynamic_router(routes)
-    paths = {r.path for r in router.routes}  # type: ignore[attr-defined]
-    assert "/Webservice/GenericTicketConnectorREST/Ticket" in paths
-    assert "/WebserviceID/1/Ticket/{TicketID}" in paths
+def test_multiple_methods_and_string_method_means_any() -> None:
+    ws = _ws(
+        {
+            "A": {"Route": "/A", "RequestMethod": ["GET", "POST"]},
+            "B": {"Route": "/B", "RequestMethod": "patch"},
+        }
+    )
+    assert match_rest_route(ws, "/A", "POST") == ("A", {})
+    assert match_rest_route(ws, "/A", "PUT") is None
+    assert match_rest_route(ws, "/B", "DELETE") == ("B", {})

@@ -18,6 +18,7 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.api.compat.webservices import OperationConfig
 from tiqora.channels.email.outbound_reply import OutboundMailError as _OutboundMailError
 from tiqora.config import Settings, get_settings
 from tiqora.db.legacy.article import Article, ArticleDataMimeAttachment
@@ -1014,6 +1015,7 @@ async def op_ticket_create(
     *,
     request: Any | None = None,
     settings: Settings | None = None,
+    operation_config: OperationConfig | None = None,  # noqa: ARG001 - used from Task 11
 ) -> dict[str, Any]:
     """TicketCreate operation."""
     op = "TicketCreate"
@@ -1194,6 +1196,7 @@ async def op_ticket_update(
     *,
     request: Any | None = None,
     settings: Settings | None = None,
+    operation_config: OperationConfig | None = None,  # noqa: ARG001 - used from Task 11
 ) -> dict[str, Any]:
     """TicketUpdate operation."""
     op = "TicketUpdate"
