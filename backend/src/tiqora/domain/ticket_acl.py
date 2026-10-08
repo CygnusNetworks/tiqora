@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import yaml
@@ -39,6 +41,7 @@ from tiqora.db.legacy.user import (
     RoleUser,
     Users,
 )
+from tiqora.deployed.store import load_active_revision
 from tiqora.permissions.engine import PERMISSION_KEYS
 
 logger = logging.getLogger(__name__)
@@ -581,10 +584,44 @@ async def build_checks(
 # ---------------------------------------------------------------------------
 
 
-async def load_valid_acls(session: AsyncSession) -> list[Acl]:
-    """Valid ACLs ordered by name (Znuny evaluation order)."""
+@dataclass(frozen=True, slots=True)
+class AclRule:
+    name: str
+    stop_after_match: bool
+    config_match: dict[str, Any]  # {"Properties": ..., "PropertiesDatabase": ...}
+    config_change: dict[str, Any]  # {"Possible": ..., "PossibleAdd": ..., "PossibleNot": ...}
+
+
+def _rule_from_dump(name: str, entry: Mapping[str, Any]) -> AclRule:
+    values = entry.get("Values") or {}
+    return AclRule(
+        name=name,
+        stop_after_match=bool(values.get("StopAfterMatch")),
+        config_match={k: values.get(k) for k in ("Properties", "PropertiesDatabase")},
+        config_change={k: values.get(k) for k in ("Possible", "PossibleAdd", "PossibleNot")},
+    )
+
+
+async def load_valid_acls(session: AsyncSession) -> list[AclRule]:
+    """Deployed ACLs ordered by name (Znuny evaluation order).
+
+    Reads the newest ACL revision, like Znuny's ``ZZZACL.pm``; only while no
+    revision exists yet it falls back to the live valid ``acl`` rows.
+    """
+    revision = await load_active_revision(session, "acl")
+    if revision is not None:
+        acls = revision.dump.get("ACL") or {}
+        return [_rule_from_dump(name, acls[name]) for name in sorted(acls)]
     result = await session.execute(select(Acl).where(Acl.valid_id == _VALID).order_by(Acl.name))
-    return list(result.scalars().all())
+    return [
+        AclRule(
+            name=acl.name,
+            stop_after_match=bool(acl.stop_after_match),
+            config_match=parse_acl_yaml(acl.config_match),
+            config_change=parse_acl_yaml(acl.config_change),
+        )
+        for acl in result.scalars().all()
+    ]
 
 
 async def apply_ticket_acl(
@@ -629,10 +666,7 @@ async def apply_ticket_acl(
     any_applied = False
 
     for acl in acls:
-        config_match = parse_acl_yaml(acl.config_match)
-        config_change = parse_acl_yaml(acl.config_change)
-
-        matched, match_try = acl_properties_match(config_match, checks_live, checks_db)
+        matched, match_try = acl_properties_match(acl.config_match, checks_live, checks_db)
         if not (matched and match_try):
             continue
 
@@ -643,7 +677,7 @@ async def apply_ticket_acl(
         filtered, used = apply_possible_filters(
             original,
             new_tmp,
-            config_change,
+            acl.config_change,
             return_type=return_type,
             return_sub_type=return_sub_type,
         )

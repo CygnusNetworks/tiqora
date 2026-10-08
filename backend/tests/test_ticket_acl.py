@@ -7,10 +7,23 @@ Possible / PossibleAdd / PossibleNot application — the core of
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Generator
+from datetime import datetime
+from typing import Any
+
+import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from tiqora.deployed import clear_revision_cache, record_revision
+from tiqora.deployed.acl_dump import build_acl_dump
 from tiqora.domain.ticket_acl import (
+    AclRule,
     acl_properties_match,
     apply_possible_filters,
+    apply_ticket_acl,
     compare_match_with_data,
+    load_valid_acls,
     match_property_items,
     parse_acl_yaml,
     properties_block_matches,
@@ -217,3 +230,150 @@ def test_parse_acl_yaml_empty_and_invalid() -> None:
     assert parse_acl_yaml("") == {}
     assert parse_acl_yaml("not: [valid: yaml: {{{") == {}
     assert parse_acl_yaml("- just a list") == {}
+
+
+# ---------------------------------------------------------------------------
+# Evaluation reads the newest ACL revision (DB; seed ids 881750-881759, rulings F8)
+# ---------------------------------------------------------------------------
+
+_T0 = datetime(2026, 3, 4, 5, 6, 7)
+_SEEDED_ACL_URLS: list[str] = []
+_STATES = {1: "new", 2: "closed successful", 4: "open"}
+
+
+def _acl_cleanup(conn: Any) -> None:
+    conn.execute(text("DELETE FROM tiqora_acl_revision"))
+    conn.execute(text("DELETE FROM acl WHERE id BETWEEN 881750 AND 881759"))
+
+
+def _insert_acl(conn: Any, n: int, name: str, state: str, stop: int = 0) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO acl (id, name, comments, description, valid_id, stop_after_match,"
+            " config_match, config_change, create_time, create_by, change_time, change_by)"
+            " VALUES (:id, :name, NULL, '', 1, :stop, :match, :change, :t, 1, :t, 1)"
+        ),
+        {
+            "id": 881750 + n,
+            "name": name,
+            "stop": stop,
+            "match": "{}\n",
+            "change": f"PossibleNot:\n  Ticket:\n    State: [{state}]\n",
+            "t": _T0,
+        },
+    )
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _delete_acl_rows() -> Generator[None, None, None]:
+    yield
+    for sync_url in set(_SEEDED_ACL_URLS):
+        engine = create_engine(sync_url)
+        with engine.begin() as conn:
+            _acl_cleanup(conn)
+        engine.dispose()
+    _SEEDED_ACL_URLS.clear()
+    clear_revision_cache()
+
+
+@pytest.fixture
+async def acl_session(mariadb_znuny_url: str) -> AsyncIterator[AsyncSession]:
+    _SEEDED_ACL_URLS.append(mariadb_znuny_url)
+    clear_revision_cache()
+    sync_engine = create_engine(mariadb_znuny_url)
+    with sync_engine.begin() as conn:
+        _acl_cleanup(conn)
+        _insert_acl(conn, 1, "a-acl", "open")
+    sync_engine.dispose()
+    engine = create_async_engine(mariadb_znuny_url.replace("mysql+pymysql://", "mysql+aiomysql://"))
+    async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as s:
+        yield s
+    await engine.dispose()
+
+
+async def _filtered_states(session: AsyncSession) -> dict[Any, str]:
+    return await apply_ticket_acl(
+        session,
+        user_id=2,
+        data=dict(_STATES),
+        return_type="Ticket",
+        return_sub_type="State",
+        checks={},
+    )
+
+
+@pytest.mark.db
+async def test_acl_from_revision_ignores_undeployed_acl(
+    acl_session: AsyncSession, mariadb_znuny_url: str
+) -> None:
+    async with acl_session.begin():
+        await record_revision(
+            acl_session,
+            "acl",
+            dump=await build_acl_dump(acl_session),
+            source="initial",
+            deployed_by=None,
+        )
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        _insert_acl(conn, 2, "b-acl", "new")  # valid, but never deployed
+    engine.dispose()
+
+    rules = await load_valid_acls(acl_session)
+    assert [r.name for r in rules] == ["a-acl"]
+    assert await _filtered_states(acl_session) == {1: "new", 2: "closed successful"}
+
+
+@pytest.mark.db
+async def test_acl_without_revision_uses_live_rows(
+    acl_session: AsyncSession, mariadb_znuny_url: str
+) -> None:
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        _insert_acl(conn, 2, "b-acl", "new", stop=1)
+    engine.dispose()
+
+    rules = await load_valid_acls(acl_session)
+    assert rules == [
+        AclRule(
+            name="a-acl",
+            stop_after_match=False,
+            config_match={},
+            config_change={"PossibleNot": {"Ticket": {"State": ["open"]}}},
+        ),
+        AclRule(
+            name="b-acl",
+            stop_after_match=True,
+            config_match={},
+            config_change={"PossibleNot": {"Ticket": {"State": ["new"]}}},
+        ),
+    ]
+    assert await _filtered_states(acl_session) == {2: "closed successful"}
+
+
+@pytest.mark.db
+async def test_revision_rule_carries_dump_sections_and_stop_flag(
+    acl_session: AsyncSession, mariadb_znuny_url: str
+) -> None:
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE acl SET stop_after_match = 1 WHERE id = 881751"))
+    engine.dispose()
+    async with acl_session.begin():
+        await record_revision(
+            acl_session,
+            "acl",
+            dump=await build_acl_dump(acl_session),
+            source="initial",
+            deployed_by=None,
+        )
+
+    (rule,) = await load_valid_acls(acl_session)
+    assert rule.name == "a-acl"
+    assert rule.stop_after_match is True
+    assert rule.config_match == {"Properties": {}, "PropertiesDatabase": {}}
+    assert rule.config_change == {
+        "Possible": {},
+        "PossibleAdd": {},
+        "PossibleNot": {"Ticket": {"State": ["open"]}},
+    }

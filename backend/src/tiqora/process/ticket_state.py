@@ -99,7 +99,7 @@ class TicketProcessCandidates:
 
 
 async def get_ticket_process_candidates(
-    session: AsyncSession, ticket_id: int
+    session: AsyncSession, ticket_id: int, *, repository: ProcessRepository | None = None
 ) -> TicketProcessCandidates | None:
     """Resolve the ticket's process state and load the candidate dialogs/
     transitions available from its current activity.
@@ -112,7 +112,7 @@ async def get_ticket_process_candidates(
     if state is None:
         return None
 
-    repository = ProcessRepository(session)
+    repository = repository or ProcessRepository(session)
     process = await repository.get_process(state.process_entity_id)
     if process is None:
         return None

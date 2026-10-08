@@ -39,7 +39,7 @@ from tiqora.domain.ticket_write_service import (
 )
 from tiqora.domain.ticket_write_service import TicketNotFound as WriteTicketNotFound
 from tiqora.permissions.engine import PermissionEngine
-from tiqora.process.config import ActivityDialogConfig, ActivityDialogFieldConfig
+from tiqora.process.config import ActivityDialogFieldConfig
 from tiqora.process.engine import start_process, submit_activity_dialog
 from tiqora.process.exceptions import (
     ActivityDialogNotAvailable,
@@ -199,14 +199,14 @@ async def get_activity_dialog(
 ) -> ActivityDialogDetailOut:
     del user
     repository = ProcessRepository(session)
-    row = await repository.get_activity_dialog(activity_dialog_entity_id)
-    if row is None:
+    node = await repository.get_activity_dialog(activity_dialog_entity_id)
+    if node is None:
         raise _map_exc(ActivityDialogNotFound(activity_dialog_entity_id))
 
-    config = ActivityDialogConfig.from_yaml(row.config)
+    config = node.config
     return ActivityDialogDetailOut(
-        entity_id=row.entity_id,
-        name=row.name,
+        entity_id=node.entity_id,
+        name=node.name,
         description_short=config.description_short,
         description_long=config.description_long,
         field_order=config.field_order,

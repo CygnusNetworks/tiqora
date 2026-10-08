@@ -73,6 +73,25 @@ def _set_fk_enforcement(conn: Connection, dialect: str, *, enabled: bool) -> Non
         conn.execute(text(f"SET session_replication_role = '{role}'"))
 
 
+def _create_revision_tables(sync_url: str) -> None:
+    """Create the deployed-revision tables before the snapshot.
+
+    ACL evaluation and the process engine read them on every call, so every
+    module needs them; creating them here keeps them across the between-module
+    restore (which empties but never drops tables).
+    """
+    from tiqora.db.tiqora.base import TiqoraBase
+    from tiqora.db.tiqora.models import TiqoraAclRevision, TiqoraProcessRevision
+
+    engine = create_engine(sync_url)
+    try:
+        TiqoraBase.metadata.create_all(
+            engine, tables=[TiqoraProcessRevision.__table__, TiqoraAclRevision.__table__]
+        )
+    finally:
+        engine.dispose()
+
+
 def _take_snapshot(sync_url: str, dialect: str) -> None:
     """Record every row of every table right after the Znuny seed load."""
     engine = create_engine(sync_url)
@@ -296,6 +315,7 @@ def mariadb_znuny_url(znuny_schema_dir: Path) -> Generator[str, None, None]:
         _load_sql_mysql(url, znuny_schema_dir / "schema.mysql.sql")
         _load_sql_mysql(url, znuny_schema_dir / "initial_insert.mysql.sql")
         _load_sql_mysql(url, znuny_schema_dir / "schema-post.mysql.sql")
+        _create_revision_tables(url)
         _take_snapshot(url, "mysql")
         yield url
 
@@ -322,5 +342,6 @@ def postgres_znuny_url(znuny_schema_dir: Path) -> Generator[str, None, None]:
         _load_sql_postgres(url, znuny_schema_dir / "schema.postgresql.sql")
         _load_sql_postgres(url, znuny_schema_dir / "initial_insert.postgresql.sql")
         _load_sql_postgres(url, znuny_schema_dir / "schema-post.postgresql.sql")
+        _create_revision_tables(url)
         _take_snapshot(url, "postgresql")
         yield url

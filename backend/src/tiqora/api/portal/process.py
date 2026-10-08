@@ -174,18 +174,18 @@ async def get_activity_dialog(
 ) -> ActivityDialogDetailOut:
     del customer
     repository = ProcessRepository(session)
-    row = await repository.get_activity_dialog(activity_dialog_entity_id)
-    if row is None:
+    node = await repository.get_activity_dialog(activity_dialog_entity_id)
+    if node is None:
         raise _map_exc(ActivityDialogNotFound(activity_dialog_entity_id))
-    config = ActivityDialogConfig.from_yaml(row.config)
+    config = node.config
     if not _dialog_allows_customer(config):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Activity dialog is not available on the customer interface",
         )
     return ActivityDialogDetailOut(
-        entity_id=row.entity_id,
-        name=row.name,
+        entity_id=node.entity_id,
+        name=node.name,
         description_short=config.description_short,
         description_long=config.description_long,
         field_order=config.field_order,
@@ -234,10 +234,10 @@ async def submit_ticket_activity_dialog(
     field_values: dict[str, Any] = body.field_values
     # Ensure dialog is customer-facing before engine runs.
     repository = ProcessRepository(session)
-    row = await repository.get_activity_dialog(body.activity_dialog_entity_id)
-    if row is None:
+    node = await repository.get_activity_dialog(body.activity_dialog_entity_id)
+    if node is None:
         raise _map_exc(ActivityDialogNotFound(body.activity_dialog_entity_id))
-    cfg = ActivityDialogConfig.from_yaml(row.config)
+    cfg = node.config
     if not _dialog_allows_customer(cfg):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
