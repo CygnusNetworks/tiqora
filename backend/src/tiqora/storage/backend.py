@@ -65,9 +65,10 @@ def _as_bytes(value: bytes | memoryview | str | None) -> bytes:
                 return bytes.fromhex(value[2:])
             except ValueError:
                 return value.encode("utf-8")
-        # Znuny's PostgreSQL TEXT column holds the attachment as base64
+        # Znuny's PostgreSQL TEXT column holds the attachment as MIME::Base64
+        # encode_base64 output (76-column lines, trailing newline)
         try:
-            return base64.b64decode(value, validate=True)
+            return base64.b64decode("".join(value.split()), validate=True)
         except ValueError:
             pass
         return value.encode("utf-8")

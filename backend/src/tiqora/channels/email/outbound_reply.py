@@ -169,7 +169,9 @@ def _signature_for_body(signature: str, signature_content_type: str | None, body
     """
     sig_is_html = _is_html(signature_content_type or "")
     if _is_html(body_ct) and not sig_is_html:
-        return _html_escape(signature).replace("\n", "<br/>\n")
+        # HTMLUtils::ToHTML: normalise the line ends first
+        normalised = signature.replace("\r\n", "\n").replace("\r", "\n")
+        return _html_escape(normalised).replace("\n", "<br/>\n")
     if not _is_html(body_ct) and sig_is_html:
         from tiqora.domain.quoting import html_to_plaintext
 
@@ -528,6 +530,7 @@ async def deliver_agent_email_reply(
     try:
         _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
     except Exception:
+        logger.warning("agent_email_queue_meta_failed", queue_id=queue_id, exc_info=True)
         queue_name = None
 
     if should_dispatch:
@@ -708,6 +711,7 @@ async def store_agent_email_for_dispatch(
     try:
         _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
     except Exception:
+        logger.warning("agent_email_queue_meta_failed", queue_id=queue_id, exc_info=True)
         queue_name = None
     article_id = await add_article(
         session, ticket_id=ticket_id, article=prepared, user_id=user_id, sysconfig=sysconfig
@@ -756,15 +760,15 @@ async def dispatch_pending_agent_email(
         )
         await write_mail_log(session, status="queued", detail="smtp_disabled", **common)
         return
-    sender = await mail_outbound.build_outbound_sender(
-        session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
-    )
     t0 = time.perf_counter()
     try:
+        sender = await mail_outbound.build_outbound_sender(
+            session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
+        )
         await send_prepared_agent_email(
             sender, prepared, extra_headers=pending.extra_headers, message=pending.message
         )
-    except OutboundMailError as exc:
+    except Exception as exc:  # OutboundMailError, or the sender could not even be built
         await write_mail_log(
             session,
             status="failed",

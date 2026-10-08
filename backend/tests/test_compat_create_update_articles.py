@@ -974,12 +974,23 @@ async def test_owner_without_lock_locks_the_new_ticket(sync_url: str) -> None:
         row = _query(sync_url, "SELECT ticket_lock_id FROM ticket WHERE id = :t", t=ticket_id)
         return int(row[0][0])
 
+    def _lock_history(ticket_id: int) -> list[str]:
+        rows = _query(
+            sync_url,
+            "SELECT t.name FROM ticket_history h JOIN ticket_history_type t"
+            " ON t.id = h.history_type_id WHERE h.ticket_id = :t"
+            " AND t.name IN ('Lock', 'Unlock') ORDER BY h.id",
+            t=ticket_id,
+        )
+        return [str(r[0]) for r in rows]
+
     owned = await _call(
         sync_url,
         "create",
         {"Ticket": _ticket("GI7630 lock owner", OwnerID=AGENT), "Article": _article("x")},
     )
     assert _lock(owned["TicketID"]) == 2
+    assert _lock_history(owned["TicketID"]) == ["Lock"]  # like TicketLockSet
     explicit = await _call(
         sync_url,
         "create",
@@ -993,13 +1004,38 @@ async def test_owner_without_lock_locks_the_new_ticket(sync_url: str) -> None:
         sync_url, "create", {"Ticket": _ticket("GI7630 lock none"), "Article": _article("x")}
     )
     assert _lock(nobody["TicketID"]) == 1
+    # a closed ticket with an owner ends up locked (forced unlock, then the owner lock) ...
+    closed_owned = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket("GI7630 closed owner", StateID=2, OwnerID=AGENT),
+            "Article": _article("x"),
+        },
+    )
+    assert _lock(closed_owned["TicketID"]) == 2
+    # ... but a requested lock on a closed ticket is dropped and stays dropped
+    closed_locked = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": _ticket("GI7630 closed lock", StateID=2, OwnerID=AGENT, LockID=2),
+            "Article": _article("x"),
+        },
+    )
+    assert _lock(closed_locked["TicketID"]) == 1
+    assert _lock_history(closed_locked["TicketID"]) == ["Unlock"]
 
 
 @pytest.mark.db
 async def test_attachment_bytes_are_stored_and_read_back_on_both_dialects(sync_url: str) -> None:
     import base64
 
-    payload = bytes(range(256)) * 3
+    from tiqora.api.compat.operations import op_ticket_get
+    from tiqora.storage.backend import DbMimeStorage
+
+    long_payload = bytes(range(256)) * 3  # many 76-column base64 lines
+    small_payload = b"x" * 60  # just over one 57-byte base64 line
     result = await _call(
         sync_url,
         "create",
@@ -1007,34 +1043,65 @@ async def test_attachment_bytes_are_stored_and_read_back_on_both_dialects(sync_u
             "Ticket": _ticket("GI7630 attachment"),
             "Article": _article(
                 "x",
-                Attachment={
-                    "Filename": "a.bin",
-                    "ContentType": "application/octet-stream",
-                    "Content": base64.b64encode(payload).decode(),
-                },
+                Attachment=[
+                    {
+                        "Filename": name,
+                        "ContentType": "application/octet-stream",
+                        "Content": base64.b64encode(payload).decode(),
+                    }
+                    for name, payload in (("long.bin", long_payload), ("small.bin", small_payload))
+                ],
             ),
         },
     )
     assert "Error" not in result, result
-    from tiqora.api.compat.operations import op_ticket_get
+    ticket_id = result["TicketID"]
 
-    engine = create_async_engine(_async_url(sync_url))
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
-    try:
-        async with factory() as session:
-            got = await op_ticket_get(
-                {
-                    "SessionID": AGENT_SESSION,
-                    "TicketID": result["TicketID"],
-                    "AllArticles": 1,
-                    "Attachments": 1,
-                },
-                session,
-                store,
-            )
-    finally:
-        await engine.dispose()
-    attachment = got["Ticket"][0]["Article"][0]["Attachment"][0]
-    assert base64.b64decode(attachment["Content"]) == payload
-    assert attachment["FilesizeRaw"] == len(payload)
+    async def _read_back() -> dict[str, bytes]:
+        engine = create_async_engine(_async_url(sync_url))
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        store = SessionStore(_FakeRedis(), _FakeSettings())  # type: ignore[arg-type]
+        try:
+            async with factory() as session:
+                got = await op_ticket_get(
+                    {
+                        "SessionID": AGENT_SESSION,
+                        "TicketID": ticket_id,
+                        "AllArticles": 1,
+                        "Attachments": 1,
+                    },
+                    session,
+                    store,
+                )
+                attachments = got["Ticket"][0]["Article"][0]["Attachment"]
+                via_ticket_get = {
+                    a["Filename"]: base64.b64decode(a["Content"]) for a in attachments
+                }
+                storage = DbMimeStorage(session)
+                via_storage: dict[str, bytes] = {}
+                for meta in await storage.list_attachments(result["ArticleID"]):
+                    found = await storage.get_attachment(meta.id)
+                    assert found is not None
+                    via_storage[meta.filename or ""] = found.content
+                assert via_storage == via_ticket_get
+                return via_ticket_get
+        finally:
+            await engine.dispose()
+
+    expected = {"long.bin": long_payload, "small.bin": small_payload}
+    assert await _read_back() == expected  # what add_article wrote
+
+    # what Znuny itself writes: MIME::Base64 encode_base64 text on PostgreSQL (76-column lines
+    # and a trailing newline), raw bytes on MariaDB
+    postgres = sync_url.startswith("postgres")
+    for name, payload in expected.items():
+        stored: Any = base64.encodebytes(payload).decode() if postgres else payload
+        _query(
+            sync_url,
+            "UPDATE article_data_mime_attachment SET content = :c WHERE filename = :f"
+            " AND article_id = :a",
+            c=stored,
+            f=name,
+            a=result["ArticleID"],
+        )
+    assert await _read_back() == expected

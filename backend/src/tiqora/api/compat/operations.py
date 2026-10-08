@@ -1074,10 +1074,13 @@ async def op_ticket_create(
         session, ticket.get("Responsible"), ticket.get("ResponsibleID")
     )
 
+    lock_for_owner = False
     lock_id = await _resolve_lock_id(session, ticket.get("Lock"), ticket.get("LockID"))
     if lock_id is None:
-        # TicketCreate.pm: an owner given without Lock/LockID locks the ticket for them
-        lock_id = 2 if has_owner else 1
+        lock_id = 1
+        # TicketCreate.pm: an owner given without Lock/LockID locks the ticket for them,
+        # after the articles (see below)
+        lock_for_owner = has_owner
 
     type_id = await _resolve_type_id(session, ticket.get("Type"), ticket.get("TypeID"))
     service_id = await _resolve_service_id(session, ticket.get("Service"), ticket.get("ServiceID"))
@@ -1185,6 +1188,11 @@ async def op_ticket_create(
                     article_id=article_id,
                     user_id=write_user_id,
                 )
+            if lock_for_owner:
+                # owner set after the articles, then locked (even a closed ticket)
+                await lock_ticket(
+                    session, ticket_id=ticket_id, user_id=write_user_id, sysconfig=sysconfig
+                )
         await session.commit()
     except TicketAccessDenied:
         await session.rollback()
@@ -1229,10 +1237,11 @@ async def _run_mail_jobs(
     """Send the queued mails, in article order, once everything is committed.
 
     Each mail runs in its own short transaction. A failing ``ArticleSend`` mail is
-    recorded in ``tiqora_mail_log``, logged and answered with Znuny's text (the data
-    stays; later mails are not sent, Znuny would have stopped there). A failing auto
+    recorded in ``tiqora_mail_log`` and logged; the remaining mails are still sent and the
+    first failure is answered with Znuny's text (the committed data stays). A failing auto
     response is only logged: Znuny ignores ``SendAutoResponse``'s result.
     """
+    first_error: dict[str, Any] | None = None
     for job in jobs:
         if job.pending is not None:
             try:
@@ -1245,10 +1254,12 @@ async def _run_mail_jobs(
                     article_id=job.pending.article_id,
                     exc_info=True,
                 )
-                return _err(
-                    f"{op}.OperationFailed",
-                    f"{op}: Article could not be created, please contact the system administrator",
-                )
+                if first_error is None:
+                    first_error = _err(
+                        f"{op}.OperationFailed",
+                        f"{op}: Article could not be created, please contact the system"
+                        " administrator",
+                    )
         elif job.auto_response is not None:
             gi = job.auto_response
             try:
@@ -1282,7 +1293,7 @@ async def _run_mail_jobs(
                     type=gi.auto_response_type,
                     exc_info=True,
                 )
-    return None
+    return first_error
 
 
 async def _default_from(
@@ -1297,10 +1308,7 @@ async def _default_from(
         return fallback
     row = (
         await session.execute(
-            text(
-                "SELECT first_name, last_name, email FROM customer_user"
-                " WHERE login = :l AND valid_id = 1 LIMIT 1"
-            ),
+            text("SELECT first_name, last_name, email FROM customer_user WHERE login = :l LIMIT 1"),
             {"l": customer_login},
         )
     ).first()

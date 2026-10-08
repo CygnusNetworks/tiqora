@@ -619,7 +619,7 @@ def _mail_log(sync_url: str) -> list[tuple[str, int | None]]:
 
 
 @pytest.mark.db
-async def test_second_article_send_failure_keeps_the_committed_data(
+async def test_article_send_failure_keeps_the_data_and_sends_the_rest(
     sync_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sender = _ScriptedSender(fail_on=(2,))
@@ -627,7 +627,10 @@ async def test_second_article_send_failure_keeps_the_committed_data(
     result = await _call(
         sync_url,
         "create",
-        {"Ticket": _ticket(), "Article": [_send_article("Eins"), _send_article("Zwei")]},
+        {
+            "Ticket": _ticket(),
+            "Article": [_send_article("Eins"), _send_article("Zwei"), _send_article("Drei")],
+        },
     )
     assert result == {
         "Error": {
@@ -638,13 +641,48 @@ async def test_second_article_send_failure_keeps_the_committed_data(
             ),
         }
     }
-    # ticket and both articles persist, the first mail went out, the failure is in the log
+    # ticket and all articles persist; the 1st and 3rd mail went out; every outcome is logged
     tickets = _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE)
     assert len(tickets) == 1
     ids = _article_ids(sync_url, int(tickets[0][0]))
-    assert len(ids) == 2
-    assert [str(m["Subject"]).endswith("Eins") for m in sender.sent] == [True]
-    assert _mail_log(sync_url) == [("sent", ids[0]), ("failed", ids[1])]
+    assert len(ids) == 3
+    assert [str(m["Subject"]).rsplit(" ", 1)[-1] for m in sender.sent] == ["Eins", "Drei"]
+    assert _mail_log(sync_url) == [("sent", ids[0]), ("failed", ids[1]), ("sent", ids[2])]
+
+
+@pytest.mark.db
+async def test_every_failing_article_send_is_logged_and_the_first_error_wins(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender(fail_on=(1, 2))
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url,
+        "create",
+        {"Ticket": _ticket(), "Article": [_send_article("Eins"), _send_article("Zwei")]},
+    )
+    assert result["Error"]["ErrorCode"] == "TicketCreate.OperationFailed"
+    ids = _article_ids(
+        sync_url, int(_query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE)[0][0])
+    )
+    assert _mail_log(sync_url) == [("failed", ids[0]), ("failed", ids[1])]
+
+
+@pytest.mark.db
+async def test_unbuildable_sender_is_logged_as_a_failure(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _use_relay(monkeypatch, _ScriptedSender())
+
+    async def _broken(session: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("oauth token fetch failed")
+
+    monkeypatch.setattr(mail_outbound, "build_outbound_sender", _broken)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}
+    )
+    assert result["Error"]["ErrorCode"] == "TicketCreate.OperationFailed"
+    assert [status for status, _ in _mail_log(sync_url)] == ["failed"]
 
 
 @pytest.mark.db
@@ -875,3 +913,26 @@ async def test_customer_follow_up_gets_the_auto_follow_up_and_ticket_data(
     assert "Nachfrage" in str(relay.sent[0]["Subject"])
     assert _history_names(sync_url, ticket_id).count("SendAutoFollowUp") == 1
     assert result["Ticket"]["Article"]["ArticleID"] == result["ArticleID"]
+
+
+@pytest.mark.db
+async def test_invalid_customer_user_still_yields_a_full_name_from(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    # UserFullname comes from CustomerUserDataGet, which does not filter on validity
+    _query(sync_url, "UPDATE customer_user SET valid_id = 2 WHERE login = :l", l=CUST_LOGIN)
+    result = await _call(
+        sync_url,
+        "create",
+        {
+            "Ticket": {**_ticket(), "CustomerUser": CUST_LOGIN},
+            "Article": {"Subject": "Alt", "Body": "Hallo", "SenderType": "customer"},
+        },
+    )
+    assert "Error" not in result, result
+    from_header = _query(
+        sync_url,
+        "SELECT a_from FROM article_data_mime WHERE article_id = :a",
+        a=result["ArticleID"],
+    )[0][0]
+    assert from_header == f'"Kim Kunde" <{CUST_MAIL}>'

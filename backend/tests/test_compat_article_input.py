@@ -125,3 +125,22 @@ def test_matching_signature_and_body_formats_are_left_alone() -> None:
 
     assert _signature_for_body("<i>x</i>", "text/html", "text/html") == "<i>x</i>"
     assert _signature_for_body("a\nb", "text/plain", "text/plain") == "a\nb"
+
+
+def test_signature_line_ends_are_normalised_for_html() -> None:
+    from tiqora.channels.email.outbound_reply import _signature_for_body
+
+    out = _signature_for_body("a\r\nb\rc", "text/plain", "text/html")
+    assert out == "a<br/>\nb<br/>\nc"
+    assert "\r" not in out
+
+
+def test_storage_decodes_znuny_encode_base64_text() -> None:
+    import base64
+
+    from tiqora.storage.backend import _as_bytes
+
+    for payload in (bytes(range(256)), b"x" * 60, b"hi", b""):
+        text_form = base64.encodebytes(payload).decode()  # 76-column lines + trailing newline
+        assert _as_bytes(text_form) == payload
+        assert _as_bytes(payload) == payload  # MariaDB bytes stay as they are
