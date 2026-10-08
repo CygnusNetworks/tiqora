@@ -20,6 +20,8 @@ export type DialScheme = PhoneConfig["dial_scheme"];
 export type DynamicFieldDef = Schemas["DynamicFieldDefOut"];
 export type ActiveCall = Schemas["ActiveCall"];
 export type PhoneScreen = "AgentTicketPhone" | "AgentTicketPhoneInbound" | "AgentTicketPhoneOutbound";
+/** Screens whose Znuny dynamic-field config `/reference/dynamic-fields` serves. */
+export type DynamicFieldScreen = PhoneScreen | "AgentTicketFreeText";
 
 /** 409 detail of an outbound call on a ticket another agent holds. */
 export type PhoneCallLockedDetail = {
@@ -55,7 +57,7 @@ export const phoneApi = {
   dismissCall(callId: string) {
     return api.request<void>("POST", `/api/v1/phone/calls/${encodeURIComponent(callId)}/dismiss`);
   },
-  screenDynamicFields(screen: PhoneScreen, signal?: AbortSignal) {
+  screenDynamicFields(screen: DynamicFieldScreen, signal?: AbortSignal) {
     return api.request<DynamicFieldDef[]>("GET", "/api/v1/reference/dynamic-fields", {
       query: { screen },
       signal,

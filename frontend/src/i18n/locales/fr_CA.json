@@ -447,6 +447,15 @@
     "durationMinutes_one": "1 minute",
     "durationMinutes_other": "{{count}} minutes",
     "dynamicFields": "Champs dynamiques",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "(pas de titre)",
     "articles": "Articles",
     "history": "Histoire",

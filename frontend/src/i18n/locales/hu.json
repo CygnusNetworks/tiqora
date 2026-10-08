@@ -447,6 +447,15 @@
     "durationMinutes_one": "1 perc",
     "durationMinutes_other": "{{count}} perc",
     "dynamicFields": "Dinamikus mezők",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "(nincs cím)",
     "articles": "Bejegyzések",
     "history": "Előzmények",

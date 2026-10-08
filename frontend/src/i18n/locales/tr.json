@@ -447,6 +447,15 @@
     "durationMinutes_one": "1 dakika",
     "durationMinutes_other": "{{count}} dk",
     "dynamicFields": "Dinamik alanlar",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "(başlık yok)",
     "articles": "Makaleler",
     "history": "Geçmiş",

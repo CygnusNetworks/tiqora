@@ -3,7 +3,7 @@ import type { DynamicFieldDef } from "@/lib/phoneApi";
 import { displayTimeZone } from "@/lib/timeZone";
 import { dfToFieldValue, dynamicFieldToDef, fieldValueToDf, type DynamicFieldValues } from "./dynamicFields";
 import { FieldsForm } from "./FieldsForm";
-import type { FieldValue, FieldValues } from "./types";
+import type { FieldErrors, FieldOption, FieldValue, FieldValues } from "./types";
 
 /**
  * Editors for ticket dynamic fields as `/reference/dynamic-fields` describes
@@ -16,11 +16,19 @@ export function DynamicFieldsForm({
   values,
   onChange,
   testId = "df",
+  errors,
+  optionsByKey,
+  disabled,
 }: {
   fields: DynamicFieldDef[];
   values: DynamicFieldValues;
   onChange: (name: string, values: string[]) => void;
   testId?: string;
+  /** Field errors by dynamic-field name. */
+  errors?: FieldErrors;
+  /** Loaded (ACL-filtered) options by `DynamicField_<name>`; they win over the static ones. */
+  optionsByKey?: Record<string, FieldOption[]>;
+  disabled?: boolean;
 }) {
   const defs = useMemo(() => fields.map(dynamicFieldToDef), [fields]);
   const zone = displayTimeZone();
@@ -36,6 +44,9 @@ export function DynamicFieldsForm({
       values={engineValues}
       columns={2}
       testId={testId}
+      errors={errors}
+      optionsByKey={optionsByKey}
+      disabled={disabled}
       onChange={(key: string, v: FieldValue) => onChange(key, fieldValueToDf(kindOf(key), v, zone))}
     />
   );

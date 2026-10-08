@@ -447,6 +447,15 @@
     "durationMinutes_one": "1 min",
     "durationMinutes_other": "{{count}} min",
     "dynamicFields": "Camps dinàmics",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "(sense títol)",
     "articles": "Articles",
     "history": "Història",

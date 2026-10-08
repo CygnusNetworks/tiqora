@@ -9,14 +9,21 @@ import { TicketHeader } from "./TicketHeader";
 // TicketHeader now embeds TicketHeaderActions (pills + Antworten/Notiz/Mehr),
 // which fetches reference data and articles — mock the same surface
 // ActionToolbar.test.tsx mocks.
-const { listReferencePriorities, listReferenceStates, listArticles, patchTicket } = vi.hoisted(
+const { listReferencePriorities, listReferenceStates, listArticles, patchTicket, screenDynamicFields } = vi.hoisted(
   () => ({
+    screenDynamicFields: vi.fn(),
     listReferencePriorities: vi.fn(),
     listReferenceStates: vi.fn(),
     listArticles: vi.fn(),
     patchTicket: vi.fn(),
   }),
 );
+
+// The embedded TicketDynamicFields asks for the Znuny "Freie Felder" config.
+vi.mock("@/lib/phoneApi", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/phoneApi")>("@/lib/phoneApi");
+  return { ...actual, phoneApi: { ...actual.phoneApi, screenDynamicFields } };
+});
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -116,6 +123,21 @@ describe("TicketHeader", () => {
     ]);
     listArticles.mockReset().mockResolvedValue([]);
     patchTicket.mockReset().mockResolvedValue(undefined);
+    screenDynamicFields.mockReset().mockResolvedValue([]);
+  });
+
+  it("embeds the dynamic fields and offers Bearbeiten for a configured field", async () => {
+    screenDynamicFields.mockResolvedValue([
+      { name: "Area", label: "Bereich", field_type: "Dropdown", required: false, possible_values: { net: "Netz" } },
+    ]);
+    wrap(
+      makeTicket({
+        permissions: { ro: true, rw: true, note: true, owner: true, priority: true, move_into: true, create: true },
+        dynamic_fields: [{ name: "Area", label: "Bereich", field_type: "Dropdown", values: ["net"] }],
+      }),
+    );
+    expect(await screen.findByText("Netz")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-header")).toContainElement(await screen.findByTestId("ticket-df-edit"));
   });
 
   it("marks the pending segment of the status bar with the exact pending state", async () => {

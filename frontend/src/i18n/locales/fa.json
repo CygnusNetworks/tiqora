@@ -447,6 +447,15 @@
     "durationMinutes_one": "1 دقیقه",
     "durationMinutes_other": "{{count}} دقیقه",
     "dynamicFields": "زمینه های پویا",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "(بدون عنوان)",
     "articles": "مقالات",
     "history": "تاریخچه",

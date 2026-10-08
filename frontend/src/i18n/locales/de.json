@@ -447,6 +447,15 @@
     "durationMinutes_one": "1 Min.",
     "durationMinutes_other": "{{count}} Min.",
     "dynamicFields": "Dynamische Felder",
+    "dynamicFieldsEdit": {
+      "edit": "Bearbeiten",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "saved": "Gespeichert",
+      "saveError": "Die Felder konnten nicht gespeichert werden.",
+      "yes": "Ja",
+      "no": "Nein"
+    },
     "noTitle": "(kein Titel)",
     "articles": "Artikel",
     "history": "Historie",

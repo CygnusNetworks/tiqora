@@ -186,6 +186,15 @@ function ticketFacets() {
 }
 const ticketById = new Map(ticketItems.map((t) => [t.id, t]));
 
+/** `/reference/dynamic-fields` for the zoom edit (AgentTicketFreeText): two set on the demo tickets, one empty. */
+const demoFreeTextFields = [
+  { name: "Category", label: "Category", field_type: "Dropdown", required: false,
+    possible_values: { Hardware: "Hardware", Software: "Software", Network: "Network" } },
+  { name: "Impact", label: "Impact", field_type: "Dropdown", required: false,
+    possible_values: { Low: "Low", Medium: "Medium", High: "High" } },
+  { name: "Due", label: "Due date", field_type: "Date", required: false, possible_values: null },
+];
+
 function ticketDetailFor(id: number) {
   const item = ticketById.get(id) ?? ticketItems[0];
   return {
@@ -1578,6 +1587,10 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/tickets/114/templates")) return chatSnippets;
   // Phone / CTI: no live call in the demo; caller lookup resolves the sample customer.
   if (p.endsWith("/api/v1/reference/phone-config")) return { dial_scheme: "tel" };
+  // Zoom edit: Znuny's AgentTicketFreeText dynamic-field config (Category has a value, Due is empty)
+  // (the resolver sees no query/body: every screen gets the same config, options stay the static ones)
+  if (p.endsWith("/api/v1/reference/dynamic-fields")) return demoFreeTextFields;
+  if (p.endsWith("/api/v1/reference/field-options") && method === "POST") return { options: {} };
   if (p.endsWith("/api/v1/phone/calls/active")) return [];
   if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;
   // Background jobs: the ticket CSV export finishes at once in the demo.

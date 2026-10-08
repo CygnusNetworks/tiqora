@@ -1,6 +1,6 @@
-import { useTranslation } from "react-i18next";
 import type { TicketDetail } from "@/lib/api";
 import { LinkedTickets } from "./LinkedTickets";
+import { TicketDynamicFields } from "./TicketDynamicFields";
 import { TicketHeaderActions } from "./TicketHeaderActions";
 import type { TicketAiSlots } from "./AiPanel";
 import { combinedEscalationLevel, spineClassName, stateColorVar } from "@/lib/status";
@@ -9,7 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
 /**
  * Ticket-zoom header shell: escalation/state spine + the content rows (see
  * `TicketHeaderActions`, which owns the reference-data queries and dialog
- * wiring and places the AI pieces) + collapsible dynamic fields.
+ * wiring and places the AI pieces) + collapsible, editable dynamic fields (`TicketDynamicFields`).
  */
 export function TicketHeader({
   ticket,
@@ -31,8 +31,6 @@ export function TicketHeader({
   /** "Similar tickets" trigger for the people row. */
   similar?: ReactNode;
 }) {
-  const { t } = useTranslation();
-
   const escLevel = combinedEscalationLevel([
     ticket.escalation_time,
     ticket.escalation_response_time,
@@ -58,21 +56,7 @@ export function TicketHeader({
         similar={similar}
       />
       <LinkedTickets ticketId={ticket.id} />
-      {ticket.dynamic_fields && ticket.dynamic_fields.length > 0 && (
-        <details className="rounded border border-hairline bg-surface-subtle px-3 py-2 text-sm">
-          <summary className="cursor-pointer font-medium text-muted">
-            {t("ticket.dynamicFields")}
-          </summary>
-          <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {ticket.dynamic_fields.map((df) => (
-              <div key={df.name}>
-                <dt className="text-xs text-muted">{df.label || df.name}</dt>
-                <dd className="text-ink">{(df.values ?? []).map(String).join(", ") || "—"}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
-      )}
+      <TicketDynamicFields ticket={ticket} />
     </header>
   );
 }

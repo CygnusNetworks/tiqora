@@ -447,6 +447,15 @@
     "durationMinutes_one": "Dakika 1",
     "durationMinutes_other": "{{count}} dakika",
     "dynamicFields": "Sehemu zinazobadilika",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "(hakuna kichwa)",
     "articles": "Makala",
     "history": "Historia",

@@ -447,6 +447,15 @@
     "durationMinutes_one": "1分鐘",
     "durationMinutes_other": "{{count}}分鐘",
     "dynamicFields": "動態字段",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "（無標題）",
     "articles": "文章",
     "history": "歷史",

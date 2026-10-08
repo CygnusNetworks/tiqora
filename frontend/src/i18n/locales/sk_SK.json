@@ -447,6 +447,15 @@
     "durationMinutes_one": "1 min",
     "durationMinutes_other": "{{count}} min",
     "dynamicFields": "Dynamické polia",
+    "dynamicFieldsEdit": {
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved",
+      "saveError": "The fields could not be saved.",
+      "yes": "Yes",
+      "no": "No"
+    },
     "noTitle": "(bez názvu)",
     "articles": "články",
     "history": "História",
