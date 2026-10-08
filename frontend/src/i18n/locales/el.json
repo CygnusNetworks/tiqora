@@ -4232,5 +4232,16 @@
       "phone": "Phone",
       "mobile": "Mobile"
     }
+  },
+  "fields": {
+    "none": "–",
+    "required": "Required",
+    "invalidNumber": "Please enter a number within the allowed range.",
+    "tooLong": "The text is too long.",
+    "unsupported": "This field cannot be edited here.",
+    "secretStored": "Stored – leave empty to keep it unchanged",
+    "secretRemove": "Remove",
+    "addValue": "Add",
+    "removeValue": "Remove {{label}}"
   }
 }

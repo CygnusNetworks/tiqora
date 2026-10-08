@@ -4240,5 +4240,16 @@
       "phone": "Telefon",
       "mobile": "Mobil"
     }
+  },
+  "fields": {
+    "none": "–",
+    "required": "Pflichtfeld",
+    "invalidNumber": "Bitte eine Zahl im erlaubten Bereich eingeben.",
+    "tooLong": "Der Text ist zu lang.",
+    "unsupported": "Dieses Feld kann hier nicht bearbeitet werden.",
+    "secretStored": "Gespeichert – leer lassen, um nichts zu ändern",
+    "secretRemove": "Entfernen",
+    "addValue": "Hinzufügen",
+    "removeValue": "{{label}} entfernen"
   }
 }
