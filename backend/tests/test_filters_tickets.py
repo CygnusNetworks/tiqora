@@ -11,15 +11,17 @@ from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import bindparam, create_engine, text
+from sqlalchemy import bindparam, create_engine, false, text, true
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.db.tiqora.base import TiqoraBase
-from tiqora.filters import Filter, FilterError
+from tiqora.filters import Condition, Filter, FilterError
 from tiqora.filters.tickets import (
     DF_FIELD_PREFIX,
     TICKET_FILTER_FIELDS,
     TicketQueryScope,
+    _const_compare,
+    _fit_int_condition,
     compile_ticket_filter,
     count_tickets,
     ticket_filter_fields,
@@ -453,6 +455,58 @@ async def test_out_of_range_ints_do_not_reach_the_database(session: AsyncSession
     )
     due = _cond("escalation_due_within", "lte", 10**15)
     await _ids(session, due, scope)
+
+
+@pytest.mark.asyncio
+async def test_epoch_column_bounds_are_clamped(session: AsyncSession) -> None:
+    scope = await ticket_query_scope(session, AGENT_A)
+    assert await _ids(session, _cond("pending_until", "after", "2100-01-01"), scope) == set()
+    assert await _ids(session, _cond("pending_until", "after", "9999-12-31"), scope) == set()
+    assert await _ids(session, _cond("pending_until", "before", "9999-12-31"), scope) <= {T1, T2}
+    between = _cond("pending_until", "between", {"from": "2030-01-01", "to": "9999-12-31"})
+    assert await _ids(session, between, scope) == set()
+
+
+@pytest.mark.asyncio
+async def test_escalation_due_within_negative_values(session: AsyncSession) -> None:
+    scope = await ticket_query_scope(session, AGENT_A)
+    # T2 escalated one hour before NOW.
+    assert await _ids(session, _cond("escalation_due_within", "lte", -1800), scope) == {T2}
+    assert await _ids(session, _cond("escalation_due_within", "lte", -7200), scope) == set()
+    assert await _ids(session, _cond("escalation_due_within", "lte", -(10**15)), scope) == set()
+
+
+@pytest.mark.parametrize(
+    ("op", "value", "expected"),
+    [
+        ("lt", 10, None),
+        ("lt", 100, True),
+        ("lt", -100, False),
+        ("lt", -50, False),
+        ("lte", 50, True),
+        ("lte", -51, False),
+        ("lte", -50, None),
+        ("gt", -100, True),
+        ("gt", 50, False),
+        ("gt", 49, None),
+        ("gte", 100, False),
+        ("gte", -50, True),
+        ("gte", 50, None),
+    ],
+)
+def test_const_compare_out_of_range(op: str, value: int, expected: bool | None) -> None:
+    assert _const_compare(op, value, -50, 50) is expected
+
+
+def test_fit_int_condition_returns_constants_for_ordered_ops() -> None:
+    lt_big = Filter.model_validate(_cond("n", "lt", 99)).where
+    assert isinstance(lt_big, Condition)
+    fitted = _fit_int_condition(lt_big, -50, 50)
+    assert str(fitted) == str(true())
+    gte_big = lt_big.model_copy(update={"op": "gte"})
+    assert str(_fit_int_condition(gte_big, -50, 50)) == str(false())
+    inside = lt_big.model_copy(update={"value": 5})
+    assert _fit_int_condition(inside, -50, 50) is inside
 
 
 @pytest.mark.asyncio

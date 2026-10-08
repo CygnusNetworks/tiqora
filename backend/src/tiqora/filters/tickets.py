@@ -254,25 +254,27 @@ def _datetime_predicate(
 ) -> ColumnElement[bool]:
     """Positive datetime comparison. ``epoch`` columns hold seconds, 0 = unset."""
 
-    def bound(dt: datetime) -> Any:
-        return _epoch(dt) if epoch else dt
+    def cmp(op_: str, dt: datetime) -> ColumnElement[bool]:
+        if not epoch:
+            return {"lt": col < dt, "lte": col <= dt, "gt": col > dt, "gte": col >= dt}[op_]  # type: ignore[no-any-return]
+        return _compare(col, op_, _epoch(dt), *_INT32)
 
     op, value = cond.op, cond.value
     if op == "before":
-        pred = col < bound(_datetime_bound(value, path))
+        pred = cmp("lt", _datetime_bound(value, path))
     elif op == "after":
-        pred = col > bound(_datetime_bound(value, path))
+        pred = cmp("gt", _datetime_bound(value, path))
     elif op == "between":
         pred = and_(
-            col >= bound(_datetime_bound(value["from"], f"{path}.from")),
-            col < bound(_datetime_bound(value["to"], f"{path}.to")),
+            cmp("gte", _datetime_bound(value["from"], f"{path}.from")),
+            cmp("lt", _datetime_bound(value["to"], f"{path}.to")),
         )
     elif op in ("within_last", "older_than"):
         try:
-            limit = bound(now - relative_delta(value, path=path))
+            limit = now - relative_delta(value, path=path)
         except OverflowError:
             raise FilterError("Der Zeitraum ist zu groß.", path=path) from None
-        pred = col >= limit if op == "within_last" else col < limit
+        pred = cmp("gte" if op == "within_last" else "lt", limit)
     else:  # pragma: no cover - validate_filter limits the ops
         raise FilterError(f"„{op}“ ist für Datumsfelder nicht möglich.", path=path)
     return and_(col > 0, pred) if epoch else pred
@@ -331,6 +333,27 @@ def _int_bounds(col: Any) -> tuple[int, int]:
     return _INT32
 
 
+def _const_compare(op: str, v: int, lo: int, hi: int) -> bool | None:
+    """Constant answer of ``col <op> v`` for a column in ``[lo, hi]``, else None."""
+    if op == "lt":
+        return True if v > hi else False if v <= lo else None
+    if op == "lte":
+        return True if v >= hi else False if v < lo else None
+    if op == "gt":
+        return True if v < lo else False if v >= hi else None
+    if op == "gte":
+        return True if v <= lo else False if v > hi else None
+    raise ValueError(op)  # pragma: no cover
+
+
+def _compare(col: Any, op: str, v: int, lo: int, hi: int) -> ColumnElement[bool]:
+    """``col <op> v`` for an integer column; out-of-range values are never bound."""
+    const = _const_compare(op, v, lo, hi)
+    if const is not None:
+        return true() if const else false()
+    return {"lt": col < v, "lte": col <= v, "gt": col > v, "gte": col >= v}[op]  # type: ignore[no-any-return]
+
+
 def _fit_int_condition(cond: Condition, lo: int, hi: int) -> Condition | ColumnElement[bool]:
     """Keep out-of-range values away from the database.
 
@@ -352,7 +375,10 @@ def _fit_int_condition(cond: Condition, lo: int, hi: int) -> Condition | ColumnE
             return cond.model_copy(update={"value": kept})
         return false() if op == "in" else true()
     if op in ("lt", "lte", "gt", "gte"):
-        return cond.model_copy(update={"value": min(max(value, lo), hi)})
+        const = _const_compare(op, value, lo, hi)
+        if const is None:
+            return cond
+        return true() if const else false()
     if op == "between":
         low, high = value["from"], value["to"]
         if low > hi or high < lo:
@@ -440,6 +466,8 @@ class _Compiler:
         if spec.type in ("id", "int"):
             fitted = _fit_int_condition(cond, *_int_bounds(col))
             if not isinstance(fitted, Condition):
+                if nullable and cond.op not in _NEGATED_OPS:
+                    return and_(col.is_not(None), fitted)
                 return fitted
             cond = fitted
         op = cond.op
@@ -527,7 +555,8 @@ class _Compiler:
             pred = Ticket.id.in_(ai_ids) if ai_ids else false()
             return not_(pred) if negative else pred
         if key == "escalation_due_within":
-            return _escalation_due_before(min(_epoch(self._now) + max(int(value), 0), _INT32[1]))
+            limit = _epoch(self._now) + int(value)
+            return _escalation_due_before(min(max(limit, _INT32[0]), _INT32[1]))
         if key == "channel":
             channels = value if isinstance(value, list) else [value]
             return or_(*(_channel_condition(Ticket.id, c) for c in channels))
