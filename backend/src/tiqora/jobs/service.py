@@ -57,6 +57,8 @@ async def enqueue_job(
                         TiqoraJob.kind == kind,
                         TiqoraJob.dedupe_key == dedupe_key,
                         TiqoraJob.status.in_(ACTIVE_STATUSES),
+                        # a job being cancelled is dying: a restart must not join it
+                        TiqoraJob.cancel_requested.is_(False),
                     )
                     .order_by(TiqoraJob.id)
                     .limit(1)
@@ -108,6 +110,7 @@ async def find_active_job(session: AsyncSession, *, kind: str, dedupe_key: str) 
                     TiqoraJob.kind == kind,
                     TiqoraJob.dedupe_key == dedupe_key,
                     TiqoraJob.status.in_(ACTIVE_STATUSES),
+                    TiqoraJob.cancel_requested.is_(False),
                 )
                 .order_by(TiqoraJob.id)
                 .limit(1)

@@ -1883,8 +1883,8 @@ async def update_dynamic_fields_strict(
     """
     from sqlalchemy import select
 
-    from tiqora.api.v1.admin.dynamic_fields import config_from_yaml
     from tiqora.db.legacy.dynamic_field import DynamicField
+    from tiqora.domain.dynamic_field_config import config_from_yaml
 
     for field_name, field_values in values.items():
         field = await load_ticket_dynamic_field(session, field_name)

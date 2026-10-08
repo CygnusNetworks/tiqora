@@ -435,8 +435,8 @@ async def screen_dynamic_fields(
     not offered -- the write paths set ticket fields only.
     """
     _ = user
-    from tiqora.api.v1.admin.dynamic_fields import config_from_yaml
     from tiqora.db.legacy.dynamic_field import DynamicField
+    from tiqora.domain.dynamic_field_config import config_from_yaml
 
     raw = await SysConfig(session).get(f"Ticket::Frontend::{screen}###DynamicField", {})
     configured: dict[str, int] = {}

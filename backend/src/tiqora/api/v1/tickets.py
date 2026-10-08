@@ -788,7 +788,10 @@ async def start_ticket_export_job(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={
-                "message": "Es laufen bereits zwei Exporte. Bitte warte, bis einer fertig ist."
+                "message": (
+                    f"Es laufen bereits {MAX_ACTIVE_EXPORTS_PER_USER} Exporte. "
+                    "Bitte warte, bis einer fertig ist."
+                )
             },
         )
     job = existing or await enqueue_job(

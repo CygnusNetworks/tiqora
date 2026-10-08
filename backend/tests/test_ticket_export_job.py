@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
+from tiqora.api.v1.tickets import MAX_ACTIVE_EXPORTS_PER_USER
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser
@@ -271,6 +272,24 @@ async def test_same_export_twice_joins_the_pending_job(
     assert a.json()["job_id"] == b.json()["job_id"]
 
 
+async def test_restart_after_cancel_request_does_not_join_the_dying_job(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with _client(factory) as client:
+        a = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+        # A running job whose cancellation was requested is still "active" but dying.
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "UPDATE tiqora_job SET status='running', cancel_requested=:c WHERE id=:i"
+                ).bindparams(bindparam("c", True), bindparam("i", a.json()["job_id"]))
+            )
+            await s.commit()
+        b = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+    assert a.status_code == b.status_code == 202
+    assert b.json()["job_id"] != a.json()["job_id"]
+
+
 async def test_third_active_export_is_rejected_with_429(
     factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -284,7 +303,9 @@ async def test_third_active_export_is_rejected_with_429(
         after_cancel = await client.post("/api/v1/tickets/export-jobs", json={"params": {}})
     assert first.status_code == second.status_code == 202
     assert third.status_code == 429
-    assert third.json()["detail"]["message"].startswith("Es laufen bereits")
+    assert third.json()["detail"]["message"].startswith(
+        f"Es laufen bereits {MAX_ACTIVE_EXPORTS_PER_USER} Exporte"
+    )
     assert again.status_code == 202  # joins the pending identical export, not a new slot
     assert after_cancel.status_code == 202
 

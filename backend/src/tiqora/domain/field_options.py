@@ -274,7 +274,7 @@ async def collect_field_options(
     :class:`~tiqora.domain.ticket_service.TicketAccessDenied` propagate); its
     attributes are the default ACL context, explicit ``context`` ids override.
     """
-    from tiqora.api.v1.admin.dynamic_fields import config_from_yaml
+    from tiqora.domain.dynamic_field_config import config_from_yaml
 
     ctx = req.context
     ids: dict[str, int | None] = {

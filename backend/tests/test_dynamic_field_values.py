@@ -686,6 +686,28 @@ async def test_patch_dropdown_value_must_be_a_possible_value(env: Any) -> None:
 
 
 @pytest.mark.db
+async def test_patch_accepts_yaml_lookalike_possible_value_keys(env: Any) -> None:
+    """Stored keys ``yes``/``no``/``01`` are strings (YAML::XS), not bool/int."""
+    url, factory = env
+    _set_possible_values(
+        url, "WaveDrop", "---\nPossibleValues:\n  yes: Ja\n  no: Nein\n  01: x\n  '02': z\n"
+    )
+    async with _client(factory, AGENT_RW) as client:
+        ok = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["yes"]}}
+        )
+        ok_num = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["01"]}}
+        )
+        bad = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["True"]}}
+        )
+    assert ok.status_code == 204, ok.text
+    assert ok_num.status_code == 204, ok_num.text
+    assert bad.status_code == 422
+
+
+@pytest.mark.db
 async def test_internal_set_ticket_dynamic_field_is_not_value_validated(env: Any) -> None:
     """Only the agent-facing PATCH validates PossibleValues (process engine etc. do not)."""
     url, factory = env
