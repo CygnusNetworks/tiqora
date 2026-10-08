@@ -20,64 +20,10 @@ from pydantic import BaseModel
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.channels.common import channel_enabled, encrypt_channel_secret, setting_key
+from tiqora.channels.registry import CHANNEL_CONFIG_KEYS
 from tiqora.domain.settings_store import get_setting, set_setting
 
 router = APIRouter(prefix="/channels", tags=["admin:channels"])
-
-# Allowed config keys per channel — anything else is rejected (this endpoint
-# writes directly into tiqora_settings, so we don't want to accept arbitrary
-# key names). "enabled" is handled separately from the other keys.
-CHANNEL_CONFIG_KEYS: Final[dict[str, set[str]]] = {
-    "sms": {
-        "outbound_webhook_url",
-        "outbound_shared_secret",
-        "inbound_shared_secret",
-        "default_customer_user",
-        "queue_name",
-    },
-    "whatsapp": {
-        "phone_number_id",
-        "access_token",
-        "app_secret",
-        "verify_token",
-        "api_version",
-        "default_customer_user",
-        "queue_name",
-    },
-    "phone": {
-        "inbound_shared_secret",
-        "dial_scheme",
-        "default_customer_user",
-        "queue_name",
-        "originate_enabled",
-        "originate_ari_url",
-        "originate_ari_user",
-        "originate_ari_secret",
-        "originate_context",
-        "originate_endpoint",
-        "originate_timeout",
-        "originate_internal",
-        "originate_region",
-        "originate_cti",
-    },
-    "telegram": {
-        "bot_token",
-        "queue_name",
-        "default_customer_user",
-        "mode",
-        "webhook_url",
-        "webhook_secret_token",
-        "consent_required",
-        "consent_text",
-        "consent_confirmed_text",
-        "start_text",
-        "tone_prompt",
-        "consent_button_label",
-        "identity_no_match_text",
-        "identity_handoff_text",
-        "followup_reopen_days",
-    },
-}
 
 _SECRET_KEY_MARKERS: Final[tuple[str, ...]] = ("secret", "token")
 # Placeholder returned on GET for secret keys; writing it back must not rotate.

@@ -2127,6 +2127,23 @@ export interface paths {
         patch: operations["update_dynamic_field_api_v1_admin_dynamic_fields__field_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/extensions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Extensions */
+        get: operations["list_extensions_api_v1_admin_extensions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/feature-grants/{feature}": {
         parameters: {
             query?: never;
@@ -11736,6 +11753,24 @@ export interface components {
             hit?: components["schemas"]["EscalationHitOut"] | null;
             /** Valid */
             valid: boolean;
+        };
+        /** ExtensionItemOut */
+        ExtensionItemOut: {
+            /** Key */
+            key: string;
+            /** Owner */
+            owner: string;
+        };
+        /** ExtensionPointOut */
+        ExtensionPointOut: {
+            /** Description */
+            description: string;
+            /** Items */
+            items: components["schemas"]["ExtensionItemOut"][];
+            /** Key */
+            key: string;
+            /** Sdk Stable */
+            sdk_stable: boolean;
         };
         /**
          * FeatureGrantsOut
@@ -22482,6 +22517,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DynamicFieldOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_extensions_api_v1_admin_extensions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtensionPointOut"][];
                 };
             };
             /** @description Validation Error */

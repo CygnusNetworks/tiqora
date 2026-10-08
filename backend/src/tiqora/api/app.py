@@ -98,6 +98,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         environment=settings.environment,
     )
 
+    # Build + freeze the extension registry now so a broken registration fails at boot.
+    from tiqora.extensions import get_registry
+
+    get_registry()
+
     # Detect OTRS/Znuny schema tier and refuse unknown shapes (with override).
     # Soft-skip only when the DB is unreachable (dev/tests without a peer DB);
     # an *unknown* schema on a reachable DB hard-fails unless overridden.

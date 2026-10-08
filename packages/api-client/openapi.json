@@ -11785,6 +11785,55 @@
         "title": "EscalationTestOut",
         "type": "object"
       },
+      "ExtensionItemOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "owner"
+        ],
+        "title": "ExtensionItemOut",
+        "type": "object"
+      },
+      "ExtensionPointOut": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExtensionItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "sdk_stable": {
+            "title": "Sdk Stable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "description",
+          "sdk_stable",
+          "items"
+        ],
+        "title": "ExtensionPointOut",
+        "type": "object"
+      },
       "FeatureGrantsOut": {
         "description": "Grants of one feature. Admins always have it; empty lists = admin-only.",
         "properties": {
@@ -39129,6 +39178,75 @@
         "summary": "Update Dynamic Field",
         "tags": [
           "admin:dynamic-fields"
+        ]
+      }
+    },
+    "/api/v1/admin/extensions": {
+      "get": {
+        "operationId": "list_extensions_api_v1_admin_extensions_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExtensionPointOut"
+                  },
+                  "title": "Response List Extensions Api V1 Admin Extensions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Extensions",
+        "tags": [
+          "admin:extensions"
         ]
       }
     },

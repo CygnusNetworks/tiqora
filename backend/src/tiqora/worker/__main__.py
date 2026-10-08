@@ -298,6 +298,10 @@ def run_worker() -> None:
         except NotImplementedError:
             signal.signal(sig, lambda *_: stop.set())
 
+    from tiqora.extensions import get_registry
+
+    get_registry()  # fail at boot on a broken registration
+
     logger.info("tiqora_worker_starting", redis_url=settings.redis_url)
     try:
         loop.run_until_complete(_ensure_legacy_schema_at_worker_start())
