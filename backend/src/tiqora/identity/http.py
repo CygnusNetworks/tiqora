@@ -1,16 +1,37 @@
-"""HTTP helpers shared by the SSO routes (agent and portal)."""
+"""HTTP helpers shared by the SSO routes (agent and portal).
+
+Browser login failures redirect to ``/login`` (agent) or ``/portal/login`` (customer) with
+``?sso_error=<code>&next=<path>``. The complete list of codes is ``SSO_ERROR_CODES``:
+every ``RejectCode`` of ``identity.login`` (no_subject, no_match, user_invalid,
+sso_not_enabled, email_unverified, ambiguous_email, login_taken, jit_missing_fields,
+provider_disabled) plus unknown_provider, config, saml_unavailable, state, saml_invalid,
+oidc_failed, idp_error. The legacy value ``1`` (SPNEGO) stays a generic failure.
+The frontend mirrors this list.
+"""
 
 from __future__ import annotations
 
 from html import escape
-from typing import Any
+from typing import Any, Final, get_args
 from urllib.parse import quote
 
 from fastapi import status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from tiqora.config import Settings
+from tiqora.identity.login import RejectCode
 from tiqora.identity.types import UserKind
+
+SSO_ERROR_CODES: Final[tuple[str, ...]] = (
+    *get_args(RejectCode),
+    "unknown_provider",
+    "config",
+    "saml_unavailable",
+    "state",
+    "saml_invalid",
+    "oidc_failed",
+    "idp_error",
+)
 
 
 def safe_next(next_path: str | None, *, default: str = "/") -> str:

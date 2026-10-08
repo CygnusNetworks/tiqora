@@ -31,6 +31,7 @@ from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.oidc import OidcClientConfig, OIDCService
 from tiqora.identity import sso_routes
 from tiqora.identity.config_models import AttributeMap
+from tiqora.identity.saml_runtime import saml_availability
 from tiqora.identity.store import ProviderChanges, update_provider
 
 pytestmark = pytest.mark.db
@@ -386,7 +387,7 @@ async def test_methods_lists_enabled_agent_sso_providers(env: Env) -> None:
     env_row = body["providers"][0]
     assert (env_row["label"], env_row["kind"]) == ("", "oidc")
     assert body["oidc"] is True
-    assert body["saml"] in (True, False)
+    assert body["saml"] is saml_availability().available
 
 
 async def test_methods_synthesises_env_oidc_without_db() -> None:
@@ -425,9 +426,10 @@ async def test_avatar_picture_kept(env: Env) -> None:
         "picture": "https://cdn.example.org/a.png",
     }
     q = await env.start("/api/v1/auth/sso/idptest-kc/login")
-    await env.client.get(
+    cb = await env.client.get(
         "/api/v1/auth/oidc/idptest-kc/callback", params={"code": "c", "state": q["state"][0]}
     )
+    assert cb.status_code == 302 and cb.headers["location"] == "/"
     token = env.client.cookies.get("tiqora_session")
     assert token
     avatar = await SessionStore(env.redis, env.settings).get_avatar_url(token)  # type: ignore[arg-type]
@@ -455,3 +457,58 @@ async def test_userinfo_sub_must_match_id_token_sub(env: Env) -> None:
         "/api/v1/auth/oidc/callback", params={"code": "c", "state": q["state"][0]}, headers=JSON
     )
     assert ok.status_code == 200, ok.text
+
+
+async def _env_login(env: Env, headers: dict[str, str] = JSON) -> httpx.Response:
+    q = await env.start("/api/v1/auth/oidc/login")
+    return await env.client.get(
+        "/api/v1/auth/oidc/callback", params={"code": "c", "state": q["state"][0]}, headers=headers
+    )
+
+
+async def test_env_oidc_survives_missing_row_without_methods(env: Env) -> None:
+    await _agent(env, 47909, "idp.env.47909")
+    env.idp.claims["c"] = {"sub": "s47909", "preferred_username": "idp.env.47909"}
+    # warm the once-per-process sync flag, then lose the row behind its back
+    await env.client.get("/api/v1/auth/methods")
+    for stmt, params in _stmts()[:2]:
+        await env.session.execute(text(stmt), params)
+    await env.session.commit()
+    resp = await _env_login(env)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["user"]["login"] == "idp.env.47909"
+
+
+async def test_env_oidc_survives_stale_disabled_row(env: Env) -> None:
+    await _agent(env, 47910, "idp.env.47910")
+    env.idp.claims["c"] = {"sub": "s47910", "preferred_username": "idp.env.47910"}
+    await env.client.get("/api/v1/auth/methods")
+    await env.session.execute(
+        text("UPDATE tiqora_identity_provider SET enabled = :f WHERE slug = 'env-oidc'"),
+        {"f": False},
+    )
+    await env.session.commit()
+    resp = await _env_login(env)
+    assert resp.status_code == 200, resp.text
+
+
+async def test_methods_hides_only_the_unreadable_provider(env: Env) -> None:
+    await _kc(env, "good")
+    bad = await _kc(env, "bad")
+    await env.session.execute(
+        text("UPDATE tiqora_identity_provider SET config = 'not json' WHERE id = :i"),
+        {"i": bad.id},
+    )
+    await env.session.commit()
+    body = (await env.client.get("/api/v1/auth/methods")).json()
+    assert [p["slug"] for p in body["providers"]] == ["env-oidc", "idptest-good"]
+
+
+def test_sso_error_codes_cover_reject_codes() -> None:
+    from typing import get_args
+
+    from tiqora.identity.http import SSO_ERROR_CODES
+    from tiqora.identity.login import RejectCode
+
+    assert set(get_args(RejectCode)) <= set(SSO_ERROR_CODES)
+    assert {"state", "saml_invalid", "oidc_failed", "idp_error", "config"} <= set(SSO_ERROR_CODES)

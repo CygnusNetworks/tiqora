@@ -19,7 +19,7 @@ from __future__ import annotations
 import base64
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
@@ -52,7 +52,7 @@ class OIDCOutboundError(OIDCError):
 class OidcClientConfig:
     issuer: str
     client_id: str
-    client_secret: str
+    client_secret: str = field(repr=False)
     scopes: str
     redirect_uri: str
     pkce: Literal["auto", "always", "never"] = "auto"

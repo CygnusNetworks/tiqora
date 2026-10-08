@@ -7,6 +7,7 @@ login and issues the session. The SAML branch arrives with Task 10.
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 from typing import Any
 from urllib.parse import quote
@@ -30,7 +31,11 @@ from tiqora.domain.oidc import (
 )
 from tiqora.identity import flow_state
 from tiqora.identity.config_models import OidcProviderConfig
-from tiqora.identity.env_providers import ensure_env_providers, runtime_config
+from tiqora.identity.env_providers import (
+    ensure_env_providers,
+    runtime_config,
+    sync_env_providers,
+)
 from tiqora.identity.flow_state import LoginState, TestResultData, TestRun
 from tiqora.identity.http import (
     login_error_redirect,
@@ -122,6 +127,27 @@ async def _ensure_env(session: AsyncSession, settings: Settings) -> None:
             logger.debug("rollback_after_failed_env_sync_failed")
 
 
+async def _load_provider(
+    session: AsyncSession, settings: Settings, slug: str
+) -> ProviderRecord | None:
+    """Provider row by slug. The env OIDC row is re-synced when missing or stale.
+
+    Production env OIDC must not fail because its row was deleted or its ``enabled``
+    flag disagrees with Settings; a failed sync is non-fatal.
+    """
+    record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+    if slug == ENV_OIDC_SLUG and (record is None or record.enabled != settings.oidc_enabled):
+        try:
+            await sync_env_providers(session, settings)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("env_provider_resync_failed", error=str(exc))
+            with contextlib.suppress(Exception):
+                await session.rollback()
+        else:
+            record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+    return record
+
+
 async def resolve_admin_id(
     request: Request, session: AsyncSession, settings: Settings
 ) -> int | None:
@@ -184,7 +210,7 @@ async def start_sso_login(
 
     await _ensure_env(session, settings)
     try:
-        record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+        record = await _load_provider(session, settings, slug)
     except Exception as exc:  # noqa: BLE001
         logger.warning("sso_provider_lookup_failed", slug=slug, error=str(exc))
         return fail("config")
@@ -327,7 +353,7 @@ async def _finish_oidc_callback(
 
     await _ensure_env(session, settings)
     try:
-        record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+        record = await _load_provider(session, settings, slug)
         env_row = (
             record
             if slug == ENV_OIDC_SLUG
