@@ -17,10 +17,18 @@ from tests.test_identity_store import _to_async_url
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth_config import AuthConfigService
-from tiqora.identity.links import delete_link, find_link, list_links, upsert_link
+from tiqora.identity import links as links_module
+from tiqora.identity.links import (
+    LinkConflictError,
+    delete_link,
+    find_link,
+    list_links,
+    upsert_link,
+)
 from tiqora.identity.login import (
     REJECT_MESSAGES,
     ExternalIdentity,
+    LoginRejected,
     apply_login,
     plan_login,
     plan_to_dict,
@@ -374,3 +382,169 @@ async def test_link_functions_and_plan_dict(env: tuple[AsyncSession, str]) -> No
     )
     d = plan_to_dict(plan)
     assert d["decision"] == "login" and d["user_id"] == 47001 and d["link_exists"] is True
+
+
+async def _plan(s, p, sub, kind="agent", **attrs):  # type: ignore[no-untyped-def]
+    return await plan_login(s, p, _ident(p.id, sub, **attrs), user_kind=kind, settings=SETTINGS)
+
+
+async def test_upsert_never_repoints_existing_link(env: tuple[AsyncSession, str]) -> None:
+    s, _ = env
+    await seed_agent(s, 47001, "idp.anna.47001")
+    await seed_agent(s, 47002, "idp.bert.47002")
+    p = await _oidc(s, "repoint")
+    await upsert_link(
+        s, provider_id=p.id, user_kind="agent", subject="s", user_id=47001, user_login="a"
+    )
+    with pytest.raises(LinkConflictError):
+        await upsert_link(
+            s, provider_id=p.id, user_kind="agent", subject="s", user_id=47002, user_login="b"
+        )
+    link = await find_link(s, provider_id=p.id, user_kind="agent", subject="s")
+    assert link is not None and (link.user_id, link.user_login) == (47001, "a")
+
+
+async def test_concurrent_first_login_insert_race(
+    env: tuple[AsyncSession, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s, _ = env
+    await seed_agent(s, 47001, "idp.anna.47001")
+    await seed_agent(s, 47002, "idp.bert.47002")
+    p = await _oidc(s, "race")
+    await upsert_link(
+        s, provider_id=p.id, user_kind="agent", subject="s", user_id=47001, user_login="a"
+    )
+    await s.commit()
+    real = links_module._get_row
+    calls = {"n": 0}
+
+    async def blind_first(*a, **kw):  # type: ignore[no-untyped-def]
+        calls["n"] += 1
+        return None if calls["n"] == 1 else await real(*a, **kw)
+
+    # The other request inserted the row between our read and our insert.
+    monkeypatch.setattr(links_module, "_get_row", blind_first)
+    same = await upsert_link(
+        s, provider_id=p.id, user_kind="agent", subject="s", user_id=47001, user_login="a2"
+    )
+    assert (same.user_id, same.user_login) == (47001, "a2")
+    calls["n"] = 0
+    with pytest.raises(LinkConflictError):
+        await upsert_link(
+            s, provider_id=p.id, user_kind="agent", subject="s", user_id=47002, user_login="b"
+        )
+    link = await find_link(s, provider_id=p.id, user_kind="agent", subject="s")
+    assert link is not None and link.user_id == 47001
+    assert len(await list_links(s, provider_id=p.id)) == 1
+
+
+async def test_apply_login_maps_link_conflict_to_reject(
+    env: tuple[AsyncSession, str],
+) -> None:
+    s, _ = env
+    await seed_agent(s, 47001, "idp.anna.47001")
+    await seed_agent(s, 47002, "idp.bert.47002")
+    p = await _oidc(s, "conflict")
+    ident = _ident(p.id, "s", preferred_username="idp.bert.47002")
+    plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+    # another request links the subject to a different account after planning
+    await upsert_link(
+        s, provider_id=p.id, user_kind="agent", subject="s", user_id=47001, user_login="a"
+    )
+    await s.commit()
+    with pytest.raises(LoginRejected) as exc:
+        await apply_login(s, p, ident, plan, settings=SETTINGS)
+    assert exc.value.reject_code == "user_invalid"
+    link = await find_link(s, provider_id=p.id, user_kind="agent", subject="s")
+    assert link is not None and link.user_id == 47001
+
+
+async def test_login_match_ignores_collation_folding(env: tuple[AsyncSession, str]) -> None:
+    s, _ = env
+    await seed_agent(s, 47013, "idp.ts.47013 ")
+    await seed_agent(s, 47014, "idp.josé.47014")
+    p = await _oidc(s, "fold")
+    # accent is not case: MariaDB *_ci says jose = josé, we must not
+    plan = await _plan(s, p, "a", preferred_username="idp.jose.47014")
+    assert plan.reject_code == "no_match"
+    assert (await _plan(s, p, "b", preferred_username="IDP.JOSÉ.47014")).user_id == 47014
+    # claimed value is stripped; stored trailing space is ignored for the fallback
+    assert (await _plan(s, p, "c", preferred_username="  idp.ts.47013  ")).user_id == 47013
+
+
+async def test_customer_email_ignores_collation_folding(env: tuple[AsyncSession, str]) -> None:
+    s, _ = env
+    cid = await seed_customer(s, "idp.kunde.47017@example.org", email="Jos\u00e9.47017@example.org")
+    p = await _oidc(s, "cfold", audience="customer", match_by="email")
+
+    def ident(email: str) -> ExternalIdentity:
+        return ExternalIdentity(
+            provider_id=p.id, subject=email, attributes={"email": (email,)}, email_verified=True
+        )
+
+    no = await plan_login(
+        s, p, ident("jose.47017@example.org"), user_kind="customer", settings=SETTINGS
+    )
+    assert no.reject_code == "no_match"
+    yes = await plan_login(
+        s, p, ident(" JOS\u00c9.47017@example.org "), user_kind="customer", settings=SETTINGS
+    )
+    assert yes.user_id == cid
+
+
+async def test_invalid_accounts_are_not_matched(env: tuple[AsyncSession, str]) -> None:
+    s, _ = env
+    await seed_agent(s, 47016, "idp.old.47016", valid_id=2)
+    await seed_customer(s, "idp.oldkunde.47018@example.org", valid_id=2)
+    p = await _oidc(s, "inv")
+    assert (await _plan(s, p, "a", preferred_username="idp.old.47016")).reject_code == "no_match"
+    pc = await _oidc(s, "invc", audience="customer")
+    plan = await _plan(
+        s, pc, "b", kind="customer", preferred_username="idp.oldkunde.47018@example.org"
+    )
+    assert plan.reject_code == "no_match"
+
+
+async def test_sso_gate_applies_to_link_matched_user(env: tuple[AsyncSession, str]) -> None:
+    s, _ = env
+    await seed_agent(s, 47001, "idp.anna.47001")
+    p = await _oidc(s, "gatelink")
+    ident = _ident(p.id, "s", preferred_username="idp.anna.47001")
+    await apply_login(
+        s,
+        p,
+        ident,
+        await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS),
+        settings=SETTINGS,
+    )
+    from tiqora.identity.store import ProviderChanges, update_provider
+
+    gated = await update_provider(
+        s, p.id, ProviderChanges(require_sso_opt_in=True), secret_key=KEY, actor_id=1
+    )
+    plan = await plan_login(s, gated, ident, user_kind="agent", settings=SETTINGS)
+    assert (plan.reject_code, plan.link_exists) == ("sso_not_enabled", True)
+
+
+async def test_second_subject_for_already_linked_account_is_allowed(
+    env: tuple[AsyncSession, str],
+) -> None:
+    # Design is silent on 1:1; several IdP subjects (e.g. re-issued accounts) may map to
+    # one local account. Each subject has its own link; pinned here deliberately.
+    s, _ = env
+    await seed_agent(s, 47001, "idp.anna.47001")
+    p = await _oidc(s, "twosubs")
+    for sub in ("sub-a", "sub-b"):
+        ident = _ident(p.id, sub, preferred_username="idp.anna.47001")
+        plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+        assert (plan.decision, plan.user_id) == ("login", 47001)
+        await apply_login(s, p, ident, plan, settings=SETTINGS)
+    assert len(await list_links(s, provider_id=p.id)) == 2
+
+
+async def test_audience_mismatch_rejects(env: tuple[AsyncSession, str]) -> None:
+    s, _ = env
+    await seed_agent(s, 47001, "idp.anna.47001")
+    p = await _oidc(s, "aud", audience="customer")
+    plan = await _plan(s, p, "a", preferred_username="idp.anna.47001")
+    assert (plan.decision, plan.reject_code) == ("reject", "no_match")

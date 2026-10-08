@@ -11,10 +11,15 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.tiqora.models import TiqoraIdentityLink
 from tiqora.identity.types import UserKind, subject_hash, utc_now
+
+
+class LinkConflictError(Exception):
+    """The subject is already linked to a different account; links are never re-pointed."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,11 +76,16 @@ async def upsert_link(
     user_id: int,
     user_login: str,
 ) -> IdentityLink:
-    """Insert, or refresh ``user_login``/``last_seen`` of the existing link. Flush only."""
+    """Insert, or refresh ``user_login``/``last_seen`` of the existing link. Flush only.
+
+    An existing link is never re-pointed: a different ``user_id`` raises
+    :class:`LinkConflictError`. A concurrent first login (unique violation on insert)
+    is re-read and follows the same same-user/conflict rule.
+    """
     now = utc_now()
     row = await _get_row(session, provider_id=provider_id, user_kind=user_kind, subject=subject)
     if row is None:
-        row = TiqoraIdentityLink(
+        new_row = TiqoraIdentityLink(
             provider_id=provider_id,
             user_kind=user_kind,
             subject_hash=subject_hash(subject),
@@ -85,11 +95,22 @@ async def upsert_link(
             first_seen=now,
             last_seen=now,
         )
-        session.add(row)
-    else:
-        row.user_id = user_id
-        row.user_login = user_login[:200]
-        row.last_seen = now
+        try:
+            async with session.begin_nested():
+                session.add(new_row)
+                await session.flush()
+        except IntegrityError:
+            row = await _get_row(
+                session, provider_id=provider_id, user_kind=user_kind, subject=subject
+            )
+            if row is None:
+                raise
+        else:
+            return _to_link(new_row)
+    if row.user_id != user_id:
+        raise LinkConflictError(subject_hash(subject))
+    row.user_login = user_login[:200]
+    row.last_seen = now
     await session.flush()
     return _to_link(row)
 

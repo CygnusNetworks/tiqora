@@ -23,10 +23,10 @@ from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.user import UserPreferences, Users
 from tiqora.db.tiqora.models import TiqoraUserAuthConfig
 from tiqora.identity.config_models import OidcProviderConfig, SamlProviderConfig
-from tiqora.identity.links import find_link, upsert_link
+from tiqora.identity.links import LinkConflictError, find_link, upsert_link
 from tiqora.identity.mapping import AssignmentDiff, MappedProfile, map_profile
 from tiqora.identity.store import ProviderRecord
-from tiqora.identity.types import SSO_KINDS, UserKind
+from tiqora.identity.types import SSO_KINDS, UserKind, audience_includes
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +92,14 @@ class LoginPlan:
     link_exists: bool
 
 
+class LoginRejected(ValueError):  # noqa: N818 - a reject, not a failure
+    """``apply_login`` cannot proceed; ``reject_code`` is the matching ``RejectCode``."""
+
+    def __init__(self, reject_code: RejectCode) -> None:
+        super().__init__(reject_code)
+        self.reject_code: RejectCode = reject_code
+
+
 @dataclass(frozen=True, slots=True)
 class _Account:
     id: int
@@ -134,27 +142,37 @@ async def _load_by_id(session: AsyncSession, user_kind: UserKind, user_id: int) 
     return _Account(id=row[0], login=row[1]) if row else None
 
 
+def _fold(value: str) -> str:
+    """Python-side comparison key: strip + casefold (no accent folding, unlike *_ci collations)."""
+    return value.strip().casefold()
+
+
 async def _match_login(session: AsyncSession, user_kind: UserKind, value: str) -> _Account | None:
     """Exact login first, else exactly one case-insensitive hit.
 
-    One ``lower()`` query, decided in Python: a case-insensitive collation
-    (MariaDB) must not turn "exact" into "any case".
+    The SQL ``lower()`` query is only a prefilter: a case/accent-insensitive PAD SPACE
+    collation (prod MariaDB) would treat 'jose' = 'josé' and ignore trailing spaces.
+    Exact / unique / ambiguous is decided in Python after re-checking every row.
     """
+    value = value.strip()
+    if not value:
+        return None
     if user_kind == "agent":
         stmt = select(Users.id, Users.login).where(
-            func.lower(Users.login) == value.lower(), Users.valid_id == 1
+            func.lower(func.rtrim(Users.login)) == value.lower(), Users.valid_id == 1
         )
     else:
         stmt = select(CustomerUser.id, CustomerUser.login).where(
-            func.lower(CustomerUser.login) == value.lower(), CustomerUser.valid_id == 1
+            func.lower(func.rtrim(CustomerUser.login)) == value.lower(), CustomerUser.valid_id == 1
         )
     rows = [_Account(id=r[0], login=r[1]) for r in (await session.execute(stmt)).all()]
     exact = [r for r in rows if r.login == value]
     if len(exact) == 1:
         return exact[0]
-    if not exact and len(rows) == 1:
-        return rows[0]
-    return None
+    if exact:
+        return None
+    folded = [r for r in rows if _fold(r.login) == _fold(value)]
+    return folded[0] if len(folded) == 1 else None
 
 
 def _decode_pref(raw: bytes | str | None) -> str:
@@ -169,16 +187,17 @@ async def _match_email(
     session: AsyncSession, user_kind: UserKind, email: str
 ) -> tuple[_Account | None, bool]:
     """Return (account, ambiguous). Compared lowercase in Python (collation/dialect safe)."""
-    wanted = email.strip().lower()
+    wanted = _fold(email)
     if user_kind == "customer":
         rows = (
             await session.execute(
-                select(CustomerUser.id, CustomerUser.login).where(
-                    func.lower(CustomerUser.email) == wanted, CustomerUser.valid_id == 1
+                select(CustomerUser.id, CustomerUser.login, CustomerUser.email).where(
+                    func.lower(func.rtrim(CustomerUser.email)) == email.strip().lower(),
+                    CustomerUser.valid_id == 1,
                 )
             )
         ).all()
-        accounts = {r[0]: _Account(id=r[0], login=r[1]) for r in rows}
+        accounts = {r[0]: _Account(id=r[0], login=r[1]) for r in rows if _fold(r[2]) == wanted}
     else:
         # Int join only (user_preferences.user_id = users.id), no string columns involved.
         pref_rows = (
@@ -191,7 +210,7 @@ async def _match_email(
         accounts = {
             r[0]: _Account(id=r[0], login=r[1])
             for r in pref_rows
-            if _decode_pref(r[2]).strip().lower() == wanted
+            if _fold(_decode_pref(r[2])) == wanted
         }
     if len(accounts) > 1:
         return None, True
@@ -219,6 +238,8 @@ async def plan_login(
     profile = map_profile(identity.attributes, provider.attribute_map)
     if not identity.subject:
         return _reject(user_kind, profile, "no_subject")
+    if not audience_includes(provider.audience, user_kind):
+        return _reject(user_kind, profile, "no_match")
 
     account: _Account | None = None
     matched_by: Literal["link", "login", "email"]
@@ -295,18 +316,23 @@ async def apply_login(
 ) -> tuple[int, str]:
     """Persist the link for a ``login`` plan and commit. Returns (user_id, login)."""
     if plan.decision == "reject":
-        raise ValueError(f"cannot apply a rejected login plan ({plan.reject_code})")
+        raise LoginRejected(plan.reject_code or "no_match")
     if plan.decision != "login" or plan.user_id is None or plan.login is None:
         raise ValueError(f"unsupported login plan decision: {plan.decision}")
     if _stores_links(provider):
-        await upsert_link(
-            session,
-            provider_id=provider.id,
-            user_kind=plan.user_kind,
-            subject=identity.subject,
-            user_id=plan.user_id,
-            user_login=plan.login,
-        )
+        try:
+            await upsert_link(
+                session,
+                provider_id=provider.id,
+                user_kind=plan.user_kind,
+                subject=identity.subject,
+                user_id=plan.user_id,
+                user_login=plan.login,
+            )
+        except LinkConflictError:
+            # The subject got linked to another account since planning (race): link wins.
+            await session.rollback()
+            raise LoginRejected("user_invalid") from None
     await session.commit()
     return plan.user_id, plan.login
 
