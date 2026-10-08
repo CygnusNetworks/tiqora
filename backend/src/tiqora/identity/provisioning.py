@@ -377,8 +377,7 @@ async def apply_assignments(
                 sorted(before),
             )
 
-    _, existing_groups = await _managed_marks(session, provider_id, user_id)
-    existing_roles, _ = await _managed_marks(session, provider_id, user_id)
+    existing_roles, existing_groups = await _managed_marks(session, provider_id, user_id)
     for role_id in sorted(diff.drop_managed_roles):
         await _drop_mark(session, provider_id, user_id, "role", role_id, "")
     for group_id, key in sorted(diff.drop_managed_groups):

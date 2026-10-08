@@ -616,20 +616,33 @@ async def test_sync_logs_grants_and_revokes(env: Env, caplog: pytest.LogCaptureF
     assert any("sync role revoke" in m and f"role {R1}" in m for m in msgs)
 
 
-async def test_concurrent_duplicate_managed_mark_is_tolerated(env: Env) -> None:
+async def test_concurrent_duplicate_managed_mark_is_tolerated(
+    env: Env, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     uid, _ = _uid(47431)
     p = await env.provider("dup", [_rule(roles=[R1])])
-    # Another login inserted the mark between our read and our write.
-    await env.s.execute(
-        text(
-            "INSERT INTO tiqora_identity_managed_assignment (provider_id, user_id, kind,"
-            " target_id, permission_key, created) VALUES (:p, :u, 'role', :r, '', :t)"
-        ),
-        {"p": p.id, "u": uid, "r": R1, "t": NOW},
-    )
-    await env.s.commit()
+    real_marks = provisioning._managed_marks
+
+    async def marks_then_concurrent_insert(
+        session: AsyncSession, provider_id: int, user_id: int
+    ) -> tuple[frozenset[int], frozenset[tuple[int, str]]]:
+        seen = await real_marks(session, provider_id, user_id)
+        # Another login inserts the mark AFTER our read, BEFORE our insert.
+        await session.execute(
+            text(
+                "INSERT INTO tiqora_identity_managed_assignment (provider_id, user_id, kind,"
+                " target_id, permission_key, created) VALUES (:p, :u, 'role', :r, '', :t)"
+            ),
+            {"p": provider_id, "u": user_id, "r": R1, "t": NOW},
+        )
+        return seen
+
+    monkeypatch.setattr(provisioning, "_managed_marks", marks_then_concurrent_insert)
     diff = AssignmentDiff(add_roles=frozenset({R1}), record_managed_roles=frozenset({R1}))
-    await provisioning.apply_assignments(env.s, provider_id=p.id, user_id=uid, diff=diff)
+    with caplog.at_level("INFO", logger="tiqora.identity.provisioning"):
+        await provisioning.apply_assignments(env.s, provider_id=p.id, user_id=uid, diff=diff)
     await env.s.commit()
+    # The duplicate insert hit the unique key (IntegrityError path) and was ignored.
+    assert any("managed mark already present" in r.getMessage() for r in caplog.records)
     assert await env.roles(uid) == {R1}
     assert await env.managed(uid) == {("role", R1, "")}

@@ -36,7 +36,6 @@ from tiqora.domain.auth import (
     user_to_dict,
 )
 from tiqora.domain.auth_config import AuthConfigService
-from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.feature_grants import CUSTOMER_DIRECTORY, CUSTOMER_EDIT, FeatureGrantService
 from tiqora.domain.passkey import two_factor_enabled, webauthn_enabled
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
@@ -71,6 +70,7 @@ from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
 from tiqora.identity.env_providers import ensure_env_providers
 from tiqora.identity.http import safe_next as _safe_next
+from tiqora.identity.ldap_login import ldap_sign_in
 from tiqora.identity.saml_runtime import saml_availability
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
@@ -441,15 +441,13 @@ async def login(
         raise _rate_limit_http_exception(pre)
 
     user = await auth.authenticate_password(body.login, body.password)
-    if user is None and settings.ldap_enabled:
-        # LDAP is tried as a fallback when local password auth fails,
-        # mirroring Znuny's chained AuthModule::LDAP behaviour. No
-        # auto-provisioning in v1: the resolved LDAP UID must match an
-        # existing, valid `users.login` row.
-        ldap_service = LdapAuthService(settings)
-        ldap_uid = await ldap_service.authenticate(body.login, body.password)
-        if ldap_uid is not None:
-            user = await auth.get_user_by_login(ldap_uid, auth_method="ldap")
+    if user is None:
+        # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
+        account_login = await ldap_sign_in(
+            session, settings, login=body.login, password=body.password, user_kind="agent"
+        )
+        if account_login is not None:
+            user = await auth.get_user_by_login(account_login, auth_method="ldap")
     if user is None:
         locked = await limiter.record_failure(login=body.login, ip=ip)
         if locked is not None:

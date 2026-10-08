@@ -27,6 +27,7 @@ from tiqora.identity.types import (
     ENV_LDAP_SLUG,
     ENV_OIDC_SLUG,
     SYSTEM_USER_ID,
+    UserKind,
     utc_now,
 )
 
@@ -34,6 +35,7 @@ logger = structlog.get_logger(__name__)
 
 __all__ = [
     "ensure_env_providers",
+    "env_ldap_config",
     "env_runtime_config",
     "reset_env_sync_cache_for_tests",
     "runtime_config",
@@ -51,7 +53,9 @@ def _fingerprint(settings: Settings) -> str:
         settings.oidc_enabled,
         settings.oidc_claim,
         settings.ldap_enabled,
+        settings.ldap_uid_attr,
         settings.customer_ldap_enabled,
+        settings.customer_ldap_uid_attr,
     )
     return hashlib.sha256(repr(parts).encode()).hexdigest()
 
@@ -90,6 +94,11 @@ def _ldap_config(settings: Settings, prefix: str) -> LdapProviderConfig:
         access_attr=get("access_attr"),
         user_attr=_user_attr(get("user_attr")),
     )
+
+
+def env_ldap_config(settings: Settings, user_kind: UserKind) -> LdapProviderConfig:
+    """``TIQORA_LDAP_*`` (agents) or ``TIQORA_CUSTOMER_LDAP_*`` (customers) as a config model."""
+    return _ldap_config(settings, "ldap_" if user_kind == "agent" else "customer_ldap_")
 
 
 def env_runtime_config(record: ProviderRecord, settings: Settings) -> BaseModel:
@@ -185,7 +194,7 @@ async def sync_env_providers(session: AsyncSession, settings: Settings) -> list[
             enabled=settings.oidc_enabled,
         )
 
-    def ldap(slug: str, name: str, audience: Any) -> Any:
+    def ldap(slug: str, name: str, audience: Any, uid_attr: str) -> Any:
         async def insert(s: AsyncSession, *, secret_key: str) -> ProviderRecord:
             return await _insert_env_row(
                 s,
@@ -195,19 +204,32 @@ async def sync_env_providers(session: AsyncSession, settings: Settings) -> list[
                 name=name,
                 audience=audience,
                 config=LdapProviderConfig(port=389),
+                attribute_map=AttributeMap(login=[uid_attr]),
                 sort=1000,
             )
 
         return insert
 
+    # The LDAP rows' login mapping mirrors the env UID attribute (shown in the admin list
+    # and used by the preview); the login itself rebuilds it from Settings anyway.
     plan = (
         (ENV_OIDC_SLUG, settings.oidc_enabled, oidc, [settings.oidc_claim]),
-        (ENV_LDAP_SLUG, settings.ldap_enabled, ldap(ENV_LDAP_SLUG, "LDAP", "agent"), None),
+        (
+            ENV_LDAP_SLUG,
+            settings.ldap_enabled,
+            ldap(ENV_LDAP_SLUG, "LDAP", "agent", settings.ldap_uid_attr),
+            [settings.ldap_uid_attr],
+        ),
         (
             ENV_CUSTOMER_LDAP_SLUG,
             settings.customer_ldap_enabled,
-            ldap(ENV_CUSTOMER_LDAP_SLUG, "LDAP (Kunden)", "customer"),
-            None,
+            ldap(
+                ENV_CUSTOMER_LDAP_SLUG,
+                "LDAP (Kunden)",
+                "customer",
+                settings.customer_ldap_uid_attr,
+            ),
+            [settings.customer_ldap_uid_attr],
         ),
     )
     for slug, enabled, insert, login_attr in plan:

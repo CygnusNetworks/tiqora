@@ -47,9 +47,9 @@ def normalize_attributes(raw: Mapping[str, Any]) -> dict[str, tuple[str, ...]]:
             value if isinstance(value, (list, tuple, set, frozenset)) else (value,)
         )
         vals = tuple(s for s in (_scalar(x) for x in items_) if s is not None)
-        # A list claim that is present but empty is kept (as ``()``): "no groups" differs
-        # from "claim not released" for role sync.
-        if vals or isinstance(value, (list, tuple, set, frozenset)):
+        # A claim that is present but empty (``[]``, ``None``, ``""``) is kept as ``()``:
+        # "no groups" differs from "claim not released" for role sync. Dicts are dropped.
+        if vals or value is None or isinstance(value, (str, list, tuple, set, frozenset)):
             out[str(key)] = vals
     return out
 
@@ -64,12 +64,12 @@ def lookup(attributes: Attributes, name: str) -> tuple[str, ...]:
 
 
 def attribute_present(attributes: Attributes, name: str) -> bool:
-    """The claim exists (even with an empty value list): exact key, else a unique
-    case-insensitive key."""
+    """The claim exists (even with an empty value list): exact key, else any
+    case-insensitive key (an ambiguous spelling still means "released")."""
     if name in attributes:
         return True
     folded = name.lower()
-    return sum(1 for k in attributes if k.lower() == folded) == 1
+    return any(k.lower() == folded for k in attributes)
 
 
 @dataclass(frozen=True, slots=True)

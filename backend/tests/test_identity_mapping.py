@@ -29,6 +29,7 @@ def test_normalize_attributes() -> None:
         "email": ("a@example.org",),
         "groups": ("g1", "7"),
         "flag": ("True",),
+        "none": (),  # present but null: kept as "released, no values" (role-sync fail-safe)
     }
 
 
@@ -42,8 +43,8 @@ def test_normalize_attributes_odd_input_and_truncation() -> None:
     out = normalize_attributes(raw)
     assert out["long"] == ("x" * 2000,)
     assert out["mixed"] == ("a", "1.5", "False")
-    assert "blank" not in out  # a blank scalar is dropped ...
-    assert out["empty"] == ()  # ... an empty list claim stays present (sync fail-safe)
+    assert out["blank"] == ()  # a blank scalar and ...
+    assert out["empty"] == ()  # ... an empty list claim stay present (sync fail-safe)
     assert normalize_attributes({"t": ("a", "b")}) == {"t": ("a", "b")}
     assert normalize_attributes({1: "x"}) == {"1": ("x",)}  # type: ignore[dict-item]
 
@@ -322,3 +323,14 @@ def test_attribute_present_distinguishes_empty_from_absent() -> None:
     attrs = normalize_attributes({"groups": [], "Mail": "a@example.org"})
     assert attribute_present(attrs, "groups") and attribute_present(attrs, "mail")
     assert not attribute_present(attrs, "roles")
+
+
+def test_attribute_present_null_blank_and_case_ambiguous_count_as_present() -> None:
+    from tiqora.identity.mapping import attribute_present
+
+    attrs = normalize_attributes({"groups": None, "memberOf": "  "})
+    assert attribute_present(attrs, "groups")  # null value: released, but empty
+    assert attribute_present(attrs, "memberof")  # blank value, other spelling
+    ambiguous = {"Groups": ("a",), "GROUPS": ("b",)}
+    assert attribute_present(ambiguous, "groups")  # two spellings: still released
+    assert lookup(ambiguous, "groups") == ()  # ... but no value is picked from either

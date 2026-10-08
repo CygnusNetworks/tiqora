@@ -6,11 +6,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
-from tiqora.api.deps import get_redis
+from tiqora.api.deps import DbSession, get_redis
 from tiqora.api.portal.deps import AppSettings, CurrentCustomer, get_customer_auth_service
 from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
-from tiqora.domain.customer_auth_ldap import CustomerLdapAuthService
 from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest
+from tiqora.identity.ldap_login import ldap_sign_in
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 
 router = APIRouter(prefix="/auth", tags=["portal-auth"])
@@ -34,6 +34,7 @@ async def login(
     response: Response,
     auth: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
     settings: AppSettings,
+    session: DbSession,
 ) -> CustomerLoginResponse:
     redis_client = await get_redis(request)
     limiter = AuthRateLimiter(redis_client, settings)
@@ -48,14 +49,13 @@ async def login(
         )
 
     customer = await auth.authenticate_password(body.login, body.password)
-    if customer is None and settings.customer_ldap_enabled:
-        # LDAP fallback, mirroring Kernel::System::CustomerAuth::LDAP. No
-        # auto-provisioning in v1: the resolved LDAP UID must match an
-        # existing, valid `customer_user.login` row.
-        ldap_service = CustomerLdapAuthService(settings)
-        ldap_uid = await ldap_service.authenticate(body.login, body.password)
-        if ldap_uid is not None:
-            customer = await auth.get_customer_by_login(ldap_uid)
+    if customer is None:
+        # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
+        account_login = await ldap_sign_in(
+            session, settings, login=body.login, password=body.password, user_kind="customer"
+        )
+        if account_login is not None:
+            customer = await auth.get_customer_by_login(account_login)
     if customer is None:
         locked = await limiter.record_failure(login=body.login, ip=ip)
         if locked is not None:

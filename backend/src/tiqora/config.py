@@ -220,9 +220,11 @@ class Settings(BaseSettings):
     krb5_ktname: str = Field(default="", validation_alias="KRB5_KTNAME")
 
     # LDAP/AD agent auth (Phase 3c). Bind-search-bind against a directory,
-    # mirroring Kernel::System::Auth::LDAP. No auto-provisioning in v1: the
-    # LDAP UID must match an existing, valid `users.login` row or the login
-    # is rejected. Tried as a fallback when local password auth fails.
+    # mirroring Kernel::System::Auth::LDAP. Appears as the read-only identity
+    # provider "env-ldap": no auto-provisioning, the LDAP UID must match an
+    # existing, valid `users.login` row or the login is rejected (directories
+    # with JIT and role sync are configured as identity providers instead).
+    # Tried after local password auth fails, together with those providers.
     ldap_enabled: bool = Field(default=False, validation_alias="TIQORA_LDAP_ENABLED")
     ldap_host: str = Field(default="", validation_alias="TIQORA_LDAP_HOST")
     ldap_port: int = Field(default=389, validation_alias="TIQORA_LDAP_PORT")
@@ -248,8 +250,9 @@ class Settings(BaseSettings):
     portal_enabled: bool = Field(default=False, validation_alias="TIQORA_PORTAL_ENABLED")
 
     # LDAP/AD customer (portal) auth (Phase 3c), mirroring
-    # Kernel::System::CustomerAuth::LDAP. Same no-auto-provisioning rule:
-    # the LDAP UID must match an existing, valid `customer_user.login`.
+    # Kernel::System::CustomerAuth::LDAP; read-only provider "env-customer-ldap".
+    # Same no-auto-provisioning rule: the LDAP UID must match an existing,
+    # valid `customer_user.login`.
     customer_ldap_enabled: bool = Field(
         default=False, validation_alias="TIQORA_CUSTOMER_LDAP_ENABLED"
     )
