@@ -1,4 +1,4 @@
-"""``Mapping::OutOfOffice`` - CSV bulk entries (port of ``Kernel/GenericInterface/Mapping/OutOfOffice.pm``)."""
+"""``Mapping::OutOfOffice``: CSV bulk entries (port of Znuny's OutOfOffice mapping)."""
 
 from __future__ import annotations
 
