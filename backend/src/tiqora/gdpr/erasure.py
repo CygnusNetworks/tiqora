@@ -1493,6 +1493,18 @@ async def run_erasure(
                     {"u": old_login},
                 )
 
+        # SSO subject links hold the IdP subject and the old login (PII) and can no
+        # longer match anything once the customer is anonymized or gone: purge them
+        # in both modes (tiqora-owned, rebuilt on the next SSO login, no backup).
+        if await _table_exists(session, "tiqora_identity_link"):
+            await session.execute(
+                text(
+                    "DELETE FROM tiqora_identity_link"
+                    " WHERE user_kind = 'customer' AND user_id IN :ids"
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": [int(c.id) for c in ordered]},
+            )
+
         # ---- tickets: rewrite refs ----
         # anonymize: customer_user_id follows the new login; customer_id stays
         # (company PK is kept). delete: both become stable tokens (masters gone).

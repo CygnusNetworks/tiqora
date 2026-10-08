@@ -39,6 +39,7 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.api.v1.customer_sort import order_customer_users
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUserCustomer
 from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
+from tiqora.domain import user_provisioning as provisioning
 from tiqora.znuny.password import hash_password
 
 router = APIRouter(tags=["admin:customers"])
@@ -205,18 +206,25 @@ async def get_customer_user(
 async def create_customer_user(
     body: CustomerUserAdminCreate, admin: AdminUser, session: DbSession
 ) -> CustomerUser:
-    ts = now()
-    data = body.model_dump(exclude={"password"})
-    cu = CustomerUser(
-        **data,
-        pw=hash_password(body.password) if body.password else None,
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
+    data = body.model_dump(
+        exclude={"password", "login", "email", "customer_id", "first_name", "last_name"}
     )
-    session.add(cu)
-    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    try:
+        cu = await provisioning.create_customer_user(
+            session,
+            login=body.login,
+            email=body.email,
+            customer_id=body.customer_id,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            pw_hash=hash_password(body.password) if body.password else None,
+            actor_id=admin.id,
+            **data,
+        )
+    except provisioning.ProvisioningError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     await session.commit()
     await session.refresh(cu)
     return cu
