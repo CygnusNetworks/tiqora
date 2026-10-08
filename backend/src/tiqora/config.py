@@ -362,6 +362,12 @@ class Settings(BaseSettings):
         default=False, validation_alias="TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP"
     )
 
+    # How often every API process polls gi_webservice_config for changes made in
+    # Znuny (rename / disable / edit) so compat webservices reload without a restart.
+    compat_webservice_reload_seconds: int = Field(
+        default=10, ge=1, validation_alias="TIQORA_COMPAT_WEBSERVICE_RELOAD_SECONDS"
+    )
+
     # WebAuthn passkeys as an alternative 2nd factor (Phase 3c). Disabled unless
     # both rp_id and origin are set — endpoints 404 and AuthMethodsOut.webauthn
     # is false when unset (ships flag-off).

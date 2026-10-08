@@ -51,6 +51,7 @@ from tiqora.api.compat.provider import (
     rest_fault_body,
     run_provider,
 )
+from tiqora.api.compat.reload import publish_webservices_changed
 from tiqora.api.compat.rest_request import (
     RestRequestError,
     build_rest_request_data,
@@ -541,6 +542,7 @@ async def admin_reload_routes(
     """Reload the webservice registry from ``gi_webservice_config`` (admin only)."""
     registry = get_registry(request.app)
     await registry.refresh(session, force=True)
+    await publish_webservices_changed(getattr(request.app.state, "redis", None))
     names = registry.names()
     logger.info("compat_webservices_reloaded", count=len(names), user=current_user.login)
     return {"status": "ok", "webservices_loaded": len(names), "webservices": names}

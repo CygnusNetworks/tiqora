@@ -1,5 +1,6 @@
 """FastAPI application factory with health, readiness, and Prometheus metrics."""
 
+import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
@@ -161,7 +162,30 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.legacy_schema_profile = None
 
     await _crypto_self_check(app, settings)
-    yield
+
+    # Compat webservices: initial load (never fatal) + background hot reload (D12).
+    from tiqora.api.compat.reload import reload_tick, run_webservice_reloader
+
+    try:
+        await reload_tick(app, force=True)
+    except Exception as _exc:  # noqa: BLE001 - requests lazy-load and the poller retries
+        logger.warning("compat_webservice_initial_load_failed", error=str(_exc))
+    reload_stop = asyncio.Event()
+    reload_task = asyncio.create_task(
+        run_webservice_reloader(
+            app,
+            interval_seconds=settings.compat_webservice_reload_seconds,
+            stop=reload_stop,
+        )
+    )
+    try:
+        yield
+    finally:
+        reload_stop.set()
+        try:
+            await asyncio.wait_for(reload_task, 5)
+        except Exception:  # noqa: BLE001 - timeout (task already cancelled) or task failure
+            logger.warning("compat_webservice_reloader_stop_failed", exc_info=True)
     redis_client = getattr(app.state, "redis", None)
     if redis_client is not None:
         await redis_client.aclose()
