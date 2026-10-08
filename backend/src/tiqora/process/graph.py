@@ -108,14 +108,13 @@ class ProcessSummary:
 class ProcessRepository:
     """Async, read-only loader for the ProcessManagement object graph.
 
-    Znuny process validity/activation is normally driven by SysConfig
-    (``Process::Default::...``) plus a ``general_catalog`` "Process::State"
-    entity that ``state_entity_id`` (e.g. ``S1``) references. Tiqora does
-    not model ``general_catalog`` lookups here — ``list_processes`` returns
-    ALL ``pm_process`` rows with their raw ``state_entity_id`` and leaves
-    "is this process active" to the caller (e.g. resolve ``S1`` against
-    ``general_catalog`` separately, or compare against a configured active
-    id). This is a deliberate simplification, not an oversight.
+    ``state_entity_id`` is one of ``S1`` (Active), ``S2`` (Inactive) or
+    ``S3`` (FadeAway). Znuny hardcodes these three in
+    ``Kernel/System/ProcessManagement/DB/Process/State.pm`` (lines 48-50,
+    67-69), not in ``general_catalog``; the names live in
+    :data:`tiqora.process.dump.PROCESS_STATE_NAMES`. ``list_processes``
+    returns ALL ``pm_process`` rows with their raw ``state_entity_id`` and
+    leaves the "is this process active" decision to the caller.
     """
 
     def __init__(self, session: AsyncSession) -> None:

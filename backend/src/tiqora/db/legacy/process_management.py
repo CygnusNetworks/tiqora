@@ -112,6 +112,21 @@ class PmTransitionAction(LegacyBase):
     change_by: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
+class PmProcessPreferences(LegacyBase):
+    """Znuny table `pm_process_preferences` — **Znuny 7.2+ only**.
+
+    Absent on 6.x; check ``get_legacy_schema_profile().has_table(...)`` before
+    querying (the table is in ``OPTIONAL_LEGACY_TABLES``). Znuny's DDL has no
+    primary key; the composite key here is an ORM identity only.
+    """
+
+    __tablename__ = "pm_process_preferences"
+
+    process_entity_id: Mapped[str] = mapped_column(String(50), primary_key=True, nullable=False)
+    preferences_key: Mapped[str] = mapped_column(String(150), primary_key=True, nullable=False)
+    preferences_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class PmEntitySync(LegacyBase):
     """Znuny table `pm_entity_sync` — designer "unsynced changes" tracker.
 

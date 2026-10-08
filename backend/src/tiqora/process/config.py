@@ -92,6 +92,7 @@ future designer UI, not consulted by engine logic.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 import yaml
@@ -117,6 +118,27 @@ def _load_yaml_mapping(raw: str | bytes | None) -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
+def _mapping(value: Any) -> Mapping[str, Any]:
+    """``value`` if it is a mapping, else ``{}``.
+
+    Znuny's ProcessDump writes ``''`` for an empty mapping (``|| ''``, e.g.
+    ``ActivityDialog``), and YAML-authored configs may carry ``null``; neither
+    may crash a loader.
+    """
+    return value if isinstance(value, Mapping) else {}
+
+
+def _str_list(value: Any) -> list[str]:
+    """A list of strings; ``''``/``None`` -> ``[]``, a bare string -> ``[str]``."""
+    if not value:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list | tuple):
+        return [str(v) for v in value]
+    return []
+
+
 def _order_key(key: str) -> tuple[int, str]:
     """Sort helper for numbered-string map keys (``'1'``, ``'2'``, ...).
 
@@ -139,7 +161,7 @@ class TransitionPathEntry(BaseModel):
     transition_actions: list[str] = Field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TransitionPathEntry:
+    def from_dict(cls, data: Mapping[str, Any]) -> TransitionPathEntry:
         return cls(
             activity_entity_id=data.get("ActivityEntityID") or "",
             transition_actions=list(data.get("TransitionAction") or []),
@@ -159,19 +181,26 @@ class ProcessConfig(BaseModel):
 
     @classmethod
     def from_yaml(cls, raw: str | bytes | None) -> ProcessConfig:
-        data = _load_yaml_mapping(raw)
-        path_raw: dict[str, Any] = data.get("Path") or {}
+        return cls.from_dict(_load_yaml_mapping(raw))
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ProcessConfig:
+        """Build from a decoded config or a Znuny dump entry.
+
+        Znuny's dump uses ``''`` for a missing ``StartActivity``/``Path``
+        (``|| ''``, DB/Process.pm:1271-1273); a falsy start becomes ``None``
+        because callers test ``is None``.
+        """
         path: dict[str, dict[str, TransitionPathEntry]] = {}
-        for activity_id, transitions in path_raw.items():
-            transitions = transitions or {}
+        for activity_id, transitions in _mapping(data.get("Path")).items():
             path[activity_id] = {
-                transition_id: TransitionPathEntry.from_dict(entry or {})
-                for transition_id, entry in transitions.items()
+                transition_id: TransitionPathEntry.from_dict(_mapping(entry))
+                for transition_id, entry in _mapping(transitions).items()
             }
         return cls(
             description=data.get("Description") or "",
-            start_activity=data.get("StartActivity"),
-            start_activity_dialog=data.get("StartActivityDialog"),
+            start_activity=data.get("StartActivity") or None,
+            start_activity_dialog=data.get("StartActivityDialog") or None,
             path=path,
         )
 
@@ -198,9 +227,13 @@ class ActivityConfig(BaseModel):
 
     @classmethod
     def from_yaml(cls, raw: str | bytes | None) -> ActivityConfig:
-        data = _load_yaml_mapping(raw)
-        raw_dialogs: dict[str, Any] = data.get("ActivityDialog") or {}
-        ordered = dict(sorted(raw_dialogs.items(), key=lambda kv: _order_key(kv[0])))
+        return cls.from_dict(_load_yaml_mapping(raw))
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ActivityConfig:
+        """``ActivityDialog`` is ``''`` in a Znuny dump when empty (DB/Process.pm:1292)."""
+        raw_dialogs = _mapping(data.get("ActivityDialog"))
+        ordered = dict(sorted(raw_dialogs.items(), key=lambda kv: _order_key(str(kv[0]))))
         return cls(activity_dialogs=ordered)
 
     @property
@@ -220,9 +253,9 @@ class ActivityDialogFieldConfig(BaseModel):
     display: str = "0"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ActivityDialogFieldConfig:
+    def from_dict(cls, data: Mapping[str, Any]) -> ActivityDialogFieldConfig:
         return cls(
-            config=data.get("Config") or {},
+            config=dict(_mapping(data.get("Config"))),
             default_value=data.get("DefaultValue"),
             description_long=data.get("DescriptionLong") or "",
             description_short=data.get("DescriptionShort") or "",
@@ -257,17 +290,21 @@ class ActivityDialogConfig(BaseModel):
 
     @classmethod
     def from_yaml(cls, raw: str | bytes | None) -> ActivityDialogConfig:
-        data = _load_yaml_mapping(raw)
-        raw_fields: dict[str, Any] = data.get("Fields") or {}
+        return cls.from_dict(_load_yaml_mapping(raw))
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ActivityDialogConfig:
+        """Empty values arrive as ``''`` in a Znuny dump (DB/Process.pm:1310-1318)."""
+        raw_fields = _mapping(data.get("Fields"))
         return cls(
             description_long=data.get("DescriptionLong") or "",
             description_short=data.get("DescriptionShort") or "",
-            field_order=list(data.get("FieldOrder") or []),
+            field_order=_str_list(data.get("FieldOrder")),
             fields={
-                name: ActivityDialogFieldConfig.from_dict(field_data or {})
+                name: ActivityDialogFieldConfig.from_dict(_mapping(field_data))
                 for name, field_data in raw_fields.items()
             },
-            interface=list(data.get("Interface") or []),
+            interface=_str_list(data.get("Interface")),
             permission=data.get("Permission") or "",
             required_lock=str(data.get("RequiredLock") or "0"),
             submit_advice_text=data.get("SubmitAdviceText") or "",
@@ -284,8 +321,17 @@ class TransitionConditionField(BaseModel):
     type_: str = "String"
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TransitionConditionField:
-        return cls(match=data.get("Match"), type_=data.get("Type") or "String")
+    def from_dict(cls, data: Any) -> TransitionConditionField:
+        """Accept the full ``{Type, Match}`` form and Znuny's shorthands.
+
+        A plain scalar means ``String`` and a list means ``Array``
+        (Transition.pm:418-428). The evaluator is Task 9.
+        """
+        if isinstance(data, Mapping):
+            return cls(match=data.get("Match"), type_=data.get("Type") or "String")
+        if isinstance(data, list | tuple):
+            return cls(match=list(data), type_="Array")
+        return cls(match=data, type_="String")
 
 
 class TransitionConditionBlock(BaseModel):
@@ -297,12 +343,14 @@ class TransitionConditionBlock(BaseModel):
     fields: dict[str, TransitionConditionField] = Field(default_factory=dict)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> TransitionConditionBlock:
-        raw_fields: dict[str, Any] = data.get("Fields") or {}
+    def from_dict(cls, data: Mapping[str, Any]) -> TransitionConditionBlock:
+        raw_fields = _mapping(data.get("Fields"))
         return cls(
             type_=data.get("Type") or "and",
             fields={
-                name: TransitionConditionField.from_dict(field_data or {})
+                name: TransitionConditionField.from_dict(
+                    field_data if field_data not in (None, "") else {}
+                )
                 for name, field_data in raw_fields.items()
             },
         )
@@ -324,12 +372,26 @@ class TransitionConfig(BaseModel):
 
     @classmethod
     def from_yaml(cls, raw: str | bytes | None) -> TransitionConfig:
-        data = _load_yaml_mapping(raw)
-        raw_conditions: dict[str, Any] = data.get("Condition") or {}
-        ordered = sorted(raw_conditions.items(), key=lambda kv: _order_key(kv[0]))
+        return cls.from_dict(_load_yaml_mapping(raw))
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> TransitionConfig:
+        """Build from a decoded config or a Znuny dump entry.
+
+        ``ConditionLinking`` falls back to ``Condition.Type`` and then ``and``
+        (Transition.pm:329-333); the ``Type``/``ConditionLinking`` keys inside
+        ``Condition`` are not condition blocks (Transition.pm:379-380). Values
+        stay free-form strings so ``xor`` survives; validation is Task 9's.
+        """
+        condition = _mapping(data.get("Condition"))
+        blocks = {k: v for k, v in condition.items() if k not in ("Type", "ConditionLinking")}
+        ordered = sorted(blocks.items(), key=lambda kv: _order_key(str(kv[0])))
+        linking = data.get("ConditionLinking") or condition.get("Type") or "and"
         return cls(
-            condition_linking=data.get("ConditionLinking") or "and",
-            conditions=[TransitionConditionBlock.from_dict(block or {}) for _, block in ordered],
+            condition_linking=str(linking),
+            conditions=[
+                TransitionConditionBlock.from_dict(_mapping(block)) for _, block in ordered
+            ],
         )
 
 
@@ -347,5 +409,8 @@ class TransitionActionConfig(BaseModel):
 
     @classmethod
     def from_yaml(cls, raw: str | bytes | None) -> TransitionActionConfig:
-        data = _load_yaml_mapping(raw)
-        return cls(module=data.get("Module") or "", config=data.get("Config") or {})
+        return cls.from_dict(_load_yaml_mapping(raw))
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> TransitionActionConfig:
+        return cls(module=data.get("Module") or "", config=dict(_mapping(data.get("Config"))))

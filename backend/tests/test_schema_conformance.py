@@ -87,6 +87,7 @@ from tiqora.db.legacy import (  # noqa: F401
     Valid,
 )
 from tiqora.db.legacy.base import legacy_metadata
+from tiqora.db.legacy.profile import OPTIONAL_LEGACY_TABLES
 
 pytestmark = pytest.mark.db
 
@@ -177,7 +178,8 @@ def test_all_mapped_tables_exist(
     db_tables = {t.lower() for t in insp.get_table_names()}
     missing = []
     for table in legacy_metadata.tables.values():
-        if table.name.lower() not in db_tables:
+        # Tables newer than Znuny 6.5 (pm_process_preferences, 7.2+) are optional.
+        if table.name.lower() not in db_tables and table.name not in OPTIONAL_LEGACY_TABLES:
             missing.append(table.name)
     assert not missing, f"Missing tables on {dialect}: {missing}"
 
@@ -195,7 +197,8 @@ def test_mapped_columns_match_name_nullability_type_category(
         if table_name not in insp.get_table_names() and table_name.lower() not in {
             t.lower() for t in insp.get_table_names()
         }:
-            errors.append(f"{table_name}: table missing")
+            if table_name not in OPTIONAL_LEGACY_TABLES:
+                errors.append(f"{table_name}: table missing")
             continue
 
         # Resolve actual table name case
