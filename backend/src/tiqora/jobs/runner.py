@@ -13,7 +13,7 @@ from datetime import timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings
@@ -70,7 +70,11 @@ class JobRunner:
 
     async def run_once(self) -> dict[str, int]:
         reaped = await self._reap()
-        purged = await self._maybe_purge()
+        try:
+            purged = await self._maybe_purge()
+        except Exception:  # noqa: BLE001 — a failing purge must never stop job starts
+            logger.warning("jobs_purge_failed", exc_info=True)
+            purged = 0
         started = 0
         if not self._stopping:
             started = await self._claim_and_start()
@@ -86,17 +90,24 @@ class JobRunner:
         async with self._factory() as session:
             result = await session.execute(
                 update(TiqoraJob)
-                .where(TiqoraJob.status == "running", TiqoraJob.heartbeat_at < cutoff)
+                .where(
+                    TiqoraJob.status == "running",
+                    func.coalesce(TiqoraJob.heartbeat_at, TiqoraJob.started_at) < cutoff,
+                )
                 .values(status="failed", error=INTERRUPTED_MESSAGE, finished_at=utc_now())
             )
             await session.commit()
             return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
     async def _load_settings(self, session: AsyncSession) -> JobsSettings:
-        values = await load_section_values(
-            session, JOBS_SECTION, secret_key=self._settings.secret_key
-        )
-        return JobsSettings.model_validate(values.model_dump())
+        try:
+            values = await load_section_values(
+                session, JOBS_SECTION, secret_key=self._settings.secret_key
+            )
+            return JobsSettings.model_validate(values.model_dump())
+        except Exception:  # noqa: BLE001 — fall back to defaults rather than skip claims
+            logger.warning("jobs_settings_load_failed", exc_info=True)
+            return JobsSettings.model_validate({})
 
     async def _maybe_purge(self) -> int:
         now = time.monotonic()
@@ -260,17 +271,20 @@ class JobRunner:
             task.cancel()
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
-        async with self._factory() as session:
-            await session.execute(
-                update(TiqoraJob)
-                .where(
-                    TiqoraJob.id.in_(list(tasks)),
-                    TiqoraJob.status == "running",
-                    TiqoraJob.worker_id == self.worker_id,
+        try:
+            async with self._factory() as session:
+                await session.execute(
+                    update(TiqoraJob)
+                    .where(
+                        TiqoraJob.id.in_(list(tasks)),
+                        TiqoraJob.status == "running",
+                        TiqoraJob.worker_id == self.worker_id,
+                    )
+                    .values(status="failed", error=INTERRUPTED_MESSAGE, finished_at=utc_now())
                 )
-                .values(status="failed", error=INTERRUPTED_MESSAGE, finished_at=utc_now())
-            )
-            await session.commit()
+                await session.commit()
+        except Exception:  # noqa: BLE001 — the reaper fails the rows later
+            logger.exception("job_shutdown_update_failed", job_ids=list(tasks))
 
     async def run_forever(self, stop: asyncio.Event, *, poll_seconds: float) -> None:
         logger.info("jobs_loop_started", worker_id=self.worker_id, poll_seconds=poll_seconds)

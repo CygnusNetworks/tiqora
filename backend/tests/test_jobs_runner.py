@@ -389,7 +389,6 @@ async def test_shutdown_marks_unfinished_jobs_interrupted(
 
     reg = _registry(_handler("test.forever", forever))
     job_id = await _enqueue(factory, reg, kind="test.forever")
-    queued_id = await _enqueue(factory, reg)
     runner = _runner(factory, reg)
     await runner.run_once()
     await asyncio.wait_for(started.wait(), 5)
@@ -400,9 +399,10 @@ async def test_shutdown_marks_unfinished_jobs_interrupted(
     assert job.finished_at is not None
     assert runner.active_count == 0
     # a stopped runner claims nothing new
+    queued_id = await _enqueue(factory, reg)
     out = await runner.run_once()
     assert out["started"] == 0
-    assert (await _fetch(factory, queued_id)).status in ("queued", "succeeded")
+    assert (await _fetch(factory, queued_id)).status == "queued"
 
 
 async def test_purge_runs_from_run_once(factory: async_sessionmaker[AsyncSession]) -> None:
@@ -421,3 +421,36 @@ async def test_purge_runs_from_run_once(factory: async_sessionmaker[AsyncSession
     assert out["purged"] == 1
     async with factory() as s:
         assert await get_job(s, job_id) is None
+
+
+async def test_two_runners_claim_a_single_job_exactly_once(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    reg = _registry()
+    job_id = await _enqueue(factory, reg, n=5)
+    a = _runner(factory, reg, "a:1")
+    b = _runner(factory, reg, "b:1")
+    out_a, out_b = await asyncio.gather(a.run_once(), b.run_once())
+    await asyncio.gather(a.wait_idle(), b.wait_idle())
+    assert out_a["started"] + out_b["started"] == 1
+    job = await _fetch(factory, job_id)
+    assert job.status == "succeeded"
+    assert job.worker_id in ("a:1", "b:1")
+
+
+async def test_running_job_without_heartbeat_is_reaped_by_started_at(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    reg = _registry()
+    job_id = await _enqueue(factory, reg)
+    old = utc_now() - timedelta(minutes=10)
+    async with factory() as s:
+        await s.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == job_id)
+            .values(status="running", worker_id="other:1", started_at=old, heartbeat_at=None)
+        )
+        await s.commit()
+    out = await _runner(factory, reg).run_once()
+    assert out["reaped"] == 1
+    assert (await _fetch(factory, job_id)).status == "failed"
