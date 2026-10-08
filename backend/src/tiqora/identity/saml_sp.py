@@ -538,9 +538,12 @@ class SamlServiceProvider:
         issuer = _text(req.message.issuer)
         if issuer != self._idp_id():
             raise SamlResponseInvalid("issuer_mismatch")
+        destination = _text_attr(req.message, "destination")
+        if destination != self._urls.slo_url:
+            raise SamlResponseInvalid("destination_mismatch")
         certs = client.metadata.certs(issuer, "any", "signing")
         signed = _redirect_signed_octets(
-            "SAMLRequest", saml_request, relay_state, sigalg, raw_query
+            "SAMLRequest", saml_request, relay_state, sigalg, signature, raw_query
         )
         if not any(_rsa_verify(cert, signed, signature, sigalg) for _name, cert in certs):
             raise SamlResponseInvalid("logout_signature")
@@ -568,7 +571,12 @@ def _reason_for(exc: Exception) -> str:
 
 
 def _redirect_signed_octets(
-    param: str, value: str, relay_state: str | None, sigalg: str, raw_query: str | None
+    param: str,
+    value: str,
+    relay_state: str | None,
+    sigalg: str,
+    signature: str,
+    raw_query: str | None,
 ) -> bytes:
     """``PARAM=..&RelayState=..&SigAlg=..`` exactly as the IdP signed it.
 
@@ -576,14 +584,30 @@ def _redirect_signed_octets(
     fallback re-encodes (which only matches IdPs that encode like Python).
     """
     if raw_query is not None:
+        signed_names = (param, "RelayState", "SigAlg", "Signature")
         raw: dict[str, str] = {}
         for pair in raw_query.split("&"):
-            key, sep, val = pair.partition("=")
-            if sep and key in (param, "RelayState", "SigAlg") and key not in raw:
-                raw[key] = val
-        if param not in raw or "SigAlg" not in raw:
+            key, _sep, val = pair.partition("=")
+            name = unquote_plus(key)
+            if name not in signed_names and name not in ("SAMLRequest", "SAMLResponse"):
+                continue  # unrelated parameter, not part of the signed string
+            # A repeated or oddly spelled key could make the parser (last wins) and this
+            # verifier (first wins) read different messages: refuse outright.
+            if name in raw or key != name:
+                raise SamlResponseInvalid("logout_signature")
+            raw[name] = val
+        for other in ("SAMLRequest", "SAMLResponse"):
+            if other != param and other in raw:
+                raise SamlResponseInvalid("logout_signature")
+        # Every value that is parsed must be the very value that was signed.
+        if param not in raw or "SigAlg" not in raw or "Signature" not in raw:
             raise SamlResponseInvalid("logout_signature")
-        if unquote_plus(raw["SigAlg"]) != sigalg:
+        if unquote_plus(raw[param]) != value or unquote_plus(raw["SigAlg"]) != sigalg:
+            raise SamlResponseInvalid("logout_signature")
+        if unquote_plus(raw["Signature"]) != signature:
+            raise SamlResponseInvalid("logout_signature")
+        raw_relay = unquote_plus(raw["RelayState"]) if "RelayState" in raw else None
+        if raw_relay != relay_state:
             raise SamlResponseInvalid("logout_signature")
         parts = [f"{param}={raw[param]}"]
         if "RelayState" in raw:
@@ -595,6 +619,11 @@ def _redirect_signed_octets(
         parts.append(urlencode({"RelayState": relay_state}))
     parts.append(urlencode({"SigAlg": sigalg}))
     return "&".join(parts).encode("ascii")
+
+
+def _text_attr(obj: Any, name: str) -> str | None:
+    value = getattr(obj, name, None)
+    return str(value) if value else None
 
 
 def _as_bytes(value: str | bytes) -> bytes:

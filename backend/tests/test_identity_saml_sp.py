@@ -573,3 +573,95 @@ async def test_parse_logout_response_requires_success_status(
     with pytest.raises(SamlResponseInvalid) as err:
         await sp.parse_logout_response(q["SAMLResponse"], binding=REDIRECT)
     assert err.value.reason == "StatusError"  # pysaml2 refuses a non-Success status itself
+
+
+# --------------------------------------------------------------------------- round 2
+
+
+def _logout_call(url: str, *, query: str | None = None, **over: object) -> dict[str, object]:
+    """Arguments as a route would pass them; parsed values follow Starlette (last wins)."""
+    raw = urllib.parse.urlparse(url).query if query is None else query
+    q = {k: v[-1] for k, v in urllib.parse.parse_qs(raw).items()}
+    args: dict[str, object] = {
+        "saml_request": q["SAMLRequest"],
+        "binding": REDIRECT,
+        "relay_state": q.get("RelayState"),
+        "sigalg": q.get("SigAlg"),
+        "signature": q.get("Signature"),
+        "raw_query": raw,
+    }
+    args.update(over)
+    return args
+
+
+async def _logout_reject(sp: SamlServiceProvider, args: dict[str, object]) -> str:
+    saml_request = str(args.pop("saml_request"))
+    with pytest.raises(SamlResponseInvalid) as err:
+        await sp.handle_logout_request(saml_request, **args)  # type: ignore[arg-type]
+    return err.value.reason
+
+
+async def test_logout_appended_duplicate_samlrequest_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    signed = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="attacker", session_index="s1")
+    victim = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="victim", session_index="s1")
+    victim_req = urllib.parse.parse_qs(urllib.parse.urlparse(victim).query)["SAMLRequest"][0]
+    query = urllib.parse.urlparse(signed).query + "&SAMLRequest=" + urllib.parse.quote(victim_req)
+    args = _logout_call(signed, query=query)
+    assert args["saml_request"] == victim_req  # what Starlette would hand to the parser
+    assert await _logout_reject(sp, args) == "logout_signature"
+
+
+async def test_logout_percent_encoded_duplicate_key_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    signed = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="attacker", session_index="s1")
+    victim = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="victim", session_index="s1")
+    victim_req = urllib.parse.parse_qs(urllib.parse.urlparse(victim).query)["SAMLRequest"][0]
+    query = urllib.parse.urlparse(signed).query + "&SAML%52equest=" + urllib.parse.quote(victim_req)
+    args = _logout_call(signed, query=query)
+    assert args["saml_request"] == victim_req
+    assert await _logout_reject(sp, args) == "logout_signature"
+
+
+async def test_logout_relay_state_must_match_raw_query(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    signed = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="u-1001", session_index="s1")
+    base = urllib.parse.urlparse(signed).query
+    # Appended RelayState: not part of what was signed.
+    appended = _logout_call(signed, query=base + "&RelayState=evil")
+    assert appended["relay_state"] == "evil"
+    assert await _logout_reject(sp, appended) == "logout_signature"
+    # Parsed RelayState that the raw query does not carry.
+    invented = _logout_call(signed, relay_state="evil")
+    assert await _logout_reject(sp, invented) == "logout_signature"
+
+
+async def test_logout_request_for_other_destination_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    other = "https://helpdesk.example.org/api/v1/auth/saml/other/sls"
+    url = idp.logout_request_redirect(sp_slo_url=other, name_id="u-1001", session_index="s1")
+    reason = await _logout_reject(sp, _logout_call(url))
+    assert reason in {"destination_mismatch", "OtherError"}
+
+
+async def test_sha1_inside_encrypted_assertion_rejected_unless_opted_in(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    req_id, b64 = _good(idp, sha1=True, encrypt_for_cert=sp.sp_certificate_pem)
+    xml = _xml(b64)
+    assert "EncryptedAssertion" in xml and "rsa-sha1" not in xml  # hidden until decrypted
+    assert (await _reject(sp, b64, req_id)).reason == "sha1_signature"
+
+    legacy = SamlServiceProvider(
+        saml_record(slug=SLUG, idp=idp, settings=S, allow_sha1_signatures=True), settings=S
+    )
+    idp.trust_sp(legacy.sp_metadata_xml())
+    req_id, b64 = _good(idp, sha1=True, encrypt_for_cert=legacy.sp_certificate_pem)
+    res = await legacy.parse_login_response(
+        b64, outstanding={req_id: AGENT_ACS}, expected_acs=AGENT_ACS
+    )
+    assert res.name_id == "u-1001"
