@@ -70,9 +70,10 @@ after-hours options (AI, hide, block escalation, create ticket).
    reply goes out by email and the visitor can continue in the portal.
 3. **Pre-chat form** with dynamic fields (reusing the typed field engine),
    **file upload** (image paste + files, size/type limits).
-4. **Identified visitors**: logged-in portal customers are recognised
-   automatically; websites can pass a signed identity token so a chat is
-   attached to the right `customer_user` without asking.
+4. **Identified visitors**: on the Tiqora portal itself, logged-in
+   customers are recognised automatically; on customer websites the host
+   passes a signed identity token so a chat is attached to the right
+   `customer_user` without asking.
 5. **Persistent conversation**: the visitor can close the tab and return; the
    history reloads; replies after the visitor left are sent by email.
 6. **Live translation** (phase 3): visitor writes Spanish, agent reads and
@@ -163,8 +164,11 @@ after-hours options (AI, hide, block escalation, create ticket).
 - Anonymous: random `visitor_id` in iframe storage; name/email asked in the
   pre-chat form or lazily ("Wohin dürfen wir antworten, falls Sie offline
   gehen?").
-- Portal customers: if a portal session cookie exists on the same Tiqora
-  origin, the frame attaches the session's `customer_user`.
+- Portal customers: only when the widget runs on the Tiqora portal pages
+  themselves (same site) does the frame see the portal session and attach
+  its `customer_user`. Inside an iframe on a customer website, browsers do
+  not send Tiqora's first-party cookies (third-party cookie blocking /
+  storage partitioning), so there the signed token below is the only way.
 - Website-signed identity: host backend signs `{sub|email, name, exp}` with
   the chat's `identity_secret` (HS256 JWT); Tiqora links to `customer_user` by
   email/login, never creates one implicitly unless the chat allows it.

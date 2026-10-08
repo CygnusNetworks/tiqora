@@ -129,7 +129,8 @@ Designer:
 
 - Tiqora writes `pm_*` rows exactly as Znuny's
   `Kernel::System::ProcessManagement::DB::*` do: entity ids from
-  `EntityIDGenerate` (`<EntityType>-<md5>`), YAML `config` in Znuny's dump
+  `EntityIDGenerate` (`<EntityType>-` + 32 random hex characters, e.g.
+  `Process-9f1c…`), YAML `config` in Znuny's dump
   format, `create_by/change_by/create_time/change_time`, and a
   `pm_entity_sync` row (`sync_state = 'not_sync'`) per changed entity.
   ACL edits likewise write `acl_sync`.

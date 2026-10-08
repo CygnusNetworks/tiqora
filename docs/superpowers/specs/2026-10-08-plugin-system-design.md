@@ -71,9 +71,10 @@ ecosystems offer and Znuny does not.
     compatibility), plugin dependencies, permissions/capabilities it declares
     (tables, routes, outbound hosts, feature keys, extension points used),
     settings schema reference, entry points.
-  - `python/` — one wheel for the plugin; **pure-Python** for runtime install.
-    Third-party Python dependencies are allowed only if they resolve against
-    the core lockfile without changing any core pin (checked at install).
+  - `python/` — one wheel for the plugin. **Runtime install** accepts only
+    pure-Python plugins whose dependencies are already in the core image
+    (checked against the core lockfile at install). Anything with additional
+    or native dependencies goes through the baked-image path.
   - `web/` — built ES modules + `manifest.json` of UI contributions.
   - `i18n/` — locale JSON (same key format as core; missing locales fall
     back to English).
@@ -168,7 +169,7 @@ Frontend (`@tiqora/plugin-sdk`, contributions declared in `web/manifest.json`):
   listed packages (native dependencies allowed) — reproducible, scanner-friendly.
 - **Runtime install (convenience):** admin uploads or picks from a repository;
   Tiqora verifies signature + compatibility, installs the wheel with
-  `--no-deps --target` into a volume (`/var/lib/tiqora/plugins/<id>/<ver>`),
+  `--no-deps --target` (all dependencies are already in the image, see §2) into a volume (`/var/lib/tiqora/plugins/<id>/<ver>`),
   serves `web/` from there, runs migrations as an async job, then asks for a
   coordinated restart of api/worker/ai-worker/mcp (processes exit cleanly
   one after another; compose `restart: unless-stopped` brings them back).

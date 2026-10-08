@@ -63,6 +63,21 @@ approvals from Slack/Teams. JSM — assets with network discovery and imports,
 change risk engine, low-risk auto-approval, approvers from asset owners,
 change calendar with freeze windows.
 
+## Znuny ITSM package coverage
+
+Where each Znuny 7.3 ITSM package lands, so "at least Znuny level" can be
+checked item by item:
+
+| Znuny package | Tiqora | Section |
+|---|---|---|
+| GeneralCatalog | `tiqora_cmdb_catalog` (+ import) | B |
+| ITSMCore (services/SLAs ITSM view, criticality × impact → priority, service incident state) | ITSM core | A |
+| ITSMIncidentProblemManagement (types, decision/additional fields, closed with workaround, min. time between incidents) | Incident/problem | A |
+| ITSMConfigurationManagement (classes, versions, states, links, search, bulk, portal view, GI `ConfigItem*`) | CMDB | B + GI design |
+| ITSMChangeManagement (changes, work orders, CAB, PIR, conditions, templates, change schedule, PSA) | Changes as tickets + approval engine + change calendar; old data as read-only archive | C, §2 |
+| ITSMServiceLevelManagement (ITSM stats: first-level solution rate, average solution time, CI/change stats) | Built-in reports + `config_items` reporting source | Reporting design |
+| ImportExport (CSV templates for CIs) | CMDB CSV/XLSX import/export with saved mapping templates | B |
+
 ## Fixed decisions
 
 ### 1. Tiqora-owned ITSM model + importer (not Znuny's ITSM tables)
@@ -120,8 +135,11 @@ Since both systems share one database, a small Perl package installed next to
 TiqoraSync can show Tiqora's ITSM data inside Znuny without a sync:
 - Ticket zoom sidebar widget "Betroffene CIs (Tiqora)": CI name, class,
   deployment/incident state, link to Tiqora — read straight from
-  `tiqora_cmdb_*` / `tiqora_itsm_link` (read-only SQL, no Tiqora tables are
-  written by Perl).
+  a small set of versioned SQL views that Tiqora owns
+  (`tiqora_v1_itsm_ci_links`, `tiqora_v1_itsm_ci`), created by Tiqora's
+  migrations — the add-on never touches the base tables, so Tiqora can change
+  its schema without breaking the Perl package (no Tiqora data is written by
+  Perl).
 - Optional linking from Znuny through Tiqora's REST API (`/api/v1/cmdb/links`,
   API key stored in Znuny SysConfig) so all writes keep going through
   Tiqora's validation.
