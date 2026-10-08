@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Final
 
 from tiqora.identity.config_models import AttributeMap, RoleRule
@@ -96,7 +96,12 @@ def map_profile(attributes: Attributes, attribute_map: AttributeMap) -> MappedPr
 
 
 def normalize_dn(value: str) -> str:
-    """Lower-case and strip whitespace around ``,`` and ``=``."""
+    """Lower-case and strip whitespace around ``,`` and ``=``.
+
+    Limitation: a backslash-escaped comma inside an RDN value (``CN=Doe\\, Jane``)
+    is split like a separator; both sides of a comparison are treated alike, so
+    equal DNs still match, but whitespace after an escaped comma is also stripped.
+    """
     parts = [p.strip() for p in value.strip().lower().split(",")]
     return ",".join("=".join(q.strip() for q in p.split("=")) for p in parts)
 
@@ -169,6 +174,11 @@ class AssignmentDiff:
     drop_managed_roles: frozenset[int] = frozenset()
     record_managed_groups: frozenset[tuple[int, str]] = frozenset()
     drop_managed_groups: frozenset[tuple[int, str]] = frozenset()
+    # Final permission key set for every group whose keys change (group_id -> keys;
+    # an empty set means "no rows left"). Consumers (the Task 18 applier) MUST write
+    # each such group's key set ONCE as a replace (Znuny PermissionGroupUserAdd
+    # semantics), not apply add_groups / remove_groups rows independently.
+    final_group_keys: Mapping[int, frozenset[str]] = field(default_factory=dict)
 
     @property
     def empty(self) -> bool:
@@ -195,18 +205,60 @@ def _diff_set[T](
     return add, drop & current, add, drop
 
 
+def _keys(perms: AbstractSet[tuple[int, str]], gid: int) -> frozenset[str]:
+    return frozenset(p for g, p in perms if g == gid)
+
+
+def _managed_group_diff(
+    desired: DesiredAssignments, state: AssignmentState
+) -> tuple[
+    frozenset[tuple[int, str]],
+    frozenset[tuple[int, str]],
+    frozenset[tuple[int, str]],
+    frozenset[tuple[int, str]],
+]:
+    """Managed-mode group diff: never removes or downgrades a key it does not manage.
+
+    Per group: if the current keys already satisfy the desired ones (a present ``rw``
+    covers every key) nothing is added. Otherwise the final key set is
+    desired ∪ current manual (unmanaged) keys, collapsed to ``{rw}`` when it holds
+    ``rw`` (Znuny stores ``rw`` alone). Managed keys no longer desired are removed.
+    """
+    add: set[tuple[int, str]] = set()
+    rem: set[tuple[int, str]] = set()
+    gids = {g for g, _ in desired.group_perms} | {g for g, _ in state.managed_group_perms}
+    for gid in gids:
+        want = _keys(desired.group_perms, gid)
+        cur = _keys(state.current_group_perms, gid)
+        managed = _keys(state.managed_group_perms, gid)
+        satisfied = not want or "rw" in cur or want <= cur
+        if satisfied:
+            final = cur - (managed - want)
+        else:
+            final = want | (cur - managed)
+            if "rw" in final:
+                final = frozenset({"rw"})
+        add.update((gid, p) for p in final - cur)
+        rem.update((gid, p) for p in cur - final)
+    drop = state.managed_group_perms - desired.group_perms
+    return frozenset(add), frozenset(rem), frozenset(add), drop
+
+
 def diff_assignments(
     desired: DesiredAssignments, state: AssignmentState, *, mode: SyncMode
 ) -> AssignmentDiff:
     """Compute the changes that bring ``state`` to ``desired`` (see module doc for rule-less kinds).
 
-    Group permissions follow Znuny ``PermissionGroupUserAdd``, which replaces the
-    whole permission key set of a (user, group): for every group that receives a
-    new key, all other current keys of that group are removed too, so a granted
-    ``rw`` never stacks on a leftover ``ro``. Groups that need no new key are left
-    alone in managed mode (manual keys survive).
+    Group permissions follow Znuny ``PermissionGroupUserAdd``, which replaces the whole
+    key set of a (user, group): apply ``final_group_keys`` once per group instead of the
+    add/remove rows. Managed mode keeps every unmanaged key (a manual ``rw`` is never
+    downgraded); authoritative mode makes the group's keys exactly the desired ones.
+
+    A group rule whose group ids are all invalid (e.g. the group was deleted) still
+    counts as "group rules configured": desired is empty, so authoritative mode strips
+    the user's group permissions while managed mode only strips managed ones.
     """
-    kw: dict[str, frozenset[Any]] = {}
+    kw: dict[str, Any] = {}
     if desired.has_role_rules:
         r_add, r_rem, r_rec, r_drop = _diff_set(
             desired.role_ids, state.current_roles, state.managed_roles, mode
@@ -218,15 +270,19 @@ def diff_assignments(
             drop_managed_roles=r_drop,
         )
     if desired.has_group_rules:
-        g_add, g_rem, g_rec, g_drop = _diff_set(
-            desired.group_perms, state.current_group_perms, state.managed_group_perms, mode
-        )
-        replaced_groups = {gid for gid, _ in g_add}
-        g_rem = g_rem | frozenset(
-            (gid, p)
-            for gid, p in state.current_group_perms
-            if gid in replaced_groups and (gid, p) not in desired.group_perms
-        )
+        if mode == "authoritative":
+            g_add, g_rem, g_rec, g_drop = _diff_set(
+                desired.group_perms, state.current_group_perms, state.managed_group_perms, mode
+            )
+        else:
+            g_add, g_rem, g_rec, g_drop = _managed_group_diff(desired, state)
+        touched = {gid for gid, _ in g_add | g_rem}
+        final: dict[int, frozenset[str]] = {}
+        for gid in touched:
+            keys = {p for g, p in state.current_group_perms if g == gid}
+            keys -= {p for g, p in g_rem if g == gid}
+            keys |= {p for g, p in g_add if g == gid}
+            final[gid] = frozenset(keys)
         # Every key that disappears also loses its managed mark.
         g_drop = g_drop | (g_rem & state.managed_group_perms)
         kw.update(
@@ -235,4 +291,5 @@ def diff_assignments(
             record_managed_groups=g_rec,
             drop_managed_groups=g_drop,
         )
+        return AssignmentDiff(final_group_keys=final, **kw)
     return AssignmentDiff(**kw)

@@ -220,3 +220,60 @@ def test_managed_manual_removal_readds_and_rerecords() -> None:
         mode="managed",
     )
     assert d.add_roles == {4} and d.record_managed_roles == {4}
+
+
+def _gd(*perms: tuple[int, str]) -> DesiredAssignments:
+    return DesiredAssignments(frozenset(), frozenset(perms), False, True)
+
+
+def _gs(cur: set[tuple[int, str]], managed: set[tuple[int, str]] | None = None) -> AssignmentState:
+    return AssignmentState(frozenset(), frozenset(cur), frozenset(), frozenset(managed or ()))
+
+
+def test_managed_manual_rw_not_downgraded_by_desired_ro() -> None:
+    d = diff_assignments(_gd((2, "ro")), _gs({(2, "rw")}), mode="managed")
+    assert d.empty and d.final_group_keys == {}
+
+
+def test_managed_ro_upgraded_to_rw_by_admin_is_left_alone() -> None:
+    d = diff_assignments(_gd((2, "ro")), _gs({(2, "rw")}, {(2, "ro")}), mode="managed")
+    assert d.empty
+
+
+def test_managed_manual_non_rw_keys_survive_new_managed_key() -> None:
+    d = diff_assignments(_gd((2, "ro")), _gs({(2, "note")}), mode="managed")
+    assert d.add_groups == {(2, "ro")} and d.remove_groups == frozenset()
+    assert d.final_group_keys == {2: frozenset({"note", "ro"})}
+    assert d.record_managed_groups == {(2, "ro")}
+
+
+def test_managed_new_rw_collapses_manual_keys() -> None:
+    d = diff_assignments(_gd((2, "rw")), _gs({(2, "ro"), (2, "note")}), mode="managed")
+    assert d.add_groups == {(2, "rw")} and d.remove_groups == {(2, "ro"), (2, "note")}
+    assert d.final_group_keys == {2: frozenset({"rw"})}
+
+
+def test_managed_stale_managed_key_removed_manual_kept() -> None:
+    d = diff_assignments(_gd((2, "rw")), _gs({(2, "ro"), (2, "note")}, {(2, "ro")}), mode="managed")
+    # rw is new -> final collapses to rw; managed ro loses its mark
+    assert d.final_group_keys == {2: frozenset({"rw"})} and (2, "ro") in d.drop_managed_groups
+    d2 = diff_assignments(_gd(), _gs({(2, "ro"), (2, "note")}, {(2, "ro")}), mode="managed")
+    assert d2.remove_groups == {(2, "ro")} and d2.final_group_keys == {2: frozenset({"note"})}
+    assert d2.drop_managed_groups == {(2, "ro")}
+
+
+def test_authoritative_final_keys_replace_group() -> None:
+    d = diff_assignments(_gd((2, "ro")), _gs({(2, "rw"), (9, "ro")}), mode="authoritative")
+    assert d.final_group_keys == {2: frozenset({"ro"}), 9: frozenset()}
+
+
+def test_invalid_group_in_only_rule_strips_group_perms_in_authoritative() -> None:
+    rules = [
+        RoleRule(attribute="g", value="a", groups=[GroupGrant(group_id=77, permissions=["rw"])])
+    ]
+    desired = evaluate_rules({"g": ("a",)}, rules, valid_role_ids=set(), valid_group_ids=set())
+    assert desired.has_group_rules and desired.group_perms == frozenset()
+    state = _gs({(2, "rw")})
+    d = diff_assignments(desired, state, mode="authoritative")
+    assert d.remove_groups == {(2, "rw")} and d.final_group_keys == {2: frozenset()}
+    assert diff_assignments(desired, state, mode="managed").empty
