@@ -569,12 +569,12 @@ subset (bool, int, float, str, `SecretStr`, `Literal`/`StrEnum`, `list[str]`,
 and `X | None` of these) checked by `validate_section_schema`; the generic
 admin screen `/admin/settings/<section>` renders the form from the schema
 (`SchemaForm`, `frontend/src/components/fields/jsonSchema.ts`). Secret
-contract: GET never returns plaintext (set secrets read as the mask
-`********`); on save, an omitted field or the mask leaves the stored
-ciphertext untouched, `""`/`null` removes it, any other string is encrypted
-anew. The frontend therefore holds `null` for an untouched secret, `""` for
-"remove" and a string for a new value, and omits untouched secrets from the
-PUT. `save_section_values` only flushes (the route commits), unlike the legacy
+contract: GET never returns plaintext (a stored secret reads as the mask
+`********`, an unset one as `null`); on save, an omitted field or the mask
+leaves the stored ciphertext untouched, `""` or an explicit `null` removes it
+(the row is deleted), any other string is encrypted anew. The frontend
+therefore omits untouched secrets from the PUT, sends `""` for "remove" and
+the string for a new value. `save_section_values` only flushes (the route commits), unlike the legacy
 `settings_store.set_setting`, which commits by itself. API:
 `/api/v1/admin/settings-sections`. Registered sections: `jobs`, `avatars`
 (the latter keeps `/api/v1/admin/avatars` and its old keys).
@@ -596,9 +596,10 @@ Failure mapping: `JobFailed(msg)` shows `msg`; a timeout or any other
 exception ends the job `failed` with a plain German message while details go to
 the worker log (no traceback ever reaches the UI); the loop keeps running.
 Finished jobs and files are purged after `jobs.retention_days`. Visibility:
-the creator or an admin; for everybody else all `/jobs/{id}` routes answer
-404. All `tiqora_job*` timestamps are application-written naive UTC. The loop
-is a daemon-catalog service `jobs` (Admin -> Dienste; not toggleable) and polls
+the creator or an admin see status and progress; the files are built from
+the creator's permissions and can be downloaded by the creator only (admins
+get 404 there); for everybody else all `/jobs/{id}` routes answer 404. All `tiqora_job*` timestamps are application-written naive UTC. The loop
+is a daemon-catalog service `jobs` (Admin -> Services (Dienste); not toggleable) and polls
 every `TIQORA_JOBS_POLL_INTERVAL_SECONDS` seconds (default 2).
 
 **Filter model** (`tiqora.filters`). A versioned JSON filter language

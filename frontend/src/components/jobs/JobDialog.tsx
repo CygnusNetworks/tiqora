@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
+import { apiErrorMessage } from "@/lib/avatarApi";
 import type { Job } from "@/lib/jobsApi";
 import { JobProgress } from "./JobProgress";
 import { useJob } from "./useJob";
@@ -23,7 +24,7 @@ export function JobDialog({
   testId?: string;
 }) {
   const { t } = useTranslation();
-  const { job, isTerminal, error, cancel, isCancelling } = useJob(jobId);
+  const { job, isTerminal, error, cancel, isCancelling, cancelError } = useJob(jobId);
 
   const onSucceededRef = useRef(onSucceeded);
   onSucceededRef.current = onSucceeded;
@@ -48,7 +49,7 @@ export function JobDialog({
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => void cancel()}
+            onClick={cancel}
             disabled={isCancelling || job.cancel_requested}
             data-testid={`${testId}-cancel`}
           >
@@ -62,7 +63,14 @@ export function JobDialog({
       }
     >
       {job ? (
-        <JobProgress job={job} testId={testId} />
+        <>
+          <JobProgress job={job} testId={testId} />
+          {cancelError && !isTerminal && (
+            <p className="mt-3 text-xs text-danger" role="alert" data-testid={`${testId}-cancel-error`}>
+              {apiErrorMessage(cancelError, t("jobs.cancelFailed"))}
+            </p>
+          )}
+        </>
       ) : error ? (
         <p className="text-sm text-danger" data-testid={`${testId}-error`}>
           {t("jobs.loadError")}

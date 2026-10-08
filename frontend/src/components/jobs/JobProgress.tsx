@@ -34,6 +34,7 @@ export function JobProgress({
       {active && (
         <div
           role="progressbar"
+          aria-label={t("jobs.progressLabel")}
           aria-valuemin={0}
           aria-valuemax={determinate ? total : undefined}
           aria-valuenow={determinate ? job.progress_done : undefined}

@@ -86,6 +86,45 @@ describe("JobDialog", () => {
     await waitFor(() => expect(cancel).toHaveBeenCalledWith(7));
   });
 
+  it("shows an error when cancelling fails and does not reject unhandled", async () => {
+    const { ApiError } = await import("@/lib/api");
+    get.mockResolvedValue(makeJob({ progress_done: 1, progress_total: 10 }));
+    cancel.mockRejectedValue(new ApiError(409, { detail: { message: "Die Aufgabe ist bereits beendet." } }, "/x"));
+    render(
+      <Providers>
+        <JobDialog jobId={7} title="Export" onClose={() => {}} />
+      </Providers>,
+    );
+    fireEvent.click(await screen.findByTestId("job-dialog-cancel"));
+    expect(await screen.findByTestId("job-dialog-cancel-error")).toHaveTextContent(
+      "Die Aufgabe ist bereits beendet.",
+    );
+  });
+
+  it("gives the progress bar an accessible name", async () => {
+    get.mockResolvedValue(makeJob({ progress_done: 1, progress_total: 10 }));
+    render(
+      <Providers>
+        <JobDialog jobId={7} title="Export" onClose={() => {}} />
+      </Providers>,
+    );
+    expect(await screen.findByRole("progressbar", { name: "Fortschritt" })).toBeInTheDocument();
+  });
+
+  it("does not poll a job that cannot be loaded", async () => {
+    const { ApiError } = await import("@/lib/api");
+    get.mockRejectedValue(new ApiError(404, { detail: "Aufgabe nicht gefunden." }, "/x"));
+    render(
+      <Providers>
+        <JobDialog jobId={7} title="Export" onClose={() => {}} />
+      </Providers>,
+    );
+    expect(await screen.findByTestId("job-dialog-error")).toBeInTheDocument();
+    const calls = get.mock.calls.length;
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(get.mock.calls.length).toBe(calls);
+  });
+
   it("shows the server's error text on failure", async () => {
     get.mockResolvedValue(makeJob({ status: "failed", error: "Zeitlimit" }));
     render(

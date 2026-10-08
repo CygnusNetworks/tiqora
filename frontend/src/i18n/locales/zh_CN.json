@@ -4334,6 +4334,8 @@
     "elapsed": "Elapsed: {{duration}}",
     "cancelRequested": "Cancelling…",
     "loadError": "The status of this task could not be loaded.",
+    "cancelFailed": "The task could not be cancelled.",
+    "progressLabel": "Progress",
     "kinds": {
       "core": {
         "ticket_export": "Ticket export"

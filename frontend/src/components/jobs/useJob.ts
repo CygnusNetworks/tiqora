@@ -12,8 +12,11 @@ export function jobPollInterval(
   job: Job | undefined,
   firstSeenMs: number,
   nowMs: number,
+  failedWithoutData = false,
 ): number | false {
   if (job && TERMINAL_JOB_STATUSES.has(job.status)) return false;
+  // A job that cannot be loaded at all (404 after a purge, 403) will not appear later.
+  if (!job && failedWithoutData) return false;
   return nowMs - firstSeenMs < FAST_POLL_WINDOW_MS ? FAST_POLL_MS : SLOW_POLL_MS;
 }
 
@@ -26,7 +29,13 @@ export function useJob(jobId: number | null | undefined) {
     queryKey: ["jobs", jobId],
     queryFn: ({ signal }) => jobsApi.get(jobId as number, signal),
     enabled: jobId != null,
-    refetchInterval: (q) => jobPollInterval(q.state.data, firstSeen.current.at, Date.now()),
+    refetchInterval: (q) =>
+      jobPollInterval(
+        q.state.data,
+        firstSeen.current.at,
+        Date.now(),
+        q.state.status === "error" && q.state.data === undefined,
+      ),
   });
 
   const cancelMutation = useMutation({
@@ -39,10 +48,13 @@ export function useJob(jobId: number | null | undefined) {
     job,
     isTerminal: job ? TERMINAL_JOB_STATUSES.has(job.status) : false,
     error: query.error,
-    cancel: async () => {
+    cancel: () => {
       if (jobId == null) return;
-      await cancelMutation.mutateAsync();
+      // `mutate`, not `mutateAsync`: a failure lands in `cancelError` instead of
+      // an unhandled rejection.
+      cancelMutation.mutate();
     },
     isCancelling: cancelMutation.isPending,
+    cancelError: cancelMutation.error,
   };
 }

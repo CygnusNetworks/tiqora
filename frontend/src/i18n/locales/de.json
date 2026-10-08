@@ -4342,6 +4342,8 @@
     "elapsed": "Dauer: {{duration}}",
     "cancelRequested": "Wird abgebrochen …",
     "loadError": "Der Stand dieser Aufgabe konnte nicht geladen werden.",
+    "cancelFailed": "Die Aufgabe konnte nicht abgebrochen werden.",
+    "progressLabel": "Fortschritt",
     "kinds": {
       "core": {
         "ticket_export": "Ticket-Export"

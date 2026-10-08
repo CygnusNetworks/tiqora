@@ -93,8 +93,9 @@ export const avatarApi = {
 
 /**
  * Readable message of a failed call. `ApiError.detail` is the whole response
- * body: a plain `{detail: "…"}` gives that text, a validation error
- * (`{detail: [{msg}]}`) its first message — never "[object Object]".
+ * body. Understood shapes of `body.detail`: a plain string, an object with a
+ * string `message` (`{message}`, `{message, path}`, `{message, errors}`), and a
+ * validation list (`[{msg}]`) — never "[object Object]".
  */
 export function apiErrorMessage(err: unknown, fallback: string): string {
   if (!(err instanceof ApiError)) return fallback;
@@ -105,6 +106,9 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   if (typeof inner === "string" && inner) return inner;
   if (Array.isArray(inner)) {
     const msg = (inner[0] as { msg?: unknown } | undefined)?.msg;
+    if (typeof msg === "string" && msg) return msg;
+  } else if (inner && typeof inner === "object") {
+    const msg = (inner as { message?: unknown }).message;
     if (typeof msg === "string" && msg) return msg;
   }
   return fallback;
