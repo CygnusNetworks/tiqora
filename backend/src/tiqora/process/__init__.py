@@ -12,6 +12,7 @@ dispatching TransitionActions, and driving Activity Dialog submission
 
 from __future__ import annotations
 
+from tiqora.process.actor import Interface, ProcessActor
 from tiqora.process.config import (
     ActivityConfig,
     ActivityDialogConfig,
@@ -26,6 +27,7 @@ from tiqora.process.config import (
 )
 from tiqora.process.engine import (
     ActivityDialogSubmitResult,
+    apply_activity_dialog,
     evaluate_transition,
     execute_transition_action,
     get_ticket_attrs,
@@ -40,6 +42,20 @@ from tiqora.process.exceptions import (
     RequiredFieldMissing,
     TicketAlreadyInProcess,
     TicketNotInProcess,
+)
+from tiqora.process.fields import (
+    CUSTOMER_SKIP_FIELDS,
+    DISPLAY_HIDDEN,
+    DISPLAY_OPTIONAL,
+    DISPLAY_REQUIRED,
+    FIELD_ALIASES,
+    TICKET_REQUIRED_FIELDS,
+    canonical_field_name,
+    dialog_field_order,
+    effective_field_values,
+    missing_required_fields,
+    normalize_field_values,
+    visible_fields,
 )
 from tiqora.process.graph import (
     ActivityDialogNode,
@@ -67,6 +83,21 @@ from tiqora.process.ticket_state import (
 
 __all__ = [
     "ACTIVITY_ID_DF_NAME",
+    "CUSTOMER_SKIP_FIELDS",
+    "DISPLAY_HIDDEN",
+    "DISPLAY_OPTIONAL",
+    "DISPLAY_REQUIRED",
+    "FIELD_ALIASES",
+    "TICKET_REQUIRED_FIELDS",
+    "Interface",
+    "ProcessActor",
+    "apply_activity_dialog",
+    "canonical_field_name",
+    "dialog_field_order",
+    "effective_field_values",
+    "missing_required_fields",
+    "normalize_field_values",
+    "visible_fields",
     "PROCESS_ID_DF_NAME",
     "ActivityConfig",
     "ActivityDialogConfig",

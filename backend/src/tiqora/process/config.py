@@ -42,18 +42,10 @@ future designer UI, not consulted by engine logic.
         DefaultValue: <any>
         DescriptionLong: <str>
         DescriptionShort: <str>
-        Display: '1' | '2'       # '1' = required/mandatory, '2' = optional
-                                  # (shown, not required). Verified against
-                                  # Kernel/Modules/AgentTicketProcess.pm:
-                                  # `Mandatory => Display == 2` is FALSE, i.e.
-                                  # Display == 2 means NOT mandatory, anything
-                                  # else truthy (in practice '1') means
-                                  # mandatory. Display == 0/absent means the
-                                  # field is skipped entirely (not in
-                                  # FieldOrder) — Tiqora does not special-case
-                                  # a literal '0' value beyond exposing it
-                                  # as-is; callers should treat missing/'0' as
-                                  # "do not render".
+        Display: '0' | '1' | '2'  # '0'/missing = hidden (DefaultValue applies),
+                                  # '1' = shown, optional, '2' = shown, mandatory
+                                  # (`Mandatory => Display == 2`, AgentTicketProcess.pm:2695,
+                                  # 4916-4936). See tiqora.process.fields.
     Interface: [AgentInterface, CustomerInterface]
     Permission: <str>
     RequiredLock: '0' | '1'
@@ -225,7 +217,7 @@ class ActivityDialogFieldConfig(BaseModel):
     default_value: Any = None
     description_long: str = ""
     description_short: str = ""
-    display: str = "1"
+    display: str = "0"
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ActivityDialogFieldConfig:
@@ -234,13 +226,18 @@ class ActivityDialogFieldConfig(BaseModel):
             default_value=data.get("DefaultValue"),
             description_long=data.get("DescriptionLong") or "",
             description_short=data.get("DescriptionShort") or "",
-            display=str(data.get("Display") if data.get("Display") is not None else "1"),
+            display=str(data.get("Display") if data.get("Display") is not None else "0"),
         )
 
     @property
+    def hidden(self) -> bool:
+        """``Display`` ``0``/missing: not shown, ``DefaultValue`` applies."""
+        return self.display in {"", "0"}
+
+    @property
     def required(self) -> bool:
-        """``True`` unless ``Display == '2'`` (optional/shown-not-required)."""
-        return self.display != "2"
+        """``Display == '2'``: shown and mandatory (AgentTicketProcess.pm:2695)."""
+        return self.display == "2"
 
 
 class ActivityDialogConfig(BaseModel):

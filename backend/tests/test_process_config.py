@@ -130,11 +130,13 @@ def test_activity_dialog_config_parses_fields_and_display() -> None:
     article = config.fields["Article"]
     assert article.config == {"ArticleType": "phone"}
     assert article.display == "1"
-    assert article.required is True
+    assert article.required is False  # 1 = shown, optional (AgentTicketProcess.pm:2695)
+    assert article.hidden is False
 
     priority = config.fields["Priority"]
     assert priority.display == "2"
-    assert priority.required is False
+    assert priority.required is True  # 2 = mandatory
+    assert priority.hidden is False
 
     assert config.interface == ["AgentInterface", "CustomerInterface"]
 

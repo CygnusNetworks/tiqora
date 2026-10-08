@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from tiqora.domain.ticket_write_service import TicketIn, create_ticket
+from tiqora.process.actor import ProcessActor
 from tiqora.process.config import (
     ActivityDialogConfig,
     ActivityDialogFieldConfig,
@@ -44,6 +45,7 @@ from tiqora.process.engine import (
     _action_ticket_state_set,
     _action_ticket_title_set,
     _apply_dialog_field_changes,
+    apply_activity_dialog,
     execute_transition_action,
     start_process,
     submit_activity_dialog,
@@ -1161,7 +1163,7 @@ FieldOrder:
 - Title
 Fields:
   Title:
-    Display: '1'
+    Display: '2'
 Interface:
 - AgentInterface
 Permission: ''
@@ -1340,4 +1342,426 @@ async def test_submit_activity_dialog_permission_denied_raises(mariadb_znuny_url
                 field_values={},
                 user_id=1,
                 sysconfig=sysconfig,
+            )
+
+
+# ---------------------------------------------------------------------------
+# apply_activity_dialog: Znuny field semantics against the DB
+# (seed ids 888501-888502, type 30501; the module is in the DB-leak baseline and is restored)
+# ---------------------------------------------------------------------------
+
+_DLG_TYPE_ID = 30501  # ticket.type_id is SMALLINT
+_DLG_SERVICE_ID = 888501
+_DLG_SLA_ID = 888501
+_DLG_USER_ID = 888501
+_DLG_OTHER_USER_ID = 888502
+
+
+async def _seed_dialog_refs(session: AsyncSession) -> None:
+    await _seed_tiqora_tables(session)
+    await session.execute(
+        text(
+            "INSERT IGNORE INTO ticket_type (id, name, valid_id, create_time, create_by,"
+            " change_time, change_by) VALUES (:i, 'DlgTypeX', 1, current_timestamp, 1,"
+            " current_timestamp, 1)"
+        ),
+        {"i": _DLG_TYPE_ID},
+    )
+    await session.execute(
+        text(
+            "INSERT IGNORE INTO service (id, name, valid_id, create_time, create_by,"
+            " change_time, change_by) VALUES (:i, 'DlgServiceX', 1, current_timestamp, 1,"
+            " current_timestamp, 1)"
+        ),
+        {"i": _DLG_SERVICE_ID},
+    )
+    await session.execute(
+        text(
+            "INSERT IGNORE INTO sla (id, name, first_response_time, update_time,"
+            " solution_time, valid_id, create_time, create_by, change_time, change_by)"
+            " VALUES (:i, 'DlgSlaX', 0, 0, 0, 1, current_timestamp, 1, current_timestamp, 1)"
+        ),
+        {"i": _DLG_SLA_ID},
+    )
+    for uid, login in ((_DLG_USER_ID, "dlg-agent-a"), (_DLG_OTHER_USER_ID, "dlg-agent-b")):
+        await session.execute(
+            text(
+                "INSERT IGNORE INTO users (id, login, pw, first_name, last_name, valid_id,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:i, :l, 'x', 'Dlg', 'Agent', 1, current_timestamp, 1,"
+                " current_timestamp, 1)"
+            ),
+            {"i": uid, "l": login},
+        )
+    await session.commit()
+
+
+async def _ticket_row(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> Any:
+    async with factory() as session:
+        return (
+            await session.execute(
+                text(
+                    "SELECT type_id, service_id, sla_id, ticket_lock_id, user_id, queue_id"
+                    " FROM ticket WHERE id = :t"
+                ),
+                {"t": ticket_id},
+            )
+        ).one()
+
+
+async def _history_types(factory: async_sessionmaker[AsyncSession], ticket_id: int) -> list[str]:
+    async with factory() as session:
+        return list(
+            (
+                await session.execute(
+                    text(
+                        "SELECT ht.name FROM ticket_history th"
+                        " JOIN ticket_history_type ht ON ht.id = th.history_type_id"
+                        " WHERE th.ticket_id = :t ORDER BY th.id"
+                    ),
+                    {"t": ticket_id},
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+
+@pytest.mark.db
+async def test_dialog_applies_type_service_sla_lock(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    before = await _ticket_row(factory, ticket_id)
+    assert before.ticket_lock_id == 1
+
+    dialog = ActivityDialogConfig.from_yaml(
+        """
+FieldOrder: [TypeID, ServiceID, SLAID, LockID]
+Fields:
+  TypeID: {Display: '1'}
+  ServiceID: {Display: '1'}
+  SLAID: {Display: '1'}
+  LockID: {Display: '1'}
+"""
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={
+                "Type": "DlgTypeX",
+                "Service": "DlgServiceX",
+                "SLA": str(_DLG_SLA_ID),
+                "Lock": "lock",
+            },
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+    after = await _ticket_row(factory, ticket_id)
+    assert (after.type_id, after.service_id, after.sla_id) == (
+        _DLG_TYPE_ID,
+        _DLG_SERVICE_ID,
+        _DLG_SLA_ID,
+    )
+    assert after.ticket_lock_id == 2
+    hist = await _history_types(factory, ticket_id)
+    assert {"TypeUpdate", "ServiceUpdate", "SLAUpdate", "Lock"} <= set(hist)
+
+    dialog_unlock = ActivityDialogConfig.from_yaml(
+        "FieldOrder: [Lock]\nFields:\n  Lock: {Display: '0', DefaultValue: unlock}\n"
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog_unlock,
+            field_values={"Lock": "lock"},  # hidden: the default wins over the request
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+    assert (await _ticket_row(factory, ticket_id)).ticket_lock_id == 1
+
+
+@pytest.mark.db
+async def test_hidden_default_queue_is_applied_over_submitted_value(
+    mariadb_znuny_url: str,
+) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+        junk_id = (
+            await session.execute(text("SELECT id FROM queue WHERE name = 'Junk' LIMIT 1"))
+        ).scalar_one()
+    ticket_id = await _make_ticket(factory, sysconfig)
+    assert (await _ticket_row(factory, ticket_id)).queue_id != junk_id
+
+    dialog = ActivityDialogConfig.from_yaml(
+        "FieldOrder: [QueueID]\nFields:\n  QueueID: {Display: '0', DefaultValue: Junk}\n"
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={"QueueID": "Raw"},
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+    assert (await _ticket_row(factory, ticket_id)).queue_id == junk_id
+
+
+@pytest.mark.db
+async def test_article_visibility_comes_from_dialog_config_not_request(
+    mariadb_znuny_url: str,
+) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+
+    dialog = ActivityDialogConfig.from_yaml(
+        """
+FieldOrder: [Article]
+Fields:
+  Article:
+    Display: '2'
+    Config: {CommunicationChannel: Internal, IsVisibleForCustomer: '0'}
+"""
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={
+                "Article": {"Subject": "Cfg subject", "Body": "Cfg body"},
+                "IsVisibleForCustomer": True,
+                "SenderType": "customer",
+            },
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+    async with factory() as session:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT a.is_visible_for_customer, st.name FROM article a"
+                    " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                    " JOIN article_data_mime m ON m.article_id = a.id"
+                    " WHERE a.ticket_id = :t AND m.a_subject = 'Cfg subject'"
+                ),
+                {"t": ticket_id},
+            )
+        ).one()
+    assert row[0] == 0
+    assert row[1] == "agent"
+
+    # Config '1' -> visible; customer interface -> sender type customer.
+    dialog_vis = ActivityDialogConfig.from_yaml(
+        """
+FieldOrder: [Article]
+Fields:
+  Article:
+    Display: '1'
+    Config: {CommunicationChannel: Internal, IsVisibleForCustomer: '1'}
+"""
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog_vis,
+            field_values={"Subject": "Cust subject", "Body": "Cust body"},
+            actor=ProcessActor.customer(login="c@example.org", customer_id="ACME"),
+            sysconfig=sysconfig,
+        )
+    async with factory() as session:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT a.is_visible_for_customer, st.name FROM article a"
+                    " JOIN article_sender_type st ON st.id = a.article_sender_type_id"
+                    " JOIN article_data_mime m ON m.article_id = a.id"
+                    " WHERE a.ticket_id = :t AND m.a_subject = 'Cust subject'"
+                ),
+                {"t": ticket_id},
+            )
+        ).one()
+    assert row[0] == 1
+    assert row[1] == "customer"
+
+
+@pytest.mark.db
+async def test_article_with_only_subject_is_not_created(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    dialog = ActivityDialogConfig.from_yaml(
+        "FieldOrder: [Article]\nFields:\n  Article: {Display: '1'}\n"
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={"Subject": "only subject", "Body": ""},
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+    async with factory() as session:
+        count = (
+            await session.execute(
+                text(
+                    "SELECT COUNT(*) FROM article_data_mime m JOIN article a ON a.id = m.article_id"
+                    " WHERE a.ticket_id = :t AND m.a_subject = 'only subject'"
+                ),
+                {"t": ticket_id},
+            )
+        ).scalar_one()
+    assert count == 0
+
+
+@pytest.mark.db
+async def test_required_lock_locks_and_sets_owner(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+    ticket_id = await _make_ticket(factory, sysconfig)  # owner 1, unlocked
+    dialog = ActivityDialogConfig.from_yaml(
+        "RequiredLock: '1'\nFieldOrder: []\nFields: {}\nInterface: [AgentInterface]\n"
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={},
+            actor=ProcessActor.agent(_DLG_USER_ID),
+            sysconfig=sysconfig,
+        )
+    row = await _ticket_row(factory, ticket_id)
+    assert row.ticket_lock_id == 2
+    assert row.user_id == _DLG_USER_ID
+    hist = await _history_types(factory, ticket_id)
+    assert hist.count("OwnerUpdate") == 1
+    assert "Lock" in hist
+
+    # Owner already is the actor and the ticket is unlocked: lock only, no OwnerUpdate row.
+    ticket2 = await _make_ticket(factory, sysconfig)
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket2,
+            dialog=dialog,
+            field_values={},
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+    row2 = await _ticket_row(factory, ticket2)
+    assert (row2.ticket_lock_id, row2.user_id) == (2, 1)
+    assert "OwnerUpdate" not in await _history_types(factory, ticket2)
+
+    # Locked by the owner: allowed again, nothing new written.
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket2,
+            dialog=dialog,
+            field_values={},
+            actor=ProcessActor.agent(1),
+            sysconfig=sysconfig,
+        )
+
+
+@pytest.mark.db
+async def test_required_lock_refuses_foreign_lock(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    async with factory() as session:
+        await session.execute(
+            text("UPDATE ticket SET ticket_lock_id = 2, user_id = :u WHERE id = :t"),
+            {"u": _DLG_OTHER_USER_ID, "t": ticket_id},
+        )
+        await session.commit()
+    dialog = ActivityDialogConfig.from_yaml(
+        "RequiredLock: '1'\nFieldOrder: [Title]\nFields:\n  Title: {Display: '1'}\n"
+    )
+    async with factory() as session, session.begin():
+        with pytest.raises(ProcessPermissionDenied):
+            await apply_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                dialog=dialog,
+                field_values={"Title": "must not apply"},
+                actor=ProcessActor.agent(_DLG_USER_ID),
+                sysconfig=sysconfig,
+            )
+    async with factory() as session:
+        title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": ticket_id})
+        ).scalar_one()
+    assert title != "must not apply"
+
+    # RequiredLock is an agent-interface rule: the customer interface is not blocked.
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=ActivityDialogConfig.from_yaml(
+                "RequiredLock: '1'\nFieldOrder: []\nFields: {}\n"
+            ),
+            field_values={},
+            actor=ProcessActor.customer(login="c@example.org", customer_id="ACME"),
+            sysconfig=sysconfig,
+        )
+
+
+@pytest.mark.db
+async def test_skip_fields_and_no_required_lock_on_create(mariadb_znuny_url: str) -> None:
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    before_title = "BPM test ticket"
+    dialog = ActivityDialogConfig.from_yaml(
+        "RequiredLock: '1'\nFieldOrder: [Title, DynamicField_Skip]\n"
+        "Fields:\n  Title: {Display: '2'}\n  DynamicField_Skip: {Display: '1'}\n"
+    )
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={"Title": "consumed by create"},
+            actor=ProcessActor.agent(_DLG_USER_ID),
+            sysconfig=sysconfig,
+            skip_fields=frozenset({"Title"}),
+            apply_required_lock=False,
+        )
+    row = await _ticket_row(factory, ticket_id)
+    assert row.ticket_lock_id == 1  # RequiredLock not applied
+    async with factory() as session:
+        title = (
+            await session.execute(text("SELECT title FROM ticket WHERE id = :t"), {"t": ticket_id})
+        ).scalar_one()
+    assert title == before_title  # skipped field not written again
+
+    # Required check still sees the skipped field.
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing, match="Title"):
+            await apply_activity_dialog(
+                session,
+                ticket_id=ticket_id,
+                dialog=dialog,
+                field_values={},
+                actor=ProcessActor.agent(1),
+                sysconfig=sysconfig,
+                skip_fields=frozenset({"Title"}),
+                apply_required_lock=False,
             )

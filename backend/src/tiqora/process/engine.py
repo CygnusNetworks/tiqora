@@ -100,6 +100,7 @@ from tiqora.domain.ticket_write_service import (
     watch_ticket,
 )
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.process.actor import ProcessActor
 from tiqora.process.config import ActivityDialogConfig, TransitionActionConfig, TransitionConfig
 from tiqora.process.exceptions import (
     ActivityDialogNotAvailable,
@@ -110,6 +111,12 @@ from tiqora.process.exceptions import (
     TicketAlreadyInProcess,
     TicketNotInProcess,
     UnresolvedFieldValue,
+)
+from tiqora.process.fields import (
+    canonical_field_name,
+    effective_field_values,
+    is_present,
+    missing_required_fields,
 )
 from tiqora.process.graph import ProcessRepository
 from tiqora.process.ticket_state import (
@@ -125,6 +132,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityDialogSubmitResult",
+    "apply_activity_dialog",
     "evaluate_transition",
     "execute_transition_action",
     "get_ticket_attrs",
@@ -1340,25 +1348,6 @@ class ActivityDialogSubmitResult:
     transition_entity_id: str | None
 
 
-def _is_present(field_name: str, field_values: dict[str, Any]) -> bool:
-    """Required-field presence check for one dialog ``Fields`` entry.
-
-    The pseudo-field ``Article`` is special-cased: Znuny's Article dialog
-    field is really a bundle of ``Subject``/``Body``/... sub-fields, so
-    "present" means either of the two content-bearing ones was submitted.
-    """
-    if field_name == "Article":
-        return bool(field_values.get("Subject")) or bool(field_values.get("Body"))
-    value = field_values.get(field_name)
-    if value is None:
-        return False
-    if isinstance(value, str):
-        return value.strip() != ""
-    if isinstance(value, list):
-        return len(value) > 0
-    return True
-
-
 async def _resolve_dialog_field_id(
     session: AsyncSession,
     *,
@@ -1399,11 +1388,12 @@ async def _apply_dialog_field_changes(
     ticket_id: int,
     user_id: int,
     sysconfig: SysConfig,
+    sender_type: str = "agent",
 ) -> None:
     """Apply submitted field_values to the ticket, per the field names the
     dialog config declares. Only fields actually present (and non-blank) in
     ``field_values`` are applied — the required/optional check already ran in
-    the caller.
+    the caller (:func:`apply_activity_dialog`).
     """
     if "Queue" in field_values:
         queue_id = await _resolve_dialog_field_id(
@@ -1456,6 +1446,57 @@ async def _apply_dialog_field_changes(
                 sysconfig=sysconfig,
             )
 
+    if "Type" in field_values:
+        type_id = await _resolve_dialog_field_id(
+            session,
+            field="Type",
+            kind="type id",
+            raw=field_values["Type"],
+            resolver=_resolve_type_id,
+        )
+        if type_id is not None:
+            await change_type(
+                session,
+                ticket_id=ticket_id,
+                new_type_id=type_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+
+    if "Service" in field_values:
+        service_id = await _resolve_dialog_field_id(
+            session,
+            field="Service",
+            kind="service id",
+            raw=field_values["Service"],
+            resolver=_resolve_service_id,
+        )
+        if service_id is not None:
+            await change_service(
+                session,
+                ticket_id=ticket_id,
+                new_service_id=service_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+
+    if "SLA" in field_values:
+        sla_id = await _resolve_dialog_field_id(
+            session,
+            field="SLA",
+            kind="sla id",
+            raw=field_values["SLA"],
+            resolver=_resolve_sla_id,
+        )
+        if sla_id is not None:
+            await change_sla(
+                session,
+                ticket_id=ticket_id,
+                new_sla_id=sla_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+
     if "Title" in field_values and field_values["Title"]:
         await change_title(
             session, ticket_id=ticket_id, new_title=str(field_values["Title"]), user_id=user_id
@@ -1491,6 +1532,18 @@ async def _apply_dialog_field_changes(
                 session, ticket_id=ticket_id, new_responsible_id=responsible_id, user_id=user_id
             )
 
+    if "Lock" in field_values:
+        lock_raw = str(field_values["Lock"]).strip().lower()
+        if lock_raw in {"lock", "2"}:
+            await lock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        elif lock_raw in {"unlock", "1"}:
+            await unlock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        elif lock_raw:
+            raise UnresolvedFieldValue(
+                f"activity dialog field 'Lock': could not resolve {field_values['Lock']!r} "
+                "to a lock (expected lock/unlock or lock id 1/2)"
+            )
+
     if "CustomerID" in field_values or "CustomerUserID" in field_values:
         t = await _ticket_must_exist(session, ticket_id)
         customer_id = field_values.get("CustomerID", t.get("customer_id"))
@@ -1503,20 +1556,26 @@ async def _apply_dialog_field_changes(
             user_id=user_id,
         )
 
-    if "Article" in dialog_config.fields and _is_present("Article", field_values):
-        article_field_cfg = dialog_config.fields["Article"].config
+    # Article (AgentTicketProcess.pm:5576, 5686-5687): stored only when Subject AND Body are
+    # set; sender, visibility and channel come from the dialog config, never from the request.
+    article_cfg = next(
+        (c for n, c in dialog_config.fields.items() if canonical_field_name(n) == "Article"), None
+    )
+    if (
+        article_cfg is not None
+        and is_present(field_values.get("Subject"))
+        and is_present(field_values.get("Body"))
+    ):
+        cfg = article_cfg.config
         channel_raw = str(
-            article_field_cfg.get("ArticleType")
-            or article_field_cfg.get("CommunicationChannel")
-            or "note"
+            cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note"
         ).lower()
-        channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
         article = ArticleIn(
-            sender_type=str(field_values.get("SenderType") or "agent"),
-            is_visible_for_customer=bool(field_values.get("IsVisibleForCustomer", False)),
-            subject=str(field_values.get("Subject", "")),
-            body=str(field_values.get("Body", "")),
-            channel=channel,
+            sender_type=sender_type,
+            is_visible_for_customer=str(cfg.get("IsVisibleForCustomer", "0")) == "1",
+            subject=str(field_values["Subject"]),
+            body=str(field_values["Body"]),
+            channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
         )
         await add_article(
             session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
@@ -1533,6 +1592,66 @@ async def _apply_dialog_field_changes(
         )
 
 
+async def _ensure_required_lock(
+    session: AsyncSession, *, ticket_id: int, user_id: int, sysconfig: SysConfig
+) -> None:
+    """Dialog ``RequiredLock`` (AgentTicketProcess.pm:182-224).
+
+    Locked ticket: only its owner may continue (``OwnerCheck``), otherwise denied.
+    Unlocked ticket: ``TicketLockSet lock``, then ``TicketOwnerSet`` only if the owner differs.
+    """
+    t = await _ticket_must_exist(session, ticket_id)
+    if int(t["ticket_lock_id"]) != 1:  # 1 = unlock
+        if int(t["user_id"]) != user_id:
+            raise ProcessPermissionDenied("Das Ticket ist von einer anderen Person gesperrt.")
+        return
+    await lock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+    if int(t["user_id"]) != user_id:
+        await assign_owner(
+            session,
+            ticket_id=ticket_id,
+            new_owner_id=user_id,
+            user_id=user_id,
+            sysconfig=sysconfig,
+        )
+
+
+async def apply_activity_dialog(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    dialog: ActivityDialogConfig,
+    field_values: dict[str, Any],
+    actor: ProcessActor,
+    sysconfig: SysConfig,
+    skip_fields: frozenset[str] = frozenset(),
+    apply_required_lock: bool = True,
+) -> None:
+    """Validate and store one activity dialog submission with Znuny's field semantics.
+
+    ``skip_fields`` (canonical names) are validated but not written again — used when a field
+    was already consumed by ``create_ticket``. ``apply_required_lock=False`` for new tickets
+    (Znuny never runs RequiredLock on create).
+    """
+    values = effective_field_values(dialog, field_values, actor.interface)
+    missing = missing_required_fields(dialog, values, actor.interface)
+    if missing:
+        raise RequiredFieldMissing(f"required activity dialog field missing: {', '.join(missing)}")
+    if apply_required_lock and dialog.required_lock == "1" and actor.interface == "AgentInterface":
+        await _ensure_required_lock(
+            session, ticket_id=ticket_id, user_id=actor.user_id, sysconfig=sysconfig
+        )
+    await _apply_dialog_field_changes(
+        session,
+        dialog_config=dialog,
+        field_values={k: v for k, v in values.items() if k not in skip_fields},
+        ticket_id=ticket_id,
+        user_id=actor.user_id,
+        sysconfig=sysconfig,
+        sender_type="customer" if actor.interface == "CustomerInterface" else "agent",
+    )
+
+
 async def submit_activity_dialog(
     session: AsyncSession,
     *,
@@ -1541,6 +1660,7 @@ async def submit_activity_dialog(
     field_values: dict[str, Any],
     user_id: int,
     sysconfig: SysConfig,
+    actor: ProcessActor | None = None,
 ) -> ActivityDialogSubmitResult:
     """Submit an Activity Dialog for *ticket_id*: apply field changes, then
     evaluate the current activity's outgoing transitions in listed (YAML
@@ -1588,16 +1708,12 @@ async def submit_activity_dialog(
                 f"{activity_dialog_entity_id!r}"
             )
 
-    for field_name, field_cfg in dialog_config.fields.items():
-        if field_cfg.required and not _is_present(field_name, field_values):
-            raise RequiredFieldMissing(f"required activity dialog field missing: {field_name}")
-
-    await _apply_dialog_field_changes(
+    await apply_activity_dialog(
         session,
-        dialog_config=dialog_config,
-        field_values=field_values,
         ticket_id=ticket_id,
-        user_id=user_id,
+        dialog=dialog_config,
+        field_values=field_values,
+        actor=actor or ProcessActor.agent(user_id),
         sysconfig=sysconfig,
     )
 
