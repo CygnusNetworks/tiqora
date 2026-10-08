@@ -104,7 +104,7 @@ def test_perl_num_integral_is_int() -> None:
 def test_catastrophic_pattern_times_out_fast() -> None:
     started = time.monotonic()
     with pytest.raises(MappingError, match="timed out"):
-        perl_fullmatch_x("(a+)+", "a" * 40 + "b")
+        perl_fullmatch_x("(a|aa)+", "a" * 40 + "b")
     assert time.monotonic() - started < 1
 
 

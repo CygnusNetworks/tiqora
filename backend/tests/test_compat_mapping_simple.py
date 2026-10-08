@@ -412,7 +412,7 @@ def test_catastrophic_regex_is_mapping_error_not_a_hang() -> None:
         {
             "Type": "Simple",
             "Config": {
-                "KeyMapRegEx": {"(a+)+": "c"},
+                "KeyMapRegEx": {"(a|aa)+": "c"},
                 "KeyMapDefault": {"MapType": "Keep"},
                 "ValueMapDefault": {"MapType": "Keep"},
             },
