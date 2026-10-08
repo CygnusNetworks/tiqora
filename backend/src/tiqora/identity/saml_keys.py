@@ -20,6 +20,7 @@ _RSA_BITS = 3072
 
 _lock = threading.Lock()
 _tmp_dir: str | None = None
+_tmp_owner_pid: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +54,8 @@ def generate_sp_keypair(common_name: str, *, days: int = 3650) -> tuple[str, str
 
 def _cleanup() -> None:
     global _tmp_dir  # noqa: PLW0603
-    if _tmp_dir is not None:
+    # A forked child inherits the atexit hook; only the creating process may remove the dir.
+    if _tmp_dir is not None and _tmp_owner_pid == os.getpid():
         shutil.rmtree(_tmp_dir, ignore_errors=True)
         _tmp_dir = None
 
@@ -68,9 +70,10 @@ def _write_private(path: str, content: str) -> None:
 
 def materialize_keypair(private_key_pem: str, cert_pem: str) -> KeyFiles:
     """Write the pair into the process-wide 0700 temp dir (files 0600); reused per cert."""
-    global _tmp_dir  # noqa: PLW0603
+    global _tmp_dir, _tmp_owner_pid  # noqa: PLW0603
     with _lock:
-        if _tmp_dir is None or not os.path.isdir(_tmp_dir):
+        if _tmp_dir is None or not os.path.isdir(_tmp_dir) or _tmp_owner_pid != os.getpid():
+            _tmp_owner_pid = os.getpid()
             _tmp_dir = tempfile.mkdtemp(prefix="tiqora-saml-")
             os.chmod(_tmp_dir, 0o700)
             atexit.register(_cleanup)

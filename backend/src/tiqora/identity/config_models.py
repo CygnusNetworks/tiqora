@@ -8,12 +8,15 @@ Secrets are ``SecretStr | None``.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Final, Literal
+from typing import Annotated, Any, Final, Literal
 
 from pydantic import BaseModel, Field, SecretStr
 
 from tiqora.identity.types import GroupPermission, ProviderKind
 from tiqora.settings_sections.section import SECRET_MASK, field_kind
+
+# Row ids must fit a 32-bit INT column (otherwise PostgreSQL fails the bind with a 500).
+DbId = Annotated[int, Field(ge=1, le=2_147_483_647)]
 
 
 class OidcProviderConfig(BaseModel):
@@ -98,19 +101,19 @@ def _default_permissions() -> list[GroupPermission]:
 
 
 class GroupGrant(BaseModel):
-    group_id: int
+    group_id: DbId
     permissions: list[GroupPermission] = Field(default_factory=_default_permissions)
 
 
 class RoleRule(BaseModel):
     attribute: str = Field(min_length=1, max_length=200)
     value: str = Field(min_length=1, max_length=500)  # compared case-insensitively after strip
-    role_ids: list[int] = Field(default_factory=list)
+    role_ids: list[DbId] = Field(default_factory=list)
     groups: list[GroupGrant] = Field(default_factory=list)
 
 
 class JitDefaults(BaseModel):
-    initial_role_ids: list[int] = Field(default_factory=list)  # agents, first login only
+    initial_role_ids: list[DbId] = Field(default_factory=list)  # agents, first login only
     initial_groups: list[GroupGrant] = Field(default_factory=list)  # agents, first login only
     customer_id: str = ""  # customers: fixed CustomerID when not mapped
     update_profile_on_login: bool = True

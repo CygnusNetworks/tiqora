@@ -279,7 +279,7 @@ async def test_update_rejects_unknown_role_and_group(session: AsyncSession) -> N
 
 @pytest.mark.asyncio
 async def test_slug_validation(session: AsyncSession) -> None:
-    for bad in ("env-oidc", "Bad Slug", "x", "login"):
+    for bad in ("env-oidc", "env-oidc\n", "login\n", "Bad Slug", "x", "login"):
         with pytest.raises(ProviderValidationError) as exc:
             await create_provider(
                 session,
@@ -380,3 +380,33 @@ async def test_list_enabled_and_delete(session: AsyncSession) -> None:
     await delete_provider(session, c.id)
     await session.commit()
     assert await get_provider(session, c.id, secret_key=KEY) is None
+
+
+@pytest.mark.asyncio
+async def test_failed_update_does_not_persist_slug(session: AsyncSession) -> None:
+    rec = await _create(session, "generic_oidc", "idptest-atomic")
+    with pytest.raises(ProviderValidationError):
+        await update_provider(
+            session,
+            rec.id,
+            ProviderChanges(
+                slug="idptest-atomic2",
+                role_rules=[RoleRule(attribute="groups", value="x", role_ids=[47099])],
+            ),
+            secret_key=KEY,
+            actor_id=1,
+        )
+    await session.commit()
+    got = await get_provider(session, rec.id, secret_key=KEY)
+    assert got is not None and got.slug == "idptest-atomic"
+
+
+def test_ids_bounded_to_int32() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        RoleRule(attribute="a", value="b", role_ids=[2**31])
+    with pytest.raises(ValidationError):
+        RoleRule(attribute="a", value="b", groups=[{"group_id": 0}])  # type: ignore[list-item]
+    with pytest.raises(ValidationError):
+        JitDefaults(initial_role_ids=[2**40])

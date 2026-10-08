@@ -17,6 +17,7 @@ from typing import Any
 import structlog
 from pydantic import BaseModel, SecretStr, TypeAdapter, ValidationError
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.crypto.secret import decrypt_secret, encrypt_secret
@@ -282,13 +283,22 @@ async def list_enabled(
 async def _check_slug(
     session: AsyncSession, slug: str, *, allow_reserved: bool = False, exclude_id: int | None = None
 ) -> None:
-    if not SLUG_RE.match(slug) or (not allow_reserved and slug in RESERVED_SLUGS):
+    if not SLUG_RE.fullmatch(slug) or (not allow_reserved and slug in RESERVED_SLUGS):
         raise ProviderValidationError({"slug": MSG_SLUG_INVALID})
     stmt = select(TiqoraIdentityProvider.id).where(TiqoraIdentityProvider.slug == slug)
     if exclude_id is not None:
         stmt = stmt.where(TiqoraIdentityProvider.id != exclude_id)
     if (await session.execute(stmt)).first() is not None:
         raise ProviderValidationError({"slug": MSG_SLUG_TAKEN})
+
+
+async def _flush_unique_slug(session: AsyncSession) -> None:
+    """Flush inside a savepoint; a concurrent duplicate slug becomes a validation error."""
+    try:
+        async with session.begin_nested():
+            await session.flush()
+    except IntegrityError as exc:
+        raise ProviderValidationError({"slug": MSG_SLUG_TAKEN}) from exc
 
 
 async def _existing_ids(session: AsyncSession, column: Any, ids: set[int]) -> set[int]:
@@ -442,7 +452,7 @@ async def create_provider(
         require_sso_opt_in=False,
     )
     session.add(row)
-    await session.flush()
+    await _flush_unique_slug(session)
     return provider_from_row(row, secret_key=secret_key)
 
 
@@ -505,17 +515,24 @@ async def update_provider(
     current = provider_from_row(row, secret_key=secret_key)
     kind = current.kind
 
-    if changes.slug is not None and changes.slug != row.slug:
-        await _check_slug(session, changes.slug, exclude_id=row.id)
-        row.slug = changes.slug
+    # Validate everything first, mutate afterwards (an autoflush must not persist a
+    # half-applied change).
+    new_slug = changes.slug if changes.slug is not None and changes.slug != row.slug else None
+    if new_slug is not None:
+        await _check_slug(session, new_slug, exclude_id=row.id)
     await _validate_assignments(
         session, role_rules=changes.role_rules, jit_defaults=changes.jit_defaults
     )
+    merged: BaseModel | None = None
     if changes.config is not None:
         try:
             merged = merge_config(kind, current.config, changes.config)
         except ValidationError as exc:
             raise _config_errors(exc) from exc
+
+    if new_slug is not None:
+        row.slug = new_slug
+    if merged is not None:
         new_secrets = _secret_values(kind, merged)
         row.config = _encode_config(kind, merged)
         # Re-encrypting yields a different Fernet token; only rewrite on a real change.
@@ -548,7 +565,7 @@ async def update_provider(
         row.role_rules = _RULES_ADAPTER.dump_json(changes.role_rules).decode()
     row.change_by = actor_id
     row.change_time = utc_now()
-    await session.flush()
+    await _flush_unique_slug(session)
     return provider_from_row(row, secret_key=secret_key)
 
 
