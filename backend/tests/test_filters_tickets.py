@@ -424,6 +424,39 @@ async def test_dynamic_fields(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("op", ["within_last", "older_than"])
+@pytest.mark.parametrize("field", ["created", "pending_until"])
+async def test_over_cap_relative_span_is_filter_error(
+    session: AsyncSession, op: str, field: str
+) -> None:
+    scope = await ticket_query_scope(session, AGENT_A)
+    cond = _cond(field, op, {"amount": 10**6, "unit": "week"})
+    with pytest.raises(FilterError):
+        await compile_ticket_filter(session, Filter.model_validate(cond), scope, now=NOW)
+    early = _cond(field, "before", "0001-01-01")
+    with pytest.raises(FilterError):
+        await compile_ticket_filter(session, Filter.model_validate(early), scope, now=NOW)
+
+
+@pytest.mark.asyncio
+async def test_out_of_range_ints_do_not_reach_the_database(session: AsyncSession) -> None:
+    scope = await ticket_query_scope(session, AGENT_A)
+    assert await _ids(session, _cond("queue_id", "eq", 5_000_000_000), scope) == set()
+    assert await _ids(session, _cond("type_id", "eq", 70_000), scope) == set()
+    assert await _ids(session, _cond("queue_id", "in", [5_000_000_000]), scope) == set()
+    assert await _ids(session, _cond("watched_by", "eq", 5_000_000_000), scope) == set()
+    assert await _ids(session, _cond("queue_id", "neq", 5_000_000_000), scope) == {T1, T2}
+    assert await _ids(session, _cond("type_id", "not_in", [70_000]), scope) == {T1, T2}
+    mixed = _cond("queue_id", "in", [Q1, 5_000_000_000])
+    assert await _ids(session, mixed, scope) == await _ids(
+        session, _cond("queue_id", "eq", Q1), scope
+    )
+    assert await _ids(session, _cond("ticket_id", "lt", 10**15), scope) == {T1, T2}
+    due = _cond("escalation_due_within", "lte", 10**15)
+    await _ids(session, due, scope)
+
+
+@pytest.mark.asyncio
 async def test_unknown_df_is_filter_error(session: AsyncSession) -> None:
     scope = await ticket_query_scope(session, AGENT_A)
     with pytest.raises(FilterError) as err:

@@ -35,7 +35,8 @@ _SCALAR_OPS = frozenset(
     {"eq", "neq", "contains", "starts_with", "lt", "lte", "gt", "gte", "before", "after"}
 )
 MAX_STRING_LENGTH = 1000
-MAX_RELATIVE_AMOUNT = 10**6
+MAX_RELATIVE_SECONDS = 100 * 366 * 86400  # span cap: 100 years
+MIN_DATETIME = datetime(1970, 1, 1)
 _INT64_MIN = -(2**63)
 _INT64_MAX = 2**63 - 1
 _UNIT_SECONDS = {"minute": 60, "hour": 3600, "day": 86400, "week": 604800}
@@ -78,6 +79,8 @@ def parse_datetime_value(value: Any, *, path: str) -> datetime:
     except (ValueError, OverflowError):
         shown = value if len(value) <= 40 else value[:40] + "…"
         raise FilterError(f"„{shown}“ ist kein gültiges Datum.", path=path) from None
+    if parsed < MIN_DATETIME:
+        raise FilterError("Das Datum darf nicht vor 1970 liegen.", path=path)
     return parsed
 
 
@@ -87,18 +90,18 @@ def relative_delta(value: Any, *, path: str) -> timedelta:
         or set(value) != {"amount", "unit"}
         or isinstance(value["amount"], bool)
         or not isinstance(value["amount"], int)
-        or not 1 <= value["amount"] <= MAX_RELATIVE_AMOUNT
+        or value["amount"] < 1
         or value["unit"] not in _UNIT_SECONDS
     ):
         raise FilterError(
-            f"Bitte eine Anzahl (1 bis {MAX_RELATIVE_AMOUNT}) und eine Einheit "
+            "Bitte eine Anzahl (mindestens 1) und eine Einheit "
             "(Minute, Stunde, Tag oder Woche) angeben.",
             path=path,
         )
-    try:
-        return timedelta(seconds=value["amount"] * _UNIT_SECONDS[value["unit"]])
-    except OverflowError:
-        raise FilterError("Der Zeitraum ist zu groß.", path=path) from None
+    seconds = value["amount"] * _UNIT_SECONDS[value["unit"]]
+    if seconds > MAX_RELATIVE_SECONDS:
+        raise FilterError("Der Zeitraum darf höchstens 100 Jahre betragen.", path=path)
+    return timedelta(seconds=seconds)
 
 
 def iter_conditions(

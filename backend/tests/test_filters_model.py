@@ -111,8 +111,10 @@ def test_valid_filter_at_depth_limit_and_iter_paths() -> None:
     "cond",
     [
         {"field": "created", "op": "within_last", "value": {"amount": 10**12, "unit": "week"}},
-        {"field": "created", "op": "older_than", "value": {"amount": 10**6 + 1, "unit": "day"}},
+        {"field": "created", "op": "older_than", "value": {"amount": 36601, "unit": "day"}},
         {"field": "created", "op": "before", "value": "0001-01-01T00:00:00+05:00"},
+        {"field": "created", "op": "before", "value": "0001-01-01"},
+        {"field": "created", "op": "within_last", "value": {"amount": 10**6, "unit": "week"}},
         {"field": "created", "op": "after", "value": "9999-12-31T23:59:59-05:00"},
         {"field": "queue_id", "op": "eq", "value": 10**30},
         {"field": "queue_id", "op": "in", "value": [1, -(10**30)]},
@@ -128,8 +130,13 @@ def test_extreme_values_are_filter_errors_not_crashes(cond: dict[str, Any]) -> N
 def test_boundary_values_are_accepted() -> None:
     _validate({"where": {"field": "queue_id", "op": "eq", "value": 2**63 - 1}})
     _validate({"where": {"field": "title", "op": "eq", "value": "x" * 1000}})
-    delta = relative_delta({"amount": 10**6, "unit": "week"}, path="p")
-    assert delta == timedelta(weeks=10**6)
+    delta = relative_delta({"amount": 36600, "unit": "day"}, path="p")
+    assert delta == timedelta(days=36600)
+    with pytest.raises(FilterError, match="100 Jahre"):
+        relative_delta({"amount": 36601, "unit": "day"}, path="p")
+    with pytest.raises(FilterError, match="1970"):
+        parse_datetime_value("1969-12-31", path="p")
+    assert parse_datetime_value("1970-01-01", path="p") == datetime(1970, 1, 1)
 
 
 def test_field_spec_rejects_ops_outside_its_type() -> None:

@@ -15,7 +15,20 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, and_, exists, false, func, not_, or_, select
+from sqlalchemy import (
+    BigInteger,
+    ColumnElement,
+    Select,
+    SmallInteger,
+    and_,
+    exists,
+    false,
+    func,
+    not_,
+    or_,
+    select,
+    true,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.ai.models import TiqoraAiTicketState
@@ -254,10 +267,12 @@ def _datetime_predicate(
             col >= bound(_datetime_bound(value["from"], f"{path}.from")),
             col < bound(_datetime_bound(value["to"], f"{path}.to")),
         )
-    elif op == "within_last":
-        pred = col >= bound(now - relative_delta(value, path=path))
-    elif op == "older_than":
-        pred = col < bound(now - relative_delta(value, path=path))
+    elif op in ("within_last", "older_than"):
+        try:
+            limit = bound(now - relative_delta(value, path=path))
+        except OverflowError:
+            raise FilterError("Der Zeitraum ist zu groß.", path=path) from None
+        pred = col >= limit if op == "within_last" else col < limit
     else:  # pragma: no cover - validate_filter limits the ops
         raise FilterError(f"„{op}“ ist für Datumsfelder nicht möglich.", path=path)
     return and_(col > 0, pred) if epoch else pred
@@ -300,6 +315,50 @@ def _positive_predicate(
 
 
 _NEGATED_OPS = {"neq": "eq", "not_in": "in"}
+
+_INT32 = (-(2**31), 2**31 - 1)
+_INT16 = (-(2**15), 2**15 - 1)
+_INT64 = (-(2**63), 2**63 - 1)
+
+
+def _int_bounds(col: Any) -> tuple[int, int]:
+    """Value range the column's integer type can hold (asyncpg refuses to bind more)."""
+    ctype = col.property.columns[0].type if hasattr(col, "property") else col.type
+    if isinstance(ctype, SmallInteger):
+        return _INT16
+    if isinstance(ctype, BigInteger):
+        return _INT64
+    return _INT32
+
+
+def _fit_int_condition(cond: Condition, lo: int, hi: int) -> Condition | ColumnElement[bool]:
+    """Keep out-of-range values away from the database.
+
+    Returns the condition (possibly with values dropped/clamped) or a constant
+    predicate when the answer does not depend on the column.
+    """
+    op, value = cond.op, cond.value
+
+    def fits(v: int) -> bool:
+        return lo <= v <= hi
+
+    if op == "eq":
+        return cond if fits(value) else false()
+    if op == "neq":
+        return cond if fits(value) else true()
+    if op in ("in", "not_in"):
+        kept = [v for v in value if fits(v)]
+        if kept:
+            return cond.model_copy(update={"value": kept})
+        return false() if op == "in" else true()
+    if op in ("lt", "lte", "gt", "gte"):
+        return cond.model_copy(update={"value": min(max(value, lo), hi)})
+    if op == "between":
+        low, high = value["from"], value["to"]
+        if low > hi or high < lo:
+            return false()
+        return cond.model_copy(update={"value": {"from": max(low, lo), "to": min(high, hi)}})
+    return cond
 
 
 class _Compiler:
@@ -378,6 +437,11 @@ class _Compiler:
         spec = TICKET_FILTER_FIELDS[key]
         epoch = key == "pending_until"
         nullable = epoch is False and _is_nullable(col)
+        if spec.type in ("id", "int"):
+            fitted = _fit_int_condition(cond, *_int_bounds(col))
+            if not isinstance(fitted, Condition):
+                return fitted
+            cond = fitted
         op = cond.op
         if op == "is_empty":
             if spec.type == "datetime":
@@ -435,7 +499,13 @@ class _Compiler:
             unlock = locks.get(UNLOCK_TYPE_NAME)
             return Ticket.ticket_lock_id == unlock if unlock is not None else false()
         if key == "watched_by":
-            users = value if isinstance(value, list) else [value]
+            users = [
+                u
+                for u in (value if isinstance(value, list) else [value])
+                if _INT32[0] <= u <= _INT32[1]
+            ]
+            if not users:
+                return false()
             rows = await self._session.execute(
                 select(TicketWatcher.ticket_id).where(TicketWatcher.user_id.in_(users))
             )
@@ -457,7 +527,7 @@ class _Compiler:
             pred = Ticket.id.in_(ai_ids) if ai_ids else false()
             return not_(pred) if negative else pred
         if key == "escalation_due_within":
-            return _escalation_due_before(_epoch(self._now) + int(value))
+            return _escalation_due_before(min(_epoch(self._now) + max(int(value), 0), _INT32[1]))
         if key == "channel":
             channels = value if isinstance(value, list) else [value]
             return or_(*(_channel_condition(Ticket.id, c) for c in channels))
