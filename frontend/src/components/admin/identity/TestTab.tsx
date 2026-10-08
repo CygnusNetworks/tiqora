@@ -48,6 +48,7 @@ export function TestTab({
     enabled: !!testId,
     queryFn: ({ signal }) => identityApi.testResult(provider.id, testId as string, signal),
     refetchInterval: (query) => {
+      if (query.state.status === "error") return false; // e.g. 404: do not keep asking
       if (query.state.data && query.state.data.status !== "started") return false;
       return Date.now() - startedAt.current > POLL_LIMIT_MS ? false : POLL_MS;
     },

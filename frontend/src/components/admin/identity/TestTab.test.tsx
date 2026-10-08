@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
+import { ApiError } from "@/lib/api";
 import { TestTab } from "./TestTab";
 import { LoginPlanView } from "./LoginPlanView";
 import { makeProvider } from "./testFixtures";
@@ -102,6 +103,38 @@ describe("TestTab", () => {
     testResult.mockResolvedValue({ status: "failed", error: "weird", subject: null, attributes: {}, plan: null });
     wrap(<TestTab provider={makeProvider()} testId="t1" />);
     expect(await screen.findByTestId("identity-test-error")).toHaveTextContent(i18n.t("auth.ssoFailed"));
+  });
+});
+
+describe("TestTab polling limits", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("stops polling after an error such as a 404", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    testResult.mockRejectedValue(new ApiError(404, "Test nicht gefunden.", "/x"));
+    wrap(<TestTab provider={makeProvider()} testId="gone" />);
+    await screen.findByText("Test nicht gefunden.");
+    const calls = testResult.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000);
+    });
+    expect(testResult.mock.calls.length).toBe(calls);
+  });
+
+  it("stops polling after two minutes and says so", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    testResult.mockResolvedValue({ status: "started", error: null, subject: null, attributes: {}, plan: null });
+    wrap(<TestTab provider={makeProvider()} testId="slow" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(125_000);
+    });
+    expect(screen.getByText(i18n.t("admin.identity.test.timeout"))).toBeInTheDocument();
+    const calls = testResult.mock.calls.length;
+    expect(calls).toBeGreaterThan(50);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(testResult.mock.calls.length).toBe(calls);
   });
 });
 

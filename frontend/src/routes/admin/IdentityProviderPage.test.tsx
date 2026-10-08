@@ -158,6 +158,43 @@ describe("ConnectionTab", () => {
     expect(screen.queryByTestId("identity-config-sp_private_key")).toBeNull();
   });
 
+  it("clears a stored secret with an empty string", async () => {
+    update.mockResolvedValue(makeProvider());
+    renderTab();
+    fireEvent.click(screen.getByTestId("identity-config-client_secret-clear"));
+    fireEvent.click(screen.getByTestId("identity-save"));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(1, { config: { client_secret: "" } }));
+  });
+
+  it("turns the SHA-1 warning red once the opt-in is stored", () => {
+    renderTab({ kind: "saml", config: { idp_metadata_url: "", allow_sha1_signatures: true, sp_certificate: "" }, secrets_set: [] });
+    expect(screen.getByTestId("identity-sha1-warning")).toHaveClass("bg-danger/15");
+  });
+
+  it("keeps the SHA-1 warning neutral while the opt-in is off", () => {
+    renderTab({ kind: "saml", config: { idp_metadata_url: "", allow_sha1_signatures: false, sp_certificate: "" }, secrets_set: [] });
+    expect(screen.getByTestId("identity-sha1-warning")).not.toHaveClass("bg-danger/15");
+  });
+
+  it("re-syncs a pristine form when the provider prop changes, but not a dirty one", () => {
+    const props = { kinds, capabilities, onSaved: vi.fn() };
+    const qc = new QueryClient();
+    const tree = (p: ReturnType<typeof makeProvider>) => (
+      <QueryClientProvider client={qc}>
+        <I18nextProvider i18n={i18n}>
+          <ConnectionTab provider={p} {...props} />
+        </I18nextProvider>
+      </QueryClientProvider>
+    );
+    const first = makeProvider();
+    const view = render(tree(first));
+    view.rerender(tree({ ...first, name: "Neu benannt" }));
+    expect(screen.getByTestId("identity-common-name")).toHaveValue("Neu benannt");
+    fireEvent.change(screen.getByTestId("identity-common-name"), { target: { value: "Meine Eingabe" } });
+    view.rerender(tree({ ...first, name: "Wieder anders" }));
+    expect(screen.getByTestId("identity-common-name")).toHaveValue("Meine Eingabe");
+  });
+
   it("warns next to the SHA-1 opt-in", () => {
     renderTab({ kind: "saml", config: { idp_metadata_url: "", allow_sha1_signatures: false, sp_certificate: "" }, secrets_set: [] });
     expect(screen.getByTestId("identity-sha1-warning")).toHaveTextContent("SHA-1");

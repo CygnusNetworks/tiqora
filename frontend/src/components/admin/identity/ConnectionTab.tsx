@@ -153,6 +153,16 @@ export function ConnectionTab({
     setMetaError(p.metadata_error);
   };
 
+  // A refetched provider replaces the form while nothing is being edited.
+  const seen = useRef(provider);
+  useEffect(() => {
+    if (seen.current === provider) return;
+    seen.current = provider;
+    if (!dirty) apply(provider);
+    // apply/dirty are read at the moment the prop changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider]);
+
   const saveM = useMutation({
     mutationFn: () => identityApi.update(provider.id, changes),
     onSuccess: (p) => {
