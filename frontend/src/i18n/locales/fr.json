@@ -2993,7 +2993,8 @@
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
-      "takeoverBadge": "Reprise"
+      "takeoverBadge": "Reprise",
+      "settingsLink": "Settings"
     },
     "mailLog": {
       "title": "Journal des communications par courrier électronique",
@@ -3360,7 +3361,8 @@
       "ticketAttributeRelations": "Matrices de dépendances compatibles Znuny (service/file, etc.) au format CSV.",
       "pgp": "Activer et désactiver PGP, gérer les clés et les phrases secrètes, régler la signature et le stockage.",
       "smime": "Activer et désactiver S/MIME, gérer les certificats, les clés privées et les relations de signataire, définir les emplacements de stockage.",
-      "aiModels": "Modèles chez les fournisseurs, profils avec modèles de repli, et quel profil traite quelle tâche."
+      "aiModels": "Modèles chez les fournisseurs, profils avec modèles de repli, et quel profil traite quelle tâche.",
+      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept."
     },
     "types": {
       "title_plural": "Types de ticket",
@@ -3720,6 +3722,39 @@
       "favicon": "Website icons",
       "faviconHint": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com.",
       "loadError": "The settings could not be loaded."
+    },
+    "settings": {
+      "save": "Save",
+      "saved": "Saved",
+      "loadError": "The settings could not be loaded.",
+      "saveError": "Saving failed.",
+      "notFound": "These settings do not exist.",
+      "jobs": {
+        "title": "Background tasks",
+        "fields": {
+          "max_concurrency": {
+            "label": "Concurrent tasks",
+            "help": "How many background tasks may run at the same time. More is faster but puts more load on the database."
+          },
+          "retention_days": {
+            "label": "Retention in days",
+            "help": "After this many days finished tasks and their files are deleted."
+          }
+        }
+      },
+      "avatars": {
+        "title": "Customer pictures",
+        "fields": {
+          "gravatar_enabled": {
+            "label": "Gravatar",
+            "help": "Profile picture for the e-mail address from gravatar.com. The server sends only the address's SHA-256 hash."
+          },
+          "favicon_enabled": {
+            "label": "Website icons",
+            "help": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com."
+          }
+        }
+      }
     }
   },
   "kb": {

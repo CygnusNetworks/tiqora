@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -5,6 +6,14 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { DaemonsPage } from "./DaemonsPage";
 import type { DaemonServiceOut } from "@/lib/api";
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, params, children, ...rest }: { to: string; params?: Record<string, string>; children: ReactNode; [k: string]: unknown }) => (
+    <a href={Object.entries(params ?? {}).reduce((acc, [k, v]) => acc.replace(`$${k}`, v), to)} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 
 const getDaemons = vi.fn();
 const putDaemon = vi.fn();
@@ -115,6 +124,15 @@ describe("DaemonsPage", () => {
 
     expect(screen.getByTestId("daemon-row-gdpr_retention")).toBeInTheDocument();
     expect(screen.getByText(/03:00/)).toBeInTheDocument();
+  });
+
+  it("links the background-task row to its settings page", async () => {
+    getDaemons.mockResolvedValue({ services: [poller(), postmaster({ slug: "jobs", enabled: true })] });
+    renderPage();
+    const link = await screen.findByTestId("daemon-jobs-settings");
+    expect(link).toHaveAttribute("href", "/admin/settings/jobs");
+    expect(link).toHaveTextContent("Settings");
+    expect(screen.getAllByTestId("daemon-jobs-settings")).toHaveLength(1);
   });
 
   it("toggling a service PUTs the flipped enabled value", async () => {

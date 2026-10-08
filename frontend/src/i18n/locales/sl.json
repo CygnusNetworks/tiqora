@@ -2993,7 +2993,8 @@
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
-      "takeoverBadge": "Prevzem"
+      "takeoverBadge": "Prevzem",
+      "settingsLink": "Settings"
     },
     "mailLog": {
       "title": "Dnevnik komunikacije po e-pošti",
@@ -3360,7 +3361,8 @@
       "ticketAttributeRelations": "Matrike odvisnosti, združljive z Znuny (storitev/vrsta ipd.), CSV.",
       "pgp": "Vklopite in izklopite PGP, upravljajte ključe in passphrase, nastavite podpis in shrambo.",
       "smime": "Vklopite in izklopite S/MIME, upravljajte potrdila, zasebne ključe in razmerja podpisnikov, nastavite mesta shrambe.",
-      "aiModels": "Modeli pri ponudnikih, profili z nadomestnimi modeli in kateri profil opravi katero nalogo."
+      "aiModels": "Modeli pri ponudnikih, profili z nadomestnimi modeli in kateri profil opravi katero nalogo.",
+      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept."
     },
     "types": {
       "title_plural": "Vrste zahtevkov",
@@ -3720,6 +3722,39 @@
       "favicon": "Website icons",
       "faviconHint": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com.",
       "loadError": "The settings could not be loaded."
+    },
+    "settings": {
+      "save": "Save",
+      "saved": "Saved",
+      "loadError": "The settings could not be loaded.",
+      "saveError": "Saving failed.",
+      "notFound": "These settings do not exist.",
+      "jobs": {
+        "title": "Background tasks",
+        "fields": {
+          "max_concurrency": {
+            "label": "Concurrent tasks",
+            "help": "How many background tasks may run at the same time. More is faster but puts more load on the database."
+          },
+          "retention_days": {
+            "label": "Retention in days",
+            "help": "After this many days finished tasks and their files are deleted."
+          }
+        }
+      },
+      "avatars": {
+        "title": "Customer pictures",
+        "fields": {
+          "gravatar_enabled": {
+            "label": "Gravatar",
+            "help": "Profile picture for the e-mail address from gravatar.com. The server sends only the address's SHA-256 hash."
+          },
+          "favicon_enabled": {
+            "label": "Website icons",
+            "help": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com."
+          }
+        }
+      }
     }
   },
   "kb": {

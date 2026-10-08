@@ -3001,7 +3001,8 @@
           "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."
         }
       },
-      "takeoverBadge": "Übernahme"
+      "takeoverBadge": "Übernahme",
+      "settingsLink": "Einstellungen"
     },
     "mailLog": {
       "title": "E-Mail-Kommunikationsprotokoll",
@@ -3368,7 +3369,8 @@
       "ticketAttributeRelations": "Znuny-kompatible Abhängigkeitsmatrizen (z. B. Service → Queue) im CSV-Format.",
       "pgp": "PGP ein- und ausschalten, Schlüssel und Passphrasen verwalten, Signatur und Speicherort einstellen.",
       "smime": "S/MIME ein- und ausschalten, Zertifikate, private Schlüssel und Signer-Beziehungen verwalten, Speicherorte einstellen.",
-      "aiModels": "Modelle bei den Providern, Profile mit Ausweichmodellen und welches Profil welche Aufgabe übernimmt."
+      "aiModels": "Modelle bei den Providern, Profile mit Ausweichmodellen und welches Profil welche Aufgabe übernimmt.",
+      "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -3728,6 +3730,39 @@
       "favicon": "Website-Icons",
       "faviconHint": "Icon der Website zur Mail-Domain bzw. Firmen-URL. Nie für Freemail-Domains wie gmail.com.",
       "loadError": "Die Einstellungen konnten nicht geladen werden."
+    },
+    "settings": {
+      "save": "Speichern",
+      "saved": "Gespeichert",
+      "loadError": "Die Einstellungen konnten nicht geladen werden.",
+      "saveError": "Speichern fehlgeschlagen.",
+      "notFound": "Diese Einstellungen gibt es nicht.",
+      "jobs": {
+        "title": "Hintergrundaufgaben",
+        "fields": {
+          "max_concurrency": {
+            "label": "Gleichzeitige Aufgaben",
+            "help": "Wie viele Hintergrundaufgaben gleichzeitig laufen dürfen. Mehr ist schneller, belastet aber die Datenbank stärker."
+          },
+          "retention_days": {
+            "label": "Aufbewahrung in Tagen",
+            "help": "Nach so vielen Tagen werden fertige Aufgaben und ihre Dateien gelöscht."
+          }
+        }
+      },
+      "avatars": {
+        "title": "Kundenbilder",
+        "fields": {
+          "gravatar_enabled": {
+            "label": "Gravatar",
+            "help": "Profilbild zur E-Mail-Adresse von gravatar.com. Der Server schickt dafür nur den SHA-256-Hash der Adresse."
+          },
+          "favicon_enabled": {
+            "label": "Website-Icons",
+            "help": "Icon der Website zur Mail-Domain bzw. Firmen-URL. Nie für Freemail-Domains wie gmail.com."
+          }
+        }
+      }
     }
   },
   "kb": {

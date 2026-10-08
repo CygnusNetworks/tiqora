@@ -1,13 +1,21 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { SchemaForm } from "@/components/fields/SchemaForm";
+import type { FieldValues } from "@/components/fields/types";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { Spinner } from "@/components/ui/Spinner";
-import { Switch } from "@/components/ui/Switch";
-import { apiErrorMessage, avatarApi, type AvatarSettings } from "@/lib/avatarApi";
+import { apiErrorMessage } from "@/lib/avatarApi";
+import {
+  changedSectionValues,
+  initialSectionValues,
+  settingsFieldErrors,
+  settingsSectionsApi,
+} from "@/lib/settingsSectionsApi";
 
 const QUERY_KEY = ["admin", "avatars"] as const;
+const SECTION_KEY = ["settings-sections", "avatars"] as const;
 
 /**
  * Where customer pictures and company logos may come from automatically:
@@ -18,39 +26,26 @@ const QUERY_KEY = ["admin", "avatars"] as const;
 export function AvatarSettingsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const settingsQ = useQuery({
-    queryKey: QUERY_KEY,
-    queryFn: ({ signal }) => avatarApi.getSettings(signal),
+  const sectionQ = useQuery({
+    queryKey: SECTION_KEY,
+    queryFn: ({ signal }) => settingsSectionsApi.get("avatars", signal),
   });
-  const [draft, setDraft] = useState<AvatarSettings | null>(null);
+  const [draft, setDraft] = useState<FieldValues | null>(null);
   useEffect(() => {
-    if (!draft && settingsQ.data) setDraft(settingsQ.data);
-  }, [draft, settingsQ.data]);
+    if (!draft && sectionQ.data) setDraft(initialSectionValues(sectionQ.data));
+  }, [draft, sectionQ.data]);
 
   const saveM = useMutation({
-    mutationFn: (body: AvatarSettings) => avatarApi.putSettings(body),
+    mutationFn: (values: Record<string, unknown>) => settingsSectionsApi.put("avatars", values),
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: QUERY_KEY });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: QUERY_KEY }),
+        qc.invalidateQueries({ queryKey: SECTION_KEY }),
+      ]);
       onClose();
     },
   });
-
-  const row = (key: keyof AvatarSettings, label: string, hint: string) => (
-    <div className="flex items-start justify-between gap-4 py-3">
-      <div className="min-w-0">
-        <p id={`avatar-setting-${key}`} className="text-sm font-medium text-ink">
-          {label}
-        </p>
-        <p className="mt-0.5 text-xs text-muted">{hint}</p>
-      </div>
-      <Switch
-        checked={draft?.[key] ?? false}
-        onChange={(on) => setDraft((prev) => (prev ? { ...prev, [key]: on } : prev))}
-        aria-labelledby={`avatar-setting-${key}`}
-        testId={`admin-avatars-${key}`}
-      />
-    </div>
-  );
+  const section = sectionQ.data;
 
   return (
     <Dialog
@@ -73,27 +68,33 @@ export function AvatarSettingsDialog({ onClose }: { onClose: () => void }) {
             variant="primary"
             size="sm"
             data-testid="admin-avatars-save"
-            disabled={!draft || saveM.isPending}
-            onClick={() => draft && saveM.mutate(draft)}
+            disabled={!section || !draft || saveM.isPending}
+            onClick={() => section && draft && saveM.mutate(changedSectionValues(section, draft))}
           >
             {saveM.isPending ? <Spinner className="h-4 w-4" /> : t("common.save")}
           </Button>
         </div>
       }
     >
-      {settingsQ.isError ? (
+      {sectionQ.isError ? (
         <p className="py-6 text-sm text-danger" data-testid="admin-avatars-load-error">
           {t("admin.avatars.loadError")}
         </p>
-      ) : !draft ? (
+      ) : !section || !draft ? (
         <div className="flex justify-center py-8">
           <Spinner />
         </div>
       ) : (
-        <div className="divide-y divide-hairline" data-testid="admin-avatars-form">
-          {row("gravatar_enabled", t("admin.avatars.gravatar"), t("admin.avatars.gravatarHint"))}
-          {row("favicon_enabled", t("admin.avatars.favicon"), t("admin.avatars.faviconHint"))}
-        </div>
+        <SchemaForm
+          schema={section.json_schema}
+          values={draft}
+          onChange={(next) => setDraft(next)}
+          errors={settingsFieldErrors(saveM.error)}
+          i18nPrefix={section.i18n_prefix}
+          secretsSet={section.secrets_set}
+          disabled={saveM.isPending}
+          testId="admin-avatars"
+        />
       )}
     </Dialog>
   );

@@ -1668,6 +1668,45 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/customer-directory")) return page(directoryEntries);
   if (p.endsWith("/customer-directory/companies")) return Object.entries(COMPANY_NAMES).map(([customer_id, name]) => ({ customer_id, name }));
   if (p.match(/\/admin\/feature-grants\/[^/]+$/)) return { user_ids: [], group_ids: [2], role_ids: [] };
+  // Settings sections (schemas as the backend's model_json_schema() produces them;
+  // the demo cannot read the PUT body, so saving echoes the defaults).
+  if (p.endsWith("/admin/settings-sections"))
+    return [
+      { key: "avatars", title_key: "admin.settings.avatars.title", owner: "core" },
+      { key: "jobs", title_key: "admin.settings.jobs.title", owner: "core" },
+    ];
+  if (p.endsWith("/admin/settings-sections/jobs"))
+    return {
+      key: "jobs",
+      title_key: "admin.settings.jobs.title",
+      i18n_prefix: "admin.settings.jobs",
+      json_schema: {
+        properties: {
+          max_concurrency: { default: 2, maximum: 8, minimum: 1, title: "Max Concurrency", type: "integer" },
+          retention_days: { default: 14, maximum: 365, minimum: 1, title: "Retention Days", type: "integer" },
+        },
+        title: "JobsSettings",
+        type: "object",
+      },
+      values: { max_concurrency: 2, retention_days: 14 },
+      secrets_set: [],
+    };
+  if (p.endsWith("/admin/settings-sections/avatars"))
+    return {
+      key: "avatars",
+      title_key: "admin.settings.avatars.title",
+      i18n_prefix: "admin.settings.avatars",
+      json_schema: {
+        properties: {
+          gravatar_enabled: { default: true, title: "Gravatar Enabled", type: "boolean" },
+          favicon_enabled: { default: true, title: "Favicon Enabled", type: "boolean" },
+        },
+        title: "AvatarSettings",
+        type: "object",
+      },
+      values: { gravatar_enabled: true, favicon_enabled: true },
+      secrets_set: [],
+    };
   // Avatar sources (the demo cannot read the PUT body; saving echoes the defaults).
   if (p.endsWith("/admin/avatars")) return { gravatar_enabled: true, favicon_enabled: true };
   if (p.endsWith("/customers/vcard-import/preview")) return { cards: [], truncated: false };

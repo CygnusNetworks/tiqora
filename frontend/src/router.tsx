@@ -99,6 +99,7 @@ import { TelegramChannelPage } from "@/routes/admin/TelegramChannelPage";
 import { OAuth2TokensPage } from "@/routes/admin/OAuth2TokensPage";
 import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
+import { SettingsSectionPage } from "@/routes/admin/SettingsSectionPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
 import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
@@ -945,6 +946,12 @@ const adminDaemonsRoute = createRoute({
   component: DaemonsPage,
 });
 
+const adminSettingsSectionRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/settings/$section",
+  component: SettingsSectionPage,
+});
+
 const adminSystemRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/system",
@@ -1108,6 +1115,7 @@ const routeTree = rootRoute.addChildren([
     adminCustomerFieldsRoute,
     adminGdprRoute,
     adminDaemonsRoute,
+    adminSettingsSectionRoute,
     adminSystemRoute,
     adminAiRoute,
     adminAiProvidersRoute,

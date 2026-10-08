@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
@@ -272,6 +273,16 @@ export function DaemonsPage() {
                       <div className="mt-0.5 text-xs text-muted">
                         {t(`admin.daemons.services.${svc.slug}.description`)}
                       </div>
+                      {svc.slug === "jobs" && (
+                        <Link
+                          to="/admin/settings/$section"
+                          params={{ section: "jobs" }}
+                          data-testid="daemon-jobs-settings"
+                          className="mt-1 inline-block text-xs font-medium text-accent hover:underline"
+                        >
+                          {t("admin.daemons.settingsLink")}
+                        </Link>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5 align-top">
                       {svc.schedule === "daily" ? (

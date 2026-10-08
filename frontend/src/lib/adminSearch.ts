@@ -526,6 +526,14 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     ],
   },
   {
+    slug: "settings-jobs",
+    route: "/admin/settings/jobs",
+    group: "system",
+    nameKey: "admin.settings.jobs.title",
+    descriptionKey: "admin.pageDescriptions.settingsJobs",
+    keywords: ["hintergrundaufgaben", "export", "aufgaben", "jobs", "background", "retention", "aufbewahrung"],
+  },
+  {
     slug: "gdpr",
     route: "/admin/gdpr",
     group: "system",

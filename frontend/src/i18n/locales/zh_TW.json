@@ -2993,7 +2993,8 @@
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
         }
       },
-      "takeoverBadge": "接管"
+      "takeoverBadge": "接管",
+      "settingsLink": "Settings"
     },
     "mailLog": {
       "title": "電子郵件通訊日誌",
@@ -3360,7 +3361,8 @@
       "ticketAttributeRelations": "Znuny 相容的相依矩陣（如服務→佇列），CSV 格式。",
       "pgp": "開啟或關閉 PGP，管理金鑰與密碼短語，設定簽章與儲存選項。",
       "smime": "開啟或關閉 S/MIME，管理憑證、私密金鑰與簽署者關係，設定儲存位置。",
-      "aiModels": "供應商的模型、含備援模型的設定檔，以及由哪個設定檔處理哪項任務。"
+      "aiModels": "供應商的模型、含備援模型的設定檔，以及由哪個設定檔處理哪項任務。",
+      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept."
     },
     "types": {
       "title_plural": "工單類型",
@@ -3720,6 +3722,39 @@
       "favicon": "Website icons",
       "faviconHint": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com.",
       "loadError": "The settings could not be loaded."
+    },
+    "settings": {
+      "save": "Save",
+      "saved": "Saved",
+      "loadError": "The settings could not be loaded.",
+      "saveError": "Saving failed.",
+      "notFound": "These settings do not exist.",
+      "jobs": {
+        "title": "Background tasks",
+        "fields": {
+          "max_concurrency": {
+            "label": "Concurrent tasks",
+            "help": "How many background tasks may run at the same time. More is faster but puts more load on the database."
+          },
+          "retention_days": {
+            "label": "Retention in days",
+            "help": "After this many days finished tasks and their files are deleted."
+          }
+        }
+      },
+      "avatars": {
+        "title": "Customer pictures",
+        "fields": {
+          "gravatar_enabled": {
+            "label": "Gravatar",
+            "help": "Profile picture for the e-mail address from gravatar.com. The server sends only the address's SHA-256 hash."
+          },
+          "favicon_enabled": {
+            "label": "Website icons",
+            "help": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com."
+          }
+        }
+      }
     }
   },
   "kb": {
