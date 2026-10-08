@@ -41,7 +41,8 @@ never committed.
 | MCP | V1 full agent access, API keys, same permission layer as UI (FastMCP, own process) |
 | Auth | Reuse Znuny password hashes (`BCRYPT:`, sha256/512, md5-crypt), OIDC, Kerberos/SPNEGO (Linux KDC), optional TOTP; Redis server sessions (no JWT) |
 | V1 scope | Full agent workflow, customer portal, admin core, ACL engine, GenericAgent, **new knowledge base** (LLM/RAG-ready, `tiqora_kb_*`) |
-| Deferred | ProcessManagement, calendar, stats, PGP/S-MIME, SOAP, package manager |
+| Shipped since V1 | Process management (import + execution, no designer), calendar, stats (fixed reports + CSV), PGP/S-MIME, SOAP transport |
+| Still open | Package/plugin system, process designer, reporting builder — planned in `docs/superpowers/specs/2026-10-08-competitive-parity-roadmap-design.md` |
 | Channels | Plugin interface; V1: email + web; planned: phone/SMS, WhatsApp Business |
 | License | AGPL-3.0 |
 
@@ -128,12 +129,12 @@ docker-compose.dev.yml
   `tiqora_kb_chunk` → Meilisearch; citable for RAG/MCP from day one.
 - **MCP tools V1:** ticket_search/get/create/reply/note/update, customer_lookup,
   kb_search/get; all async; CI ban on sync blocking in MCP tools (SSE starvation).
-- **PermissionEngine runtime (current state, deliberate):** evaluates **group/role
-  only** (`group_user` / `role_user` → `group_role`, with `rw` implying other keys).
-  Znuny `acl` table rows (`config_match` / `config_change`) are **not** evaluated
-  at runtime. Admin exposes ACL as read-only (`GET /api/v1/admin/acl`); full ACL
-  editor + runtime evaluation remain deferred. Frame as a known limitation of the
-  current cut, not as a bug in MCP/REST scoping.
+- **PermissionEngine runtime (current state):** queue permissions are
+  group/role based like Znuny (`group_user` / `role_user` → `group_role`, with
+  `rw` implying other keys). Znuny `acl` table rows (`config_match` /
+  `config_change`) filter the selectable options — state, queue, priority,
+  type, service, SLA, and (from wave 0) dynamic-field options — via
+  `domain/ticket_acl.py`; they do not grant or revoke queue access.
 
 ## Phases
 

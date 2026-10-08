@@ -240,9 +240,10 @@ framework. Items below are intentionally incomplete or out of scope.
 
 ### TicketCreate / TicketUpdate — deferred side-effects
 
+`ArticleSend: 1` (agents, TicketCreate and TicketUpdate) sends the article as e-mail through the same outbound path as agent replies (`deliver_agent_email_reply`), including `EmailSecurity` — see [crypto.md](crypto.md).
+
 | Gap | Why deferred |
 |-----|----------------|
-| `ArticleSend` (real outbound email on create/update) | Needs SMTP, loop protection, signatures, auto-response; half-emulation would mislead integrators |
 | Notification overrides (`NoAgentNotify`, `ForceNotificationToUserID`, …) | Bound to the notification event stack; incorrect stubs look like “no mail was sent” bugs |
 | `TimeUnit` → `time_accounting` row on article | Small follow-up; table exists, not yet wired on the compat article path |
 | Multiple `Article` entries per request | Znuny accepts an array; Tiqora uses the **first** element only |
@@ -424,7 +425,8 @@ narrower than Znuny), **by design** (deliberate platform choice).
 |---|---|---|
 | Webservice admin / editor | by design | Webservices are loaded from the database; no editor |
 | Requester side / invokers | by design | See [What is not emulated](#what-is-not-emulated-and-why) |
-| `ArticleSend`, `TimeUnit`, multiple articles in TicketCreate/Update | partial | See [TicketCreate / TicketUpdate](#ticketcreate--ticketupdate--deferred-side-effects) |
+| `TimeUnit`, multiple articles in TicketCreate/Update | partial | See [TicketCreate / TicketUpdate](#ticketcreate--ticketupdate--deferred-side-effects) |
+| `ArticleSend` (outbound e-mail on create/update) | yes | Agents only, like Znuny |
 | TicketSearch `Created*`, flags, attachment search, `Result=COUNT` | partial | See [partial fidelity](#ticketget--search--session--timeaccounting--partial-fidelity) |
 
 ### Processes, daemon, calendar
