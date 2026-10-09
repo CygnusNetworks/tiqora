@@ -41,6 +41,11 @@ def register_core(registry: Registry) -> None:
     for s in core_report_sources():
         registry.add(REPORT_SOURCES, s)
 
+    from tiqora.reporting.catalogue import BUILTIN_REPORTS, core_builtin_reports
+
+    for r in core_builtin_reports():
+        registry.add(BUILTIN_REPORTS, r)
+
 
 def get_registry() -> Registry:
     global _REGISTRY
