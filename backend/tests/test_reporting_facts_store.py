@@ -558,6 +558,49 @@ async def test_ai_flags(url_fixture: str, request: pytest.FixtureRequest) -> Non
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_draft_used_counts_manual_accept_origin_not_auto(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """R-AIFLAG: an article origin "manual_accept" (human accepted a draft) is a used
+    draft and not an auto reply; "auto" is the reverse."""
+    sync_url = request.getfixturevalue(url_fixture)
+    _seed(sync_url)
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        for article_id, source in ((47541, "manual_accept"), (47540, "auto")):
+            conn.execute(
+                text(
+                    "INSERT INTO tiqora_ai_article_origin (article_id, source, queue_id, created)"
+                    " VALUES (:a, :s, :q, :now)"
+                ),
+                {"a": article_id, "s": source, "q": Q2, "now": T0},
+            )
+    engine.dispose()
+    engine, factory = _factory(sync_url)
+    try:
+        async with factory() as s:
+            await rebuild_ticket_facts(s, [T_FULL], now=BUILT)
+            await s.commit()
+        async with factory() as s:
+            full = await _fact(s, T_FULL)
+            assert full is not None
+            assert full.ai_draft_used is True and full.ai_auto_replied is True
+        with create_engine(sync_url).begin() as conn:
+            conn.execute(text("DELETE FROM tiqora_ai_article_origin WHERE article_id = 47540"))
+        async with factory() as s:
+            await rebuild_ticket_facts(s, [T_FULL], now=BUILT)
+            await s.commit()
+        async with factory() as s:
+            full = await _fact(s, T_FULL)
+            assert full is not None
+            assert full.ai_draft_used is True and full.ai_auto_replied is False
+    finally:
+        await engine.dispose()
+    _clean(sync_url)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_dirty_queue_round_trip(url_fixture: str, request: pytest.FixtureRequest) -> None:
     sync_url = request.getfixturevalue(url_fixture)
     _URLS.add(sync_url)
@@ -576,8 +619,12 @@ async def test_dirty_queue_round_trip(url_fixture: str, request: pytest.FixtureR
             assert taken_at == T0 + timedelta(seconds=10)
             assert (await take_dirty_ticket_ids(s, 1))[0] == [b]  # limit, oldest first
             # does not delete
-            rows = await s.execute(select(func.count()).select_from(TiqoraReportDirtyTicket))
-            assert rows.scalar_one() >= 2
+            rows = await s.execute(
+                select(func.count())
+                .select_from(TiqoraReportDirtyTicket)
+                .where(TiqoraReportDirtyTicket.ticket_id.between(LO, HI))
+            )
+            assert rows.scalar_one() == 2
 
             # a mark made while the rebuild ran survives the clear
             await mark_tickets_dirty(s, [a], now=T0 + timedelta(seconds=20))
@@ -591,6 +638,37 @@ async def test_dirty_queue_round_trip(url_fixture: str, request: pytest.FixtureR
         async with factory() as s:
             empty_ids, _ = await take_dirty_ticket_ids(s, 10)
             assert [i for i in empty_ids if LO <= i <= HI] == []
+    finally:
+        await engine.dispose()
+    _clean(sync_url)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_remark_in_same_second_survives_clear(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """A re-mark made in the same wall second as the take must not be cleared
+    (MariaDB ``queued_at`` is DATETIME(6), so the microsecond difference is stored)."""
+    sync_url = request.getfixturevalue(url_fixture)
+    _URLS.add(sync_url)
+    _clean(sync_url)
+    engine, factory = _factory(sync_url)
+    a = 47530
+    try:
+        async with factory() as s:
+            await mark_tickets_dirty(s, [a], now=T0)
+            await s.commit()
+        async with factory() as s:
+            ids, taken_at = await take_dirty_ticket_ids(s, 10)
+            assert ids == [a] and taken_at == T0
+            await mark_tickets_dirty(s, [a], now=T0 + timedelta(microseconds=5))
+            await clear_dirty(s, ids, taken_at)
+            await s.commit()
+        async with factory() as s:
+            ids_after, at_after = await take_dirty_ticket_ids(s, 10)
+            assert ids_after == [a]
+            assert at_after == T0 + timedelta(microseconds=5)
     finally:
         await engine.dispose()
     _clean(sync_url)

@@ -6,8 +6,8 @@ Create Date: 2026-10-09
 
 ``tiqora_report_ticket_fact.ticket_id`` and ``tiqora_report_dirty_ticket.ticket_id``
 mirror ``ticket.id`` and are never generated. ``gap_ids`` is ``MEDIUMTEXT`` on
-MariaDB (thousands of gaps exceed ``TEXT``'s 64 KiB). All timestamps the
-application writes are naive UTC.
+MariaDB (thousands of gaps exceed ``TEXT``'s 64 KiB).
+``queued_at`` has microsecond precision on MariaDB. All timestamps the application writes are naive UTC.
 """
 
 from __future__ import annotations
@@ -102,15 +102,11 @@ def upgrade() -> None:
         ["customer_id", "created_at"],
     )
     op.create_index("ix_tiqora_report_fact_owner", "tiqora_report_ticket_fact", ["owner_id"])
-    op.create_index(
-        "ix_tiqora_report_fact_state_type", "tiqora_report_ticket_fact", ["state_type"]
-    )
+    op.create_index("ix_tiqora_report_fact_state_type", "tiqora_report_ticket_fact", ["state_type"])
     op.create_index(
         "ix_tiqora_report_fact_last_event", "tiqora_report_ticket_fact", ["last_event_at"]
     )
-    op.create_index(
-        "ix_tiqora_report_fact_version", "tiqora_report_ticket_fact", ["fact_version"]
-    )
+    op.create_index("ix_tiqora_report_fact_version", "tiqora_report_ticket_fact", ["fact_version"])
 
     op.create_table(
         "tiqora_report_ticket_event",
@@ -191,7 +187,11 @@ def upgrade() -> None:
     op.create_table(
         "tiqora_report_dirty_ticket",
         sa.Column("ticket_id", sa.BigInteger(), autoincrement=False, nullable=False),
-        sa.Column("queued_at", sa.DateTime(), nullable=False),
+        sa.Column(
+            "queued_at",
+            sa.DateTime().with_variant(mysql.DATETIME(fsp=6), "mysql", "mariadb"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("ticket_id"),
     )
 

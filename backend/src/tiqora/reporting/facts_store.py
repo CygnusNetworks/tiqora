@@ -50,6 +50,7 @@ from tiqora.znuny.sysconfig import SysConfig
 
 FACT_CHUNK_SIZE: Final = 200
 _IN_CHUNK: Final = 1000
+_ORIGIN_MANUAL_ACCEPT: Final = "manual_accept"  # human accepted an AI draft
 
 _locks: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = (
     weakref.WeakKeyDictionary()
@@ -214,21 +215,21 @@ async def load_fact_inputs(
             ).all()
         }
         auto_replied: set[int] = set()
+        accepted_by_origin: set[int] = set()
         article_ids = list(article_ticket)
         for article_chunk in _chunks(article_ids, _IN_CHUNK):
-            auto_replied.update(
-                article_ticket[int(aid)]
-                for aid in (
-                    await session.execute(
-                        select(TiqoraAiArticleOrigin.article_id).where(
-                            TiqoraAiArticleOrigin.article_id.in_(list(article_chunk)),
-                            TiqoraAiArticleOrigin.source == SOURCE_AUTO,
-                        )
+            for aid, source in (
+                await session.execute(
+                    select(TiqoraAiArticleOrigin.article_id, TiqoraAiArticleOrigin.source).where(
+                        TiqoraAiArticleOrigin.article_id.in_(list(article_chunk)),
+                        TiqoraAiArticleOrigin.source.in_([SOURCE_AUTO, _ORIGIN_MANUAL_ACCEPT]),
                     )
                 )
-                .scalars()
-                .all()
-            )
+            ).all():
+                if source == SOURCE_AUTO:
+                    auto_replied.add(article_ticket[int(aid)])
+                else:
+                    accepted_by_origin.add(article_ticket[int(aid)])
         draft_used = {
             int(tid)
             for tid in (
@@ -292,7 +293,7 @@ async def load_fact_inputs(
                     triaged=tid in triaged,
                     triage_queue_applied=triaged.get(tid, False),
                     auto_replied=tid in auto_replied,
-                    draft_used=tid in draft_used,
+                    draft_used=tid in draft_used or tid in accepted_by_origin,
                     handed_off=tid in handed_off,
                 ),
                 process_entity_id=process_ids.get(tid),
@@ -377,12 +378,9 @@ async def rebuild_and_commit(
         for attempt in range(1, attempts + 1):
             try:
                 async with fact_write_lock(), factory() as session:
-                    try:
-                        res = await rebuild_ticket_facts(session, chunk, now=now)
-                        await session.commit()
-                    except BaseException:
-                        await session.rollback()
-                        raise
+                    # leaving the session context without commit rolls back
+                    res = await rebuild_ticket_facts(session, chunk, now=now)
+                    await session.commit()
             except (IntegrityError, OperationalError):
                 if attempt == attempts:
                     raise

@@ -1081,4 +1081,8 @@ class TiqoraReportDirtyTicket(TiqoraBase):
     __tablename__ = "tiqora_report_dirty_ticket"
 
     ticket_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
-    queued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # Microseconds on MariaDB too: ``clear_dirty`` compares against a taken-at time and
+    # whole-second values would let it delete a mark made in the same second.
+    queued_at: Mapped[datetime] = mapped_column(
+        DateTime().with_variant(mysql.DATETIME(fsp=6), "mysql", "mariadb"), nullable=False
+    )

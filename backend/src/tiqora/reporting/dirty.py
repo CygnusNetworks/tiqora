@@ -49,8 +49,8 @@ async def take_dirty_ticket_ids(session: AsyncSession, limit: int) -> tuple[list
     """Oldest marks first (``queued_at``, ``ticket_id``); does not delete.
 
     Returns the ids and the snapshot time to hand to :func:`clear_dirty`: the newest
-    ``queued_at`` among the returned rows, so it has the stored precision (MariaDB
-    ``DATETIME`` keeps whole seconds). With no rows the snapshot is the current time.
+    ``queued_at`` among the returned rows, so it has the stored precision (``DATETIME(6)`` on
+    MariaDB, set in the model and migration). With no rows the snapshot is the current time.
     """
     rows = (
         await session.execute(

@@ -97,3 +97,13 @@ def test_report_ticket_ids_do_not_generate_ids() -> None:
         assert "AUTO_INCREMENT" not in _column_ddl(table, column, mysql.dialect())
         for marker in ("SERIAL", "GENERATED"):
             assert marker not in _column_ddl(table, column, postgresql.dialect())
+
+
+def test_report_dirty_queued_at_has_microseconds_on_mariadb() -> None:
+    """``clear_dirty`` compares ``queued_at`` with a taken-at time; whole-second
+    ``DATETIME`` would delete a mark made in the same second."""
+    from tiqora.db.tiqora.models import TiqoraReportDirtyTicket
+
+    table = TiqoraReportDirtyTicket.__table__
+    assert "DATETIME(6)" in _column_ddl(table, "queued_at", mysql.dialect())
+    assert "DATETIME(6)" not in _column_ddl(table, "queued_at", postgresql.dialect())
