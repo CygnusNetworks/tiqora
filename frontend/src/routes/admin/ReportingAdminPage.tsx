@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { JobDialog } from "@/components/jobs/JobDialog";
 import { StatTile } from "@/components/agent/stats/StatTile";
 import { reportErrorMessage, reportsApi } from "@/lib/reportsApi";
+import { jobsApi } from "@/lib/jobsApi";
 import { formatCalendarDay, formatDateTime } from "@/lib/format";
 
 const QUERY_KEY = ["admin", "reporting", "status"] as const;
@@ -29,6 +30,16 @@ export function ReportingAdminPage() {
     refetchInterval: REFETCH_INTERVAL_MS,
   });
 
+  // The status only knows pending/running/done; whether a pending build is
+  // queued or failed lives on its job.
+  const buildJobId = statusQ.data && statusQ.data.backfill_status !== "done" ? statusQ.data.backfill_job_id : null;
+  const buildJobQ = useQuery({
+    queryKey: ["admin", "reporting", "build-job", buildJobId],
+    queryFn: ({ signal }) => jobsApi.get(buildJobId as number, signal),
+    enabled: buildJobId != null,
+    refetchInterval: REFETCH_INTERVAL_MS,
+  });
+
   const rebuild = useMutation({
     mutationFn: () =>
       reportsApi.adminBackfill({ since: since || null, restart: true, snapshots: true }),
@@ -41,15 +52,23 @@ export function ReportingAdminPage() {
 
   const s = statusQ.data;
   const num = (n: number) => new Intl.NumberFormat(locale).format(n);
+  const jobStatus = buildJobQ.data?.status;
+  const buildFailed = s?.backfill_status === "pending" && (jobStatus === "failed" || jobStatus === "cancelled");
+  const buildQueued = s?.backfill_status === "pending" && !buildFailed && buildJobId != null;
+  const buildActive = s?.backfill_status === "running" || buildQueued;
   const stateLabel = !s
     ? ""
     : s.backfill_status === "running"
       ? s.backfill_progress != null
         ? t("admin.reporting.buildingPercent", { percent: Math.round(s.backfill_progress * 100) })
         : t("admin.reporting.building")
-      : s.ready
-        ? t("admin.reporting.ready")
-        : t("admin.reporting.pending");
+      : buildFailed
+        ? t("admin.reporting.failed")
+        : buildQueued
+          ? t("admin.reporting.queued")
+          : s.ready
+            ? t("admin.reporting.ready")
+            : t("admin.reporting.pending");
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4" data-testid="admin-reporting-page">
@@ -143,6 +162,7 @@ export function ReportingAdminPage() {
         <Button
           size="sm"
           onClick={() => setConfirming(true)}
+          disabled={buildActive}
           data-testid="admin-reporting-rebuild"
         >
           {t("admin.reporting.rebuild")}

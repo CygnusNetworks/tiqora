@@ -9,6 +9,9 @@ import type { ReportingStatus } from "@/lib/reportsApi";
 
 const adminStatus = vi.fn();
 const adminBackfill = vi.fn();
+const jobGet = vi.fn();
+
+vi.mock("@/lib/jobsApi", () => ({ jobsApi: { get: (...a: unknown[]) => jobGet(...a) } }));
 
 vi.mock("@/lib/reportsApi", async (orig) => ({
   ...(await orig<typeof import("@/lib/reportsApi")>()),
@@ -61,6 +64,7 @@ function renderPage() {
 describe("ReportingAdminPage", () => {
   beforeEach(async () => {
     adminStatus.mockReset().mockResolvedValue(status);
+    jobGet.mockReset().mockResolvedValue({ id: 9202, status: "queued" });
     adminBackfill.mockReset().mockResolvedValue({ job_id: 9202, status: "queued" });
     await i18n.changeLanguage("de");
   });
@@ -87,12 +91,46 @@ describe("ReportingAdminPage", () => {
     fireEvent.change(screen.getByTestId("admin-reporting-since"), { target: { value: "2024-01-01" } });
     fireEvent.click(screen.getByTestId("admin-reporting-rebuild"));
     expect(adminBackfill).not.toHaveBeenCalled();
-    expect(await screen.findByText(/Alle Berichtsdaten werden neu berechnet/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        "Alle Berichtsdaten werden neu berechnet. Das kann bei vielen Tickets Stunden dauern. Bis dahin zeigen die Berichte einen Hinweis und sind noch nicht vollständig.",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
     await waitFor(() =>
       expect(adminBackfill).toHaveBeenCalledWith({ since: "2024-01-01", restart: true, snapshots: true }),
     );
     expect(await screen.findByTestId("admin-reporting-job")).toHaveTextContent("job 9202");
+  });
+
+  it("shows a dash for missing dates", async () => {
+    adminStatus.mockResolvedValue({ ...status, ready: false, as_of: null, last_snapshot_date: null, snapshot_time_zone: null });
+    renderPage();
+    await screen.findByTestId("admin-reporting-state");
+    expect(screen.getByTestId("admin-reporting-as-of")).toHaveTextContent("—");
+    expect(screen.getByTestId("admin-reporting-last-snapshot")).toHaveTextContent("—");
+  });
+
+  it("disables the rebuild button while a build runs", async () => {
+    adminStatus.mockResolvedValue({ ...status, ready: false, backfill_status: "running", backfill_progress: 0.1, backfill_job_id: 9202 });
+    renderPage();
+    await screen.findByTestId("admin-reporting-state");
+    expect(screen.getByTestId("admin-reporting-rebuild")).toBeDisabled();
+  });
+
+  it("shows a queued build and disables the button", async () => {
+    adminStatus.mockResolvedValue({ ...status, ready: false, backfill_status: "pending", backfill_progress: null, backfill_job_id: 9202 });
+    renderPage();
+    expect(await screen.findByText("Aufbau ist eingeplant")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-reporting-rebuild")).toBeDisabled();
+  });
+
+  it("shows a failed build and allows a new rebuild", async () => {
+    jobGet.mockResolvedValue({ id: 9202, status: "failed" });
+    adminStatus.mockResolvedValue({ ...status, ready: false, backfill_status: "pending", backfill_progress: null, backfill_job_id: 9202 });
+    renderPage();
+    expect(await screen.findByText("Der letzte Aufbau ist fehlgeschlagen")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-reporting-rebuild")).toBeEnabled();
   });
 
   it("sends since null without a date", async () => {

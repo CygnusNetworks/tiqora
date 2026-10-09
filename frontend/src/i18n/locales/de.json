@@ -3861,8 +3861,8 @@
             }
           },
           "near_miss_percent": {
-            "label": "Knapp verfehlt in Prozent",
-            "help": "Ein Ticket gilt als knapp verfehlt, wenn es höchstens so viel Prozent der Zielzeit überschritten hat."
+            "label": "Knapp eingehalten ab Prozent",
+            "help": "Bei 10 % zählt ein Ticket als knapp, wenn es nicht überschritten ist, aber 90 % oder mehr der Zielzeit verbraucht hat. Der Wert hier ist der Abstand zur Zielzeit in Prozent."
           },
           "cache_seconds": {
             "label": "Zwischenspeicher in Sekunden",
@@ -3874,15 +3874,15 @@
           },
           "max_result_rows": {
             "label": "Höchstzahl Ergebniszeilen",
-            "help": "Mehr Zeilen zeigt ein Bericht am Bildschirm nicht an; der Rest wird als „Sonstige“ zusammengefasst."
+            "help": "Mehr Zeilen liefert ein Bericht nicht. Der Rest wird abgeschnitten und der Bericht als gekürzt markiert. „Weitere“ gibt es nur bei einer Begrenzung pro Gruppierung (Top-N)."
           },
           "export_row_limit": {
             "label": "Höchstzahl Zeilen beim Export",
             "help": "Größere Exporte nach Excel oder CSV werden bei dieser Zeilenzahl abgeschnitten."
           },
           "query_timeout_seconds": {
-            "label": "Zeitlimit pro Bericht in Sekunden",
-            "help": "Dauert die Berechnung länger, wird sie abgebrochen und eine Meldung angezeigt."
+            "label": "Zeitlimit pro Datenbankabfrage in Sekunden",
+            "help": "Dauert eine einzelne Abfrage länger, wird sie abgebrochen und eine Meldung angezeigt."
           }
         }
       }
@@ -4312,11 +4312,13 @@
       "eventRows": "Ereigniszeilen",
       "rebuild": "Berichtsdaten neu aufbauen",
       "rebuildSince": "Ab Datum (optional)",
-      "rebuildHelp": "Rechnet alle Berichtsdaten aus den Tickets und ihrem Verlauf neu. Ohne Datum wird die gesamte Historie verwendet.",
-      "rebuildConfirm": "Alle Berichtsdaten werden neu berechnet. Das kann bei vielen Tickets Stunden dauern; die Berichte bleiben währenddessen nutzbar.",
+      "rebuildHelp": "Rechnet alle Berichtsdaten aus den Tickets und ihrem Verlauf neu. Ein Datum gilt für Tickets, die an diesem Tag oder später angelegt wurden; ältere Tickets bleiben unverändert. Ohne Datum werden alle Tickets verwendet.",
+      "rebuildConfirm": "Alle Berichtsdaten werden neu berechnet. Das kann bei vielen Tickets Stunden dauern. Bis dahin zeigen die Berichte einen Hinweis und sind noch nicht vollständig.",
       "rebuildStart": "Neu aufbauen",
       "rebuildError": "Der Neuaufbau konnte nicht gestartet werden.",
-      "loadError": "Der Zustand der Berichtsdaten konnte nicht geladen werden."
+      "loadError": "Der Zustand der Berichtsdaten konnte nicht geladen werden.",
+      "failed": "Der letzte Aufbau ist fehlgeschlagen",
+      "queued": "Aufbau ist eingeplant"
     }
   },
   "kb": {

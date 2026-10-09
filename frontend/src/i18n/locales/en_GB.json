@@ -3861,8 +3861,8 @@
             }
           },
           "near_miss_percent": {
-            "label": "Near miss in percent",
-            "help": "A ticket counts as a near miss if it overran the target time by at most this many percent."
+            "label": "Near miss from percent",
+            "help": "At 10%, a ticket counts as a near miss if it was not breached but used 90% or more of its target time. The value is the distance to the target in percent."
           },
           "cache_seconds": {
             "label": "Cache in seconds",
@@ -3874,15 +3874,15 @@
           },
           "max_result_rows": {
             "label": "Maximum result rows",
-            "help": "A report shows no more rows on screen; the rest is summed up as \"Other\"."
+            "help": "A report returns no more rows than this. The rest is cut off and the report is marked as truncated. \"Others\" only appears with a per-grouping limit (top N)."
           },
           "export_row_limit": {
             "label": "Maximum rows when exporting",
             "help": "Larger exports to Excel or CSV are cut off at this number of rows."
           },
           "query_timeout_seconds": {
-            "label": "Time limit per report in seconds",
-            "help": "If the calculation takes longer it is stopped and a message is shown."
+            "label": "Time limit per database query in seconds",
+            "help": "If a single query takes longer it is stopped and a message is shown."
           }
         }
       }
@@ -4312,11 +4312,13 @@
       "eventRows": "Event rows",
       "rebuild": "Rebuild report data",
       "rebuildSince": "From date (optional)",
-      "rebuildHelp": "Recalculates all report data from the tickets and their history. Without a date the whole history is used.",
-      "rebuildConfirm": "All report data will be recalculated. With many tickets this can take hours; the reports stay usable meanwhile.",
+      "rebuildHelp": "Recalculates all report data from the tickets and their history. A date applies to tickets created on or after that day; older tickets stay unchanged. Without a date all tickets are used.",
+      "rebuildConfirm": "All report data will be recalculated. With many tickets this can take hours. Until then the reports show a notice and are not complete yet.",
       "rebuildStart": "Rebuild",
       "rebuildError": "The rebuild could not be started.",
-      "loadError": "The state of the report data could not be loaded."
+      "loadError": "The state of the report data could not be loaded.",
+      "failed": "The last build failed",
+      "queued": "A build is queued"
     }
   },
   "kb": {
