@@ -753,3 +753,149 @@ async def test_a_retry_waiting_for_its_due_time_does_not_block_later_lane_jobs(
     await runner.wait_idle()
     assert (await _fetch(factory, first)).status == "queued"
     assert (await _fetch(factory, second)).status == "succeeded"
+
+
+async def test_timeout_before_the_checkpoint_requeues_and_after_it_records_once(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    hooked: list[tuple[int, str | None]] = []
+    passed_checkpoint: list[bool] = []
+
+    async def slow(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        if payload.n == 1:
+            await ctx.checkpoint("sending")
+            passed_checkpoint.append(True)
+        await asyncio.sleep(30)
+        return {}
+
+    async def hook(ctx: JobContext, payload: _Payload) -> None:
+        hooked.append((payload.n, ctx.interrupted_by))
+
+    reg = _registry(
+        _handler(
+            "test.mail",
+            slow,
+            timeout_seconds=1,
+            max_attempts=3,
+            requeue_if_interrupted=True,
+            on_interrupted=hook,
+        )
+    )
+    before = await _enqueue(factory, reg, kind="test.mail", n=0)
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await runner.wait_idle()
+    job = await _fetch(factory, before)
+    # cut off before its checkpoint: nothing happened, so it goes back to the queue
+    assert (job.status, job.attempts, job.error) == ("queued", 1, None)
+    assert hooked == []
+    async with factory() as s:
+        await s.execute(update(TiqoraJob).where(TiqoraJob.id == before).values(status="cancelled"))
+        await s.commit()
+    after = await _enqueue(factory, reg, kind="test.mail", n=1)
+    await runner.run_once()
+    await runner.wait_idle()
+    job = await _fetch(factory, after)
+    assert passed_checkpoint == [True]
+    assert (job.status, job.error) == ("failed", TIMEOUT_MESSAGE)
+    assert hooked == [(1, "timeout")]  # the hook learns why, and runs exactly once
+
+
+async def test_timeout_of_a_kind_without_requeue_still_fails(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async def slow(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        await asyncio.sleep(30)
+        return {}
+
+    reg = _registry(_handler("test.slow", slow, timeout_seconds=1))
+    job_id = await _enqueue(factory, reg, kind="test.slow")
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await runner.wait_idle()
+    job = await _fetch(factory, job_id)
+    assert (job.status, job.error, job.attempts) == ("failed", TIMEOUT_MESSAGE, 1)
+
+
+async def test_cancel_requested_job_ends_cancelled_instead_of_a_retry(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def flaky(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        started.set()
+        await release.wait()
+        raise JobRetry("später", delay_seconds=60)
+
+    reg = _registry(_handler("test.flaky", flaky, max_attempts=3))
+    job_id = await _enqueue(factory, reg, kind="test.flaky")
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await asyncio.wait_for(started.wait(), 5)
+    async with factory() as s:
+        job = await get_job(s, job_id)
+        assert job is not None
+        await request_cancel(s, job)
+        await s.commit()
+    release.set()
+    await runner.wait_idle()
+    job = await _fetch(factory, job_id)
+    # a requeued row with cancel_requested would never be claimed again (stuck "queued")
+    assert job.status == "cancelled"
+    assert job.finished_at is not None
+
+
+async def test_cancel_requested_job_ends_cancelled_instead_of_an_interrupt_requeue(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    reg = _registry(_handler("test.mail", _noop, max_attempts=3, requeue_if_interrupted=True))
+    job_id = await _enqueue(factory, reg, kind="test.mail")
+    await _force_running(factory, job_id, attempts=1, checkpoint=None)
+    async with factory() as s:
+        await s.execute(
+            update(TiqoraJob).where(TiqoraJob.id == job_id).values(cancel_requested=True)
+        )
+        await s.commit()
+    assert await _runner(factory, reg)._reap() == 1
+    job = await _fetch(factory, job_id)
+    assert job.status == "cancelled" and job.finished_at is not None
+
+
+async def test_a_runner_does_not_reclaim_a_job_whose_old_claim_still_runs_here(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+    runs: list[int] = []
+
+    async def mail(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        runs.append(ctx.attempt)
+        started.set()
+        await release.wait()
+        return {}
+
+    reg = _registry(_handler("test.mail", mail, max_attempts=3, requeue_if_interrupted=True))
+    job_id = await _enqueue(factory, reg, kind="test.mail")
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await asyncio.wait_for(started.wait(), 5)
+    old_task = runner._active[job_id]
+    async with factory() as s:  # its heartbeat went stale: the reaper requeues it
+        await s.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == job_id)
+            .values(heartbeat_at=utc_now() - timedelta(minutes=10))
+        )
+        await s.commit()
+    out = await runner.run_once()
+    assert out["reaped"] == 1
+    assert out["started"] == 0  # the old task still runs on this runner
+    assert runner._active[job_id] is old_task and runner.active_count == 1
+    release.set()
+    await runner.wait_idle()
+    assert (await _fetch(factory, job_id)).status == "queued"  # the old claim did not finish it
+    assert (await runner.run_once())["started"] == 1
+    await runner.wait_idle()
+    assert runs == [1, 2]
+    assert (await _fetch(factory, job_id)).status == "succeeded"

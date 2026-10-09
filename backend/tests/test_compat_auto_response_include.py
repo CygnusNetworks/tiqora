@@ -14,7 +14,7 @@ import asyncio
 import base64
 import time
 from collections.abc import Generator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import aiosmtplib
@@ -888,7 +888,7 @@ async def test_failing_auto_response_never_fails_the_call(
 
 
 @pytest.mark.db
-async def test_raising_add_article_in_auto_response_leaves_no_partial_rows(
+async def test_auto_response_sent_but_not_stored_is_reported_and_never_resent(
     sync_url: str, relay: CapturingMailSender, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from tiqora.channels.email import autoresponse
@@ -902,12 +902,29 @@ async def test_raising_add_article_in_auto_response_leaves_no_partial_rows(
     )
     assert "Error" not in result, result
     ticket_id = result["TicketID"]
-    assert _article_count(sync_url, ticket_id) == 1
+    assert _article_count(sync_url, ticket_id) == 1  # no partial auto reply article
     assert "SendAutoReply" not in _history_names(sync_url, ticket_id)
+    # but the mail did go out: never sent again, reported truthfully, logged as sent and
+    # counted by the loop protection
+    from tiqora.jobs.handlers.gi_mail import FAILED_AFTER_SEND_MESSAGE
+
+    assert len(relay.sent) == 1
+    assert [(j["status"], j["error"]) for j in _jobs(sync_url)] == [
+        ("failed", FAILED_AFTER_SEND_MESSAGE)
+    ]
+    assert _mail_log(sync_url) == [("sent", None)]
+    assert "storing its article failed: database went away" in _log_details(sync_url)[0]
     assert (
-        _query(sync_url, "SELECT 1 FROM ticket_loop_protection WHERE sent_to = :a", a=CUSTOMER_MAIL)
-        == []
+        len(
+            _query(
+                sync_url, "SELECT 1 FROM ticket_loop_protection WHERE sent_to = :a", a=CUSTOMER_MAIL
+            )
+        )
+        == 1
     )
+    make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+    assert await drain_gi_mail_jobs(sync_url) == []
+    assert len(relay.sent) == 1
 
 
 @pytest.mark.db
@@ -1343,3 +1360,133 @@ def test_gi_mail_runs_in_its_own_serial_lane_with_mail_queue_attempts() -> None:
     assert GI_MAIL_JOB.lane == MAIL_LANE and LANE_SLOTS[MAIL_LANE] == 1
     assert GI_MAIL_JOB.max_attempts == 3  # MailQueue###ItemMaxAttempts default
     assert GI_MAIL_JOB.requeue_if_interrupted and GI_MAIL_JOB.on_interrupted is not None
+
+
+@pytest.mark.db
+async def test_interruption_while_building_the_sender_requeues_the_mail(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The checkpoint is set right before SMTP starts: a worker stopped while the sender is
+    still being built (e.g. an OAuth token fetch) did not send anything, so the mail goes
+    back into the queue instead of being recorded as failed."""
+    from tiqora.config import get_settings
+    from tiqora.extensions import get_registry
+    from tiqora.jobs.runner import JobRunner
+
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    building = asyncio.Event()
+
+    async def _slow_build(session: Any, **kwargs: Any) -> Any:
+        building.set()
+        await asyncio.Event().wait()
+        return sender
+
+    monkeypatch.setattr(mail_outbound, "build_outbound_sender", _slow_build)
+    await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}, drain=False
+    )
+    (job,) = _jobs(sync_url)
+    engine = create_async_engine(_async_url(sync_url))
+    try:
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        runner = JobRunner(
+            session_factory=factory, settings=get_settings(), registry=get_registry()
+        )
+        attempt = await runner._claim(job["id"])
+        task = asyncio.create_task(
+            runner._execute(job["id"], "gi_mail", _payload_json(job), None, attempt=attempt)
+        )
+        runner._active[job["id"]] = task
+        await asyncio.wait_for(building.wait(), 10)
+        await runner.shutdown(grace_seconds=0.1)
+    finally:
+        await engine.dispose()
+    (job,) = _jobs(sync_url)
+    assert (job["status"], job["checkpoint"], job["attempts"]) == ("queued", None, 1)
+    assert _send_errors(sync_url) == [] and _mail_log(sync_url) == []
+    assert sender.attempts == 0
+
+
+# ---------------------------------------------------------------------------
+# PendingTime (Znuny Common.pm ValidatePendingTime)
+# ---------------------------------------------------------------------------
+
+PENDING_REMINDER = 6  # initial_insert: "pending reminder"
+
+
+def _until_time(sync_url: str, ticket_id: int) -> int:
+    return int(_query(sync_url, "SELECT until_time FROM ticket WHERE id = :t", t=ticket_id)[0][0])
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    "pending",
+    [
+        {"Diff": "1e300"},
+        {"Diff": 10**12},
+        {"Diff": "-5"},
+        {"Diff": "1.5"},
+        {"Diff": 60, "Year": 2030},
+        {"Year": 2030, "Month": 13, "Day": 1, "Hour": 0, "Minute": 0},
+        {"Year": 2030, "Month": 2, "Day": 30},
+        {"Year": "", "Month": 1, "Day": 1},
+        {"Year": 2030, "Month": 1, "Day": 1, "Hour": -1},
+        {"Year": 2030, "Month": 1},
+        {"Year": 10**12, "Month": 1, "Day": 1},
+        {"Year": 2030, "Month": 1, "Day": 1, "Days": 3},
+        "tomorrow",
+    ],
+)
+async def test_invalid_pending_time_is_refused_like_znuny(
+    sync_url: str, relay: CapturingMailSender, pending: Any
+) -> None:
+    ticket = {**_ticket(), "StateID": PENDING_REMINDER, "PendingTime": pending}
+    result = await _call(sync_url, "create", {"Ticket": ticket, "Article": _customer_article()})
+    assert result["Error"] == {
+        "ErrorCode": "TicketCreate.InvalidParameter",
+        "ErrorMessage": "TicketCreate: Ticket->PendingTime parameter is invalid!",
+    }
+    assert _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE) == []
+
+    created = await _call(sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article()})
+    ticket_id = created["TicketID"]
+    updated = await _call(
+        sync_url,
+        "update",
+        {
+            "TicketID": ticket_id,
+            "Ticket": {
+                "Title": "GI7650 changed",
+                "StateID": PENDING_REMINDER,
+                "PendingTime": pending,
+            },
+        },
+    )
+    assert updated["Error"] == {
+        "ErrorCode": "TicketUpdate.InvalidParameter",
+        "ErrorMessage": "TicketUpdate: Ticket->PendingTime parameter is invalid!",
+    }
+    # validated before the first write: nothing changed
+    assert _query(sync_url, "SELECT title FROM ticket WHERE id = :t", t=ticket_id) == [(TITLE,)]
+
+
+@pytest.mark.db
+async def test_valid_pending_time_sets_the_until_time(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    ticket = {**_ticket(), "StateID": PENDING_REMINDER, "PendingTime": {"Diff": " 60 "}}
+    before = int(time.time())
+    created = await _call(sync_url, "create", {"Ticket": ticket, "Article": _customer_article()})
+    assert "Error" not in created, created
+    assert before + 3600 - 5 <= _until_time(sync_url, created["TicketID"]) <= before + 3600 + 60
+    absolute = {"Year": "2030", "Month": 1, "Day": 2, "Hour": 3, "Minute": 4}
+    updated = await _call(
+        sync_url,
+        "update",
+        {"TicketID": created["TicketID"], "Ticket": {"PendingTime": absolute}},
+    )
+    assert "Error" not in updated, updated
+    assert _until_time(sync_url, created["TicketID"]) == int(
+        datetime(2030, 1, 2, 3, 4, tzinfo=UTC).timestamp()
+    )

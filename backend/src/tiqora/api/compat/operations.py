@@ -120,6 +120,7 @@ from tiqora.znuny.password import (
     needs_rehash,
     verify_password,
 )
+from tiqora.znuny.perl_format import perl_int
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -592,26 +593,83 @@ async def _lookup_name(session: AsyncSession, table: str, id_: int | None) -> st
     return str(row[0]) if row else None
 
 
-def _parse_pending_time(raw: Any) -> datetime | None:
-    """Parse Znuny PendingTime {Year,Month,Day,Hour,Minute} or {Diff: minutes}."""
-    if not raw or not isinstance(raw, dict):
+class InvalidPendingTime(ValueError):
+    """``Ticket->PendingTime`` fails Znuny's ``ValidatePendingTime`` (or cannot be stored)."""
+
+
+_PENDING_DIFF_RE = re.compile(r"[0-9]+")
+_PENDING_INT_RE = re.compile(r"-?[0-9]+")  # CPAN DateTime's integer check
+# Kernel::System::DateTime passes these on to DateTime->new, which dies on them (they are
+# duration names, no constructor arguments)
+_PENDING_DURATION_KEYS = frozenset(
+    {"Years", "Months", "Weeks", "Days", "Hours", "Minutes", "Seconds"}
+)
+_UNTIL_TIME_MAX = 2**31 - 1  # ticket.until_time is a 32-bit INTEGER
+
+
+def _pending_time(raw: Any, *, now: datetime | None = None) -> datetime | None:
+    """``Ticket->PendingTime`` of TicketCreate / TicketUpdate as the until time (UTC).
+
+    Validation is Znuny ``Common.pm`` ``ValidatePendingTime`` (after the operations trim
+    every value): ``{Diff}`` alone with digits only, or ``{Year, Month, Day[, Hour, Minute]}``
+    without an empty or negative value that ``Kernel::System::DateTime`` accepts; ``Diff``
+    together with any other key is invalid. Raises :class:`InvalidPendingTime`. ``None`` when
+    no PendingTime was given (Perl-false) or ``Diff`` is 0 (``TicketPendingTimeSet`` then sets
+    nothing).
+
+    Deviation: a value Znuny validates but whose result does not fit ``until_time`` (a 32-bit
+    epoch) or a Python date (years 1-9999) is invalid too; Znuny fails later in the database.
+    """
+    if not perl_truthy(raw):
         return None
-    if raw.get("Diff") is not None:
-        try:
-            return datetime.now(tz=UTC) + timedelta(minutes=int(raw["Diff"]))
-        except (ValueError, TypeError):
+    if not isinstance(raw, dict) or not raw:
+        raise InvalidPendingTime
+    values = {k: (v.strip() if isinstance(v, str) else v) for k, v in raw.items()}
+    now = now or datetime.now(tz=UTC)
+    if len(values) == 1 and values.get("Diff") is not None:
+        diff = values["Diff"]
+        if not perl_is_string(diff) or not _PENDING_DIFF_RE.fullmatch(perl_str(diff)):
+            raise InvalidPendingTime
+        minutes = int(perl_str(diff))
+        if minutes == 0:
             return None
-    try:
-        return datetime(
-            int(raw.get("Year", 0)),
-            int(raw.get("Month", 0)),
-            int(raw.get("Day", 0)),
-            int(raw.get("Hour", 0)),
-            int(raw.get("Minute", 0)),
-            tzinfo=UTC,
-        )
-    except (ValueError, TypeError):
-        return None
+        try:
+            moment = now + timedelta(minutes=minutes)
+        except OverflowError as exc:
+            raise InvalidPendingTime from exc
+    elif values.get("Diff") is not None:
+        raise InvalidPendingTime  # Diff together with any other option is forbidden
+    else:
+        for value in values.values():
+            if not perl_is_string(value) or perl_str(value) == "" or perl_int(value) < 0:
+                raise InvalidPendingTime
+        if _PENDING_DURATION_KEYS & values.keys():
+            raise InvalidPendingTime
+        parts: list[int] = []
+        for key, required in (
+            ("Year", True),
+            ("Month", True),
+            ("Day", True),
+            ("Hour", False),
+            ("Minute", False),
+        ):
+            value = values.get(key)
+            if value is None:
+                if required:
+                    raise InvalidPendingTime  # "Missing parameter Year." (DateTime.pm)
+                parts.append(0)
+                continue
+            text_value = perl_str(value)
+            if not _PENDING_INT_RE.fullmatch(text_value) or (required and int(text_value) == 0):
+                raise InvalidPendingTime
+            parts.append(int(text_value))
+        try:
+            moment = datetime(parts[0], parts[1], parts[2], parts[3], parts[4], tzinfo=UTC)
+        except (ValueError, OverflowError) as exc:
+            raise InvalidPendingTime from exc
+    if moment.timestamp() > _UNTIL_TIME_MAX:
+        raise InvalidPendingTime
+    return moment
 
 
 async def _state_ids_for_type(session: AsyncSession, type_name: str) -> list[int]:
@@ -1198,7 +1256,11 @@ async def op_ticket_create(
     type_id = await _resolve_type_id(session, ticket.get("Type"), ticket.get("TypeID"))
     service_id = await _resolve_service_id(session, ticket.get("Service"), ticket.get("ServiceID"))
     sla_id = await _resolve_sla_id(session, ticket.get("SLA"), ticket.get("SLAID"))
-    pending_time = _parse_pending_time(ticket.get("PendingTime"))
+    try:
+        pending_time = _pending_time(ticket.get("PendingTime"))
+    except InvalidPendingTime:
+        # TicketCreate.pm:833-838 (ValidatePendingTime)
+        return _err(f"{op}.InvalidParameter", f"{op}: Ticket->PendingTime parameter is invalid!")
 
     if is_customer:
         # Ownership-scoped create: force customer identity; never agent queue-group ACL.
@@ -1654,6 +1716,11 @@ async def op_ticket_update(
         return _err(f"{op}.AccessDenied", f"{op}: No permission to update ticket!")
 
     # Everything is validated before the first write (Run + _CheckArticle + _CheckDynamicField).
+    try:
+        pending_time = _pending_time(ticket.get("PendingTime"))
+    except InvalidPendingTime:
+        # TicketUpdate.pm:818-824 (ValidatePendingTime)
+        return _err(f"{op}.InvalidParameter", f"{op}: Ticket->PendingTime parameter is invalid!")
     articles = await parse_gi_articles(
         art_data,
         op=op,
@@ -1701,7 +1768,6 @@ async def op_ticket_update(
             new_state_id = await _resolve_state_id(
                 session, ticket.get("State"), ticket.get("StateID")
             )
-            pending_time = _parse_pending_time(ticket.get("PendingTime"))
             if new_state_id is not None:
                 await change_state(
                     session,
@@ -2636,6 +2702,10 @@ async def op_ticket_search(
         limit = min(int(limit_raw), 2000)
     except (ValueError, TypeError):
         limit = 500
+    if limit < 0:
+        # Znuny writes "LIMIT -5" into the SQL, the database refuses it and TicketSearch
+        # returns nothing
+        return {}
 
     joins_sql = " ".join(joins)
     where_sql = " AND ".join(conditions) if conditions else "1=1"

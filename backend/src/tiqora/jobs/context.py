@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from typing import Literal
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -25,6 +26,9 @@ class JobFailed(Exception):
     def __init__(self, message: str) -> None:
         super().__init__(message)
         self.message = message
+
+
+InterruptReason = Literal["restart", "timeout"]
 
 
 class JobRetry(Exception):
@@ -51,6 +55,7 @@ class JobContext:
         attempt: int = 1,
         max_attempts: int = 1,
         worker_id: str | None = None,
+        interrupted_by: InterruptReason | None = None,
     ) -> None:
         self.job_id = job_id
         self.kind = kind
@@ -60,6 +65,8 @@ class JobContext:
         self.attempt = attempt  # 1 for the first claim, 2 for the first retry, ...
         self.max_attempts = max_attempts
         self.worker_id = worker_id
+        # set for the on_interrupted hook: what ended the run
+        self.interrupted_by = interrupted_by
         self._last_progress_write: float | None = None
 
     @property

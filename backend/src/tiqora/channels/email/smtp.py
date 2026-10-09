@@ -8,7 +8,7 @@ protocol so tests can inject a capturing fake.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from email import policy as email_policy
 from email.message import EmailMessage
 from email.utils import formatdate, getaddresses, make_msgid
@@ -91,6 +91,39 @@ def is_permanent_smtp_failure(exc: BaseException) -> bool:
     """
     codes = smtp_reply_codes(exc)
     return bool(codes) and all(500 <= code < 600 for code in codes)
+
+
+class HookedMailSender:
+    """A :class:`MailSender` that awaits ``before_send()`` right before every send and
+    ``after_send(message)`` right after every successful one (e.g. a job checkpoint)."""
+
+    def __init__(
+        self,
+        inner: MailSender,
+        *,
+        before_send: Callable[[], Awaitable[None]] | None = None,
+        after_send: Callable[[EmailMessage], Awaitable[None]] | None = None,
+    ) -> None:
+        self._inner = inner
+        self._before_send = before_send
+        self._after_send = after_send
+
+    @property
+    def last_smtp_code(self) -> int | None:
+        code = getattr(self._inner, "last_smtp_code", None)
+        return code if isinstance(code, int) else None
+
+    @property
+    def last_smtp_detail(self) -> str | None:
+        detail = getattr(self._inner, "last_smtp_detail", None)
+        return str(detail) if detail else None
+
+    async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None:
+        if self._before_send is not None:
+            await self._before_send()
+        await self._inner.send(message, envelope_from=envelope_from)
+        if self._after_send is not None:
+            await self._after_send(message)
 
 
 class SmtpMailSender:

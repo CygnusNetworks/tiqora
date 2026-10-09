@@ -29,15 +29,22 @@ Delivery follows ``Kernel/System/MailQueue.pm`` with its default settings:
   is stored (payload), like Znuny. The auto response article is only stored after a
   successful send, so a failure leaves no article and no loop-protection row behind, only a
   ``failed`` mail-log row for the ticket; temporary errors are retried like any mail. A mail
-  that went out but could not be stored afterwards is never sent again.
-* Interruption (worker restart or crash): the handler sets the job's checkpoint ``sending``
-  right before SMTP. A job interrupted before it goes back into the queue and is sent later;
-  one interrupted after it is never sent again (it may or may not have reached the relay)
-  and is recorded as failed like a final send error (:func:`on_gi_mail_interrupted`).
+  that went out but could not be stored afterwards is never sent again: the job fails with
+  :data:`FAILED_AFTER_SEND_MESSAGE`, a ``sent`` mail-log row carries the error and the loop
+  protection still counts it.
+* Interruption (worker restart or crash, or the job timeout): the handler sets the job's
+  checkpoint ``sending`` right before SMTP starts (after the sender was built). A job
+  interrupted before it goes back into the queue and is sent later; one interrupted after it
+  is never sent again (it may or may not have reached the relay) and is recorded as failed
+  like a final send error (:func:`on_gi_mail_interrupted`, with a restart or a timeout text).
+  A worker that dies after committing the ``sent`` row but before finishing the job leaves
+  that row plus a transmission error behind - the mail is not sent twice, which is the side
+  to err on.
 """
 
 from __future__ import annotations
 
+from email.message import EmailMessage
 from typing import Any, Literal
 
 import structlog
@@ -60,6 +67,9 @@ FAILED_AFTER_SEND_MESSAGE = (
 )
 INTERRUPTED_SEND_ERROR = (
     "Sending was interrupted by a restart of the worker; the mail may not have been delivered."
+)
+TIMEOUT_SEND_ERROR = (
+    "Sending did not finish within the job's time limit; the mail may not have been delivered."
 )
 
 
@@ -101,13 +111,15 @@ class _Progress:
         self._ctx = ctx
         self.sending = False
         self.sent = False
+        self.message: EmailMessage | None = None
 
     async def checkpoint(self) -> None:
         await self._ctx.checkpoint(CHECKPOINT_SENDING)
         self.sending = True
 
-    async def mark_sent(self) -> None:
+    async def mark_sent(self, message: EmailMessage | None = None) -> None:
         self.sent = True
+        self.message = message
 
 
 async def _article_send(
@@ -131,9 +143,15 @@ async def _article_send(
             notes.append(_retry_note(ctx, exc))
             return notes[-1]
 
-        await progress.checkpoint()
         try:
-            await dispatch_pending_agent_email(session, sysconfig, pending, retry_note=retry_note)
+            # the checkpoint is set right before SMTP starts (after the sender was built)
+            await dispatch_pending_agent_email(
+                session,
+                sysconfig,
+                pending,
+                retry_note=retry_note,
+                before_send=progress.checkpoint,
+            )
         except Exception as exc:
             if not notes:  # failed before a send was tried and logged: run_gi_mail records it
                 raise
@@ -207,7 +225,10 @@ async def _auto_response(
             await session.rollback()
             if isinstance(exc, JobCancelled):  # the checkpoint found the job taken away
                 raise
-            # sent, but storing the auto response failed: never send it twice
+            if progress.sent:
+                # sent, but storing the auto response failed: never send it twice, say so
+                await _record_sent_unstored(ctx, payload, progress, exc)
+                raise JobFailed(FAILED_AFTER_SEND_MESSAGE) from exc
             temporary = (
                 not progress.sent and not ctx.last_attempt and not is_permanent_smtp_failure(exc)
             )
@@ -219,13 +240,12 @@ async def _auto_response(
                 retry=temporary,
                 error=str(exc),
             )
-            if not progress.sent:
-                note = _retry_note(ctx, exc) if temporary else None
-                await _record_lost_mail(
-                    ctx,
-                    payload,
-                    f"Sending failed: {exc}" + (f" ({note})" if note else ""),
-                )
+            note = _retry_note(ctx, exc) if temporary else None
+            await _record_lost_mail(
+                ctx,
+                payload,
+                f"Sending failed: {exc}" + (f" ({note})" if note else ""),
+            )
             if temporary:
                 raise _retry(ctx, failed_message) from exc
             raise JobFailed(failed_message) from exc
@@ -253,6 +273,7 @@ async def run_gi_mail(ctx: JobContext, payload: GiMailPayload) -> dict[str, Any]
         )
         message = "Die E-Mail konnte nicht gesendet werden. Details stehen im Mail-Protokoll."
         if progress.sent:  # the mail is out; only the bookkeeping after it failed
+            await _record_sent_unstored(ctx, payload, progress, exc)
             raise JobFailed(FAILED_AFTER_SEND_MESSAGE) from exc
         if not progress.sending and not ctx.last_attempt:
             raise _retry(ctx, message) from exc
@@ -263,7 +284,77 @@ async def run_gi_mail(ctx: JobContext, payload: GiMailPayload) -> dict[str, Any]
 async def on_gi_mail_interrupted(ctx: JobContext, payload: GiMailPayload) -> None:
     """Record a mail whose job was interrupted for good (after its checkpoint, out of
     attempts, or cut off by the job timeout): never lost silently."""
-    await _record_lost_mail(ctx, payload, INTERRUPTED_SEND_ERROR)
+    reason = TIMEOUT_SEND_ERROR if ctx.interrupted_by == "timeout" else INTERRUPTED_SEND_ERROR
+    await _record_lost_mail(ctx, payload, reason)
+
+
+async def _record_sent_unstored(
+    ctx: JobContext, payload: GiMailPayload, progress: _Progress, exc: BaseException
+) -> None:
+    """The mail went out, but what the job writes afterwards was rolled back: log the send
+    (``sent`` row, with the error) and, for an auto response, keep its loop protection
+    (``ticket_loop_protection`` counts every auto response that left)."""
+    from email.utils import getaddresses
+
+    from tiqora.channels.email import loop_protection
+    from tiqora.domain.mail_log import write_mail_log
+
+    logger.error(
+        "gi_mail_sent_but_not_stored",
+        kind=payload.kind,
+        ticket_id=payload.ticket_id,
+        article_id=payload.article_id,
+        error=str(exc),
+    )
+    try:
+        async with ctx.session_factory() as session:
+            message = progress.message
+            if payload.kind == "auto_response" and message is not None:
+                to_line = str(message.get("To", ""))
+                await write_mail_log(
+                    session,
+                    direction="out",
+                    status="sent",
+                    from_addr=str(message.get("From", "")),
+                    to_addr=to_line,
+                    subject=str(message.get("Subject", "")),
+                    message_id=str(message.get("Message-ID", "")) or None,
+                    ticket_id=payload.ticket_id,
+                    detail=(
+                        f"auto-response ({payload.auto_response_type}) sent; storing its"
+                        f" article failed: {exc}"
+                    ),
+                )
+                for _name, addr in getaddresses([to_line]):
+                    if addr:
+                        await loop_protection.record(session, to=addr)
+            else:
+                row = (
+                    await session.execute(
+                        text(
+                            "SELECT a_from, a_to, a_cc, a_subject, a_message_id"
+                            " FROM article_data_mime WHERE article_id = :aid"
+                        ),
+                        {"aid": payload.article_id},
+                    )
+                ).first()
+                from_addr, to_addr, cc_addr, subject, message_id = row or ("", "", None, "", None)
+                await write_mail_log(
+                    session,
+                    direction="out",
+                    status="sent",
+                    from_addr=str(from_addr or ""),
+                    to_addr=str(to_addr or ""),
+                    cc_addr=cc_addr or None,
+                    subject=str(subject or ""),
+                    message_id=message_id or None,
+                    ticket_id=payload.ticket_id,
+                    article_id=payload.article_id,
+                    detail=f"sent; recording it failed afterwards: {exc}",
+                )
+            await session.commit()
+    except Exception:  # noqa: BLE001 — the job fails either way; the log has the error
+        logger.exception("gi_mail_sent_record_failed", ticket_id=payload.ticket_id)
 
 
 async def _record_lost_mail(ctx: JobContext, payload: GiMailPayload, reason: str) -> None:

@@ -23,17 +23,23 @@ import json
 import os
 import socket
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import ColumnElement, func, or_, select, update
+from sqlalchemy import ColumnElement, case, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import Settings
 from tiqora.db.tiqora.models import TiqoraJob
 from tiqora.extensions import Registry
-from tiqora.jobs.context import JobCancelled, JobContext, JobFailed, JobRetry
+from tiqora.jobs.context import (
+    InterruptReason,
+    JobCancelled,
+    JobContext,
+    JobFailed,
+    JobRetry,
+)
 from tiqora.jobs.registry import DEFAULT_LANE, JOB_HANDLERS, lane_slots
 from tiqora.jobs.service import MAX_RESULT_CHARS, purge_finished_jobs, utc_now
 from tiqora.jobs.settings import JOBS_SECTION, JobsSettings
@@ -59,6 +65,21 @@ UNKNOWN_KIND_MESSAGE = "Diese Aufgabe kennt der Hintergrunddienst nicht (mehr)."
 RESULT_TOO_LARGE_MESSAGE = "Das Ergebnis ist zu groß."
 
 _SHUTDOWN_GRACE_SECONDS = 20
+
+
+def _requeue_values(*, due_at: datetime | None) -> dict[str, Any]:
+    """Column values that put a claimed job back into the queue - or end it ``cancelled``
+    when a cancel was requested meanwhile (a requeued row with ``cancel_requested`` would
+    never be claimed again and stay ``queued`` forever)."""
+    cancel = TiqoraJob.cancel_requested.is_(True)
+    return {
+        "status": case((cancel, "cancelled"), else_="queued"),
+        "worker_id": None,
+        "started_at": None,
+        "heartbeat_at": None,
+        "due_at": due_at,  # meaningless on a cancelled row
+        "finished_at": case((cancel, utc_now()), else_=None),
+    }
 
 
 class JobRunner:
@@ -130,8 +151,18 @@ class JobRunner:
                 ).all()
             )
 
-    async def _settle_interrupted(self, row: Any, *conditions: ColumnElement[bool]) -> bool:
-        """Requeue or fail one interrupted ``running`` job; True when its row changed."""
+    async def _settle_interrupted(
+        self,
+        row: Any,
+        *conditions: ColumnElement[bool],
+        interrupted_by: InterruptReason = "restart",
+    ) -> bool:
+        """Requeue or fail one interrupted ``running`` job; True when its row changed.
+
+        ``interrupted_by`` is ``"restart"`` (shutdown, reaper) or ``"timeout"`` (the runner
+        cut the handler off); it picks the error text and is handed to ``on_interrupted``. A
+        requeue of a job whose cancel was requested ends it ``cancelled`` instead.
+        """
         job_id, kind, payload, created_by, attempts, checkpoint = row
         handler = self._registry.get(JOB_HANDLERS, kind)
         claim = (
@@ -150,33 +181,42 @@ class JobRunner:
                 result = await session.execute(
                     update(TiqoraJob)
                     .where(*claim, TiqoraJob.checkpoint.is_(None))
-                    .values(
-                        status="queued",
-                        worker_id=None,
-                        started_at=None,
-                        heartbeat_at=None,
-                        due_at=None,
-                    )
+                    .values(**_requeue_values(due_at=None))
                 )
                 await session.commit()
             if result.rowcount == 1:  # type: ignore[attr-defined]
-                logger.warning("job_requeued_after_interrupt", job_id=job_id, kind=kind)
+                logger.warning(
+                    "job_requeued_after_interrupt",
+                    job_id=job_id,
+                    kind=kind,
+                    interrupted_by=interrupted_by,
+                )
                 return True
             # the handler reached its checkpoint meanwhile: fail it below
+        message = TIMEOUT_MESSAGE if interrupted_by == "timeout" else INTERRUPTED_MESSAGE
         async with self._factory() as session:
             result = await session.execute(
                 update(TiqoraJob)
                 .where(*claim)
-                .values(status="failed", error=INTERRUPTED_MESSAGE, finished_at=utc_now())
+                .values(status="failed", error=message, finished_at=utc_now())
             )
             await session.commit()
         if result.rowcount != 1:  # type: ignore[attr-defined]
-            return False
-        await self._call_on_interrupted(job_id, kind, payload, created_by, int(attempts))
+            return False  # settled elsewhere already: never recorded twice
+        await self._call_on_interrupted(
+            job_id, kind, payload, created_by, int(attempts), interrupted_by=interrupted_by
+        )
         return True
 
     async def _call_on_interrupted(
-        self, job_id: int, kind: str, payload: str, created_by: int | None, attempt: int
+        self,
+        job_id: int,
+        kind: str,
+        payload: str,
+        created_by: int | None,
+        attempt: int,
+        *,
+        interrupted_by: InterruptReason,
     ) -> None:
         """Run the handler's ``on_interrupted`` hook for a job that was just failed."""
         handler = self._registry.get(JOB_HANDLERS, kind)
@@ -192,6 +232,7 @@ class JobRunner:
                 session_factory=self._factory,
                 attempt=attempt,
                 max_attempts=handler.max_attempts,
+                interrupted_by=interrupted_by,
             )
             await handler.on_interrupted(ctx, parsed)
         except Exception:  # noqa: BLE001 — recording must never stop the runner
@@ -279,6 +320,10 @@ class JobRunner:
             rows = (await session.execute(stmt)).all()
         started = 0
         for job_id, kind, payload, created_by in rows:
+            if job_id in self._active:
+                # an older claim of this job still runs here (reaped, then requeued): let it
+                # end first, so the active set keeps one task per job
+                continue
             attempt = await self._claim(job_id)
             if attempt:
                 task = asyncio.create_task(
@@ -352,11 +397,12 @@ class JobRunner:
             )
             if status == "retry":
                 await self._requeue_for_retry(job_id, attempt, error, result)
+            elif status == "timeout":
+                # the runner cut the handler off: settled like an interruption (requeue before
+                # the checkpoint when the handler allows it, else failed + on_interrupted)
+                await self._settle_timeout(job_id, kind, payload, created_by, attempt)
             else:
                 await self._finalize(job_id, status, error=error, result=result, attempt=attempt)
-                if error == TIMEOUT_MESSAGE:
-                    # the runner cut the handler off like an interruption
-                    await self._call_on_interrupted(job_id, kind, payload, created_by, attempt)
         finally:
             heartbeat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -412,7 +458,24 @@ class JobRunner:
             return await asyncio.wait_for(guarded(), timeout=handler.timeout_seconds)
         except TimeoutError:
             logger.warning("job_timeout", job_id=job_id, kind=kind)
-            return "failed", TIMEOUT_MESSAGE, None
+            return "timeout", TIMEOUT_MESSAGE, None
+
+    async def _settle_timeout(
+        self, job_id: int, kind: str, payload: str, created_by: int | None, attempt: int
+    ) -> None:
+        try:
+            async with self._factory() as session:
+                checkpoint = (
+                    await session.execute(
+                        select(TiqoraJob.checkpoint).where(*self._own_claim(job_id, attempt))
+                    )
+                ).scalar_one_or_none()
+            row = (job_id, kind, payload, created_by, attempt, checkpoint)
+            await self._settle_interrupted(
+                row, TiqoraJob.worker_id == self.worker_id, interrupted_by="timeout"
+            )
+        except Exception:  # noqa: BLE001 — the reaper settles the row later
+            logger.exception("job_timeout_settle_failed", job_id=job_id)
 
     async def _requeue_for_retry(
         self, job_id: int, attempt: int, message: str | None, delay: str | None
@@ -424,12 +487,8 @@ class JobRunner:
                     update(TiqoraJob)
                     .where(*self._own_claim(job_id, attempt))
                     .values(
-                        status="queued",
-                        worker_id=None,
-                        started_at=None,
-                        heartbeat_at=None,
+                        **_requeue_values(due_at=due),
                         checkpoint=None,
-                        due_at=due,
                         progress_message=message[:500] if message else None,
                     )
                 )

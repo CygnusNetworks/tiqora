@@ -24,7 +24,7 @@ import re
 import secrets
 import socket
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, replace
 from email.message import EmailMessage
 from typing import TYPE_CHECKING, Any
@@ -832,6 +832,7 @@ async def dispatch_pending_agent_email(
     pending: PendingAgentEmail,
     *,
     retry_note: Callable[[BaseException], str | None] | None = None,
+    before_send: Callable[[], Awaitable[None]] | None = None,
 ) -> None:
     """Send a stored agent email (after the commit) and record the outcome.
 
@@ -843,7 +844,8 @@ async def dispatch_pending_agent_email(
     ``retry_note`` (the GI mail worker) decides per failure: a text when the mail will be
     tried again - the log row's detail then carries it and no transmission error is
     recorded (Znuny's ``MailQueue`` only sets it for a final failure) - or ``None`` when
-    the failure is final.
+    the failure is final. ``before_send`` is awaited right before SMTP starts (after the
+    sender was built); an exception from it propagates unrecorded.
     """
     from tiqora.domain import mail_outbound
 
@@ -870,14 +872,8 @@ async def dispatch_pending_agent_email(
         await write_mail_log(session, status="queued", detail="smtp_disabled", **common)
         return
     t0 = time.perf_counter()
-    try:
-        sender = await mail_outbound.build_outbound_sender(
-            session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
-        )
-        await send_prepared_agent_email(
-            sender, prepared, extra_headers=pending.extra_headers, message=pending.message
-        )
-    except Exception as exc:  # OutboundMailError, or the sender could not even be built
+
+    async def failed(exc: Exception) -> None:
         note = retry_note(exc) if retry_note is not None else None
         await write_mail_log(
             session,
@@ -886,14 +882,29 @@ async def dispatch_pending_agent_email(
             duration_ms=int((time.perf_counter() - t0) * 1000),
             **common,
         )
-        if note is not None:
-            raise
-        await record_transmission_error(
-            session,
-            article_id=pending.article_id,
-            message_id=prepared.message_id,
-            message=str(exc),
+        if note is None:
+            await record_transmission_error(
+                session,
+                article_id=pending.article_id,
+                message_id=prepared.message_id,
+                message=str(exc),
+            )
+
+    try:
+        sender = await mail_outbound.build_outbound_sender(
+            session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
         )
+    except Exception as exc:  # the sender could not even be built
+        await failed(exc)
+        raise
+    if before_send is not None:
+        await before_send()  # not a send failure when it raises: the mail was not tried
+    try:
+        await send_prepared_agent_email(
+            sender, prepared, extra_headers=pending.extra_headers, message=pending.message
+        )
+    except Exception as exc:  # OutboundMailError
+        await failed(exc)
         raise
     smtp_code = getattr(sender, "last_smtp_code", None)
     smtp_detail = getattr(sender, "last_smtp_detail", None)

@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
-from tiqora.api.compat.search_filters import create_time_settings, time_filters
+from tiqora.api.compat.search_filters import (
+    clamped_minutes_before,
+    create_time_settings,
+    time_filters,
+)
 
 NOW = datetime(2026, 3, 10, 12, 0, 0)
 
@@ -229,29 +233,32 @@ def test_sanitize_id_filters_no_match_unless_names_can_still_match() -> None:
 
 
 def test_huge_minutes_saturate_like_znuny_datetime() -> None:
-    """Minutes "1e300": Znuny's CPAN DateTime saturates to a far-past date (no error); the
-    direct comparisons get the earliest / latest date instead of an OverflowError."""
+    """Minutes beyond the date range: Znuny's CPAN DateTime (1.52) does not fail. A huge
+    positive value gives a far-past date, a negative one a far-future date (5+ digit years),
+    a far-past one once the seconds wrap a signed 64-bit integer, and once they pass an
+    unsigned one ("-1e300") the start of today minus one second."""
+    data = {
+        "TicketCreateTimeOlderMinutes": "1e300",
+        "TicketCreateTimeNewerMinutes": "-1e12",
+        "TicketEscalationTimeOlderMinutes": "1e300",
+        "ArticleCreateTimeOlderMinutes": "-2e17",
+    }
     conditions: list[str] = []
     params: dict[str, Any] = {}
-    assert time_filters(
-        {
-            "TicketCreateTimeOlderMinutes": "1e300",
-            "TicketCreateTimeNewerMinutes": "-1e300",
-            "TicketEscalationTimeOlderMinutes": "1e300",
-        },
-        conditions,
-        params,
-        [],
-        now=NOW,
-    )
+    assert time_filters(data, conditions, params, [], now=NOW)
     assert params["tw1"] == datetime.min
     assert params["tw2"] == datetime.max.replace(microsecond=0)
     assert params["tw3"] == -(2**31)  # the epoch column is a 32-bit INTEGER
+    assert clamped_minutes_before(NOW, "-2e17") == datetime.min
+    # Perl: subtract(minutes => "-1e300") at 2026-03-10 12:00:00 -> 2026-03-09 23:59:59
+    for value in ("-1e300", "-1e18", "-3.0745e17"):
+        assert clamped_minutes_before(NOW, value) == datetime(2026, 3, 9, 23, 59, 59), value
+    assert clamped_minutes_before(NOW, "-3.07e17") == datetime.min  # still wraps far past
 
 
-def test_huge_minutes_in_history_families_give_no_result() -> None:
-    # Znuny formats the saturated date ("-292277022601-11-04 ...") and refuses it with
-    # "Invalid time format" -> TicketSearch returns nothing
+def test_huge_minutes_in_history_families_follow_perl() -> None:
+    # Znuny formats an out-of-range date ("-292277022601-11-04 ..." or a 5-digit year) and
+    # refuses it with "Invalid time format" -> TicketSearch returns nothing
     for key in (
         "TicketChangeTimeOlderMinutes",
         "TicketLastChangeTimeNewerMinutes",
@@ -259,3 +266,10 @@ def test_huge_minutes_in_history_families_give_no_result() -> None:
         "TicketPendingTimeNewerMinutes",
     ):
         assert time_filters({key: "1e300"}, [], {}, [], now=NOW) is False, key
+        assert time_filters({key: "-1e12"}, [], {}, [], now=NOW) is False, key
+    # "-1e300" collapses to a normal date: the search runs with it
+    params: dict[str, Any] = {}
+    assert time_filters({"TicketPendingTimeNewerMinutes": "-1e300"}, [], params, [], now=NOW)
+    assert list(params.values()) == [int(datetime(2026, 3, 9, 23, 59, 59, tzinfo=UTC).timestamp())]
+    # years below 1000 keep Perl's zero-padded 4-digit format and stay valid
+    assert time_filters({"TicketLastChangeTimeOlderMinutes": 10**9}, [], {}, [], now=NOW)

@@ -352,7 +352,8 @@ async def test_invalid_date_returns_empty_object(sync_url: str) -> None:
 
 async def test_huge_exponent_minutes_never_fail(sync_url: str) -> None:
     """Minutes "1e300" used to raise OverflowError (HTTP 500). Znuny's DateTime saturates to a
-    far-past date: "older than" matches nothing, "newer than" what any huge value matches."""
+    far-past date: "older than" matches nothing, "newer than" what any huge value matches;
+    a huge negative value collapses to the start of today minus one second."""
     far = 10**9  # about 1900 years: representable, older than every ticket
     for family in ("TicketCreateTime", "ArticleCreateTime"):
         assert await _ids(sync_url, {f"{family}OlderMinutes": "1e300"}) == []
@@ -361,7 +362,20 @@ async def test_huge_exponent_minutes_never_fail(sync_url: str) -> None:
         )
     assert await _ids(sync_url, {"TicketEscalationTimeNewerMinutes": "1e300"}) == [T_C]
     assert await _search(sync_url, {"TicketChangeTimeOlderMinutes": "1e300"}) == {}
-    assert await _search(sync_url, {"TicketPendingTimeNewerMinutes": "-1e300"}) == {}
+    assert await _search(sync_url, {"TicketChangeTimeNewerMinutes": "-1e12"}) == {}
+    # Perl: "-1e300" minutes collapse to the start of today minus one second (UTC)
+    start = datetime.now(tz=UTC).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+    bound = (start - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
+    assert await _ids(sync_url, {"TicketPendingTimeNewerMinutes": "-1e300"}) == await _ids(
+        sync_url, {"TicketPendingTimeNewerDate": bound}
+    )
+
+
+async def test_negative_limit_gives_an_empty_result(sync_url: str) -> None:
+    # Znuny: "LIMIT -5" is refused by the database -> TicketSearch returns nothing (was a 500)
+    assert await _search(sync_url, {"Limit": "-5"}) == {}
+    assert await _search(sync_url, {"Limit": -1}) == {}
+    assert await _ids(sync_url, {"Limit": "1"}) != []
 
 
 async def test_ticket_id_filter(sync_url: str) -> None:

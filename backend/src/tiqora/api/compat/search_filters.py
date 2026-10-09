@@ -178,27 +178,49 @@ _FAR_PAST = datetime.min  # noqa: DTZ901 - naive UTC like every bound here
 _FAR_FUTURE = datetime.max.replace(microsecond=0)  # noqa: DTZ901
 
 
-def minutes_before(now: datetime, minutes: Any) -> datetime | None:
-    """``now`` minus ``minutes`` (Perl-numified), like Znuny's ``DateTime->Subtract``.
+# CPAN DateTime keeps the seconds of a duration in a Perl integer: past 2**63 they wrap, past
+# 2**64 (unsigned) they collapse to -1
+_IV_MAX = 2**63 - 1
+_UV_LIMIT = 2**64
 
-    ``None`` when the result lies outside the dates Python can represent ("1e300"): Znuny's
-    CPAN DateTime does not fail there but saturates to a date like
-    ``-292277022601-11-04``; see :func:`clamped_minutes_before`.
+
+def minutes_before(now: datetime, minutes: Any) -> datetime | None:
+    """``now`` minus ``minutes`` (Perl-numified), as Znuny's ``DateTime->Subtract`` computes it.
+
+    Exact while the result is a date of the years 1-9999. Beyond that, CPAN DateTime (1.52)
+    does not fail; it produces dates outside the ``YYYY-`` format:
+
+    * a huge positive value: a far-past date (negative years, e.g. ``-292277022601-11-04``);
+    * a negative value: a far-future date (5+ digit years) while ``-minutes * 60`` fits a
+      signed 64-bit integer, a far-past one while it fits an unsigned one, and beyond that
+      (``"-1e300"``) the seconds collapse to -1: the start of today minus one second, a
+      normal date.
+
+    Returns that "start of today minus one second" date, or ``None`` for the far-past /
+    far-future results (see :func:`clamped_minutes_before`).
     """
+    number = perl_int(minutes)
     try:
-        return now - timedelta(minutes=perl_int(minutes))
+        return now - timedelta(minutes=number)
     except OverflowError:
-        return None
+        pass
+    if number < 0 and -number * 60 >= _UV_LIMIT:
+        return now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(seconds=1)
+    return None
 
 
 def clamped_minutes_before(now: datetime, minutes: Any) -> datetime:
-    """:func:`minutes_before`, saturated like Znuny: far past for a huge positive value,
-    far future for a huge negative one (``create_time <= far past`` matches nothing,
-    ``>= far past`` everything - the same rows Znuny's saturated date selects)."""
+    """:func:`minutes_before` for direct comparisons: Perl's far-past result becomes the
+    earliest date, its far-future result the latest (``create_time <= far past`` matches
+    nothing, ``>= far past`` everything). Znuny puts its out-of-range date string into the SQL
+    as it is, so what it selects there depends on the database."""
     moment = minutes_before(now, minutes)
     if moment is not None:
         return moment
-    return _FAR_PAST if perl_int(minutes) > 0 else _FAR_FUTURE
+    number = perl_int(minutes)
+    if number > 0 or -number * 60 > _IV_MAX:
+        return _FAR_PAST
+    return _FAR_FUTURE
 
 
 _CLOSE_HISTORY = (
@@ -301,10 +323,11 @@ def time_filters(
             if minutes is not None:
                 bound_moment = minutes_before(now, minutes)
                 if bound_moment is None:
-                    # Znuny formats the saturated date ("-292277022601-...") and refuses it:
-                    # "Invalid time format" -> TicketSearch returns nothing
+                    # Znuny formats the out-of-range date ("-292277022601-..." or a 5-digit
+                    # year) and refuses it: "Invalid time format" -> TicketSearch returns nothing
                     return False
-                dates[bound] = bound_moment.strftime("%Y-%m-%d %H:%M:%S")
+                # zero-padded year like Perl's ymd (strftime's %Y does not pad on every libc)
+                dates[bound] = bound_moment.isoformat(sep=" ", timespec="seconds")
             else:
                 dates[bound] = _scalar(data, f"{prefix}{bound}Date")
 

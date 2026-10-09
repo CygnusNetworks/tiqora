@@ -351,7 +351,10 @@ def _soap_response(content: bytes, version: str, status_code: int) -> Response:
 
 
 async def _read_body_capped(request: Request, max_length: int) -> bytes | None:
-    """The request body, or ``None`` as soon as more than ``max_length`` bytes arrived."""
+    """The request body, or ``None`` as soon as more than ``max_length`` bytes arrived.
+
+    Consumes the request stream: ``request.body()`` cannot be called afterwards.
+    """
     chunks: list[bytes] = []
     received = 0
     async for chunk in request.stream():
@@ -359,9 +362,9 @@ async def _read_body_capped(request: Request, max_length: int) -> bytes | None:
         if received > max_length:
             return None
         chunks.append(chunk)
-    body = b"".join(chunks)
-    request._body = body  # Starlette's cache: a later request.body() returns it again
-    return body
+    # Starlette has no public way to hand a streamed body back to ``request.body()``; the
+    # SOAP handler passes these bytes on itself, and nothing after it reads the request body
+    return b"".join(chunks)
 
 
 async def _handle_soap_request(

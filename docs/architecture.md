@@ -606,8 +606,12 @@ Interruptions: a handler with `requeue_if_interrupted=True` calls
 `ctx.checkpoint("...")` right before an irreversible step (SMTP); a job
 interrupted by shutdown (grace 20 s) or reaped before its checkpoint is put
 back into the queue (while `attempts < max_attempts`), one interrupted after it
-fails and the handler's `on_interrupted` hook records the failure (also called
-after a timeout). `checkpoint()`, retry and finalize are conditional on the
+fails and the handler's `on_interrupted` hook records the failure. A timeout
+is settled the same way (requeue before the checkpoint, else failed with the
+timeout text; `ctx.interrupted_by` tells the hook `"restart"` or `"timeout"`),
+and the hook runs only when this settlement changed the row. A requeue or retry
+of a job whose cancel was requested ends it `cancelled`. A runner never claims
+a job again while an older claim of it still runs in that runner. `checkpoint()`, retry and finalize are conditional on the
 claim (`worker_id` + `attempts`), so a reaped and requeued job is never
 overwritten by its old claim, and the old claim stops at its checkpoint.
 Existing kinds use the defaults and behave as before.
