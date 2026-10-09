@@ -152,7 +152,7 @@ async def detect_followup(
             hook_divider = cfg.divider
     generator = await sysconfig.ticket_number_generator()
     system_id = await sysconfig.system_id()
-    check_system_id = bool(await sysconfig.get("Ticket::NumberGenerator::CheckSystemID", False))
+    check_system_id = await sysconfig.get_bool("Ticket::NumberGenerator::CheckSystemID")
     min_counter_size = int(
         await sysconfig.get("Ticket::NumberGenerator::AutoIncrement::MinCounterSize", 5) or 5
     )

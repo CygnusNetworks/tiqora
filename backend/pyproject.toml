@@ -58,6 +58,8 @@ dependencies = [
     # AI attachment text extraction (tiqora.ai.attachments) — runs inside the
     # agent runtime/summary render path, must ship in the prod image.
     "pypdf>=5",
+    # GenericInterface XSLT mapping + XML::Simple port (tiqora.api.compat.mapping).
+    "lxml>=6.1.1",
     "python-docx>=1.1",
     "openpyxl>=3.1",
     "odfpy>=1.4",
@@ -67,6 +69,7 @@ dependencies = [
     "spacy>=3.8,<3.9",
     "de_core_news_sm @ https://github.com/explosion/spacy-models/releases/download/de_core_news_sm-3.8.0/de_core_news_sm-3.8.0-py3-none-any.whl",
     "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+    "regex>=2024.11.6",
 ]
 
 [project.optional-dependencies]
@@ -171,6 +174,10 @@ module = [
     "psutil.*",
     "saml2",
     "saml2.*",
+    "lxml",
+    "lxml.*",
+    "regex",
+    "regex.*",
 ]
 ignore_missing_imports = true
 

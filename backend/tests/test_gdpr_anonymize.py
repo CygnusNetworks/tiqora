@@ -161,6 +161,15 @@ async def test_anonymize_customer_force_parallel_scrubs_pii(mariadb_znuny_url: s
     async with factory() as session:
         await _seed_tiqora_tables(session)
         await _insert_customer(session, login=login, customer_id="ANON-GDPR2")
+        for key, val in (("UserID", login), ("UserType", "Customer"), ("UserEmail", login)):
+            await session.execute(
+                text(
+                    "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
+                    " VALUES ('GI8960CLI', :k, :v, 0)"
+                ),
+                {"k": key, "v": val},
+            )
+        await session.commit()
 
     result = await anonymize_customer(
         factory,
@@ -173,6 +182,12 @@ async def test_anonymize_customer_force_parallel_scrubs_pii(mariadb_znuny_url: s
     assert result.customer_users == 1
 
     async with factory() as session:
+        left = (
+            await session.execute(
+                text("SELECT COUNT(*) FROM sessions WHERE session_id = 'GI8960CLI'")
+            )
+        ).scalar_one()
+        assert int(left) == 0
         row = (
             await session.execute(
                 text(

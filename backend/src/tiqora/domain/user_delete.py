@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.znuny.sessions import delete_agent_sessions
+
 # Rows that exist only because the agent does: deleting the account should
 # take them with it rather than refuse. Order matters — children first.
 OWNED: tuple[tuple[str, str], ...] = (
@@ -156,4 +158,6 @@ async def delete_user_rows(session: AsyncSession, user_id: int) -> None:
             f"DELETE FROM {_quote(dialect, table)} WHERE {_quote(dialect, column)} = :uid{kind}"
         )
         await session.execute(stmt, {"uid": user_id})
+    # The agent's Znuny/GI sessions carry their name and e-mail: they go with the account.
+    await delete_agent_sessions(session, user_id)
     await session.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": user_id})

@@ -3056,6 +3056,14 @@
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
+        },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         }
       },
       "takeoverBadge": "adquisición",
@@ -4797,10 +4805,13 @@
     "elapsed": "Elapsed: {{duration}}",
     "cancelRequested": "Cancelling…",
     "loadError": "The status of this task could not be loaded.",
+    "cancelFailed": "The task could not be cancelled.",
+    "progressLabel": "Progress",
     "kinds": {
       "core": {
         "ticket_export": "Ticket export"
-      }
+      },
+      "gi_mail": "Send email from a web service request"
     },
     "ticketExport": {
       "title": "Export tickets as CSV",

@@ -3611,6 +3611,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/reporting/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Backfill
+         * @description Queue the (re)build of the report data; a second request joins the pending job.
+         *
+         *     With ``restart`` the data counts as "not ready" again, unless a job is already
+         *     active: that job owns the state and is joined as it is.
+         */
+        post: operations["start_backfill_api_v1_admin_reporting_backfill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reporting/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reporting Status */
+        get: operations["get_reporting_status_api_v1_admin_reporting_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/roles": {
         parameters: {
             query?: never;
@@ -4310,7 +4350,8 @@ export interface paths {
         post?: never;
         /**
          * Deactivate User
-         * @description Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users.
+         * @description Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users. The
+         *     account's sessions (Znuny rows and Redis) end with it.
          */
         delete: operations["deactivate_user_api_v1_admin_users__user_id__delete"];
         options?: never;
@@ -8826,7 +8867,7 @@ export interface paths {
         put?: never;
         /**
          * Admin Reload Routes
-         * @description Re-mount dynamic webservice routes without restart (authenticated).
+         * @description Reload the webservice registry from ``gi_webservice_config`` (admin only).
          */
         post: operations["admin_reload_routes_znuny_compat_admin_reload_post"];
         delete?: never;
@@ -8846,15 +8887,7 @@ export interface paths {
         put?: never;
         /**
          * Canonical Soap Endpoint
-         * @description Canonical always-available SOAP provider endpoint.
-         *
-         *     Unlike REST, SOAP has no per-operation route mapping in Znuny — a single
-         *     endpoint per webservice accepts any operation, dispatched from the SOAP
-         *     Body wrapper element name. This fallback route uses the default Znuny
-         *     ``NameSpace`` (``http://www.otrs.org/TicketConnector/``); webservices
-         *     configured in ``gi_webservice_config`` with their own NameSpace are
-         *     additionally mounted at ``/Webservice/{name}`` and ``/WebserviceID/{id}``
-         *     (see :func:`_load_soap_webservices` / :func:`build_soap_router`).
+         * @description Canonical always-available SOAP provider endpoint (default NameSpace, no mapping).
          */
         post: operations["canonical_soap_endpoint_znuny_compat_soap__webservice__post"];
         delete?: never;
@@ -16139,6 +16172,56 @@ export interface components {
             subject: string;
             /** To Address */
             to_address?: string | null;
+        };
+        /** ReportBackfillIn */
+        ReportBackfillIn: {
+            /**
+             * Restart
+             * @default true
+             */
+            restart: boolean;
+            /** Since */
+            since?: string | null;
+            /**
+             * Snapshots
+             * @default true
+             */
+            snapshots: boolean;
+        };
+        /**
+         * ReportingStatusOut
+         * @description Admin view: the status plus the bookkeeping behind it.
+         */
+        ReportingStatusOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Backfill Job Id */
+            backfill_job_id: number | null;
+            /** Backfill Progress */
+            backfill_progress: number | null;
+            /**
+             * Backfill Status
+             * @enum {string}
+             */
+            backfill_status: "pending" | "running" | "done";
+            /** Dirty Count */
+            dirty_count: number;
+            /** Event Rows */
+            event_rows: number;
+            /** Fact Rows */
+            fact_rows: number;
+            /** Gap Count */
+            gap_count: number;
+            /** History Lag */
+            history_lag: number;
+            /** Last History Id */
+            last_history_id: number;
+            /** Last Snapshot Date */
+            last_snapshot_date: string | null;
+            /** Ready */
+            ready: boolean;
+            /** Snapshot Time Zone */
+            snapshot_time_zone: string | null;
         };
         /** ResolvedCustomerLink */
         ResolvedCustomerLink: {
@@ -28267,6 +28350,76 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_backfill_api_v1_admin_reporting_backfill_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportBackfillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reporting_status_api_v1_admin_reporting_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportingStatusOut"];
+                };
             };
             /** @description Validation Error */
             422: {

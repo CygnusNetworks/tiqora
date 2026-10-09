@@ -7,7 +7,7 @@ Seed ids use the 925xx band (users 9250x, group 92510, queue 92520, ticket
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -119,7 +119,12 @@ def _to_async_url(sync_url: str) -> str:
     return sync_url
 
 
+_NOTIF_IDS = "(SELECT id FROM notification_event WHERE name LIKE 'dfval-notify%')"
+
+
 def _cleanup(conn: Any) -> None:
+    key_col = "`key`" if conn.dialect.name == "mysql" else '"key"'
+    conn.execute(text(f"DELETE FROM tiqora_settings WHERE {key_col} = 'notification.sender_email'"))
     for sql in (
         f"DELETE FROM ticket_history WHERE ticket_id = {TICKET_ID}",
         f"DELETE FROM tiqora_event_outbox WHERE ticket_id = {TICKET_ID}",
@@ -130,6 +135,10 @@ def _cleanup(conn: Any) -> None:
         f"DELETE FROM queue WHERE id = {QUEUE_ID}",
         f"DELETE FROM group_user WHERE group_id = {GROUP_ID}",
         f"DELETE FROM permission_groups WHERE id = {GROUP_ID}",
+        f"DELETE FROM notification_event_item WHERE notification_id IN {_NOTIF_IDS}",
+        f"DELETE FROM notification_event_message WHERE notification_id IN {_NOTIF_IDS}",
+        "DELETE FROM notification_event WHERE name LIKE 'dfval-notify%'",
+        f"DELETE FROM user_preferences WHERE user_id IN ({AGENT_RW}, {AGENT_RO})",
         f"DELETE FROM users WHERE id IN ({AGENT_RW}, {AGENT_RO})",
     ):
         conn.execute(text(sql))
@@ -446,17 +455,270 @@ async def test_checkbox_empty_value_is_stored_as_zero(env: Any) -> None:
 @pytest.mark.db
 async def test_znuny_format_readers_return_space_separated_dates(env: Any) -> None:
     """Compat GI and process conditions read value_date as "YYYY-MM-DD HH:MM:SS"."""
-    from tiqora.api.compat.operations import _load_dynamic_fields_gi
+    from tiqora.api.compat.ticket_get import build_ticket_entry
     from tiqora.process.engine import _evaluate_field, get_ticket_attrs
 
     url, factory = env
     await _set(factory, "WaveDue", ["2026-02-01"])
     await _set(factory, "WaveWhen", ["2026-02-01 10:30:00"])
     async with factory() as session:
-        gi = {d["Name"]: d["Value"] for d in await _load_dynamic_fields_gi(session, TICKET_ID)}
+        entry = await build_ticket_entry(
+            session,
+            TICKET_ID,
+            dynamic_fields=True,
+            extended=False,
+            now=datetime.now(UTC).replace(tzinfo=None),
+        )
+        assert entry is not None
+        gi = {d["Name"]: d["Value"] for d in entry["DynamicField"]}
         attrs = await get_ticket_attrs(session, TICKET_ID)
     assert gi["WaveDue"] == "2026-02-01 00:00:00"
     assert gi["WaveWhen"] == "2026-02-01 10:30:00"
     assert attrs["DynamicField_WaveDue"] == "2026-02-01 00:00:00"
     assert _evaluate_field("2026-02-01 00:00:00", "String", attrs["DynamicField_WaveDue"])
     assert _evaluate_field("2026-01-31 00:00:00", "GreaterThan", attrs["DynamicField_WaveDue"])
+
+
+def _legacy_row(url: str, name: str, value_text: str) -> None:
+    _query(
+        url,
+        "INSERT INTO dynamic_field_value (field_id, object_id, value_text) VALUES (:f, :o, :v)",
+        f=DFS[name][0],
+        o=TICKET_ID,
+        v=value_text,
+    )
+
+
+@pytest.mark.db
+async def test_reads_use_the_typed_column_not_the_first_non_empty(env: Any) -> None:
+    from tiqora.domain.dynamic_field_values import get_df_values
+
+    url, factory = env
+    # Stray value_text next to the typed value must not shadow it (Znuny ValueGet).
+    _query(
+        url,
+        "INSERT INTO dynamic_field_value (field_id, object_id, value_text, value_int)"
+        " VALUES (:f, :o, 'junk', 1)",
+        f=DFS["WaveFlag"][0],
+        o=TICKET_ID,
+    )
+    _query(
+        url,
+        "INSERT INTO dynamic_field_value (field_id, object_id, value_text, value_date)"
+        " VALUES (:f, :o, 'junk', :d)",
+        f=DFS["WaveDue"][0],
+        o=TICKET_ID,
+        d=datetime(2026, 2, 1),
+    )
+    async with factory() as session:
+        flag = await load_ticket_dynamic_field(session, "WaveFlag")
+        due = await load_ticket_dynamic_field(session, "WaveDue")
+        assert flag is not None and due is not None
+        assert await get_df_values(session, flag, TICKET_ID) == ["1"]
+        assert await get_df_values(session, due, TICKET_ID) == ["2026-02-01 00:00:00"]
+
+
+@pytest.mark.db
+async def test_legacy_value_text_of_typed_field_is_read_and_rewritten(env: Any) -> None:
+    from tiqora.domain.dynamic_field_values import get_df_values
+
+    url, factory = env
+    _legacy_row(url, "WaveDue", "2026-02-01")
+    _legacy_row(url, "WaveFlag", "1")
+    async with factory() as session:
+        due = await load_ticket_dynamic_field(session, "WaveDue")
+        flag = await load_ticket_dynamic_field(session, "WaveFlag")
+        assert due is not None and flag is not None
+        assert await get_df_values(session, due, TICKET_ID) == ["2026-02-01 00:00:00"]
+        assert await get_df_values(session, flag, TICKET_ID) == ["1"]
+    # Same logical value, but the legacy row counts as changed -> typed column.
+    assert await _set(factory, "WaveDue", ["2026-02-01"]) is True
+    assert await _set(factory, "WaveFlag", ["1"]) is True
+    assert _rows(url, "WaveDue") == [(None, datetime(2026, 2, 1), None)]
+    assert _rows(url, "WaveFlag") == [(None, None, 1)]
+    # Now it is a normal typed row again: unchanged -> no-op.
+    assert await _set(factory, "WaveDue", ["2026-02-01"]) is False
+    assert await _set(factory, "WaveFlag", ["1"]) is False
+
+
+@pytest.mark.db
+async def test_event_is_named_per_field_like_znuny(env: Any) -> None:
+    url, factory = env
+    await _set(factory, "WaveText", ["x"])
+    rows = _query(
+        url, "SELECT event_type FROM tiqora_event_outbox WHERE ticket_id = :t", t=TICKET_ID
+    )
+    assert [r[0] for r in rows] == ["TicketDynamicFieldUpdate_WaveText"]
+
+
+@pytest.mark.db
+async def test_znuny_notification_bound_to_df_event_fires(env: Any) -> None:
+    from tiqora.channels.email.smtp import CapturingMailSender
+    from tiqora.config import get_settings
+    from tiqora.domain.settings_store import KEY_NOTIFICATION_SENDER_EMAIL, set_setting
+    from tiqora.worker.notifications import process_event
+    from tiqora.znuny.sysconfig import SysConfig
+
+    url, factory = env
+    _query(
+        url,
+        "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+        " VALUES (:u, 'UserEmail', 'dfval.rw@example.org')",
+        u=AGENT_RW,
+    )
+    _query(
+        url,
+        "INSERT INTO notification_event (name, valid_id, create_time, create_by,"
+        " change_time, change_by) VALUES ('dfval-notify', 1, :t, 1, :t, 1)",
+        t=NOW,
+    )
+    nid = _query(url, "SELECT id FROM notification_event WHERE name = 'dfval-notify'")[0][0]
+    for key, value in (
+        ("Events", "TicketDynamicFieldUpdate_WaveText"),
+        ("Transports", "Email"),
+        ("Recipients", "AgentOwner"),
+    ):
+        _query(
+            url,
+            "INSERT INTO notification_event_item (notification_id, event_key, event_value)"
+            " VALUES (:n, :k, :v)",
+            n=nid,
+            k=key,
+            v=value,
+        )
+    _query(
+        url,
+        "INSERT INTO notification_event_message (notification_id, subject, text,"
+        " content_type, language) VALUES (:n, 'DF changed', 'body', 'text/plain', 'en')",
+        n=nid,
+    )
+    async with factory() as session:
+        await set_setting(session, KEY_NOTIFICATION_SENDER_EMAIL, "support@example.org")
+    await _set(factory, "WaveText", ["x"])
+    [(event_type,)] = _query(
+        url, "SELECT event_type FROM tiqora_event_outbox WHERE ticket_id = :t", t=TICKET_ID
+    )
+    sender = CapturingMailSender()
+    async with factory() as session, session.begin():
+        sent, failed = await process_event(
+            session,
+            SysConfig(session),
+            sender,
+            event_type=event_type,
+            ticket_id=TICKET_ID,
+            payload={},
+            user_id=1,
+            settings=get_settings(),
+        )
+    assert (sent, failed) == (1, 0)
+    # The pre-Znuny plain name no longer matches a notification bound per field.
+    async with factory() as session, session.begin():
+        assert await process_event(
+            session,
+            SysConfig(session),
+            CapturingMailSender(),
+            event_type="TicketDynamicFieldUpdate",
+            ticket_id=TICKET_ID,
+            payload={},
+            user_id=1,
+            settings=get_settings(),
+        ) == (0, 0)
+
+
+def test_webhook_plain_df_event_subscription_matches_per_field_events() -> None:
+    from tiqora.worker.webhooks import webhook_matches_event
+
+    assert webhook_matches_event('["TicketDynamicFieldUpdate"]', "TicketDynamicFieldUpdate_Foo")
+    assert webhook_matches_event('["TicketDynamicFieldUpdate_Foo"]', "TicketDynamicFieldUpdate_Foo")
+    assert not webhook_matches_event(
+        '["TicketDynamicFieldUpdate_Bar"]', "TicketDynamicFieldUpdate_Foo"
+    )
+    assert not webhook_matches_event('["TicketCreate"]', "TicketDynamicFieldUpdate_Foo")
+
+
+def _set_possible_values(url: str, name: str, config: str) -> None:
+    _query(url, "UPDATE dynamic_field SET config = :c WHERE id = :i", c=config, i=DFS[name][0])
+
+
+_POSSIBLE = "---\nPossibleValues:\n  a: Alpha\n  b: Beta\n  3: Drei\n"
+
+
+@pytest.mark.db
+async def test_patch_unknown_dynamic_field_is_422_and_atomic(env: Any) -> None:
+    url, factory = env
+    async with _client(factory, AGENT_RW) as client:
+        resp = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"dynamic_fields": {"WaveText": ["neu"], "NoSuchField": ["x"]}},
+        )
+        single = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"field_name": "NoSuchField", "field_values": ["x"]},
+        )
+    assert resp.status_code == 422, resp.text
+    assert "NoSuchField" in resp.text
+    assert single.status_code == 422, single.text
+    assert _rows(url, "WaveText") == []
+
+
+@pytest.mark.db
+async def test_patch_dropdown_value_must_be_a_possible_value(env: Any) -> None:
+    url, factory = env
+    _set_possible_values(url, "WaveDrop", _POSSIBLE)
+    _set_possible_values(url, "WaveMulti", _POSSIBLE)
+    async with _client(factory, AGENT_RW) as client:
+        bad = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["zzz"]}}
+        )
+        bad_multi = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"dynamic_fields": {"WaveMulti": ["a", "zzz"]}},
+        )
+        bad_single = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"field_name": "WaveDrop", "field_values": ["zzz"]},
+        )
+        ok = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}",
+            json={"dynamic_fields": {"WaveDrop": ["b"], "WaveMulti": ["a", "3"]}},
+        )
+        cleared = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": [""]}}
+        )
+    assert bad.status_code == bad_multi.status_code == bad_single.status_code == 422
+    assert "zzz" in bad.text
+    assert ok.status_code == 204, ok.text
+    assert _rows(url, "WaveMulti") == [("a", None, None), ("3", None, None)]
+    assert cleared.status_code == 204, cleared.text
+    assert _rows(url, "WaveDrop") == []
+
+
+@pytest.mark.db
+async def test_patch_accepts_yaml_lookalike_possible_value_keys(env: Any) -> None:
+    """Stored keys ``yes``/``no``/``01`` are strings (YAML::XS), not bool/int."""
+    url, factory = env
+    _set_possible_values(
+        url, "WaveDrop", "---\nPossibleValues:\n  yes: Ja\n  no: Nein\n  01: x\n  '02': z\n"
+    )
+    async with _client(factory, AGENT_RW) as client:
+        ok = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["yes"]}}
+        )
+        ok_num = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["01"]}}
+        )
+        bad = await client.patch(
+            f"/api/v1/tickets/{TICKET_ID}", json={"dynamic_fields": {"WaveDrop": ["True"]}}
+        )
+    assert ok.status_code == 204, ok.text
+    assert ok_num.status_code == 204, ok_num.text
+    assert bad.status_code == 422
+
+
+@pytest.mark.db
+async def test_internal_set_ticket_dynamic_field_is_not_value_validated(env: Any) -> None:
+    """Only the agent-facing PATCH validates PossibleValues (process engine etc. do not)."""
+    url, factory = env
+    _set_possible_values(url, "WaveDrop", _POSSIBLE)
+    assert await _set(factory, "WaveDrop", ["not-listed"]) is True
+    assert _rows(url, "WaveDrop") == [("not-listed", None, None)]

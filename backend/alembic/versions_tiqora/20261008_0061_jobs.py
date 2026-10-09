@@ -29,7 +29,9 @@ def upgrade() -> None:
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column("kind", sa.String(100), nullable=False),
         sa.Column("status", sa.String(20), nullable=False),
-        sa.Column("payload", sa.Text(), nullable=False),
+        sa.Column(
+            "payload", sa.Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb"), nullable=False
+        ),
         sa.Column(
             "result", sa.Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb"), nullable=True
         ),

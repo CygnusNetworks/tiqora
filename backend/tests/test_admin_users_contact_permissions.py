@@ -107,6 +107,7 @@ _TEST_LOGINS = [
     "update.contact",
     "lang.test",
     "revoke.me",
+    "revoke.znuny",
     "keep.session",
     "invitestatus.test",
 ]
@@ -954,6 +955,112 @@ async def test_admin_password_reset_revokes_live_sessions(mariadb_znuny_url: str
             assert await store.get(victim) is None
             # Only that account's sessions are touched.
             assert await store.get(bystander) is not None
+    finally:
+        await engine.dispose()
+
+
+async def test_admin_password_reset_deletes_znuny_sessions_even_if_redis_fails(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DB rows are revoked first in their own try: a Redis outage must not skip them."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    settings = _settings()
+
+    async def _boom(self: SessionStore, user_id: int, *, keep_token: str | None = None) -> int:
+        raise ConnectionError("redis down")
+
+    monkeypatch.setattr(SessionStore, "revoke_user_sessions", _boom)
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="revoke.znuny",
+                    password="s3cret-pw-1234",
+                    first_name="Rev",
+                    last_name="Znuny",
+                ),
+                _root_user(),
+                session,
+                settings,
+            )
+            for sid, uid in (("GI8960ADM1", str(created.id)), ("GI8960ADM2", "8969")):
+                for key, val in (("UserID", uid), ("UserType", "User")):
+                    await session.execute(
+                        text(
+                            "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
+                            " VALUES (:s, :k, :v, 0)"
+                        ),
+                        {"s": sid, "k": key, "v": val},
+                    )
+            await session.commit()
+
+            await admin_users.update_user(
+                created.id,
+                UserUpdate(password="a-brand-new-pw-5678"),
+                _fake_request(),
+                _root_user(),
+                session,
+                settings,
+            )
+
+            left = (
+                await session.execute(
+                    text("SELECT DISTINCT session_id FROM sessions WHERE session_id LIKE :p"),
+                    {"p": "GI8960ADM%"},
+                )
+            ).all()
+            assert [r[0] for r in left] == ["GI8960ADM2"]
+    finally:
+        async with factory() as session:
+            await session.execute(text("DELETE FROM sessions WHERE session_id LIKE 'GI8960ADM%'"))
+            await session.commit()
+        await engine.dispose()
+
+
+async def test_admin_password_reset_redis_revoke_runs_when_db_delete_fails(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Other direction: a failing DB delete is rolled back and Redis revocation still runs."""
+    _ensure_tiqora_tables(mariadb_znuny_url)
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    redis = _FakeRedis()
+    settings = _settings()
+
+    async def _boom(session: Any, user_id: int) -> int:
+        raise RuntimeError("sessions table unavailable")
+
+    monkeypatch.setattr(admin_users, "delete_agent_sessions", _boom)
+    try:
+        async with factory() as session:
+            created = await admin_users.create_user(
+                UserCreate(
+                    login="revoke.znuny",
+                    password="s3cret-pw-1234",
+                    first_name="Rev",
+                    last_name="Znuny",
+                ),
+                _root_user(),
+                session,
+                settings,
+            )
+            store = SessionStore(redis, settings)  # type: ignore[arg-type]
+            victim = await store.create(created.id, "revoke.znuny")
+
+            await admin_users.update_user(
+                created.id,
+                UserUpdate(password="a-brand-new-pw-5678"),
+                _fake_request(redis),
+                _root_user(),
+                session,
+                settings,
+            )
+
+            assert await store.get(victim) is None
+            # The session is still usable afterwards (no aborted transaction).
+            assert (await session.execute(text("SELECT 1"))).scalar_one() == 1
     finally:
         await engine.dispose()
 

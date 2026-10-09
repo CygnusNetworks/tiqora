@@ -147,6 +147,11 @@ KEY_PORTAL_ENABLED = "portal.enabled"
 KEY_TELEGRAM_POLLER_ENABLED = "daemon.telegram_poller.enabled"
 KEY_TELEGRAM_POLLER_INTERVAL_SECONDS = "daemon.telegram_poller.interval_seconds"
 
+# Reporting fact builder (wave 1) — maintains tiqora_report_* from ticket history.
+# Default ON (it only writes additive tiqora_* tables).
+KEY_REPORT_FACTS_ENABLED = "daemon.report_facts.enabled"
+KEY_REPORT_FACTS_INTERVAL_SECONDS = "daemon.report_facts.interval_seconds"
+
 # Telegram inbound update_id cursor (Phase T3). Shared by both transports: the
 # poller advances it after each successfully processed getUpdates batch, the
 # webhook route advances it (dedup guard) after each delivered update. Not a

@@ -19,16 +19,27 @@ def register_core(registry: Registry) -> None:
 
     from tiqora.avatars.settings import AVATARS_SECTION
     from tiqora.jobs.settings import JOBS_SECTION
+    from tiqora.reporting.settings import REPORTING_SECTION
     from tiqora.settings_sections.section import SETTINGS_SECTIONS, validate_section_schema
 
-    for section in (JOBS_SECTION, AVATARS_SECTION):
+    for section in (JOBS_SECTION, AVATARS_SECTION, REPORTING_SECTION):
         validate_section_schema(section)
         registry.add(SETTINGS_SECTIONS, section)
 
+    from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
     from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB
     from tiqora.jobs.registry import JOB_HANDLERS
+    from tiqora.reporting.backfill import REPORT_BACKFILL_JOB
 
     registry.add(JOB_HANDLERS, TICKET_EXPORT_JOB)
+    registry.add(JOB_HANDLERS, GI_MAIL_JOB)
+    registry.add(JOB_HANDLERS, REPORT_BACKFILL_JOB)
+
+    from tiqora.reporting.semantic import REPORT_SOURCES
+    from tiqora.reporting.sources import core_report_sources
+
+    for s in core_report_sources():
+        registry.add(REPORT_SOURCES, s)
 
 
 def get_registry() -> Registry:

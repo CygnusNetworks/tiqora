@@ -9,21 +9,61 @@ Ports request/response semantics from:
 
 from __future__ import annotations
 
-import base64
+import asyncio
 import re
-from datetime import UTC, datetime
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.api.compat.article_input import (
+    GiArticle,
+    GiDynamicFields,
+    article_id_result,
+    normalize_article_list,
+    parse_gi_articles,
+    parse_gi_dynamic_fields,
+)
+from tiqora.api.compat.article_input import (
+    gi_error as _err,
+)
+from tiqora.api.compat.history_at import queues_at
+from tiqora.api.compat.mapping import MappingError
+from tiqora.api.compat.mapping.out_of_office import OutOfOfficeMapper
+from tiqora.api.compat.mapping.perl import perl_is_string, perl_str, perl_truthy
+from tiqora.api.compat.provider import OperationFault
+from tiqora.api.compat.search_filters import (
+    article_text_filters,
+    clamped_minutes_before,
+    create_time_settings,
+    created_filters,
+    sanitize_id_filters,
+    time_filters,
+)
+from tiqora.api.compat.ticket_get import (
+    build_article_entries,
+    build_ticket_entry,
+    load_ticket_get_context,
+    znuny_num,
+    znuny_ts,
+)
+from tiqora.api.compat.webservices import OperationConfig
+from tiqora.api.compat.znuny_session import (
+    session_get_key_allowed,
+    write_znuny_session,
+    znuny_agent_user_data,
+    znuny_customer_user_data,
+    znuny_session_writes_enabled,
+)
 from tiqora.channels.email.outbound_reply import OutboundMailError as _OutboundMailError
+from tiqora.channels.email.outbound_reply import (
+    store_agent_email_for_dispatch,
+)
 from tiqora.config import Settings, get_settings
-from tiqora.db.legacy.article import Article, ArticleDataMimeAttachment
-from tiqora.db.legacy.article import ArticleDataMime as ArticleDataMimeModel
 from tiqora.db.legacy.customer import CustomerUser
-from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
 from tiqora.db.legacy.queue import Queue
 from tiqora.db.legacy.ticket import (
     Ticket,
@@ -35,6 +75,10 @@ from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraUserPasskey
 from tiqora.domain.auth import AuthenticatedUser, SessionStore
 from tiqora.domain.auth_config import AuthConfigService
+from tiqora.domain.dynamic_field_values import (
+    set_article_dynamic_field,
+    set_ticket_dynamic_field,
+)
 from tiqora.domain.portal_ticket_service import (
     PORTAL_SYSTEM_USER_ID,
     customer_can_access_ticket,
@@ -47,6 +91,7 @@ from tiqora.domain.ticket_write_service import (
     TicketIn,
     TicketNotFound,
     add_article,
+    add_time_accounting,
     assign_owner,
     assign_responsible,
     change_priority,
@@ -56,12 +101,14 @@ from tiqora.domain.ticket_write_service import (
     lock_ticket,
     move_queue,
     set_customer,
+    set_ticket_lock,
     unlock_ticket,
-    update_dynamic_field,
 )
 from tiqora.domain.totp import TOTPService
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
+from tiqora.znuny.cache_invalidation import invalidate_cache_type
+from tiqora.znuny.escalation import escalation_index_build
 from tiqora.znuny.history import (
     add_service_update,
     add_sla_update,
@@ -73,6 +120,7 @@ from tiqora.znuny.password import (
     needs_rehash,
     verify_password,
 )
+from tiqora.znuny.perl_format import perl_int
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -80,11 +128,6 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Error helpers (Znuny wire format)
 # ---------------------------------------------------------------------------
-
-
-def _err(code: str, message: str) -> dict[str, Any]:
-    """Return a Znuny-style GenericInterface error envelope."""
-    return {"Error": {"ErrorCode": code, "ErrorMessage": message}}
 
 
 # ---------------------------------------------------------------------------
@@ -405,13 +448,28 @@ async def _lookup_session(
             return None
     # Customer sessions: never treat UserID as an agent principal for ACL.
     if user_type == _CUSTOMER_USER_TYPE:
+        if not await _principal_is_valid(session, user_login, customer=True):
+            return None
         return (_CUSTOMER_SENTINEL_USER_ID, user_login, _CUSTOMER_USER_TYPE)
     if not user_id_s:
         return None
     try:
-        return (int(user_id_s), user_login, user_type or _AGENT_USER_TYPE)
+        agent_id = int(user_id_s)
     except ValueError:
         return None
+    if not await _principal_is_valid(session, agent_id, customer=False):
+        return None
+    return (agent_id, user_login, user_type or _AGENT_USER_TYPE)
+
+
+async def _principal_is_valid(session: AsyncSession, who: int | str, *, customer: bool) -> bool:
+    """A disabled account must not keep working through a still-live session row."""
+    if customer:
+        stmt = select(CustomerUser.valid_id).where(CustomerUser.login == who)
+    else:
+        stmt = select(Users.valid_id).where(Users.id == who)
+    valid_id = (await session.execute(stmt)).scalars().first()
+    return valid_id == 1
 
 
 # ---------------------------------------------------------------------------
@@ -535,28 +593,115 @@ async def _lookup_name(session: AsyncSession, table: str, id_: int | None) -> st
     return str(row[0]) if row else None
 
 
-def _parse_pending_time(raw: Any) -> datetime | None:
-    """Parse Znuny PendingTime {Year,Month,Day,Hour,Minute} or {Diff: minutes}."""
-    if not raw or not isinstance(raw, dict):
-        return None
-    if raw.get("Diff") is not None:
-        try:
-            from datetime import timedelta
+class InvalidPendingTime(ValueError):
+    """``Ticket->PendingTime`` fails Znuny's ``ValidatePendingTime`` (or cannot be stored)."""
 
-            return datetime.now(tz=UTC) + timedelta(minutes=int(raw["Diff"]))
-        except (ValueError, TypeError):
-            return None
-    try:
-        return datetime(
-            int(raw.get("Year", 0)),
-            int(raw.get("Month", 0)),
-            int(raw.get("Day", 0)),
-            int(raw.get("Hour", 0)),
-            int(raw.get("Minute", 0)),
-            tzinfo=UTC,
-        )
-    except (ValueError, TypeError):
+
+class PendingTimeNotSet(Exception):
+    """``Ticket->PendingTime`` passes ``ValidatePendingTime`` but ``TicketPendingTimeSet``
+    refuses it: the absolute form without ``Hour`` or ``Minute`` ("Need Hour!",
+    Ticket.pm:3958-3966). TicketCreate then creates the ticket without a pending time,
+    TicketUpdate to a pending state fails (``Success => 0``)."""
+
+
+# Znuny TicketUpdate answers {Success => 0, Errormessage => ...} (sic) when
+# TicketPendingTimeSet fails; Provider.pm finds no ErrorMessage and uses its default summary
+OPERATION_FAILED_MESSAGE = "OperationObject returned an error, cancelling Request"
+
+
+_PENDING_DIFF_RE = re.compile(r"[0-9]+")
+_PENDING_INT_RE = re.compile(r"-?[0-9]+")  # CPAN DateTime's integer check
+# Kernel::System::DateTime passes these on to DateTime->new, which dies on them (they are
+# duration names, no constructor arguments)
+_PENDING_DURATION_KEYS = frozenset(
+    {"Years", "Months", "Weeks", "Days", "Hours", "Minutes", "Seconds"}
+)
+# ticket.until_time is a signed 32-bit INTEGER: 1901-12-13 20:45:52 .. 2038-01-19 03:14:07 UTC
+_UNTIL_TIME_MIN, _UNTIL_TIME_MAX = -(2**31), 2**31 - 1
+
+
+def _pending_time(raw: Any, *, now: datetime | None = None) -> datetime | None:
+    """``Ticket->PendingTime`` of TicketCreate / TicketUpdate as the until time (UTC).
+
+    Validation is Znuny ``Common.pm`` ``ValidatePendingTime`` (after the operations trim
+    every value): ``{Diff}`` alone with digits only, or ``{Year, Month, Day[, Hour, Minute]}``
+    without an empty or negative value that ``Kernel::System::DateTime`` accepts; ``Diff``
+    together with any other key is invalid. Raises :class:`InvalidPendingTime`. ``None`` when
+    no PendingTime was given (Perl-false) or ``Diff`` is 0 (``TicketPendingTimeSet`` then sets
+    nothing). A valid absolute form without ``Hour`` or ``Minute`` raises
+    :class:`PendingTimeNotSet` (``TicketPendingTimeSet`` needs both; no default midnight).
+
+    Deviation: a value Znuny validates but whose result does not fit ``until_time`` (a signed
+    32-bit epoch, 1901-12-13 .. 2038-01-19) or a Python date (years 1-9999) is invalid too,
+    whatever the target state; Znuny only writes it for a pending state and then fails in the
+    database (PostgreSQL, strict MariaDB) or stores a clamped value (non-strict MariaDB).
+    """
+    if not perl_truthy(raw):
         return None
+    if not isinstance(raw, dict) or not raw:
+        raise InvalidPendingTime
+    values = {k: (v.strip() if isinstance(v, str) else v) for k, v in raw.items()}
+    now = now or datetime.now(tz=UTC)
+    if len(values) == 1 and values.get("Diff") is not None:
+        diff = values["Diff"]
+        if not perl_is_string(diff) or not _PENDING_DIFF_RE.fullmatch(perl_str(diff)):
+            raise InvalidPendingTime
+        minutes = int(perl_str(diff))
+        if minutes == 0:
+            return None
+        try:
+            moment = now + timedelta(minutes=minutes)
+        except OverflowError as exc:
+            raise InvalidPendingTime from exc
+    elif values.get("Diff") is not None:
+        raise InvalidPendingTime  # Diff together with any other option is forbidden
+    else:
+        for value in values.values():
+            if not perl_is_string(value) or perl_str(value) == "" or perl_int(value) < 0:
+                raise InvalidPendingTime
+        if _PENDING_DURATION_KEYS & values.keys():
+            raise InvalidPendingTime
+        parts: list[int] = []
+        missing_time = False
+        for key, required in (
+            ("Year", True),
+            ("Month", True),
+            ("Day", True),
+            ("Hour", False),
+            ("Minute", False),
+        ):
+            value = values.get(key)
+            if value is None:
+                if required:
+                    raise InvalidPendingTime  # "Missing parameter Year." (DateTime.pm)
+                parts.append(0)  # DateTime->new's default: the date is still validated
+                missing_time = True
+                continue
+            text_value = perl_str(value)
+            if not _PENDING_INT_RE.fullmatch(text_value) or (required and int(text_value) == 0):
+                raise InvalidPendingTime
+            parts.append(int(text_value))
+        try:
+            moment = datetime(parts[0], parts[1], parts[2], parts[3], parts[4], tzinfo=UTC)
+        except (ValueError, OverflowError) as exc:
+            raise InvalidPendingTime from exc
+        if missing_time:
+            raise PendingTimeNotSet
+    if not _UNTIL_TIME_MIN <= moment.timestamp() <= _UNTIL_TIME_MAX:
+        raise InvalidPendingTime
+    return moment
+
+
+async def _is_pending_state(session: AsyncSession, state_id: int) -> bool:
+    """The state's type starts with "pending" (Znuny ``$StateData{TypeName} =~ /^pending/i``)."""
+    row = (
+        await session.execute(
+            select(TicketStateType.name)
+            .join(TicketState, TicketState.type_id == TicketStateType.id)
+            .where(TicketState.id == state_id)
+        )
+    ).first()
+    return row is not None and str(row[0]).lower().startswith("pending")
 
 
 async def _state_ids_for_type(session: AsyncSession, type_name: str) -> list[int]:
@@ -601,9 +746,17 @@ def _like_pattern(val: Any) -> str:
     return str(val).replace("*", "%")
 
 
+def _pref_param(session: AsyncSession, value: str) -> bytes | str:
+    """Bind value for ``user_preferences.preferences_value`` (BLOB on MySQL, TEXT on PostgreSQL)."""
+    bind = session.get_bind()
+    if bind is not None and bind.dialect.name == "postgresql":
+        return value
+    return value.encode("utf-8")
+
+
 async def _set_user_preference(session: AsyncSession, user_id: int, key: str, value: str) -> None:
-    """Upsert a user_preferences row (value stored as UTF-8 bytes)."""
-    raw = value.encode("utf-8")
+    """Upsert a user_preferences row (UTF-8 bytes; plain text on PostgreSQL's TEXT column)."""
+    raw = _pref_param(session, value)
     existing = (
         await session.execute(
             text(
@@ -632,85 +785,8 @@ async def _set_user_preference(session: AsyncSession, user_id: int, key: str, va
 
 
 # ---------------------------------------------------------------------------
-# Article payload builder
+# Article delivery helpers (the article payload itself: compat/article_input.py)
 # ---------------------------------------------------------------------------
-
-
-def _build_article_in(art_data: dict[str, Any], user_type: str) -> ArticleIn:
-    """Build ArticleIn from GenericInterface article sub-object.
-
-    Znuny defaults (TicketCreate.pm lines 547-554):
-    - CommunicationChannel defaults to 'Internal' if not given
-    - IsVisibleForCustomer defaults from config (usually 1 for agent)
-    - SenderType defaults to 'agent' for User, 'customer' for Customer
-
-    For TicketUpdate notes (not email/phone), IsVisibleForCustomer should
-    default to 0 (internal) — per the Znuny TicketUpdate op behaviour.
-    """
-    channel_raw = (art_data.get("CommunicationChannel") or "Internal").strip()
-    # Map Znuny channel names to our internal names
-    channel_map = {
-        "Internal": "note",
-        "Email": "email",
-        "Phone": "phone",
-        "Chat": "note",
-    }
-    channel = channel_map.get(channel_raw, "note")
-
-    # IsVisibleForCustomer: explicit value wins; fallback: 0 (internal) for notes
-    is_visible_raw = art_data.get("IsVisibleForCustomer")
-    if is_visible_raw is not None:
-        is_visible = bool(int(is_visible_raw))
-    else:
-        # For email channel from agent, default visible; for notes default internal
-        is_visible = channel == "email" and user_type == _AGENT_USER_TYPE
-
-    sender_type_raw = art_data.get("SenderType")
-    if not sender_type_raw:
-        sender_type = "agent" if user_type == _AGENT_USER_TYPE else "customer"
-    else:
-        sender_type = sender_type_raw.lower()
-
-    # Attachments: list of {Filename, ContentType, Content(base64)}
-    attachments: list[tuple[str, str, bytes]] = []
-    for att in art_data.get("Attachment") or []:
-        if not isinstance(att, dict):
-            continue
-        try:
-            content_b64 = att.get("Content") or ""
-            content_bytes = base64.b64decode(content_b64)
-        except Exception:
-            content_bytes = b""
-        attachments.append(
-            (
-                att.get("Filename") or "attachment",
-                att.get("ContentType") or "application/octet-stream",
-                content_bytes,
-            )
-        )
-
-    return ArticleIn(
-        sender_type=sender_type,
-        is_visible_for_customer=is_visible,
-        subject=art_data.get("Subject") or "",
-        body=art_data.get("Body") or "",
-        content_type=art_data.get("ContentType") or "text/plain; charset=utf-8",
-        from_address=art_data.get("From"),
-        to_address=art_data.get("To"),
-        cc=art_data.get("Cc"),
-        bcc=art_data.get("Bcc"),
-        message_id=art_data.get("MessageID"),
-        in_reply_to=art_data.get("InReplyTo"),
-        references=art_data.get("References"),
-        channel=channel,
-        attachments=attachments,
-    )
-
-
-def _wants_article_send(art_data: dict[str, Any], user_type: str) -> bool:
-    """Znuny ``Article->ArticleSend``: send the article by email (agents only)."""
-    flag = art_data.get("ArticleSend")
-    return user_type == _AGENT_USER_TYPE and str(flag or "").strip() not in ("", "0")
 
 
 def _as_send_article(article_in: ArticleIn, art_data: dict[str, Any]) -> ArticleIn:
@@ -730,25 +806,142 @@ def _as_send_article(article_in: ArticleIn, art_data: dict[str, Any]) -> Article
     )
 
 
-async def _deliver_article(
+async def _queue_gi_mail(
+    session: AsyncSession,
+    *,
+    kind: str,
+    ticket_id: int,
+    article_id: int,
+    user_id: int,
+    auto_response_type: str = "",
+    queue_id: int | None = None,
+) -> None:
+    """Queue one mail of the request as a worker job, in the request transaction.
+
+    The job row commits together with the ticket and article (never a job whose article
+    could still roll back, never a committed article whose mail is lost). The request
+    answers without waiting for SMTP - Znuny queues these mails in its MailQueue too.
+    An auto response carries the ticket's queue at this moment: Znuny decides it in
+    ``ArticleCreate``, so a later queue move (or a worker backlog) does not change it.
+    """
+    from tiqora.jobs.handlers.gi_mail import GI_MAIL_KIND, GiMailPayload
+    from tiqora.jobs.service import enqueue_job
+
+    await enqueue_job(
+        session,
+        kind=GI_MAIL_KIND,
+        payload=GiMailPayload(
+            kind=kind,  # type: ignore[arg-type]
+            ticket_id=ticket_id,
+            article_id=article_id,
+            user_id=user_id,
+            auto_response_type=auto_response_type,
+            queue_id=queue_id,
+        ),
+        created_by=None,  # a system job: not listed as anyone's own background task
+    )
+
+
+async def _write_gi_article(
     session: AsyncSession,
     sysconfig: SysConfig,
+    settings: Settings | None,
+    gi: GiArticle,
+    *,
     ticket_id: int,
-    queue_id: int,
     user_id: int,
-    article: ArticleIn,
 ) -> int:
-    from tiqora.channels.email.outbound_reply import deliver_agent_email_reply
+    """Store one request article, book its TimeUnit and queue its mail for the worker.
 
-    return await deliver_agent_email_reply(
-        session,
-        sysconfig,
-        None,
-        ticket_id=ticket_id,
-        queue_id=queue_id,
-        user_id=user_id,
-        article=article,
-    )
+    ``ArticleSend`` stores the prepared (and secured) article now; the worker sends it.
+    Every other article queues its auto response (Znuny sends it from ``ArticleCreate``,
+    never for ``ArticleSend``) - only while an outbound relay is configured, because without
+    one no auto response is ever sent.
+    """
+    queue_row = (
+        await session.execute(
+            text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+        )
+    ).first()
+    queue_id = int(queue_row[0]) if queue_row else 0
+    if gi.send:
+        pending = await store_agent_email_for_dispatch(
+            session,
+            sysconfig,
+            ticket_id=ticket_id,
+            queue_id=queue_id,
+            user_id=user_id,
+            article=_as_send_article(gi.article, gi.raw),
+        )
+        article_id = pending.article_id
+        await _queue_gi_mail(
+            session,
+            kind="article_send",
+            ticket_id=ticket_id,
+            article_id=article_id,
+            user_id=user_id,
+        )
+    else:
+        article_id = await add_article(
+            session,
+            ticket_id=ticket_id,
+            article=await _apply_stored_email_security(gi.article, gi.raw, sysconfig, settings),
+            user_id=user_id,
+            sysconfig=sysconfig,
+        )
+        if gi.auto_response_type and await _outbound_relay_enabled(session):
+            await _queue_gi_mail(
+                session,
+                kind="auto_response",
+                ticket_id=ticket_id,
+                article_id=article_id,
+                user_id=user_id,
+                auto_response_type=gi.auto_response_type,
+                queue_id=queue_id,
+            )
+    if gi.time_unit is not None:
+        await add_time_accounting(
+            session,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            time_unit=gi.time_unit,
+            user_id=user_id,
+        )
+    return article_id
+
+
+async def _outbound_relay_enabled(session: AsyncSession) -> bool:
+    from tiqora.domain import mail_outbound
+
+    return bool((await mail_outbound.resolve_outbound_smtp(session)).enabled)
+
+
+async def _write_ticket_dynamic_fields(
+    session: AsyncSession, fields: GiDynamicFields, *, ticket_id: int, user_id: int
+) -> None:
+    for name, values in fields.ticket.items():
+        await set_ticket_dynamic_field(
+            session, ticket_id=ticket_id, field=fields.configs[name], values=values, user_id=user_id
+        )
+
+
+async def _write_article_dynamic_fields(
+    session: AsyncSession,
+    fields: GiDynamicFields,
+    *,
+    ticket_id: int,
+    article_id: int,
+    user_id: int,
+) -> None:
+    for name, values in fields.article.items():
+        await set_article_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            article_id=article_id,
+            field=fields.configs[name],
+            values=values,
+            user_id=user_id,
+        )
 
 
 async def _apply_stored_email_security(
@@ -877,6 +1070,26 @@ async def op_session_create(
             auth_method="session",
         )
 
+    sysconfig = SysConfig(session)
+    if await znuny_session_writes_enabled(cfg, sysconfig):
+        if user_login:
+            user_data = await znuny_agent_user_data(session, user.id, sysconfig=sysconfig)
+            user_type = _AGENT_USER_TYPE
+        else:
+            user_data = await znuny_customer_user_data(session, customer_login)
+            user_type = _CUSTOMER_USER_TYPE
+        headers = getattr(request, "headers", None)
+        session_id = await write_znuny_session(
+            session,
+            user_data=user_data,
+            user_type=user_type,
+            remote_addr=_peer_addr(request) or "none",
+            user_agent=(headers.get("user-agent") if headers is not None else "") or "none",
+            now_epoch=int(datetime.now(UTC).timestamp()),
+        )
+        await session.commit()
+        return {"SessionID": session_id}
+
     token = await session_store.create(user.id, user.login)
     return {"SessionID": token}
 
@@ -891,10 +1104,14 @@ async def op_session_get(
 ) -> dict[str, Any]:
     """SessionGet — return SessionData key/value list for a SessionID.
 
-    Matches Znuny SessionGet: no auth params beyond SessionID; returns all
-    session key/value pairs (UserPw / UserChallengeToken filtered).
+    Matches Znuny SessionGet: no auth params beyond SessionID; the session is checked
+    first (``CheckSessionID``: idle / absolute expiry, here also a still valid account and
+    the optional remote-IP binding - the same check as every authenticated call) and an
+    invalid one answers ``SessionGet.SessionInvalid``. Returns the allow-listed session
+    key/value pairs.
     """
     op = "SessionGet"
+    invalid = _err(f"{op}.SessionInvalid", f"{op}: SessionID is Invalid!")
     session_id = (data.get("SessionID") or "").strip()
     if not session_id:
         return _err(f"{op}.MissingParameter", f"{op}: SessionID is missing!")
@@ -907,10 +1124,15 @@ async def op_session_get(
         )
     ).fetchall()
     if rows:
+        valid = await _lookup_session(
+            session, session_id, remote_addr=_peer_addr(request), settings=settings
+        )
+        if valid is None:
+            return invalid
         session_data: list[dict[str, Any]] = []
         for key, val, serialized in rows:
             k = str(key)
-            if k in ("UserPw", "UserChallengeToken"):
+            if not session_get_key_allowed(k):
                 continue
             entry: dict[str, Any] = {"Key": k, "Value": val if val is not None else ""}
             if serialized:
@@ -922,7 +1144,7 @@ async def op_session_get(
     # Fall back to Tiqora Redis session store.
     payload = await session_store.get(session_id)
     if payload is None:
-        return _err(f"{op}.SessionInvalid", f"{op}: SessionID is Invalid!")
+        return invalid
     user_id, login = payload
     if user_id == _CUSTOMER_SENTINEL_USER_ID:
         user_type = _CUSTOMER_USER_TYPE
@@ -1014,6 +1236,7 @@ async def op_ticket_create(
     *,
     request: Any | None = None,
     settings: Settings | None = None,
+    operation_config: OperationConfig | None = None,
 ) -> dict[str, Any]:
     """TicketCreate operation."""
     op = "TicketCreate"
@@ -1046,22 +1269,32 @@ async def op_ticket_create(
     if priority_id is None:
         return _err(f"{op}.MissingParameter", f"{op}: Ticket->Priority or PriorityID is missing!")
 
-    owner_id = await _resolve_user_id(session, ticket.get("Owner"), ticket.get("OwnerID"))
-    if owner_id is None:
-        owner_id = PORTAL_SYSTEM_USER_ID if is_customer else 1
+    requested_owner_id = await _resolve_user_id(session, ticket.get("Owner"), ticket.get("OwnerID"))
+    # Znuny: an owner given in the request means "no agent mail for the first article".
+    has_owner = perl_truthy(requested_owner_id)  # TicketCreate.pm:1862: "0" is no owner
 
     responsible_id = await _resolve_user_id(
         session, ticket.get("Responsible"), ticket.get("ResponsibleID")
     )
 
+    lock_for_owner = False
     lock_id = await _resolve_lock_id(session, ticket.get("Lock"), ticket.get("LockID"))
     if lock_id is None:
-        lock_id = 1  # unlock
+        lock_id = 1
+        # TicketCreate.pm:1865-1870: an owner given without Lock/LockID locks the ticket for
+        # them, after TicketOwnerSet and the articles (see below)
+        lock_for_owner = has_owner
 
     type_id = await _resolve_type_id(session, ticket.get("Type"), ticket.get("TypeID"))
     service_id = await _resolve_service_id(session, ticket.get("Service"), ticket.get("ServiceID"))
     sla_id = await _resolve_sla_id(session, ticket.get("SLA"), ticket.get("SLAID"))
-    pending_time = _parse_pending_time(ticket.get("PendingTime"))
+    try:
+        pending_time = _pending_time(ticket.get("PendingTime"))
+    except PendingTimeNotSet:
+        pending_time = None  # TicketCreate.pm:1466 ignores TicketPendingTimeSet's failure
+    except InvalidPendingTime:
+        # TicketCreate.pm:833-838 (ValidatePendingTime)
+        return _err(f"{op}.InvalidParameter", f"{op}: Ticket->PendingTime parameter is invalid!")
 
     if is_customer:
         # Ownership-scoped create: force customer identity; never agent queue-group ACL.
@@ -1072,70 +1305,54 @@ async def op_ticket_create(
     else:
         pe = PermissionEngine(session)
         if not await pe.check(user_id, queue_id, "create"):
-            return _err(f"{op}.AccessDenied", f"{op}: No permission to create tickets in Queue!")
-        customer_id_val = ticket.get("CustomerID")
-        customer_user_val = ticket.get("CustomerUser")
+            # TicketCreate.pm:519
+            return _err(
+                f"{op}.AccessDenied", f"{op}: Can not create tickets in given Queue or QueueID!"
+            )
+        # TicketCreate.pm:1318-1361: CustomerUser by login, else by e-mail; CustomerID from
+        # the customer user unless the request names a non-empty one
+        customer_user_val, customer_id_val = await _resolve_customer_defaults(
+            session, ticket.get("CustomerUser"), ticket.get("CustomerID")
+        )
         write_user_id = user_id
 
-    # Dynamic fields
-    dynamic_fields: dict[str, list[str]] = {}
-    for df in data.get("DynamicField") or []:
-        if isinstance(df, dict):
-            fname = df.get("Name") or ""
-            val = df.get("Value")
-            if fname:
-                dynamic_fields[fname] = [str(val)] if val is not None else []
+    # Everything is validated before the first write (Run + _CheckArticle + _CheckDynamicField).
+    articles = await parse_gi_articles(
+        data.get("Article"),
+        op=op,
+        user_type=user_type,
+        has_owner=has_owner,
+        session=session,
+        sysconfig=sysconfig,
+    )
+    if isinstance(articles, dict):
+        return articles
+    fields = await parse_gi_dynamic_fields(
+        data.get("DynamicField"), op=op, articles_present=True, session=session
+    )
+    if isinstance(fields, dict):
+        return fields
 
-    # Build optional article (single dict or first of list)
-    article_in: ArticleIn | None = None
-    send_article: ArticleIn | None = None
-    art_data = data.get("Article")
-    if isinstance(art_data, list) and art_data:
-        art_data = art_data[0]
-    if art_data and isinstance(art_data, dict):
-        # MimeType + Charset → ContentType when ContentType omitted
-        if not art_data.get("ContentType") and art_data.get("MimeType"):
-            charset = art_data.get("Charset") or "utf-8"
-            art_data = {
-                **art_data,
-                "ContentType": f"{art_data['MimeType']}; charset={charset}",
-            }
-        # Attachment may be a single dict
-        att = art_data.get("Attachment")
-        if isinstance(att, dict):
-            art_data = {**art_data, "Attachment": [att]}
-        article_in = _build_article_in(art_data, user_type)
-        if _wants_article_send(art_data, user_type):
-            # Znuny ArticleSend: sent by SMTP (EmailSecurity applied on the
-            # wire) right after the ticket exists — see below.
-            send_article = _as_send_article(article_in, art_data)
-            if not (send_article.to_address or "").strip():
-                return _err(
-                    f"{op}.InvalidParameter",
-                    f"{op}: Article->To parameter must be a valid email address"
-                    " when Article->ArticleSend is set!",
-                )
-            article_in = None
-        else:
-            article_in = await _apply_stored_email_security(
-                article_in, art_data, sysconfig, settings
-            )
+    # A closed ticket is never created locked (TicketCreate.pm: forced unlock).
+    closed_state = state_id in await _state_ids_for_type(session, "closed")
 
     ticket_in = TicketIn(
         title=title,
         queue_id=queue_id,
         state_id=state_id,
         priority_id=priority_id,
-        owner_id=owner_id,
-        lock_id=lock_id,
-        responsible_id=responsible_id,
+        # TicketCreate.pm:1396 creates with OwnerID 1 and unlocked; owner and lock follow as
+        # TicketOwnerSet / TicketLockSet so the history matches (see below)
+        owner_id=1,
+        lock_id=1,
+        responsible_id=None,
         customer_id=customer_id_val,
         customer_user_id=customer_user_val,
         type_id=type_id,
         service_id=service_id,
         sla_id=sla_id,
-        dynamic_fields=dynamic_fields,
-        article=article_in,
+        dynamic_fields={},
+        article=None,
     )
 
     try:
@@ -1143,6 +1360,23 @@ async def op_ticket_create(
             ticket_id = await create_ticket(
                 session, session_factory, sysconfig, params=ticket_in, user_id=write_user_id
             )
+            if lock_id == 2:
+                # TicketCreate.pm:1417-1426: explicit Lock is a TicketLockSet after the create
+                await lock_ticket(
+                    session, ticket_id=ticket_id, user_id=write_user_id, sysconfig=sysconfig
+                )
+            elif lock_id != 1:
+                await set_ticket_lock(
+                    session,
+                    ticket_id=ticket_id,
+                    lock_id=lock_id,
+                    user_id=write_user_id,
+                    sysconfig=sysconfig,
+                )
+            if closed_state and lock_id != 1:
+                await unlock_ticket(
+                    session, ticket_id=ticket_id, user_id=write_user_id, sysconfig=sysconfig
+                )
             # PendingTime on create: set until_time via change_state with same state.
             if pending_time is not None:
                 await change_state(
@@ -1153,10 +1387,71 @@ async def op_ticket_create(
                     sysconfig=sysconfig,
                     pending_time=pending_time,
                 )
-            if send_article is not None:
-                await _deliver_article(
-                    session, sysconfig, ticket_id, queue_id, write_user_id, send_article
+            await _write_ticket_dynamic_fields(
+                session, fields, ticket_id=ticket_id, user_id=write_user_id
+            )
+            article_ids: list[int] = []
+            queue_label = await _queue_label(session, ticket.get("Queue"), queue_id)
+            for gi in articles:
+                if not gi.send:
+                    # TicketCreate.pm:1544-1558: without ArticleSend To is the queue and Cc/Bcc
+                    # are not passed on
+                    gi = replace(
+                        gi,
+                        article=replace(gi.article, to_address=queue_label, cc=None, bcc=None),
+                    )
+                if not gi.article.from_address and not gi.send:
+                    gi = replace(
+                        gi,
+                        article=replace(
+                            gi.article,
+                            from_address=await _default_from(session, customer_user_val, None),
+                        ),
+                    )
+                article_id = await _write_gi_article(
+                    session,
+                    sysconfig,
+                    settings,
+                    gi,
+                    ticket_id=ticket_id,
+                    user_id=write_user_id,
                 )
+                article_ids.append(article_id)
+                await _write_article_dynamic_fields(
+                    session,
+                    fields,
+                    ticket_id=ticket_id,
+                    article_id=article_id,
+                    user_id=write_user_id,
+                )
+            final_owner_id = int(requested_owner_id or 0) if has_owner else write_user_id
+            # TicketCreate.pm:1853-1880: TicketOwnerSet after the articles, to the requested
+            # owner, else (no notification) to the calling user; then the lock for an owner
+            await assign_owner(
+                session,
+                ticket_id=ticket_id,
+                new_owner_id=final_owner_id,
+                user_id=write_user_id,
+                sysconfig=sysconfig,
+            )
+            if lock_for_owner:
+                # then locked (even a closed ticket)
+                await lock_ticket(
+                    session, ticket_id=ticket_id, user_id=write_user_id, sysconfig=sysconfig
+                )
+            # TicketCreate.pm:1883: TicketResponsibleSet after owner and lock (a no-op when
+            # it is the creation default, root)
+            if responsible_id and int(responsible_id) != 1:
+                await assign_responsible(
+                    session,
+                    ticket_id=ticket_id,
+                    new_responsible_id=int(responsible_id),
+                    user_id=write_user_id,
+                )
+            # Ticket::EventModulePost###9990-EscalationIndex (TicketCreate, ArticleCreate; runs
+            # as a transaction handler, i.e. once after everything above) rebuilds the
+            # escalation columns; the last article is the "last sender" of the update time
+            await escalation_index_build(session, ticket_id, write_user_id, sysconfig)
         await session.commit()
     except TicketAccessDenied:
         await session.rollback()
@@ -1168,7 +1463,139 @@ async def op_ticket_create(
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
-    return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
+    return await _with_ticket_data(
+        article_id_result(
+            {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+            article_ids,
+            op=op,
+        ),
+        session,
+        operation_config,
+        op=op,
+        ticket_id=ticket_id,
+        article_ids=article_ids,
+        attachments=bool(data.get("Attachment")),
+    )
+
+
+async def _resolve_customer_defaults(
+    session: AsyncSession, customer_user: Any, customer_id: Any
+) -> tuple[str | None, str | None]:
+    """``(CustomerUser, CustomerID)`` for a GI TicketCreate (TicketCreate.pm:1318-1361).
+
+    The customer user is looked up by login, else (``PostMasterSearch``) by e-mail address
+    (first login in sort order); a found record yields its canonical login and its
+    ``customer_id`` as the default CustomerID. A non-empty CustomerID in the request wins.
+    An unknown customer user stays as sent.
+    """
+    login = str(customer_user) if customer_user not in (None, "") else None
+    company: str | None = None
+    if login:
+        row = (
+            await session.execute(
+                text("SELECT login, customer_id FROM customer_user WHERE login = :l LIMIT 1"),
+                {"l": login},
+            )
+        ).first()
+        if row is None:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT login, customer_id FROM customer_user"
+                        " WHERE LOWER(email) = LOWER(:e) AND valid_id = 1"
+                        " ORDER BY login LIMIT 1"
+                    ),
+                    {"e": login},
+                )
+            ).first()
+        if row is not None:
+            login, company = str(row[0]), (str(row[1]) if row[1] else None)
+    explicit = str(customer_id) if customer_id not in (None, "") else None
+    # '' (not NULL) with a customer user but no company: TicketCustomerSet stores what it got
+    return login, explicit or company or ("" if login else None)
+
+
+async def _queue_label(session: AsyncSession, queue_name: Any, queue_id: int) -> str:
+    """Queue name of the request as sent, else the looked-up one (TicketCreate.pm:1552-1558)."""
+    if queue_name:
+        return str(queue_name)
+    row = (
+        await session.execute(text("SELECT name FROM queue WHERE id = :i"), {"i": queue_id})
+    ).first()
+    return str(row[0]) if row else ""
+
+
+async def _default_from(
+    session: AsyncSession, customer_login: str | None, fallback: str | None
+) -> str | None:
+    """Znuny's From for an article without one (TicketCreate.pm 1512-1545).
+
+    The customer user's ``"Full Name" <mail>``; the raw customer user when there is no
+    such record; ``fallback`` when the request names no customer.
+    """
+    if not customer_login:
+        return fallback
+    row = (
+        await session.execute(
+            text("SELECT first_name, last_name, email FROM customer_user WHERE login = :l LIMIT 1"),
+            {"l": customer_login},
+        )
+    ).first()
+    if row is None:
+        return customer_login
+    full_name = " ".join(p for p in (row[0], row[1]) if p).strip()
+    return f'"{full_name}" <{row[2]}>' if row[2] else (full_name or customer_login)
+
+
+async def _with_ticket_data(
+    result: dict[str, Any],
+    session: AsyncSession,
+    operation_config: OperationConfig | None,
+    *,
+    op: str,
+    ticket_id: int,
+    article_ids: list[int],
+    attachments: bool,
+) -> dict[str, Any]:
+    """``IncludeTicketData`` of the webservice operation: answer with ``Ticket``.
+
+    ``TicketGet`` (with dynamic fields) plus the ``ArticleGet`` of just the articles this call
+    created. TicketCreate lists them under ``Article`` always and with attachments only when
+    the request had a top-level ``Attachment`` (``attachments``); TicketUpdate uses ``Article``
+    (a hash) for one, ``Articles`` for several, and always includes attachments.
+    """
+    if operation_config is None or not operation_config.include_ticket_data:
+        return result
+    now = datetime.now(UTC).replace(tzinfo=None)
+    ctx = await load_ticket_get_context(session, dynamic_fields=True, articles=bool(article_ids))
+    ticket = await build_ticket_entry(
+        session, ticket_id, dynamic_fields=True, extended=False, now=now, ctx=ctx
+    )
+    if ticket is None:
+        return result
+    if article_ids:
+        entries = await build_article_entries(
+            session,
+            ticket_id,
+            customer_only=False,
+            sender_types=None,
+            order="ASC",
+            limit=0,
+            dynamic_fields=True,
+            attachments=attachments,
+            get_attachment_contents=True,
+            html_body_as_attachment=False,
+            ctx=ctx,
+            only_article_ids=article_ids,
+        )
+        if entries:
+            if op == "TicketCreate":
+                ticket["Article"] = entries
+            elif len(article_ids) == 1:
+                ticket["Article"] = entries[0]
+            else:
+                ticket["Articles"] = entries
+    return {**result, "Ticket": ticket}
 
 
 async def _get_tn(session: AsyncSession, ticket_id: int) -> str:
@@ -1194,6 +1621,7 @@ async def op_ticket_update(
     *,
     request: Any | None = None,
     settings: Settings | None = None,
+    operation_config: OperationConfig | None = None,
 ) -> dict[str, Any]:
     """TicketUpdate operation."""
     op = "TicketUpdate"
@@ -1211,7 +1639,12 @@ async def op_ticket_update(
 
     ticket_id: int
     if ticket_id_raw is not None:
-        ticket_id = int(ticket_id_raw)
+        # TicketUpdate.pm:416-436: an id that is not a ticket (empty, "0", not a number) fails
+        # the TicketGet with AccessDenied
+        raw_id = perl_str(ticket_id_raw).strip()
+        if not perl_truthy(ticket_id_raw) or not re.fullmatch(r"[0-9]{1,18}", raw_id):
+            return _err(f"{op}.AccessDenied", f"{op}: User does not have access to the ticket!")
+        ticket_id = int(raw_id)
     else:
         row = (
             await session.execute(
@@ -1256,24 +1689,38 @@ async def op_ticket_update(
                 f"{op}.AccessDenied",
                 f"{op}: Customers may only add follow-up articles, not change ticket fields!",
             )
-        if not art_data or not isinstance(art_data, dict):
+        if not normalize_article_list(art_data):
             return _err(
                 f"{op}.MissingParameter",
                 f"{op}: Article is required for customer follow-up!",
             )
+        follow_ups = await parse_gi_articles(
+            art_data,
+            op=op,
+            user_type=user_type,
+            has_owner=False,
+            session=session,
+            sysconfig=sysconfig,
+        )
+        if isinstance(follow_ups, dict):
+            return follow_ups
+        article_ids: list[int] = []
+        customer_from = await _default_from(session, login, None)
         try:
             async with session.begin_nested():
-                article_in = _build_article_in(
-                    {**art_data, "IsVisibleForCustomer": art_data.get("IsVisibleForCustomer", 1)},
-                    user_type,
-                )
-                await add_article(
-                    session,
-                    ticket_id=ticket_id,
-                    article=article_in,
-                    user_id=PORTAL_SYSTEM_USER_ID,
-                    sysconfig=sysconfig,
-                )
+                for gi in follow_ups:
+                    if not gi.article.from_address:
+                        gi = replace(gi, article=replace(gi.article, from_address=customer_from))
+                    article_ids.append(
+                        await _write_gi_article(
+                            session,
+                            sysconfig,
+                            settings,
+                            gi,
+                            ticket_id=ticket_id,
+                            user_id=PORTAL_SYSTEM_USER_ID,
+                        )
+                    )
             await session.commit()
         except TicketNotFound:
             await session.rollback()
@@ -1284,11 +1731,61 @@ async def op_ticket_update(
         except InvalidInput as e:
             await session.rollback()
             return _err(f"{op}.InvalidParameter", str(e))
-        return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
+        return await _with_ticket_data(
+            article_id_result(
+                {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+                article_ids,
+                op=op,
+            ),
+            session,
+            operation_config,
+            op=op,
+            ticket_id=ticket_id,
+            article_ids=article_ids,
+            attachments=True,
+        )
 
     pe = PermissionEngine(session)
     if not await pe.check(user_id, queue_id, "rw"):
         return _err(f"{op}.AccessDenied", f"{op}: No permission to update ticket!")
+
+    # Everything is validated before the first write (Run + _CheckArticle + _CheckDynamicField).
+    try:
+        pending_time = _pending_time(ticket.get("PendingTime"))
+    except PendingTimeNotSet:
+        # TicketUpdate.pm:1738-1755: only a pending target state calls TicketPendingTimeSet;
+        # its failure answers Success => 0 (Znuny has already written the attributes before
+        # the state; Tiqora writes nothing)
+        target_state = await _resolve_state_id(session, ticket.get("State"), ticket.get("StateID"))
+        if target_state is not None and await _is_pending_state(session, target_state):
+            raise OperationFault(OPERATION_FAILED_MESSAGE) from None
+        pending_time = None
+    except InvalidPendingTime:
+        # TicketUpdate.pm:818-824 (ValidatePendingTime)
+        return _err(f"{op}.InvalidParameter", f"{op}: Ticket->PendingTime parameter is invalid!")
+    articles = await parse_gi_articles(
+        art_data,
+        op=op,
+        user_type=user_type,
+        has_owner=False,
+        session=session,
+        sysconfig=sysconfig,
+    )
+    if isinstance(articles, dict):
+        return articles
+    fields = await parse_gi_dynamic_fields(
+        data.get("DynamicField"), op=op, articles_present=bool(articles), session=session
+    )
+    if isinstance(fields, dict):
+        return fields
+    article_fields: list[GiDynamicFields] = []
+    for gi in articles:
+        own = await parse_gi_dynamic_fields(
+            gi.raw.get("DynamicField"), op=op, articles_present=True, session=session
+        )
+        if isinstance(own, dict):
+            return own
+        article_fields.append(own)
 
     try:
         async with session.begin_nested():
@@ -1313,7 +1810,6 @@ async def op_ticket_update(
             new_state_id = await _resolve_state_id(
                 session, ticket.get("State"), ticket.get("StateID")
             )
-            pending_time = _parse_pending_time(ticket.get("PendingTime"))
             if new_state_id is not None:
                 await change_state(
                     session,
@@ -1491,71 +1987,36 @@ async def op_ticket_update(
                     user_id=user_id,
                 )
 
-            # Dynamic fields
-            for df in data.get("DynamicField") or []:
-                if isinstance(df, dict):
-                    fname = df.get("Name") or ""
-                    val = df.get("Value")
-                    if fname:
-                        values = [str(val)] if val is not None else []
-                        await update_dynamic_field(
-                            session,
-                            ticket_id=ticket_id,
-                            field_name=fname,
-                            values=values,
-                            user_id=user_id,
-                        )
-
-            # Article
-            art_data = data.get("Article")
-            if isinstance(art_data, list) and art_data:
-                art_data = art_data[0]
-            if art_data and isinstance(art_data, dict):
-                # TicketUpdate note: IsVisibleForCustomer defaults to 0 (internal)
-                if art_data.get("IsVisibleForCustomer") is None:
-                    art_data = {**art_data, "IsVisibleForCustomer": 0}
-                if not art_data.get("ContentType") and art_data.get("MimeType"):
-                    charset = art_data.get("Charset") or "utf-8"
-                    art_data = {
-                        **art_data,
-                        "ContentType": f"{art_data['MimeType']}; charset={charset}",
-                    }
-                att = art_data.get("Attachment")
-                if isinstance(att, dict):
-                    art_data = {**art_data, "Attachment": [att]}
-                article_in = _build_article_in(art_data, user_type)
-                if _wants_article_send(art_data, user_type):
-                    send_article = _as_send_article(article_in, art_data)
-                    if not (send_article.to_address or "").strip():
-                        raise InvalidInput(
-                            f"{op}: Article->To parameter must be a valid email address"
-                            " when Article->ArticleSend is set!"
-                        )
-                    queue_row = (
-                        await session.execute(
-                            text("SELECT queue_id FROM ticket WHERE id = :tid"),
-                            {"tid": ticket_id},
-                        )
-                    ).first()
-                    await _deliver_article(
-                        session,
-                        sysconfig,
-                        ticket_id,
-                        int(queue_row[0]) if queue_row else 0,
-                        user_id,
-                        send_article,
-                    )
-                else:
-                    article_in = await _apply_stored_email_security(
-                        article_in, art_data, sysconfig, settings
-                    )
-                    await add_article(
-                        session,
-                        ticket_id=ticket_id,
-                        article=article_in,
-                        user_id=user_id,
-                        sysconfig=sysconfig,
-                    )
+            # Articles first, then the request's dynamic fields (TicketUpdate.pm: Article
+            # fields land on the first article, Ticket fields on the ticket).
+            article_ids = []
+            for gi, own_fields in zip(articles, article_fields, strict=True):
+                article_id = await _write_gi_article(
+                    session,
+                    sysconfig,
+                    settings,
+                    gi,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                )
+                article_ids.append(article_id)
+                await _write_ticket_dynamic_fields(
+                    session, own_fields, ticket_id=ticket_id, user_id=user_id
+                )
+                await _write_article_dynamic_fields(
+                    session, own_fields, ticket_id=ticket_id, article_id=article_id, user_id=user_id
+                )
+            await _write_ticket_dynamic_fields(
+                session, fields, ticket_id=ticket_id, user_id=user_id
+            )
+            if article_ids:
+                await _write_article_dynamic_fields(
+                    session,
+                    fields,
+                    ticket_id=ticket_id,
+                    article_id=article_ids[0],
+                    user_id=user_id,
+                )
 
         await session.commit()
     except TicketNotFound:
@@ -1571,7 +2032,40 @@ async def op_ticket_update(
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
 
-    return {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)}
+    return await _with_ticket_data(
+        article_id_result(
+            {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
+            article_ids,
+            op=op,
+        ),
+        session,
+        operation_config,
+        op=op,
+        ticket_id=ticket_id,
+        article_ids=article_ids,
+        attachments=True,
+    )
+
+
+_MAX_BIGINT = 2**63 - 1
+
+
+def _gi_ticket_id_tokens(raw: Any, *, split_pattern: str) -> list[str] | None:
+    """The ``TicketID`` parameter of TicketGet/TicketHistoryGet as strings.
+
+    A non-empty scalar is split like Perl ``split`` (trailing empty fields dropped), a
+    non-empty list is taken as is; anything else is ``None`` (``WrongStructure``).
+    """
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, (str, int, float)) and str(raw) != "":
+        parts = re.split(split_pattern, str(raw))
+        while parts and parts[-1] == "":
+            parts.pop()
+        return parts
+    if isinstance(raw, (list, tuple)) and raw:
+        return [perl_str(x) if not isinstance(x, (dict, list)) else "" for x in raw]
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -1601,36 +2095,33 @@ async def op_ticket_get(
     user_id, login, user_type = auth
     is_customer = user_type == _CUSTOMER_USER_TYPE
 
+    # TicketGet.pm:264-297
     ticket_ids_raw = data.get("TicketID")
-    if ticket_ids_raw is None:
-        return _err(f"{op}.MissingParameter", f"{op}: TicketID is required!")
+    if not perl_truthy(ticket_ids_raw):
+        return _err(f"{op}.MissingParameter", f"{op}: TicketID parameter is missing!")
+    parsed_ids = _gi_ticket_id_tokens(ticket_ids_raw, split_pattern=r"\s*,\s*")
+    if parsed_ids is None:
+        return _err(f"{op}.WrongStructure", f"{op}: Structure for TicketID is not correct!")
+    if not all(re.fullmatch(r"[1-9][0-9]*", t) for t in parsed_ids):
+        return _err(f"{op}.WrongStructure", f"{op}: Invalid ticket ID parameter(s) found!")
+    ticket_ids = [int(t) for t in parsed_ids]
 
-    # TicketID can be a single value, CSV string, or a list
-    if isinstance(ticket_ids_raw, (list, tuple)):
-        ticket_ids = [int(t) for t in ticket_ids_raw]
-    elif isinstance(ticket_ids_raw, str) and "," in ticket_ids_raw:
-        ticket_ids = [int(t.strip()) for t in ticket_ids_raw.split(",") if t.strip()]
-    else:
-        ticket_ids = [int(ticket_ids_raw)]
-
-    all_articles = bool(int(data.get("AllArticles") or 0))
-    with_attachments = bool(int(data.get("Attachments") or 0))
-    with_dynamic_fields = bool(int(data.get("DynamicFields") or 0))
-    extended = bool(int(data.get("Extended") or 0))
+    all_articles = perl_truthy(data.get("AllArticles"))
+    with_attachments = perl_truthy(data.get("Attachments"))
+    with_dynamic_fields = perl_truthy(data.get("DynamicFields"))
+    extended = perl_truthy(data.get("Extended"))
     get_attachment_contents = data.get("GetAttachmentContents")
-    if get_attachment_contents is None:
-        get_attachment_contents = 1
-    get_attachment_contents = bool(int(get_attachment_contents))
-    article_order = str(data.get("ArticleOrder") or "ASC").upper()
-    if article_order not in ("ASC", "DESC"):
-        article_order = "ASC"
+    get_attachment_contents = (
+        True if get_attachment_contents is None else perl_truthy(get_attachment_contents)
+    )
+    article_order = str(data.get("ArticleOrder") or "ASC")
     try:
         article_limit = int(data.get("ArticleLimit") or 0)
     except (ValueError, TypeError):
         article_limit = 0
     sender_type_filter = data.get("ArticleSenderType")
     if sender_type_filter is not None:
-        sender_type_filter = [str(s).lower() for s in _to_list(sender_type_filter)]
+        sender_type_filter = [str(s) for s in _to_list(sender_type_filter)]
 
     customer_company = ""
     allowed_groups: set[int] = set()
@@ -1640,132 +2131,66 @@ async def op_ticket_get(
         pe = PermissionEngine(session)
         allowed_groups = set(await pe.groups_for_permission(user_id, "ro"))
 
+    html_body_as_attachment = perl_truthy(data.get("HTMLBodyAsAttachment"))
+    now = datetime.now(UTC).replace(tzinfo=None)
+
+    # TicketGet.pm checks every requested ticket first; the first one the caller may not
+    # read (unknown ids included) fails the whole call.
+    for tid in ticket_ids:
+        if tid > _MAX_BIGINT:  # no such ticket; never bound (column is BIGINT)
+            return _err(f"{op}.AccessDenied", f"{op}: User does not have access to the ticket!")
+        q_group = (
+            await session.execute(
+                text(
+                    "SELECT q.group_id FROM ticket t JOIN queue q ON q.id = t.queue_id"
+                    " WHERE t.id = :tid"
+                ),
+                {"tid": tid},
+            )
+        ).scalar_one_or_none()
+        if q_group is None:
+            allowed = False
+        elif is_customer:
+            allowed = await customer_can_access_ticket(
+                session, login=login, customer_id=customer_company, ticket_id=tid
+            )
+        else:
+            allowed = q_group in allowed_groups
+        if not allowed:
+            return _err(f"{op}.AccessDenied", f"{op}: User does not have access to the ticket!")
+
+    ctx = await load_ticket_get_context(
+        session, dynamic_fields=with_dynamic_fields, articles=all_articles
+    )
     tickets_out: list[dict[str, Any]] = []
     for tid in ticket_ids:
-        t = (
-            (
-                await session.execute(
-                    text(
-                        "SELECT t.*, ts.name as state_name, tp.name as priority_name,"
-                        " q.name as queue_name, tst.name as state_type,"
-                        " lt.name as lock_name,"
-                        " u.login as owner_login,"
-                        " ru.login as responsible_login,"
-                        " tt.name as type_name,"
-                        " svc.name as service_name,"
-                        " sla.name as sla_name"
-                        " FROM ticket t"
-                        " JOIN ticket_state ts ON ts.id = t.ticket_state_id"
-                        " JOIN ticket_priority tp ON tp.id = t.ticket_priority_id"
-                        " JOIN queue q ON q.id = t.queue_id"
-                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-                        " LEFT JOIN ticket_lock_type lt ON lt.id = t.ticket_lock_id"
-                        " LEFT JOIN users u ON u.id = t.user_id"
-                        " LEFT JOIN users ru ON ru.id = t.responsible_user_id"
-                        " LEFT JOIN ticket_type tt ON tt.id = t.type_id"
-                        " LEFT JOIN service svc ON svc.id = t.service_id"
-                        " LEFT JOIN sla ON sla.id = t.sla_id"
-                        " WHERE t.id = :tid LIMIT 1"
-                    ),
-                    {"tid": tid},
-                )
-            )
-            .mappings()
-            .first()
+        ticket_dict = await build_ticket_entry(
+            session,
+            tid,
+            dynamic_fields=with_dynamic_fields,
+            extended=extended,
+            now=now,
+            ctx=ctx,
         )
-        if t is None:
+        if ticket_dict is None:
             continue
 
-        if is_customer:
-            if not await customer_can_access_ticket(
-                session, login=login, customer_id=customer_company, ticket_id=tid
-            ):
-                continue
-        else:
-            # Permission check via queue→group
-            q_group = (
-                await session.execute(select(Queue.group_id).where(Queue.id == int(t["queue_id"])))
-            ).scalar_one_or_none()
-            if q_group not in allowed_groups:
-                continue
-
-        ticket_dict: dict[str, Any] = {
-            "TicketID": t["id"],
-            "TicketNumber": t["tn"],
-            "Title": t["title"],
-            "QueueID": t["queue_id"],
-            "Queue": t["queue_name"],
-            "StateID": t["ticket_state_id"],
-            "State": t["state_name"],
-            "StateType": t["state_type"],
-            "PriorityID": t["ticket_priority_id"],
-            "Priority": t["priority_name"],
-            "LockID": t["ticket_lock_id"],
-            "Lock": t["lock_name"],
-            "OwnerID": t["user_id"],
-            "Owner": t["owner_login"],
-            "ResponsibleID": t["responsible_user_id"],
-            "Responsible": t["responsible_login"],
-            "TypeID": t["type_id"],
-            "Type": t["type_name"],
-            "ServiceID": t["service_id"],
-            "Service": t["service_name"],
-            "SLAID": t["sla_id"],
-            "SLA": t["sla_name"],
-            "CustomerID": t["customer_id"],
-            "CustomerUserID": t["customer_user_id"],
-            "CreateTime": t["create_time"].isoformat() if t["create_time"] else None,
-            "ChangeTime": t["change_time"].isoformat() if t["change_time"] else None,
-            "ArchiveFlag": "n" if not t["archive_flag"] else "y",
-            "UntilTime": t["until_time"] or 0,
-        }
-
-        if extended:
-            ticket_dict["EscalationTime"] = t["escalation_time"] or 0
-            ticket_dict["EscalationResponseTime"] = t["escalation_response_time"] or 0
-            ticket_dict["EscalationUpdateTime"] = t["escalation_update_time"] or 0
-            ticket_dict["EscalationSolutionTime"] = t["escalation_solution_time"] or 0
-            # First response / closed timestamps from history when available
-            fr = (
-                await session.execute(
-                    text(
-                        "SELECT MIN(th.create_time) FROM ticket_history th"
-                        " JOIN ticket_history_type tht ON tht.id = th.history_type_id"
-                        " WHERE th.ticket_id = :tid"
-                        " AND tht.name IN ('SendAnswer','EmailAgent','PhoneCallAgent','AddNote')"
-                    ),
-                    {"tid": tid},
-                )
-            ).first()
-            if fr and fr[0]:
-                ticket_dict["FirstResponse"] = fr[0].isoformat()
-            closed = (
-                await session.execute(
-                    text(
-                        "SELECT MIN(th.create_time) FROM ticket_history th"
-                        " JOIN ticket_state ts ON ts.id = th.state_id"
-                        " JOIN ticket_state_type tst ON tst.id = ts.type_id"
-                        " WHERE th.ticket_id = :tid AND LOWER(tst.name) LIKE 'closed%'"
-                    ),
-                    {"tid": tid},
-                )
-            ).first()
-            if closed and closed[0]:
-                ticket_dict["Closed"] = closed[0].isoformat()
-
-        if with_dynamic_fields:
-            ticket_dict["DynamicField"] = await _load_dynamic_fields_gi(session, int(t["id"]))
-
         if all_articles:
-            ticket_dict["Article"] = await _load_articles_gi(
+            articles = await build_article_entries(
                 session,
-                int(t["id"]),
-                with_attachments=with_attachments,
+                tid,
+                customer_only=is_customer,
+                sender_types=sender_type_filter,
+                order=article_order,
+                limit=article_limit,
+                dynamic_fields=with_dynamic_fields,
+                attachments=with_attachments,
                 get_attachment_contents=get_attachment_contents,
-                article_order=article_order,
-                article_limit=article_limit,
-                sender_type_filter=sender_type_filter,
+                html_body_as_attachment=html_body_as_attachment,
+                ctx=ctx,
             )
+            if articles:
+                ticket_dict["Article"] = articles
 
         tickets_out.append(ticket_dict)
 
@@ -1773,168 +2198,6 @@ async def op_ticket_get(
         return _err(f"{op}.AccessDenied", f"{op}: No access or tickets not found!")
 
     return {"Ticket": tickets_out}
-
-
-async def _load_dynamic_fields_gi(session: AsyncSession, ticket_id: int) -> list[dict[str, Any]]:
-    """Load dynamic fields in Znuny GI format."""
-    df_rows = (
-        (
-            await session.execute(
-                select(DynamicField).where(
-                    DynamicField.object_type == "Ticket",
-                    DynamicField.valid_id == 1,
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    if not df_rows:
-        return []
-
-    field_by_id = {f.id: f for f in df_rows}
-    values_rows = (
-        (
-            await session.execute(
-                select(DynamicFieldValue).where(
-                    DynamicFieldValue.object_id == ticket_id,
-                    DynamicFieldValue.field_id.in_(field_by_id.keys()),
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    grouped: dict[int, list[Any]] = {fid: [] for fid in field_by_id}
-    for v in values_rows:
-        val: Any
-        if v.value_text is not None:
-            val = v.value_text
-        elif v.value_int is not None:
-            val = v.value_int
-        elif v.value_date is not None:
-            val = v.value_date.strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            continue
-        grouped.setdefault(v.field_id, []).append(val)
-
-    out: list[dict[str, Any]] = []
-    for fid, field in field_by_id.items():
-        vals = grouped.get(fid, [])
-        out.append({"Name": field.name, "Value": vals[0] if len(vals) == 1 else vals})
-    return out
-
-
-async def _load_articles_gi(
-    session: AsyncSession,
-    ticket_id: int,
-    *,
-    with_attachments: bool,
-    get_attachment_contents: bool = True,
-    article_order: str = "ASC",
-    article_limit: int = 0,
-    sender_type_filter: list[str] | None = None,
-) -> list[dict[str, Any]]:
-    """Load articles in Znuny GI format."""
-    order_clause = Article.id.desc() if article_order == "DESC" else Article.id.asc()
-    art_rows = (
-        (
-            await session.execute(
-                select(Article).where(Article.ticket_id == ticket_id).order_by(order_clause)
-            )
-        )
-        .scalars()
-        .all()
-    )
-
-    if not art_rows:
-        return []
-
-    # Map sender_type_id → name for filter + response
-    st_rows = (await session.execute(text("SELECT id, name FROM article_sender_type"))).fetchall()
-    st_name_by_id = {int(r[0]): str(r[1]).lower() for r in st_rows}
-
-    if sender_type_filter:
-        allowed = {s.lower() for s in sender_type_filter}
-        art_rows = [
-            a
-            for a in art_rows
-            if st_name_by_id.get(int(a.article_sender_type_id or 0), "") in allowed
-        ]
-
-    if article_limit and article_limit > 0:
-        art_rows = list(art_rows)[:article_limit]
-
-    if not art_rows:
-        return []
-
-    art_ids = [a.id for a in art_rows]
-    mime_rows = (
-        (
-            await session.execute(
-                select(ArticleDataMimeModel).where(ArticleDataMimeModel.article_id.in_(art_ids))
-            )
-        )
-        .scalars()
-        .all()
-    )
-    mime_by_id = {m.article_id: m for m in mime_rows}
-
-    out: list[dict[str, Any]] = []
-    for a in art_rows:
-        m = mime_by_id.get(a.id)
-        st_name = st_name_by_id.get(int(a.article_sender_type_id or 0))
-        art_dict: dict[str, Any] = {
-            "ArticleID": a.id,
-            "TicketID": a.ticket_id,
-            "IsVisibleForCustomer": int(a.is_visible_for_customer or 0),
-            "SenderTypeID": a.article_sender_type_id,
-            "SenderType": st_name,
-            "CommunicationChannelID": a.communication_channel_id,
-            "CreateTime": a.create_time.isoformat() if a.create_time else None,
-        }
-        if m:
-            art_dict.update(
-                {
-                    "From": m.a_from,
-                    "To": m.a_to,
-                    "Cc": m.a_cc,
-                    "Subject": m.a_subject,
-                    "Body": m.a_body,
-                    "ContentType": m.a_content_type,
-                    "MessageID": m.a_message_id,
-                }
-            )
-
-        if with_attachments:
-            att_rows = (
-                (
-                    await session.execute(
-                        select(ArticleDataMimeAttachment).where(
-                            ArticleDataMimeAttachment.article_id == a.id
-                        )
-                    )
-                )
-                .scalars()
-                .all()
-            )
-            atts: list[dict[str, Any]] = []
-            for att in att_rows:
-                entry: dict[str, Any] = {
-                    "Filename": att.filename,
-                    "ContentType": att.content_type,
-                    "ContentSize": att.content_size,
-                }
-                if get_attachment_contents:
-                    entry["Content"] = base64.b64encode(att.content or b"").decode("ascii")
-                atts.append(entry)
-            art_dict["Attachment"] = atts
-
-        out.append(art_dict)
-
-    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1954,12 +2217,16 @@ async def op_ticket_search(
 
     Supports core Znuny TicketSearch filters: TicketNumber, Title, Queues,
     States, StateType (string or list), Priorities, Types, Locks, Services,
-    SLAs, OwnerIDs/ResponsibleIDs/WatchUserIDs, Customer*, create-time windows,
-    MIMEBase_* / Fulltext article filters, SortBy/OrderBy, UseSubQueues,
-    SearchInArchive, DynamicField_X (Equals/Like/comparison ops).
-    """
-    from datetime import timedelta
+    SLAs, OwnerIDs/ResponsibleIDs/WatchUserIDs, Customer*, TicketID, Created*
+    (NewTicket history row), ticket create/change/last-change/close/pending/escalation
+    time windows (see ``search_filters``), MIMEBase_* / Fulltext article filters,
+    SortBy/OrderBy, UseSubQueues, SearchInArchive, DynamicField_X (Equals/Like/
+    comparison ops). No hit answers ``{}`` like Znuny (no ``TicketID`` key).
 
+    ``Result`` (COUNT/ARRAY), ticket/article flag filters and mention filters are not
+    GenericInterface parameters in Znuny (the operation always uses ``Result => ARRAY``
+    and its ``_GetParams`` whitelist drops them), so they are ignored here as well.
+    """
     op = "TicketSearch"
 
     auth = await _auth_from_params(data, session, session_store, request=request, settings=settings)
@@ -1967,6 +2234,11 @@ async def op_ticket_search(
         return _reprefix_auth_error(op, auth)
     user_id, login, user_type = auth
     is_customer = user_type == _CUSTOMER_USER_TYPE
+
+    # an id outside its column width can never match: no match, never bound
+    data, no_id_match = sanitize_id_filters(data)
+    if no_id_match:
+        return {}
 
     conditions: list[str] = []
     params: dict[str, Any] = {}
@@ -1984,7 +2256,7 @@ async def op_ticket_search(
         scope = await customer_ticket_scope_filter(session, login=login, customer_id=company_id)
         owned_ids = set((await session.execute(select(Ticket.id).where(scope))).scalars().all())
         if not owned_ids:
-            return {"TicketID": []}
+            return {}
         o_list = list(owned_ids)
         o_ph = ",".join(f":own{i}" for i in range(len(o_list)))
         conditions.append(f"t.id IN ({o_ph})")
@@ -2011,7 +2283,7 @@ async def op_ticket_search(
         pe = PermissionEngine(session)
         allowed_groups = await pe.groups_for_permission(user_id, "ro")
         if not allowed_groups:
-            return {"TicketID": []}
+            return {}
 
         allowed_queue_rows = (
             (
@@ -2057,7 +2329,7 @@ async def op_ticket_search(
             queue_filter = queue_filter & req_queues
 
         if not queue_filter:
-            return {"TicketID": []}
+            return {}
 
         q_list = list(queue_filter)
         placeholders = ",".join(f":q{i}" for i in range(len(q_list)))
@@ -2112,7 +2384,7 @@ async def op_ticket_search(
         else:
             state_ids = all_type_sids
         if not state_ids:
-            return {"TicketID": []}
+            return {}
 
     # StateTypes (Tiqora extension) + StateTypeIDs
     if data.get("StateTypes"):
@@ -2124,7 +2396,7 @@ async def op_ticket_search(
         else:
             state_ids = all_type_sids
         if not state_ids:
-            return {"TicketID": []}
+            return {}
     if data.get("StateTypeIDs"):
         # Map type_ids → state ids
         type_id_list = [int(x) for x in _to_list(data["StateTypeIDs"])]
@@ -2143,7 +2415,7 @@ async def op_ticket_search(
         else:
             state_ids = type_sids
         if not state_ids:
-            return {"TicketID": []}
+            return {}
 
     if state_ids:
         s_list = list(state_ids)
@@ -2310,56 +2582,26 @@ async def op_ticket_search(
         if data.get("ArchiveFlags") is None and data.get("SearchInArchive") is None:
             conditions.append("t.archive_flag = 0")
 
-    # Ticket create-time filters
-    now_ts = datetime.now(tz=UTC)
-    if tct_newer_min := data.get("TicketCreateTimeNewerMinutes"):
-        cutoff = now_ts - timedelta(minutes=int(tct_newer_min))
-        conditions.append("t.create_time >= :ct_newer_min")
-        params["ct_newer_min"] = cutoff
-    if tct_older_min := data.get("TicketCreateTimeOlderMinutes"):
-        cutoff = now_ts - timedelta(minutes=int(tct_older_min))
-        conditions.append("t.create_time <= :ct_older_min")
-        params["ct_older_min"] = cutoff
-    if tct_newer := data.get("TicketCreateTimeNewerDate"):
-        conditions.append("t.create_time >= :ct_newer")
-        params["ct_newer"] = tct_newer
-    if tct_older := data.get("TicketCreateTimeOlderDate"):
-        conditions.append("t.create_time <= :ct_older")
-        params["ct_older"] = tct_older
+    # Ticket time windows (create / change / close / pending / escalation), Znuny semantics
+    now_naive = datetime.now(tz=UTC).replace(tzinfo=None)
+    time_data = create_time_settings(data, now=now_naive)
+    if not time_filters(time_data, conditions, params, joins, now=now_naive):
+        return {}
+    await created_filters(session, data, conditions, params)
 
-    # MIMEBase / Fulltext article filters via article_data_mime
-    mime_filters: list[tuple[str, str]] = []
-    for field, col in (
-        ("MIMEBase_From", "a_from"),
-        ("MIMEBase_To", "a_to"),
-        ("MIMEBase_Cc", "a_cc"),
-        ("MIMEBase_Subject", "a_subject"),
-        ("MIMEBase_Body", "a_body"),
-    ):
-        if data.get(field):
-            mime_filters.append((col, _like_pattern(data[field])))
-    if data.get("Fulltext"):
-        ft = _like_pattern(data["Fulltext"])
-        mime_filters.append(("__fulltext__", ft))
+    # TicketID: limit the search to one id or a list of ids
+    if (tid_raw := data.get("TicketID")) not in (None, "", []):
+        try:
+            tid_list = [int(x) for x in _to_list(tid_raw)]
+        except (TypeError, ValueError):
+            return {}
+        ph = ",".join(f":tid{i}" for i in range(len(tid_list)))
+        conditions.append(f"t.id IN ({ph})")
+        for i, tid_val in enumerate(tid_list):
+            params[f"tid{i}"] = tid_val
 
-    if mime_filters:
-        _add_join(
-            "JOIN article a ON a.ticket_id = t.id"
-            " JOIN article_data_mime adm ON adm.article_id = a.id",
-            "mime",
-        )
-        mime_parts = []
-        for i, (col, pat) in enumerate(mime_filters):
-            if col == "__fulltext__":
-                mime_parts.append(
-                    f"(adm.a_from LIKE :mf{i} OR adm.a_to LIKE :mf{i}"
-                    f" OR adm.a_cc LIKE :mf{i} OR adm.a_subject LIKE :mf{i}"
-                    f" OR adm.a_body LIKE :mf{i} OR t.title LIKE :mf{i})"
-                )
-            else:
-                mime_parts.append(f"adm.{col} LIKE :mf{i}")
-            params[f"mf{i}"] = pat
-        conditions.append("(" + " AND ".join(mime_parts) + ")")
+    # MIMEBase / Fulltext / ContentSearch article filters (see search_filters)
+    await article_text_filters(session, SysConfig(session), data, conditions, params, _add_join)
 
     # Article create-time filters
     if any(
@@ -2374,10 +2616,10 @@ async def op_ticket_search(
         _add_join("JOIN article a_ct ON a_ct.ticket_id = t.id", "article_ct")
         if m := data.get("ArticleCreateTimeNewerMinutes"):
             conditions.append("a_ct.create_time >= :act_nm")
-            params["act_nm"] = now_ts - timedelta(minutes=int(m))
+            params["act_nm"] = clamped_minutes_before(now_naive, m)
         if m := data.get("ArticleCreateTimeOlderMinutes"):
             conditions.append("a_ct.create_time <= :act_om")
-            params["act_om"] = now_ts - timedelta(minutes=int(m))
+            params["act_om"] = clamped_minutes_before(now_naive, m)
         if m := data.get("ArticleCreateTimeNewerDate"):
             conditions.append("a_ct.create_time >= :act_nd")
             params["act_nd"] = m
@@ -2464,31 +2706,55 @@ async def op_ticket_search(
         "SLA": "t.sla_id",
         "PendingTime": "t.until_time",
         "EscalationTime": "t.escalation_time",
+        "EscalationUpdateTime": "t.escalation_update_time",
+        "EscalationResponseTime": "t.escalation_response_time",
+        "EscalationSolutionTime": "t.escalation_solution_time",
     }
-    sort_raw = data.get("SortBy") or "Age"
-    order_raw = data.get("OrderBy") or "Down"
-    sort_list = _to_list(sort_raw)
-    order_list = _to_list(order_raw)
+    # tickets without pending/escalation time store 0: always sort them last (Znuny)
+    zero_last = {
+        "PendingTime",
+        "EscalationTime",
+        "EscalationUpdateTime",
+        "EscalationResponseTime",
+        "EscalationSolutionTime",
+    }
+    sort_list = _to_list(data.get("SortBy") or "Age")
+    order_list = _to_list(data.get("OrderBy") or "Down")
     order_parts: list[str] = []
-    for i, s in enumerate(sort_list):
-        col = sort_map.get(str(s), "t.create_time")
+    select_cols: list[str] = []  # PostgreSQL: ORDER BY expressions must be in the DISTINCT list
+    for i, sort_key in enumerate(sort_list):
+        col = sort_map.get(str(sort_key), "t.create_time")
         direction = str(order_list[i] if i < len(order_list) else order_list[-1]).lower()
         dir_sql = "ASC" if direction in ("up", "asc") else "DESC"
+        if str(sort_key) in zero_last:
+            flag = f"zero_{len(select_cols)}"
+            select_cols.append(f"(CASE WHEN {col} = 0 THEN 1 ELSE 0 END) AS {flag}")
+            order_parts.append(f"{flag} ASC")
         order_parts.append(f"{col} {dir_sql}")
+        if col not in select_cols:
+            select_cols.append(col)
     if not order_parts:
         order_parts = ["t.create_time DESC"]
+        select_cols = ["t.create_time"]
     order_sql = ", ".join(order_parts)
+    order_cols = select_cols
 
     limit_raw = data.get("Limit") or 500
     try:
         limit = min(int(limit_raw), 2000)
     except (ValueError, TypeError):
         limit = 500
+    if limit < 0:
+        # Znuny writes "LIMIT -5" into the SQL, the database refuses it and TicketSearch
+        # returns nothing
+        return {}
 
     joins_sql = " ".join(joins)
     where_sql = " AND ".join(conditions) if conditions else "1=1"
     sql = (
-        f"SELECT DISTINCT t.id FROM ticket t {joins_sql}"
+        # PostgreSQL requires every ORDER BY expression in a SELECT DISTINCT list
+        f"SELECT DISTINCT t.id{''.join(', ' + c for c in order_cols if c != 't.id')}"
+        f" FROM ticket t {joins_sql}"
         f" WHERE {where_sql}"
         f" ORDER BY {order_sql}"
         f" LIMIT {limit}"
@@ -2497,6 +2763,8 @@ async def op_ticket_search(
     rows = (await session.execute(text(sql), params)).fetchall()
     ticket_ids = [int(r[0]) for r in rows]
 
+    if not ticket_ids:
+        return {}
     return {"TicketID": ticket_ids}
 
 
@@ -2530,31 +2798,26 @@ async def op_ticket_history_get(
     if user_type != _AGENT_USER_TYPE:
         return _err(f"{op}.AuthFail", f"{op}: User needs to an Agent!")
 
+    # TicketHistoryGet.pm:120-143
     ticket_ids_raw = data.get("TicketID")
-    if ticket_ids_raw is None:
+    if not perl_truthy(ticket_ids_raw):
         return _err(f"{op}.MissingParameter", f"{op}: TicketID parameter is missing!")
-
-    if isinstance(ticket_ids_raw, str):
-        if "," in ticket_ids_raw:
-            ticket_ids = [int(x.strip()) for x in ticket_ids_raw.split(",") if x.strip()]
-        else:
-            ticket_ids = [int(ticket_ids_raw)]
-    elif isinstance(ticket_ids_raw, (list, tuple)):
-        ticket_ids = [int(x) for x in ticket_ids_raw]
-    else:
-        try:
-            ticket_ids = [int(ticket_ids_raw)]
-        except (ValueError, TypeError):
-            return _err(
-                f"{op}.WrongStructure",
-                f"{op}: Structure for TicketID is not correct!",
-            )
+    tokens = _gi_ticket_id_tokens(ticket_ids_raw, split_pattern=",")
+    if tokens is None:
+        return _err(f"{op}.WrongStructure", f"{op}: Structure for TicketID is not correct!")
 
     pe = PermissionEngine(session)
     allowed_groups = set(await pe.groups_for_permission(user_id, "ro"))
 
     histories: list[dict[str, Any]] = []
-    for tid in ticket_ids:
+    for tid_token in tokens:
+        # a non-numeric id has no access, like CheckAccessPermissions (TicketHistoryGet.pm:146-160)
+        if not re.fullmatch(r"[0-9]{1,18}", tid_token):
+            return _err(
+                f"{op}.AccessDenied",
+                f"{op}: User does not have access to the ticket {tid_token}!",
+            )
+        tid = int(tid_token)
         t_row = (
             await session.execute(
                 text(
@@ -2602,7 +2865,7 @@ async def op_ticket_history_get(
                     "ArticleID": r["article_id"],
                     "Name": r["name"],
                     "CreateBy": r["create_by"],
-                    "CreateTime": r["create_time"].isoformat() if r["create_time"] else None,
+                    "CreateTime": znuny_ts(r["create_time"]),
                     "HistoryType": r["history_type"],
                     "QueueID": r["queue_id"],
                     "OwnerID": r["owner_id"],
@@ -2623,6 +2886,22 @@ async def op_ticket_history_get(
 # ---------------------------------------------------------------------------
 # TimeAccountingGet
 # ---------------------------------------------------------------------------
+
+
+def _parse_znuny_datetime(raw: Any) -> datetime | None:
+    value = str(raw).strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(value, fmt)  # noqa: DTZ007 - Znuny timestamps are naive UTC
+        except ValueError:
+            continue
+    try:  # ISO variants ("2024-06-01T12:00:00", "...Z", "...+02:00")
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
 
 
 async def op_time_accounting_get(
@@ -2658,21 +2937,23 @@ async def op_time_accounting_get(
     if target_id is None:
         return {"TimeAccountingResult": []}
 
-    start = data["TimeAccountingStart"]
-    end = data["TimeAccountingEnd"]
+    # PostgreSQL (asyncpg) refuses strings for timestamp bounds: bind datetimes on both dialects.
+    start = _parse_znuny_datetime(data["TimeAccountingStart"])
+    end = _parse_znuny_datetime(data["TimeAccountingEnd"])
+    if start is None or end is None:
+        return {}
 
     rows = (
         (
             await session.execute(
                 text(
                     "SELECT t.id AS ticket_id, t.tn, t.customer_id, t.title,"
-                    " ta.time_unit, ta.create_time, q.name AS queue_name"
+                    " ta.time_unit, ta.create_time"
                     " FROM time_accounting ta"
                     " JOIN ticket t ON t.id = ta.ticket_id"
-                    " LEFT JOIN queue q ON q.id = t.queue_id"
                     " WHERE ta.create_by = :uid"
                     " AND ta.create_time BETWEEN :start AND :end"
-                    " ORDER BY ta.create_time ASC, t.id ASC"
+                    " ORDER BY ta.create_time ASC, t.id ASC, ta.id ASC"
                 ),
                 {"uid": target_id, "start": start, "end": end},
             )
@@ -2681,15 +2962,20 @@ async def op_time_accounting_get(
         .all()
     )
 
+    # Znuny reports the queue the ticket was in when the time was booked (no TicketID key).
+    # The history of each ticket is read once, not once per accounting row.
+    moments: dict[int, list[datetime]] = {}
+    for r in rows:
+        moments.setdefault(int(r["ticket_id"]), []).append(r["create_time"])
+    queues = {tid: await queues_at(session, tid, at) for tid, at in moments.items()}
     entries = [
         {
-            "TicketID": r["ticket_id"],
             "TicketNumber": r["tn"],
             "TicketCustomerID": r["customer_id"],
             "TicketTitle": r["title"],
-            "TimeUnit": r["time_unit"],
-            "Created": r["create_time"].isoformat() if r["create_time"] else None,
-            "Queue": r["queue_name"],
+            "TimeUnit": perl_str(znuny_num(r["time_unit"])),
+            "Created": znuny_ts(r["create_time"]),
+            "Queue": queues[int(r["ticket_id"])][r["create_time"]],
         }
         for r in rows
     ]
@@ -2702,6 +2988,87 @@ async def op_time_accounting_get(
 # ---------------------------------------------------------------------------
 # OutOfOffice
 # ---------------------------------------------------------------------------
+
+
+def _string_with_data(value: Any) -> bool:
+    """``IsStringWithData``: a defined, non-empty plain scalar."""
+    return perl_is_string(value) and perl_str(value) != ""
+
+
+def _like_escape(value: str) -> str:
+    """``Quote($Value, 'Like')``: ``_`` is literal (backslash = LIKE escape on both dialects)."""
+    return value.replace("\\", "\\\\").replace("_", "\\_")
+
+
+async def _out_of_office_user_ids(session: AsyncSession, entry: dict[str, Any]) -> list[int]:
+    """User IDs ``User::UserSearch`` finds for an OutOfOffice entry (``Valid`` users only).
+
+    Znuny checks ``Search`` (``UserSearch``), then ``PostMasterSearch`` (``UserEmail``), then
+    ``UserLogin`` - the first one given decides. The caller needs exactly one id.
+
+    * ``UserSearch``: whitespace -> ``+`` (OutOfOffice.pm:196), ``QueryCondition`` over
+      login / first_name / last_name: every word must match one of the columns, case
+      insensitively, as a whole value; ``*`` is the wildcard. Znuny's ``|``, ``AND``/``OR``,
+      ``!`` and parentheses are not supported (the words are AND-ed).
+    * ``UserEmail``: ``SearchPreferences(Key => 'UserEmail')`` - a LIKE on the preference,
+      ``LOWER()`` on both sides where the database is case sensitive (PostgreSQL); on
+      MariaDB the BLOB column compares byte-wise, exactly like Znuny there.
+    * ``UserLogin``: ``LOWER(login) LIKE lower(value)`` with ``*`` -> ``%``.
+    """
+    search = entry.get("UserSearch")
+    if _string_with_data(search):
+        words = [w for w in re.split(r"[\s+]+", perl_str(search)) if w]
+        if not words:
+            return []
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        for i, word in enumerate(words):
+            params[f"w{i}"] = _like_escape(word.lower()).replace("*", "%")
+            conditions.append(
+                f"(LOWER(login) LIKE :w{i} OR LOWER(first_name) LIKE :w{i}"
+                f" OR LOWER(last_name) LIKE :w{i})"
+            )
+        rows = await session.execute(
+            text(f"SELECT id FROM users WHERE {' AND '.join(conditions)} AND valid_id = 1"),
+            params,
+        )
+        return [int(r[0]) for r in rows.all()]
+
+    email = entry.get("UserEmail")
+    if _string_with_data(email):
+        bind = session.get_bind()
+        postgres = bind is not None and bind.dialect.name == "postgresql"
+        cond = (
+            "LOWER(p.preferences_value) LIKE LOWER(:e)"
+            if postgres
+            else "p.preferences_value LIKE :e"
+        )
+        rows = await session.execute(
+            text(
+                "SELECT p.user_id FROM user_preferences p WHERE p.preferences_key = 'UserEmail'"
+                f" AND {cond}"
+            ),
+            {"e": _pref_param(session, perl_str(email))},
+        )
+        ids = sorted({int(r[0]) for r in rows.all()})
+        if not ids:
+            return []
+        # UserSearch returns every match as soon as one of them is a user GetUserData finds
+        # (OutOfOffice passes no Valid, so validity is not checked on this path)
+        known = await session.execute(
+            text("SELECT id FROM users WHERE id IN :ids").bindparams(
+                bindparam("ids", expanding=True)
+            ),
+            {"ids": ids},
+        )
+        return ids if known.first() is not None else []
+
+    login = perl_str(entry.get("UserLogin"))
+    rows = await session.execute(
+        text("SELECT id FROM users WHERE LOWER(login) LIKE :l AND valid_id = 1"),
+        {"l": _like_escape(login.lower()).replace("*", "%")},
+    )
+    return [int(r[0]) for r in rows.all()]
 
 
 async def op_out_of_office(
@@ -2724,89 +3091,66 @@ async def op_out_of_office(
     if not await _agent_in_group(session, user_id, "admin"):
         return _err(f"{op}.AuthFail", f"{op}: User needs to be in group admin.")
 
+    # Same result as a webservice with `MappingInbound: {Type: OutOfOffice}`.
+    if (
+        data.get("OutOfOfficeEntriesCSVString") is not None
+        and data.get("OutOfOfficeEntries") is None
+    ):
+        try:
+            data = await asyncio.to_thread(OutOfOfficeMapper().map, data)
+        except MappingError as exc:
+            return _err(f"{op}.WrongInputStructure", str(exc))
+
     entries = data.get("OutOfOfficeEntries")
     if not isinstance(entries, list) or not entries:
-        return _err(
-            f"{op}.WrongInputStructure",
-            f"{op}: OutOfOfficeEntries must be a non-empty list!",
+        # OutOfOffice.pm:149-170: Success => 0 -> the provider answers with a fault
+        raise OperationFault(
+            "Payload does not contain out-of-office entries or they could not be parsed."
         )
 
-    results: list[dict[str, Any]] = []
+    written = False
     for entry in entries:
-        if not isinstance(entry, dict):
-            results.append({"Error": f"{op}.WrongInputStructure", "Entry": entry})
-            continue
-
-        # Resolve target agent
-        target_id: int | None = None
-        if entry.get("UserLogin"):
-            target_id = await _resolve_user_id(session, str(entry["UserLogin"]), None)
-        elif entry.get("UserEmail"):
-            row = (
-                await session.execute(
-                    text(
-                        "SELECT user_id FROM user_preferences"
-                        " WHERE preferences_key = 'UserEmail'"
-                        " AND preferences_value = :e LIMIT 1"
-                    ),
-                    {"e": str(entry["UserEmail"]).encode("utf-8")},
-                )
-            ).first()
-            if row:
-                target_id = int(row[0])
-        elif entry.get("UserSearch"):
-            search = str(entry["UserSearch"]).replace(" ", "%")
-            row = (
-                await session.execute(
-                    text(
-                        "SELECT id FROM users WHERE valid_id = 1"
-                        " AND (login LIKE :s OR first_name LIKE :s OR last_name LIKE :s)"
-                        " LIMIT 1"
-                    ),
-                    {"s": f"%{search}%"},
-                )
-            ).first()
-            if row:
-                target_id = int(row[0])
-
-        if target_id is None:
-            results.append(
-                {
-                    "OutOfOffice": int(bool(entry.get("OutOfOffice"))),
-                    "Error": "User not found",
-                    "Entry": entry,
-                }
+        # OutOfOffice.pm:174-192: a hash with at least one of the three lookup keys
+        if (
+            not isinstance(entry, dict)
+            or not entry
+            or not any(
+                _string_with_data(entry.get(k)) for k in ("UserEmail", "UserSearch", "UserLogin")
             )
+        ):
             continue
+        user_ids = await _out_of_office_user_ids(session, entry)
+        if len(user_ids) != 1:
+            continue  # OutOfOffice.pm:207-218: "Error while looking up unique user ID."
+        target_id = user_ids[0]
 
-        # Parse StartDate / EndDate as YYYY-MM-DD
-        pref: dict[str, str] = {
-            "OutOfOffice": "1" if entry.get("OutOfOffice") else "0",
-        }
-        for part, key in (("Start", "StartDate"), ("End", "EndDate")):
-            date_s = entry.get(key) or entry.get(f"{part}Date")
-            if date_s and re.match(r"^\d{4}-\d{2}-\d{2}$", str(date_s)):
-                y, mo, d = str(date_s).split("-")
-                pref[f"OutOfOffice{part}Year"] = y
-                pref[f"OutOfOffice{part}Month"] = mo
-                pref[f"OutOfOffice{part}Day"] = d
+        pref: dict[str, str] = {}
+        # OutOfOffice.pm:228-236: unanchored match; the first missing / unparsable part ends
+        # the loop (`last DATEPART`), so an invalid StartDate also drops EndDate
+        for part in ("Start", "End"):
+            date_s = entry.get(f"{part}Date")
+            if not _string_with_data(date_s):
+                break
+            match = re.search(r"(\d{4})-(\d{2})-(\d{2})", str(date_s))
+            if match is None:
+                break
+            pref[f"OutOfOffice{part}Year"] = match.group(1)
+            pref[f"OutOfOffice{part}Month"] = match.group(2)
+            pref[f"OutOfOffice{part}Day"] = match.group(3)
+        # `$Entry->{OutOfOffice} ? 1 : 0` - Perl truthiness ("0" and "" are off)
+        pref["OutOfOffice"] = "1" if perl_truthy(entry.get("OutOfOffice")) else "0"
 
         for k, v in pref.items():
             await _set_user_preference(session, target_id, k, v)
+        written = True
 
-        results.append(
-            {
-                "OutOfOffice": int(bool(entry.get("OutOfOffice"))),
-                "UserLogin": (
-                    await session.execute(
-                        text("SELECT login FROM users WHERE id = :id"), {"id": target_id}
-                    )
-                ).scalar_one(),
-            }
-        )
-
+    if written:
+        # User.pm SetPreferences -> _UserCacheClear: Znuny must not keep serving the old
+        # out-of-office state from its User cache
+        await invalidate_cache_type(session, "User")
     await session.commit()
-    return {"OutOfOfficeEntries": results}
+    # OutOfOffice.pm:260-264: the answer carries no per-entry detail
+    return {"Success": 1}
 
 
 __all__ = [

@@ -49,15 +49,17 @@ Backend (new unless marked):
 |---|---|
 | `backend/src/tiqora/reporting/__init__.py` | package docstring only (no import side effects) |
 | `backend/src/tiqora/reporting/settings.py` | `ReportingSettings`, `REPORTING_SECTION` |
-| `backend/src/tiqora/reporting/working_time.py` | `WorkingCalendar`, `EscalationTargets`, `CalendarResolver`, `to_epoch`, `from_epoch`, `working_minutes` |
+| `backend/src/tiqora/reporting/working_time.py` | `WorkingCalendar`, `EscalationTargets`, `CalendarResolver`, `to_epoch` (re-export of `escalation.to_epoch`), `from_epoch`, `working_minutes`, `due_at` |
 | `backend/src/tiqora/reporting/history_events.py` | pure: `TicketRow`, `HistoryRow`, `ArticleRow`, `EventRow`, `derive_events` |
 | `backend/src/tiqora/reporting/facts.py` | pure: `AiFlags`, `FactInputs`, `FactRow`, `compute_fact`, `CHANNEL_KEYS`, `FACT_VERSION` |
 | `backend/src/tiqora/reporting/facts_store.py` | DB: `load_fact_inputs`, `rebuild_ticket_facts`, `rebuild_and_commit`, `delete_ticket_facts`, `fact_write_lock` |
 | `backend/src/tiqora/reporting/dirty.py` | `mark_tickets_dirty`, `take_dirty_ticket_ids` |
-| `backend/src/tiqora/reporting/state.py` | `load_state`, `save_state`, `facts_status` |
+| `backend/src/tiqora/reporting/state.py` | `STATE_NAME`, `load_state`, `facts_status` |
 | `backend/src/tiqora/reporting/incremental.py` | `run_report_facts_tick` + constants |
 | `backend/src/tiqora/reporting/snapshots.py` | `Segment`, `ticket_timeline`, `day_end_instants`, `compute_snapshot_counts`, `write_snapshots`, `snapshot_days` |
 | `backend/src/tiqora/reporting/backfill.py` | `ReportBackfillPayload`, `run_backfill`, `REPORT_BACKFILL_JOB` |
+| `backend/src/tiqora/filters/predicates.py` | public predicate helpers extracted from `filters/tickets.py` (`like_escape`, `column_predicate`, `positive_predicate`, `fit_int_condition`, `int_bounds`, ...); `filters/tickets.py` imports them |
+| `backend/src/tiqora/reporting/filter_sql.py` | `compile_conditions` on the shared wave-0 predicate helpers extracted from `filters/tickets.py` |
 | `backend/src/tiqora/reporting/sql.py` | `shift_seconds`, `date_bucket`, `date_part`, `TzSegment`, `tz_segments`, `to_local`, `statement_timeout`, `ReportQueryTimeout` |
 | `backend/src/tiqora/reporting/definition.py` | `ReportDefinition` and parts, `TimeWindow`, `resolve_time_window`, `DefinitionError`, `validate_definition`, `definition_hash` |
 | `backend/src/tiqora/reporting/semantic.py` | `Dimension`, `Measure`, `FilterOnlyField`, `ReportSource`, `CompileContext`, `REPORT_SOURCES` |
@@ -77,8 +79,6 @@ Backend (new unless marked):
 | `backend/src/tiqora/cli/report.py` | `tiqora report backfill|status` |
 | `backend/src/tiqora/worker/report_facts.py` | `run_report_facts_worker_tick` (enabled switch + settings) |
 | modify `backend/src/tiqora/znuny/escalation.py` | public `escalation_preferences`, `calendar_config`, `to_epoch`; new `working_seconds_between` |
-| modify `backend/src/tiqora/domain/ticket_write_service.py` | `add_time_accounting` → Znuny-identical (change_time + `TimeAccounting` history) |
-| modify `backend/src/tiqora/znuny/history.py` | `TYPE_TIME_ACCOUNTING`, `add_time_accounting_history` |
 | modify `backend/src/tiqora/stats/service.py` | `StatsService` methods delegate to built-ins |
 | modify `backend/src/tiqora/gdpr/erasure.py` | delete facts + mark tickets dirty on erasure/rollback |
 | modify shared: `db/tiqora/models.py`, `extensions/core.py`, `config.py`, `domain/settings_store.py`, `worker/__main__.py`, `worker/services.py`, `api/v1/__init__.py`, `api/v1/admin/__init__.py`, `main.py` | registrations only (listed per task) |
@@ -221,6 +221,7 @@ tiqora_report_state                               -- single row name = "facts"
   backfill_target_ticket_id   BIGINT NULL
   backfill_since              DATE NULL
   backfill_started_at         DATETIME NULL
+  backfill_run_token          VARCHAR(36) NULL
   backfill_finished_at        DATETIME NULL
   last_snapshot_date          DATE NULL
   snapshot_time_zone          VARCHAR(64) NULL
@@ -243,7 +244,7 @@ class ReportingSettings(BaseModel):
     near_miss_percent: int = Field(10, ge=1, le=50)
     cache_seconds: int = Field(300, ge=0, le=3600)
     inline_row_threshold: int = Field(200_000, ge=1_000, le=10_000_000)
-    max_result_rows: int = Field(5_000, ge=100, le=50_000)
+    max_result_rows: int = Field(5_000, ge=100, le=10_000)
     export_row_limit: int = Field(100_000, ge=1_000, le=1_000_000)
     query_timeout_seconds: int = Field(60, ge=5, le=600)
 REPORTING_SECTION = SettingsSection(key="reporting", model=ReportingSettings,
@@ -441,7 +442,7 @@ async def run_report_facts_tick(*, settings: Settings | None = None,
 Tick order (each step commits on its own; every step is idempotent, so a crash in between only repeats work):
 
 1. `load_state`. If `last_history_id == 0`: set it to `MAX(ticket_history.id)` (0 if empty), commit (older history belongs to the backfill).
-2. If `backfill_status == "pending"` and `backfill_job_id is None`: `enqueue_job(kind="core.report_backfill", payload=ReportBackfillPayload(), created_by=None, dedupe_key="report_backfill")`, store the job id, commit.
+2. If `backfill_status == "pending"` and `backfill_job_id is None`: `enqueue_job(session, kind="core.report_backfill", payload=ReportBackfillPayload(), created_by=None, dedupe_key="report_backfill")`, store the job id, commit.
 3. History: up to `MAX_BATCHES_PER_TICK` times read `id, ticket_id` with `id > last_history_id ORDER BY id LIMIT HISTORY_BATCH`, plus rows whose id is in the gap list. Gap bookkeeping: every id between the old watermark and the batch maximum that was not returned joins the gap list with `first_seen = wall_clock()`; gap ids that now returned a row leave it; gaps older than `GAP_TTL_SECONDS` are dropped (rolled-back inserts); the list is capped at `MAX_GAPS` (oldest dropped). Rebuild touched tickets with `rebuild_and_commit`, then save `last_history_id` + `gap_ids` + `last_tick_at`, commit. (A time-based "only rows older than 60 s" filter was rejected: `ticket_history.create_time` is written with the DB session's `current_timestamp`, whose zone is not reliably UTC on prod.)
 4. Dirty queue: `take_dirty_ticket_ids(DIRTY_BATCH)` → `rebuild_and_commit` → `clear_dirty`, commit.
 5. Fact version upgrade (only when `backfill_status == "done"`): up to `VERSION_UPGRADE_BATCH` fact ticket ids with `fact_version < FACT_VERSION` → rebuild.
@@ -649,7 +650,8 @@ class Dimension:
     expr: ExprFn                     # raw column (naive UTC datetime for "date"/"hour"/"weekday"; DATE for "local_date")
     labels: LabelSource = "none"
     i18n_values: str | None = None   # "reports.values.state_type" etc. for enums
-    filter_type: FieldType | None = None     # wave-0 filter type; None = not filterable
+    filter_type: FieldType | None = None     # wave-0 filter type; None = not filterable; enums use "enum"
+    enum_values: tuple[str, ...] = ()        # allowed values when filter_type == "enum"
     options_source: str | None = None        # wave-0 POST /reference/field-options key ("queue", "state", ...)
     stock: bool = False              # daily snapshot date: values are stocks, not flows
 
@@ -681,6 +683,7 @@ class ReportSource:
     time_fields: tuple[str, ...] = ()                  # date / local_date dimension keys
     default_time_field: str | None = None
     requires_facts: bool = True
+    archive_exclusion: BoolFn | None = None            # drops archived tickets unless scope.include_archived (tickets, ticket_events)
     def dimension(self, key: str) -> Dimension | None
     def measure(self, key: str) -> Measure | None
     def filter_spec(self, key: str) -> FilterFieldSpec | None   # dimensions with filter_type + filter_fields
@@ -690,8 +693,8 @@ REPORT_SOURCES: ExtensionPoint[ReportSource]   # key "core.reporting.sources", i
 
 Sources (Task 11; exact keys — labels via `labels`, enum values translated in the frontend):
 
-- `tickets` — FROM `tiqora_report_ticket_fact f`; scope `f.queue_id`. Dimensions: `queue`(id, queue, filter id, options `queue`), `queue_at_create`(id, queue), `state`(id, state, options `state`), `state_type`(enum `reports.values.state_type`, filter string), `priority`(id, priority, options `priority`), `type`(id, type, options `type`), `service`(id, service, options `service`), `sla`(id, sla, options `sla`), `owner`(id, user), `responsible`(id, user), `customer`(string `f.customer_id`, customer_company), `customer_user`(string, customer_user), `channel`(enum `reports.values.channel`), `created`(date `f.created_at`), `closed`(date `f.closed_at`), `first_response`(date `f.first_response_at`), `created_hour`(hour of `f.created_at`), `created_weekday`(weekday of `f.created_at`), `process`(string `f.process_entity_id`). Filter-only: `archived`, `merged`, `reopened` (`reopen_count > 0`), `has_first_response`, `ai_triaged`, `ai_auto_replied`, `ai_handed_off` (bool). Time fields `created` (default), `closed`, `first_response`. Measures: `tickets` count; `closed_tickets` count_if `state_type = 'closed'`; `open_tickets` count_if `state_type IN OPEN_STATE_TYPES`; `reopened_tickets` count_if `reopen_count > 0`; `reopen_rate` rate(`reopen_count > 0` / `close_count > 0`); `fcr_rate` rate(`close_count > 0 AND reopen_count = 0 AND article_out_count <= 1` / `close_count > 0`); `first_response_avg|p50|p90` (`first_response_working_minutes`, minutes); `first_response_clock_avg|p50` (`first_response_minutes`); `solution_avg|p50|p90` (`solution_working_minutes`); `solution_clock_avg|p50` (`solution_minutes`); `response_breaches` count_if RESP_BREACH; `response_breach_rate` rate(RESP_BREACH / `first_response_target_minutes > 0`); `solution_breaches`, `solution_breach_rate` (same with solution); `update_breaches` sum(`update_breach_count`); `response_near_misses` count_if (`first_response_breached = false AND first_response_target_minutes > 0 AND first_response_working_minutes * 100 >= first_response_target_minutes * (100 - near_miss_percent)`); `solution_near_misses` likewise; `sla_met_rate` rate(has any target AND NOT RESP_BREACH AND NOT SOL_BREACH AND `update_breach_count = 0` / has any target); `accounted_time` sum (units); `agent_touches_avg` avg(`agent_touch_count`, number); `queue_moves_avg` avg(`queue_move_count`, number); `pingpong_tickets` count_if `queue_pingpong`. RESP_BREACH = `first_response_breached = true OR (first_response_breached IS NULL AND first_response_due_at IS NOT NULL AND first_response_due_at < :now)`; SOL_BREACH likewise with `solution_*`.
-- `ticket_events` — FROM `tiqora_report_ticket_event e JOIN tiqora_report_ticket_fact f ON f.ticket_id = e.ticket_id`; scope `f.queue_id` (current queue, like ticket visibility). Dimensions: `kind`(enum `reports.values.event_kind`, filter string), `occurred`(date), `occurred_hour`, `occurred_weekday`, `actor`(id `e.actor_user_id`, user), `queue`(id `e.queue_id`, queue), `from_queue`/`to_queue`(id `e.from_id`/`e.to_id`, queue), `from_state`/`to_state`(id, state), `from_state_type`/`to_state_type`(enum `e.from_value`/`e.to_value`, `reports.values.state_type`), `ticket_queue`(id `f.queue_id`, queue), `ticket_state`(id `f.state_id`, state), `ticket_priority`(id `f.priority_id`, priority), `ticket_type`(id `f.type_id`, type), `channel`(enum `f.channel`), `customer`(string `f.customer_id`, customer_company). Time field `occurred`. Measures: `events` count; `tickets` count_distinct(`e.ticket_id`); `dwell_avg_hours|dwell_p50_hours|dwell_p90_hours` (`e.from_duration_seconds / 3600.0`, hours).
+- `tickets` — FROM `tiqora_report_ticket_fact f`; scope `f.queue_id`. Dimensions: `queue`(id, queue, filter id, options `queue`), `queue_at_create`(id, queue), `state`(id, state, options `state`), `state_type`(enum `reports.values.state_type`, filter enum), `priority`(id, priority, options `priority`), `type`(id, type, options `type`), `service`(id, service, options `service`), `sla`(id, sla, options `sla`), `owner`(id, user), `responsible`(id, user), `customer`(string `f.customer_id`, customer_company), `customer_user`(string, customer_user), `channel`(enum `reports.values.channel`), `created`(date `f.created_at`), `closed`(date `f.closed_at`), `first_response`(date `f.first_response_at`), `created_hour`(hour of `f.created_at`), `created_weekday`(weekday of `f.created_at`), `process`(string `f.process_entity_id`). Filter-only: `archived`, `merged`, `reopened` (`reopen_count > 0`), `has_first_response`, `ai_triaged`, `ai_auto_replied`, `ai_handed_off` (bool). Time fields `created` (default), `closed`, `first_response`. Measures: `tickets` count; `closed_tickets` count_if `state_type = 'closed'`; `open_tickets` count_if `state_type IN OPEN_STATE_TYPES`; `reopened_tickets` count_if `reopen_count > 0`; `reopen_rate` rate(`reopen_count > 0` / `close_count > 0`); `fcr_rate` rate(`close_count > 0 AND reopen_count = 0 AND article_out_count <= 1` / `close_count > 0`); `first_response_avg|p50|p90` (`first_response_working_minutes`, minutes); `first_response_clock_avg|p50` (`first_response_minutes`); `solution_avg|p50|p90` (`solution_working_minutes`); `solution_clock_avg|p50` (`solution_minutes`); `response_breaches` count_if RESP_BREACH; `response_breach_rate` rate(RESP_BREACH / `first_response_target_minutes > 0`); `solution_breaches`, `solution_breach_rate` (same with solution); `update_breaches` sum(`update_breach_count`); `update_breached_tickets` count_if `update_breach_count > 0`; `response_near_misses` count_if (`first_response_breached = false AND first_response_target_minutes > 0 AND first_response_working_minutes * 100 >= first_response_target_minutes * (100 - near_miss_percent)`); `solution_near_misses` likewise; `sla_met_rate` rate(has any target AND NOT RESP_BREACH AND NOT SOL_BREACH AND `update_breach_count = 0` / has any target); `accounted_time` sum (units); `agent_touches_avg` avg(`agent_touch_count`, number); `queue_moves_avg` avg(`queue_move_count`, number); `pingpong_tickets` count_if `queue_pingpong`. RESP_BREACH = `first_response_breached = true OR (first_response_breached IS NULL AND first_response_due_at IS NOT NULL AND first_response_due_at < :now)`; SOL_BREACH likewise with `solution_*`.
+- `ticket_events` — FROM `tiqora_report_ticket_event e JOIN tiqora_report_ticket_fact f ON f.ticket_id = e.ticket_id`; scope `f.queue_id` (current queue, like ticket visibility). Dimensions: `kind`(enum `reports.values.event_kind`, filter enum), `occurred`(date), `occurred_hour`, `occurred_weekday`, `actor`(id `e.actor_user_id`, user), `queue`(id `e.queue_id`, queue), `from_queue`/`to_queue`(id `e.from_id`/`e.to_id`, queue), `from_state`/`to_state`(id, state), `from_state_type`/`to_state_type`(enum `e.from_value`/`e.to_value` for kinds create/state/close/reopen, NULL for others, `reports.values.state_type`; `from_queue`/`to_queue` only for kinds queue/create, `from_state`/`to_state` only for state/close/reopen), `ticket_queue`(id `f.queue_id`, queue), `ticket_state`(id `f.state_id`, state), `ticket_priority`(id `f.priority_id`, priority), `ticket_type`(id `f.type_id`, type), `channel`(enum `f.channel`), `customer`(string `f.customer_id`, customer_company). Time field `occurred`. Measures: `events` count; `tickets` count_distinct(`e.ticket_id`); `dwell_avg_hours|dwell_p50_hours|dwell_p90_hours` (`e.from_duration_seconds / 3600.0`, hours).
 - `daily_snapshot` — FROM `tiqora_report_daily_snapshot s`; scope `s.queue_id`. Dimensions: `snapshot`(local_date `s.snapshot_date`, stock), `queue`, `state_type`, `priority`. Time field `snapshot`. Measures (all sum, stock): `open_tickets`(`open_count`), `age_0_1d`, `age_1_3d`, `age_3_7d`, `age_7_30d`, `age_30d_plus`.
 - `accounted_time` — FROM Znuny `time_accounting ta JOIN ticket t ON t.id = ta.ticket_id` (integer join, both Znuny); scope `t.queue_id`; `requires_facts = False`. Dimensions: `agent`(id `ta.create_by`, user), `customer`(string `t.customer_id`, customer_company), `customer_user`(string `t.customer_user_id`, customer_user), `queue`(id `t.queue_id`), `type`(id `t.type_id`), `service`(id `t.service_id`), `ticket`(id `t.id`, ticket), `booked`(date `ta.create_time`), `booked_weekday`. Time field `booked`. Measures: `time_units` sum(`ta.time_unit`, units); `bookings` count; `tickets` count_distinct(`ta.ticket_id`).
 - `open_tickets` (live, "now") — FROM Znuny `ticket t JOIN ticket_state st ON st.id = t.ticket_state_id JOIN ticket_state_type stt ON stt.id = st.type_id`; scope `t.queue_id`; base_where `stt.name IN OPEN_STATE_TYPES AND t.archive_flag = 0`; `requires_facts = False`. Dimensions: `queue`, `state`, `state_type`(`stt.name`), `priority`, `type`, `service`, `sla`, `owner`(`t.user_id`), `responsible`, `customer`, `customer_user`, `created`(date `t.create_time`). Time field `created` (no default — window only when the definition sets one). Measures: `tickets` count; `age_0_1d … age_30d_plus` count_if on `t.create_time` against `ctx.now` (bucket edges 1, 3, 7, 30 days); `escalated` count_if (`t.escalation_time > 0 AND t.escalation_time < :now_epoch`); `unassigned` count_if `t.user_id = 1`.
@@ -724,8 +727,11 @@ class CompiledReport:
     measures: tuple[MeasurePlan, ...]
     window: TimeWindow | None
     stock_dates: tuple[date, ...] | None        # daily_snapshot period-end dates used
+    include_archived: bool = False              # scope.include_archived took effect (cache keys must include it)
 
-class CompileError(DefinitionError): ...         # runtime parameter/choice errors (422)
+HIDDEN_QUEUE_ID: Final = -1                     # value of queue dimensions outside the viewer's scope ("Andere Queue")
+
+class ReportCompileError(DefinitionError): ...   # runtime parameter/choice errors (422); not SQLAlchemy's CompileError
 
 def compile_report(defn: ReportDefinition, params: RunParams, scope: TicketQueryScope, *,
                    now: datetime, near_miss_percent: int, registry: Registry,
@@ -733,7 +739,7 @@ def compile_report(defn: ReportDefinition, params: RunParams, scope: TicketQuery
     # group_by: dimension indices to keep (totals queries use [] / [0] / [1])
 ```
 
-Compiler rules: (1) `validate_definition`; apply `dimension_choices` (must be in `choices`), `grain` (first date dimension), parameter values (`ReportParameter`: value must be in `allowed_values` when set; `in` takes a list ≤ 1000; `eq` a scalar; bool ops ignore the value; required+missing → `CompileError`; missing optional → `default` or skipped). (2) Permission: `scope.queue_ids` empty → `stmt = None`; otherwise `source.scope_column(ctx).in_(sorted(scope.queue_ids))` is ANDed OUTSIDE every user/parameter condition, so no `any`/`not` can widen it. (3) Window: `params.window_override` or `resolve_time_window(time_range or RelativeTimeRange(unit="day", count=30, include_current=True), zone, now)`; applied to `time_field` (`expr >= start_utc AND expr < end_utc`; `local_date` fields compare `start_date <= x <= end_date`); sources with no `default_time_field` and no `time_range` get no window. (4) Date dimensions: `date_bucket(to_local(expr, ctx.tz), grain)`; hour/weekday: `date_part(to_local(expr, ctx.tz), …)`; `local_date`: `date_bucket(expr, grain)` without shift. (5) Stock dimensions/measures (`daily_snapshot`): if the snapshot dimension is absent or its grain is not `day`, restrict `snapshot_date IN stock_dates` = for every bucket in the window the last day of the bucket clipped to `end_date` and to `params.last_snapshot_date` when set; absent dimension → only the last such date. (6) Filters: `defn.filter` and `params.extra_filter` compiled by `filter_sql.compile_conditions` (R8a). (7) Measures → select columns per `MeasurePlan`: count `COUNT(*)`; count_if `SUM(CASE WHEN cond THEN 1 ELSE 0 END)`; count_distinct `COUNT(DISTINCT expr)`; sum/avg/min/max; rate → two SUM(CASE) columns; p50/p90 → nothing in `stmt`, `raw_stmt` gets the value column. (8) Sort/limit are applied in the engine (after percentiles/rates exist).
+Compiler rules: (1) `validate_definition`; apply `dimension_choices` (must be in `choices`), `grain` (first date dimension), parameter values (`ReportParameter`: value must be in `allowed_values` when set; `in` takes a list ≤ 1000; `eq` a scalar; bool ops ignore the value; required+missing → `CompileError`; missing optional → `default` or skipped). (2) Permission: `scope.queue_ids` empty → `stmt = None`; otherwise `source.scope_column(ctx).in_(sorted(scope.queue_ids))` is ANDed OUTSIDE every user/parameter condition, so no `any`/`not` can widen it; `source.archive_exclusion` is ANDed unless `scope.include_archived` (the caller grants that to admins only, like `GET /tickets`); queue-labelled dimensions that are not the scope column (`queue_at_create`, event `queue`/`from_queue`/`to_queue`) map ids outside the scope to `HIDDEN_QUEUE_ID` in SELECT and in filters; the effective definition records applied parameter values as each parameter's `default` (`required` cleared) so its hash differs per value. (3) Window: `params.window_override` or `resolve_time_window(time_range or RelativeTimeRange(unit="day", count=30, include_current=True), zone, now)`; applied to `time_field` (`expr >= start_utc AND expr < end_utc`; `local_date` fields compare `start_date <= x <= end_date`); sources with no `default_time_field` and no `time_range` get no window. (4) Date dimensions: `date_bucket(to_local(expr, ctx.tz), grain)`; hour/weekday: `date_part(to_local(expr, ctx.tz), …)`; `local_date`: `date_bucket(expr, grain)` without shift. (5) Stock dimensions/measures (`daily_snapshot`): if the snapshot dimension is absent or its grain is not `day`, restrict `snapshot_date IN stock_dates` = for every bucket in the window the last day of the bucket clipped to `end_date` and to `params.last_snapshot_date` when set; absent dimension → only the last such date. (6) Filters: `defn.filter` and `params.extra_filter` compiled by `filter_sql.compile_conditions` (R8a). (7) Measures → select columns per `MeasurePlan`: count `COUNT(*)`; count_if `SUM(CASE WHEN cond THEN 1 ELSE 0 END)`; count_distinct `COUNT(DISTINCT expr)`; sum/avg/min/max; rate → two SUM(CASE) columns; p50/p90 → nothing in `stmt`, `raw_stmt` gets the value column. (8) Sort/limit are applied in the engine (after percentiles/rates exist).
 
 ```python
 # backend/src/tiqora/reporting/filter_sql.py   (R8a)
@@ -749,35 +755,57 @@ def compile_conditions(flt: Filter, resolve: Callable[[str], tuple[FilterFieldSp
 # backend/src/tiqora/reporting/engine.py
 OTHER_KEY: Final = "__other__"
 PERCENTILE_SAMPLE_CAP: Final = 200_000
-async def estimate_rows(session: AsyncSession, compiled: CompiledReport) -> int
+INLINE_BUDGET_SECONDS: Final = 75          # R-INLINEBUDGET: one deadline for all queries of a request
+@dataclass
+class QueryBudget:                         # seconds per statement
+    per_query_seconds: int = 60; deadline: float | None = None; clock: Callable[[], float] = time.monotonic
+    @classmethod
+    def inline(cls, reporting, seconds=INLINE_BUDGET_SECONDS, *, clock=time.monotonic) -> QueryBudget
+    @classmethod
+    def job(cls, reporting) -> QueryBudget  # query_timeout_seconds per statement, no shared deadline
+    def statement_seconds(self) -> int      # inline: min(per_query, remaining); remaining < 1 -> ReportQueryTimeout
+async def estimate_rows(session: AsyncSession, compiled: CompiledReport, *,
+                        budget: QueryBudget | None = None) -> int
     # SELECT COUNT(*) FROM <same FROM/WHERE as stmt>; 0 when stmt is None
 async def run_report(session: AsyncSession, *, defn: ReportDefinition, params: RunParams, user_id: int,
                      report_key: str | None, reporting: ReportingSettings,
                      cache: ReportCache | None = None, now: datetime | None = None,
                      row_cap: int | None = None, compare_previous: bool = False,
-                     registry: Registry | None = None, use_cache: bool = True) -> ReportResultOut
-    # scope = ticket_query_scope(session, user_id); compile; cache lookup (key from R8b); execute stmt inside
-    # statement_timeout(reporting.query_timeout_seconds) and asyncio.wait_for(timeout + 5) -> ReportQueryTimeout;
+                     registry: Registry | None = None, use_cache: bool = True,
+                     include_archived: bool = False, budget: QueryBudget | None = None) -> ReportResultOut
+    # scope = ticket_query_scope(session, user_id, include_archived=include_archived and is_admin); compile; cache
+    # lookup (key from R8b; a hit gets the caller's report_key and the current facts status); execute every
+    # statement inside statement_timeout(budget.statement_seconds()) and asyncio.wait_for(seconds + 5) ->
+    # ReportQueryTimeout (budget None = QueryBudget.job; inline callers pass ONE QueryBudget.inline per request,
+    # shared with estimate_rows; label lookups count against it too); a client-side timeout/cancellation
+    # invalidates the connection before the timeout reset runs (R-STMTRESET T10 amendment);
     # percentiles from raw_stmt (linear interpolation like PERCENTILE_CONT; > PERCENTILE_SAMPLE_CAP rows -> sampled
     # first rows, result.truncated = True); rates num/den (den 0 -> None); top_n folding (additive measures summed
     # into "__other__", others None); time-series bucket fill (zero rows for empty buckets of the FIRST date
     # dimension when it is the only dimension or the series dimension is another one); sort (definition.sort, else
     # first date dimension asc, else first measure desc); limit; row_cap (default reporting.max_result_rows) ->
     # truncated; totals via extra compiled queries with group_by [] / [0] / [1]; compare_previous -> the same
-    # totals for the window shifted back by its own length ("previous"); labels via resolve_labels; facts status;
-    # store in cache
+    # totals for the window shifted back by its own length ("previous"; whole local days shift by their day
+    # count, exact UTC bounds by end - start); labels via resolve_labels; facts status; store in cache.
+    # row_count = rows after `limit`, before the row cap. Folded "__other__" rows: count/count_if/sum summed,
+    # rates from summed num/den, percentiles from the merged samples, everything else None; top-n ranks by the
+    # first measure when it adds up, else by the row count. Zero-bucket fill skips stock (snapshot) dimensions.
 @dataclass(frozen=True, slots=True)
 class RunPlan:
     compiled: CompiledReport
     cache_key: str
+    # + definition (as given), params (incl. the state row's last_snapshot_date), scope, facts, row_cap,
+    #   compare_previous, now, near_miss_percent, registry -- what execute_plan and the totals queries need
 async def plan_report(session: AsyncSession, *, defn: ReportDefinition, params: RunParams, user_id: int,
                       reporting: ReportingSettings, row_cap: int | None = None, compare_previous: bool = False,
-                      now: datetime | None = None, registry: Registry | None = None) -> RunPlan
+                      now: datetime | None = None, registry: Registry | None = None,
+                      include_archived: bool = False) -> RunPlan
     # what run_report does first (scope, last_snapshot_date, compile, cache key); the API uses it for the cache
     # lookup and estimate_rows before deciding inline vs. job
 async def raw_measure_values(session: AsyncSession, *, defn: ReportDefinition, measure_key: str,
                              params: RunParams, user_id: int, reporting: ReportingSettings,
-                             now: datetime | None = None, registry: Registry | None = None) -> list[float]
+                             now: datetime | None = None, registry: Registry | None = None,
+                             include_archived: bool = False, budget: QueryBudget | None = None) -> list[float]
     # the percentile value list of one measure (used by the /stats SLA wrapper), capped at PERCENTILE_SAMPLE_CAP
 
 # backend/src/tiqora/reporting/labels.py
@@ -786,7 +814,8 @@ async def resolve_labels(session: AsyncSession, source: LabelSource, keys: Itera
     # service -> service.name; sla -> sla.name; user -> "First Last" (login when empty);
     # customer_company -> customer_company.name (keys loaded as IN-list, string compare on one table);
     # customer_user -> "First Last" from customer_user by login; ticket -> "<tn> <title>"; none -> {}.
-    # Result keys are str(key); missing keys map to str(key).
+    # Result keys are str(key); missing keys map to str(key). Queue HIDDEN_QUEUE_ID (-1) -> "Andere Queue",
+    # never looked up.
 ```
 
 R8b — cache:
@@ -801,8 +830,11 @@ class ReportCache:
     def __init__(self, backend: CacheBackend | None, ttl_seconds: int) -> None
     @staticmethod
     def key_for(*, definition_hash: str, queue_ids: Iterable[int], window: TimeWindow | None, time_zone: str,
-                row_cap: int, compare_previous: bool) -> str
-        # CACHE_PREFIX + sha256(json of: hash, sorted queue ids, window start/end iso, zone, row_cap, compare_previous)
+                row_cap: int, compare_previous: bool, include_archived: bool, extra_filter: Filter | None,
+                last_snapshot_date: date | None, near_miss_percent: int) -> str
+        # CACHE_PREFIX + sha256(json of: hash, sorted queue ids, window start/end iso, zone, row_cap, compare_previous,
+        # CompiledReport.include_archived, sha256 of extra_filter, last_snapshot_date iso, near_miss_percent);
+        # every argument is required (no caller can forget a scope input)
     async def get(self, key: str) -> ReportResultOut | None       # backend errors -> None + log warning
     async def put(self, key: str, result: ReportResultOut) -> None  # ttl 0 or backend None -> no-op; errors logged
 def cache_backend_from_settings(settings: Settings) -> CacheBackend   # redis.asyncio.from_url(settings.redis_url, decode_responses=True)
@@ -898,7 +930,7 @@ GET  /api/v1/admin/reporting/status    -> ReportingStatusOut
 POST /api/v1/admin/reporting/backfill  -> 202 JobAccepted   (body ReportBackfillIn; dedupe_key "report_backfill"; sets state.backfill_job_id)
 ```
 
-Access (`tiqora/reporting/access.py`): `async def require_report_access(session, user) -> None` — `access == "all_agents"` → ok; `"stats_group"` → admin, or `ro` (incl. `rw`) on the valid group named `stats` (`PermissionEngine.groups_for_permission` + `PermissionGroups` lookup by name) → else `HTTPException(403, {"message": "Für Berichte fehlt die Berechtigung (Gruppe „stats“)."})`. The `/api/v1/stats/*` wrappers apply the same check.
+Access (`tiqora/reporting/access.py`): `async def require_report_access(session, user_id: int, reporting: ReportingSettings) -> None` (user id + loaded settings: the jobs only have a user id; `has_report_access` returns the bool) — `access == "all_agents"` → ok; `"stats_group"` → admin, or `ro` (incl. `rw`) on the valid group named `stats` (`PermissionEngine.groups_for_permission` + `PermissionGroups` lookup by name) → else `HTTPException(403, {"message": "Für Berichte fehlt die Berechtigung (Gruppe „stats“)."})`. The `/api/v1/stats/*` wrappers apply the same check.
 
 Jobs (`tiqora/reporting/jobs.py`):
 
@@ -1112,7 +1144,7 @@ Colour tokens (`themes/tokens.css`, validated in the session that wrote this pla
 7. **Working minutes without working hours.** Znuny's `FirstResponseInMin`/`SolutionInMin` are 0 when no working hours are configured; facts store `NULL` there and breaches fall back to wall-clock minutes, so P50 values are never a misleading 0.
 8. **Labels for exports come from the frontend** (`ReportExportIn.column_labels/value_labels`): there is no server-side i18n catalogue, and duplicating 49 locales server-side is not worth it in phase 1. Phase 3 scheduled exports (no browser) will need a server-side label set — recorded there.
 9. **Not in phase 1:** dynamic fields as dimensions (`df.<Name>` keys reserved; needs the "reportable" side table), `articles`/`ai_usage` sources, AI impact and mail-delivery reports (phase 4), the read replica URL (still open; `run_report` takes a session, so a second engine can be passed later).
-10. **`TimeAccounting` history parity fix** (Task 6): Tiqora's `add_time_accounting` writes no `TimeAccounting` history row and does not touch `ticket.change_time`; Znuny's `TicketAccountTime` does both. Fixed here because the facts' `accounted_time` is refreshed through history rows.
+10. ~~**`TimeAccounting` history parity fix** (Task 6): Tiqora's `add_time_accounting` writes no `TimeAccounting` history row and does not touch `ticket.change_time`; Znuny's `TicketAccountTime` does both. Fixed here because the facts' `accounted_time` is refreshed through history rows.~~ Struck ([R-T6]): `add_time_accounting` on main already does both.
 
 ---
 ## Tasks
@@ -1436,6 +1468,8 @@ Order: backend Tasks 1→17 are sequential (each builds on the committed previou
 
 ### Task 6: `TimeAccounting` history like Znuny (backend)
 
+> **Verify-only ([R-T6]).** `add_time_accounting` on main already writes `change_time`, the `%%unit%%perl_sum` history row and normalises 0.256 to 0.25. Run `tests/test_time_accounting_znuny.py` plus the existing time-accounting tests; add no new function, no new test file and no `format(float(...), ".15g")` rewrite. The steps below are superseded.
+
 **Files:**
 - Modify: `backend/src/tiqora/znuny/history.py` (`TYPE_TIME_ACCOUNTING: Final = "TimeAccounting"`, `async def add_time_accounting_history(session, *, ticket_id, article_id, time_unit: str, accounted_time: str, user_id) -> None`), `backend/src/tiqora/domain/ticket_write_service.py` (`add_time_accounting`)
 - Test: `backend/tests/test_time_accounting_history.py` (both dialects, band 47200–47219); existing tests found by `grep -ln "time-accounting\|add_time_accounting" backend/tests` stay green.
@@ -1531,7 +1565,7 @@ Order: backend Tasks 1→17 are sequential (each builds on the committed previou
   ```
   `test_admin_reporting_api.py`: admin GET status 200 with `history_lag >= 0`; non-admin 403; POST backfill → 202 `{"job_id", "status": "queued"}`, a second POST while queued returns the same `job_id` (dedupe); `state.backfill_job_id` set.
 - [ ] **Step 2: Run → FAIL.** `cd backend && TIQORA_STRICT_DB_LEAKS=1 uv run python -m pytest -q tests/test_reporting_backfill.py tests/test_admin_reporting_api.py`
-- [ ] **Step 3: Implement** per R6/R9. `run_backfill_job(ctx, payload)` = `run_backfill(ctx.session_factory, ctx.settings, payload, progress=ctx.progress, check_cancelled=ctx.check_cancelled)`. `since` → first ticket id: `SELECT MIN(id) FROM ticket WHERE create_time >= :since_utc` (local midnight of `since` in the reporting zone → naive UTC). Zone via `load_reporting_settings` + `reporting_time_zone`. Admin POST: `enqueue_job(kind="core.report_backfill", payload=ReportBackfillPayload(**body.model_dump()), created_by=user.id, dedupe_key="report_backfill")`, set `state.backfill_job_id`, and when `restart` set `backfill_status="pending"` only if no job is active; commit; 202. Status: `history_lag = MAX(ticket_history.id) - last_history_id`, counts by `SELECT COUNT(*)`. CLI: argparse subcommands `backfill` (`--since`, `--restart`, `--no-snapshots`) printing `"{done}/{total} {message}"` per progress call, and `status` printing `facts_status(...).model_dump_json(indent=2)`.
+- [ ] **Step 3: Implement** per R6/R9. `run_backfill_job(ctx, payload)` = `run_backfill(ctx.session_factory, ctx.settings, payload, progress=ctx.progress, check_cancelled=ctx.check_cancelled)`. `since` → first ticket id: `SELECT MIN(id) FROM ticket WHERE create_time >= :since_utc` (local midnight of `since` in the reporting zone → naive UTC). Zone via `load_reporting_settings` + `reporting_time_zone`. Admin POST: `enqueue_job(session, kind="core.report_backfill", payload=ReportBackfillPayload(**body.model_dump()), created_by=user.id, dedupe_key="report_backfill")`, set `state.backfill_job_id`, and when `restart` set `backfill_status="pending"` only if no job is active; commit; 202. Status: `history_lag = MAX(ticket_history.id) - last_history_id`, counts by `SELECT COUNT(*)`. CLI: argparse subcommands `backfill` (`--since`, `--restart`, `--no-snapshots`) printing `"{done}/{total} {message}"` per progress call, and `status` printing `facts_status(...).model_dump_json(indent=2)`.
 - [ ] **Step 4: Run → PASS**, regenerate openapi, lint gates, commit `feat(reporting): resumable backfill job, CLI and admin status`.
 
 ### Task 9: Incremental fact loop, worker service, GDPR hook (backend)

@@ -32,6 +32,7 @@ from tiqora.api.v1.admin.schemas import (
     DynamicFieldUpdate,
 )
 from tiqora.db.legacy.dynamic_field import DynamicField
+from tiqora.domain.dynamic_field_config import config_from_yaml
 
 router = APIRouter(prefix="/dynamic-fields", tags=["admin:dynamic-fields"])
 
@@ -89,19 +90,6 @@ def config_to_yaml(config: dict[str, Any]) -> str:
     returns ``str``, not ``bytes``.
     """
     return yaml.safe_dump(config, default_flow_style=False, allow_unicode=True)
-
-
-def config_from_yaml(raw: str | bytes | None) -> dict[str, Any]:
-    if not raw:
-        return {}
-    if isinstance(raw, memoryview | bytearray):
-        raw = bytes(raw)
-    text = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
-    try:
-        loaded = yaml.safe_load(text)
-    except yaml.YAMLError:
-        return {}
-    return loaded if isinstance(loaded, dict) else {}
 
 
 def _to_out(row: DynamicField) -> DynamicFieldOut:

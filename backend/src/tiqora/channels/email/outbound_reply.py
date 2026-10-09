@@ -24,10 +24,10 @@ import re
 import secrets
 import socket
 import time
-from collections.abc import Mapping
-from dataclasses import replace
+from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import dataclass, replace
 from email.message import EmailMessage
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy import text
@@ -161,6 +161,24 @@ def append_signature(body: str, signature: str, *, content_type: str) -> str:
     return (body or "").rstrip() + "\n\n-- \n" + sig
 
 
+def _signature_for_body(signature: str, signature_content_type: str | None, body_ct: str) -> str:
+    """The signature in the body's format (Znuny sets RichText per article before ``Signature``).
+
+    Plain signature behind an HTML body: escaped, line breaks as ``<br/>``; HTML
+    signature behind a plain body: converted to text.
+    """
+    sig_is_html = _is_html(signature_content_type or "")
+    if _is_html(body_ct) and not sig_is_html:
+        # HTMLUtils::ToHTML: normalise the line ends first
+        normalised = signature.replace("\r\n", "\n").replace("\r", "\n")
+        return _html_escape(normalised).replace("\n", "<br/>\n")
+    if not _is_html(body_ct) and sig_is_html:
+        from tiqora.domain.quoting import html_to_plaintext
+
+        return html_to_plaintext(signature)
+    return signature
+
+
 def _html_escape(value: str) -> str:
     return (
         value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
@@ -237,10 +255,10 @@ async def prepare_outgoing_agent_email(
     article: ArticleIn,
 ) -> ArticleIn:
     """Return a copy of *article* ready to send and store (sig, From, Message-ID, visibility)."""
-    from_line, queue_name, sig_text, _sig_ct = await _queue_outbound_meta(session, queue_id)
+    from_line, queue_name, sig_text, sig_ct = await _queue_outbound_meta(session, queue_id)
 
     body = article.body or ""
-    if sig_text and sig_text.strip():
+    if article.append_signature and sig_text and sig_text.strip():
         # Expand against full ticket context (customer_user, agents, queue) so
         # signature tags like OTRS_AGENT_* / OTRS_CUSTOMER_DATA_* / OTRS_TICKET_*
         # resolve the same way as Answer templates.
@@ -254,7 +272,11 @@ async def prepare_outgoing_agent_email(
             customer_subject=article.subject or "",
             customer_email_lines=[],
         )
-        body = append_signature(body, expanded, content_type=article.content_type)
+        if article.signature_directly_after_body:
+            expanded = _signature_for_body(expanded, sig_ct, article.content_type)
+            body = body + expanded if expanded else body
+        else:
+            body = append_signature(body, expanded, content_type=article.content_type)
 
     in_reply_to = article.in_reply_to
     references = article.references
@@ -508,6 +530,7 @@ async def deliver_agent_email_reply(
     try:
         _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
     except Exception:
+        logger.warning("agent_email_queue_meta_failed", queue_id=queue_id, exc_info=True)
         queue_name = None
 
     if should_dispatch:
@@ -641,6 +664,260 @@ async def deliver_agent_email_reply(
     return article_id
 
 
+@dataclass(frozen=True)
+class PendingAgentEmail:
+    """An agent email that is stored but not yet sent (see :func:`dispatch_pending_agent_email`)."""
+
+    article_id: int
+    ticket_id: int
+    prepared: ArticleIn
+    message: EmailMessage | None
+    extra_headers: Mapping[str, str]
+    queue_name: str | None
+
+
+async def store_agent_email_for_dispatch(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    *,
+    ticket_id: int,
+    queue_id: int,
+    user_id: int,
+    article: ArticleIn,
+) -> PendingAgentEmail:
+    """Prepare, secure and STORE an agent email; the mail itself is sent later.
+
+    For callers that must commit their database work before any mail leaves (the
+    GenericInterface ``ArticleSend``): a mail whose ticket or article could still roll
+    back is never sent. Send it with :func:`dispatch_pending_agent_email` after the commit.
+    """
+    prepared = await prepare_outgoing_agent_email(
+        session,
+        sysconfig,
+        ticket_id=ticket_id,
+        queue_id=queue_id,
+        user_id=user_id,
+        article=article,
+    )
+    prepared = await _apply_queue_security(session, prepared, queue_id)
+    banner = await sysconfig.mail_banner_headers()
+    secured: SecuredMessage | None = None
+    if prepared.email_security is not None and prepared.email_security.active:
+        secured = await secure_agent_email(
+            session,
+            prepared,
+            build_agent_email_message(prepared, extra_headers=banner),
+        )
+    try:
+        _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, queue_id)
+    except Exception:
+        logger.warning("agent_email_queue_meta_failed", queue_id=queue_id, exc_info=True)
+        queue_name = None
+    article_id = await add_article(
+        session, ticket_id=ticket_id, article=prepared, user_id=user_id, sysconfig=sysconfig
+    )
+    await store_security(session, article_id, secured, user_id)
+    return PendingAgentEmail(
+        article_id=article_id,
+        ticket_id=ticket_id,
+        prepared=prepared,
+        message=secured.message if secured is not None else None,
+        extra_headers=banner,
+        queue_name=queue_name,
+    )
+
+
+async def load_pending_agent_email(
+    session: AsyncSession, sysconfig: SysConfig, *, article_id: int
+) -> PendingAgentEmail | None:
+    """Rebuild the mail of a stored agent email article (the worker side of ArticleSend).
+
+    The request stored the fully prepared article (:func:`store_agent_email_for_dispatch`)
+    and, for a signed/encrypted mail, the secured bytes in ``article_data_mime_plain``. The
+    mail is rebuilt from exactly that: the plain message from the article columns, the
+    secured one from its stored bytes (sent unchanged), plus today's banner headers. ``None``
+    when the article no longer exists.
+    """
+    from tiqora.crypto.article_view import load_raw_mail
+    from tiqora.crypto.mime_build import secured_message_from_raw
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT a.ticket_id, t.queue_id, m.a_from, m.a_reply_to, m.a_to, m.a_cc,"
+                    " m.a_bcc, m.a_subject, m.a_message_id, m.a_in_reply_to, m.a_references,"
+                    " m.a_content_type, m.a_body"
+                    " FROM article a JOIN article_data_mime m ON m.article_id = a.id"
+                    " JOIN ticket t ON t.id = a.ticket_id WHERE a.id = :aid"
+                ),
+                {"aid": article_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        return None
+    body = row["a_body"]
+    if isinstance(body, (bytes, bytearray, memoryview)):
+        body = bytes(body).decode("utf-8", "replace")
+    prepared = ArticleIn(
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=str(row["a_subject"] or ""),
+        body=str(body or ""),
+        content_type=str(row["a_content_type"] or "text/plain; charset=utf-8"),
+        from_address=row["a_from"] or None,
+        to_address=row["a_to"] or None,
+        cc=row["a_cc"] or None,
+        bcc=row["a_bcc"] or None,
+        reply_to=row["a_reply_to"] or None,
+        message_id=row["a_message_id"] or None,
+        in_reply_to=row["a_in_reply_to"] or None,
+        references=row["a_references"] or None,
+        channel="email",
+    )
+    raw = await load_raw_mail(session, article_id)
+    message = secured_message_from_raw(raw, prepared.bcc) if raw else None
+    try:
+        _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, int(row["queue_id"]))
+    except Exception:
+        logger.warning("agent_email_queue_meta_failed", queue_id=row["queue_id"], exc_info=True)
+        queue_name = None
+    return PendingAgentEmail(
+        article_id=article_id,
+        ticket_id=int(row["ticket_id"]),
+        prepared=prepared,
+        message=message,
+        extra_headers=await sysconfig.mail_banner_headers(),
+        queue_name=queue_name,
+    )
+
+
+async def record_transmission_error(
+    session: AsyncSession, *, article_id: int, message_id: str | None, message: str
+) -> None:
+    """Znuny ``MailQueue::_SetArticleTransmissionError`` for a mail that could not be sent.
+
+    Creates the article's ``article_data_mime_send_error`` row
+    (``ArticleCreateTransmissionError``) or, when one exists, updates its message
+    (``ArticleUpdateTransmissionError``). The caller commits.
+    """
+    exists = (
+        await session.execute(
+            text("SELECT 1 FROM article_data_mime_send_error WHERE article_id = :a"),
+            {"a": article_id},
+        )
+    ).first()
+    if exists is not None:
+        await session.execute(
+            text("UPDATE article_data_mime_send_error SET log_message = :m WHERE article_id = :a"),
+            {"m": message, "a": article_id},
+        )
+        return
+    await session.execute(
+        text(
+            "INSERT INTO article_data_mime_send_error"
+            " (article_id, message_id, log_message, create_time)"
+            " VALUES (:a, :mid, :m, current_timestamp)"
+        ),
+        {"a": article_id, "mid": (message_id or None), "m": message},
+    )
+
+
+async def dispatch_pending_agent_email(
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    pending: PendingAgentEmail,
+    *,
+    retry_note: Callable[[BaseException], str | None] | None = None,
+    before_send: Callable[[], Awaitable[None]] | None = None,
+) -> None:
+    """Send a stored agent email (after the commit) and record the outcome.
+
+    Without an outbound relay nothing is sent and a ``queued`` row is logged. A send
+    failure is logged to ``tiqora_mail_log``, recorded as the article's transmission error
+    (:func:`record_transmission_error`, the caller commits) and raised as
+    :class:`OutboundMailError`; the stored article stays.
+
+    ``retry_note`` (the GI mail worker) decides per failure: a text when the mail will be
+    tried again - the log row's detail then carries it and no transmission error is
+    recorded (Znuny's ``MailQueue`` only sets it for a final failure) - or ``None`` when
+    the failure is final. ``before_send`` is awaited right before SMTP starts (after the
+    sender was built); an exception from it propagates unrecorded.
+    """
+    from tiqora.domain import mail_outbound
+
+    prepared = pending.prepared
+    common: dict[str, Any] = {
+        "direction": "out",
+        "from_addr": prepared.from_address or "",
+        "to_addr": prepared.to_address or "",
+        "cc_addr": prepared.cc,
+        "subject": prepared.subject or "",
+        "message_id": prepared.message_id,
+        "ticket_id": pending.ticket_id,
+        "article_id": pending.article_id,
+        "queue": pending.queue_name,
+    }
+    resolved = await mail_outbound.resolve_outbound_smtp(session)
+    if not resolved.enabled:
+        logger.warning(
+            "agent_email_not_dispatched",
+            reason="smtp_disabled",
+            ticket_id=pending.ticket_id,
+            article_id=pending.article_id,
+        )
+        await write_mail_log(session, status="queued", detail="smtp_disabled", **common)
+        return
+    t0 = time.perf_counter()
+
+    async def failed(exc: Exception) -> None:
+        note = retry_note(exc) if retry_note is not None else None
+        await write_mail_log(
+            session,
+            status="failed",
+            detail=str(exc) if note is None else f"{exc} ({note})",
+            duration_ms=int((time.perf_counter() - t0) * 1000),
+            **common,
+        )
+        if note is None:
+            await record_transmission_error(
+                session,
+                article_id=pending.article_id,
+                message_id=prepared.message_id,
+                message=str(exc),
+            )
+
+    try:
+        sender = await mail_outbound.build_outbound_sender(
+            session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
+        )
+    except Exception as exc:  # the sender could not even be built
+        await failed(exc)
+        raise
+    if before_send is not None:
+        await before_send()  # not a send failure when it raises: the mail was not tried
+    try:
+        await send_prepared_agent_email(
+            sender, prepared, extra_headers=pending.extra_headers, message=pending.message
+        )
+    except Exception as exc:  # OutboundMailError
+        await failed(exc)
+        raise
+    smtp_code = getattr(sender, "last_smtp_code", None)
+    smtp_detail = getattr(sender, "last_smtp_detail", None)
+    await write_mail_log(
+        session,
+        status="sent",
+        smtp_code=smtp_code if isinstance(smtp_code, int) else None,
+        detail=str(smtp_detail) if smtp_detail else None,
+        duration_ms=int((time.perf_counter() - t0) * 1000),
+        **common,
+    )
+
+
 # Public alias so callers outside this module (e.g. the reference compose-context
 # endpoint, which needs the same From/signature resolution for a preview) don't
 # have to reach into a leading-underscore name.
@@ -648,6 +925,11 @@ queue_outbound_meta = _queue_outbound_meta
 
 __all__ = [
     "OutboundMailError",
+    "PendingAgentEmail",
+    "dispatch_pending_agent_email",
+    "load_pending_agent_email",
+    "record_transmission_error",
+    "store_agent_email_for_dispatch",
     "append_signature",
     "build_agent_email_message",
     "build_references_chain",

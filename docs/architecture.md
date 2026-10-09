@@ -646,12 +646,12 @@ subset (bool, int, float, str, `SecretStr`, `Literal`/`StrEnum`, `list[str]`,
 and `X | None` of these) checked by `validate_section_schema`; the generic
 admin screen `/admin/settings/<section>` renders the form from the schema
 (`SchemaForm`, `frontend/src/components/fields/jsonSchema.ts`). Secret
-contract: GET never returns plaintext (set secrets read as the mask
-`********`); on save, an omitted field or the mask leaves the stored
-ciphertext untouched, `""`/`null` removes it, any other string is encrypted
-anew. The frontend therefore holds `null` for an untouched secret, `""` for
-"remove" and a string for a new value, and omits untouched secrets from the
-PUT. `save_section_values` only flushes (the route commits), unlike the legacy
+contract: GET never returns plaintext (a stored secret reads as the mask
+`********`, an unset one as `null`); on save, an omitted field or the mask
+leaves the stored ciphertext untouched, `""` or an explicit `null` removes it
+(the row is deleted), any other string is encrypted anew. The frontend
+therefore omits untouched secrets from the PUT, sends `""` for "remove" and
+the string for a new value. `save_section_values` only flushes (the route commits), unlike the legacy
 `settings_store.set_setting`, which commits by itself. API:
 `/api/v1/admin/settings-sections`. Registered sections: `jobs`, `avatars`
 (the latter keeps `/api/v1/admin/avatars` and its old keys).
@@ -663,19 +663,43 @@ requests at 90 s). A feature route validates permissions, calls `enqueue_job`
 (optional `dedupe_key` returns an already active job) and answers
 `202 {job_id, status}`; there is deliberately no generic "create job"
 endpoint. The UI polls `GET /api/v1/jobs/{id}` (1 s for the first 30 s, then
-3 s). Handlers (`JobHandler`: `kind`, `payload_model`, `run`, `timeout_seconds`)
+3 s). Handlers (`JobHandler`: `kind`, `payload_model`, `run`, `timeout_seconds`,
+plus `lane`, `max_attempts`, `requeue_if_interrupted`, `on_interrupted`)
 get a `JobContext` for throttled `progress()`, cooperative `check_cancelled()`
 and `add_file()` (result files live in `tiqora_job_file`, up to 200 MiB). The
 `JobRunner` claims queued rows with a conditional `UPDATE` (several worker
-replicas are safe), honours `jobs.max_concurrency`, heartbeats every 30 s and
-reaps `running` rows without a heartbeat for 180 s as failed ("interrupted").
+replicas are safe), heartbeats every 30 s and reaps `running` rows without a
+heartbeat for 180 s as failed ("interrupted").
+Lanes: a handler names its `lane` (default `"default"`). Every lane is filled
+on its own, in job id order; `default` has `jobs.max_concurrency` slots per
+runner, every other lane the slots in `tiqora.jobs.registry.LANE_SLOTS` (1 if
+not listed), counted over all runners. `gi_mail` runs in `mail` (1 slot): GI
+mails go out one by one in queue order and never wait behind an export.
+Retries: a handler raises `JobRetry(message, delay_seconds=...)`; the row goes
+back to `queued` with `due_at` (claims skip it until then) and `attempts`
+counts every claim (`ctx.attempt`, `ctx.max_attempts` = the handler's
+`max_attempts`, default 1; a retry on the last attempt fails with the message).
+Interruptions: a handler with `requeue_if_interrupted=True` calls
+`ctx.checkpoint("...")` right before an irreversible step (SMTP); a job
+interrupted by shutdown (grace 20 s) or reaped before its checkpoint is put
+back into the queue (while `attempts < max_attempts`), one interrupted after it
+fails and the handler's `on_interrupted` hook records the failure. A timeout
+is settled the same way (requeue before the checkpoint, else failed with the
+timeout text; `ctx.interrupted_by` tells the hook `"restart"` or `"timeout"`),
+and the hook runs only when this settlement changed the row. A requeue or retry
+of a job whose cancel was requested ends it `cancelled`. A runner never claims
+a job again while an older claim of it still runs in that runner. `checkpoint()`, retry and finalize are conditional on the
+claim (`worker_id` + `attempts`), so a reaped and requeued job is never
+overwritten by its old claim, and the old claim stops at its checkpoint.
+Existing kinds use the defaults and behave as before.
 Failure mapping: `JobFailed(msg)` shows `msg`; a timeout or any other
 exception ends the job `failed` with a plain German message while details go to
 the worker log (no traceback ever reaches the UI); the loop keeps running.
 Finished jobs and files are purged after `jobs.retention_days`. Visibility:
-the creator or an admin; for everybody else all `/jobs/{id}` routes answer
-404. All `tiqora_job*` timestamps are application-written naive UTC. The loop
-is a daemon-catalog service `jobs` (Admin -> Dienste; not toggleable) and polls
+the creator or an admin see status and progress; the files are built from
+the creator's permissions and can be downloaded by the creator only (admins
+get 404 there); for everybody else all `/jobs/{id}` routes answer 404. All `tiqora_job*` timestamps are application-written naive UTC. The loop
+is a daemon-catalog service `jobs` (Admin -> Services (Dienste); not toggleable) and polls
 every `TIQORA_JOBS_POLL_INTERVAL_SECONDS` seconds (default 2).
 
 **Filter model** (`tiqora.filters`). A versioned JSON filter language
@@ -821,12 +845,27 @@ would use an executor helper.
 Mounted at `/znuny-compat` in the main API process (same `tiqora-api`).
 
 - **Canonical routes** always available (see `docs/compatibility.md`).
-- **Dynamic routes** loaded from `gi_webservice_config` at startup via
-  `mount_dynamic_compat_routes()` called in the lifespan.
+- **Webservice registry** (`api/compat/webservices.py`): `gi_webservice_config`
+  rows are parsed into an immutable snapshot (routes, operations, mappers);
+  one broken row is skipped without affecting the others. Routes are matched
+  per request on the raw path (catch-all `Webservice(ID)` routes), not mounted
+  at startup.
+- **Provider pipeline** (`api/compat/provider.py`, `rest_request.py`): REST
+  request-data rules, inbound mapping, operation dispatch by `Type`, outbound
+  mapping, JSON/text response. Mappers are pure and run in worker threads.
+- **Mapping package** (`api/compat/mapping/`): `Simple`, `XSLT` (lxml, sandboxed,
+  bundled `OTRSFunctions.xsl`), `OutOfOffice`; regexes on the `regex` package.
+- **Reloader** (`api/compat/reload.py`): a background task in `tiqora-api`
+  polls a fingerprint of `gi_webservice_config` every
+  `TIQORA_COMPAT_WEBSERVICE_RELOAD_SECONDS` and also listens on a Redis channel
+  for immediate wake-ups after `/admin/reload`.
+- **Sessions**: `SessionCreate` writes Znuny `sessions` rows
+  (`api/compat/znuny_session.py`); the worker loop `znuny_session_purge`
+  removes expired rows.
 - Auth: UserLogin+Password, CustomerUserLogin+Password, or Znuny SessionID
   (validated against `sessions` key-value table).
 - Error shape: `{"Error": {"ErrorCode": "Op.ErrorType", "ErrorMessage": "..."}}`.
-- Parameter merging: query string + JSON body, body wins.
+- Parameter merging: URI/query values win over the JSON body (Znuny REST rules).
 - **SOAP transport** (`api/compat/soap.py`): a second wire codec for the
   same supported operations/dispatch table — parses `HTTP::SOAP` envelopes
   (Body wrapper element name → operation, via `defusedxml` to prevent XXE)

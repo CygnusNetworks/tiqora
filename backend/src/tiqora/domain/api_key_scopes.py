@@ -56,7 +56,13 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/templates", "tickets"),
     ("/api/v1/search", "tickets"),
     ("/api/v1/integrations", "tickets"),
+    # Background jobs are started by ticket features (CSV export today); polling and
+    # downloading them must work with the same key that enqueued them.
+    ("/api/v1/jobs", "tickets"),
+    ("/api/v1/ticket-filters", "tickets"),
+    ("/api/v1/avatars", "tickets"),
     ("/api/v1/customers", "customers"),
+    ("/api/v1/customer-directory", "customers"),
     ("/api/v1/kb", "kb"),
     ("/api/v1/calendar", "calendar"),
     ("/api/v1/stats", "stats"),

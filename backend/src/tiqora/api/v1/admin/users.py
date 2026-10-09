@@ -56,6 +56,7 @@ from tiqora.domain.welcome_invite import send_setup_invite
 from tiqora.domain.welcome_mail import WelcomeMailError
 from tiqora.permissions.engine import PERMISSION_KEYS
 from tiqora.znuny.password import hash_password
+from tiqora.znuny.sessions import delete_agent_sessions
 
 logger = structlog.get_logger(__name__)
 
@@ -297,21 +298,13 @@ async def update_user(
 
     # A password reset is usually incident response: kick every live session of
     # that account, or the attacker's stolen cookie simply outlives the
-    # credential it was taken with (security review M-2). Never let a Redis
-    # hiccup fail the password write that already committed.
+    # credential it was taken with (security review M-2). Disabling the account
+    # ends its sessions too. Never let a Redis hiccup fail the write that already
+    # committed.
     if password_changed:
-        try:
-            revoked = await SessionStore(await get_redis(request), settings).revoke_user_sessions(
-                user_id
-            )
-            logger.info(
-                "admin.users.sessions_revoked",
-                user_id=user_id,
-                revoked=revoked,
-                reason="password_changed",
-            )
-        except Exception as exc:  # noqa: BLE001 — password already changed
-            logger.warning("admin.users.session_revoke_failed", user_id=user_id, error=str(exc))
+        await _revoke_agent_sessions(session, request, settings, user, reason="password_changed")
+    elif "valid_id" in data and user.valid_id != 1:
+        await _revoke_agent_sessions(session, request, settings, user, reason="account_disabled")
 
     out_email = (
         (email or None) if email_set else await get_preference(session, user_id, "UserEmail")
@@ -325,9 +318,34 @@ async def update_user(
     return _with_preferences(user, out_email, out_mobile, phone_extension=out_extension)
 
 
+async def _revoke_agent_sessions(
+    session: DbSession, request: Request, settings: AppSettings, user: Users, *, reason: str
+) -> None:
+    """End every session of *user*: Znuny ``sessions`` rows first (own try + rollback),
+    then Redis - a Redis outage must not skip the DB rows and vice versa."""
+    user_id = user.id
+    try:
+        await delete_agent_sessions(session, user_id)
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001 — the account change already committed
+        await session.rollback()
+        await session.refresh(user)  # rollback expires loaded attributes
+        logger.warning("admin.users.znuny_session_revoke_failed", user_id=user_id, error=str(exc))
+    try:
+        revoked = await SessionStore(await get_redis(request), settings).revoke_user_sessions(
+            user_id
+        )
+        logger.info("admin.users.sessions_revoked", user_id=user_id, revoked=revoked, reason=reason)
+    except Exception as exc:  # noqa: BLE001 — the account change already committed
+        logger.warning("admin.users.session_revoke_failed", user_id=user_id, error=str(exc))
+
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def deactivate_user(user_id: int, admin: AdminUser, session: DbSession) -> None:
-    """Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users."""
+async def deactivate_user(
+    user_id: int, request: Request, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> None:
+    """Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users. The
+    account's sessions (Znuny rows and Redis) end with it."""
     user = await session.get(Users, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -336,6 +354,7 @@ async def deactivate_user(user_id: int, admin: AdminUser, session: DbSession) ->
     user.change_by = admin.id
     await invalidate_znuny_cache_types(session, USER_CACHE_TYPES)
     await session.commit()
+    await _revoke_agent_sessions(session, request, settings, user, reason="account_disabled")
 
 
 @router.get("/{user_id}/groups", response_model=list[GroupOut])

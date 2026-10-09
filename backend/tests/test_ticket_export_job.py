@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
+from tiqora.api.v1.tickets import MAX_ACTIVE_EXPORTS_PER_USER
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser
@@ -238,3 +239,101 @@ def test_worker_registry_has_ticket_export_handler() -> None:
         assert handler is TICKET_EXPORT_JOB
     finally:
         set_registry_for_tests(None)
+
+
+async def test_invalid_filter_is_rejected_at_enqueue_with_422(
+    factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.api.v1 import tickets as tickets_api
+    from tiqora.filters import FilterError
+
+    async def boom(*_a: Any, **_k: Any) -> None:
+        raise FilterError("Unbekanntes Feld „x“.", path="where.field")
+
+    monkeypatch.setattr(tickets_api, "compile_ticket_filter", boom)
+    async with _client(factory) as client:
+        resp = await client.post("/api/v1/tickets/export-jobs", json={"params": {}})
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == {"message": "Unbekanntes Feld „x“.", "path": "where.field"}
+    async with factory() as s:
+        n = (
+            await s.execute(text("SELECT COUNT(*) FROM tiqora_job WHERE kind='core.ticket_export'"))
+        ).scalar_one()
+    assert n == 0
+
+
+async def test_same_export_twice_joins_the_pending_job(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with _client(factory) as client:
+        a = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+        b = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+    assert a.status_code == b.status_code == 202
+    assert a.json()["job_id"] == b.json()["job_id"]
+
+
+async def test_restart_after_cancel_request_does_not_join_the_dying_job(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with _client(factory) as client:
+        a = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+        # A running job whose cancellation was requested is still "active" but dying.
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "UPDATE tiqora_job SET status='running', cancel_requested=:c WHERE id=:i"
+                ).bindparams(bindparam("c", True), bindparam("i", a.json()["job_id"]))
+            )
+            await s.commit()
+        b = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+    assert a.status_code == b.status_code == 202
+    assert b.json()["job_id"] != a.json()["job_id"]
+
+
+async def test_third_active_export_is_rejected_with_429(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with _client(factory) as client:
+        first = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+        second = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q2}})
+        third = await client.post("/api/v1/tickets/export-jobs", json={"params": {}})
+        again = await client.post("/api/v1/tickets/export-jobs", json={"params": {"queue_id": Q1}})
+        # Cancelling one frees a slot.
+        await client.post(f"/api/v1/jobs/{first.json()['job_id']}/cancel")
+        after_cancel = await client.post("/api/v1/tickets/export-jobs", json={"params": {}})
+    assert first.status_code == second.status_code == 202
+    assert third.status_code == 429
+    assert third.json()["detail"]["message"].startswith(
+        f"Es laufen bereits {MAX_ACTIVE_EXPORTS_PER_USER} Exporte"
+    )
+    assert again.status_code == 202  # joins the pending identical export, not a new slot
+    assert after_cancel.status_code == 202
+
+
+async def test_filter_error_at_run_time_fails_job_with_the_real_message(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    from tiqora.jobs.service import enqueue_job
+
+    async with factory() as s:
+        job = await enqueue_job(
+            s,
+            kind="core.ticket_export",
+            payload={
+                "user_id": AGENT,
+                "filter": {"where": {"field": "no_such_field", "op": "eq", "value": 1}},
+            },
+            created_by=AGENT,
+        )
+        await s.commit()
+        job_id = job.id
+    runner = JobRunner(
+        session_factory=factory, settings=Settings(environment="test"), registry=get_registry()
+    )
+    await runner.run_once()
+    await runner.wait_idle()
+    async with _client(factory) as client:
+        body = (await client.get(f"/api/v1/jobs/{job_id}")).json()
+    assert body["status"] == "failed"
+    assert body["error"].startswith("Der Filter ist nicht mehr gültig: ")
+    assert "no_such_field" in body["error"]

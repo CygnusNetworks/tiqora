@@ -435,8 +435,8 @@ async def screen_dynamic_fields(
     not offered -- the write paths set ticket fields only.
     """
     _ = user
-    from tiqora.api.v1.admin.dynamic_fields import config_from_yaml
     from tiqora.db.legacy.dynamic_field import DynamicField
+    from tiqora.domain.dynamic_field_config import config_from_yaml
 
     raw = await SysConfig(session).get(f"Ticket::Frontend::{screen}###DynamicField", {})
     configured: dict[str, int] = {}
@@ -554,7 +554,7 @@ async def compose_context(
     except InvalidInput as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     sysconfig = SysConfig(session)
-    rich_text = bool(await sysconfig.get("Frontend::RichText", 1))
+    rich_text = await sysconfig.get_bool("Frontend::RichText", True)
     signature = sig_text or ""
     if signature.strip():
         signature = await expand_placeholders(

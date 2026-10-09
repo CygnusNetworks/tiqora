@@ -8,7 +8,7 @@ protocol so tests can inject a capturing fake.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from email import policy as email_policy
 from email.message import EmailMessage
 from email.utils import formatdate, getaddresses, make_msgid
@@ -61,6 +61,69 @@ def envelope_recipients(message: EmailMessage, extra: str | None) -> list[str] |
     if extra not in recipients:
         recipients.append(extra)
     return recipients
+
+
+def smtp_reply_codes(exc: BaseException) -> list[int]:
+    """SMTP reply codes carried by ``exc`` or the first error in its cause chain that has
+    any (aiosmtplib response errors; a refused-recipients error has one per recipient)."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        codes: list[int] = []
+        if isinstance(current, aiosmtplib.SMTPRecipientsRefused):
+            codes = [r.code for r in current.recipients if isinstance(r.code, int)]
+        elif isinstance(current, aiosmtplib.SMTPResponseException) and isinstance(
+            current.code, int
+        ):
+            codes = [current.code]
+        if codes:
+            return codes
+        current = current.__cause__ or current.__context__
+    return []
+
+
+def is_permanent_smtp_failure(exc: BaseException) -> bool:
+    """Znuny ``MailQueue::_SendError``: only a 5xx reply is a permanent error.
+
+    4xx replies, connection errors, timeouts and errors without an SMTP reply are
+    temporary (the mail is tried again).
+    """
+    codes = smtp_reply_codes(exc)
+    return bool(codes) and all(500 <= code < 600 for code in codes)
+
+
+class HookedMailSender:
+    """A :class:`MailSender` that awaits ``before_send()`` right before every send and
+    ``after_send(message)`` right after every successful one (e.g. a job checkpoint)."""
+
+    def __init__(
+        self,
+        inner: MailSender,
+        *,
+        before_send: Callable[[], Awaitable[None]] | None = None,
+        after_send: Callable[[EmailMessage], Awaitable[None]] | None = None,
+    ) -> None:
+        self._inner = inner
+        self._before_send = before_send
+        self._after_send = after_send
+
+    @property
+    def last_smtp_code(self) -> int | None:
+        code = getattr(self._inner, "last_smtp_code", None)
+        return code if isinstance(code, int) else None
+
+    @property
+    def last_smtp_detail(self) -> str | None:
+        detail = getattr(self._inner, "last_smtp_detail", None)
+        return str(detail) if detail else None
+
+    async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None:
+        if self._before_send is not None:
+            await self._before_send()
+        await self._inner.send(message, envelope_from=envelope_from)
+        if self._after_send is not None:
+            await self._after_send(message)
 
 
 class SmtpMailSender:

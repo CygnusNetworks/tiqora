@@ -379,6 +379,18 @@ class Settings(BaseSettings):
         default=False, validation_alias="TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP"
     )
 
+    # GI SessionCreate writes Znuny ``sessions`` rows (valid in both systems, Znuny's idle
+    # and absolute expiry) instead of a Redis token. Off when Tiqora owns the schema.
+    compat_session_write_znuny: bool = Field(
+        default=True, validation_alias="TIQORA_COMPAT_SESSION_WRITE_ZNUNY"
+    )
+
+    # How often every API process polls gi_webservice_config for changes made in
+    # Znuny (rename / disable / edit) so compat webservices reload without a restart.
+    compat_webservice_reload_seconds: int = Field(
+        default=10, ge=1, validation_alias="TIQORA_COMPAT_WEBSERVICE_RELOAD_SECONDS"
+    )
+
     # WebAuthn passkeys as an alternative 2nd factor (Phase 3c). Disabled unless
     # both rp_id and origin are set — endpoints 404 and AuthMethodsOut.webauthn
     # is false when unset (ships flag-off).
@@ -406,6 +418,10 @@ class Settings(BaseSettings):
     # Background job runner (tiqora.jobs): how often the worker looks for queued jobs.
     jobs_poll_interval_seconds: int = Field(
         default=2, ge=1, le=60, validation_alias="TIQORA_JOBS_POLL_INTERVAL_SECONDS"
+    )
+    # How often the worker deletes expired Znuny `sessions` rows.
+    znuny_session_purge_interval_seconds: int = Field(
+        default=300, ge=5, le=86400, validation_alias="TIQORA_ZNUNY_SESSION_PURGE_INTERVAL_SECONDS"
     )
     # Outbound SMTP. Disabled by default so agent email replies store the
     # article without 502ing when no relay is configured (prod often has no
@@ -440,6 +456,12 @@ class Settings(BaseSettings):
     # (default ON) is the takeover switch; this is only the poll interval.
     outbox_drain_interval_seconds: int = Field(
         default=60, validation_alias="TIQORA_OUTBOX_DRAIN_INTERVAL"
+    )
+
+    # Report data upkeep (facts, events, daily snapshots). ``daemon.report_facts.enabled``
+    # (default ON) switches it off; this is only the poll interval.
+    report_facts_interval_seconds: int = Field(
+        default=60, validation_alias="TIQORA_REPORT_FACTS_INTERVAL"
     )
 
     # AI worker (tiqora-ai-worker, separate process/compose service — see

@@ -1,0 +1,275 @@
+"""Pure tests for the TicketSearch time helpers (``create_time_settings``, ``time_filters``)."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+
+from tiqora.api.compat.search_filters import (
+    clamped_minutes_before,
+    create_time_settings,
+    time_filters,
+)
+
+NOW = datetime(2026, 3, 10, 12, 0, 0)
+
+
+def test_time_point_last_two_days() -> None:
+    out = create_time_settings(
+        {
+            "ChangeTimeSearchType": "TimePoint",
+            "TicketChangeTimePoint": "2",
+            "TicketChangeTimePointFormat": "day",
+            "TicketChangeTimePointStart": "Last",
+        },
+        now=NOW,
+    )
+    assert out["TicketChangeTimeNewerMinutes"] == 2 * 24 * 60
+    assert "TicketChangeTimeOlderMinutes" not in out
+
+
+def test_time_point_before_is_older_minutes() -> None:
+    out = create_time_settings(
+        {
+            "CloseTimeSearchType": "TimePoint",
+            "TicketCloseTimePoint": "3",
+            "TicketCloseTimePointFormat": "week",
+            "TicketCloseTimePointStart": "Before",
+        },
+        now=NOW,
+    )
+    assert out["TicketCloseTimeOlderMinutes"] == 3 * 60 * 24 * 7
+
+
+def test_time_point_needs_all_three_parts() -> None:
+    out = create_time_settings(
+        {
+            "LastChangeTimeSearchType": "TimePoint",
+            "TicketLastChangeTimePoint": "2",
+            "TicketLastChangeTimePointFormat": "day",
+        },
+        now=NOW,
+    )
+    assert "TicketLastChangeTimeNewerMinutes" not in out
+    assert "TicketLastChangeTimeOlderMinutes" not in out
+
+
+def test_time_slot_to_dates() -> None:
+    out = create_time_settings(
+        {
+            "ChangeTimeSearchType": "TimeSlot",
+            "TicketChangeTimeStartYear": "2026",
+            "TicketChangeTimeStartMonth": "3",
+            "TicketChangeTimeStartDay": "5",
+            "TicketChangeTimeStopYear": "2026",
+            "TicketChangeTimeStopMonth": "4",
+            "TicketChangeTimeStopDay": "9",
+        },
+        now=NOW,
+    )
+    assert out["TicketChangeTimeNewerDate"] == "2026-03-05 00:00:00"
+    assert out["TicketChangeTimeOlderDate"] == "2026-04-09 23:59:59"
+
+
+def test_time_slot_missing_day_gives_znuny_zero_padded_invalid_date() -> None:
+    # Znuny's sprintf("%02d") turns a missing day into "00" (a true value), so the
+    # unusable date reaches the core search, which then returns nothing.
+    out = create_time_settings(
+        {
+            "ChangeTimeSearchType": "TimeSlot",
+            "TicketChangeTimeStartYear": "2026",
+            "TicketChangeTimeStartMonth": "3",
+        },
+        now=NOW,
+    )
+    assert out["TicketChangeTimeNewerDate"] == "2026-03-00 00:00:00"
+    conditions: list[str] = []
+    assert time_filters(out, conditions, {}, [], now=NOW) is False
+
+
+def test_create_time_settings_does_not_mutate_input() -> None:
+    data: dict[str, Any] = {"ChangeTimeSearchType": "TimeSlot"}
+    create_time_settings(data, now=NOW)
+    assert data == {"ChangeTimeSearchType": "TimeSlot"}
+
+
+def test_invalid_date_string_aborts() -> None:
+    assert time_filters({"TicketChangeTimeNewerDate": "yesterday"}, [], {}, [], now=NOW) is False
+    assert (
+        time_filters({"TicketCreateTimeOlderDate": "2026-13-01 00:00:00"}, [], {}, [], now=NOW)
+        is False
+    )
+
+
+def test_newer_date_in_the_future_aborts() -> None:
+    assert (
+        time_filters({"TicketCreateTimeNewerDate": "2026-03-11 00:00:00"}, [], {}, [], now=NOW)
+        is False
+    )
+
+
+def test_newer_after_older_aborts() -> None:
+    data = {
+        "TicketCloseTimeNewerDate": "2026-03-05 00:00:00",
+        "TicketCloseTimeOlderDate": "2026-03-01 00:00:00",
+    }
+    assert time_filters(data, [], {}, [], now=NOW) is False
+
+
+def test_create_window_binds_datetimes() -> None:
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+    ok = time_filters(
+        {"TicketCreateTimeNewerMinutes": "60", "TicketCreateTimeOlderDate": "2026-03-10 11:00:00"},
+        conditions,
+        params,
+        [],
+        now=NOW,
+    )
+    assert ok is True
+    assert conditions == ["t.create_time >= :tw1", "t.create_time <= :tw2"]
+    assert params == {
+        "tw1": datetime(2026, 3, 10, 11, 0, 0),
+        "tw2": datetime(2026, 3, 10, 11, 0, 0),
+    }
+
+
+def test_escalation_excludes_zero_and_uses_epoch() -> None:
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+    assert time_filters(
+        {"TicketEscalationResponseTimeOlderMinutes": "0"}, conditions, params, [], now=NOW
+    )
+    assert conditions == [
+        "t.escalation_response_time != 0",
+        "t.escalation_response_time <= :tw1",
+    ]
+    assert params == {"tw1": 1773144000}  # 2026-03-10 12:00:00 UTC
+
+
+def test_change_bounds_share_one_history_row() -> None:
+    conditions: list[str] = []
+    joins: list[str] = []
+    assert time_filters(
+        {
+            "TicketChangeTimeNewerDate": "2026-03-01 00:00:00",
+            "TicketChangeTimeOlderDate": "2026-03-09 00:00:00",
+        },
+        conditions,
+        {},
+        joins,
+        now=NOW,
+    )
+    # one EXISTS per family, both bounds on the same row; no join (no N^2 rows)
+    assert joins == []
+    assert conditions == [
+        "EXISTS (SELECT 1 FROM ticket_history thw1 WHERE thw1.ticket_id = t.id"
+        " AND thw1.create_time <= :tw1 AND thw1.create_time >= :tw2)"
+    ]
+
+
+def test_change_and_close_are_separate_families() -> None:
+    conditions: list[str] = []
+    joins: list[str] = []
+    assert time_filters(
+        {"TicketChangeTimeNewerMinutes": "60", "TicketCloseTimeNewerMinutes": "30"},
+        conditions,
+        {},
+        joins,
+        now=NOW,
+    )
+    assert joins == []
+    assert len(conditions) == 2
+    assert "thw1" in conditions[0] and "closed" not in conditions[0]
+    assert "thw2" in conditions[1] and "tst.name = 'closed'" in conditions[1]
+
+
+def test_close_uses_new_ticket_and_state_update_with_closed_states() -> None:
+    conditions: list[str] = []
+    joins: list[str] = []
+    assert time_filters({"TicketCloseTimeNewerMinutes": "30"}, conditions, {}, joins, now=NOW)
+    assert joins == []
+    assert len(conditions) == 1
+    assert conditions[0].startswith("EXISTS (SELECT 1 FROM ticket_history thw1 WHERE")
+    assert "'NewTicket', 'StateUpdate'" in conditions[0]
+    assert "tst.name = 'closed'" in conditions[0]
+    assert conditions[0].endswith("AND thw1.create_time >= :tw1)")
+
+
+def test_pending_is_restricted_to_pending_state_types() -> None:
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+    assert time_filters({"TicketPendingTimeOlderMinutes": "5"}, conditions, params, [], now=NOW)
+    assert "'pending reminder', 'pending auto'" in conditions[0]
+    assert conditions[1] == "t.until_time <= :tw1"
+    assert params == {"tw1": 1773144000 - 300}
+
+
+def test_no_time_params_adds_nothing() -> None:
+    conditions: list[str] = []
+    assert time_filters({"Title": "x"}, conditions, {}, [], now=NOW)
+    assert conditions == []
+
+
+def test_bounded_ids_drops_out_of_range_and_garbage() -> None:
+    from tiqora.api.compat.search_filters import SMALLINT_MAX, bounded_ids
+
+    assert bounded_ids([1, "2", 40000, "x", 2**70], SMALLINT_MAX) == [1, 2]
+    assert bounded_ids(32767, SMALLINT_MAX) == [32767]
+    assert bounded_ids(32768, SMALLINT_MAX) == []
+    assert bounded_ids(None, SMALLINT_MAX) == []
+
+
+def test_sanitize_id_filters_no_match_unless_names_can_still_match() -> None:
+    from tiqora.api.compat.search_filters import sanitize_id_filters
+
+    out, no_match = sanitize_id_filters({"StateIDs": [40000]})
+    assert no_match is True
+    assert out["StateIDs"] == []
+    out, no_match = sanitize_id_filters({"StateIDs": [40000], "States": ["new"]})
+    assert no_match is False
+    out, no_match = sanitize_id_filters({"QueueIDs": ["5", 2**40], "Title": "x"})
+    assert (out["QueueIDs"], no_match) == ([5], False)
+
+
+def test_huge_minutes_saturate_like_znuny_datetime() -> None:
+    """Minutes beyond the date range: Znuny's CPAN DateTime (1.52) does not fail. A huge
+    positive value gives a far-past date, a negative one a far-future date (5+ digit years),
+    a far-past one once the seconds wrap a signed 64-bit integer, and once they pass an
+    unsigned one ("-1e300") the start of today minus one second."""
+    data = {
+        "TicketCreateTimeOlderMinutes": "1e300",
+        "TicketCreateTimeNewerMinutes": "-1e12",
+        "TicketEscalationTimeOlderMinutes": "1e300",
+        "ArticleCreateTimeOlderMinutes": "-2e17",
+    }
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+    assert time_filters(data, conditions, params, [], now=NOW)
+    assert params["tw1"] == datetime.min
+    assert params["tw2"] == datetime.max.replace(microsecond=0)
+    assert params["tw3"] == -(2**31)  # the epoch column is a 32-bit INTEGER
+    assert clamped_minutes_before(NOW, "-2e17") == datetime.min
+    # Perl: subtract(minutes => "-1e300") at 2026-03-10 12:00:00 -> 2026-03-09 23:59:59
+    for value in ("-1e300", "-1e18", "-3.0745e17"):
+        assert clamped_minutes_before(NOW, value) == datetime(2026, 3, 9, 23, 59, 59), value
+    assert clamped_minutes_before(NOW, "-3.07e17") == datetime.min  # still wraps far past
+
+
+def test_huge_minutes_in_history_families_follow_perl() -> None:
+    # Znuny formats an out-of-range date ("-292277022601-11-04 ..." or a 5-digit year) and
+    # refuses it with "Invalid time format" -> TicketSearch returns nothing
+    for key in (
+        "TicketChangeTimeOlderMinutes",
+        "TicketLastChangeTimeNewerMinutes",
+        "TicketCloseTimeOlderMinutes",
+        "TicketPendingTimeNewerMinutes",
+    ):
+        assert time_filters({key: "1e300"}, [], {}, [], now=NOW) is False, key
+        assert time_filters({key: "-1e12"}, [], {}, [], now=NOW) is False, key
+    # "-1e300" collapses to a normal date: the search runs with it
+    params: dict[str, Any] = {}
+    assert time_filters({"TicketPendingTimeNewerMinutes": "-1e300"}, [], params, [], now=NOW)
+    assert list(params.values()) == [int(datetime(2026, 3, 9, 23, 59, 59, tzinfo=UTC).timestamp())]
+    # years below 1000 keep Perl's zero-padded 4-digit format and stay valid
+    assert time_filters({"TicketLastChangeTimeOlderMinutes": 10**9}, [], {}, [], now=NOW)

@@ -11,7 +11,7 @@ built frontend static assets. Process role is selected at start:
 | Command / env | Process |
 |---|---|
 | `api` (default) | FastAPI (uvicorn) |
-| `worker` | Background worker (Znuny-write poller, indexing, outbox/webhooks, daemon takeovers, background-job runner for exports etc.; poll interval `TIQORA_JOBS_POLL_INTERVAL_SECONDS`, default 2, range 1-60) |
+| `worker` | Background worker (Znuny-write poller, indexing, outbox/webhooks, daemon takeovers, background-job runner for exports and the GenericInterface mails (`ArticleSend`, auto responses) etc.; poll interval `TIQORA_JOBS_POLL_INTERVAL_SECONDS`, default 2, range 1-60) |
 | `ai-worker` | AI subsystem loop (triage, auto-reply, auto-summary), isolated from the main worker; inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
 | `mcp` | FastMCP server |
 
@@ -61,6 +61,8 @@ and never commit real credentials.
 | `TIQORA_CUSTOMER_SMIME_CERT_COLUMN` | *(empty)* | `SMIME::FetchFromCustomer`: `customer_user` column holding the customer's certificate (Znuny `UserSMIMECertificate` map entry). See [crypto.md](crypto.md#smimefetchfromcustomer). |
 | `TIQORA_CUSTOMER_LDAP_SMIME_ATTR` / `TIQORA_CUSTOMER_LDAP_EMAIL_ATTR` | `userSMIMECertificate` / `mail` | `SMIME::FetchFromCustomer` from the customer LDAP directory (`TIQORA_CUSTOMER_LDAP_*`): certificate attribute and the attribute matched against the sender address. |
 | `TIQORA_STEP_UP_MAX_AGE` | `900` | "Sudo mode" window (seconds): how long after logging in a session may still register or delete a passkey. Past this the agent must sign in again. Only enforced once the account already has a second factor, so first-time and forced enrollment stay frictionless. |
+| `TIQORA_COMPAT_WEBSERVICE_RELOAD_SECONDS` | `10` | How often every `tiqora-api` process polls `gi_webservice_config` so GenericInterface webservices added, renamed, edited or disabled in Znuny are served without a restart. |
+| `TIQORA_COMPAT_SESSION_WRITE_ZNUNY` | `true` | Compat `SessionCreate` writes Znuny `sessions` rows (valid in Znuny too, Znuny's idle/absolute expiry; expired rows are purged by the worker loop `znuny_session_purge`). `false` keeps Redis tokens. Never writes rows once Tiqora owns the schema. Note Znuny's `SessionCheckRemoteIP` (default `1`): see [compatibility.md](compatibility.md#session-handling). |
 | `TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP` | `false` | Bind Znuny session ids presented to the compat GenericInterface to the client IP Znuny recorded (its `SessionCheckRemoteIP`). Off by default: Znuny stored the address **its own** webserver saw, which differs from Tiqora's socket peer behind a reverse proxy, so enabling it there rejects valid sessions. Turn on only when both peers observe the same client address. Idle/absolute session expiry is always enforced regardless of this flag. |
 | `TIQORA_TOTP_PENDING_TTL` | `300` | Seconds a pending-2FA session stays valid |
 | `TIQORA_TOTP_ISSUER` | `Tiqora` | Shown in authenticator apps |

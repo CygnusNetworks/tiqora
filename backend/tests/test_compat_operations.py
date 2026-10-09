@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import time
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -144,8 +145,40 @@ async def _create_tiqora_tables(session: AsyncSession) -> None:
     await session.commit()
 
 
+# SessionCreate writes Znuny ``sessions`` rows (default since wave 1): delete every row the
+# module added, per database it seeded (the rest of the module is on db_leak_baseline.txt).
+_SESSION_MAX_ID: dict[str, int] = {}
+
+
+def _remember_sessions_watermark(sync_url: str) -> None:
+    if sync_url in _SESSION_MAX_ID:
+        return
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            _SESSION_MAX_ID[sync_url] = int(
+                conn.execute(text("SELECT COALESCE(MAX(id), 0) FROM sessions")).scalar_one()
+            )
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _delete_new_session_rows() -> Iterator[None]:
+    yield
+    for sync_url, max_id in _SESSION_MAX_ID.items():
+        engine = create_engine(sync_url)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("DELETE FROM sessions WHERE id > :m"), {"m": max_id})
+        finally:
+            engine.dispose()
+    _SESSION_MAX_ID.clear()
+
+
 def _seed_compat_data(sync_url: str) -> dict[str, Any]:
     """Seed data for compat tests and return IDs."""
+    _remember_sessions_watermark(sync_url)
     engine = create_engine(sync_url)
     ids: dict[str, Any] = {}
 
@@ -450,7 +483,8 @@ async def test_session_id_auth_ticket_search(compat_mariadb: dict[str, Any]) -> 
 
     # Should return a list (possibly empty) without an Error key
     assert "Error" not in result, f"Got error instead of ticket IDs: {result}"
-    assert "TicketID" in result
+    # Znuny answers an empty hit list with an empty Data object (no TicketID key)
+    assert set(result) <= {"TicketID"}
     await engine.dispose()
 
 
@@ -644,7 +678,11 @@ async def test_ticket_create_auth_fail(compat_mariadb: dict[str, Any]) -> None:
 
 @pytest.mark.db
 async def test_ticket_update_note_stays_internal(compat_mariadb: dict[str, Any]) -> None:
-    """TicketUpdate: article note without explicit IsVisibleForCustomer defaults to 0 (internal)."""
+    """TicketUpdate: an explicit IsVisibleForCustomer=0 keeps the note internal.
+
+    Without the field Znuny uses the SysConfig default 1 (see
+    ``test_compat_create_update_articles``).
+    """
     engine = create_async_engine(compat_mariadb["async_url"])
     factory = async_sessionmaker(engine, expire_on_commit=False)
     store = _make_session_store()
@@ -684,7 +722,7 @@ async def test_ticket_update_note_stays_internal(compat_mariadb: dict[str, Any])
                     "Subject": "Internal Note",
                     "Body": "This should be internal",
                     "CommunicationChannel": "Internal",
-                    # IsVisibleForCustomer NOT specified — should default to 0
+                    "IsVisibleForCustomer": 0,
                 },
             },
             session,
@@ -869,7 +907,7 @@ async def test_ticket_search_state_type_singular(compat_mariadb: dict[str, Any])
         )
 
     assert "Error" not in result_closed
-    assert ticket_id not in result_closed["TicketID"], (
+    assert ticket_id not in result_closed.get("TicketID", []), (
         f"Ticket {ticket_id} should NOT appear in 'closed' StateType search"
     )
     await engine.dispose()
@@ -934,7 +972,7 @@ async def test_ticket_search_customer_user_login(compat_mariadb: dict[str, Any])
         )
 
     assert "Error" not in result2
-    assert ticket_id not in result2["TicketID"]
+    assert ticket_id not in result2.get("TicketID", [])
     await engine.dispose()
 
 
@@ -1011,7 +1049,7 @@ async def test_ticket_search_no_permission_returns_empty(compat_mariadb: dict[st
         )
 
     assert "Error" not in result
-    assert result["TicketID"] == []
+    assert result == {}
     await engine.dispose()
 
 
@@ -1535,7 +1573,9 @@ async def test_ticket_create_invalid_dynamic_field_value_is_invalid_parameter(
                 sysconfig,
             )
         assert result["Error"]["ErrorCode"].endswith(".InvalidParameter"), result
-        assert "CompatBadFlag" in result["Error"]["ErrorMessage"]
+        assert result["Error"]["ErrorMessage"] == (
+            "TicketCreate: DynamicField->Value parameter is invalid!"
+        )
         async with factory() as session:
             n = (
                 await session.execute(

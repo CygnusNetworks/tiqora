@@ -25,6 +25,7 @@ from __future__ import annotations
 from email.message import EmailMessage
 from typing import TYPE_CHECKING, Literal
 
+import regex
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -126,6 +127,38 @@ async def _secure_auto_response(
     return False
 
 
+# The pattern is admin configuration, the address comes from a remote mail: like the GI
+# mapping regexes, run it on the ``regex`` package with a per-match time budget.
+_NO_AUTO_REGEX_TIMEOUT_SECONDS = 0.2
+
+
+def _matches_no_auto_response(pattern: str, address: str) -> bool:
+    """``$Email =~ /$NoAutoRegExp/i``; a pattern that does not compile or runs out of time
+    never matches (logged)."""
+    if not pattern:
+        return False
+    try:
+        compiled = regex.compile(pattern, regex.IGNORECASE)
+    except (regex.error, RecursionError, OverflowError):
+        logger.warning("autoresponse_bad_no_auto_regexp", pattern=pattern)
+        return False
+    try:
+        return compiled.search(address, timeout=_NO_AUTO_REGEX_TIMEOUT_SECONDS) is not None
+    except TimeoutError:
+        logger.warning("autoresponse_no_auto_regexp_timeout", pattern=pattern)
+        return False
+
+
+async def _is_valid_system_address(session: AsyncSession, address: str) -> bool:
+    row = (
+        await session.execute(
+            text("SELECT 1 FROM system_address WHERE LOWER(value0) = :a AND valid_id = 1 LIMIT 1"),
+            {"a": address.lower()},
+        )
+    ).first()
+    return row is not None
+
+
 async def send_auto_response(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
@@ -212,6 +245,7 @@ async def send_auto_response(
     max_emails = await sysconfig.postmaster_max_emails()
     max_per_address = await sysconfig.postmaster_max_emails_per_address()
 
+    no_auto_regexp = str(await sysconfig.get("SendNoAutoResponseRegExp") or "")
     allowed: list[str] = []
     for addr in recipients:
         if not await loop_protection.check(
@@ -225,6 +259,21 @@ async def send_auto_response(
                 user_id=user_id,
             )
             logger.warning("autoresponse_loop_protected", ticket_id=ticket_id, to=addr)
+            continue
+        # Email.pm: not to MAILER-DAEMON / postmaster / abuse ...
+        if _matches_no_auto_response(no_auto_regexp, addr):
+            await history_add(
+                session,
+                ticket_id=ticket_id,
+                history_type="Misc",
+                name=f"Sent no auto response to '{addr}', SendNoAutoResponseRegExp matched.",
+                user_id=user_id,
+            )
+            logger.info("autoresponse_regexp_matched", ticket_id=ticket_id, to=addr)
+            continue
+        # ... and not to one of our own (valid) system addresses.
+        if await _is_valid_system_address(session, addr):
+            logger.info("autoresponse_system_address", ticket_id=ticket_id, to=addr)
             continue
         allowed.append(addr)
 

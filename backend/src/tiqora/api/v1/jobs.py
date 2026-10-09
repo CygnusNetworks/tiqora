@@ -12,6 +12,7 @@ from tiqora.extensions import get_registry
 from tiqora.jobs.schemas import JobOut, job_out
 from tiqora.jobs.service import (
     JobNotCancellable,
+    can_download_job_file,
     can_view_job,
     get_job,
     get_job_file,
@@ -80,6 +81,9 @@ async def download_job_file(
     job_id: int, file_id: int, user: CurrentUser, session: DbSession
 ) -> Response:
     job = await _visible_job(session, user, job_id)
+    # Files hold data selected with the creator's permissions: admins only see metadata.
+    if not can_download_job_file(job, user_id=user.id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND)
     row = await get_job_file(session, job.id, file_id)
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND)

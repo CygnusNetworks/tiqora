@@ -66,6 +66,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from email.utils import parseaddr
 
@@ -348,6 +349,7 @@ async def _resolve_recipients(
     notification: _NotificationRow,
     ticket: dict[str, object],
     skip_user_ids: frozenset[int] = frozenset(),
+    extra_user_ids: Sequence[int] = (),
 ) -> list[_Recipient]:
     recipients: list[_Recipient] = []
     seen: set[tuple[str, str]] = set()
@@ -394,6 +396,12 @@ async def _resolve_recipients(
                 time_zone=prefs.get(USER_TIME_ZONE_KEY) or None,
             )
         )
+
+    # Znuny's ``Data->{Recipients}``: agents the sender pre-calculated (the
+    # ForceNotificationToUserID of ArticleCreate); they come first and are
+    # still subject to the skip / valid / address checks above.
+    for uid in extra_user_ids:
+        await _add_agent(int(uid))
 
     recipient_kinds = set(notification.items.get("Recipients", []))
     if "AgentOwner" in recipient_kinds and ticket.get("user_id"):
@@ -663,13 +671,6 @@ async def _render_message(
 _SECURITY_LOG_LEVELS = {"error": "error", "notice": "info"}
 
 
-def _sysconfig_flag(value: object) -> bool:
-    """SysConfig checkbox values arrive as ``1``/``0`` ints or strings."""
-    if isinstance(value, str):
-        return value.strip() not in ("", "0")
-    return bool(value)
-
-
 async def _notification_security(
     session: AsyncSession,
     sysconfig: SysConfig,
@@ -700,7 +701,7 @@ async def _notification_security(
             )
         ).first()
         default_sign_key = str(row[0]) if row is not None and row[0] else None
-    rich_text = _sysconfig_flag(await sysconfig.get("Frontend::RichText", 1))
+    rich_text = await sysconfig.get_bool("Frontend::RichText", True)
     decision = await asyncio.to_thread(
         notification_security_sync,
         config,
@@ -900,6 +901,9 @@ async def process_event(
         frozenset(_as_int(uid) for uid in raw_skip) if isinstance(raw_skip, list) else frozenset()
     )
 
+    raw_extra = payload.get("recipient_user_ids")
+    extra_user_ids = tuple(_as_int(uid) for uid in raw_extra) if isinstance(raw_extra, list) else ()
+
     # Resolved once per event: every recipient's subject gets the same hook.
     hook_cfg = await load_subject_config(session, sysconfig)
 
@@ -921,7 +925,9 @@ async def process_event(
         if transports and "Email" not in transports:
             continue
 
-        recipients = await _resolve_recipients(session, notification, ticket, skip_user_ids)
+        recipients = await _resolve_recipients(
+            session, notification, ticket, skip_user_ids, extra_user_ids
+        )
         for recipient in recipients:
             try:
                 zone = valid_time_zone(recipient.time_zone) or default_zone

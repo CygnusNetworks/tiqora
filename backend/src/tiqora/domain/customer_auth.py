@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import secrets
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -200,6 +201,37 @@ class CustomerSessionStore:
     async def delete(self, token: str) -> None:
         await self._client.delete(self._key(token), self._born_key(token), self._auth_at_key(token))
         await drop_sso(self._client, "c", token)
+
+    async def revoke_logins(self, logins: Iterable[str]) -> int:
+        """Delete every portal session of *logins* (no per-login index: scan the tokens)."""
+        wanted = set(logins)
+        if not wanted:
+            return 0
+        removed = 0
+        async for raw_key in self._client.scan_iter(match=f"{self._prefix}*", count=500):
+            key = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else str(raw_key)
+            token = key[len(self._prefix) :]
+            if not token or ":" in token:  # the born: side keys
+                continue
+            value = await self._client.get(key)
+            if isinstance(value, bytes):
+                value = value.decode("utf-8")
+            if value is not None and str(value).split(":", 1)[-1] in wanted:
+                await self.delete(token)
+                removed += 1
+        return removed
+
+
+async def revoke_customer_redis_sessions(
+    client: redis.Redis, settings: Settings, logins: Iterable[str]
+) -> int:
+    """Every Redis session of the customers *logins*: portal sessions and GI customer tokens."""
+    from tiqora.domain.auth import SessionStore
+
+    wanted = set(logins)
+    portal = await CustomerSessionStore(client, settings).revoke_logins(wanted)
+    compat = await SessionStore(client, settings).revoke_customer_sessions(wanted)
+    return portal + compat
 
 
 class CustomerAuthService:

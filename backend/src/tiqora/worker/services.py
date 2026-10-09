@@ -34,6 +34,8 @@ from tiqora.domain.settings_store import (
     KEY_PENDING_CHECK_INTERVAL_SECONDS,
     KEY_POSTMASTER_ENABLED,
     KEY_POSTMASTER_INTERVAL_SECONDS,
+    KEY_REPORT_FACTS_ENABLED,
+    KEY_REPORT_FACTS_INTERVAL_SECONDS,
     KEY_SMIME_CUSTOMER_RENEW_ENABLED,
     KEY_TELEGRAM_POLLER_ENABLED,
     KEY_TELEGRAM_POLLER_INTERVAL_SECONDS,
@@ -201,6 +203,16 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         interval_settings_attr="jobs_poll_interval_seconds",
         tick_timeout_seconds=STATUS_EVERY_SECONDS,
     ),
+    # Deletes expired Znuny `sessions` rows (always on, like Znuny's Maint::Session::DeleteExpired).
+    DaemonService(
+        slug="znuny_session_purge",
+        enabled_key=None,
+        default_enabled=True,
+        toggleable=False,
+        schedule_kind="interval",
+        interval_key=None,
+        interval_settings_attr="znuny_session_purge_interval_seconds",
+    ),
     DaemonService(
         slug="smime_customer_renew",
         enabled_key=KEY_SMIME_CUSTOMER_RENEW_ENABLED,
@@ -216,6 +228,16 @@ DAEMON_SERVICES: tuple[DaemonService, ...] = (
         toggleable=True,
         schedule_kind="daily",
         daily_at="04:30",
+    ),
+    # Keeps the report data (facts, events, daily snapshots) current after the backfill.
+    DaemonService(
+        slug="report_facts",
+        enabled_key=KEY_REPORT_FACTS_ENABLED,
+        default_enabled=True,
+        toggleable=True,
+        schedule_kind="interval",
+        interval_key=KEY_REPORT_FACTS_INTERVAL_SECONDS,
+        interval_settings_attr="report_facts_interval_seconds",
     ),
 )
 

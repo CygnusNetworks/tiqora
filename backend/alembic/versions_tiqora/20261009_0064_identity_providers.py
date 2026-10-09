@@ -1,8 +1,8 @@
 """Create identity provider, link and managed-assignment tables.
 
-Revision ID: 20261008_0062
-Revises: 20261008_0061
-Create Date: 2026-10-08
+Revision ID: 20261009_0064
+Revises: 20261009_0063
+Create Date: 2026-10-09
 
 ``metadata_xml`` is ``MEDIUMTEXT`` on MariaDB (SAML IdP metadata can exceed
 64 KiB). Booleans and timestamps are written by the application (naive UTC);
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
 
-revision: str = "20261008_0062"
-down_revision: str | None = "20261008_0061"
+revision: str = "20261009_0064"
+down_revision: str | None = "20261009_0063"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

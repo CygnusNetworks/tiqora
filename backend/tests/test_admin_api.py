@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
 import yaml
@@ -94,6 +95,26 @@ class _FakeRedis:
 
     async def delete(self, key: str) -> None:  # noqa: ARG002
         pass
+
+
+class _NoSessionsRedis:
+    """A Redis without any session keys (customer session revocation scans it)."""
+
+    async def scan_iter(self, match: str = "*", count: int | None = None) -> Any:
+        for key in ():
+            yield key
+
+    async def get(self, key: str) -> None:
+        return None
+
+    async def delete(self, *keys: str) -> None:
+        return None
+
+
+def _no_redis_request() -> Any:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(redis=_NoSessionsRedis())))
 
 
 class _FakeSettings:
@@ -395,7 +416,9 @@ async def test_admin_customer_user_create_and_soft_delete(
         )
         assert created.valid_id == 1
 
-        await admin_customers.deactivate_customer_user(created.id, admin_user, s)
+        await admin_customers.deactivate_customer_user(
+            created.id, _no_redis_request(), admin_user, s, get_settings()
+        )
         refreshed = await admin_customers.get_customer_user(created.id, admin_user, s)
         assert refreshed.valid_id == 2
 
@@ -441,7 +464,9 @@ async def test_admin_customer_user_list_pagination_and_valid_filter(
             )
             created_ids.append(cu.id)
         for cid in created_ids[:3]:
-            await admin_customers.deactivate_customer_user(cid, admin_user, s)
+            await admin_customers.deactivate_customer_user(
+                cid, _no_redis_request(), admin_user, s, get_settings()
+            )
 
         # Default valid filter hides the 3 invalid rows; page window caps items.
         page1 = await admin_customers.list_customer_users(
@@ -722,8 +747,10 @@ async def test_admin_customer_user_bulk_update(
         # Validity bulk-set (valid_id=2) on three of four.
         result = await admin_customers.bulk_update_customer_users(
             CustomerUserBulkUpdate(ids=target, valid_id=2),
+            _no_redis_request(),
             admin_user,
             s,
+            get_settings(),
         )
         assert result.updated == 3
 
@@ -736,8 +763,10 @@ async def test_admin_customer_user_bulk_update(
         # Company reassignment only on a subset.
         result2 = await admin_customers.bulk_update_customer_users(
             CustomerUserBulkUpdate(ids=target[:2], customer_id=cust_b),
+            _no_redis_request(),
             admin_user,
             s,
+            get_settings(),
         )
         assert result2.updated == 2
         for cid in target[:2]:
@@ -756,16 +785,20 @@ async def test_admin_customer_user_bulk_update(
         with pytest.raises(HTTPException) as empty_exc:
             await admin_customers.bulk_update_customer_users(
                 CustomerUserBulkUpdate.model_construct(ids=[]),
+                _no_redis_request(),
                 admin_user,
                 s,
+                get_settings(),
             )
         assert empty_exc.value.status_code == 422
 
         with pytest.raises(HTTPException) as cap_exc:
             await admin_customers.bulk_update_customer_users(
                 CustomerUserBulkUpdate.model_construct(ids=list(range(1001))),
+                _no_redis_request(),
                 admin_user,
                 s,
+                get_settings(),
             )
         assert cap_exc.value.status_code == 422
 

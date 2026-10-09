@@ -229,6 +229,34 @@ async def test_df_options_sorted_and_acl_filtered(
 
 
 @pytest.mark.asyncio
+async def test_df_options_keep_yaml_lookalike_keys_as_strings(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    """Znuny keys are strings: unquoted yes/no/on/01 must not become True/False/1."""
+    url, factory = db
+    _seed(url)
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE dynamic_field SET config = :c WHERE id = :i"),
+            {
+                "c": (
+                    "---\nPossibleValues:\n  yes: Ja\n  no: Nein\n  on: An\n"
+                    "  01: Eins\n  '02': Zwei\n"
+                ),
+                "i": DF_AREA,
+            },
+        )
+    engine.dispose()
+    body = {"fields": [AREA], "context": {"ticket_id": T_Q2, "action": "AgentTicketFreeText"}}
+    async with _client(factory) as client:
+        resp = await client.post(URL, json=body)
+    assert resp.status_code == 200, resp.text
+    got = {o["value"]: o["label"] for o in resp.json()["options"][AREA]}
+    assert got == {"yes": "Ja", "no": "Nein", "on": "An", "01": "Eins", "02": "Zwei"}
+
+
+@pytest.mark.asyncio
 async def test_df_options_without_matching_acl(
     db: tuple[str, async_sessionmaker[AsyncSession]],
 ) -> None:
