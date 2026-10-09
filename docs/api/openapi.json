@@ -37232,7 +37232,7 @@
     },
     "/api/v1/admin/auth-config/{user_id}/reset-2fa": {
       "post": {
-        "description": "Admin force-disable: delete TOTP enrollment and all passkeys for the agent.",
+        "description": "Admin force-disable: delete TOTP enrollment and all passkeys for the agent.\n\nAlso clears a pending TOTP enrollment and revokes every session of the agent\n(pending ones included): with no factor left, a surviving session could\nattach one of its own without a step-up.",
         "operationId": "reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post",
         "parameters": [
           {
@@ -41410,7 +41410,7 @@
     },
     "/api/v1/admin/customer-users/{customer_user_id}/reset-2fa": {
       "post": {
-        "description": "Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.\n\nMirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,\nno code needed); the log line is the audit trail.",
+        "description": "Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.\n\nAlso clears a pending TOTP enrollment and revokes every session of the customer\n(pending ones included): with no factor left, a surviving session could attach\none of its own without a step-up.\n\nMirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,\nno code needed); the log line is the audit trail.",
         "operationId": "reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post",
         "parameters": [
           {

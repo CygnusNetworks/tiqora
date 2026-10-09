@@ -1636,6 +1636,10 @@ export interface paths {
         /**
          * Reset 2Fa
          * @description Admin force-disable: delete TOTP enrollment and all passkeys for the agent.
+         *
+         *     Also clears a pending TOTP enrollment and revokes every session of the agent
+         *     (pending ones included): with no factor left, a surviving session could
+         *     attach one of its own without a step-up.
          */
         post: operations["reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post"];
         delete?: never;
@@ -2278,6 +2282,10 @@ export interface paths {
         /**
          * Reset Customer User 2Fa
          * @description Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+         *
+         *     Also clears a pending TOTP enrollment and revokes every session of the customer
+         *     (pending ones included): with no factor left, a surviving session could attach
+         *     one of its own without a step-up.
          *
          *     Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
          *     no code needed); the log line is the audit trail.
