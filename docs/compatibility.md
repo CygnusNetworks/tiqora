@@ -927,7 +927,9 @@ figures differ from Znuny's `Kernel::System::Stats`:
 - **Job results are private.** The result of a report job (run or export) can be
   fetched by its creator only, administrators included. A user may have at most 3
   report jobs queued or running; further requests get 429. A job whose cancel
-  was requested no longer counts: it stops within about a second.
+  was requested no longer counts: it ends within about a second, although the
+  database may finish its running statement for up to
+  `reporting.query_timeout_seconds`.
 - **Inline runs have a 75 s budget** (below the 90 s nginx `/api/` timeout) and
   answer 504 with a JSON `detail.message` when it is used up; large reports
   run as background jobs instead.

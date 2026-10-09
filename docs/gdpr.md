@@ -251,7 +251,9 @@ rebuilds it again on the next tick.
 rebuild and invalidates the report cache the same way (cached rows and labels
 can hold the old names). It does not change `ticket.customer_id` /
 `customer_user_id` (tickets are left as they are), so the rebuilt facts keep the
-old login there, exactly like the ticket table does.
+old login there, exactly like the ticket table does. Removing the login from the
+tickets and the report data completely requires the admin erasure (which rewrites
+the tickets' customer references and rebuilds their facts).
 
 ### Caveats
 

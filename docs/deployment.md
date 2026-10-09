@@ -306,7 +306,15 @@ serves as the report result cache (keys `tiqora:report:v1:*`, TTL
 new backfill (first build, admin rebuild, CLI) and every GDPR erasure or customer
 anonymisation invalidates the whole cache. Reports run inline for at most 75 s,
 below nginx's 90 s `/api/` timeout; larger ones run as background jobs.
-Cancelling a report job stops it within about a second.
+Cancelling a report job ends it within about a second and frees its slot, but
+the database statement it was running is only cut off on the client side: the
+server may keep executing it for up to `reporting.query_timeout_seconds`
+(default 60).
+
+After an upgrade that changes the report fact version, the worker rebuilds the
+facts and events on its own, but stored daily snapshots (backlog history) are
+only rewritten for the last two days: run an admin rebuild (Admin,
+Berichtsdaten) to recompute the older history as well.
 
 The first backfill (and every admin rebuild) runs as a background job in the
 default lane and occupies one of its `jobs.max_concurrency` slots (default 2) for

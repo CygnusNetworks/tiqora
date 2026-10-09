@@ -112,8 +112,12 @@ def moved_by_merge(row: HistoryRow) -> bool:
     A merge within the same second as the row's creation cannot be told apart
     (DATETIME has whole seconds) and is treated as the ticket's own row.
     """
+    # Znuny's WHERE is ``article_id IS NOT NULL OR article_id != 0``: a stored 0
+    # (legacy/imported rows) is moved too, so only NULL rules a row out
     return (
-        bool(row.article_id) and row.change_time is not None and row.change_time > row.create_time
+        row.article_id is not None
+        and row.change_time is not None
+        and row.change_time > row.create_time
     )
 
 

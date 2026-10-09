@@ -337,3 +337,25 @@ def test_state_update_with_article_still_closes() -> None:
     )
     ev = derive_events(t(), [h(1, "NewTicket", 0), close], [], STATE_TYPES)
     assert kinds(ev) == ["create", "state", "close"]
+
+
+def test_merge_moved_row_with_article_id_zero_is_moved_too() -> None:
+    """F5: TicketMerge moves ``article_id IS NOT NULL OR article_id != 0`` rows: 0 included."""
+    from dataclasses import replace
+
+    hist = [
+        h(1, "NewTicket", 0, queue=10, state=1),
+        _moved(2, "StateUpdate", 10, merged_at=30, article=0, queue=20, state=2),
+        h(3, "Move", 40, queue=11, state=1),
+    ]
+    ev = derive_events(t(queue_id=11), hist, [], STATE_TYPES)
+    assert kinds(ev) == ["create", "queue"]
+    # without a merge stamp (change_time == create_time) an article_id 0 row is the ticket's own
+    own = replace(
+        h(2, "StateUpdate", 10, state=2), article_id=0, change_time=T0 + timedelta(minutes=10)
+    )
+    assert kinds(derive_events(t(), [h(1, "NewTicket", 0), own], [], STATE_TYPES)) == [
+        "create",
+        "state",
+        "close",
+    ]

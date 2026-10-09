@@ -9,10 +9,11 @@ never sets ``TIQORA_SCHEMA_OWNERSHIP``.
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Iterator
 from datetime import datetime
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import bindparam, create_engine, inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.config import Settings
@@ -23,6 +24,33 @@ from tiqora.gdpr.anonymize import CustomerNotFoundError, anonymize_customer
 from tiqora.gdpr.gate import GdprRefusedError
 
 NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def _drop_report_marks(request: pytest.FixtureRequest) -> Iterator[None]:
+    """anonymize_customer queues the customer's tickets for a report rebuild: drop the marks."""
+    yield
+    if "mariadb_znuny_url" not in request.fixturenames:
+        return
+    engine = create_engine(request.getfixturevalue("mariadb_znuny_url"))
+    try:
+        if "tiqora_report_dirty_ticket" in inspect(engine).get_table_names():
+            with engine.begin() as conn:
+                ids = [
+                    int(r[0])
+                    for r in conn.execute(
+                        text("SELECT id FROM ticket WHERE customer_id LIKE 'ANON-GDPR%'")
+                    )
+                ]
+                if ids:  # integer IN list, no cross-table join (collations)
+                    conn.execute(
+                        text(
+                            "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id IN :ids"
+                        ).bindparams(bindparam("ids", expanding=True)),
+                        {"ids": ids},
+                    )
+    finally:
+        engine.dispose()
 
 
 def _mysql_async(url: str) -> str:
