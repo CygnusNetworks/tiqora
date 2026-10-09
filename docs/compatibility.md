@@ -886,15 +886,37 @@ figures differ from Znuny's `Kernel::System::Stats`:
 - **Solution minutes run to the last close**, not the first one (the old
   `/api/v1/stats` used the first close). A reopened and closed-again ticket counts
   its full open time.
-- **Owner names, not logins**, label the agent dimensions in reports and in the
-  `/api/v1/stats/*` JSON/CSV.
+- **Owner names, not logins**, label the agent dimensions in reports. The owner
+  dimension of `/api/v1/stats/open-snapshot` (JSON and CSV `Label`) shows
+  "First Last" instead of the login; agent-workload keeps both columns (`Login`,
+  `Name`).
 - **Numbers are incomplete until the first backfill finishes** (worker loop
   `report_facts`, or `tiqora report backfill`). Until then reports show a hint
   and the figures cover only what is built so far.
 - **Truncation.** When a row cap cuts a `/api/v1/stats/*` result the response
   carries `X-Tiqora-Truncated: 1`; a warning is logged once per request.
-- **"Open now" endpoints ignore date filters.** The open-ticket snapshot and the
-  agent workload describe the current state, so `from`/`to` do not apply to them.
+- **"Open now" ignores date filters.** The open-ticket snapshot and the "owned
+  open" side of the agent workload describe the current state, so
+  `date_from`/`date_to` do not apply to them (closed-in-period still uses them).
+- **Merges.** Znuny's `TicketMerge` moves the merged ticket's article-linked
+  history rows to the main ticket (stamping `change_time`); they still carry the
+  merged ticket's queue, state and owner. Reports skip those rows when deriving
+  the main ticket's queue moves, closes, reopens and owner changes (the moved
+  articles still count for the main ticket, as in Znuny's first-response time).
+  A merge within the same second as the moved row's creation cannot be told
+  apart and is read as the main ticket's own row.
+- **SLA breaches of ended tickets.** A ticket without a decision whose due time
+  has passed counts as breached only while it is open; merged, removed and closed
+  tickets are not (Znuny stops escalation for them). Such a ticket counts as
+  "met" in `sla_met_rate`, like an open ticket still inside its target.
+- **Accounted time includes archived tickets** (historically correct totals);
+  Znuny's `TicketAccountedTime` excludes them by default when
+  `Ticket::ArchiveSystem` is on (`ArchiveFlags => ['n']`). Znuny's
+  TicketAverage/Min/Max and Article* kinds are phase-2 builder measures.
+- **Access.** `reporting.access` defaults to `all_agents` (today's `/stats`
+  behaviour); `stats_group` restricts reports to admins and members (`ro`) of
+  Znuny's `stats` group, the Znuny parity setting (stock Znuny gives `stats` to
+  admins only). `GET /api/v1/auth/me` returns `can_view_reports`.
 - **Closed count is a creation cohort.** In `ticket_kpis`, `volume_by_queue`,
   `sla_by_customer` and `top_customers`, "closed tickets" are tickets created in
   the window and by now closed, not tickets closed in the window.
@@ -904,7 +926,8 @@ figures differ from Znuny's `Kernel::System::Stats`:
   tickets reopened after their close.
 - **Job results are private.** The result of a report job (run or export) can be
   fetched by its creator only, administrators included. A user may have at most 3
-  report jobs queued or running; further requests get 429.
+  report jobs queued or running; further requests get 429. A job whose cancel
+  was requested no longer counts: it stops within about a second.
 - **Inline runs have a 75 s budget** (below the 90 s nginx `/api/` timeout) and
   answer 504 with a JSON `detail.message` when it is used up; large reports
   run as background jobs instead.
@@ -916,7 +939,11 @@ figures differ from Znuny's `Kernel::System::Stats`:
 - **Cache.** Results are cached for up to `reporting.cache_seconds` (default 300,
   0 = off) per viewer scope. Results that depend on "now" (relative date filters,
   ages of open tickets) can therefore be that stale. Results computed while the
-  facts were not ready are never cached. GDPR erasure purges the whole report
-  cache.
+  facts were not ready are never cached. GDPR erasure, `tiqora gdpr
+  anonymize-customer` and every new backfill or rebuild invalidate the whole
+  report cache; a report that was computing at that moment cannot store its
+  result where later requests look (cache generation).
+- **Very wide results are cut.** One report query loads at most 200 000 groups;
+  a wider result keeps an arbitrary subset and is flagged truncated.
 - **Admin rebuild.** Rebuilding the report data from the admin page restarts the
   build: reports show a hint and are incomplete until the rebuild has finished.

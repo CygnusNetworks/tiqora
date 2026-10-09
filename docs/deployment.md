@@ -301,9 +301,26 @@ tiqora report status                          # state of the report data as JSON
 The admin page for report data (Admin, Berichte = reports) shows the state and
 can rebuild everything; during a rebuild reports are incomplete again. Redis
 serves as the report result cache (keys `tiqora:report:v1:*`, TTL
-`reporting.cache_seconds`, default 300); if Redis is down reports still run,
-uncached. Reports run inline for at most 75 s, below nginx's 90 s `/api/`
-timeout; larger ones run as background jobs.
+`reporting.cache_seconds`, default 300, plus the counter
+`tiqora:report:generation`); if Redis is down reports still run, uncached. Every
+new backfill (first build, admin rebuild, CLI) and every GDPR erasure or customer
+anonymisation invalidates the whole cache. Reports run inline for at most 75 s,
+below nginx's 90 s `/api/` timeout; larger ones run as background jobs.
+Cancelling a report job stops it within about a second.
+
+The first backfill (and every admin rebuild) runs as a background job in the
+default lane and occupies one of its `jobs.max_concurrency` slots (default 2) for
+minutes to hours; report runs, report exports and ticket exports share the
+remaining slot meanwhile.
+
+The live `open_now` reports and the `escalated` count read
+`ticket.escalation_time`, which Tiqora's `escalation` service keeps current while
+Znuny's daemon is stopped; with that service off, "escalated" shows 0.
+
+Changes that write no `ticket_history` row are not picked up: calendar/SLA/queue
+escalation settings (working minutes stay as built), a change of
+`reporting.time_zone` (earlier daily snapshots keep the old zone), and direct SQL.
+Rebuild the report data afterwards.
 
 ## Reverse proxy sketch
 

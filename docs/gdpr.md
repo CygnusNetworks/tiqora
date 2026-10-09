@@ -241,9 +241,17 @@ and names. Admin erasure therefore deletes the facts and events of every
 affected ticket in the same transaction and queues those tickets for a rebuild
 (the rebuilt rows no longer carry the erased references), and it purges the
 whole report result cache (Redis keys `tiqora:report:v1:*`) afterwards instead of
-waiting for the TTL. `tiqora gdpr anonymize-customer` does not touch the fact
-tables: they keep the old `customer_user` until the tickets are rebuilt (Admin,
-report data, rebuild).
+waiting for the TTL. The purge also bumps `tiqora:report:generation`, so a report
+that was computing during the erasure cannot store its result where later
+requests look. A rebuild that read a ticket just before the erasure committed can
+bring the old customer fields back for one tick; the erasure's dirty mark
+rebuilds it again on the next tick.
+
+`tiqora gdpr anonymize-customer` queues the customer's tickets for a fact
+rebuild and invalidates the report cache the same way (cached rows and labels
+can hold the old names). It does not change `ticket.customer_id` /
+`customer_user_id` (tickets are left as they are), so the rebuilt facts keep the
+old login there, exactly like the ticket table does.
 
 ### Caveats
 
