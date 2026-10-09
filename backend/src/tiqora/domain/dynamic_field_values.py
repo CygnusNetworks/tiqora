@@ -286,12 +286,23 @@ def df_display_value(
         possible = {str(k): v for k, v in raw.items()} if isinstance(raw, dict) else {}
         # Perl truthiness: a label of "" or "0" does not count, the key is shown instead.
         shown = [
-            k if possible.get(k) in (None, "", "0", 0) else str(possible[k]) for k in keys if k
+            k if possible.get(k) in (None, "", "0", 0) else str(possible[k])
+            for k in keys
+            if k not in ("", "0")
         ]
         return readable_history_value(field_type, shown)
     if field_type == "Checkbox":
         key = keys[0] if keys else ""
         return "" if key == "" else ("Checked" if key == "1" else "Unchecked")
+    return readable_history_value(field_type, keys)
+
+
+def df_readable_value(field_type: str, stored: str | Sequence[str] | None) -> str:
+    """``ReadableValueRender`` of a stored value: a Multiselect joins its truthy items with
+    ``", "`` (``Multiselect.pm:775-787`` skips ``""`` and ``"0"``), a Date keeps the day."""
+    keys = [stored] if isinstance(stored, str) else [str(v) for v in (stored or [])]
+    if field_type == "Multiselect":
+        keys = [k for k in keys if k not in ("", "0")]
     return readable_history_value(field_type, keys)
 
 

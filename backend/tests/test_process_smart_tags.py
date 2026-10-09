@@ -27,8 +27,9 @@ from sqlalchemy.ext.asyncio import (
 
 from tiqora.channels.email.placeholder import PlaceholderContext, expand_placeholders
 from tiqora.deployed import clear_revision_cache
-from tiqora.domain.dynamic_field_values import df_display_value
-from tiqora.process.config import TransitionActionConfig
+from tiqora.domain.dynamic_field_values import df_display_value, df_readable_value
+from tiqora.process.conditions import resolve_transition_tags
+from tiqora.process.config import TransitionActionConfig, TransitionConfig
 from tiqora.process.engine import execute_transition_action, run_transitions
 from tiqora.process.smart_tags import (
     build_tag_context,
@@ -44,6 +45,7 @@ T0 = datetime(2026, 3, 4, 5, 6, 7)
 AGENT = 887510
 DF_REGION, DF_TAGS, DF_PLAIN, DF_FLAG = 887520, 887521, 887522, 887523
 TICKET_MAIN, TICKET_ONE, TICKET_PROC, TICKET_SET = 887540, 887541, 887542, 887543
+TICKET_ATTACK = 887544
 TN_MAIN = "2026030488754"
 ARTICLE_BASE = 887560  # article ids 887560..887564
 PROC = 887700  # pm_process 887700, dialog 887710, activities 887720/887721, transition 887730
@@ -191,6 +193,15 @@ def _seed(conn: Any) -> None:
     _add_article(conn, ARTICLE_BASE + 2, TICKET_ONE, "customer", "Only", "only body")
     _add_ticket(conn, TICKET_PROC, "2026030488754P", "Order ticket", customer_user=None)
     _add_ticket(conn, TICKET_SET, "2026030488754S", "Set ticket", customer_user=None)
+    _add_ticket(conn, TICKET_ATTACK, "2026030488754X", "Attack ticket", customer_user=None)
+    _add_article(
+        conn,
+        ARTICLE_BASE + 3,
+        TICKET_ATTACK,
+        "customer",
+        "<OTRS_CONFIG_SendmailModule::AuthPassword>",
+        "<OTRS_CONFIG_DatabasePw>",
+    )
 
 
 def _add_process(conn: Any) -> None:
@@ -602,3 +613,123 @@ async def test_dash_mode_is_off_by_default() -> None:
 
 def test_split_scalar_list_trims_items() -> None:
     assert split_scalar_list(" 1,2 ,3,4 ") == ["1", "2", "3", "4"]
+
+
+def _secret_sysconfig() -> SysConfig:
+    async def _fetch(name: str) -> Any:
+        return "s3cret" if name.endswith(("AuthPassword", "DatabasePw")) else None
+
+    return SysConfig(fetch=_fetch)
+
+
+async def test_template_path_masks_password_config_and_secret_hash_elements() -> None:
+    """TemplateGenerator.pm:1799-1806 + 2127-2143: config passwords and secret keys are ``xxx``."""
+    ctx = PlaceholderContext(
+        customer={"userpassword": "hash1", "pw": "hash2", "useremail": "cora@example.org"},
+        config_overrides={"SendmailModule::AuthPassword": "s3cret", "some::setting": "plain"},
+    )
+    out = await expand_placeholders(
+        None,
+        _secret_sysconfig(),
+        "<OTRS_CONFIG_SendmailModule::AuthPassword>|<OTRS_CONFIG_DatabasePw>|"
+        "<OTRS_CONFIG_Some::Setting>|<OTRS_CUSTOMER_DATA_UserPassword>|<OTRS_CUSTOMER_pw>|"
+        "<OTRS_CUSTOMER_DATA_UserEmail>",
+        context=ctx,
+    )
+    assert out == "xxx|xxx|plain|xxx|xxx|cora@example.org"
+
+
+async def test_condition_path_masks_password_config() -> None:
+    config = TransitionConfig.from_dict(
+        {
+            "Condition": {
+                "1": {
+                    "Type": "and",
+                    "Fields": {
+                        "Title": {
+                            "Type": "Equal",
+                            "Match": "<OTRS_CONFIG_SendmailModule::AuthPassword>",
+                        }
+                    },
+                }
+            }
+        }
+    )
+    ctx = PlaceholderContext(
+        znuny_dash=True, config_overrides={"SendmailModule::AuthPassword": "s3cret"}
+    )
+
+    async def render(text_: str) -> str:
+        return await render_tags(text_, ctx=ctx, sysconfig=_secret_sysconfig())
+
+    tags = await resolve_transition_tags(config, {"Title": "x"}, render=render)
+    assert tags == {"<OTRS_CONFIG_SendmailModule::AuthPassword>": "xxx"}
+
+
+@pytest.mark.db
+async def test_action_path_masks_two_pass_customer_subject_attack(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """A customer subject carrying a config tag is inserted by step 1 (FIRST_ARTICLE_Subject)
+    and must not be expanded to the secret by step 2 (ArticleSend would mail it back)."""
+    async with factory() as session:
+        cfg = await replace_action_config(
+            {"Subject": "<OTRS_FIRST_ARTICLE_Subject>", "Body": "<OTRS_FIRST_ARTICLE_Body>"},
+            session=session,
+            ticket_id=TICKET_ATTACK,
+            user_id=AGENT,
+            sysconfig=_secret_sysconfig(),
+        )
+    assert cfg == {"Subject": "xxx", "Body": "xxx"}
+
+    action = TransitionActionConfig(
+        module="Kernel::System::ProcessManagement::TransitionAction::TicketTitleSet",
+        config={"Title": "<OTRS_FIRST_ARTICLE_Subject>"},
+    )
+    async with factory() as session, session.begin():
+        await execute_transition_action(
+            session,
+            action=action,
+            ticket_id=TICKET_ATTACK,
+            process_entity_id="P",
+            activity_entity_id="A",
+            transition_entity_id="T",
+            user_id=AGENT,
+            sysconfig=_secret_sysconfig(),
+        )
+    async with factory() as session:
+        title = (
+            await session.execute(
+                text("SELECT title FROM ticket WHERE id = :t"), {"t": TICKET_ATTACK}
+            )
+        ).scalar_one()
+    assert title == "xxx"
+
+
+@pytest.mark.db
+async def test_article_maps_stay_out_of_customer_and_current_user_maps(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async with factory() as session:
+        ctx = await build_tag_context(
+            session, ticket_id=TICKET_MAIN, user_id=AGENT, sysconfig=_sysconfig()
+        )
+    assert ctx.customer_article["from"] == "customer@example.org"
+    assert ctx.agent_article["subject"] == "Re: Hilfe"
+    assert "from" not in ctx.customer
+    assert "subject" not in ctx.current_user
+
+
+@pytest.mark.db
+async def test_tiqora_alias_is_recognised_in_action_config(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    cfg = await _replace(factory, {"Title": "<TIQORA_TICKET_Title>|<TIQORA_CURRENT_UserLogin>"})
+    assert cfg == {"Title": "Printer|agent-8875"}
+
+
+def test_zero_key_is_falsy_in_multiselect_render() -> None:
+    """Multiselect.pm:775-787 / 877-880: ``"0"`` is skipped like ``""``."""
+    assert df_display_value("Multiselect", {}, ["0", "a"]) == "a"
+    assert df_readable_value("Multiselect", ["0", "a", ""]) == "a"
+    assert df_readable_value("Date", "2026-02-01 10:30:00") == "2026-02-01"

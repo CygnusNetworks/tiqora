@@ -40,7 +40,7 @@ from tiqora.channels.email.placeholder import (
     load_placeholder_context,
 )
 from tiqora.domain.dynamic_field_config import config_from_yaml
-from tiqora.domain.dynamic_field_values import df_display_value, readable_history_value
+from tiqora.domain.dynamic_field_values import df_display_value, df_readable_value
 from tiqora.domain.quoting import clean_subject
 from tiqora.process.conditions import ConditionData, get_condition_data
 from tiqora.znuny.sysconfig import SysConfig
@@ -48,13 +48,15 @@ from tiqora.znuny.sysconfig import SysConfig
 # Base.pm:373-376, 460: the ticket tag loop gives up after 1000 rounds.
 _MAX_ROUNDS = 1000
 # Base.pm:375 / 395 / 419: ``[A-Za-z0-9_]+`` between ``<OTRS_TICKET_`` and ``>``, case-insensitive.
-_TICKET_TAG_RE = re.compile(r"<OTRS_TICKET_([A-Za-z0-9_]+)>", re.IGNORECASE)
+_TICKET_TAG_RE = re.compile(r"<(?:OTRS|TIQORA)_TICKET_([A-Za-z0-9_]+)>", re.IGNORECASE)
 _DF_VALUE_RE = re.compile(r"DynamicField_(\S+?)_Value")
 _DF_RE = re.compile(r"DynamicField_(\S+)")
 # Base.pm:754: any remaining tag that step 2 has to render. Deliberately also matches ``:``
 # (``<OTRS_CONFIG_Ticket::Hook>``): Znuny's ``[A-Za-z0-9_]+`` skips step 2 for a value whose only
 # tag is a config key, which is never what the process author means.
-_ANY_TAG_RE = re.compile(r"<OTRS_[A-Za-z0-9_:]+(?:\[(?:.+?)\])?>", re.IGNORECASE | re.DOTALL)
+_ANY_TAG_RE = re.compile(
+    r"<(?:OTRS|TIQORA)_[A-Za-z0-9_:]+(?:\[(?:.+?)\])?>", re.IGNORECASE | re.DOTALL
+)
 
 _ARTICLE_SQL = (
     "SELECT a.id, a.ticket_id, a.article_sender_type_id, a.communication_channel_id,"
@@ -181,12 +183,12 @@ async def build_tag_context(
         ctx.customer_subject = await _clean_subject(sysconfig, customer["Subject"])
         ctx.customer_body = customer["Body"]
         ctx.customer_email_lines = customer["Body"].splitlines()
-        ctx.customer.update({k.lower(): v for k, v in customer.items()})
+        ctx.customer_article = {k.lower(): v for k, v in customer.items()}
     agent = await _load_article(session, ticket_id, sender_type="agent")
     if agent is not None:
         ctx.agent_subject = await _clean_subject(sysconfig, agent["Subject"])
         ctx.agent_body = agent["Body"]
-        ctx.current_user.update({k.lower(): v for k, v in agent.items()})
+        ctx.agent_article = {k.lower(): v for k, v in agent.items()}
     return ctx
 
 
@@ -268,7 +270,7 @@ async def _replace_ticket_attributes(
                 rendered = (
                     df_display_value(field_type, df_config, keys)
                     if display_match is not None
-                    else readable_history_value(field_type, keys)
+                    else df_readable_value(field_type, keys)
                 )
                 value = _replace_tag(value, tag, rendered)
                 continue
@@ -338,7 +340,10 @@ async def replace_action_config(
     DynamicFieldSet action splits it again, ``_ConvertScalar2ArrayRef``, Base.pm:826-840).
     """
     out: dict[str, Any] = copy.deepcopy(dict(config))
-    if not any(isinstance(v, str) and "<otrs_" in v.lower() for v in out.values()):
+    if not any(
+        isinstance(v, str) and ("<otrs_" in v.lower() or "<tiqora_" in v.lower())
+        for v in out.values()
+    ):
         return out
     data = await get_condition_data(session, ticket_id)
     first = await _load_article(session, ticket_id, first=True)

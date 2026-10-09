@@ -27,6 +27,7 @@ from tiqora.domain.dynamic_field_config import config_from_yaml
 from tiqora.domain.dynamic_field_values import (
     DynamicFieldConfig,
     df_display_value,
+    df_readable_value,
     get_df_values_bulk,
 )
 from tiqora.domain.settings_store import get_setting_bool
@@ -123,6 +124,11 @@ class PlaceholderContext:
     # <OTRS_TA_*> alone (TemplateGenerator.pm:1592-1600, 1682, 2050-2068). Off for e-mail
     # templates and notifications, which keep rendering an empty string; on for process smart tags.
     znuny_dash: bool = False
+    # Last customer / agent article (Znuny ``Data`` / ``DataAgent``): read by the generic
+    # ``<OTRS_CUSTOMER_*>`` / ``<OTRS_AGENT_*>`` tags only, never by ``CUSTOMER_DATA_`` (allow-list
+    # gate) or ``CURRENT_``.
+    customer_article: dict[str, str] = field(default_factory=dict)
+    agent_article: dict[str, str] = field(default_factory=dict)
 
 
 def _as_str(value: Any, zone: str = "UTC") -> str:
@@ -389,7 +395,7 @@ async def _fetch_ticket_df_entries(session: AsyncSession, ticket_id: int) -> dic
         if not stored:
             continue
         key = f"dynamicfield_{df.name.lower()}"
-        out[key] = ", ".join(stored)
+        out[key] = df_readable_value(df.field_type, stored)
         out[f"{key}_value"] = df_display_value(df.field_type, config_from_yaml(raw_config), stored)
     return out
 
@@ -547,7 +553,7 @@ async def load_placeholder_context(
     return ctx
 
 
-async def _resolve_tag(
+async def _resolve_tag_raw(
     tag: str,
     bracket: str | None,
     *,
@@ -613,7 +619,7 @@ async def _resolve_tag(
                     ).strip()
                 return full or ctx.customer.get("userlogin") or ""
             return ""
-        found = _lookup(ctx.customer, rest)
+        found = _lookup({**ctx.customer, **ctx.customer_article}, rest)
         return "" if found is None else found
 
     if tag_u.startswith("OWNER_"):
@@ -644,7 +650,7 @@ async def _resolve_tag(
             return "\n".join(lines[: int(bracket)] if bracket and bracket.isdigit() else lines)
         if field_u in {"SUBJECT", "BODY", "NOTE", "EMAIL"}:
             return ""
-        found = _lookup(ctx.current_user, field)
+        found = _lookup({**ctx.current_user, **ctx.agent_article}, field)
         return "" if found is None else found
 
     if tag_u == "QUEUE":
@@ -689,6 +695,42 @@ async def _resolve_tag(
     # caller turns the empty result into "-" (TemplateGenerator.pm:1682, the OTRS_ catch-all).
     logger.debug("placeholder_unknown_tag", tag=tag)
     return ""
+
+
+# TemplateGenerator.pm:2127-2143 ``_MaskSensitiveValue``: general key names for hash elements,
+# and the stricter password pattern for config keys. ``pw`` (the raw customer_user column) is
+# not in Znuny's $SecretRE, but the same column is exposed here as ``<OTRS_CUSTOMER_pw>``, so
+# hash elements are checked against both patterns.
+_SECRET_RE = re.compile(r"config|secret|passw|userpw|auth|token", re.IGNORECASE)
+_PASSWORD_RE = re.compile(r"(?:password|pw)\d*$", re.IGNORECASE)
+
+
+async def _resolve_tag(
+    tag: str,
+    bracket: str | None,
+    *,
+    ctx: PlaceholderContext,
+    sysconfig: SysConfig,
+) -> str:
+    """Resolve one tag and mask secrets (single choke point for templates, conditions, actions).
+
+    ``OTRS_CONFIG_<name>`` is masked when the setting name ends in ``password``/``pw`` plus
+    digits (``:1799-1806`` -> ``:2132-2143``); every other hash/special element whose name
+    matches ``config|secret|passw|userpw|auth|token`` becomes ``xxx`` (``:2050-2056``).
+    Dynamic-field tags are Znuny's ``Dynamic`` handler and are not masked.
+    """
+    value = await _resolve_tag_raw(tag, bracket, ctx=ctx, sysconfig=sysconfig)
+    tag_u = tag.upper()
+    if tag_u.startswith("CONFIG_"):
+        name = tag[len("CONFIG_") :]
+        if _PASSWORD_RE.search(name.replace("_", "::")) or _PASSWORD_RE.search(name):
+            return "xxx"
+        return value
+    if not value or "DYNAMICFIELD_" in tag_u:
+        return value
+    if _SECRET_RE.search(tag) or _PASSWORD_RE.search(tag):
+        return "xxx"
+    return value
 
 
 async def expand_placeholders(
@@ -792,7 +834,7 @@ async def _expand_placeholders_inner(
         if ctx.znuny_dash and tag_u.startswith("TA_"):
             continue  # process-management marker, kept verbatim (TemplateGenerator.pm:1592-1600)
         replacement = await _resolve_tag(tag, bracket, ctx=ctx, sysconfig=sysconfig)
-        if ctx.znuny_dash and replacement == "" and not tag_u.startswith("CONFIG_"):
+        if ctx.znuny_dash and replacement in ("", "0") and not tag_u.startswith("CONFIG_"):
             # An empty hash value falls through to the "-" catch-all (TemplateGenerator.pm:2050,
             # 1682); OTRS_CONFIG_ is replaced earlier, ``Get($Key) // ''``, and stays empty (:1799).
             replacement = "-"
