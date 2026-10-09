@@ -1,6 +1,34 @@
 {
   "components": {
     "schemas": {
+      "AbsoluteTimeRange": {
+        "additionalProperties": false,
+        "description": "Local dates in the report time zone, both inclusive.",
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "kind": {
+            "const": "absolute",
+            "default": "absolute",
+            "title": "Kind",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "AbsoluteTimeRange",
+        "type": "object"
+      },
       "AclCreate": {
         "description": "Create a Znuny ``acl`` row. YAML fields stored as text 1:1.",
         "properties": {
@@ -7374,6 +7402,48 @@
         "title": "BounceRequest",
         "type": "object"
       },
+      "BuiltinReportOut": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ReportDefinition"
+          },
+          "description_key": {
+            "title": "Description Key",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "overview": {
+            "title": "Overview",
+            "type": "boolean"
+          },
+          "read_only": {
+            "default": true,
+            "title": "Read Only",
+            "type": "boolean"
+          },
+          "title_key": {
+            "title": "Title Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "category",
+          "title_key",
+          "description_key",
+          "definition",
+          "overview"
+        ],
+        "title": "BuiltinReportOut",
+        "type": "object"
+      },
       "CalendarOut": {
         "properties": {
           "color": {
@@ -11187,6 +11257,61 @@
         "title": "DimensionCountOut",
         "type": "object"
       },
+      "DimensionRef": {
+        "additionalProperties": false,
+        "properties": {
+          "choices": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Choices",
+            "type": "array"
+          },
+          "grain": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "quarter",
+                  "year"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grain"
+          },
+          "key": {
+            "maxLength": 120,
+            "title": "Key",
+            "type": "string"
+          },
+          "top_n": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top N"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "DimensionRef",
+        "type": "object"
+      },
       "DraftIn": {
         "properties": {
           "action": {
@@ -12024,6 +12149,67 @@
           "items"
         ],
         "title": "ExtensionPointOut",
+        "type": "object"
+      },
+      "FactsStatusOut": {
+        "description": "Whether the derived report data is usable, and how far the first build is.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "backfill_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Job Id"
+          },
+          "backfill_progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backfill Progress"
+          },
+          "backfill_status": {
+            "enum": [
+              "pending",
+              "running",
+              "done"
+            ],
+            "title": "Backfill Status",
+            "type": "string"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ready",
+          "as_of",
+          "backfill_status",
+          "backfill_job_id",
+          "backfill_progress"
+        ],
+        "title": "FactsStatusOut",
         "type": "object"
       },
       "FeatureGrantsOut": {
@@ -16991,6 +17177,21 @@
           }
         },
         "title": "McpToolPolicyUpdate",
+        "type": "object"
+      },
+      "MeasureRef": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 120,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "MeasureRef",
         "type": "object"
       },
       "MentionCreate": {
@@ -22078,6 +22279,45 @@
         "title": "RedisStatusOut",
         "type": "object"
       },
+      "RelativeTimeRange": {
+        "additionalProperties": false,
+        "properties": {
+          "count": {
+            "maximum": 3660.0,
+            "minimum": 1.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "include_current": {
+            "default": false,
+            "title": "Include Current",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "relative",
+            "default": "relative",
+            "title": "Kind",
+            "type": "string"
+          },
+          "unit": {
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "quarter",
+              "year"
+            ],
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "unit",
+          "count"
+        ],
+        "title": "RelativeTimeRange",
+        "type": "object"
+      },
       "RemoteModelsOut": {
         "properties": {
           "models": {
@@ -22198,6 +22438,900 @@
           }
         },
         "title": "ReportBackfillIn",
+        "type": "object"
+      },
+      "ReportCatalogueOut": {
+        "properties": {
+          "facts": {
+            "$ref": "#/components/schemas/FactsStatusOut"
+          },
+          "reports": {
+            "items": {
+              "$ref": "#/components/schemas/BuiltinReportOut"
+            },
+            "title": "Reports",
+            "type": "array"
+          }
+        },
+        "required": [
+          "reports",
+          "facts"
+        ],
+        "title": "ReportCatalogueOut",
+        "type": "object"
+      },
+      "ReportDefinition": {
+        "additionalProperties": false,
+        "properties": {
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/DimensionRef"
+            },
+            "maxItems": 3,
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Filter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "maximum": 10000.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/MeasureRef"
+            },
+            "maxItems": 10,
+            "minItems": 1,
+            "title": "Measures",
+            "type": "array"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ReportParameter"
+            },
+            "maxItems": 10,
+            "title": "Parameters",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": 1,
+            "default": 1,
+            "title": "Schema Version",
+            "type": "integer"
+          },
+          "sort": {
+            "items": {
+              "$ref": "#/components/schemas/SortSpec"
+            },
+            "maxItems": 3,
+            "title": "Sort",
+            "type": "array"
+          },
+          "source": {
+            "maxLength": 120,
+            "title": "Source",
+            "type": "string"
+          },
+          "time_field": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Field"
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "absolute": "#/components/schemas/AbsoluteTimeRange",
+                    "relative": "#/components/schemas/RelativeTimeRange"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RelativeTimeRange"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AbsoluteTimeRange"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Range"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/Totals"
+          },
+          "visualization": {
+            "$ref": "#/components/schemas/Visualization"
+          }
+        },
+        "required": [
+          "source",
+          "measures"
+        ],
+        "title": "ReportDefinition",
+        "type": "object"
+      },
+      "ReportExportIn": {
+        "additionalProperties": false,
+        "properties": {
+          "column_labels": {
+            "additionalProperties": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "maxProperties": 20,
+            "propertyNames": {
+              "maxLength": 120
+            },
+            "title": "Column Labels",
+            "type": "object"
+          },
+          "compare_previous": {
+            "default": false,
+            "title": "Compare Previous",
+            "type": "boolean"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDefinition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dimension_choices": {
+            "additionalProperties": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxProperties": 3,
+            "propertyNames": {
+              "maxLength": 3
+            },
+            "title": "Dimension Choices",
+            "type": "object"
+          },
+          "force_job": {
+            "default": false,
+            "title": "Force Job",
+            "type": "boolean"
+          },
+          "format": {
+            "default": "xlsx",
+            "enum": [
+              "xlsx",
+              "csv"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "grain": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "quarter",
+                  "year"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grain"
+          },
+          "info_lines": {
+            "items": {
+              "maxLength": 300,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Info Lines",
+            "type": "array"
+          },
+          "no_cache": {
+            "default": false,
+            "title": "No Cache",
+            "type": "boolean"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  "maxItems": 1000,
+                  "type": "array"
+                },
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxProperties": 10,
+            "propertyNames": {
+              "maxLength": 40
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "report_key": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Key"
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "absolute": "#/components/schemas/AbsoluteTimeRange",
+                    "relative": "#/components/schemas/RelativeTimeRange"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RelativeTimeRange"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AbsoluteTimeRange"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Range"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          },
+          "title": {
+            "default": "Bericht",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "totals_label": {
+            "default": "Summe",
+            "maxLength": 40,
+            "title": "Totals Label",
+            "type": "string"
+          },
+          "value_labels": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "maxLength": 200,
+                "type": "string"
+              },
+              "maxProperties": 500,
+              "propertyNames": {
+                "maxLength": 200
+              },
+              "type": "object"
+            },
+            "maxProperties": 20,
+            "propertyNames": {
+              "maxLength": 120
+            },
+            "title": "Value Labels",
+            "type": "object"
+          }
+        },
+        "title": "ReportExportIn",
+        "type": "object"
+      },
+      "ReportParameter": {
+        "additionalProperties": false,
+        "description": "Znuny \"changeable at runtime\".",
+        "properties": {
+          "allowed_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "maxLength": 1000,
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "maxItems": 1000,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Values"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "maxLength": 1000,
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "maxItems": 1000,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default"
+          },
+          "field": {
+            "maxLength": 120,
+            "title": "Field",
+            "type": "string"
+          },
+          "key": {
+            "pattern": "^[a-z][a-z0-9_]{0,39}$",
+            "title": "Key",
+            "type": "string"
+          },
+          "label_key": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label Key"
+          },
+          "op": {
+            "default": "in",
+            "enum": [
+              "in",
+              "eq",
+              "is_true",
+              "is_false"
+            ],
+            "title": "Op",
+            "type": "string"
+          },
+          "required": {
+            "default": false,
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "field"
+        ],
+        "title": "ReportParameter",
+        "type": "object"
+      },
+      "ReportResultOut": {
+        "properties": {
+          "cached": {
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/ResultColumnOut"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "facts": {
+            "$ref": "#/components/schemas/FactsStatusOut"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "labels": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Labels",
+            "type": "object"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportTotalsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Key"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "time_window": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeWindowOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "totals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportTotalsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "report_key",
+          "columns",
+          "rows",
+          "labels",
+          "totals",
+          "previous",
+          "row_count",
+          "truncated",
+          "time_window",
+          "generated_at",
+          "cached",
+          "facts"
+        ],
+        "title": "ReportResultOut",
+        "type": "object"
+      },
+      "ReportRunIn": {
+        "additionalProperties": false,
+        "description": "Body of ``POST /reports/run``: exactly one of ``report_key`` / ``definition``.\n\nUnknown fields are rejected (422): ``window_override``, ``extra_filter`` and\n``last_snapshot_date`` exist only internally (``RunParams``) for the\n``/stats`` wrappers and the engine, never as request fields.",
+        "properties": {
+          "compare_previous": {
+            "default": false,
+            "title": "Compare Previous",
+            "type": "boolean"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportDefinition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dimension_choices": {
+            "additionalProperties": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxProperties": 3,
+            "propertyNames": {
+              "maxLength": 3
+            },
+            "title": "Dimension Choices",
+            "type": "object"
+          },
+          "force_job": {
+            "default": false,
+            "title": "Force Job",
+            "type": "boolean"
+          },
+          "grain": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "quarter",
+                  "year"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grain"
+          },
+          "no_cache": {
+            "default": false,
+            "title": "No Cache",
+            "type": "boolean"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "maxLength": 1000,
+                        "type": "string"
+                      },
+                      {
+                        "type": "integer"
+                      }
+                    ]
+                  },
+                  "maxItems": 1000,
+                  "type": "array"
+                },
+                {
+                  "maxLength": 1000,
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxProperties": 10,
+            "propertyNames": {
+              "maxLength": 40
+            },
+            "title": "Parameters",
+            "type": "object"
+          },
+          "report_key": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Key"
+          },
+          "time_range": {
+            "anyOf": [
+              {
+                "discriminator": {
+                  "mapping": {
+                    "absolute": "#/components/schemas/AbsoluteTimeRange",
+                    "relative": "#/components/schemas/RelativeTimeRange"
+                  },
+                  "propertyName": "kind"
+                },
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RelativeTimeRange"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AbsoluteTimeRange"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Range"
+          },
+          "time_zone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Zone"
+          }
+        },
+        "title": "ReportRunIn",
+        "type": "object"
+      },
+      "ReportRunOut": {
+        "description": "200: ``result`` (inline run or cache hit); 202: ``job`` (background run).",
+        "properties": {
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobAccepted"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportResultOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ReportRunOut",
+        "type": "object"
+      },
+      "ReportSourceOut": {
+        "properties": {
+          "default_time_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Time Field"
+          },
+          "dimensions": {
+            "items": {
+              "$ref": "#/components/schemas/SourceDimensionOut"
+            },
+            "title": "Dimensions",
+            "type": "array"
+          },
+          "filter_fields": {
+            "items": {
+              "$ref": "#/components/schemas/SourceDimensionOut"
+            },
+            "title": "Filter Fields",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "measures": {
+            "items": {
+              "$ref": "#/components/schemas/SourceMeasureOut"
+            },
+            "title": "Measures",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "label_key",
+          "dimensions",
+          "measures",
+          "filter_fields",
+          "default_time_field"
+        ],
+        "title": "ReportSourceOut",
+        "type": "object"
+      },
+      "ReportTotalsOut": {
+        "properties": {
+          "columns": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Columns",
+            "type": "object"
+          },
+          "grand": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grand"
+          },
+          "rows": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Rows",
+            "type": "object"
+          }
+        },
+        "title": "ReportTotalsOut",
         "type": "object"
       },
       "ReportingStatusOut": {
@@ -22346,6 +23480,82 @@
           "url"
         ],
         "title": "ResolvedCustomerLink",
+        "type": "object"
+      },
+      "ResultColumnOut": {
+        "properties": {
+          "grain": {
+            "anyOf": [
+              {
+                "enum": [
+                  "day",
+                  "week",
+                  "month",
+                  "quarter",
+                  "year"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grain"
+          },
+          "i18n_values": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "I18N Values"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "dimension",
+              "measure"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "id",
+              "string",
+              "enum",
+              "date",
+              "hour",
+              "weekday",
+              "count",
+              "number",
+              "minutes",
+              "hours",
+              "days",
+              "units",
+              "percent"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "role",
+          "type",
+          "label_key"
+        ],
+        "title": "ResultColumnOut",
         "type": "object"
       },
       "RoleAssignment": {
@@ -24358,6 +25568,128 @@
           "article_id"
         ],
         "title": "SmsSendResponse",
+        "type": "object"
+      },
+      "SortSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "default": "desc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 120,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "SortSpec",
+        "type": "object"
+      },
+      "SourceDimensionOut": {
+        "description": "A dimension, or (in ``filter_fields``) a filter-only field of a source.\n\nFilter-only fields have ``kind`` = their filter type, ``labels`` \"none\",\nno ``i18n_values`` / ``options_source`` and ``time_field`` false.",
+        "properties": {
+          "filter_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter Type"
+          },
+          "i18n_values": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "I18N Values"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "labels": {
+            "title": "Labels",
+            "type": "string"
+          },
+          "options_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options Source"
+          },
+          "time_field": {
+            "title": "Time Field",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label_key",
+          "kind",
+          "labels",
+          "i18n_values",
+          "filter_type",
+          "options_source",
+          "time_field"
+        ],
+        "title": "SourceDimensionOut",
+        "type": "object"
+      },
+      "SourceMeasureOut": {
+        "properties": {
+          "agg": {
+            "title": "Agg",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label_key": {
+            "title": "Label Key",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label_key",
+          "agg",
+          "unit"
+        ],
+        "title": "SourceMeasureOut",
         "type": "object"
       },
       "SplitRequest": {
@@ -28100,6 +29432,65 @@
         "title": "TimeAccountingReportOut",
         "type": "object"
       },
+      "TimeWindowOut": {
+        "properties": {
+          "end": {
+            "format": "date-time",
+            "title": "End",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "title": "Start",
+            "type": "string"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "time_zone": {
+            "title": "Time Zone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "start_date",
+          "end_date",
+          "time_zone"
+        ],
+        "title": "TimeWindowOut",
+        "type": "object"
+      },
+      "Totals": {
+        "additionalProperties": false,
+        "properties": {
+          "columns": {
+            "default": false,
+            "title": "Columns",
+            "type": "boolean"
+          },
+          "grand": {
+            "default": false,
+            "title": "Grand",
+            "type": "boolean"
+          },
+          "rows": {
+            "default": false,
+            "title": "Rows",
+            "type": "boolean"
+          }
+        },
+        "title": "Totals",
+        "type": "object"
+      },
       "TypeRefOut": {
         "properties": {
           "id": {
@@ -28916,6 +30307,54 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "Visualization": {
+        "additionalProperties": false,
+        "properties": {
+          "chart_measures": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chart Measures"
+          },
+          "series_dimension": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Dimension"
+          },
+          "type": {
+            "default": "table",
+            "enum": [
+              "table",
+              "pivot",
+              "bar",
+              "stacked_bar",
+              "line",
+              "area",
+              "donut",
+              "heatmap",
+              "kpi"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "title": "Visualization",
         "type": "object"
       },
       "VolumePointOut": {
@@ -68470,6 +69909,444 @@
         "summary": "List Types",
         "tags": [
           "reference"
+        ]
+      }
+    },
+    "/api/v1/reporting/sources": {
+      "get": {
+        "description": "Report sources with their dimensions, measures and filter fields (builder, filters).",
+        "operationId": "list_sources_api_v1_reporting_sources_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReportSourceOut"
+                  },
+                  "title": "Response List Sources Api V1 Reporting Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Sources",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reporting/status": {
+      "get": {
+        "description": "Whether the report data is ready (banner while the first build runs).",
+        "operationId": "get_facts_status_api_v1_reporting_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactsStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Facts Status",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports": {
+      "get": {
+        "description": "The built-in reports (catalogue order) and the readiness of the report data.",
+        "operationId": "list_reports_api_v1_reports_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportCatalogueOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Reports",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/export": {
+      "post": {
+        "description": "Queue an XLSX/CSV export (always a job; the file is ``<title slug>.xlsx|.csv``).\n\nThe request is checked now (422 for invalid definitions or parameters);\nthe worker evaluates access and the viewer's scope again when it runs.",
+        "operationId": "export_report_api_v1_reports_export_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Report",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/run": {
+      "post": {
+        "description": "Run a built-in report (``report_key``) or an inline ``definition``.\n\n200 with ``result`` (inline or from the cache), or 202 with ``job`` when\nthe report is large; poll ``GET /jobs/{id}``, the job result is the report.",
+        "operationId": "run_report_endpoint_api_v1_reports_run_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRunOut"
+                }
+              }
+            },
+            "description": "Runs as a background job."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Report Endpoint",
+        "tags": [
+          "reports"
+        ]
+      }
+    },
+    "/api/v1/reports/{report_key}": {
+      "get": {
+        "operationId": "get_report_api_v1_reports__report_key__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "report_key",
+            "required": true,
+            "schema": {
+              "title": "Report Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuiltinReportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report",
+        "tags": [
+          "reports"
         ]
       }
     },

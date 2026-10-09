@@ -185,3 +185,24 @@ def test_jobs_and_ticket_filters_map_to_tickets() -> None:
     assert path_to_area("/api/v1/ticket-filters/count") == "tickets"
     assert path_to_area("/api/v1/customer-directory/vcards") == "customers"
     assert scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/jobs/5/files/3")
+
+
+def test_reports_and_reporting_map_to_stats() -> None:
+    for path in (
+        "/api/v1/reports",
+        "/api/v1/reports/builtin.channel_mix",
+        "/api/v1/reports/run",
+        "/api/v1/reports/export",
+        "/api/v1/reporting/sources",
+        "/api/v1/reporting/status",
+    ):
+        assert path_to_area(path) == "stats", path
+    ro, rw = frozenset({"stats:ro"}), frozenset({"stats:rw"})
+    assert scopes_allow(ro, method="GET", path="/api/v1/reports")
+    assert scopes_allow(ro, method="GET", path="/api/v1/reporting/sources")
+    assert not scopes_allow(ro, method="POST", path="/api/v1/reports/run")  # enqueues jobs
+    assert scopes_allow(rw, method="POST", path="/api/v1/reports/run")
+    assert scopes_allow(rw, method="POST", path="/api/v1/reports/export")
+    assert not scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/reports")
+    # the admin reporting page stays admin-only
+    assert path_to_area("/api/v1/admin/reporting/status") == "admin"

@@ -6,6 +6,7 @@ tickets 91830-91832). The module deletes every row it created.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Iterator
 from datetime import datetime
 from typing import Any
@@ -15,6 +16,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import bindparam, create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+import tiqora.api.v1.tickets as tickets_api
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.v1.tickets import MAX_ACTIVE_EXPORTS_PER_USER
@@ -308,6 +310,44 @@ async def test_third_active_export_is_rejected_with_429(
     )
     assert again.status_code == 202  # joins the pending identical export, not a new slot
     assert after_cancel.status_code == 202
+
+
+async def test_concurrent_exports_cannot_overshoot_the_cap(
+    factory: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Five different exports at once: the user-row lock lets exactly the cap through."""
+    real_count = tickets_api.count_active_jobs
+
+    async def slow_count(*args: Any, **kwargs: Any) -> int:
+        n = await real_count(*args, **kwargs)
+        await asyncio.sleep(0.2)  # widen the check-then-insert window
+        return n
+
+    monkeypatch.setattr(tickets_api, "count_active_jobs", slow_count)
+    bodies = [
+        {"params": {"queue_id": Q1}},
+        {"params": {"queue_id": Q2}},
+        {"params": {}},
+        {"params": {"queue_id": Q1}, "order": "asc"},
+        {"params": {"queue_id": Q2}, "order": "asc"},
+    ]
+    async with _client(factory) as client:
+        responses = await asyncio.gather(
+            *(client.post("/api/v1/tickets/export-jobs", json=b) for b in bodies)
+        )
+    codes = sorted(r.status_code for r in responses)
+    assert codes == [202] * MAX_ACTIVE_EXPORTS_PER_USER + [429] * (5 - MAX_ACTIVE_EXPORTS_PER_USER)
+    async with factory() as s:
+        active = (
+            await s.execute(
+                text(
+                    "SELECT COUNT(*) FROM tiqora_job WHERE kind = 'core.ticket_export'"
+                    " AND created_by = :u AND status IN ('queued', 'running')"
+                ),
+                {"u": AGENT},
+            )
+        ).scalar_one()
+    assert active == MAX_ACTIVE_EXPORTS_PER_USER
 
 
 async def test_filter_error_at_run_time_fails_job_with_the_real_message(

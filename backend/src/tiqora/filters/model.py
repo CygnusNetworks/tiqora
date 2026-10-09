@@ -38,19 +38,21 @@ class Condition(BaseModel):
 
 
 class AllOf(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_mode_override="validation")
 
     all: list[FilterNode] = Field(min_length=1)
 
 
 class AnyOf(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_mode_override="validation")
 
     any: list[FilterNode] = Field(min_length=1)
 
 
 class Not(BaseModel):
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(
+        extra="forbid", populate_by_name=True, json_schema_mode_override="validation"
+    )
 
     not_: FilterNode = Field(alias="not")
 
@@ -61,7 +63,7 @@ FilterNode = AllOf | AnyOf | Not | Condition
 class Filter(BaseModel):
     """Serialise with ``model_dump(by_alias=True, exclude_none=True)``."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_mode_override="validation")
 
     version: Literal[1] = 1
     where: FilterNode | None = None  # None = no condition (scope only)

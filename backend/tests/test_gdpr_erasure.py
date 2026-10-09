@@ -2261,10 +2261,25 @@ async def test_run_erasure_purges_customer_second_factors(
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 @pytest.mark.parametrize("variant", ["anonymize", "delete", "delete_tickets"])
 async def test_erasure_removes_report_facts_and_marks_dirty(
-    url_fixture: str, variant: str, request: pytest.FixtureRequest
+    url_fixture: str,
+    variant: str,
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Facts copy customer_id/customer_user: every mode drops them and queues a rebuild."""
+    """Facts copy customer_id/customer_user: every mode drops them and queues a rebuild.
+
+    Cached report results (rows, labels) are purged too, not left to their TTL.
+    """
+    from tiqora.gdpr import erasure
     from tiqora.reporting.facts_store import rebuild_ticket_facts
+
+    purged: list[str] = []
+
+    async def record_purge(redis_url: str) -> int:
+        purged.append(redis_url)
+        return 0
+
+    monkeypatch.setattr(erasure, "purge_report_cache_at", record_purge)
 
     url = request.getfixturevalue(url_fixture)
     engine, factory = await _factory(url)
@@ -2323,6 +2338,7 @@ async def test_erasure_removes_report_facts_and_marks_dirty(
         actor="test",
         delete_tickets=variant == "delete_tickets",
     )
+    assert purged == [Settings().redis_url]  # once per erasure, after the commit
     async with factory() as session:
         assert await report_rows(session, tid) == (0, 0, 1)
         await session.execute(

@@ -4,9 +4,10 @@ Order of work for one run: viewer scope (``ticket_query_scope``; archived
 tickets only for admins who ask, like ``GET /tickets``) -> state row
 (``last_snapshot_date``, facts status) -> compile -> cache lookup -> main
 query (+ raw percentile rows) -> top-n folding -> rates and percentiles ->
-zero buckets of a time series -> sort -> limit -> row cap -> totals and the
-previous period (own queries, never derived from capped rows) -> labels ->
-cache store.
+zero buckets of a time series (only when the grid fits the row cap) -> sort
+-> limit -> row cap -> totals and the previous period (own queries, never
+derived from capped rows; row/column totals only for the returned rows) ->
+labels -> cache store (only when the report data is ready).
 
 Time limits (R-INLINEBUDGET): every statement runs inside
 ``statement_timeout`` plus a client-side ``asyncio.wait_for`` backstop. A
@@ -150,15 +151,18 @@ async def _fetch(session: AsyncSession, stmt: Select[Any], budget: QueryBudget) 
 async def _bounded[R](
     budget: QueryBudget, work: Callable[[], Awaitable[R]], session: AsyncSession
 ) -> R:
-    """Run non-report lookups (labels) inside the shared deadline, if there is one."""
-    if budget.deadline is None:
-        return await work()
+    """Run non-report lookups (labels) within the budget (per-query limit in jobs).
+
+    A timeout or cancellation invalidates the connection like :func:`_fetch`.
+    """
     seconds = budget.statement_seconds()
     try:
         return await asyncio.wait_for(work(), seconds)
-    except TimeoutError as exc:
+    except (TimeoutError, asyncio.CancelledError) as exc:
         await invalidate_quietly(session)
-        raise ReportQueryTimeout(f"label lookup exceeded {seconds}s") from exc
+        if isinstance(exc, TimeoutError):
+            raise ReportQueryTimeout(f"label lookup exceeded {seconds}s") from exc
+        raise
 
 
 # --------------------------------------------------------------------------
@@ -254,14 +258,30 @@ def _recompile(plan: RunPlan, group_by: Sequence[int], window: TimeWindow | None
     )
 
 
+def resolve_budget(budget: QueryBudget | None, reporting: ReportingSettings) -> QueryBudget:
+    """The one meaning of ``budget=None`` in every engine entry point: job mode.
+
+    Inline (HTTP) callers MUST create one :meth:`QueryBudget.inline` per request
+    and pass that same object to ``estimate_rows`` and ``run_report``.
+    """
+    return budget if budget is not None else QueryBudget.job(reporting)
+
+
 async def estimate_rows(
-    session: AsyncSession, compiled: CompiledReport, *, budget: QueryBudget | None = None
+    session: AsyncSession,
+    compiled: CompiledReport,
+    *,
+    reporting: ReportingSettings,
+    budget: QueryBudget | None = None,
 ) -> int:
-    """``SELECT COUNT(*)`` over the same FROM/WHERE as ``compiled.stmt`` (scope included)."""
+    """``SELECT COUNT(*)`` over the same FROM/WHERE as ``compiled.stmt`` (scope included).
+
+    ``budget`` as in :func:`run_report` (see :func:`resolve_budget`).
+    """
     if compiled.stmt is None:
         return 0
     stmt = compiled.stmt.with_only_columns(func.count(), maintain_column_froms=True).group_by(None)
-    rows = await _fetch(session, stmt, budget or QueryBudget())
+    rows = await _fetch(session, stmt, resolve_budget(budget, reporting))
     return int(rows[0][0]) if rows else 0
 
 
@@ -476,6 +496,13 @@ def _columns(compiled: CompiledReport) -> list[ResultColumnOut]:
     return cols
 
 
+def _bucket_count(grain: str, start: date, end: date) -> int:
+    """Number of buckets without building them (upper bound for day grain: the days)."""
+    if grain == "day":
+        return (end - start).days + 1
+    return len(_buckets(grain, start, end))  # <= 3660 / 7 entries
+
+
 def _buckets(grain: str, start: date, end: date) -> list[date]:
     out: list[date] = []
     bucket = unit_start(grain, start)
@@ -486,24 +513,39 @@ def _buckets(grain: str, start: date, end: date) -> list[date]:
 
 
 def _fill_time_series(
-    groups: dict[Key, _Group], compiled: CompiledReport, dims: Sequence[Dimension]
-) -> None:
-    """Zero rows for the empty buckets of the first date dimension (in place)."""
+    groups: dict[Key, _Group],
+    compiled: CompiledReport,
+    dims: Sequence[Dimension],
+    max_rows: int,
+) -> bool:
+    """Zero rows for the empty buckets of the first date dimension (in place).
+
+    The grid (buckets x series values, after top-n folding) is only built when it
+    fits into ``max_rows`` (the row cap); otherwise nothing is filled and True is
+    returned (the result is then flagged ``truncated``). This bounds the work an
+    inline definition with many series over a long window can cause.
+    """
     window = compiled.window
     defn = compiled.definition
     idx = next((i for i, d in enumerate(dims) if d.kind in _DATE_KINDS), None)
     if window is None or idx is None or dims[idx].stock:
-        return
+        return False
     series = defn.visualization.series_dimension
     if len(dims) > 1 and (series is None or series == idx):
-        return
-    buckets = _buckets(defn.dimensions[idx].grain or "day", window.start_date, window.end_date)
+        return False
+    grain = defn.dimensions[idx].grain or "day"
+    if _bucket_count(grain, window.start_date, window.end_date) > max_rows:
+        return True
+    buckets = _buckets(grain, window.start_date, window.end_date)
     others = {(*key[:idx], *key[idx + 1 :]) for key in groups} if len(dims) > 1 else {()}
+    if len(others) * len(buckets) > max_rows:
+        return True
     for rest in others:
         for bucket in buckets:
             key = (*rest[:idx], bucket, *rest[idx:])
             if key not in groups:
                 groups[key] = _empty_group(compiled.measures)
+    return False
 
 
 @dataclass
@@ -598,9 +640,14 @@ async def _totals(
     rows: bool,
     columns: bool,
     top: dict[int, set[Any]],
+    shown: dict[int, set[Any]],
     window: TimeWindow | None = None,
 ) -> tuple[ReportTotalsOut, bool]:
-    """Totals from their own queries (``group_by`` [] / [0] / [1]); bool = samples capped."""
+    """Totals from their own queries (``group_by`` [] / [0] / [1]); bool = samples capped.
+
+    Row/column totals are kept only for the dimension values of the returned rows
+    (``shown``), so they never outgrow the row cap and need no extra labels.
+    """
     width = len(plan.compiled.definition.dimensions)
     out = ReportTotalsOut()
     truncated = False
@@ -619,6 +666,8 @@ async def _totals(
         if pos in top:
             groups = _fold(groups, 0, top[pos], compiled.measures)
         for (value,), group in groups.items():
+            if value not in shown[pos]:
+                continue
             dims: list[Cell] = [None] * width
             dims[pos] = _dim_cell(value)
             target[str(_dim_cell(value))] = dims + _measure_cells(group, compiled.measures)
@@ -684,7 +733,8 @@ async def execute_plan(
         if ref.top_n is not None:
             top[i] = _top_values(groups, i, ref.top_n, compiled.measures)
             groups = _fold(groups, i, top[i], compiled.measures)
-    _fill_time_series(groups, compiled, dims)
+    if _fill_time_series(groups, compiled, dims, plan.row_cap):
+        truncated = True
 
     records = [_Record(key, _measure_cells(g, compiled.measures)) for key, g in groups.items()]
     records = _sort(records, compiled, dims)
@@ -695,6 +745,7 @@ async def execute_plan(
         records = records[: plan.row_cap]
         truncated = True
 
+    shown = {i: {rec.key[i] for rec in records} for i in range(len(dims))}
     want = defn.totals
     totals: ReportTotalsOut | None = None
     if want.grand or want.rows or want.columns or plan.compare_previous:
@@ -706,6 +757,7 @@ async def execute_plan(
             rows=want.rows,
             columns=want.columns,
             top=top,
+            shown=shown,
         )
         truncated |= capped
     previous: ReportTotalsOut | None = None
@@ -718,6 +770,7 @@ async def execute_plan(
             rows=want.rows,
             columns=want.columns,
             top=top,
+            shown=shown,
             window=previous_window(compiled.window),
         )
         truncated |= capped
@@ -726,11 +779,8 @@ async def execute_plan(
     for i, (ref, dim) in enumerate(zip(defn.dimensions, dims, strict=True)):
         if dim.labels == "none":
             continue
-        values = {rec.key[i] for rec in records}
-        for tot in (totals, previous):
-            if tot is not None and i in (0, 1):
-                values |= {v[i] for v in (tot.rows if i == 0 else tot.columns).values()}
-        keys = [v for v in values if v is not None and v != OTHER_KEY]
+        # totals rows/columns only carry values of these rows (see _totals)
+        keys = [v for v in shown[i] if v is not None and v != OTHER_KEY]
         source = dim.labels
         labels[ref.key] = await _bounded(
             budget, partial(resolve_labels, session, source, keys), session
@@ -759,8 +809,9 @@ async def run_report(
 ) -> ReportResultOut:
     """Run one report for ``user_id``; see the module docstring.
 
-    ``budget`` ``None`` = job mode (``query_timeout_seconds`` per statement);
-    inline callers pass one :meth:`QueryBudget.inline` for the whole request.
+    ``budget`` ``None`` = job mode (``query_timeout_seconds`` per statement), the
+    same meaning as in :func:`estimate_rows` (see :func:`resolve_budget`); inline
+    callers pass one :meth:`QueryBudget.inline` for the whole request.
     """
     plan = await plan_report(
         session,
@@ -778,13 +829,41 @@ async def run_report(
         hit = await cache.get(plan.cache_key)
         if hit is not None:
             return hit.model_copy(update={"report_key": report_key, "facts": plan.facts})
+    return await execute_and_store(
+        session,
+        plan,
+        report_key=report_key,
+        reporting=reporting,
+        cache=cache if use_cache else None,
+        budget=budget,
+    )
+
+
+async def execute_and_store(
+    session: AsyncSession,
+    plan: RunPlan,
+    *,
+    report_key: str | None,
+    reporting: ReportingSettings,
+    cache: ReportCache | None,
+    budget: QueryBudget | None = None,
+) -> ReportResultOut:
+    """Second half of :func:`run_report` for callers that planned (and looked up) already.
+
+    Runs ``plan`` and stores the result under ``plan.cache_key`` (when ``cache`` is
+    given and the data is ready). No cache lookup: the caller did it. ``budget`` as in
+    :func:`run_report`.
+    """
     result = await execute_plan(
         session,
         plan,
         report_key=report_key,
-        budget=budget if budget is not None else QueryBudget.job(reporting),
+        budget=resolve_budget(budget, reporting),
     )
-    if use_cache and cache is not None:
+    # never cache numbers computed while the report data is still being built: a
+    # later hit would show them with the then-current "ready" status
+    data_ready = plan.facts.ready or not plan.compiled.source.requires_facts
+    if cache is not None and data_ready:
         await cache.put(plan.cache_key, result)
     return result
 
@@ -822,6 +901,6 @@ async def raw_measure_values(
     rows = await _fetch(
         session,
         compiled.raw_stmt.limit(PERCENTILE_SAMPLE_CAP),
-        budget if budget is not None else QueryBudget.job(reporting),
+        resolve_budget(budget, reporting),
     )
     return [float(r._mapping[label]) for r in rows if r._mapping[label] is not None]

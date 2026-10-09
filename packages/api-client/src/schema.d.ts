@@ -7004,6 +7004,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reporting/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sources
+         * @description Report sources with their dimensions, measures and filter fields (builder, filters).
+         */
+        get: operations["list_sources_api_v1_reporting_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reporting/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Facts Status
+         * @description Whether the report data is ready (banner while the first build runs).
+         */
+        get: operations["get_facts_status_api_v1_reporting_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reports
+         * @description The built-in reports (catalogue order) and the readiness of the report data.
+         */
+        get: operations["list_reports_api_v1_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Report
+         * @description Queue an XLSX/CSV export (always a job; the file is ``<title slug>.xlsx|.csv``).
+         *
+         *     The request is checked now (422 for invalid definitions or parameters);
+         *     the worker evaluates access and the viewer's scope again when it runs.
+         */
+        post: operations["export_report_api_v1_reports_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Report Endpoint
+         * @description Run a built-in report (``report_key``) or an inline ``definition``.
+         *
+         *     200 with ``result`` (inline or from the cache), or 202 with ``job`` when
+         *     the report is large; poll ``GET /jobs/{id}``, the job result is the report.
+         */
+        post: operations["run_report_endpoint_api_v1_reports_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report */
+        get: operations["get_report_api_v1_reports__report_key__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -8900,6 +9023,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AbsoluteTimeRange
+         * @description Local dates in the report time zone, both inclusive.
+         */
+        AbsoluteTimeRange: {
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "absolute";
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+        };
         /**
          * AclCreate
          * @description Create a Znuny ``acl`` row. YAML fields stored as text 1:1.
@@ -11271,6 +11415,25 @@ export interface components {
             /** To Address */
             to_address: string;
         };
+        /** BuiltinReportOut */
+        BuiltinReportOut: {
+            /** Category */
+            category: string;
+            definition: components["schemas"]["ReportDefinition"];
+            /** Description Key */
+            description_key: string;
+            /** Key */
+            key: string;
+            /** Overview */
+            overview: boolean;
+            /**
+             * Read Only
+             * @default true
+             */
+            read_only: boolean;
+            /** Title Key */
+            title_key: string;
+        };
         /** CalendarOut */
         CalendarOut: {
             /** Color */
@@ -12445,6 +12608,17 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** DimensionRef */
+        DimensionRef: {
+            /** Choices */
+            choices?: string[];
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** Key */
+            key: string;
+            /** Top N */
+            top_n?: number | null;
+        };
         /** DraftIn */
         DraftIn: {
             /** Action */
@@ -12752,6 +12926,25 @@ export interface components {
             key: string;
             /** Sdk Stable */
             sdk_stable: boolean;
+        };
+        /**
+         * FactsStatusOut
+         * @description Whether the derived report data is usable, and how far the first build is.
+         */
+        FactsStatusOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Backfill Job Id */
+            backfill_job_id: number | null;
+            /** Backfill Progress */
+            backfill_progress: number | null;
+            /**
+             * Backfill Status
+             * @enum {string}
+             */
+            backfill_status: "pending" | "running" | "done";
+            /** Ready */
+            ready: boolean;
         };
         /**
          * FeatureGrantsOut
@@ -14465,6 +14658,11 @@ export interface components {
             /** Mutating */
             mutating?: boolean | null;
         };
+        /** MeasureRef */
+        MeasureRef: {
+            /** Key */
+            key: string;
+        };
         /** MentionCreate */
         MentionCreate: {
             /** Article Id */
@@ -16138,6 +16336,26 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** RelativeTimeRange */
+        RelativeTimeRange: {
+            /** Count */
+            count: number;
+            /**
+             * Include Current
+             * @default false
+             */
+            include_current: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "relative";
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "day" | "week" | "month" | "quarter" | "year";
+        };
         /** RemoteModelsOut */
         RemoteModelsOut: {
             /** Models */
@@ -16188,6 +16406,240 @@ export interface components {
              */
             snapshots: boolean;
         };
+        /** ReportCatalogueOut */
+        ReportCatalogueOut: {
+            facts: components["schemas"]["FactsStatusOut"];
+            /** Reports */
+            reports: components["schemas"]["BuiltinReportOut"][];
+        };
+        /** ReportDefinition */
+        ReportDefinition: {
+            /** Dimensions */
+            dimensions?: components["schemas"]["DimensionRef"][];
+            filter?: components["schemas"]["Filter"] | null;
+            /** Limit */
+            limit?: number | null;
+            /** Measures */
+            measures: components["schemas"]["MeasureRef"][];
+            /** Parameters */
+            parameters?: components["schemas"]["ReportParameter"][];
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Sort */
+            sort?: components["schemas"]["SortSpec"][];
+            /** Source */
+            source: string;
+            /** Time Field */
+            time_field?: string | null;
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+            /** Time Zone */
+            time_zone?: string | null;
+            totals?: components["schemas"]["Totals"];
+            visualization?: components["schemas"]["Visualization"];
+        };
+        /** ReportExportIn */
+        ReportExportIn: {
+            /** Column Labels */
+            column_labels?: {
+                [key: string]: string;
+            };
+            /**
+             * Compare Previous
+             * @default false
+             */
+            compare_previous: boolean;
+            definition?: components["schemas"]["ReportDefinition"] | null;
+            /** Dimension Choices */
+            dimension_choices?: {
+                [key: string]: string;
+            };
+            /**
+             * Force Job
+             * @default false
+             */
+            force_job: boolean;
+            /**
+             * Format
+             * @default xlsx
+             * @enum {string}
+             */
+            format: "xlsx" | "csv";
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** Info Lines */
+            info_lines?: string[];
+            /**
+             * No Cache
+             * @default false
+             */
+            no_cache: boolean;
+            /** Parameters */
+            parameters?: {
+                [key: string]: (string | number)[] | string | number | boolean | null;
+            };
+            /** Report Key */
+            report_key?: string | null;
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+            /** Time Zone */
+            time_zone?: string | null;
+            /**
+             * Title
+             * @default Bericht
+             */
+            title: string;
+            /**
+             * Totals Label
+             * @default Summe
+             */
+            totals_label: string;
+            /** Value Labels */
+            value_labels?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
+        /**
+         * ReportParameter
+         * @description Znuny "changeable at runtime".
+         */
+        ReportParameter: {
+            /** Allowed Values */
+            allowed_values?: (string | number)[] | null;
+            /** Default */
+            default?: (string | number)[] | null;
+            /** Field */
+            field: string;
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key?: string | null;
+            /**
+             * Op
+             * @default in
+             * @enum {string}
+             */
+            op: "in" | "eq" | "is_true" | "is_false";
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
+        /** ReportResultOut */
+        ReportResultOut: {
+            /** Cached */
+            cached: boolean;
+            /** Columns */
+            columns: components["schemas"]["ResultColumnOut"][];
+            facts: components["schemas"]["FactsStatusOut"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Labels */
+            labels: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            previous: components["schemas"]["ReportTotalsOut"] | null;
+            /** Report Key */
+            report_key: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Rows */
+            rows: (string | number | null)[][];
+            time_window: components["schemas"]["TimeWindowOut"] | null;
+            totals: components["schemas"]["ReportTotalsOut"] | null;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * ReportRunIn
+         * @description Body of ``POST /reports/run``: exactly one of ``report_key`` / ``definition``.
+         *
+         *     Unknown fields are rejected (422): ``window_override``, ``extra_filter`` and
+         *     ``last_snapshot_date`` exist only internally (``RunParams``) for the
+         *     ``/stats`` wrappers and the engine, never as request fields.
+         */
+        ReportRunIn: {
+            /**
+             * Compare Previous
+             * @default false
+             */
+            compare_previous: boolean;
+            definition?: components["schemas"]["ReportDefinition"] | null;
+            /** Dimension Choices */
+            dimension_choices?: {
+                [key: string]: string;
+            };
+            /**
+             * Force Job
+             * @default false
+             */
+            force_job: boolean;
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /**
+             * No Cache
+             * @default false
+             */
+            no_cache: boolean;
+            /** Parameters */
+            parameters?: {
+                [key: string]: (string | number)[] | string | number | boolean | null;
+            };
+            /** Report Key */
+            report_key?: string | null;
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+            /** Time Zone */
+            time_zone?: string | null;
+        };
+        /**
+         * ReportRunOut
+         * @description 200: ``result`` (inline run or cache hit); 202: ``job`` (background run).
+         */
+        ReportRunOut: {
+            job?: components["schemas"]["JobAccepted"] | null;
+            result?: components["schemas"]["ReportResultOut"] | null;
+        };
+        /** ReportSourceOut */
+        ReportSourceOut: {
+            /** Default Time Field */
+            default_time_field: string | null;
+            /** Dimensions */
+            dimensions: components["schemas"]["SourceDimensionOut"][];
+            /** Filter Fields */
+            filter_fields: components["schemas"]["SourceDimensionOut"][];
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key: string;
+            /** Measures */
+            measures: components["schemas"]["SourceMeasureOut"][];
+        };
+        /** ReportTotalsOut */
+        ReportTotalsOut: {
+            /** Columns */
+            columns?: {
+                [key: string]: (string | number | null)[];
+            };
+            /** Grand */
+            grand?: (string | number | null)[] | null;
+            /** Rows */
+            rows?: {
+                [key: string]: (string | number | null)[];
+            };
+        };
         /**
          * ReportingStatusOut
          * @description Admin view: the status plus the bookkeeping behind it.
@@ -16229,6 +16681,27 @@ export interface components {
             label: string | null;
             /** Url */
             url: string | null;
+        };
+        /** ResultColumnOut */
+        ResultColumnOut: {
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** I18N Values */
+            i18n_values?: string | null;
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "dimension" | "measure";
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "id" | "string" | "enum" | "date" | "hour" | "weekday" | "count" | "number" | "minutes" | "hours" | "days" | "units" | "percent";
         };
         /** RoleAssignment */
         RoleAssignment: {
@@ -16835,6 +17308,53 @@ export interface components {
         SmsSendResponse: {
             /** Article Id */
             article_id: number;
+        };
+        /** SortSpec */
+        SortSpec: {
+            /**
+             * Direction
+             * @default desc
+             * @enum {string}
+             */
+            direction: "asc" | "desc";
+            /** Key */
+            key: string;
+        };
+        /**
+         * SourceDimensionOut
+         * @description A dimension, or (in ``filter_fields``) a filter-only field of a source.
+         *
+         *     Filter-only fields have ``kind`` = their filter type, ``labels`` "none",
+         *     no ``i18n_values`` / ``options_source`` and ``time_field`` false.
+         */
+        SourceDimensionOut: {
+            /** Filter Type */
+            filter_type: string | null;
+            /** I18N Values */
+            i18n_values: string | null;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Label Key */
+            label_key: string;
+            /** Labels */
+            labels: string;
+            /** Options Source */
+            options_source: string | null;
+            /** Time Field */
+            time_field: boolean;
+        };
+        /** SourceMeasureOut */
+        SourceMeasureOut: {
+            /** Agg */
+            agg: string;
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key: string;
+            /** Unit */
+            unit: string;
         };
         /** SplitRequest */
         SplitRequest: {
@@ -18145,6 +18665,49 @@ export interface components {
             /** Total Units */
             total_units: number;
         };
+        /** TimeWindowOut */
+        TimeWindowOut: {
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Time Zone */
+            time_zone: string;
+        };
+        /** Totals */
+        Totals: {
+            /**
+             * Columns
+             * @default false
+             */
+            columns: boolean;
+            /**
+             * Grand
+             * @default false
+             */
+            grand: boolean;
+            /**
+             * Rows
+             * @default false
+             */
+            rows: boolean;
+        };
         /** TypeRefOut */
         TypeRefOut: {
             /** Id */
@@ -18382,6 +18945,19 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** Visualization */
+        Visualization: {
+            /** Chart Measures */
+            chart_measures?: number[] | null;
+            /** Series Dimension */
+            series_dimension?: number | null;
+            /**
+             * Type
+             * @default table
+             * @enum {string}
+             */
+            type: "table" | "pivot" | "bar" | "stacked_bar" | "line" | "area" | "donut" | "heatmap" | "kpi";
         };
         /** VolumePointOut */
         VolumePointOut: {
@@ -36615,6 +37191,223 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TypeRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_v1_reporting_sources_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSourceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_facts_status_api_v1_reporting_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactsStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reports_api_v1_reports_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportCatalogueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report_api_v1_reports_export_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportExportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_endpoint_api_v1_reports_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunOut"];
+                };
+            };
+            /** @description Runs as a background job. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_api_v1_reports__report_key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuiltinReportOut"];
                 };
             };
             /** @description Validation Error */
