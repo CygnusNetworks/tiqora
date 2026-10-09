@@ -43,12 +43,8 @@ DAEMON_MAIL = "MAILER-DAEMON@example.org"
 TITLE = "GI7650 ticket"
 
 _SEEDED: list[str] = []
-_COUNTER_TABLES = (
-    "tiqora_event_outbox",
-    "tiqora_cache_invalidation",
-    "ticket_number_counter",
-    "tiqora_job",
-)
+# tiqora_job rows are removed by the explicit gi_mail DELETE in _cleanup_statements
+_COUNTER_TABLES = ("tiqora_event_outbox", "tiqora_cache_invalidation", "ticket_number_counter")
 _SNAPSHOTS: dict[str, dict[str, int]] = {}
 _IN_QUEUE = f"(SELECT id FROM ticket WHERE queue_id = {QUEUE})"
 _IN_QUEUE_ARTICLES = f"(SELECT id FROM article WHERE ticket_id IN {_IN_QUEUE})"
