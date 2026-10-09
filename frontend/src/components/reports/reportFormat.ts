@@ -100,11 +100,17 @@ function formatNumber(value: number, locale: string, fractionDigits: [number, nu
   }).format(value);
 }
 
-/** Minutes as "45 min" / "3,5 h" / "2,1 T". */
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Minutes as "45 min" / "3,5 h" / "2,1 T". Each unit is chosen from the value
+ * rounded to one decimal, so 59.96 min reads "1 h", never "60 min", and
+ * 1439.9 min reads "1 T", never "24 h".
+ */
 function formatMinutes(minutes: number, locale: string): string {
-  const abs = Math.abs(minutes);
-  if (abs < 60) return `${formatNumber(minutes, locale, [0, 0])} min`;
-  if (abs < 1440) return `${formatNumber(minutes / 60, locale, [0, 1])} h`;
+  if (Math.abs(round1(minutes)) < 60) return `${formatNumber(minutes, locale, [0, 1])} min`;
+  const hours = minutes / 60;
+  if (Math.abs(round1(hours)) < 24) return `${formatNumber(hours, locale, [0, 1])} h`;
   return `${formatNumber(minutes / 1440, locale, [0, 1])} ${dayUnit(locale)}`;
 }
 

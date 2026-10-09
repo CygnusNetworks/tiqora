@@ -1,5 +1,7 @@
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useJob } from "@/components/jobs/useJob";
+import { TERMINAL_JOB_STATUSES, jobsApi } from "@/lib/jobsApi";
 import { reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsApi";
 
 /**
@@ -8,6 +10,9 @@ import { reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsAp
  * back the job's result once it succeeded. A failed or cancelled job becomes
  * `error` (Error with the job's text); request errors stay `ApiError` so the
  * caller can show the server's German message via `reportErrorMessage`.
+ *
+ * A still-active job is cancelled (best effort) when the request changes or the
+ * component unmounts, so quick preset changes do not fill the per-user job cap.
  */
 export function useReportRun(body: ReportRunIn | null, opts: { enabled?: boolean } = {}) {
   const enabled = body != null && opts.enabled !== false;
@@ -15,13 +20,32 @@ export function useReportRun(body: ReportRunIn | null, opts: { enabled?: boolean
     queryKey: ["reports", "run", body],
     queryFn: ({ signal }) => reportsApi.run(body as ReportRunIn, signal),
     enabled,
-    // A background job is started once per request; a refetch is explicit.
-    staleTime: Infinity,
+    // Live reports ("open now") must not stay frozen after a remount.
+    staleTime: 60_000,
     retry: false,
   });
 
   const jobId = run.data?.job?.job_id ?? null;
   const { job, error: jobLoadError } = useJob(jobId);
+
+  const statusById = useRef(new Map<number, string>());
+  if (jobId != null && job?.status) statusById.current.set(jobId, job.status);
+  const liveJobRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (jobId == null) return;
+    liveJobRef.current = jobId;
+    const statuses = statusById.current;
+    return () => {
+      liveJobRef.current = null;
+      // Deferred so StrictMode's simulated unmount/remount does not cancel a live job.
+      setTimeout(() => {
+        if (liveJobRef.current === jobId) return;
+        const status = statuses.get(jobId);
+        if (status && TERMINAL_JOB_STATUSES.has(status as never)) return;
+        void Promise.resolve(jobsApi.cancel(jobId)).catch(() => {});
+      }, 0);
+    };
+  }, [jobId]);
 
   let result: ReportResult | undefined = run.data?.result ?? undefined;
   let error: unknown = run.error ?? null;

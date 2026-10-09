@@ -75,6 +75,16 @@ describe("formatMeasure", () => {
     expect(formatMeasure(null, "count", "de")).toBe("—");
   });
 
+  it("never shows 60 min or 24 h for a smaller value", () => {
+    expect(formatMeasure(59.6, "minutes", "de")).toBe("59,6 min");
+    expect(formatMeasure(59.96, "minutes", "de")).toBe("1 h");
+    expect(formatMeasure(60, "minutes", "de")).toBe("1 h");
+    expect(formatMeasure(0.4, "minutes", "de")).toBe("0,4 min");
+    expect(formatMeasure(1439.9, "minutes", "de")).toBe("1 T");
+    expect(formatMeasure(23.5 * 60, "minutes", "de")).toBe("23,5 h");
+    expect(formatMeasure(0.99, "hours", "de")).toBe("59,4 min");
+  });
+
   it("formats days, hours, units and counts", () => {
     expect(formatMeasure(3000, "minutes", "de")).toBe("2,1 T");
     expect(formatMeasure(3000, "minutes", "en")).toBe("2.1 d");

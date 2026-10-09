@@ -75,11 +75,27 @@ describe("report texts", () => {
   });
 
   it("explains the closed count of the creation-cohort reports (R-T14-COHORT)", () => {
-    for (const name of ["ticket_kpis", "volume_by_queue", "sla_by_customer", "top_customers"]) {
+    for (const name of ["ticket_kpis", "volume_by_queue", "top_customers"]) {
       expect(lookup(de, `reports.builtin.${name}.description`), name).toContain(
         "im Zeitraum erstellt und inzwischen geschlossen",
       );
     }
+  });
+
+  it("does not claim a closed column for sla_by_customer, which has none", () => {
+    expect(lookup(de, "reports.builtin.sla_by_customer.description")).not.toContain("geschlossen");
+  });
+
+  it("says a choice replaces the queue split and defines first-contact resolution", () => {
+    for (const name of ["open_now", "volume_by_queue"]) {
+      const text = lookup(de, `reports.builtin.${name}.description`) as string;
+      expect(text, name).toContain("statt nach Queue");
+      expect(text, name).not.toContain("zusätzlich");
+    }
+    const fcr = lookup(de, "reports.builtin.first_contact_resolution.description") as string;
+    expect(fcr).toContain("höchstens eine ausgehende Antwort");
+    expect(lookup(de, "reports.builtin.ticket_kpis.description")).toContain("Anteil verletzter Erstreaktionen");
+    expect(lookup(de, "reports.builtin.sla_times.description")).toContain("langsamsten 10 %");
   });
 
   it("explains both halves of first-contact resolution (R-T14-FCR)", () => {

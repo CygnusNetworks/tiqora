@@ -32,6 +32,8 @@ function wrapper() {
 beforeEach(() => {
   vi.mocked(reportsApi.run).mockReset();
   vi.mocked(jobsApi.get).mockReset();
+  vi.mocked(jobsApi.cancel).mockReset();
+  vi.mocked(jobsApi.cancel).mockResolvedValue(job("cancelled"));
 });
 
 describe("useReportRun", () => {
@@ -87,5 +89,68 @@ describe("useReportRun", () => {
     expect(result.current.isLoading).toBe(false);
     expect(reportErrorMessage(new Error("Zu groß"), "Fehler")).toBe("Zu groß");
     expect(reportErrorMessage("boom", "Fehler")).toBe("Fehler");
+  });
+
+  it("cancels the old job when the request changes", async () => {
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: null, job: { job_id: 5, status: "queued" } });
+    vi.mocked(jobsApi.get).mockResolvedValue(job("running"));
+    const { result, rerender } = renderHook(({ b }) => useReportRun(b), {
+      wrapper: wrapper(),
+      initialProps: { b: body },
+    });
+    await waitFor(() => expect(result.current.jobId).toBe(5));
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: resultOf(1), job: null });
+    rerender({ b: { report_key: "builtin.backlog_trend" } as ReportRunIn });
+    await waitFor(() => expect(jobsApi.cancel).toHaveBeenCalledWith(5));
+    await waitFor(() => expect(result.current.result?.row_count).toBe(1));
+    expect(result.current.jobId).toBeNull();
+  });
+
+  it("cancels a running job on unmount, but not a finished one", async () => {
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: null, job: { job_id: 5, status: "queued" } });
+    vi.mocked(jobsApi.get).mockResolvedValue(job("running"));
+    const first = renderHook(() => useReportRun(body), { wrapper: wrapper() });
+    await waitFor(() => expect(first.result.current.jobId).toBe(5));
+    await waitFor(() => expect(jobsApi.get).toHaveBeenCalled());
+    first.unmount();
+    await waitFor(() => expect(jobsApi.cancel).toHaveBeenCalledWith(5));
+
+    vi.mocked(jobsApi.cancel).mockClear();
+    vi.mocked(jobsApi.get).mockResolvedValue(job("succeeded", { result: resultOf(2) as unknown as Job["result"] }));
+    const second = renderHook(() => useReportRun(body), { wrapper: wrapper() });
+    await waitFor(() => expect(second.result.current.result?.row_count).toBe(2));
+    second.unmount();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(jobsApi.cancel).not.toHaveBeenCalled();
+  });
+
+  it("ignores a cancel failure", async () => {
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: null, job: { job_id: 5, status: "queued" } });
+    vi.mocked(jobsApi.get).mockResolvedValue(job("running"));
+    vi.mocked(jobsApi.cancel).mockRejectedValue(new Error("409"));
+    const { result, unmount } = renderHook(() => useReportRun(body), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.jobId).toBe(5));
+    unmount();
+    await waitFor(() => expect(jobsApi.cancel).toHaveBeenCalled());
+  });
+
+  it("never lets a stale response overwrite a newer one", async () => {
+    let releaseOld: (v: { result: ReportResult; job: null }) => void = () => {};
+    vi.mocked(reportsApi.run).mockImplementation((b) =>
+      b.report_key === "builtin.volume"
+        ? new Promise((res) => {
+            releaseOld = res as typeof releaseOld;
+          })
+        : Promise.resolve({ result: resultOf(2), job: null }),
+    );
+    const { result, rerender } = renderHook(({ b }) => useReportRun(b), {
+      wrapper: wrapper(),
+      initialProps: { b: body },
+    });
+    rerender({ b: { report_key: "builtin.backlog_trend" } as ReportRunIn });
+    await waitFor(() => expect(result.current.result?.row_count).toBe(2));
+    releaseOld({ result: resultOf(99), job: null });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(result.current.result?.row_count).toBe(2);
   });
 });
