@@ -118,6 +118,12 @@ async def _begin(
             state.backfill_run_token = uuid.uuid4().hex
             state.backfill_finished_at = None
             state.updated_at = now
+        if resume:
+            # a takeover: the token rotates so the previous owner (a CLI run, a reaped
+            # job that woke up) stops at its next state write, and updated_at is fresh so
+            # the worker tick does not mistake the run for an abandoned one
+            state.backfill_run_token = uuid.uuid4().hex
+            state.updated_at = utc_now()
         assert state.backfill_start_ticket_id is not None
         assert state.backfill_cursor_ticket_id is not None
         assert state.backfill_target_ticket_id is not None
@@ -242,6 +248,8 @@ async def run_backfill(
         for i in range(0, len(days), SNAPSHOT_WINDOW_DAYS):
             window = days[i : i + SNAPSHOT_WINDOW_DAYS]
             await snapshot_days(factory, window, zone=zone, now=now)
+            # proves liveness (updated_at) and stops a run that was taken over
+            await _save_cursor(factory, run, cursor)
             days_done += len(window)
             # one bar over both phases: the snapshot days continue after the tickets
             await progress(total + days_done, total + len(days), SNAPSHOTS_MESSAGE)

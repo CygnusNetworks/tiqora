@@ -29,6 +29,8 @@ from tiqora.db.tiqora.models import (
 )
 from tiqora.extensions.core import register_core
 from tiqora.extensions.registry import Registry
+from tiqora.jobs import JobCancelled
+from tiqora.reporting import backfill as backfill_module
 from tiqora.reporting import incremental
 from tiqora.reporting.backfill import ReportBackfillPayload, run_backfill
 from tiqora.reporting.dirty import mark_tickets_dirty
@@ -51,10 +53,10 @@ _CLEANUP = (
     "DELETE FROM tiqora_report_daily_snapshot WHERE queue_id BETWEEN :lo AND :hi",
     # the backfill also builds the Znuny seed ticket (created "now")
     "DELETE FROM tiqora_report_ticket_event WHERE ticket_id BETWEEN :lo AND :hi OR ticket_id IN"
-    " (SELECT id FROM ticket WHERE id < :lo AND create_time >= '2024-05-31')",
+    " (SELECT id FROM ticket WHERE id < 47000 AND create_time >= '2024-05-31')",
     # the backfill also builds the Znuny seed ticket (created "now")
     "DELETE FROM tiqora_report_ticket_fact WHERE ticket_id BETWEEN :lo AND :hi OR ticket_id IN"
-    " (SELECT id FROM ticket WHERE id < :lo AND create_time >= '2024-05-31')",
+    " (SELECT id FROM ticket WHERE id < 47000 AND create_time >= '2024-05-31')",
     "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_report_state",
     "DELETE FROM tiqora_job_file WHERE job_id IN"
@@ -341,20 +343,36 @@ async def test_gap_row_committed_later_is_processed(
 
 
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_old_gaps_expire(url_fixture: str, request: pytest.FixtureRequest) -> None:
+async def test_old_gaps_expire(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
     url = request.getfixturevalue(url_fixture)
     _seed(url)
+    warnings: list[tuple[str, dict[str, Any]]] = []
+
+    class _Log:
+        def warning(self, event: str, **kw: Any) -> None:
+            warnings.append((event, kw))
+
+        def __getattr__(self, name: str) -> Any:
+            return lambda *a, **k: None
+
+    monkeypatch.setattr(incremental, "logger", _Log())
     engine, factory = _factory(url)
     try:
         wm = await _prime(url, factory)
-        old, fresh = wm + 5, wm + 6
+        # gaps below the watermark whose rows never showed up (ids that do not exist)
+        high = wm + 100
+        old, fresh = wm + 50, wm + 60
         await _set_state(
             factory,
+            last_history_id=high,
             gap_ids=json.dumps([[old, WALL - GAP_TTL_SECONDS - 1], [fresh, WALL - 10]]),
         )
         result = await _tick(factory)
         assert [g[0] for g in json.loads((await _state(factory)).gap_ids or "[]")] == [fresh]
         assert result["gaps"] == 1
+        assert ("report_facts_gaps_expired", {"count": 1, "ids": [old]}) in warnings
     finally:
         await engine.dispose()
 
@@ -598,41 +616,53 @@ async def test_reaped_backfill_is_requeued_with_backoff_and_resumes(
 
 
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_failing_backfill_backs_off_and_cli_run_is_left_alone(
+async def test_backfill_backoff_doubles_with_recent_failures(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
+    """Delay is 300 s * 2^(n-1) after the last failure; only failures of the last 24 h count."""
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    engine, factory = _factory(url)
+
+    async def queued(ages: list[int], status: str = "failed") -> bool:
+        """Failed jobs that ended ``ages`` seconds before NOW (last one is the stored job)."""
+        async with factory() as s:
+            await s.execute(text("DELETE FROM tiqora_job WHERE kind = 'core.report_backfill'"))
+            await s.commit()
+        last = 0
+        for age in sorted(ages, reverse=True):
+            last = await _add_job(factory, status, NOW - timedelta(seconds=age))
+        await _set_state(factory, backfill_job_id=last, backfill_status="pending")
+        await _tick(factory)
+        return len(await _jobs(factory)) > len(ages)
+
+    try:
+        await _prime(url, factory)
+        assert await queued([100]) is False  # 1 failure: wait 300 s
+        assert await queued([400]) is True
+        assert await queued([500, 400]) is False  # 2 failures: wait 600 s
+        assert await queued([700, 650]) is True
+        assert await queued([90_000, 400]) is True  # the 25 h old failure does not count
+        assert await queued([3000, 2000, 1000, 900]) is False  # 4 failures: 2400 s
+        six = [80_000, 70_000, 60_000, 50_000, 40_000]
+        assert await queued([*six, 3650]) is True  # 6 failures: capped at 3600 s
+        assert await queued([*six, 3500]) is False
+        # an admin cancelled it: never queued again by the tick
+        assert await queued([86_000], status="cancelled") is False
+        assert incremental._backfill_retry_delay(1) == timedelta(seconds=300)
+        assert incremental._backfill_retry_delay(2) == timedelta(seconds=600)
+        assert incremental._backfill_retry_delay(99) == timedelta(seconds=3600)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_cli_run_is_left_alone(url_fixture: str, request: pytest.FixtureRequest) -> None:
     url = request.getfixturevalue(url_fixture)
     _seed(url)
     engine, factory = _factory(url)
     try:
         await _prime(url, factory)
-        async with factory() as s:
-            await s.execute(text("DELETE FROM tiqora_job WHERE kind = 'core.report_backfill'"))
-            await s.commit()
-        # one fresh failure: wait the base delay (300 s)
-        j1 = await _add_job(factory, "failed", NOW - timedelta(seconds=60))
-        await _set_state(factory, backfill_job_id=j1)
-        await _tick(factory)
-        assert [j.id for j in await _jobs(factory)] == [j1]
-        # ... which has passed 400 s later; with two failures the wait is 600 s
-        j0 = await _add_job(factory, "cancelled", NOW - timedelta(seconds=500))
-        await _set_state(factory, backfill_job_id=j1)
-        await _tick(factory)  # NOW - 60 s + 600 s is still ahead
-        assert {j.id for j in await _jobs(factory)} == {j0, j1}
-        assert incremental._backfill_retry_delay(1) < incremental._backfill_retry_delay(2)
-        assert incremental._backfill_retry_delay(99) == timedelta(
-            seconds=incremental.BACKFILL_RETRY_MAX_SECONDS
-        )
-        async with factory() as s:
-            await s.execute(text("DELETE FROM tiqora_job WHERE id IN (:a, :b)"), {"a": j0, "b": j1})
-            await s.commit()
-        j2 = await _add_job(factory, "failed", NOW - timedelta(seconds=400))
-        await _set_state(factory, backfill_job_id=j2)
-        await _tick(factory)  # single failure 400 s ago: due again
-        assert [j.id for j in await _jobs(factory)][0] == j2
-        assert len(await _jobs(factory)) == 2
-
-        # a CLI run: running, no job id, state written a moment ago -> no job
         async with factory() as s:
             await s.execute(text("DELETE FROM tiqora_job WHERE kind = 'core.report_backfill'"))
             await s.commit()
@@ -646,12 +676,282 @@ async def test_failing_backfill_backs_off_and_cli_run_is_left_alone(
         )
         await _tick(factory)
         assert await _jobs(factory) == []
-        # ... but a long-silent one is resumed
-        await _set_state(factory, updated_at=NOW - timedelta(hours=1))
+        await _set_state(factory, updated_at=NOW - timedelta(hours=1))  # silent for long
         await _tick(factory)
         assert len(await _jobs(factory)) == 1
     finally:
         await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_snapshot_phase_keeps_the_run_alive_and_resume_rotates_the_token(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    monkeypatch.setattr(backfill_module, "SNAPSHOT_WINDOW_DAYS", 1)
+    engine, factory = _factory(url)
+    long_ago = datetime(2000, 1, 1)
+    fresh: list[bool] = []
+
+    async def progress(done: int, total: int | None, message: str | None) -> None:
+        if message != backfill_module.SNAPSHOTS_MESSAGE:
+            return
+        async with factory() as s:
+            st = await load_state(s, for_update=True)
+            fresh.append(st.updated_at > datetime(2001, 1, 1))
+            st.updated_at = long_ago  # the next window has to touch the state again
+            await s.commit()
+
+    try:
+        await run_backfill(
+            factory,
+            SETTINGS,
+            ReportBackfillPayload(since=date(2024, 6, 1)),
+            progress=progress,
+            check_cancelled=_noop,
+            sleep_seconds=0,
+            now=NOW,
+        )
+        assert len(fresh) == 7 and all(fresh)  # 06-01 .. 06-07, one state write per window
+
+        # resume: the token rotates, the previous owner stops, updated_at is fresh
+        await _set_state(factory, backfill_status="running", updated_at=long_ago)
+        payload = ReportBackfillPayload()
+        await _set_state(factory, backfill_run_token="old-owner")
+        old = await backfill_module._begin(factory, SETTINGS, ReportBackfillPayload(restart=True))
+        new = await backfill_module._begin(factory, SETTINGS, payload)
+        assert new.token != old.token
+        assert (await _state(factory)).updated_at > datetime(2001, 1, 1)
+        with pytest.raises(JobCancelled):
+            await backfill_module._save_cursor(factory, old, old.start + 1)
+        await backfill_module._save_cursor(factory, new, new.start + 1)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_failing_ticket_is_isolated_and_retried_with_backoff(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    incremental._failing.clear()
+    real = incremental.rebuild_and_commit
+    attempts: list[list[int]] = []
+    broken = {"on": True}
+
+    async def flaky(factory: Any, ids: Any, **kwargs: Any) -> Any:
+        ids = list(ids)
+        attempts.append(ids)
+        if broken["on"] and 47678 in ids:
+            raise RuntimeError("poison")
+        return await real(factory, ids, **kwargs)
+
+    monkeypatch.setattr(incremental, "rebuild_and_commit", flaky)
+    engine, factory = _factory(url)
+    try:
+        wm = await _prime(url, factory)
+        _insert_history(url, [(wm + 1, 47678, "NewTicket"), (wm + 2, 47679, "NewTicket")])
+        result = await _tick(factory)
+        assert result["watermark"] == wm + 2  # the poison ticket does not stall the watermark
+        assert await _fact_ids(factory) == {47679}
+        assert 47678 in incremental._failing
+
+        async def dirty_count() -> int:
+            async with factory() as s:
+                return int(
+                    (
+                        await s.execute(
+                            text(
+                                "SELECT COUNT(*) FROM tiqora_report_dirty_ticket"
+                                " WHERE ticket_id = 47678"
+                            )
+                        )
+                    ).scalar_one()
+                )
+
+        assert await dirty_count() == 1  # queued for a retry
+        attempts.clear()
+        await _tick(factory)  # within the back-off: not tried again
+        assert [a for a in attempts if 47678 in a] == [] and await dirty_count() == 1
+        broken["on"] = False
+        await _tick(factory, wall=WALL + 3600)  # back-off over, ticket healthy again
+        assert await _fact_ids(factory) == {47678, 47679}
+        assert await dirty_count() == 0 and 47678 not in incremental._failing
+    finally:
+        incremental._failing.clear()
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_version_upgrade_rebuilds_old_facts(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    from tiqora.reporting.facts import FACT_VERSION
+
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    engine, factory = _factory(url)
+    try:
+        await _prime(url, factory)
+        async with factory() as s:
+            await mark_tickets_dirty(s, [47671])
+            await s.commit()
+        await _tick(factory)
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "UPDATE tiqora_report_ticket_fact SET fact_version = 0 WHERE ticket_id = 47671"
+                )
+            )
+            await s.commit()
+        assert (await _tick(factory))["upgraded"] == 0  # backfill not done yet
+        await _set_state(factory, backfill_status="done")
+        assert (await _tick(factory))["upgraded"] == 1
+        async with factory() as s:
+            version = (
+                await s.execute(
+                    text(
+                        "SELECT fact_version FROM tiqora_report_ticket_fact WHERE ticket_id = 47671"
+                    )
+                )
+            ).scalar_one()
+        assert version == FACT_VERSION
+        assert (await _tick(factory))["upgraded"] == 0
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_history_is_read_in_batches_over_several_ticks(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    monkeypatch.setattr(incremental, "HISTORY_BATCH", 2)
+    monkeypatch.setattr(incremental, "MAX_BATCHES_PER_TICK", 2)
+    engine, factory = _factory(url)
+    try:
+        wm = await _prime(url, factory)
+        _insert_history(url, [(wm + 1 + i, 47670 + i, "NewTicket") for i in range(5)])
+        first = await _tick(factory)
+        assert first["history_rows"] == 4 and first["watermark"] == wm + 4
+        assert await _fact_ids(factory) == {47670, 47671, 47672, 47673}
+        second = await _tick(factory)
+        assert second["history_rows"] == 1 and second["watermark"] == wm + 5
+        assert await _fact_ids(factory) == {47670, 47671, 47672, 47673, 47674}
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_gap_list_is_capped_at_max_gaps(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    monkeypatch.setattr(incremental, "MAX_GAPS", 3)
+    engine, factory = _factory(url)
+    try:
+        wm = await _prime(url, factory)
+        _insert_history(url, [(wm + 10, 47670, "NewTicket")])
+        result = await _tick(factory)
+        assert result["gaps"] == 3
+        gaps = json.loads((await _state(factory)).gap_ids or "[]")
+        assert [g[0] for g in gaps] == [wm + 7, wm + 8, wm + 9]  # the highest ones are kept
+        # a second batch cannot grow the list beyond the cap: oldest first_seen goes
+        _insert_history(url, [(wm + 14, 47671, "NewTicket")])
+        await _tick(factory, wall=WALL + 5)
+        gaps = json.loads((await _state(factory)).gap_ids or "[]")
+        assert len(gaps) == 3 and {g[0] for g in gaps} == {wm + 11, wm + 12, wm + 13}
+    finally:
+        await engine.dispose()
+
+
+def test_missing_ids_honour_auto_increment_increment() -> None:
+    # step 3, offset 2: ids 2, 5, 8, 11 are expected; 5 and 11 were returned
+    assert incremental._missing_ids(1, 11, {5, 11}, step=3, offset=2) == [8, 2]
+    assert incremental._missing_ids(1, 11, {5, 11}) == [10, 9, 8, 7, 6, 4, 3, 2]
+    assert incremental._missing_ids(1, 12, {5}, step=3, offset=2) == [11, 8, 2]
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_id_step_is_one_on_the_test_servers(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    engine, factory = _factory(url)
+    try:
+        assert await incremental._id_step(factory) == (1, 1)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_snapshot_pass_rewrites_the_day_before_yesterday(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    engine, factory = _factory(url)
+    try:
+        await _prime(url, factory)
+        async with factory() as s:
+            await mark_tickets_dirty(s, [47677])
+            await s.commit()
+        await _set_state(factory, backfill_status="done", last_snapshot_date=date(2024, 6, 6))
+        async with factory() as s:  # a stale value of the day that is written again
+            s.add(
+                TiqoraReportDailySnapshot(
+                    snapshot_date=date(2024, 6, 6),
+                    queue_id=QUEUE,
+                    state_type="new",
+                    priority_id=3,
+                    open_count=99,
+                    age_0_1d=0,
+                    age_1_3d=0,
+                    age_3_7d=99,
+                    age_7_30d=0,
+                    age_30d_plus=0,
+                    built_at=NOW,
+                )
+            )
+            await s.commit()
+        result = await _tick(factory)
+        assert result["snapshot_days"] == 2  # 06-06 again (late rows) and 06-07
+        async with factory() as s:
+            counts = {
+                r.snapshot_date: r.open_count
+                for r in (
+                    await s.execute(
+                        select(TiqoraReportDailySnapshot).where(
+                            TiqoraReportDailySnapshot.queue_id == QUEUE
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            }
+        assert counts == {date(2024, 6, 6): 1, date(2024, 6, 7): 1}
+        assert (await _tick(factory))["snapshot_days"] == 0  # not rewritten on every tick
+    finally:
+        await engine.dispose()
+
+
+async def test_concurrent_ticks_are_serialised(monkeypatch: pytest.MonkeyPatch) -> None:
+    running = {"now": 0, "max": 0}
+
+    async def slow(*args: Any) -> dict[str, int]:
+        running["now"] += 1
+        running["max"] = max(running["max"], running["now"])
+        await asyncio.sleep(0.05)
+        running["now"] -= 1
+        return {}
+
+    monkeypatch.setattr(incremental, "_run_tick", slow)
+    await asyncio.gather(*(run_report_facts_tick() for _ in range(3)))
+    assert running["max"] == 1
 
 
 async def test_disabled_service_skips(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -3011,7 +3011,7 @@
         },
         "report_facts": {
           "name": "Report data upkeep",
-          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date every minute."
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         },
         "jobs": {
           "name": "Background tasks",

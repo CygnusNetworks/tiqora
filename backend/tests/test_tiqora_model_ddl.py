@@ -8,6 +8,8 @@ two disagree, the disagreement only shows up in production.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from sqlalchemy.dialects import mysql, postgresql
 from sqlalchemy.schema import CreateTable
 
@@ -73,6 +75,13 @@ def test_report_fact_columns_ddl() -> None:
     assert "NUMERIC(12, 2)" in _column_ddl(fact, "accounted_time", mysql.dialect())
     pk = [c.name for c in TiqoraReportDailySnapshot.__table__.primary_key.columns]
     assert pk == ["snapshot_date", "queue_id", "state_type", "priority_id"]
+    for dialect in (mysql.dialect(), postgresql.dialect()):
+        token = _column_ddl(TiqoraReportState.__table__, "backfill_run_token", dialect)
+        assert "VARCHAR(36)" in token and "NOT NULL" not in token
+    migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261008_0062_reporting_facts.py"
+    ).read_text()
+    assert 'sa.Column("backfill_run_token", sa.String(36), nullable=True)' in migration
     assert "MEDIUMTEXT" in _column_ddl(TiqoraReportState.__table__, "gap_ids", mysql.dialect())
     assert "MEDIUMTEXT" not in _column_ddl(
         TiqoraReportState.__table__, "gap_ids", postgresql.dialect()

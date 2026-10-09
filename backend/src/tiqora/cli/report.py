@@ -39,7 +39,7 @@ def add_report_subparser(sub: argparse._SubParsersAction) -> None:  # type: igno
 
 async def _cmd_backfill(args: argparse.Namespace) -> int:
     from tiqora.jobs.context import JobCancelled
-    from tiqora.jobs.service import find_active_job
+    from tiqora.jobs.service import find_active_job, utc_now
     from tiqora.reporting.backfill import REPORT_BACKFILL_JOB, ReportBackfillPayload, run_backfill
     from tiqora.reporting.state import load_state
 
@@ -60,6 +60,7 @@ async def _cmd_backfill(args: argparse.Namespace) -> int:
         # a CLI run has no job: the worker tick must not resume it through a stale job id
         state = await load_state(session, for_update=True)
         state.backfill_job_id = None
+        state.updated_at = utc_now()
         await session.commit()
 
     async def progress(done: int, total: int | None, message: str | None) -> None:
