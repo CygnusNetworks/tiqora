@@ -128,6 +128,8 @@ KEY_AI_AUDIT_CLEANUP_ENABLED = "daemon.ai_audit_cleanup.enabled"
 # Default ON like the Znuny cron task; the job itself only acts when SMIME and
 # SMIME::FetchFromCustomer are enabled, and is idempotent next to Znuny's.
 KEY_SMIME_CUSTOMER_RENEW_ENABLED = "daemon.smime_customer_renew.enabled"
+# Daily re-download of SAML IdP metadata (tiqora.identity.metadata_refresh); default on.
+KEY_IDENTITY_METADATA_REFRESH_ENABLED = "daemon.identity_metadata.enabled"
 # Global kill-switch for auto-reply (plan #10). Independent of
 # system.operation_mode: when true, every auto-reply run is blocked even in
 # tiqora_primary. Manual assist and summaries are unaffected.
@@ -144,6 +146,11 @@ KEY_PORTAL_ENABLED = "portal.enabled"
 # Default OFF, like every other daemon.* takeover switch.
 KEY_TELEGRAM_POLLER_ENABLED = "daemon.telegram_poller.enabled"
 KEY_TELEGRAM_POLLER_INTERVAL_SECONDS = "daemon.telegram_poller.interval_seconds"
+
+# Reporting fact builder (wave 1) — maintains tiqora_report_* from ticket history.
+# Default ON (it only writes additive tiqora_* tables).
+KEY_REPORT_FACTS_ENABLED = "daemon.report_facts.enabled"
+KEY_REPORT_FACTS_INTERVAL_SECONDS = "daemon.report_facts.interval_seconds"
 
 # Telegram inbound update_id cursor (Phase T3). Shared by both transports: the
 # poller advances it after each successfully processed getUpdates batch, the

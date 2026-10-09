@@ -20,16 +20,23 @@ vi.mock("@tanstack/react-router", () => ({
     children,
     to,
     params,
+    search,
     className,
+    "data-testid": testId,
   }: {
     children: React.ReactNode;
     to: string;
     params?: Record<string, string>;
+    search?: Record<string, string>;
     className?: string;
+    "data-testid"?: string;
   }) => (
     <a
-      href={`${to}${params ? `/${Object.values(params).join("/")}` : ""}`}
+      href={`${to}${params ? `/${Object.values(params).join("/")}` : ""}${
+        search ? `?${new URLSearchParams(search).toString()}` : ""
+      }`}
       className={className}
+      data-testid={testId}
     >
       {children}
     </a>
@@ -107,6 +114,13 @@ describe("TimeAccountingReportPage", () => {
     ]) {
       expect(screen.getByTestId(id)).toBeInTheDocument();
     }
+  });
+
+  it("links to the time reports in the reports catalogue", async () => {
+    renderPage();
+    const link = await screen.findByTestId("time-accounting-reports-link");
+    expect(link).toHaveAttribute("href", "/agent/reports?category=time");
+    expect(link).toHaveTextContent(i18n.t("timeAccounting.reportsLink"));
   });
 
   it("writes the preset range into the URL search", async () => {

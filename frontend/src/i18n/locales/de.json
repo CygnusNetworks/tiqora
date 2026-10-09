@@ -67,7 +67,7 @@
     "toggle": "Navigation umschalten",
     "insights": "Insights",
     "reports": "Reports",
-    "stats": "Reports",
+    "stats": "Berichte",
     "calendar": "Kalender",
     "showAllQueues": "Alle anzeigen",
     "showActiveQueues": "Aktive anzeigen",
@@ -183,7 +183,8 @@
     "clearFilters": "Filter zurücksetzen",
     "pageRange": "{{from}}–{{to}}",
     "pageScope": "auf dieser Seite",
-    "chartPeak": "Spitze {{units}}"
+    "chartPeak": "Spitze {{units}}",
+    "reportsLink": "Auswertungen nach Kunde, Queue, Agent, Typ"
   },
   "common": {
     "prev": "Zurück",
@@ -237,7 +238,33 @@
       "hint": "2FA ist für dieses Konto erforderlich — bitte jetzt einrichten.",
       "startError": "2FA-Einrichtung konnte nicht gestartet werden. Bitte erneut versuchen oder einen Admin kontaktieren.",
       "confirmError": "Ungültiger Code — bitte erneut versuchen."
-    }
+    },
+    "providers": {
+      "defaultLabel": "Mit SSO anmelden",
+      "or": "oder"
+    },
+    "ssoErrors": {
+      "no_subject": "Der Anmeldedienst hat keine eindeutige Kennung übermittelt. Bitte wenden Sie sich an die Administration.",
+      "no_match": "Zu diesem Konto gibt es hier keinen Zugang. Bitte wenden Sie sich an die Administration.",
+      "user_invalid": "Das verknüpfte Benutzerkonto ist deaktiviert oder gelöscht.",
+      "sso_not_enabled": "Für Ihr Konto ist die Anmeldung über den Anmeldedienst nicht freigeschaltet.",
+      "email_unverified": "Der Anmeldedienst hat Ihre E-Mail-Adresse nicht als bestätigt gemeldet.",
+      "ambiguous_email": "Ihre E-Mail-Adresse gehört zu mehreren Benutzerkonten. Bitte wenden Sie sich an die Administration.",
+      "login_taken": "Der Anmeldename ist bereits für ein anderes Benutzerkonto vergeben.",
+      "jit_missing_fields": "Für die automatische Anlage Ihres Kontos fehlen Angaben vom Anmeldedienst.",
+      "email_invalid": "Die vom Anmeldedienst übermittelte E-Mail-Adresse ist für ein neues Konto nicht zulässig. Bitte wenden Sie sich an Ihre Administration.",
+      "email_in_use": "Die E-Mail-Adresse wird bereits von einem anderen Kundenkonto verwendet. Bitte wenden Sie sich an Ihre Administration.",
+      "jit_domain_not_allowed": "Für Ihre E-Mail-Domain werden Konten nicht automatisch angelegt. Bitte wenden Sie sich an Ihre Administration.",
+      "provider_disabled": "Dieser Anmeldedienst ist deaktiviert.",
+      "unknown_provider": "Dieser Anmeldedienst ist nicht bekannt.",
+      "config": "Die Anmeldung über diesen Anmeldedienst ist noch nicht vollständig eingerichtet.",
+      "saml_unavailable": "Die Anmeldung über SAML ist auf diesem Server nicht verfügbar.",
+      "state": "Die Anmeldung hat zu lange gedauert oder wurde in einem anderen Fenster begonnen. Bitte erneut versuchen.",
+      "saml_invalid": "Die Antwort des Anmeldedienstes war ungültig. Bitte erneut versuchen.",
+      "oidc_failed": "Die Anmeldung beim Anmeldedienst ist fehlgeschlagen. Bitte erneut versuchen.",
+      "idp_error": "Der Anmeldedienst hat die Anmeldung abgelehnt."
+    },
+    "loggedOut": "Sie wurden abgemeldet."
   },
   "security": {
     "title": "Sicherheit",
@@ -274,7 +301,10 @@
     "passkeyDeleteError": "Passkey konnte nicht entfernt werden.",
     "passkeyReauthRequired": "Aus Sicherheitsgründen bitte erneut anmelden, bevor Passkeys geändert werden.",
     "passkeyDeleteLastError": "Der letzte 2FA-Faktor kann nicht entfernt werden, solange 2FA erzwungen ist.",
-    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys (WebAuthn)."
+    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys (WebAuthn).",
+    "totpReauthRequired": "Aus Sicherheitsgründen bitte erneut anmelden, bevor die Authenticator-App eingerichtet wird.",
+    "enrollError": "Die Authenticator-App konnte nicht eingerichtet werden. Bitte erneut versuchen.",
+    "totpQrAlt": "QR-Code für die Authenticator-App"
   },
   "dashboard": {
     "greeting": {
@@ -1301,7 +1331,22 @@
     },
     "login": {
       "subtitle": "Bei Ihrem Support-Konto anmelden",
-      "email": "E-Mail oder Benutzername"
+      "email": "E-Mail oder Benutzername",
+      "ssoDivider": "oder",
+      "twoFactorTitle": "Zwei-Faktor-Anmeldung",
+      "twoFactorHint": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.",
+      "passkeyOnlyHint": "Bestätigen Sie die Anmeldung mit Ihrem Passkey.",
+      "totpLabel": "Bestätigungscode",
+      "passkeyButton": "Mit Passkey bestätigen",
+      "verify": "Bestätigen",
+      "totpInvalid": "Ungültiger oder abgelaufener Code.",
+      "passkeyInvalid": "Der Passkey konnte nicht bestätigt werden.",
+      "passkeyFailed": "Die Passkey-Bestätigung ist fehlgeschlagen. Bitte erneut versuchen.",
+      "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys.",
+      "cancel": "Abbrechen",
+      "rateLimited": "Zu viele Fehlversuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+      "twoFactorExpired": "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.",
+      "backToLogin": "Zurück zur Anmeldung"
     },
     "tickets": {
       "title": "Meine Tickets",
@@ -1362,6 +1407,11 @@
       "save": "Speichern",
       "keys": "Verschlüsselung",
       "keysDesc": "Laden Sie Ihren PGP-Schlüssel oder Ihr S/MIME-Zertifikat hoch, damit wir Ihnen verschlüsselte E-Mails senden können. Er muss Ihre E-Mail-Adresse {{email}} enthalten."
+    },
+    "security": {
+      "title": "Sicherheit",
+      "nav": "Sicherheit",
+      "intro": "Schützen Sie Ihr Konto zusätzlich mit einem zweiten Faktor bei der Anmeldung."
     },
     "process": {
       "start": "Neues Prozessticket",
@@ -2110,7 +2160,9 @@
       "ticketAttributeRelations": "Attribut­beziehungen",
       "pgp": "PGP",
       "smime": "S/MIME",
-      "aiModels": "Modelle"
+      "aiModels": "Modelle",
+      "identityProviders": "Identitätsanbieter",
+      "reporting": "Berichtsdaten"
     },
     "table": {
       "id": "ID",
@@ -2433,7 +2485,12 @@
       "accessGroupsHint": "Alle Mitglieder dieser Gruppen, egal mit welchem Recht.",
       "accessRoles": "Rollen",
       "accessRolesHint": "Alle Agenten mit einer dieser Rollen.",
-      "accessLoadError": "Die aktuelle Zugriffsliste konnte nicht geladen werden."
+      "accessLoadError": "Die aktuelle Zugriffsliste konnte nicht geladen werden.",
+      "reset2fa": "Zwei-Faktor-Anmeldung zurücksetzen",
+      "reset2faConfirmTitle": "Zwei-Faktor-Anmeldung zurücksetzen?",
+      "reset2faConfirmBody": "Die Authenticator-App und alle Passkeys von {{login}} werden entfernt. Danach genügt das Passwort zur Anmeldung, bis eine neue Zwei-Faktor-Anmeldung eingerichtet ist.",
+      "reset2faDone": "Zwei-Faktor-Anmeldung von {{login}} wurde zurückgesetzt.",
+      "reset2faFailed": "Die Zwei-Faktor-Anmeldung konnte nicht zurückgesetzt werden."
     },
     "customerCompanies": {
       "title_plural": "Kundenunternehmen",
@@ -3024,9 +3081,21 @@
           "name": "S/MIME-Kundenzertifikate erneuern",
           "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."
         },
+        "identity_metadata": {
+          "name": "Aktualisierung der Anmeldedienst-Metadaten",
+          "description": "Lädt die SAML-Metadaten der Anmeldedienste (Zertifikate, Adressen) einmal täglich neu; schlägt der Abruf fehl, bleibt die letzte funktionierende Fassung erhalten und es erscheint eine Warnung."
+        },
         "jobs": {
           "name": "Hintergrundaufgaben",
           "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."
+        },
+        "znuny_session_purge": {
+          "name": "Znuny-Sitzungen aufräumen",
+          "description": "Löscht abgelaufene Sitzungen der Znuny-Schnittstelle (GenericInterface) alle paar Minuten."
+        },
+        "report_facts": {
+          "name": "Berichtsdaten aktuell halten",
+          "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
         },
         "deploy_watch": {
           "name": "Bereitstellung beobachten",
@@ -3202,7 +3271,8 @@
       "reset2fa": "2FA zurücksetzen",
       "resetConfirmTitle": "Zwei-Faktor-Authentifizierung zurücksetzen?",
       "resetConfirmBody": "Dies deaktiviert 2FA für {{login}}. Bei weiterhin geltender Erzwingung muss erneut eingerichtet werden.",
-      "empty": "Keine Agenten gefunden."
+      "empty": "Keine Agenten gefunden.",
+      "identityLink": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten"
     },
     "gdpr": {
       "title": "Datenschutz / DSGVO",
@@ -3403,7 +3473,10 @@
       "pgp": "PGP ein- und ausschalten, Schlüssel und Passphrasen verwalten, Signatur und Speicherort einstellen.",
       "smime": "S/MIME ein- und ausschalten, Zertifikate, private Schlüssel und Signer-Beziehungen verwalten, Speicherorte einstellen.",
       "aiModels": "Modelle bei den Providern, Profile mit Ausweichmodellen und welches Profil welche Aufgabe übernimmt.",
-      "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben."
+      "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben.",
+      "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten.",
+      "reporting": "Zustand der Berichtsdaten ansehen und alles neu berechnen lassen.",
+      "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -3796,6 +3869,47 @@
           }
         }
       },
+      "reporting": {
+        "title": "Berichte",
+        "fields": {
+          "time_zone": {
+            "label": "Zeitzone der Berichte",
+            "help": "Nach dieser Zeitzone werden Tage, Wochen und Monate abgegrenzt. Leer lassen für die Standard-Zeitzone von Znuny, z. B. Europe/Berlin."
+          },
+          "access": {
+            "label": "Wer darf Berichte sehen",
+            "help": "Alle Agenten oder nur Mitglieder der Gruppe „stats“, wie in Znuny.",
+            "options": {
+              "all_agents": "Alle Agenten",
+              "stats_group": "Nur Gruppe „stats“"
+            }
+          },
+          "near_miss_percent": {
+            "label": "Knapp eingehalten ab Prozent",
+            "help": "Bei 10 % zählt ein Ticket als knapp, wenn es nicht überschritten ist, aber 90 % oder mehr der Zielzeit verbraucht hat. Der Wert hier ist der Abstand zur Zielzeit in Prozent."
+          },
+          "cache_seconds": {
+            "label": "Zwischenspeicher in Sekunden",
+            "help": "So lange wird ein Berichtsergebnis wiederverwendet, bevor neu gerechnet wird. 0 schaltet den Zwischenspeicher aus."
+          },
+          "inline_row_threshold": {
+            "label": "Grenze für Sofortberechnung",
+            "help": "Berichte über mehr Ticketzeilen als hier werden im Hintergrund gerechnet, damit die Seite nicht hängt."
+          },
+          "max_result_rows": {
+            "label": "Höchstzahl Ergebniszeilen",
+            "help": "Mehr Zeilen liefert ein Bericht nicht. Der Rest wird abgeschnitten und der Bericht als gekürzt markiert. „Weitere“ gibt es nur bei einer Begrenzung pro Gruppierung (Top-N)."
+          },
+          "export_row_limit": {
+            "label": "Höchstzahl Zeilen beim Export",
+            "help": "Größere Exporte nach Excel oder CSV werden bei dieser Zeilenzahl abgeschnitten."
+          },
+          "query_timeout_seconds": {
+            "label": "Zeitlimit pro Datenbankabfrage in Sekunden",
+            "help": "Dauert eine einzelne Abfrage länger, wird sie abgebrochen und eine Meldung angezeigt."
+          }
+        }
+      },
       "process": {
         "title": "Prozesse und ACLs",
         "fields": {
@@ -3805,6 +3919,439 @@
           }
         }
       }
+    },
+    "identity": {
+      "title": "Identitätsanbieter",
+      "description": "Hier richten Sie ein, über welche Anmeldedienste (Microsoft, Google, SAML, LDAP …) sich Agenten und Kunden anmelden dürfen.",
+      "add": "Hinzufügen",
+      "empty": "Noch kein Identitätsanbieter eingerichtet. Mit „Hinzufügen“ legen Sie den ersten an.",
+      "loadError": "Die Identitätsanbieter konnten nicht geladen werden.",
+      "deleteTitle": "Identitätsanbieter löschen?",
+      "deleteBody": "„{{name}}“ wird gelöscht, ebenso {{count}} Verknüpfung(en) von Benutzern mit diesem Anmeldedienst. Die Benutzerkonten selbst bleiben erhalten.",
+      "deleteError": "Der Identitätsanbieter konnte nicht gelöscht werden.",
+      "deleteAria": "{{name}} löschen",
+      "envBadge": "aus Umgebungsvariablen, hier nicht änderbar",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "saveError": "Die Änderungen konnten nicht gespeichert werden.",
+      "placeholder": "Dieser Bereich wird in einem späteren Schritt ergänzt.",
+      "columns": {
+        "name": "Name",
+        "kind": "Art",
+        "audience": "Gilt für",
+        "state": "Zustand"
+      },
+      "kind": {
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "LDAP / Active Directory"
+      },
+      "audience": {
+        "agent": "Nur Agenten",
+        "customer": "Nur Kunden",
+        "both": "Agenten und Kunden"
+      },
+      "state": {
+        "enabled": "Aktiv",
+        "disabled": "Deaktiviert",
+        "metadataError": "Metadaten fehlerhaft"
+      },
+      "preset": {
+        "entra_id": "Microsoft Entra ID",
+        "google_workspace": "Google Workspace",
+        "keycloak": "Keycloak",
+        "authentik": "authentik",
+        "adfs": "AD FS (Active Directory Federation Services)",
+        "generic_saml": "SAML (allgemein)",
+        "generic_oidc": "OpenID Connect (allgemein)",
+        "ldap": "LDAP-Verzeichnis",
+        "active_directory": "Active Directory (LDAP)"
+      },
+      "presetDialog": {
+        "title": "Identitätsanbieter hinzufügen",
+        "description": "Wählen Sie eine Vorlage. Die Verbindungsdaten tragen Sie im nächsten Schritt ein.",
+        "choose": "Vorlage wählen",
+        "create": "Anlegen",
+        "createError": "Der Identitätsanbieter konnte nicht angelegt werden."
+      },
+      "tabs": {
+        "connection": "Verbindung",
+        "mapping": "Zuordnung",
+        "roles": "Rollen aus dem Anmeldedienst",
+        "test": "Testanmeldung",
+        "links": "Verknüpfungen"
+      },
+      "sections": {
+        "general": "Allgemein",
+        "connection": "Verbindung"
+      },
+      "common": {
+        "name": "Name",
+        "slug": "Kurzname",
+        "slugHelp": "Kommt in die Anmeldeadresse; nur Kleinbuchstaben, Ziffern und Bindestrich.",
+        "audience": "Gilt für",
+        "enabled": "Aktiv",
+        "enabledHelp": "Nur aktive Anmeldedienste erscheinen auf der Anmeldeseite.",
+        "buttonLabel": "Beschriftung der Anmeldetaste",
+        "buttonLabelHelp": "Leer lassen, dann wird der Name verwendet.",
+        "buttonIcon": "Symbol der Anmeldetaste",
+        "sort": "Reihenfolge",
+        "sortHelp": "Kleinere Zahlen stehen weiter oben."
+      },
+      "icons": {
+        "microsoft": "Microsoft",
+        "google": "Google",
+        "key": "Schlüssel",
+        "shield": "Schild",
+        "building": "Gebäude",
+        "directory": "Verzeichnis"
+      },
+      "saml": {
+        "unavailable": {
+          "package": "SAML ist auf diesem Server nicht eingerichtet: Das Python-Paket „pysaml2“ fehlt. Anmeldungen über SAML sind erst nach der Installation möglich.",
+          "xmlsec1": "SAML ist auf diesem Server nicht eingerichtet: Das Programm „xmlsec1“ fehlt. Anmeldungen über SAML sind erst nach der Installation möglich."
+        },
+        "sha1Warning": "Achtung: SHA-1-Signaturen gelten als gebrochen. Aktivieren Sie die Annahme nur für ältere Anmeldedienste, die nichts anderes können.",
+        "copyCertificate": "Zertifikat kopieren",
+        "refresh": "Metadaten neu laden",
+        "refreshError": "Die Metadaten konnten nicht geladen werden.",
+        "fetchedAt": "Zuletzt geladen: {{when}}"
+      },
+      "endpoints": {
+        "title": "Adressen für den Anmeldedienst",
+        "hint": "Diese Adressen tragen Sie in der Verwaltung des Anmeldedienstes ein.",
+        "baseUrlMissing": "Die öffentliche Adresse dieses Servers ist nicht eingestellt, deshalb fehlen die Adressen. Bitte zuerst die öffentliche Adresse (TIQORA_PUBLIC_BASE_URL) setzen.",
+        "labels": {
+          "agent_redirect_uri": "Rücksprung-Adresse für Agenten",
+          "customer_redirect_uri": "Rücksprung-Adresse für Kunden",
+          "backchannel_logout_url": "Adresse für Abmeldung durch den Anmeldedienst",
+          "sp_entity_id": "Entity-ID dieses Servers",
+          "agent_acs_url": "Antwort-Adresse (ACS) für Agenten",
+          "customer_acs_url": "Antwort-Adresse (ACS) für Kunden",
+          "sp_metadata_url": "Metadaten dieses Servers",
+          "slo_url": "Abmelde-Adresse"
+        }
+      },
+      "test": {
+        "intro": "Mit einer Testanmeldung sehen Sie, welche Werte der Anmeldedienst übermittelt und was bei einer echten Anmeldung passieren würde. Es wird nichts angelegt und niemand angemeldet.",
+        "ldapHint": "Für LDAP gibt es keine Testanmeldung über den Browser. Prüfen Sie die Verbindung, indem Sie sich auf der Anmeldeseite mit einem Verzeichniskonto anmelden.",
+        "audience": "Testen als",
+        "audiences": {
+          "agent": "Agent",
+          "customer": "Kunde"
+        },
+        "draftHint": "Ungespeicherte Änderungen der Verbindung werden für diesen Test verwendet.",
+        "start": "Testanmeldung starten",
+        "startError": "Die Testanmeldung konnte nicht gestartet werden.",
+        "resultHeading": "Ergebnis der Testanmeldung",
+        "loadError": "Das Ergebnis konnte nicht geladen werden.",
+        "waiting": "Warte auf die Anmeldung …",
+        "timeout": "Das Ergebnis ist nach zwei Minuten nicht eingetroffen. Bitte die Testanmeldung erneut starten.",
+        "subject": "Kennung",
+        "attributesHeading": "Vom Anmeldedienst übermittelte Werte",
+        "useForPreview": "Werte für die Vorschau übernehmen"
+      },
+      "plan": {
+        "rejected": "Die Anmeldung würde abgelehnt:",
+        "create": "Wird beim ersten Anmelden angelegt",
+        "newLogin": "Neuer Anmeldename: {{login}}",
+        "loginAs": "Anmeldung als {{login}}",
+        "matchedBy": {
+          "link": "Gefunden über eine bestehende Verknüpfung",
+          "login": "Gefunden über den Anmeldenamen",
+          "email": "Gefunden über die E-Mail-Adresse",
+          "jit": "Wird automatisch angelegt"
+        },
+        "profileChanges": "Änderungen am Profil",
+        "rolesAdd": "Rollen, die hinzukommen",
+        "rolesRemove": "Rollen, die entfallen",
+        "groupsAdd": "Gruppenrechte, die hinzukommen",
+        "groupsRemove": "Gruppenrechte, die entfallen"
+      },
+      "config": {
+        "oidc": {
+          "fields": {
+            "issuer": {
+              "label": "Adresse des Anmeldedienstes (Issuer)",
+              "help": "z. B. https://login.example.org/realms/firma. „/.well-known/openid-configuration“ wird automatisch ergänzt."
+            },
+            "client_id": {
+              "label": "Client-ID"
+            },
+            "client_secret": {
+              "label": "Client-Geheimnis"
+            },
+            "scopes": {
+              "label": "Angeforderte Bereiche",
+              "help": "Durch Leerzeichen getrennt."
+            },
+            "redirect_uri": {
+              "label": "Rücksprung-Adresse",
+              "help": "Leer lassen, dann wird sie aus der öffentlichen Adresse berechnet."
+            },
+            "pkce": {
+              "label": "PKCE",
+              "options": {
+                "auto": "Automatisch",
+                "always": "Immer",
+                "never": "Nie"
+              }
+            },
+            "email_must_be_verified": {
+              "label": "E-Mail-Adresse muss bestätigt sein",
+              "help": "Nötig, wenn Benutzer über ihre E-Mail-Adresse gefunden oder angelegt werden."
+            },
+            "allow_private_network": {
+              "label": "Interne Netzwerke erlauben",
+              "help": "Nur für Anmeldedienste im eigenen Netz (z. B. selbst betriebenes Keycloak)."
+            },
+            "backchannel_logout": {
+              "label": "Abmeldung durch den Anmeldedienst annehmen"
+            },
+            "allowed_tenant_ids": {
+              "label": "Erlaubte Microsoft-Mandanten-IDs",
+              "help": "Nur für Microsoft Entra mit der mandantenübergreifenden Adresse (common/organizations): nur Anmeldungen aus diesen Mandanten. Leer = jede Organisation (Mandant). Bei Zuordnung über den Anmeldenamen die eigene Mandanten-ID eintragen."
+            }
+          }
+        },
+        "saml": {
+          "fields": {
+            "idp_metadata_url": {
+              "label": "Metadaten-Adresse des Anmeldedienstes",
+              "help": "Wird täglich neu geladen."
+            },
+            "idp_metadata_xml": {
+              "label": "Metadaten als XML",
+              "help": "Alternative zur Adresse: Metadaten hier einfügen."
+            },
+            "idp_entity_id": {
+              "label": "Entity-ID des Anmeldedienstes",
+              "help": "Nur nötig, wenn die Metadaten mehrere Anmeldedienste enthalten."
+            },
+            "name_id_format": {
+              "label": "Format der Benutzerkennung",
+              "options": {
+                "unspecified": "Nicht festgelegt",
+                "emailAddress": "E-Mail-Adresse",
+                "persistent": "Dauerhaft",
+                "transient": "Einmalig"
+              }
+            },
+            "sign_requests": {
+              "label": "Anmeldeanfragen signieren"
+            },
+            "want_response_signed": {
+              "label": "Gesamte Antwort muss signiert sein",
+              "help": "Die Zusicherung des Anmeldedienstes muss immer signiert sein."
+            },
+            "allow_idp_initiated": {
+              "label": "Anmeldung direkt vom Anmeldedienst aus erlauben"
+            },
+            "allow_sha1_signatures": {
+              "label": "Unsichere SHA-1-Signaturen akzeptieren",
+              "help": "Nur für ältere Anmeldedienste. SHA-1 gilt als gebrochen."
+            },
+            "clock_skew_seconds": {
+              "label": "Erlaubte Zeitabweichung (Sekunden)"
+            },
+            "allow_private_network": {
+              "label": "Interne Netzwerke erlauben",
+              "help": "Nur für Metadaten-Adressen im eigenen Netz."
+            },
+            "sp_certificate": {
+              "label": "Zertifikat dieses Servers",
+              "help": "Wird automatisch erzeugt. Im Anmeldedienst hinterlegen, wenn Anfragen signiert werden."
+            },
+            "sp_private_key": {
+              "label": "Privater Schlüssel dieses Servers"
+            }
+          }
+        },
+        "ldap": {
+          "fields": {
+            "host": {
+              "label": "Server"
+            },
+            "port": {
+              "label": "Port"
+            },
+            "use_ssl": {
+              "label": "Verschlüsselt verbinden (LDAPS)"
+            },
+            "use_starttls": {
+              "label": "Verschlüsselung mit StartTLS"
+            },
+            "base_dn": {
+              "label": "Suchbasis (Base DN)"
+            },
+            "bind_dn": {
+              "label": "Benutzer für die Suche (Bind DN)"
+            },
+            "bind_password": {
+              "label": "Passwort für die Suche"
+            },
+            "uid_attr": {
+              "label": "Attribut des Anmeldenamens"
+            },
+            "always_filter": {
+              "label": "Zusätzlicher Suchfilter"
+            },
+            "group_dn": {
+              "label": "Gruppe, die anmelden darf (Group DN)",
+              "help": "Leer lassen, dann dürfen alle gefundenen Benutzer sich anmelden."
+            },
+            "access_attr": {
+              "label": "Mitglieds-Attribut der Gruppe"
+            },
+            "user_attr": {
+              "label": "Benutzer in der Gruppe als",
+              "options": {
+                "DN": "DN",
+                "UID": "Anmeldename"
+              }
+            },
+            "subject_attr": {
+              "label": "Eindeutige Kennung",
+              "help": "Dauerhafte Kennung des Verzeichniseintrags. Leer: objectGUID (Active Directory) oder entryUUID."
+            },
+            "tls_verify": {
+              "label": "Zertifikat des Servers prüfen",
+              "help": "Empfohlen. Nur für ein Testverzeichnis mit selbst ausgestelltem Zertifikat ausschalten."
+            },
+            "ca_certs_pem": {
+              "label": "Eigenes CA-Zertifikat (PEM)",
+              "help": "Nur nötig, wenn das Zertifikat des Verzeichnisses von Ihrer eigenen Zertifizierungsstelle stammt."
+            }
+          }
+        }
+      },
+      "ldap": {
+        "tlsWarning": "Achtung: Das Zertifikat des Verzeichnisservers wird nicht geprüft. Ein Angreifer im Netz könnte Anmeldedaten mitlesen oder sich als Verzeichnis ausgeben. Schalten Sie die Prüfung nur für ein Testverzeichnis aus.",
+        "tlsWarningEnv": "Achtung: Das Zertifikat des Verzeichnisservers wird nicht geprüft. Ein Angreifer im Netz könnte Anmeldedaten mitlesen oder sich als Verzeichnis ausgeben. Die Einstellung kommt aus der Umgebung: TIQORA_LDAP_TLS_VERIFY=true setzen (beim Kundenverzeichnis TIQORA_CUSTOMER_LDAP_TLS_VERIFY=true)."
+      },
+      "mapping": {
+        "fieldsHeading": "Welche Werte füllen welches Feld?",
+        "fieldsHelp": "Tragen Sie ein, aus welchen Angaben des Anmeldedienstes das Feld gefüllt wird. Der erste Wert mit Inhalt gilt. Mit einem Unterstrich davor (_Beispiel) setzen Sie einen festen Text.",
+        "sourcePlaceholder": "Angabe des Anmeldedienstes",
+        "field": {
+          "login": "Anmeldename",
+          "email": "E-Mail",
+          "first_name": "Vorname",
+          "last_name": "Nachname",
+          "customer_id": "Kundennummer",
+          "mobile": "Mobilnummer"
+        },
+        "matchBy": "Anmeldung zuordnen über",
+        "matchByOption": {
+          "login": "Anmeldename",
+          "email": "E-Mail"
+        },
+        "matchByHelp": "Damit wird das passende Benutzerkonto gefunden, wenn noch keine Verknüpfung besteht.",
+        "emailUntrustedWarning": "Achtung: Die E-Mail-Adresse muss beim Anmeldedienst nicht bestätigt sein. Wer dort fremde Adressen eintragen kann, könnte sich in fremde Konten anmelden. Schalten Sie auf dem Reiter „Verbindung“ „E-Mail-Adresse muss bestätigt sein“ ein oder ordnen Sie über den Anmeldenamen zu.",
+        "entraEmailWarning": "Hinweis: Bei Microsoft Entra kann die E-Mail-Adresse eines Kontos geändert werden und gilt nicht als sichere Kennung. Besser über den Anmeldenamen zuordnen und die erlaubten Mandanten-IDs eintragen.",
+        "jit": "Beim ersten Anmelden automatisch anlegen",
+        "jitHelp": "Ist ein Benutzer noch nicht bekannt, wird beim ersten Anmelden ein Konto angelegt. Sonst werden unbekannte Benutzer abgewiesen.",
+        "allowedDomains": "Erlaubte E-Mail-Domains",
+        "allowedDomainsHelp": "Nur Benutzer mit einer E-Mail-Adresse aus diesen Domains (z. B. example.org) erhalten automatisch ein Konto.",
+        "noDomainWarning": "Achtung: Ohne Domain-Einschränkung kann sich jeder, der sich bei diesem Anmeldedienst anmelden kann, ein Konto anlegen lassen, egal mit welcher E-Mail-Domain. Tragen Sie die Domains Ihrer Organisation ein.",
+        "initialRoles": "Rollen für neue Konten (Agenten)",
+        "initialGroups": "Gruppenrechte für neue Konten (Agenten)",
+        "fixedCustomerId": "Feste Kundennummer für neue Kunden",
+        "fixedCustomerIdHelp": "Wird verwendet, wenn der Anmeldedienst keine Kundennummer übermittelt.",
+        "updateProfile": "Namen und E-Mail bei jeder Anmeldung aktualisieren",
+        "previewHeading": "Vorschau",
+        "previewEmpty": "Starten Sie eine Testanmeldung und wählen Sie „Werte für die Vorschau übernehmen“. Dann sehen Sie hier sofort, was bei einer Anmeldung mit diesen Werten passieren würde, auch für ungespeicherte Änderungen.",
+        "previewHelp": "So würde eine Anmeldung mit den Werten der letzten Testanmeldung ablaufen, einschließlich Ihrer ungespeicherten Änderungen auf dem Reiter „Zuordnung“. Ungespeicherte Änderungen der Rollenregeln sind nicht enthalten.",
+        "previewError": "Die Vorschau konnte nicht berechnet werden.",
+        "previewAudience": "Vorschau als",
+        "samlEmailWarning": "Hinweis: Der Anmeldedienst entscheidet, welche E-Mail-Adresse ein Benutzer hat. Nutzen Sie die Zuordnung über E-Mail nur, wenn Benutzer ihre Adresse dort nicht selbst ändern können; sonst ordnen Sie über den Anmeldenamen zu."
+      },
+      "roles": {
+        "rulesHeading": "Regeln",
+        "rulesHelp": "Wenn ein Wert des Anmeldedienstes passt, erhält der Benutzer die gewählten Rollen und Gruppenrechte.",
+        "rulesEmpty": "Noch keine Regel angelegt.",
+        "attribute": "Angabe des Anmeldedienstes",
+        "value": "Wert",
+        "roles": "Rollen",
+        "groups": "Gruppen",
+        "addGroup": "Gruppe hinzufügen",
+        "removeGroup": "{{name}} entfernen",
+        "removeRule": "Regel entfernen",
+        "addRule": "Regel hinzufügen",
+        "perm": {
+          "ro": "Lesen (ro)",
+          "move_into": "Verschieben in (move_into)",
+          "create": "Anlegen (create)",
+          "note": "Notiz (note)",
+          "owner": "Besitzer (owner)",
+          "priority": "Priorität (priority)",
+          "rw": "Alle Rechte (rw)"
+        },
+        "rwHint": "rw enthält alle Rechte.",
+        "ldapGroupDn": "Mitglied der LDAP-Gruppe (DN)",
+        "syncHeading": "Wie werden Rollen und Gruppen abgeglichen?",
+        "sync": {
+          "managed": "Nur selbst vergebene Zuordnungen pflegen (empfohlen)",
+          "managedHelp": "Es werden nur Zuordnungen entfernt, die eine Regel hier selbst vergeben hat. Von Hand vergebene Rollen und Gruppen bleiben.",
+          "authoritative": "Wie Znuny: alle Rollen und Gruppen ersetzen",
+          "authoritativeHelp": "Bei jeder Anmeldung gelten genau die Rollen und Gruppen aus den Regeln. Alles andere, auch von Hand Vergebenes, wird entfernt."
+        },
+        "managedHeading": "Verwaltete Zuordnungen",
+        "managedHelp": "Rollen und Gruppenrechte, die durch eine Regel vergeben wurden.",
+        "managedEmpty": "Noch keine Zuordnung durch eine Regel vergeben.",
+        "managedError": "Die verwalteten Zuordnungen konnten nicht geladen werden.",
+        "managedAccount": "Konto",
+        "managedAssignment": "Zuordnung",
+        "managedSince": "Seit",
+        "managedRole": "Rolle {{name}}",
+        "managedGroup": "Gruppe {{name}} ({{permission}})"
+      },
+      "links": {
+        "intro": "Diese Konten haben sich über diesen Anmeldedienst angemeldet. Wird eine Verknüpfung gelöst, wird bei der nächsten Anmeldung neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist. Sonst wird die Anmeldung abgewiesen.",
+        "empty": "Noch hat sich niemand über diesen Anmeldedienst angemeldet.",
+        "loadError": "Die Verknüpfungen konnten nicht geladen werden.",
+        "removeTitle": "Verknüpfung lösen?",
+        "removeBody": "Die Verknüpfung von „{{login}}“ mit diesem Anmeldedienst wird gelöst. Das Benutzerkonto bleibt erhalten. Bei der nächsten Anmeldung wird neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist; sonst wird die Anmeldung abgewiesen.",
+        "remove": "Verknüpfung lösen",
+        "removeError": "Die Verknüpfung konnte nicht gelöst werden.",
+        "account": "Konto",
+        "kind": "Art",
+        "subject": "Kennung beim Anmeldedienst",
+        "firstSeen": "Zuerst gesehen",
+        "lastSeen": "Zuletzt gesehen",
+        "kinds": {
+          "agent": "Agent",
+          "customer": "Kunde"
+        }
+      }
+    },
+    "reporting": {
+      "title": "Berichtsdaten",
+      "subtitle": "Zustand der Auswertungsdaten, aus denen die Berichte gespeist werden. Hier lässt sich alles bei Bedarf neu berechnen.",
+      "settings": "Einstellungen für Berichte",
+      "ready": "Bereit: die Berichtsdaten sind aktuell",
+      "building": "Wird aufgebaut",
+      "buildingPercent": "Wird aufgebaut ({{percent}} %)",
+      "pending": "Noch nicht aufgebaut",
+      "asOf": "Stand",
+      "lag": "Rückstand",
+      "lagHint": "Ticketänderungen, die noch nicht ausgewertet sind",
+      "gaps": "Lücken",
+      "gapsHint": "Übersprungene Änderungen, die nachgeholt werden",
+      "dirty": "Zur Neuberechnung vorgemerkt",
+      "dirtyHint": "Tickets, deren Werte neu berechnet werden",
+      "lastSnapshot": "Letzter Tagesstand",
+      "factRows": "Ticketzeilen",
+      "eventRows": "Ereigniszeilen",
+      "rebuild": "Berichtsdaten neu aufbauen",
+      "rebuildSince": "Ab Datum (optional)",
+      "rebuildHelp": "Rechnet alle Berichtsdaten aus den Tickets und ihrem Verlauf neu. Ein Datum gilt für Tickets, die an diesem Tag oder später angelegt wurden; ältere Tickets bleiben unverändert. Ohne Datum werden alle Tickets verwendet.",
+      "rebuildConfirm": "Alle Berichtsdaten werden neu berechnet. Das kann bei vielen Tickets Stunden dauern. Bis dahin zeigen die Berichte einen Hinweis und sind noch nicht vollständig.",
+      "rebuildStart": "Neu aufbauen",
+      "rebuildError": "Der Neuaufbau konnte nicht gestartet werden.",
+      "loadError": "Der Zustand der Berichtsdaten konnte nicht geladen werden.",
+      "failed": "Der letzte Aufbau ist fehlgeschlagen",
+      "queued": "Aufbau ist eingeplant"
     },
     "deploy": {
       "title": "Bereitstellung",
@@ -4439,12 +4986,354 @@
     "progressLabel": "Fortschritt",
     "kinds": {
       "core": {
-        "ticket_export": "Ticket-Export"
-      }
+        "ticket_export": "Ticket-Export",
+        "report_run": "Bericht",
+        "report_export": "Berichtsexport",
+        "report_backfill": "Berichtsdaten aufbauen"
+      },
+      "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },
     "ticketExport": {
       "title": "Tickets als CSV exportieren",
       "startFailed": "Der Export konnte nicht gestartet werden."
+    }
+  },
+  "reports": {
+    "title": "Berichte",
+    "subtitle": "Auswertungen zu Aufkommen, Bestand, SLA und gebuchter Zeit",
+    "overview": "Übersicht",
+    "catalogue": "Berichtsliste",
+    "allReports": "Alle Berichte",
+    "back": "Zurück zu den Berichten",
+    "empty": "Für diesen Zeitraum gibt es keine Daten.",
+    "loading": "Bericht wird erstellt …",
+    "error": "Der Bericht konnte nicht erstellt werden.",
+    "other": "Weitere",
+    "showTable": "Tabelle anzeigen",
+    "showChart": "Diagramm anzeigen",
+    "export": "Exportieren",
+    "exportXlsx": "Als Excel-Datei (XLSX)",
+    "exportCsv": "Als CSV-Datei",
+    "exportTitle": "Bericht",
+    "truncated": "Die Tabelle ist gekürzt. Bitte den Zeitraum verkleinern oder den Bericht exportieren.",
+    "cached": "Zwischengespeichert",
+    "totals": "Summe",
+    "previousPeriod": "Vorheriger Zeitraum",
+    "timeRange": "Zeitraum",
+    "grain": "Gruppierung nach Zeit",
+    "groupBy": "Aufteilen nach",
+    "custom": "Eigener Zeitraum",
+    "from": "Von",
+    "to": "Bis",
+    "apply": "Anwenden",
+    "timeZone": "Zeitzone",
+    "factsBuilding": "Die Berichtsdaten werden noch aufgebaut. Die Zahlen sind bis dahin unvollständig.",
+    "factsBuildingProgress": "Die Berichtsdaten werden aufgebaut ({{percent}} %). Die Zahlen sind bis dahin unvollständig.",
+    "factsAsOf": "Stand: {{time}}",
+    "timeout": "Der Bericht hat zu lange gebraucht. Bitte den Zeitraum verkleinern oder ihn als Export starten.",
+    "weekLabel": "KW {{week}}",
+    "hourLabel": "{{hour}} Uhr",
+    "categories": {
+      "overview": "Übersicht",
+      "volume": "Aufkommen",
+      "backlog": "Bestand",
+      "sla": "SLA",
+      "quality": "Qualität",
+      "agents": "Mitarbeiter",
+      "time": "Zeitbuchungen",
+      "customers": "Kunden",
+      "patterns": "Muster"
+    },
+    "builtin": {
+      "ticket_kpis": {
+        "title": "Kennzahlen",
+        "description": "Die wichtigsten Zahlen der letzten 30 Tage (einschließlich heute): erstellte Tickets, Anteil verletzter Erstreaktionen sowie mittlere Erstreaktions- und Lösungszeit, gemessen in Arbeitszeit. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
+      },
+      "volume": {
+        "title": "Erstellte und geschlossene Tickets",
+        "description": "Wie viele Tickets pro Woche erstellt und geschlossen wurden (letzte 12 vollständige Wochen)."
+      },
+      "backlog_trend": {
+        "title": "Offene Tickets im Verlauf",
+        "description": "Wie viele Tickets an jedem Tag der letzten 30 Tage (einschließlich heute) offen waren, Stand am Tagesende."
+      },
+      "open_now": {
+        "title": "Offene Tickets jetzt",
+        "description": "Alle gerade offenen Tickets, standardmäßig je Queue. Wahlweise lassen sie sich statt nach Queue nach Status, Priorität, Bearbeiter, Typ oder Service gruppieren."
+      },
+      "agent_activity": {
+        "title": "Aktivität der Mitarbeiter",
+        "description": "Antworten, Notizen und Schließungen je Mitarbeiter in den letzten 30 Tagen (einschließlich heute)."
+      },
+      "volume_by_channel": {
+        "title": "Tickets nach Kanal",
+        "description": "Wie viele Tickets pro Woche über welchen Kanal (E-Mail, Telefon, Telegram …) eingegangen sind (letzte 12 vollständige Wochen)."
+      },
+      "channel_mix": {
+        "title": "Kanalverteilung",
+        "description": "Aus welchen Kanälen die Tickets der letzten 30 Tage (einschließlich heute) stammen."
+      },
+      "volume_by_queue": {
+        "title": "Tickets je Queue",
+        "description": "Wie viele Tickets pro Queue in den letzten 30 Tagen (einschließlich heute) erstellt wurden. Wahlweise lassen sie sich statt nach Queue nach Typ, Service oder Priorität gruppieren. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
+      },
+      "backlog_by_state": {
+        "title": "Bestand nach Status",
+        "description": "Offene Tickets je Tag, aufgeteilt nach Statustyp (neu, offen, wartend), letzte 30 Tage (einschließlich heute)."
+      },
+      "backlog_aging": {
+        "title": "Alter der offenen Tickets",
+        "description": "Wie lange die offenen Tickets jeder Queue schon liegen: unter 1 Tag, 1 bis 3, 3 bis 7, 7 bis 30 und über 30 Tage."
+      },
+      "sla_compliance": {
+        "title": "SLA-Einhaltung",
+        "description": "Wie viele Tickets ihre SLA-Zeiten eingehalten haben, je Queue, im letzten vollständigen Monat. Dazu verletzte und knapp eingehaltene Zeiten."
+      },
+      "sla_times": {
+        "title": "Reaktions- und Lösungszeiten",
+        "description": "Mittlere Zeit (Median) und die langsamsten 10 % der Erstreaktions- und Lösungszeiten pro Woche, gemessen in Arbeitszeit (letzte 12 vollständige Wochen)."
+      },
+      "sla_by_customer": {
+        "title": "SLA je Kunde",
+        "description": "Wie gut die SLA-Zeiten pro Kunde eingehalten wurden (letzte 3 vollständige Monate): erstellte Tickets, verletzte Zeiten sowie mittlere Erstreaktions- und Lösungszeit."
+      },
+      "first_contact_resolution": {
+        "title": "Lösung im ersten Kontakt",
+        "description": "„Geschlossen“ zählt die Tickets, die gerade geschlossen sind. Die Quoten beziehen sich auf die Tickets, die im Zeitraum geschlossen wurden (letzter vollständiger Monat). „Im ersten Kontakt gelöst“ heißt: geschlossen, nie wieder geöffnet und höchstens eine ausgehende Antwort."
+      },
+      "reopen_trend": {
+        "title": "Wiedereröffnungen im Verlauf",
+        "description": "Wie oft geschlossene Tickets wieder geöffnet wurden, pro Woche (letzte 12 vollständige Wochen). Maßgeblich ist der Zeitpunkt des Schließens."
+      },
+      "queue_transfers": {
+        "title": "Queue-Wechsel",
+        "description": "Von welcher Queue in welche Queue Tickets verschoben wurden (letzte 30 Tage, einschließlich heute)."
+      },
+      "pingpong": {
+        "title": "Hin und Her zwischen Queues",
+        "description": "Tickets, die mehrfach zwischen Queues verschoben wurden, und wie oft ein Ticket im Schnitt die Queue wechselt (letzte 30 Tage, einschließlich heute)."
+      },
+      "time_in_state": {
+        "title": "Verweildauer in Status",
+        "description": "Wie lange Tickets in einem Status bleiben, bevor er wechselt: Durchschnitt, Median und langsamste 10 % (letzte 30 Tage, einschließlich heute)."
+      },
+      "time_by_customer": {
+        "title": "Gebuchte Zeit je Kunde",
+        "description": "Die auf Tickets gebuchte Zeit pro Kunde im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
+      },
+      "time_by_queue": {
+        "title": "Gebuchte Zeit je Queue",
+        "description": "Die auf Tickets gebuchte Zeit pro Queue im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
+      },
+      "time_by_agent": {
+        "title": "Gebuchte Zeit je Mitarbeiter",
+        "description": "Die von jedem Mitarbeiter gebuchte Zeit im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
+      },
+      "time_by_type": {
+        "title": "Gebuchte Zeit je Typ",
+        "description": "Die auf Tickets gebuchte Zeit pro Tickettyp im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
+      },
+      "time_by_agent_month": {
+        "title": "Gebuchte Zeit je Mitarbeiter und Monat",
+        "description": "Gebuchte Zeit je Mitarbeiter und Monat, die letzten 12 Monate (einschließlich des laufenden). Entspricht der Znuny-Statistik „Gebuchte Zeit“."
+      },
+      "top_customers": {
+        "title": "Top-Kunden",
+        "description": "Die Kunden mit den meisten Tickets in den letzten 3 vollständigen Monaten, mit Lösungszeit und gebuchter Zeit. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
+      },
+      "created_heatmap": {
+        "title": "Wann Tickets eingehen",
+        "description": "Eingegangene Tickets nach Wochentag und Uhrzeit (letzte 12 vollständige Wochen) – zeigt, wann am meisten los ist."
+      }
+    },
+    "dimensions": {
+      "queue": "Queue",
+      "queue_at_create": "Queue bei Erstellung",
+      "state": "Status",
+      "state_type": "Statustyp",
+      "priority": "Priorität",
+      "type": "Typ",
+      "service": "Service",
+      "sla": "SLA",
+      "owner": "Bearbeiter",
+      "responsible": "Verantwortlicher",
+      "customer": "Kunde",
+      "customer_user": "Ansprechpartner",
+      "channel": "Kanal",
+      "created": "Erstellt",
+      "closed": "Geschlossen",
+      "first_response": "Erstreaktion",
+      "created_hour": "Uhrzeit der Erstellung",
+      "created_weekday": "Wochentag der Erstellung",
+      "process": "Prozess",
+      "kind": "Ereignis",
+      "occurred": "Zeitpunkt",
+      "occurred_hour": "Uhrzeit",
+      "occurred_weekday": "Wochentag",
+      "actor": "Mitarbeiter",
+      "from_queue": "Von Queue",
+      "to_queue": "Nach Queue",
+      "from_state": "Von Status",
+      "to_state": "Nach Status",
+      "from_state_type": "Von Statustyp",
+      "to_state_type": "Nach Statustyp",
+      "ticket_queue": "Queue des Tickets",
+      "ticket_state": "Status des Tickets",
+      "ticket_priority": "Priorität des Tickets",
+      "ticket_type": "Typ des Tickets",
+      "snapshot": "Stichtag",
+      "agent": "Mitarbeiter",
+      "ticket": "Ticket",
+      "booked": "Gebucht",
+      "booked_weekday": "Wochentag der Buchung",
+      "archived": "Archiviert",
+      "merged": "Zusammengeführt",
+      "reopened": "Wiedereröffnet",
+      "has_first_response": "Mit Erstreaktion",
+      "ai_triaged": "Von der KI einsortiert",
+      "ai_auto_replied": "Von der KI beantwortet",
+      "ai_handed_off": "An Mitarbeiter übergeben"
+    },
+    "measures": {
+      "tickets": "Tickets",
+      "closed_tickets": "Geschlossen",
+      "open_tickets": "Offen",
+      "reopened_tickets": "Wiedereröffnet",
+      "reopen_rate": "Wiedereröffnungsquote",
+      "fcr_rate": "Im ersten Kontakt gelöst",
+      "first_response_avg": "Erstreaktion (Durchschnitt)",
+      "first_response_p50": "Erstreaktion (Median)",
+      "first_response_p90": "Erstreaktion (langsamste 10 %)",
+      "first_response_clock_avg": "Erstreaktion rund um die Uhr (Durchschnitt)",
+      "first_response_clock_p50": "Erstreaktion rund um die Uhr (Median)",
+      "solution_avg": "Lösungszeit (Durchschnitt)",
+      "solution_p50": "Lösungszeit (Median)",
+      "solution_p90": "Lösungszeit (langsamste 10 %)",
+      "solution_clock_avg": "Lösungszeit rund um die Uhr (Durchschnitt)",
+      "solution_clock_p50": "Lösungszeit rund um die Uhr (Median)",
+      "response_breaches": "Erstreaktion verletzt",
+      "response_breach_rate": "Quote verletzter Erstreaktion",
+      "solution_breaches": "Lösungszeit verletzt",
+      "solution_breach_rate": "Quote verletzter Lösungszeit",
+      "update_breaches": "Aktualisierungszeit verletzt",
+      "update_breached_tickets": "Tickets mit verletzter Aktualisierungszeit",
+      "response_near_misses": "Erstreaktion knapp eingehalten",
+      "solution_near_misses": "Lösungszeit knapp eingehalten",
+      "sla_met_rate": "SLA eingehalten",
+      "accounted_time": "Gebuchte Zeit",
+      "agent_touches_avg": "Bearbeiter pro Ticket (Durchschnitt)",
+      "queue_moves_avg": "Queue-Wechsel pro Ticket (Durchschnitt)",
+      "pingpong_tickets": "Tickets mit Hin und Her",
+      "events": "Ereignisse",
+      "dwell_avg_hours": "Verweildauer (Durchschnitt)",
+      "dwell_p50_hours": "Verweildauer (Median)",
+      "dwell_p90_hours": "Verweildauer (langsamste 10 %)",
+      "age_0_1d": "Unter 1 Tag",
+      "age_1_3d": "1 bis 3 Tage",
+      "age_3_7d": "3 bis 7 Tage",
+      "age_7_30d": "7 bis 30 Tage",
+      "age_30d_plus": "Über 30 Tage",
+      "escalated": "Eskaliert",
+      "unassigned": "Ohne Bearbeiter",
+      "time_units": "Gebuchte Zeit",
+      "bookings": "Buchungen"
+    },
+    "parameters": {
+      "queues": "Queues"
+    },
+    "values": {
+      "state_type": {
+        "new": "Neu",
+        "open": "Offen",
+        "closed": "Geschlossen",
+        "pending reminder": "Wartet auf Erinnerung",
+        "pending auto": "Wartet automatisch",
+        "removed": "Entfernt",
+        "merged": "Zusammengeführt"
+      },
+      "channel": {
+        "email": "E-Mail",
+        "phone": "Telefon",
+        "internal": "Intern",
+        "telegram": "Telegram",
+        "webchat": "Webchat",
+        "sms": "SMS",
+        "whatsapp": "WhatsApp"
+      },
+      "event_kind": {
+        "create": "Erstellt",
+        "state": "Statuswechsel",
+        "close": "Geschlossen",
+        "reopen": "Wiedereröffnet",
+        "queue": "Queue-Wechsel",
+        "owner": "Bearbeiterwechsel",
+        "responsible": "Wechsel des Verantwortlichen",
+        "priority": "Prioritätswechsel",
+        "type": "Typwechsel",
+        "service": "Servicewechsel",
+        "sla": "SLA-Wechsel",
+        "merge": "Zusammengeführt",
+        "process_activity": "Prozessschritt",
+        "reply": "Antwort",
+        "note": "Notiz",
+        "customer_message": "Kundennachricht"
+      },
+      "weekday": {
+        "1": "Montag",
+        "2": "Dienstag",
+        "3": "Mittwoch",
+        "4": "Donnerstag",
+        "5": "Freitag",
+        "6": "Samstag",
+        "7": "Sonntag"
+      }
+    },
+    "presets": {
+      "today": "Heute",
+      "yesterday": "Gestern",
+      "thisWeek": "Diese Woche",
+      "last7Days": "Letzte 7 Tage",
+      "thisMonth": "Dieser Monat",
+      "lastMonth": "Letzter Monat",
+      "thisQuarter": "Dieses Quartal",
+      "lastQuarter": "Letztes Quartal",
+      "thisYear": "Dieses Jahr",
+      "lastYear": "Letztes Jahr",
+      "last30Days": "Letzte 30 Tage",
+      "reset": "Zurücksetzen"
+    },
+    "grains": {
+      "day": "Tag",
+      "week": "Woche",
+      "month": "Monat",
+      "quarter": "Quartal",
+      "year": "Jahr"
+    },
+    "chart": {
+      "noData": "Keine Daten",
+      "legend": "Legende",
+      "deltaUp": "Anstieg",
+      "deltaDown": "Rückgang",
+      "deltaFlat": "Unverändert",
+      "ofTotal": "{{percent}} vom Gesamtwert",
+      "total": "Gesamt"
+    },
+    "openReport": "Bericht öffnen",
+    "retry": "Erneut versuchen",
+    "exportFailed": "Der Export konnte nicht gestartet werden.",
+    "runningInBackground": "Der Bericht wird im Hintergrund erstellt. Das kann einen Moment dauern …",
+    "previousPeriodValue": "Vorheriger Zeitraum: {{value}}",
+    "info": {
+      "timeRange": "Zeitraum: {{range}}",
+      "timeZone": "Zeitzone: {{zone}}",
+      "queues": "Queues: {{queues}}"
+    },
+    "agentTable": {
+      "agent": "Mitarbeiter",
+      "open": "Offen",
+      "replies": "Antworten",
+      "notes": "Notizen",
+      "closed": "Geschlossen"
     }
   }
 }

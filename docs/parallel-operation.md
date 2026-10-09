@@ -236,6 +236,31 @@ environments where installing the addon is not possible.
 Proving the path: an admin creates a queue in Tiqora and it appears in Znuny
 without restart.
 
+## GenericInterface sessions
+
+During parallel operation the compat `SessionCreate` writes real Znuny
+`sessions` rows (the `AuthSession::DB` key set, without the password hash), so
+a SessionID created through Tiqora is also valid in Znuny and the other way
+round, with Znuny's `SessionMaxIdleTime` / `SessionMaxTime`. Tiqora's worker
+loop `znuny_session_purge` (every 300 s, always on) deletes expired rows with the
+same rule as Znuny's `GetExpiredSessionIDs`; running Znuny's
+`Maint::Session::DeleteExpired` as well is harmless as long as both use the same
+`SessionMaxTime` / `SessionMaxIdleTime`. Tiqora reads them from the SysConfig in the
+database: if Znuny overrides them in `Config.pm`, Tiqora purges with the database
+values and can end Znuny web sessions earlier than Znuny would. The loop cannot be
+switched off, so keep these limits in the SysConfig during parallel operation.
+Disabling an agent or a customer user, an admin password reset, password setup, a
+customer's own password change and GDPR erasure remove the person's `sessions`
+rows (and, where the change is made by an admin, the person's Redis sessions).
+`SessionGet` answers `SessionInvalid` for an expired session or a disabled account,
+like Znuny.
+
+Znuny's `SessionCheckRemoteIP` defaults to `1`. Tiqora stores the client
+address it sees, which behind different proxies is not the address Znuny sees,
+so Znuny may reject a Tiqora-created session. Set `SessionCheckRemoteIP` to `0`
+in Znuny or make both systems see the same client address. Set
+`TIQORA_COMPAT_SESSION_WRITE_ZNUNY=false` to keep GI sessions in Redis only.
+
 ## Detecting Znuny writes
 
 Tiqora poller:

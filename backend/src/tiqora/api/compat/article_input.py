@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import base64
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from email.message import EmailMessage
 from typing import Any
 
 import structlog
@@ -18,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.api.compat.mapping.perl import perl_is_string, perl_str, perl_truthy
+from tiqora.channels.email.smtp import HookedMailSender, MailSender
 from tiqora.domain.dynamic_field_values import (
     DynamicFieldConfig,
     DynamicFieldValueError,
@@ -41,7 +44,8 @@ _USER_LIST_KEYS = (
 logger = structlog.get_logger(__name__)
 
 
-def _err(code: str, message: str) -> dict[str, Any]:
+def gi_error(code: str, message: str) -> dict[str, Any]:
+    """A Znuny-style GenericInterface error envelope (``ReturnError``)."""
     return {"Error": {"ErrorCode": code, "ErrorMessage": message}}
 
 
@@ -168,30 +172,32 @@ async def parse_gi_dynamic_fields(
     configs: dict[str, DynamicFieldConfig] = {}
     for item in items:
         if not isinstance(item, dict) or not item:
-            return _err(
+            return gi_error(
                 f"{op}.InvalidParameter", f"{op}: Ticket->DynamicField parameter is invalid!"
             )
         name = _trim(item.get("Name"))
         value = item.get("Value")
         for needed, got in (("Name", name), ("Value", value)):
             if got is None or not (perl_is_string(got) or isinstance(got, list)):
-                return _err(
+                return gi_error(
                     f"{op}.MissingParameter",
                     f"{op}: DynamicField->{needed}{gap}parameter is missing!",
                 )
         config = await load_dynamic_field(session, name) if isinstance(name, str) else None
         # the database may match case-insensitively; Znuny's lookup is an exact hash key
         if config is None or config.name != name:
-            return _err(f"{op}.InvalidParameter", f"{op}: DynamicField->Name parameter is invalid!")
+            return gi_error(
+                f"{op}.InvalidParameter", f"{op}: DynamicField->Name parameter is invalid!"
+            )
         if op == "TicketUpdate" and config.object_type == "Article" and not articles_present:
-            return _err(
+            return gi_error(
                 f"{op}.MissingParameter",
                 f"{op}: To create an article DynamicField an article is required!",
             )
         values = _df_values(value)
         valid = values is not None and await _value_is_valid(session, config, value, values)
         if not valid:
-            return _err(
+            return gi_error(
                 f"{op}.InvalidParameter", f"{op}: DynamicField->Value parameter is invalid!"
             )
         configs[config.name] = config
@@ -251,12 +257,12 @@ async def _check_user_lists(
         if value is None:
             continue
         if isinstance(value, dict) and value:
-            return _err(f"{op}.InvalidParameter", f"{op}: Article->{key} parameter is invalid!")
+            return gi_error(f"{op}.InvalidParameter", f"{op}: Article->{key} parameter is invalid!")
         ids = value if isinstance(value, list) and value else [value]
         for user_id in ids:
             if not await _valid_user(session, user_id):
                 shown = "ARRAY(0x0)" if isinstance(user_id, list | dict) else perl_str(user_id)
-                return _err(
+                return gi_error(
                     f"{op}.InvalidParameter",
                     f"{op}: Article->{key} UserID={shown} parameter is invalid!",
                 )
@@ -337,47 +343,49 @@ async def parse_gi_articles(
         history_comment = _scalar_text(art.get("HistoryComment")) or cfg_history_comment
 
         if auto_response and not await _name_exists(session, "auto_response_type", auto_response):
-            return _err(
+            return gi_error(
                 f"{op}.InvalidParameter", f"{op}: Article->AutoResponseType parameter is invalid!"
             )
 
         send = user_type == _AGENT_USER_TYPE and perl_truthy(art.get("ArticleSend"))
         if send and not (_scalar_text(art.get("To")) or "").strip():
-            return _err(
+            return gi_error(
                 f"{op}.InvalidParameter",
                 f"{op}: Article->To parameter must be a valid email address"
                 " when Article->ArticleSend is set!",
             )
 
         if not history_type:
-            return _err(
+            return gi_error(
                 f"{op}.InvalidParameter",
                 f"{op}: Article-> HistoryType is required and Sysconfig"
                 " HistoryType setting could not be read!",
             )
         if not await _name_exists(session, "ticket_history_type", history_type):
-            return _err(
+            return gi_error(
                 f"{op}.InvalidParameter", f"{op}: Article->HistoryType parameter is invalid!"
             )
 
         time_raw = art.get("TimeUnit")
         time_text = None if time_raw is None else perl_str(time_raw)
         if (time_text is None or time_text == "") and account_time and need_time:
-            return _err(
+            return gi_error(
                 f"{op}.MissingParameter",
                 f"{op}: Article->TimeUnit is required by sysconfig option!",
             )
         time_unit: str | None = None
         if perl_truthy(time_text):
             if not _TIME_UNIT_RE.fullmatch(time_text or ""):
-                return _err(
+                return gi_error(
                     f"{op}.InvalidParameter", f"{op}: Article->TimeUnit parameter is invalid!"
                 )
             time_unit = time_text
 
         no_notify_raw = art.get("NoAgentNotify")
         if perl_truthy(no_notify_raw) and perl_str(no_notify_raw) != "1":
-            return _err(f"{op}.InvalidParameter", f"{op}: Article->NoAgent parameter is invalid!")
+            return gi_error(
+                f"{op}.InvalidParameter", f"{op}: Article->NoAgent parameter is invalid!"
+            )
 
         if (err := await _check_user_lists(session, art, op=op)) is not None:
             return err
@@ -449,9 +457,15 @@ async def send_gi_auto_response(
     subject: str,
     body: str,
     user_id: int,
+    before_send: Callable[[], Awaitable[None]] | None = None,
+    after_send: Callable[[EmailMessage], Awaitable[None]] | None = None,
 ) -> int | None:
     """The queue's auto response for a request article (Znuny ``ArticleCreate`` →
     ``SendAutoResponse``, ``OrigHeader`` = the article's From / Subject / Body).
+
+    ``before_send`` is awaited right before the SMTP send (the GI mail worker's
+    checkpoint), ``after_send`` with the sent message right after a successful one; neither
+    is called when no mail goes out.
 
     Only for articles stored with ``add_article``; the caller does not call it for
     ``ArticleSend``. Sent through the configured outbound relay; without one nothing is
@@ -464,9 +478,11 @@ async def send_gi_auto_response(
     if not (await mail_outbound.resolve_outbound_smtp(session)).enabled:
         logger.info("compat_auto_response_no_outbound_relay", ticket_id=ticket_id)
         return None
-    sender = await mail_outbound.build_outbound_sender(
+    sender: MailSender = await mail_outbound.build_outbound_sender(
         session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
     )
+    if before_send is not None or after_send is not None:
+        sender = HookedMailSender(sender, before_send=before_send, after_send=after_send)
     return await send_auto_response(
         session,
         session_factory,

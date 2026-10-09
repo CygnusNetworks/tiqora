@@ -183,7 +183,8 @@
     "clearFilters": "Azzera filtri",
     "pageRange": "{{from}}–{{to}}",
     "pageScope": "in questa pagina",
-    "chartPeak": "picco {{units}}"
+    "chartPeak": "picco {{units}}",
+    "reportsLink": "Reports by customer, queue, agent, type"
   },
   "common": {
     "prev": "Precedente",
@@ -237,7 +238,33 @@
       "hint": "La 2FA è obbligatoria per questo account — la configuri ora.",
       "startError": "Impossibile avviare la configurazione 2FA. Riprovare o contattare un amministratore.",
       "confirmError": "Codice non valido — riprovare."
-    }
+    },
+    "providers": {
+      "defaultLabel": "Sign in with SSO",
+      "or": "or"
+    },
+    "ssoErrors": {
+      "no_subject": "The sign-in service did not send a unique identifier. Please contact your administrator.",
+      "no_match": "There is no access for this account here. Please contact your administrator.",
+      "user_invalid": "The linked user account is disabled or deleted.",
+      "sso_not_enabled": "Sign-in through the sign-in service is not enabled for your account.",
+      "email_unverified": "The sign-in service did not report your e-mail address as verified.",
+      "ambiguous_email": "Your e-mail address belongs to several user accounts. Please contact your administrator.",
+      "login_taken": "The username is already taken by another user account.",
+      "jit_missing_fields": "The sign-in service did not send the details needed to create your account.",
+      "email_invalid": "The e-mail address sent by the sign-in service is not accepted for a new account. Please contact your administrator.",
+      "email_in_use": "The e-mail address is already used by another customer account. Please contact your administrator.",
+      "jit_domain_not_allowed": "Accounts cannot be created automatically for your e-mail domain. Please contact your administrator.",
+      "provider_disabled": "This sign-in service is disabled.",
+      "unknown_provider": "This sign-in service is not known.",
+      "config": "Sign-in through this service is not fully set up yet.",
+      "saml_unavailable": "SAML sign-in is not available on this server.",
+      "state": "The sign-in took too long or was started in another window. Please try again.",
+      "saml_invalid": "The response of the sign-in service was invalid. Please try again.",
+      "oidc_failed": "Signing in with the sign-in service failed. Please try again.",
+      "idp_error": "The sign-in service rejected the sign-in."
+    },
+    "loggedOut": "You have been signed out."
   },
   "security": {
     "title": "Sicurezza",
@@ -274,7 +301,10 @@
     "passkeyDeleteError": "Impossibile rimuovere la passkey.",
     "passkeyReauthRequired": "Per la Sua sicurezza, acceda di nuovo prima di modificare le Sue passkey.",
     "passkeyDeleteLastError": "Impossibile rimuovere l'ultimo fattore 2FA mentre la 2FA è obbligatoria.",
-    "passkeyUnsupported": "Questo browser non supporta le passkey (WebAuthn)."
+    "passkeyUnsupported": "Questo browser non supporta le passkey (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {
@@ -1301,7 +1331,22 @@
     },
     "login": {
       "subtitle": "Acceda al Suo account di supporto",
-      "email": "Email o nome utente"
+      "email": "Email o nome utente",
+      "ssoDivider": "or",
+      "twoFactorTitle": "Two-factor sign-in",
+      "twoFactorHint": "Enter the 6-digit code from your authenticator app.",
+      "passkeyOnlyHint": "Confirm the sign-in with your passkey.",
+      "totpLabel": "Verification code",
+      "passkeyButton": "Confirm with passkey",
+      "verify": "Confirm",
+      "totpInvalid": "Invalid or expired code.",
+      "passkeyInvalid": "The passkey could not be verified.",
+      "passkeyFailed": "Passkey confirmation failed. Please try again.",
+      "passkeyUnsupported": "This browser does not support passkeys.",
+      "cancel": "Cancel",
+      "rateLimited": "Too many failed attempts. Please wait a moment and try again.",
+      "twoFactorExpired": "The sign-in has expired. Please sign in again.",
+      "backToLogin": "Back to sign-in"
     },
     "tickets": {
       "title": "I miei ticket",
@@ -1362,6 +1407,11 @@
       "save": "Salva",
       "keys": "Cifratura",
       "keysDesc": "Carichi la Sua chiave PGP o il Suo certificato S/MIME, così potremo inviarLe e-mail cifrate. Deve contenere il Suo indirizzo e-mail {{email}}."
+    },
+    "security": {
+      "title": "Security",
+      "nav": "Security",
+      "intro": "Protect your account with a second factor when you sign in."
     },
     "process": {
       "start": "Start a process",
@@ -2110,7 +2160,9 @@
       "ticketAttributeRelations": "Relazioni tra attributi",
       "pgp": "PGP",
       "smime": "S/MIME",
-      "aiModels": "Modelli"
+      "aiModels": "Modelli",
+      "identityProviders": "Identity providers",
+      "reporting": "Report data"
     },
     "table": {
       "id": "ID",
@@ -2433,7 +2485,12 @@
       "accessGroupsHint": "Every member of these groups, whatever their permission there.",
       "accessRoles": "Roles",
       "accessRolesHint": "Every agent holding one of these roles.",
-      "accessLoadError": "Could not load the current access list."
+      "accessLoadError": "Could not load the current access list.",
+      "reset2fa": "Reset two-factor sign-in",
+      "reset2faConfirmTitle": "Reset two-factor sign-in?",
+      "reset2faConfirmBody": "The authenticator app and all passkeys of {{login}} will be removed. Until a new two-factor sign-in is set up, the password alone is enough to sign in.",
+      "reset2faDone": "Two-factor sign-in of {{login}} was reset.",
+      "reset2faFailed": "Could not reset the two-factor sign-in."
     },
     "customerCompanies": {
       "title_plural": "Aziende cliente",
@@ -3016,9 +3073,21 @@
           "name": "Rinnovo dei certificati S/MIME dei clienti",
           "description": "Importa ogni giorno dal backend clienti i certificati cliente rinnovati (Znuny RenewCustomerSMIMECertificates; richiede SMIME::FetchFromCustomer)."
         },
+        "identity_metadata": {
+          "name": "Identity provider metadata refresh",
+          "description": "Re-downloads SAML identity provider metadata (certificates, endpoints) once a day; a failed download keeps the last working copy and shows a warning."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."
+        },
+        "znuny_session_purge": {
+          "name": "Znuny session cleanup",
+          "description": "Deletes expired sessions of the Znuny interface (GenericInterface) every few minutes."
+        },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
         },
         "deploy_watch": {
           "name": "Deploy watcher",
@@ -3194,7 +3263,8 @@
       "reset2fa": "Ripristina 2FA",
       "resetConfirmTitle": "Reimpostare l'autenticazione a due fattori?",
       "resetConfirmBody": "Questo disabilita 2FA per {{login}}. Dovranno registrarsi nuovamente se l'applicazione delle norme è ancora in vigore.",
-      "empty": "Nessun agente trovato."
+      "empty": "Nessun agente trovato.",
+      "identityLink": "Set up sign-in through Microsoft, Google, SAML or LDAP"
     },
     "gdpr": {
       "title": "Privacy/GDPR",
@@ -3395,7 +3465,10 @@
       "pgp": "Attivi e disattivi PGP, gestisca chiavi e passphrase, imposti firma e memorizzazione.",
       "smime": "Attivi e disattivi S/MIME, gestisca certificati, chiavi private e relazioni del firmatario, imposti i percorsi di memorizzazione.",
       "aiModels": "Modelli presso i provider, profili con modelli di riserva e quale profilo svolge quale attività.",
-      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept."
+      "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept.",
+      "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP.",
+      "reporting": "Check the state of the report data and have everything recalculated.",
+      "settingsReporting": "Reports: time zone, access, cache and limits for results and exports."
     },
     "types": {
       "title_plural": "Tipi di ticket",
@@ -3788,6 +3861,47 @@
           }
         }
       },
+      "reporting": {
+        "title": "Reports",
+        "fields": {
+          "time_zone": {
+            "label": "Report time zone",
+            "help": "Days, weeks and months are cut by this time zone. Leave empty for the Znuny default time zone, e.g. Europe/Berlin."
+          },
+          "access": {
+            "label": "Who may see reports",
+            "help": "All agents, or only members of the \"stats\" group as in Znuny.",
+            "options": {
+              "all_agents": "All agents",
+              "stats_group": "Only group \"stats\""
+            }
+          },
+          "near_miss_percent": {
+            "label": "Near miss from percent",
+            "help": "At 10%, a ticket counts as a near miss if it was not breached but used 90% or more of its target time. The value is the distance to the target in percent."
+          },
+          "cache_seconds": {
+            "label": "Cache in seconds",
+            "help": "How long a report result is reused before it is recalculated. 0 turns the cache off."
+          },
+          "inline_row_threshold": {
+            "label": "Limit for instant calculation",
+            "help": "Reports over more ticket rows than this run in the background so the page does not freeze."
+          },
+          "max_result_rows": {
+            "label": "Maximum result rows",
+            "help": "A report returns no more rows than this. The rest is cut off and the report is marked as truncated. \"Others\" only appears with a per-grouping limit (top N)."
+          },
+          "export_row_limit": {
+            "label": "Maximum rows when exporting",
+            "help": "Larger exports to Excel or CSV are cut off at this number of rows."
+          },
+          "query_timeout_seconds": {
+            "label": "Time limit per database query in seconds",
+            "help": "If a single query takes longer it is stopped and a message is shown."
+          }
+        }
+      },
       "process": {
         "title": "Processes and ACLs",
         "fields": {
@@ -3797,6 +3911,439 @@
           }
         }
       }
+    },
+    "identity": {
+      "title": "Identity providers",
+      "description": "Set up which sign-in services (Microsoft, Google, SAML, LDAP …) agents and customers may use to sign in.",
+      "add": "Add",
+      "empty": "No identity provider set up yet. Use “Add” to create the first one.",
+      "loadError": "The identity providers could not be loaded.",
+      "deleteTitle": "Delete identity provider?",
+      "deleteBody": "“{{name}}” will be deleted, along with {{count}} link(s) between users and this sign-in service. The user accounts themselves are kept.",
+      "deleteError": "The identity provider could not be deleted.",
+      "deleteAria": "Delete {{name}}",
+      "envBadge": "from environment variables, cannot be changed here",
+      "copy": "Copy",
+      "copied": "Copied",
+      "saveError": "The changes could not be saved.",
+      "placeholder": "This area will be added in a later step.",
+      "columns": {
+        "name": "Name",
+        "kind": "Type",
+        "audience": "Applies to",
+        "state": "State"
+      },
+      "kind": {
+        "oidc": "OpenID Connect",
+        "saml": "SAML",
+        "ldap": "LDAP / Active Directory"
+      },
+      "audience": {
+        "agent": "Agents only",
+        "customer": "Customers only",
+        "both": "Agents and customers"
+      },
+      "state": {
+        "enabled": "Active",
+        "disabled": "Disabled",
+        "metadataError": "Metadata faulty"
+      },
+      "preset": {
+        "entra_id": "Microsoft Entra ID",
+        "google_workspace": "Google Workspace",
+        "keycloak": "Keycloak",
+        "authentik": "authentik",
+        "adfs": "AD FS (Active Directory Federation Services)",
+        "generic_saml": "SAML (generic)",
+        "generic_oidc": "OpenID Connect (generic)",
+        "ldap": "LDAP directory",
+        "active_directory": "Active Directory (LDAP)"
+      },
+      "presetDialog": {
+        "title": "Add identity provider",
+        "description": "Pick a template. You enter the connection details in the next step.",
+        "choose": "Choose a template",
+        "create": "Create",
+        "createError": "The identity provider could not be created."
+      },
+      "tabs": {
+        "connection": "Connection",
+        "mapping": "Mapping",
+        "roles": "Roles from the sign-in service",
+        "test": "Test sign-in",
+        "links": "Links"
+      },
+      "sections": {
+        "general": "General",
+        "connection": "Connection"
+      },
+      "common": {
+        "name": "Name",
+        "slug": "Short name",
+        "slugHelp": "Part of the sign-in address; lowercase letters, digits and hyphen only.",
+        "audience": "Applies to",
+        "enabled": "Active",
+        "enabledHelp": "Only active providers appear on the sign-in page.",
+        "buttonLabel": "Sign-in button label",
+        "buttonLabelHelp": "Leave empty to use the name.",
+        "buttonIcon": "Sign-in button icon",
+        "sort": "Order",
+        "sortHelp": "Smaller numbers come first."
+      },
+      "icons": {
+        "microsoft": "Microsoft",
+        "google": "Google",
+        "key": "Key",
+        "shield": "Shield",
+        "building": "Building",
+        "directory": "Directory"
+      },
+      "saml": {
+        "unavailable": {
+          "package": "SAML is not set up on this server: the Python package “pysaml2” is missing. SAML sign-ins are only possible after it is installed.",
+          "xmlsec1": "SAML is not set up on this server: the program “xmlsec1” is missing. SAML sign-ins are only possible after it is installed."
+        },
+        "sha1Warning": "Warning: SHA-1 signatures are considered broken. Only accept them for legacy sign-in services that cannot do anything else.",
+        "copyCertificate": "Copy certificate",
+        "refresh": "Reload metadata",
+        "refreshError": "The metadata could not be loaded.",
+        "fetchedAt": "Last loaded: {{when}}"
+      },
+      "endpoints": {
+        "title": "Addresses for the sign-in service",
+        "hint": "Enter these addresses in the sign-in service's administration.",
+        "baseUrlMissing": "This server's public address is not set, so the addresses are missing. Please set the public address (TIQORA_PUBLIC_BASE_URL) first.",
+        "labels": {
+          "agent_redirect_uri": "Redirect address for agents",
+          "customer_redirect_uri": "Redirect address for customers",
+          "backchannel_logout_url": "Address for sign-out by the sign-in service",
+          "sp_entity_id": "Entity ID of this server",
+          "agent_acs_url": "Response address (ACS) for agents",
+          "customer_acs_url": "Response address (ACS) for customers",
+          "sp_metadata_url": "Metadata of this server",
+          "slo_url": "Sign-out address"
+        }
+      },
+      "test": {
+        "intro": "A test sign-in shows which values the sign-in service sends and what a real sign-in would do. Nothing is created and nobody is signed in.",
+        "ldapHint": "There is no browser test sign-in for LDAP. Check the connection by signing in on the login page with a directory account.",
+        "audience": "Test as",
+        "audiences": {
+          "agent": "Agent",
+          "customer": "Customer"
+        },
+        "draftHint": "Unsaved connection changes are used for this test.",
+        "start": "Start test sign-in",
+        "startError": "The test sign-in could not be started.",
+        "resultHeading": "Result of the test sign-in",
+        "loadError": "The result could not be loaded.",
+        "waiting": "Waiting for the sign-in …",
+        "timeout": "No result arrived within two minutes. Please start the test sign-in again.",
+        "subject": "Identifier",
+        "attributesHeading": "Values sent by the sign-in service",
+        "useForPreview": "Use these values for the preview"
+      },
+      "plan": {
+        "rejected": "The sign-in would be rejected:",
+        "create": "Will be created on first sign-in",
+        "newLogin": "New login name: {{login}}",
+        "loginAs": "Sign-in as {{login}}",
+        "matchedBy": {
+          "link": "Found through an existing link",
+          "login": "Found by login name",
+          "email": "Found by e-mail address",
+          "jit": "Will be created automatically"
+        },
+        "profileChanges": "Profile changes",
+        "rolesAdd": "Roles to be added",
+        "rolesRemove": "Roles to be removed",
+        "groupsAdd": "Group permissions to be added",
+        "groupsRemove": "Group permissions to be removed"
+      },
+      "config": {
+        "oidc": {
+          "fields": {
+            "issuer": {
+              "label": "Sign-in service address (issuer)",
+              "help": "e.g. https://login.example.org/realms/company. “/.well-known/openid-configuration” is appended automatically."
+            },
+            "client_id": {
+              "label": "Client ID"
+            },
+            "client_secret": {
+              "label": "Client secret"
+            },
+            "scopes": {
+              "label": "Requested scopes",
+              "help": "Separated by spaces."
+            },
+            "redirect_uri": {
+              "label": "Redirect address",
+              "help": "Leave empty to compute it from the public address."
+            },
+            "pkce": {
+              "label": "PKCE",
+              "options": {
+                "auto": "Automatic",
+                "always": "Always",
+                "never": "Never"
+              }
+            },
+            "email_must_be_verified": {
+              "label": "E-mail address must be verified",
+              "help": "Needed when users are found or created by e-mail address."
+            },
+            "allow_private_network": {
+              "label": "Allow internal networks",
+              "help": "Only for sign-in services on your own network (e.g. self-hosted Keycloak)."
+            },
+            "backchannel_logout": {
+              "label": "Accept sign-out by the sign-in service"
+            },
+            "allowed_tenant_ids": {
+              "label": "Allowed Microsoft tenant IDs",
+              "help": "Only for Microsoft Entra with the multi-tenant address (common/organizations): sign-ins from these tenants only. Empty = every tenant."
+            }
+          }
+        },
+        "saml": {
+          "fields": {
+            "idp_metadata_url": {
+              "label": "Metadata address of the sign-in service",
+              "help": "Reloaded daily."
+            },
+            "idp_metadata_xml": {
+              "label": "Metadata as XML",
+              "help": "Alternative to the address: paste the metadata here."
+            },
+            "idp_entity_id": {
+              "label": "Entity ID of the sign-in service",
+              "help": "Only needed if the metadata contains several sign-in services."
+            },
+            "name_id_format": {
+              "label": "User identifier format",
+              "options": {
+                "unspecified": "Unspecified",
+                "emailAddress": "E-mail address",
+                "persistent": "Persistent",
+                "transient": "Transient"
+              }
+            },
+            "sign_requests": {
+              "label": "Sign sign-in requests"
+            },
+            "want_response_signed": {
+              "label": "Whole response must be signed",
+              "help": "The sign-in service's assertion must always be signed."
+            },
+            "allow_idp_initiated": {
+              "label": "Allow sign-in started at the sign-in service"
+            },
+            "allow_sha1_signatures": {
+              "label": "Accept insecure SHA-1 signatures",
+              "help": "Only for legacy sign-in services. SHA-1 is considered broken."
+            },
+            "clock_skew_seconds": {
+              "label": "Allowed clock difference (seconds)"
+            },
+            "allow_private_network": {
+              "label": "Allow internal networks",
+              "help": "Only for metadata addresses on your own network."
+            },
+            "sp_certificate": {
+              "label": "Certificate of this server",
+              "help": "Generated automatically. Store it at the sign-in service if requests are signed."
+            },
+            "sp_private_key": {
+              "label": "Private key of this server"
+            }
+          }
+        },
+        "ldap": {
+          "fields": {
+            "host": {
+              "label": "Server"
+            },
+            "port": {
+              "label": "Port"
+            },
+            "use_ssl": {
+              "label": "Connect encrypted (LDAPS)"
+            },
+            "use_starttls": {
+              "label": "Encrypt with StartTLS"
+            },
+            "base_dn": {
+              "label": "Search base (base DN)"
+            },
+            "bind_dn": {
+              "label": "User for the search (bind DN)"
+            },
+            "bind_password": {
+              "label": "Password for the search"
+            },
+            "uid_attr": {
+              "label": "Login name attribute"
+            },
+            "always_filter": {
+              "label": "Additional search filter"
+            },
+            "group_dn": {
+              "label": "Group that may sign in (group DN)",
+              "help": "Leave empty to let every user found sign in."
+            },
+            "access_attr": {
+              "label": "Group membership attribute"
+            },
+            "user_attr": {
+              "label": "Users in the group as",
+              "options": {
+                "DN": "DN",
+                "UID": "Login name"
+              }
+            },
+            "subject_attr": {
+              "label": "Unique identifier",
+              "help": "For Active Directory: objectGUID."
+            },
+            "tls_verify": {
+              "label": "Check the server certificate",
+              "help": "Recommended. Turn off only for a test directory with a self-signed certificate."
+            },
+            "ca_certs_pem": {
+              "label": "Own CA certificate (PEM)",
+              "help": "Only needed when the directory's certificate comes from your own certification authority."
+            }
+          }
+        }
+      },
+      "ldap": {
+        "tlsWarning": "Warning: the directory server's certificate is not checked. An attacker on the network could read sign-in data or pose as the directory. Only turn the check off for a test directory.",
+        "tlsWarningEnv": "Warning: the directory server's certificate is not checked. An attacker on the network could read sign-in data or pose as the directory. The setting comes from the environment: set TIQORA_LDAP_TLS_VERIFY=true (customer directory: TIQORA_CUSTOMER_LDAP_TLS_VERIFY=true)."
+      },
+      "mapping": {
+        "fieldsHeading": "Which values fill which field?",
+        "fieldsHelp": "Enter which details from the sign-in service fill the field. The first value with content wins. Prefix with an underscore (_example) to set a fixed text.",
+        "sourcePlaceholder": "Detail from the sign-in service",
+        "field": {
+          "login": "Login name",
+          "email": "Email",
+          "first_name": "First name",
+          "last_name": "Last name",
+          "customer_id": "Customer number",
+          "mobile": "Mobile number"
+        },
+        "matchBy": "Match sign-in by",
+        "matchByOption": {
+          "login": "Login name",
+          "email": "Email"
+        },
+        "matchByHelp": "Used to find the matching user account when no link exists yet.",
+        "emailUntrustedWarning": "Warning: the email address does not have to be confirmed at the sign-in service. Anyone who can enter other people's addresses there could sign in to their accounts. Turn on \"Email address must be confirmed\" on the Connection tab, or match by login name.",
+        "entraEmailWarning": "Note: with Microsoft Entra the email address of an account can be changed and is not a safe identifier. Better match by login name and enter the allowed tenant IDs.",
+        "jit": "Create accounts automatically on first sign-in",
+        "jitHelp": "If a user is not known yet, an account is created on first sign-in. Otherwise unknown users are turned away.",
+        "allowedDomains": "Allowed email domains",
+        "allowedDomainsHelp": "Only users with an email address from these domains (e.g. example.org) automatically get an account.",
+        "noDomainWarning": "Warning: without a domain restriction anyone who can sign in at this sign-in service can have an account created, whatever their email domain. Enter your organisation's domains.",
+        "initialRoles": "Roles for new accounts (agents)",
+        "initialGroups": "Group permissions for new accounts (agents)",
+        "fixedCustomerId": "Fixed customer number for new customers",
+        "fixedCustomerIdHelp": "Used when the sign-in service does not send a customer number.",
+        "updateProfile": "Update name and email on every sign-in",
+        "previewHeading": "Preview",
+        "previewEmpty": "Start a test sign-in and choose \"Use these values for the preview\". You then see here at once what a sign-in with these values would do, including unsaved changes.",
+        "previewHelp": "This is what a sign-in with the values of the last test sign-in would do, including your unsaved changes.",
+        "previewError": "The preview could not be calculated.",
+        "previewAudience": "Preview as",
+        "samlEmailWarning": "Note: the sign-in service decides which e-mail address a user has. Only match by e-mail if users cannot change their address there themselves; otherwise match by login name."
+      },
+      "roles": {
+        "rulesHeading": "Rules",
+        "rulesHelp": "When a value from the sign-in service matches, the user gets the chosen roles and group permissions.",
+        "rulesEmpty": "No rule yet.",
+        "attribute": "Detail from the sign-in service",
+        "value": "Value",
+        "roles": "Roles",
+        "groups": "Groups",
+        "addGroup": "Add group",
+        "removeGroup": "Remove {{name}}",
+        "removeRule": "Remove rule",
+        "addRule": "Add rule",
+        "perm": {
+          "ro": "Read (ro)",
+          "move_into": "Move into (move_into)",
+          "create": "Create (create)",
+          "note": "Note (note)",
+          "owner": "Owner (owner)",
+          "priority": "Priority (priority)",
+          "rw": "All permissions (rw)"
+        },
+        "rwHint": "rw includes all permissions.",
+        "ldapGroupDn": "Member of LDAP group (DN)",
+        "syncHeading": "How are roles and groups reconciled?",
+        "sync": {
+          "managed": "Only maintain assignments made by these rules (recommended)",
+          "managedHelp": "Only assignments that a rule here created are removed. Roles and groups assigned by hand stay.",
+          "authoritative": "Like Znuny: replace all roles and groups",
+          "authoritativeHelp": "On every sign-in exactly the roles and groups from the rules apply. Everything else, including what was assigned by hand, is removed."
+        },
+        "managedHeading": "Managed assignments",
+        "managedHelp": "Roles and group permissions that were assigned by a rule.",
+        "managedEmpty": "No assignment made by a rule yet.",
+        "managedError": "The managed assignments could not be loaded.",
+        "managedAccount": "Account",
+        "managedAssignment": "Assignment",
+        "managedSince": "Since",
+        "managedRole": "Role {{name}}",
+        "managedGroup": "Group {{name}} ({{permission}})"
+      },
+      "links": {
+        "intro": "These accounts signed in through this sign-in service. When a link is removed, the account is matched again on its next sign-in.",
+        "empty": "Nobody has signed in through this sign-in service yet.",
+        "loadError": "The links could not be loaded.",
+        "removeTitle": "Remove link?",
+        "removeBody": "The link between \"{{login}}\" and this sign-in service is removed. The user account stays and is matched again on the next sign-in.",
+        "remove": "Remove link",
+        "removeError": "The link could not be removed.",
+        "account": "Account",
+        "kind": "Type",
+        "subject": "ID at the sign-in service",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "kinds": {
+          "agent": "Agent",
+          "customer": "Customer"
+        }
+      }
+    },
+    "reporting": {
+      "title": "Report data",
+      "subtitle": "State of the data that feeds the reports. Recalculate everything here when needed.",
+      "settings": "Report settings",
+      "ready": "Ready: the report data is up to date",
+      "building": "Being built",
+      "buildingPercent": "Being built ({{percent}}%)",
+      "pending": "Not built yet",
+      "asOf": "As of",
+      "lag": "Backlog",
+      "lagHint": "Ticket changes not evaluated yet",
+      "gaps": "Gaps",
+      "gapsHint": "Skipped changes that will be caught up",
+      "dirty": "Queued for recalculation",
+      "dirtyHint": "Tickets whose values are being recalculated",
+      "lastSnapshot": "Last daily snapshot",
+      "factRows": "Ticket rows",
+      "eventRows": "Event rows",
+      "rebuild": "Rebuild report data",
+      "rebuildSince": "From date (optional)",
+      "rebuildHelp": "Recalculates all report data from the tickets and their history. A date applies to tickets created on or after that day; older tickets stay unchanged. Without a date all tickets are used.",
+      "rebuildConfirm": "All report data will be recalculated. With many tickets this can take hours. Until then the reports show a notice and are not complete yet.",
+      "rebuildStart": "Rebuild",
+      "rebuildError": "The rebuild could not be started.",
+      "loadError": "The state of the report data could not be loaded.",
+      "failed": "The last build failed",
+      "queued": "A build is queued"
     },
     "deploy": {
       "title": "Deployment",
@@ -4431,12 +4978,354 @@
     "progressLabel": "Progress",
     "kinds": {
       "core": {
-        "ticket_export": "Ticket export"
-      }
+        "ticket_export": "Ticket export",
+        "report_run": "Report",
+        "report_export": "Report export",
+        "report_backfill": "Build report data"
+      },
+      "gi_mail": "Send email from a web service request"
     },
     "ticketExport": {
       "title": "Export tickets as CSV",
       "startFailed": "The export could not be started."
+    }
+  },
+  "reports": {
+    "title": "Reports",
+    "subtitle": "Insights into volume, backlog, SLA and booked time",
+    "overview": "Overview",
+    "catalogue": "Report list",
+    "allReports": "All reports",
+    "back": "Back to reports",
+    "empty": "There is no data for this period.",
+    "loading": "Building the report …",
+    "error": "The report could not be built.",
+    "other": "Others",
+    "showTable": "Show table",
+    "showChart": "Show chart",
+    "export": "Export",
+    "exportXlsx": "As Excel file (XLSX)",
+    "exportCsv": "As CSV file",
+    "exportTitle": "Report",
+    "truncated": "The table is shortened. Narrow the period or export the report.",
+    "cached": "Cached",
+    "totals": "Total",
+    "previousPeriod": "Previous period",
+    "timeRange": "Period",
+    "grain": "Time grouping",
+    "groupBy": "Split by",
+    "custom": "Custom period",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply",
+    "timeZone": "Time zone",
+    "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
+    "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
+    "factsAsOf": "As of {{time}}",
+    "timeout": "The report took too long. Narrow the period or start it as an export.",
+    "weekLabel": "Wk {{week}}",
+    "hourLabel": "{{hour}}:00",
+    "categories": {
+      "overview": "Overview",
+      "volume": "Volume",
+      "backlog": "Backlog",
+      "sla": "SLA",
+      "quality": "Quality",
+      "agents": "Agents",
+      "time": "Time booking",
+      "customers": "Customers",
+      "patterns": "Patterns"
+    },
+    "builtin": {
+      "ticket_kpis": {
+        "title": "Key figures",
+        "description": "The main figures of the last 30 days (including today): created tickets, share of breached first responses and the median first-response and solution times, measured in working time. “Closed” counts the tickets that were created in the period and have been closed since."
+      },
+      "volume": {
+        "title": "Created and closed tickets",
+        "description": "How many tickets were created and closed per week (last 12 complete weeks)."
+      },
+      "backlog_trend": {
+        "title": "Open tickets over time",
+        "description": "How many tickets were open on each of the last 30 days (including today), counted at the end of the day."
+      },
+      "open_now": {
+        "title": "Open tickets now",
+        "description": "All tickets that are open right now, by queue by default. Alternatively they can be grouped by state, priority, owner, type or service instead of by queue."
+      },
+      "agent_activity": {
+        "title": "Agent activity",
+        "description": "Replies, notes and closings per agent in the last 30 days (including today)."
+      },
+      "volume_by_channel": {
+        "title": "Tickets by channel",
+        "description": "How many tickets arrived per week through which channel (email, phone, Telegram …), last 12 complete weeks."
+      },
+      "channel_mix": {
+        "title": "Channel mix",
+        "description": "Which channels the tickets of the last 30 days (including today) came from."
+      },
+      "volume_by_queue": {
+        "title": "Tickets per queue",
+        "description": "How many tickets were created per queue in the last 30 days (including today). Alternatively they can be grouped by type, service or priority instead of by queue. “Closed” counts the tickets that were created in the period and have been closed since."
+      },
+      "backlog_by_state": {
+        "title": "Backlog by state",
+        "description": "Open tickets per day, split by state type (new, open, pending), last 30 days (including today)."
+      },
+      "backlog_aging": {
+        "title": "Age of open tickets",
+        "description": "How long the open tickets of each queue have been waiting: under 1 day, 1 to 3, 3 to 7, 7 to 30 and over 30 days."
+      },
+      "sla_compliance": {
+        "title": "SLA compliance",
+        "description": "How many tickets met their SLA times, per queue, in the last complete month, plus breached and nearly missed times."
+      },
+      "sla_times": {
+        "title": "Response and solution times",
+        "description": "Median and slowest 10 % of the first-response and solution times per week, measured in working time (last 12 complete weeks)."
+      },
+      "sla_by_customer": {
+        "title": "SLA by customer",
+        "description": "How well SLA times were met per customer (last 3 complete months): created tickets, breached times and median first-response and solution times."
+      },
+      "first_contact_resolution": {
+        "title": "First-contact resolution",
+        "description": "“Closed” counts the tickets that are closed right now. The rates are based on the tickets closed in the period (last complete month). “Resolved on first contact” means: closed, never reopened and at most one outgoing reply."
+      },
+      "reopen_trend": {
+        "title": "Reopenings over time",
+        "description": "How often closed tickets were reopened, per week (last 12 complete weeks). The time of closing decides which week counts."
+      },
+      "queue_transfers": {
+        "title": "Queue transfers",
+        "description": "From which queue to which queue tickets were moved (last 30 days, including today)."
+      },
+      "pingpong": {
+        "title": "Back and forth between queues",
+        "description": "Tickets that were moved between queues repeatedly, and how often a ticket changes queue on average (last 30 days, including today)."
+      },
+      "time_in_state": {
+        "title": "Time spent in each state",
+        "description": "How long tickets stay in a state before it changes: average, median and slowest 10 % (last 30 days, including today)."
+      },
+      "time_by_customer": {
+        "title": "Booked time per customer",
+        "description": "The time booked on tickets per customer in the last complete month, with bookings and tickets involved."
+      },
+      "time_by_queue": {
+        "title": "Booked time per queue",
+        "description": "The time booked on tickets per queue in the last complete month, with bookings and tickets involved."
+      },
+      "time_by_agent": {
+        "title": "Booked time per agent",
+        "description": "The time each agent booked in the last complete month, with bookings and tickets involved."
+      },
+      "time_by_type": {
+        "title": "Booked time per type",
+        "description": "The time booked on tickets per ticket type in the last complete month, with bookings and tickets involved."
+      },
+      "time_by_agent_month": {
+        "title": "Booked time per agent and month",
+        "description": "Booked time per agent and month for the last 12 months (including the current one). Matches the Znuny statistic “accounted time”."
+      },
+      "top_customers": {
+        "title": "Top customers",
+        "description": "The customers with the most tickets in the last 3 complete months, with solution time and booked time. “Closed” counts the tickets that were created in the period and have been closed since."
+      },
+      "created_heatmap": {
+        "title": "When tickets arrive",
+        "description": "Tickets by weekday and hour of the day (last 12 complete weeks) – shows when it is busiest."
+      }
+    },
+    "dimensions": {
+      "queue": "Queue",
+      "queue_at_create": "Queue at creation",
+      "state": "State",
+      "state_type": "State type",
+      "priority": "Priority",
+      "type": "Type",
+      "service": "Service",
+      "sla": "SLA",
+      "owner": "Owner",
+      "responsible": "Responsible",
+      "customer": "Customer",
+      "customer_user": "Contact",
+      "channel": "Channel",
+      "created": "Created",
+      "closed": "Closed",
+      "first_response": "First response",
+      "created_hour": "Hour of creation",
+      "created_weekday": "Weekday of creation",
+      "process": "Process",
+      "kind": "Event",
+      "occurred": "Time",
+      "occurred_hour": "Hour",
+      "occurred_weekday": "Weekday",
+      "actor": "Agent",
+      "from_queue": "From queue",
+      "to_queue": "To queue",
+      "from_state": "From state",
+      "to_state": "To state",
+      "from_state_type": "From state type",
+      "to_state_type": "To state type",
+      "ticket_queue": "Ticket queue",
+      "ticket_state": "Ticket state",
+      "ticket_priority": "Ticket priority",
+      "ticket_type": "Ticket type",
+      "snapshot": "Day",
+      "agent": "Agent",
+      "ticket": "Ticket",
+      "booked": "Booked",
+      "booked_weekday": "Weekday of booking",
+      "archived": "Archived",
+      "merged": "Merged",
+      "reopened": "Reopened",
+      "has_first_response": "With first response",
+      "ai_triaged": "Sorted by AI",
+      "ai_auto_replied": "Answered by AI",
+      "ai_handed_off": "Handed over to an agent"
+    },
+    "measures": {
+      "tickets": "Tickets",
+      "closed_tickets": "Closed",
+      "open_tickets": "Open",
+      "reopened_tickets": "Reopened",
+      "reopen_rate": "Reopen rate",
+      "fcr_rate": "Resolved on first contact",
+      "first_response_avg": "First response (average)",
+      "first_response_p50": "First response (median)",
+      "first_response_p90": "First response (slowest 10 %)",
+      "first_response_clock_avg": "First response, around the clock (average)",
+      "first_response_clock_p50": "First response, around the clock (median)",
+      "solution_avg": "Solution time (average)",
+      "solution_p50": "Solution time (median)",
+      "solution_p90": "Solution time (slowest 10 %)",
+      "solution_clock_avg": "Solution time, around the clock (average)",
+      "solution_clock_p50": "Solution time, around the clock (median)",
+      "response_breaches": "First response breached",
+      "response_breach_rate": "First-response breach rate",
+      "solution_breaches": "Solution time breached",
+      "solution_breach_rate": "Solution breach rate",
+      "update_breaches": "Update time breached",
+      "update_breached_tickets": "Tickets with breached update time",
+      "response_near_misses": "First response nearly missed",
+      "solution_near_misses": "Solution time nearly missed",
+      "sla_met_rate": "SLA met",
+      "accounted_time": "Booked time",
+      "agent_touches_avg": "Agents per ticket (average)",
+      "queue_moves_avg": "Queue moves per ticket (average)",
+      "pingpong_tickets": "Tickets moved back and forth",
+      "events": "Events",
+      "dwell_avg_hours": "Time in state (average)",
+      "dwell_p50_hours": "Time in state (median)",
+      "dwell_p90_hours": "Time in state (slowest 10 %)",
+      "age_0_1d": "Under 1 day",
+      "age_1_3d": "1 to 3 days",
+      "age_3_7d": "3 to 7 days",
+      "age_7_30d": "7 to 30 days",
+      "age_30d_plus": "Over 30 days",
+      "escalated": "Escalated",
+      "unassigned": "Unassigned",
+      "time_units": "Booked time",
+      "bookings": "Bookings"
+    },
+    "parameters": {
+      "queues": "Queues"
+    },
+    "values": {
+      "state_type": {
+        "new": "New",
+        "open": "Open",
+        "closed": "Closed",
+        "pending reminder": "Pending reminder",
+        "pending auto": "Pending auto",
+        "removed": "Removed",
+        "merged": "Merged"
+      },
+      "channel": {
+        "email": "Email",
+        "phone": "Phone",
+        "internal": "Internal",
+        "telegram": "Telegram",
+        "webchat": "Web chat",
+        "sms": "SMS",
+        "whatsapp": "WhatsApp"
+      },
+      "event_kind": {
+        "create": "Created",
+        "state": "State change",
+        "close": "Closed",
+        "reopen": "Reopened",
+        "queue": "Queue change",
+        "owner": "Owner change",
+        "responsible": "Responsible change",
+        "priority": "Priority change",
+        "type": "Type change",
+        "service": "Service change",
+        "sla": "SLA change",
+        "merge": "Merged",
+        "process_activity": "Process step",
+        "reply": "Reply",
+        "note": "Note",
+        "customer_message": "Customer message"
+      },
+      "weekday": {
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday",
+        "7": "Sunday"
+      }
+    },
+    "presets": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "last7Days": "Last 7 days",
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "thisQuarter": "This quarter",
+      "lastQuarter": "Last quarter",
+      "thisYear": "This year",
+      "lastYear": "Last year",
+      "last30Days": "Last 30 days",
+      "reset": "Reset"
+    },
+    "grains": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "quarter": "Quarter",
+      "year": "Year"
+    },
+    "chart": {
+      "noData": "No data",
+      "legend": "Legend",
+      "deltaUp": "Increase",
+      "deltaDown": "Decrease",
+      "deltaFlat": "Unchanged",
+      "ofTotal": "{{percent}} of total",
+      "total": "Total"
+    },
+    "openReport": "Open report",
+    "retry": "Try again",
+    "exportFailed": "The export could not be started.",
+    "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "previousPeriodValue": "Previous period: {{value}}",
+    "info": {
+      "timeRange": "Period: {{range}}",
+      "timeZone": "Time zone: {{zone}}",
+      "queues": "Queues: {{queues}}"
+    },
+    "agentTable": {
+      "agent": "Agent",
+      "open": "Open",
+      "replies": "Replies",
+      "notes": "Notes",
+      "closed": "Closed"
     }
   }
 }

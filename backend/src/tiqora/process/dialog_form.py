@@ -37,7 +37,6 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, ServiceCustomerUser, ServiceSla, Sla
 from tiqora.db.legacy.ticket import Ticket
@@ -75,6 +74,7 @@ from tiqora.process.schemas import (
     ProcessDialogOptionOut,
 )
 from tiqora.process.ticket_state import get_ticket_process_candidates
+from tiqora.util.perl import perl_truthy
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)

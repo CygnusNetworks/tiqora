@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+import redis.asyncio as redis
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, exists, func, select
 
-from tiqora.api.deps import AppSettings, DbSession
+from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.deps import AdminUser
 from tiqora.api.v1.admin.pagination import ListParamsDep, Page
 from tiqora.api.v1.admin.schemas import (
@@ -16,6 +19,7 @@ from tiqora.api.v1.admin.schemas import (
 )
 from tiqora.db.legacy.user import PermissionGroups, Users
 from tiqora.db.tiqora.models import TiqoraUserAuthConfig, TiqoraUserPasskey, TiqoraUserTotp
+from tiqora.domain.auth import SessionStore
 from tiqora.domain.auth_config import (
     AuthConfigService,
     get_enforce_group_ids,
@@ -199,13 +203,20 @@ async def reset_2fa(
     admin: AdminUser,
     session: DbSession,
     settings: AppSettings,
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
 ) -> None:
-    """Admin force-disable: delete TOTP enrollment and all passkeys for the agent."""
+    """Admin force-disable: delete TOTP enrollment and all passkeys for the agent.
+
+    Also clears a pending TOTP enrollment and revokes every session of the agent
+    (pending ones included): with no factor left, a surviving session could
+    attach one of its own without a step-up.
+    """
     _ = admin
     user = await session.get(Users, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    totp = TOTPService(session, settings)
+    totp = TOTPService(session, settings, redis_client)
     await totp.force_disable(user_id)
     await session.execute(delete(TiqoraUserPasskey).where(TiqoraUserPasskey.user_id == user_id))
     await session.commit()
+    await SessionStore(redis_client, settings).revoke_user_sessions(user_id)

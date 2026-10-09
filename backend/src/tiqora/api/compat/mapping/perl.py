@@ -12,20 +12,10 @@ from typing import Any
 import regex
 
 from tiqora.api.compat.mapping import MappingConfigError, MappingError
+from tiqora.util.perl import perl_truthy as perl_truthy  # re-export (single implementation)
 from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS, PerlRegexError
 from tiqora.util.perl_regex import compile_perl_regex as _compile_perl_regex
 from tiqora.znuny.perl_format import perl_num_str
-
-
-def perl_truthy(value: Any) -> bool:
-    """Perl boolean context: undef, "", "0", 0, 0.0 are false; references (dict/list) are true."""
-    if value is None:
-        return False
-    if isinstance(value, str):
-        return value not in ("", "0")
-    if isinstance(value, (int, float)):
-        return value != 0
-    return True
 
 
 def perl_is_string(value: Any) -> bool:

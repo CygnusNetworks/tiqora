@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import re
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import func, or_, select
+import redis.asyncio as redis
+import structlog
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import delete, func, or_, select
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import AppSettings, DbSession, get_redis
 from tiqora.api.v1.admin.common import (
     CUSTOMER_COMPANY_CACHE_TYPES,
     CUSTOMER_USER_CACHE_TYPES,
@@ -39,9 +42,16 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.api.v1.customer_sort import order_customer_users
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUserCustomer
 from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
+from tiqora.db.tiqora.models import TiqoraCustomerPasskey
+from tiqora.domain import user_provisioning as provisioning
+from tiqora.domain.customer_auth import CustomerSessionStore, revoke_customer_redis_sessions
+from tiqora.domain.totp import TOTPService
+from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.znuny.password import hash_password
+from tiqora.znuny.sessions import delete_customer_sessions
 
 router = APIRouter(tags=["admin:customers"])
+logger = structlog.get_logger(__name__)
 
 # Columns searched by both the plain substring search and the regex search.
 CUSTOMER_USER_SEARCH_COLUMNS = (
@@ -141,8 +151,10 @@ async def list_customer_users(
 @router.patch("/customer-users/bulk", response_model=CustomerUserBulkUpdateResult)
 async def bulk_update_customer_users(
     body: CustomerUserBulkUpdate,
+    request: Request,
     admin: AdminUser,
     session: DbSession,
+    settings: AppSettings,
 ) -> CustomerUserBulkUpdateResult:
     """Apply ``valid_id`` and/or ``customer_id`` to many customer_user rows.
 
@@ -185,7 +197,13 @@ async def bulk_update_customer_users(
 
     await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
-    return CustomerUserBulkUpdateResult(updated=len(rows))
+    updated = len(rows)
+    if body.valid_id is not None and body.valid_id != 1:
+        # disabled accounts: their sessions end (Znuny rows, then Redis)
+        await _revoke_customer_sessions(
+            session, request, settings, list(rows), reason="account_disabled"
+        )
+    return CustomerUserBulkUpdateResult(updated=updated)
 
 
 @router.get("/customer-users/{customer_user_id}", response_model=CustomerUserAdminOut)
@@ -205,38 +223,87 @@ async def get_customer_user(
 async def create_customer_user(
     body: CustomerUserAdminCreate, admin: AdminUser, session: DbSession
 ) -> CustomerUser:
-    ts = now()
-    data = body.model_dump(exclude={"password"})
-    cu = CustomerUser(
-        **data,
-        pw=hash_password(body.password) if body.password else None,
-        create_time=ts,
-        create_by=admin.id,
-        change_time=ts,
-        change_by=admin.id,
-    )
-    session.add(cu)
-    await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
+    try:
+        cu = await provisioning.create_customer_user(
+            session,
+            login=body.login,
+            email=body.email,
+            customer_id=body.customer_id,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            pw_hash=hash_password(body.password) if body.password else None,
+            actor_id=admin.id,
+            valid_id=body.valid_id,
+            title=body.title,
+            phone=body.phone,
+            fax=body.fax,
+            mobile=body.mobile,
+            street=body.street,
+            zip=body.zip,
+            city=body.city,
+            country=body.country,
+            comments=body.comments,
+        )
+    except provisioning.ProvisioningError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if exc.code == "email_in_use"
+                else status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=str(exc),
+        ) from exc
     await session.commit()
     await session.refresh(cu)
     return cu
+
+
+async def _revoke_customer_sessions(
+    session: DbSession,
+    request: Request,
+    settings: AppSettings,
+    customers: list[CustomerUser],
+    *,
+    reason: str,
+) -> None:
+    """End every session of *customers*: Znuny ``sessions`` rows first (own try +
+    rollback), then Redis (portal sessions and GI customer tokens) - like the agent path."""
+    logins = [cu.login for cu in customers]
+    try:
+        for login in logins:
+            await delete_customer_sessions(session, login)
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001 — the account change already committed
+        await session.rollback()
+        for cu in customers:
+            await session.refresh(cu)  # rollback expires loaded attributes
+        logger.warning("admin.customers.znuny_session_revoke_failed", error=str(exc))
+    try:
+        revoked = await revoke_customer_redis_sessions(await get_redis(request), settings, logins)
+        logger.info("admin.customers.sessions_revoked", revoked=revoked, reason=reason)
+    except Exception as exc:  # noqa: BLE001 — the account change already committed
+        logger.warning("admin.customers.session_revoke_failed", error=str(exc))
 
 
 @router.patch("/customer-users/{customer_user_id}", response_model=CustomerUserAdminOut)
 async def update_customer_user(
     customer_user_id: int,
     body: CustomerUserAdminUpdate,
+    request: Request,
     admin: AdminUser,
     session: DbSession,
+    settings: AppSettings,
 ) -> CustomerUser:
     cu = await session.get(CustomerUser, customer_user_id)
     if cu is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
     data = body.model_dump(exclude_unset=True)
+    password_changed = False
     if "password" in data:
         password = data.pop("password")
         if password:
             cu.pw = hash_password(password)
+            password_changed = True
     for field, value in data.items():
         setattr(cu, field, value)
     cu.change_time = now()
@@ -244,12 +311,21 @@ async def update_customer_user(
     await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
     await session.refresh(cu)
+    # A password reset (incident response) or a disabled account ends every session.
+    if password_changed:
+        await _revoke_customer_sessions(session, request, settings, [cu], reason="password_changed")
+    elif "valid_id" in data and cu.valid_id != 1:
+        await _revoke_customer_sessions(session, request, settings, [cu], reason="account_disabled")
     return cu
 
 
 @router.delete("/customer-users/{customer_user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_customer_user(
-    customer_user_id: int, admin: AdminUser, session: DbSession
+    customer_user_id: int,
+    request: Request,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
 ) -> None:
     cu = await session.get(CustomerUser, customer_user_id)
     if cu is None:
@@ -259,6 +335,38 @@ async def deactivate_customer_user(
     cu.change_by = admin.id
     await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
+    await _revoke_customer_sessions(session, request, settings, [cu], reason="account_disabled")
+
+
+@router.post("/customer-users/{customer_user_id}/reset-2fa", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_customer_user_2fa(
+    customer_user_id: int,
+    admin: AdminUser,
+    session: DbSession,
+    settings: AppSettings,
+    redis_client: Annotated[redis.Redis, Depends(get_redis)],
+) -> None:
+    """Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+
+    Also clears a pending TOTP enrollment and revokes every session of the customer
+    (pending ones included): with no factor left, a surviving session could attach
+    one of its own without a step-up.
+
+    Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
+    no code needed); the log line is the audit trail.
+    """
+    cu = await session.get(CustomerUser, customer_user_id)
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
+    await TOTPService(session, settings, redis_client, subject=CUSTOMER_2FA).force_disable(
+        customer_user_id
+    )
+    await session.execute(
+        delete(TiqoraCustomerPasskey).where(TiqoraCustomerPasskey.user_id == customer_user_id)
+    )
+    await session.commit()
+    await CustomerSessionStore(redis_client, settings).revoke_customer_sessions(customer_user_id)
+    logger.info("customer_2fa_reset", customer_user_id=customer_user_id, admin_id=admin.id)
 
 
 @router.get("/customer-companies", response_model=Page[CustomerCompanyOut])

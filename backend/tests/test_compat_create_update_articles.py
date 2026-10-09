@@ -649,7 +649,8 @@ async def test_force_and_exclude_user_ids_are_validated_but_not_forwarded(sync_u
         "SELECT a_to FROM article_data_mime WHERE article_id = :a",
         a=ok["ArticleID"],
     )
-    assert to_line[0][0] == "queue@example.org"
+    # without ArticleSend To is the queue name, whatever the request says (TicketCreate.pm:1557)
+    assert to_line[0][0] == "GI7630Queue"
 
     bad_user = await _call(
         sync_url,
@@ -1014,7 +1015,8 @@ async def test_owner_without_lock_locks_the_new_ticket(sync_url: str) -> None:
         },
     )
     assert _lock(closed_owned["TicketID"]) == 2
-    # ... but a requested lock on a closed ticket is dropped and stays dropped
+    # ... and a requested lock on a closed ticket is set and then unlocked again, with both
+    # history rows like Znuny (TicketCreate.pm:1417-1426 TicketLockSet, 1445-1453 forced unlock)
     closed_locked = await _call(
         sync_url,
         "create",
@@ -1024,7 +1026,7 @@ async def test_owner_without_lock_locks_the_new_ticket(sync_url: str) -> None:
         },
     )
     assert _lock(closed_locked["TicketID"]) == 1
-    assert _lock_history(closed_locked["TicketID"]) == ["Unlock"]
+    assert _lock_history(closed_locked["TicketID"]) == ["Lock", "Unlock"]
 
 
 @pytest.mark.db

@@ -879,26 +879,9 @@ async def add_article(
         ).first()
         reset_unlock = prev is not None and prev[0] == "agent"
     if reset_unlock:
-        current_timeout = (
-            await session.execute(
-                text("SELECT timeout FROM ticket WHERE id = :tid"), {"tid": ticket_id}
-            )
-        ).scalar_one()
-        if int(current_timeout or 0) != incoming_time:
-            await session.execute(
-                text(
-                    "UPDATE ticket SET timeout = :to, change_time = current_timestamp,"
-                    " change_by = :uid WHERE id = :tid"
-                ),
-                {"to": incoming_time, "uid": user_id, "tid": ticket_id},
-            )
-            await history_add(
-                session,
-                ticket_id=ticket_id,
-                history_type=TYPE_MISC,
-                name="Reset of unlock time.",
-                user_id=user_id,
-            )
+        await ticket_unlock_timeout_update(
+            session, ticket_id=ticket_id, unlock_timeout=incoming_time, user_id=user_id
+        )
 
     # Legacy per-article notification events (MIMEBase.pm). Exactly one of
     # them fires, chosen by history type -- and NotificationNewTicket only for
@@ -924,7 +907,10 @@ async def add_article(
         self_notify = str(await sysconfig.get("AgentSelfNotifyOnAction")) in {"1", "True"}
         # MIMEBase.pm: SkipRecipients = Exclude + ExcludeMute; Recipients = the
         # forced agents (the worker still applies skip/valid/permission checks).
-        skip_ids: list[int] = [] if self_notify else [user_id]
+        # NotificationEvent.pm:1078-1085: the acting agent is skipped unless it is one of
+        # the pre-calculated (forced) recipients.
+        forced = {int(uid) for uid in article.force_notification_user_ids}
+        skip_ids: list[int] = [] if self_notify or int(user_id) in forced else [user_id]
         for uid in (
             *article.exclude_notification_user_ids,
             *article.exclude_mute_notification_user_ids,
@@ -1715,6 +1701,9 @@ async def assign_owner(
     )
     if new_lock_id != current_lock_id:
         await add_lock(session, ticket_id=ticket_id, lock="lock", user_id=user_id)
+        await ticket_unlock_timeout_update(
+            session, ticket_id=ticket_id, unlock_timeout=int(time.time()), user_id=user_id
+        )
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_legacy_notification(
@@ -1765,6 +1754,40 @@ async def assign_responsible(
     )
 
 
+async def ticket_unlock_timeout_update(
+    session: AsyncSession, *, ticket_id: int, unlock_timeout: int, user_id: int
+) -> None:
+    """Port of ``Ticket.pm::TicketUnlockTimeoutUpdate``.
+
+    Silent no-op when ``ticket.timeout`` already equals ``unlock_timeout``; otherwise
+    writes it (bumping change_time/change_by) plus a Misc "Reset of unlock time." row.
+    """
+    current_timeout = (
+        await session.execute(
+            text("SELECT timeout FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+        )
+    ).scalar_one()
+    if int(current_timeout or 0) == unlock_timeout:
+        return
+    await session.execute(
+        text(
+            "UPDATE ticket SET timeout = :to, change_time = current_timestamp,"
+            " change_by = :uid WHERE id = :tid"
+        ),
+        {"to": unlock_timeout, "uid": user_id, "tid": ticket_id},
+    )
+    await history_add(
+        session,
+        ticket_id=ticket_id,
+        history_type=TYPE_MISC,
+        name="Reset of unlock time.",
+        user_id=user_id,
+    )
+    # Ticket.pm:1960 clears the ticket cache and fires TicketUnlockTimeoutUpdate
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "TicketUnlockTimeoutUpdate", ticket_id)
+
+
 async def lock_ticket(
     session: AsyncSession,
     *,
@@ -1788,9 +1811,54 @@ async def lock_ticket(
         {"uid": user_id, "tid": ticket_id},
     )
     await add_lock(session, ticket_id=ticket_id, lock="lock", user_id=user_id)
+    # TicketLockSet (Lock => 'lock') restarts the unlock timeout at the current epoch second.
+    await ticket_unlock_timeout_update(
+        session, ticket_id=ticket_id, unlock_timeout=int(time.time()), user_id=user_id
+    )
     await ticket_accelerator_update(session, ticket_id, sysconfig)
     await invalidate_ticket_cache(session, ticket_id)
     await _emit_event(session, "TicketLockUpdate", ticket_id, {"lock": "lock"})
+
+
+async def set_ticket_lock(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    lock_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+) -> None:
+    """``TicketLockSet`` for an arbitrary lock type (e.g. tmp_lock); no-op if unchanged.
+
+    History type follows Ticket.pm:4226-4241 (Lock / Unlock, else Misc) with ``%%<name>``.
+    """
+    if lock_id == 1:
+        await unlock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        return
+    if lock_id == 2:
+        await lock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        return
+    t = await _ticket_must_exist(session, ticket_id)
+    if int(t["ticket_lock_id"]) == lock_id:
+        return
+    name_row = (
+        await session.execute(
+            text("SELECT name FROM ticket_lock_type WHERE id = :i"), {"i": lock_id}
+        )
+    ).first()
+    if name_row is None:
+        raise InvalidInput(f"Unknown ticket lock id: {lock_id!r}")
+    await session.execute(
+        text(
+            "UPDATE ticket SET ticket_lock_id = :l, change_time = current_timestamp,"
+            " change_by = :uid WHERE id = :tid"
+        ),
+        {"l": lock_id, "uid": user_id, "tid": ticket_id},
+    )
+    await add_lock(session, ticket_id=ticket_id, lock=str(name_row[0]), user_id=user_id)
+    await ticket_accelerator_update(session, ticket_id, sysconfig)
+    await invalidate_ticket_cache(session, ticket_id)
+    await _emit_event(session, "TicketLockUpdate", ticket_id, {"lock": str(name_row[0])})
 
 
 async def unlock_ticket(

@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
+    CHAR,
     BigInteger,
     Boolean,
+    Date,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     LargeBinary,
+    Numeric,
+    SmallInteger,
     String,
     Text,
     UniqueConstraint,
@@ -864,6 +870,12 @@ class TiqoraJob(TiqoraBase):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # claims so far; a retried / requeued job keeps counting
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # a queued job is not claimed before this moment (retry backoff)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # set by the handler right before an irreversible step (JobContext.checkpoint)
+    checkpoint: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     __table_args__ = (
         Index("ix_tiqora_job_status_created", "status", "created_at"),
@@ -927,3 +939,360 @@ class TiqoraAclRevision(TiqoraBase):
     deployed_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (Index("ix_tiqora_acl_revision_checksum", "checksum"),)
+
+
+#: SAML IdP metadata documents can exceed 64 KiB: ``MEDIUMTEXT`` on MariaDB.
+IDENTITY_METADATA_TEXT = Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")
+
+
+class TiqoraIdentityProvider(TiqoraBase):
+    """A configured sign-in provider (OIDC, SAML or LDAP). Timestamps are app-written naive UTC.
+
+    ``config`` holds the non-secret fields of the kind's config model as JSON;
+    secrets live encrypted in ``secrets_enc``.
+    """
+
+    __tablename__ = "tiqora_identity_provider"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    audience: Mapped[str] = mapped_column(String(16), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    sort: Mapped[int] = mapped_column(Integer, nullable=False)
+    button_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    button_icon: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    preset: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    #: JSON; may carry pasted SAML IdP metadata (MEDIUMTEXT on MariaDB).
+    config: Mapped[str] = mapped_column(IDENTITY_METADATA_TEXT, nullable=False)
+    secrets_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    match_by: Mapped[str] = mapped_column(String(16), nullable=False)
+    require_sso_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    attribute_map: Mapped[str] = mapped_column(Text, nullable=False)
+    jit_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    jit_defaults: Mapped[str] = mapped_column(Text, nullable=False)
+    role_rules: Mapped[str] = mapped_column(Text, nullable=False)
+    sync_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    metadata_xml: Mapped[str | None] = mapped_column(IDENTITY_METADATA_TEXT, nullable=True)
+    metadata_fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    metadata_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    create_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    create_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    change_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    change_time: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_tiqora_identity_provider_slug"),
+        Index("ix_tiqora_identity_provider_enabled", "enabled", "sort"),
+    )
+
+
+class TiqoraIdentityLink(TiqoraBase):
+    """Binds an IdP subject to a local account. Compared by ``subject_hash`` (sha256 hex),
+    never by the collated ``subject`` column; ``user_id`` is a soft reference."""
+
+    __tablename__ = "tiqora_identity_link"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(
+            "tiqora_identity_provider.id",
+            ondelete="CASCADE",
+            name="fk_tiqora_identity_link_provider",
+        ),
+        nullable=False,
+    )
+    user_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    subject_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    subject: Mapped[str] = mapped_column(String(512), nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_login: Mapped[str] = mapped_column(String(200), nullable=False)
+    first_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_id", "user_kind", "subject_hash", name="uq_tiqora_identity_link_subject"
+        ),
+        Index("ix_tiqora_identity_link_user", "user_kind", "user_id"),
+    )
+
+
+class TiqoraIdentityManagedAssignment(TiqoraBase):
+    """A role/group assignment created by a provider's role rule (so sync may remove it).
+
+    Agents only (no ``user_kind``): write through ``user_provisioning.record_managed_assignment``.
+    """
+
+    __tablename__ = "tiqora_identity_managed_assignment"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    provider_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey(
+            "tiqora_identity_provider.id",
+            ondelete="CASCADE",
+            name="fk_tiqora_identity_managed_provider",
+        ),
+        nullable=False,
+    )
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    target_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    permission_key: Mapped[str] = mapped_column(String(20), nullable=False)
+    created: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "provider_id",
+            "user_id",
+            "kind",
+            "target_id",
+            "permission_key",
+            name="uq_tiqora_identity_managed",
+        ),
+        Index("ix_tiqora_identity_managed_user", "user_id"),
+    )
+
+
+class TiqoraCustomerTotp(TiqoraBase):
+    """Per-customer TOTP 2FA enrollment (customer portal).
+
+    Same shape as :class:`TiqoraUserTotp`; the database column is
+    ``customer_user_id`` (``customer_user.id`` -- a different id space than
+    ``users.id``) while the Python attribute stays ``user_id`` so
+    ``TOTPService`` works on both models unchanged.
+    """
+
+    __tablename__ = "tiqora_customer_totp"
+
+    user_id: Mapped[int] = mapped_column(
+        "customer_user_id", Integer, primary_key=True, autoincrement=False, nullable=False
+    )
+    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class TiqoraCustomerPasskey(TiqoraBase):
+    """Per-customer WebAuthn passkey credential (portal second factor)."""
+
+    __tablename__ = "tiqora_customer_passkey"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    user_id: Mapped[int] = mapped_column("customer_user_id", Integer, nullable=False)
+    credential_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sign_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    transports: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aaguid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, default="Passkey")
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (Index("ix_tiqora_customer_passkey_user", "customer_user_id"),)
+
+
+class TiqoraReportTicketFact(TiqoraBase):
+    """One row per ticket, fully recomputed whenever the ticket is touched.
+
+    ``ticket_id`` mirrors ``ticket.id`` and must never be generated. Datetimes
+    copied from Znuny stay as stored; ``built_at`` is app-written naive UTC.
+    """
+
+    __tablename__ = "tiqora_report_ticket_fact"
+
+    ticket_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    tn: Mapped[str] = mapped_column(String(50), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    queue_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    queue_id_at_create: Mapped[int] = mapped_column(Integer, nullable=False)
+    state_id: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    state_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    priority_id: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    type_id: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    service_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sla_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    owner_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    responsible_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    customer_id: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    customer_user: Mapped[str | None] = mapped_column(String(250), nullable=True)
+    channel: Mapped[str] = mapped_column(String(30), nullable=False)
+    archived: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    merged: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    first_response_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    first_response_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_response_working_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_response_target_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    first_response_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    first_response_breached: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    first_closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    solution_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    solution_working_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    solution_target_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    solution_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    solution_breached: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    update_target_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    update_breach_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    calendar_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    close_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    reopen_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    queue_move_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    queue_pingpong: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    owner_change_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    article_in_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    article_out_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    note_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    agent_touch_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    accounted_time: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal(0), server_default="0"
+    )
+    ai_triaged: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    ai_triage_queue_applied: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    ai_auto_replied: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    ai_draft_used: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    #: "currently handed off" (the escalation marker is cleared again on resume)
+    ai_handed_off: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    process_entity_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    last_event_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_history_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    fact_version: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    built_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tiqora_report_fact_queue_created", "queue_id", "created_at"),
+        Index("ix_tiqora_report_fact_created", "created_at"),
+        Index("ix_tiqora_report_fact_closed", "closed_at"),
+        Index("ix_tiqora_report_fact_customer_created", "customer_id", "created_at"),
+        Index("ix_tiqora_report_fact_owner", "owner_id"),
+        Index("ix_tiqora_report_fact_state_type", "state_type"),
+        Index("ix_tiqora_report_fact_last_event", "last_event_at"),
+        Index("ix_tiqora_report_fact_version", "fact_version"),
+    )
+
+
+class TiqoraReportTicketEvent(TiqoraBase):
+    """Derived ticket event; deleted and re-inserted together with the fact."""
+
+    __tablename__ = "tiqora_report_ticket_event"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    history_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    article_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    actor_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    from_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    to_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    from_value: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    to_value: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    from_duration_seconds: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    queue_id: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tiqora_report_event_ticket", "ticket_id"),
+        Index("ix_tiqora_report_event_kind_time", "kind", "occurred_at"),
+        Index("ix_tiqora_report_event_actor_time", "actor_user_id", "occurred_at"),
+        Index("ix_tiqora_report_event_queue_time", "queue_id", "occurred_at"),
+    )
+
+
+class TiqoraReportDailySnapshot(TiqoraBase):
+    """End-of-day stock per queue / state type / priority in the reporting zone."""
+
+    __tablename__ = "tiqora_report_daily_snapshot"
+
+    snapshot_date: Mapped[date] = mapped_column(Date, primary_key=True, autoincrement=False)
+    queue_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    state_type: Mapped[str] = mapped_column(String(30), primary_key=True)
+    priority_id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    open_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_0_1d: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_1_3d: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_3_7d: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_7_30d: Mapped[int] = mapped_column(Integer, nullable=False)
+    age_30d_plus: Mapped[int] = mapped_column(Integer, nullable=False)
+    built_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    __table_args__ = (Index("ix_tiqora_report_snapshot_queue_date", "queue_id", "snapshot_date"),)
+
+
+class TiqoraReportState(TiqoraBase):
+    """Single row (``name = "facts"``): fact builder watermark, gaps and backfill cursor."""
+
+    __tablename__ = "tiqora_report_state"
+
+    name: Mapped[str] = mapped_column(String(50), primary_key=True)
+    last_history_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    #: JSON ``[[history_id, first_seen_epoch], ...]`` — thousands of gaps exceed ``TEXT``.
+    gap_ids: Mapped[str | None] = mapped_column(MEDIUM_TEXT_VARIANT, nullable=True)
+    last_tick_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_orphan_sweep_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    backfill_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
+    backfill_job_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    backfill_start_ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    backfill_cursor_ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    backfill_target_ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    backfill_since: Mapped[date | None] = mapped_column(Date, nullable=True)
+    backfill_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: uuid of the run that owns the cursor; a writer of a replaced run must not touch the state
+    backfill_run_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    backfill_finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_snapshot_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    snapshot_time_zone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class TiqoraReportDirtyTicket(TiqoraBase):
+    """Tickets whose facts must be rebuilt without a new history row."""
+
+    __tablename__ = "tiqora_report_dirty_ticket"
+
+    ticket_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    # Microseconds on MariaDB too: ``clear_dirty`` compares against a taken-at time and
+    # whole-second values would let it delete a mark made in the same second.
+    queued_at: Mapped[datetime] = mapped_column(
+        DateTime().with_variant(mysql.DATETIME(fsp=6), "mysql", "mariadb"), nullable=False
+    )

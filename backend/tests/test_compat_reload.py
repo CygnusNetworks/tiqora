@@ -56,6 +56,12 @@ _SNAPSHOTS: dict[str, dict[str, int]] = {}
 def _seed_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
     return (
         (f"DELETE FROM gi_webservice_config WHERE id = {WS_ID}", {}),
+        (
+            "DELETE FROM sessions WHERE session_id IN (SELECT session_id FROM"
+            " (SELECT session_id FROM sessions WHERE data_key = 'UserLogin'"
+            " AND data_value = 'hot.agent') s)",
+            {},
+        ),
         (f"DELETE FROM users WHERE id = {AGENT_ID}", {}),
     )
 
@@ -505,3 +511,28 @@ async def test_message_burst_is_coalesced_into_one_forced_reload() -> None:
         stop.set()
         await asyncio.wait_for(task, 2)
     assert app.calls.count(True) == 1
+
+
+async def test_subscribe_cancelled_midway_closes_the_candidate_and_reraises() -> None:
+    """A BaseException (cancellation during shutdown) must not leak the pooled pubsub."""
+    from types import SimpleNamespace
+
+    from tiqora.api.compat.reload import _subscribe
+
+    class _Pubsub:
+        closed = False
+
+        async def subscribe(self, channel: str) -> None:
+            raise asyncio.CancelledError
+
+        async def unsubscribe(self, channel: str) -> None:
+            return None
+
+        async def aclose(self) -> None:
+            self.closed = True
+
+    candidate = _Pubsub()
+    app = SimpleNamespace(state=SimpleNamespace(redis=SimpleNamespace(pubsub=lambda: candidate)))
+    with pytest.raises(asyncio.CancelledError):
+        await _subscribe(app)
+    assert candidate.closed is True

@@ -75,7 +75,7 @@ async function renderShell(initialEntry = "/agent") {
     "/agent/queues",
     "/agent/kb",
     "/agent/calendar",
-    "/agent/stats",
+    "/agent/reports",
     "/agent/search",
     "/agent/customers",
   ];
@@ -139,6 +139,8 @@ describe("AgentShell sidebar", () => {
     expect(screen.getByTestId("agent-nav-kb")).toBeInTheDocument();
     expect(screen.getByTestId("agent-nav-calendar")).toBeInTheDocument();
     expect(screen.getByTestId("agent-nav-stats")).toBeInTheDocument();
+    // "Berichte" opens the reports page (the old /agent/stats only redirects there).
+    expect(screen.getByTestId("agent-nav-stats")).toHaveAttribute("href", "/agent/reports");
     expect(screen.getByTestId("sidebar-group-workspace-toggle")).toHaveAttribute(
       "aria-expanded",
       "true",

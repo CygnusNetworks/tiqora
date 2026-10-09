@@ -57,6 +57,50 @@ Default peer is **Znuny 6.5.22** (`GOLDEN_PEER=znuny-6.5`). Further peers
 (6.0–7.3) are selected via `GOLDEN_PEER` once the matching release tree is
 present under the repo root (see `peers.yaml`).
 
+## SAML tests (`saml` marker) and identity suites
+
+SAML tests (`-m saml`, e.g. `test_identity_saml_*`, the logout and portal SSO modules) need the
+`saml` extra (pysaml2) **and** the `xmlsec1` binary. Install both locally:
+
+```sh
+brew install libxmlsec1            # macOS; Debian/Ubuntu: apt-get install xmlsec1
+cd backend && uv sync --extra dev --extra crypto --extra saml
+```
+
+Without them the modules skip. CI (`.github/workflows/ci.yml`, nightly) installs `xmlsec1` and the extra and sets
+`TIQORA_REQUIRE_SAML_TESTS=1`, which turns a missing pysaml2/`xmlsec1` into a hard failure so the
+security corpus (signature stripping, wrong Recipient, replay, SHA-1 rejection/opt-in, ...) cannot
+silently vanish:
+
+```sh
+cd backend
+TIQORA_STRICT_DB_LEAKS=1 TIQORA_REQUIRE_SAML_TESTS=1 uv run python -m pytest -q
+```
+
+The `env OIDC/LDAP unchanged` tests (`test_env_oidc_unchanged_*`, `test_env_ldap_login_unchanged`)
+are the production safety net: re-run them after any change to `identity/sso_routes.py`,
+`identity/login.py` or `api/v1/auth.py`. The JIT account shape is additionally compared with real
+Znuny in `tests/golden/test_identity_jit.py` (golden suite, manual: `GOLDEN=1 just golden-run`).
+
+## Optional: Keycloak round trip (OIDC + SAML)
+
+`backend/tests/test_identity_keycloak.py` (marker `keycloak`) starts a real Keycloak
+(`quay.io/keycloak/keycloak:26.0.7`, `start-dev`) via testcontainers, creates a realm with a
+confidential OIDC client, a SAML client (imported from Tiqora's own SP metadata, RSA-SHA256) and the
+user `kc.anna` in group `support`, and drives the browser leg with `httpx`. It asserts a JIT agent
+session with the role from the `groups` rule and SP-initiated logout ending at `/login?logged_out=1`
+for both protocols. Provider defaults stay strict (id_token checked against discovery issuer + JWKS,
+signed assertions, SHA-1 rejected). Opt-in, not part of CI; needs Docker, pysaml2 + `xmlsec1`:
+
+```sh
+cd backend
+TIQORA_KEYCLOAK_TESTS=1 uv run python -m pytest tests/test_identity_keycloak.py -q -m keycloak   # ~1 min
+```
+
+Without `TIQORA_KEYCLOAK_TESTS=1` the module is skipped. Tiqora's SSRF guard always blocks loopback,
+so the test reaches Keycloak as `keycloak.test` (resolver patched to a private address,
+`allow_private_network=True`, connect target redirected to the published container port).
+
 ## What gets validated
 
 | Area | Test file |

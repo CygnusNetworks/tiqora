@@ -8,7 +8,9 @@ import {
 import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage } from "@/routes/agent/DashboardPage";
-import { StatsPage } from "@/routes/agent/StatsPage";
+import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
+import { ReportViewPage } from "@/routes/agent/ReportViewPage";
+import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
@@ -65,6 +67,7 @@ import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
 import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
 import { KbArticlePage } from "@/routes/portal/KbArticlePage";
 import { PreferencesPage as PortalPreferencesPage } from "@/routes/portal/PreferencesPage";
+import { SecurityPage as PortalSecurityPage } from "@/routes/portal/SecurityPage";
 import { AdminShell } from "@/components/layout/AdminShell";
 import { RequireAdmin } from "@/auth/RequireAdmin";
 import { AdminHomePage } from "@/routes/admin/AdminHomePage";
@@ -106,6 +109,7 @@ import { MailLogPage } from "@/routes/admin/MailLogPage";
 import { SubjectConfigPage } from "@/routes/admin/SubjectConfigPage";
 import { SettingsSectionPage } from "@/routes/admin/SettingsSectionPage";
 import { DaemonsPage } from "@/routes/admin/DaemonsPage";
+import { ReportingAdminPage } from "@/routes/admin/ReportingAdminPage";
 import { SystemInfoPage } from "@/routes/admin/SystemInfoPage";
 import { PostmasterFiltersPage } from "@/routes/admin/PostmasterFiltersPage";
 import { PostmasterFilterDetailPage } from "@/routes/admin/PostmasterFilterDetailPage";
@@ -120,6 +124,11 @@ import { QueueCustomerLinksPage } from "@/routes/admin/QueueCustomerLinksPage";
 import { CustomerFieldsPage } from "@/routes/admin/CustomerFieldsPage";
 import { ApiKeysPage } from "@/routes/admin/ApiKeysPage";
 import { AuthConfigPage } from "@/routes/admin/AuthConfigPage";
+import { IdentityProvidersPage } from "@/routes/admin/IdentityProvidersPage";
+import {
+  IdentityProviderPage,
+  type IdentityProviderSearch,
+} from "@/routes/admin/IdentityProviderPage";
 import { GdprPage, type GdprSearch } from "@/routes/admin/GdprPage";
 import { AiSettingsPage } from "@/routes/admin/AiSettingsPage";
 import { AiProvidersPage } from "@/routes/admin/AiProvidersPage";
@@ -143,14 +152,23 @@ const indexRoute = createRoute({
   component: HomeRedirect,
 });
 
+function searchFlag(v: unknown): string | undefined {
+  return typeof v === "string" || typeof v === "number" || typeof v === "boolean"
+    ? String(v)
+    : undefined;
+}
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
   validateSearch: (
     s: Record<string, unknown>,
-  ): { next?: string; sso_error?: string } => ({
+  ): { next?: string; sso_error?: string; logged_out?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
-    sso_error: typeof s.sso_error === "string" ? s.sso_error : undefined,
+    // The router JSON-parses search values: `?sso_error=1` arrives as a number.
+    sso_error: searchFlag(s.sso_error),
+    // Only the backend's "1" marks a sign-out; "0"/"false" must not show the note.
+    logged_out: searchFlag(s.logged_out) === "1" ? "1" : undefined,
   }),
   component: LoginPage,
 });
@@ -447,10 +465,29 @@ const agentSettingsRoute = createRoute({
   },
 });
 
+// The old statistics page lives on as the reports overview; keep bookmarks working.
 const agentStatsRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/stats",
-  component: StatsPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/agent/reports" });
+  },
+});
+
+const agentReportsRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports",
+  validateSearch: (s: Record<string, unknown>): ReportsSearch => ({
+    category: typeof s.category === "string" && /^[a-z_]{1,32}$/.test(s.category) ? s.category : undefined,
+  }),
+  component: ReportsPage,
+});
+
+const agentReportViewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/$reportKey",
+  validateSearch: validateReportViewSearch,
+  component: ReportViewPage,
 });
 
 const agentCalendarRoute = createRoute({
@@ -553,8 +590,14 @@ const agentDialRoute = createRoute({
 const portalLoginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/portal/login",
-  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { next?: string; sso_error?: string; logged_out?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
+    // The router JSON-parses search values: `?sso_error=1` arrives as a number.
+    sso_error: searchFlag(s.sso_error),
+    // Only the backend's "1" marks a sign-out; "0"/"false" must not show the note.
+    logged_out: searchFlag(s.logged_out) === "1" ? "1" : undefined,
   }),
   component: () => (
     <RequirePortalEnabled>
@@ -641,6 +684,12 @@ const portalPreferencesRoute = createRoute({
   component: PortalPreferencesPage,
 });
 
+const portalSecurityRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/security",
+  component: PortalSecurityPage,
+});
+
 // /admin: agent session (RequireAuth) + is_admin from /me (RequireAdmin)
 // gated shell with a grouped left sidebar nav (see AdminShell).
 const adminLayoutRoute = createRoute({
@@ -671,6 +720,29 @@ const adminAuthConfigRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/auth-config",
   component: AuthConfigPage,
+});
+
+const adminIdentityProvidersRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/identity-providers",
+  component: IdentityProvidersPage,
+});
+
+const adminIdentityProviderRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/identity-providers/$providerId",
+  validateSearch: (s: Record<string, unknown>): IdentityProviderSearch => ({
+    tab:
+      s.tab === "connection" ||
+      s.tab === "mapping" ||
+      s.tab === "roles" ||
+      s.tab === "test" ||
+      s.tab === "links"
+        ? s.tab
+        : undefined,
+    test: typeof s.test === "string" && s.test ? s.test : undefined,
+  }),
+  component: IdentityProviderPage,
 });
 
 const adminGroupsRoute = createRoute({
@@ -971,6 +1043,12 @@ const adminDaemonsRoute = createRoute({
   component: DaemonsPage,
 });
 
+const adminReportingRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: "/reporting",
+  component: ReportingAdminPage,
+});
+
 const adminSettingsSectionRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: "/settings/$section",
@@ -1070,6 +1148,8 @@ const routeTree = rootRoute.addChildren([
     agentSecurityRoute,
     agentSettingsRoute,
     agentStatsRoute,
+    agentReportsRoute,
+    agentReportViewRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
     agentServicesRoute,
@@ -1087,11 +1167,14 @@ const routeTree = rootRoute.addChildren([
     portalKbRoute,
     portalKbArticleRoute,
     portalPreferencesRoute,
+    portalSecurityRoute,
   ]),
   adminLayoutRoute.addChildren([
     adminIndexRoute,
     adminUsersRoute,
     adminAuthConfigRoute,
+    adminIdentityProvidersRoute,
+    adminIdentityProviderRoute,
     adminGroupsRoute,
     adminRolesRoute,
     adminAgentRolesRoute,
@@ -1142,6 +1225,7 @@ const routeTree = rootRoute.addChildren([
     adminCustomerFieldsRoute,
     adminGdprRoute,
     adminDaemonsRoute,
+    adminReportingRoute,
     adminSettingsSectionRoute,
     adminSystemRoute,
     adminAiRoute,

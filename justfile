@@ -42,15 +42,15 @@ mcp:
 
 # Run backend unit/integration tests (db tests auto-skip without Docker)
 test:
-    cd backend && uv run pytest -q
+    cd backend && uv run python -m pytest -q
 
 # Unit tests only (no Docker / testcontainers)
 test-unit:
-    cd backend && uv run pytest -q -m "not db"
+    cd backend && uv run python -m pytest -q -m "not db"
 
 # DB integration tests (MariaDB + Postgres via testcontainers)
 test-db:
-    cd backend && uv run pytest -q -m db
+    cd backend && uv run python -m pytest -q -m db
 
 # Lint (ruff) + type-check (mypy)
 lint:
@@ -173,7 +173,7 @@ golden-test:
     eval "$(python3 tests/golden/peer_env.py "${GOLDEN_PEER:-}")"
     export GOLDEN=1
     export GOLDEN_PEER GOLDEN_COMPOSE_PROJECT GOLDEN_DB_URL GOLDEN_DB_ASYNC_URL
-    cd backend && uv run pytest -q -m golden ../tests/golden
+    cd backend && uv run python -m pytest -q -m golden ../tests/golden
 
 # One-shot: up + seed + test + clean for GOLDEN_PEER
 golden-run:

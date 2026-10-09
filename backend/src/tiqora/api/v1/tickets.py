@@ -87,7 +87,12 @@ from tiqora.filters.ticket_params import TicketListParams, filter_from_list_para
 from tiqora.filters.tickets import compile_ticket_filter, ticket_query_scope
 from tiqora.jobs.handlers.ticket_export import TICKET_EXPORT_JOB, TicketExportPayload
 from tiqora.jobs.schemas import JobAccepted
-from tiqora.jobs.service import count_active_jobs, enqueue_job, find_active_job
+from tiqora.jobs.service import (
+    count_active_jobs,
+    enqueue_job,
+    find_active_job,
+    lock_user_job_quota,
+)
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.znuny.sysconfig import SysConfig
 
@@ -785,6 +790,10 @@ async def start_ticket_export_job(
     # may only have a few different exports in flight.
     digest = hashlib.sha256(json.dumps(job_payload, sort_keys=True).encode()).hexdigest()[:32]
     dedupe_key = f"ticket_export:{user.id}:{digest}"
+    # Fresh transaction whose first statement locks the user's row: concurrent requests
+    # of one user run dedupe + count + enqueue one after the other (no cap overshoot).
+    await session.rollback()
+    await lock_user_job_quota(session, user.id)
     existing = await find_active_job(session, kind=TICKET_EXPORT_JOB.kind, dedupe_key=dedupe_key)
     if existing is None and (
         await count_active_jobs(session, kind=TICKET_EXPORT_JOB.kind, created_by=user.id)

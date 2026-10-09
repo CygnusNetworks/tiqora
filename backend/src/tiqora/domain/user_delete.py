@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.znuny.sessions import delete_agent_sessions
+
 # Rows that exist only because the agent does: deleting the account should
 # take them with it rather than refuse. Order matters — children first.
 OWNED: tuple[tuple[str, str], ...] = (
@@ -35,6 +37,10 @@ OWNED: tuple[tuple[str, str], ...] = (
     ("tiqora_user_totp", "user_id"),
     ("tiqora_user_passkey", "user_id"),
     ("tiqora_user_auth_config", "user_id"),
+    # SSO: role/group rows a provider rule created, and the IdP-subject links
+    # (agent kind only -- customer ids live in the same column space).
+    ("tiqora_identity_managed_assignment", "user_id"),
+    ("tiqora_identity_link", "user_id"),
     ("tiqora_form_draft", "user_id"),
     ("tiqora_standard_template_user", "user_id"),
     ("tiqora_api_key", "user_id"),
@@ -46,6 +52,8 @@ OWNED: tuple[tuple[str, str], ...] = (
     ("ticket_watcher", "user_id"),
 )
 _OWNED_KEYS = frozenset(OWNED)
+# Tables whose user_id column is shared by agents and customers, told apart by user_kind.
+_KIND_SCOPED = frozenset({"tiqora_identity_link"})
 
 # `tiqora_*` tables have no FK constraints, so information_schema does not
 # report them. These are the ones that must BLOCK a delete (things the agent
@@ -145,8 +153,11 @@ async def delete_user_rows(session: AsyncSession, user_id: int) -> None:
     for table, column in OWNED:
         if not await _table_exists(session, table):
             continue
+        kind = " AND user_kind = 'agent'" if table in _KIND_SCOPED else ""
         stmt = text(  # noqa: S608
-            f"DELETE FROM {_quote(dialect, table)} WHERE {_quote(dialect, column)} = :uid"
+            f"DELETE FROM {_quote(dialect, table)} WHERE {_quote(dialect, column)} = :uid{kind}"
         )
         await session.execute(stmt, {"uid": user_id})
+    # The agent's Znuny/GI sessions carry their name and e-mail: they go with the account.
+    await delete_agent_sessions(session, user_id)
     await session.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": user_id})

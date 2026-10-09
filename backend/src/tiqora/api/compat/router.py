@@ -45,6 +45,7 @@ from tiqora.api.compat.operations import (
     op_time_accounting_get,
 )
 from tiqora.api.compat.provider import (
+    OperationFault,
     ProviderOutcome,
     error_status_code,
     render_rest,
@@ -259,7 +260,10 @@ async def canonical_ticket_update(
 ) -> Response:
     data = await _merge_params(request)
     data["TicketID"] = ticket_id
-    result = await _dispatch_operation("TicketUpdate", data, session, session_store, request)
+    try:
+        result = await _dispatch_operation("TicketUpdate", data, session, session_store, request)
+    except OperationFault as exc:
+        return _fault_response(exc.message, status.HTTP_500_INTERNAL_SERVER_ERROR)
     return _json_or_501(result)
 
 
@@ -331,7 +335,10 @@ async def canonical_out_of_office(
     session_store: SessionStore = Depends(get_session_store),  # noqa: B008
 ) -> Response:
     data = await _merge_params(request)
-    result = await _dispatch_operation("OutOfOffice", data, session, session_store, request)
+    try:
+        result = await _dispatch_operation("OutOfOffice", data, session, session_store, request)
+    except OperationFault as exc:
+        return _fault_response(exc.message, status.HTTP_500_INTERNAL_SERVER_ERROR)
     return _json_or_501(result)
 
 
@@ -344,6 +351,23 @@ def _soap_response(content: bytes, version: str, status_code: int) -> Response:
     return Response(
         content=content, media_type=content_type_for_version(version), status_code=status_code
     )
+
+
+async def _read_body_capped(request: Request, max_length: int) -> bytes | None:
+    """The request body, or ``None`` as soon as more than ``max_length`` bytes arrived.
+
+    Consumes the request stream: ``request.body()`` cannot be called afterwards.
+    """
+    chunks: list[bytes] = []
+    received = 0
+    async for chunk in request.stream():
+        received += len(chunk)
+        if received > max_length:
+            return None
+        chunks.append(chunk)
+    # Starlette has no public way to hand a streamed body back to ``request.body()``; the
+    # SOAP handler passes these bytes on itself, and nothing after it reads the request body
+    return b"".join(chunks)
 
 
 async def _handle_soap_request(
@@ -360,7 +384,24 @@ async def _handle_soap_request(
     its name with no mapping. With a webservice the operation name selects the configured
     operation (type + mapping) through the provider pipeline.
     """
-    body_bytes = await request.body()
+    # SOAP.pm:160-165: a body longer than the transport's MaxLength is refused with 413
+    # (text/plain, like every Znuny transport error) before it is parsed or mapped
+    max_length = webservice.max_length if webservice is not None else None
+    if max_length is not None:
+        try:
+            declared = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            declared = 0
+        if declared > max_length:
+            return _text_error(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large")
+        # a body without Content-Length (chunked) is read with a running count and refused
+        # as soon as it passes the limit - never read completely first
+        body = await _read_body_capped(request, max_length)
+        if body is None:
+            return _text_error(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large")
+        body_bytes = body
+    else:
+        body_bytes = await request.body()
     soap_action = request.headers.get("SOAPAction") or request.headers.get("soapaction")
 
     try:
@@ -388,9 +429,14 @@ async def _handle_soap_request(
         )
         return _soap_response(fault, parsed.version, status.HTTP_501_NOT_IMPLEMENTED)
 
-    result = await _dispatch_operation(
-        parsed.operation, parsed.data, session, session_store, request
-    )
+    try:
+        result = await _dispatch_operation(
+            parsed.operation, parsed.data, session, session_store, request
+        )
+    except OperationFault as exc:
+        return _render_soap(
+            ProviderOutcome(500, {}, {}, exc.message), parsed.operation, parsed.version, namespace
+        )
     return _render_soap(
         ProviderOutcome(_error_status_code(result), result, {}, None),
         parsed.operation,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, WithJsonSchema
 
@@ -53,6 +53,9 @@ class UserMe(BaseModel):
     first_name: str
     last_name: str
     auth_method: str
+    # True when logging out also ends the identity provider session (SAML SLO / OIDC
+    # end-session); the UI then posts to ``/auth/sso/logout`` instead of ``/auth/logout``.
+    sso_logout: bool = False
     # Znuny user_preferences.UserEmail when set; used for Gravatar.
     email: str | None = None
     # Best-effort OIDC/Google ``picture`` claim captured at SSO login.
@@ -99,6 +102,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class LoginProviderOut(BaseModel):
+    slug: str
+    kind: Literal["oidc", "saml"]
+    # button_label or name; env rows without a button label: "" (frontend default text)
+    label: str
+    icon: str | None = None
+
+
 class AuthMethodsOut(BaseModel):
     password: bool = True
     oidc: bool = False
@@ -109,6 +120,10 @@ class AuthMethodsOut(BaseModel):
     # Whether the customer portal is available at all (see portal_gate). The
     # landing page uses this to skip straight to the agent login.
     portal_enabled: bool = True
+    # Enabled OIDC/SAML providers with the agent audience (sort, id).
+    providers: list[LoginProviderOut] = Field(default_factory=list)
+    # SAML is usable on this server (pysaml2 + xmlsec1 present).
+    saml: bool = False
 
 
 class TOTPEnrollOut(BaseModel):
@@ -615,10 +630,24 @@ class CustomerMe(BaseModel):
     customer_id: str
     first_name: str
     last_name: str
+    sso_logout: bool = False
+
+
+class PortalAuthMethodsOut(BaseModel):
+    """Sign-in options of the customer portal login page."""
+
+    password: bool = True
+    # Enabled OIDC/SAML providers with the customer audience (sort, id).
+    providers: list[LoginProviderOut] = Field(default_factory=list)
+    webauthn: bool = False
 
 
 class CustomerLoginResponse(BaseModel):
-    customer: CustomerMe
+    # ``customer`` is null while a second factor is still owed (``pending_2fa``).
+    customer: CustomerMe | None = None
+    pending_2fa: bool = False
+    totp_enrolled: bool = False
+    passkey_enrolled: bool = False
 
 
 class PortalTicketCreateRequest(BaseModel):

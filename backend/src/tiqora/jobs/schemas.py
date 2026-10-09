@@ -55,8 +55,16 @@ def _parse_result(raw: str | None) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def job_out(job: TiqoraJob, files: list[TiqoraJobFile], registry: Registry) -> JobOut:
+def job_out(
+    job: TiqoraJob, files: list[TiqoraJobFile], registry: Registry, *, viewer_id: int
+) -> JobOut:
+    """API view of ``job`` for ``viewer_id``.
+
+    A ``result_private`` handler's result is shown to the job's creator only.
+    """
     handler = registry.get(JOB_HANDLERS, job.kind)
+    private = handler is not None and handler.result_private
+    own = job.created_by is not None and job.created_by == viewer_id
     return JobOut(
         id=job.id,
         kind=job.kind,
@@ -66,7 +74,7 @@ def job_out(job: TiqoraJob, files: list[TiqoraJobFile], registry: Registry) -> J
         progress_total=job.progress_total,
         progress_message=job.progress_message,
         cancel_requested=bool(job.cancel_requested),
-        result=_parse_result(job.result),
+        result=_parse_result(job.result) if own or not private else None,
         error=job.error,
         files=[
             JobFileOut(id=f.id, name=f.name, content_type=f.content_type, size_bytes=f.size_bytes)

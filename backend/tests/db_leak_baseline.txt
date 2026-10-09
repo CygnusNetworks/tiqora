@@ -82,8 +82,6 @@ test_reference_api.py
 test_search_flag.py
 test_search_meili.py
 test_spnego.py
-test_stats_api.py
-test_stats_service.py
 test_subject_hook.py
 test_sysconfig_db.py
 test_template_permission.py

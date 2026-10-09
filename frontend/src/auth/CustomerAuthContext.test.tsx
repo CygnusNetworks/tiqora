@@ -4,11 +4,37 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CustomerAuthProvider, useCustomerAuth } from "./CustomerAuthContext";
 import { ApiError } from "@/lib/portalApi";
 
-const { portalMeMock, portalLoginMock, portalLogoutMock } = vi.hoisted(() => ({
-  portalMeMock: vi.fn(),
-  portalLoginMock: vi.fn(),
-  portalLogoutMock: vi.fn(),
+const {
+  portalMeMock,
+  portalLoginMock,
+  portalLogoutMock,
+  totpVerifyMock,
+  submitSsoLogoutMock,
+  passkeyBeginMock,
+  passkeyFinishMock,
+  startAuthenticationMock,
+} = vi.hoisted(() => ({
+    portalMeMock: vi.fn(),
+    portalLoginMock: vi.fn(),
+    portalLogoutMock: vi.fn(),
+    totpVerifyMock: vi.fn(),
+    submitSsoLogoutMock: vi.fn(),
+    passkeyBeginMock: vi.fn(),
+    passkeyFinishMock: vi.fn(),
+    startAuthenticationMock: vi.fn(),
+  }));
+
+vi.mock("@/lib/portalSecurityApi", () => ({
+  customerSecurityApi: {
+    totpVerify: totpVerifyMock,
+    passkeyAuthenticateBegin: passkeyBeginMock,
+    passkeyAuthenticateFinish: passkeyFinishMock,
+  },
 }));
+
+vi.mock("@/lib/ssoLogout", () => ({ submitSsoLogout: submitSsoLogoutMock }));
+
+vi.mock("@simplewebauthn/browser", () => ({ startAuthentication: startAuthenticationMock }));
 
 vi.mock("@/lib/portalApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/portalApi")>();
@@ -109,6 +135,136 @@ describe("CustomerAuthContext", () => {
     expect(portalLogoutMock).toHaveBeenCalled();
     await waitFor(() => expect(result.current.isAuthenticated).toBe(false));
     expect(result.current.customer).toBeNull();
+  });
+
+  it("login() with a pending second factor keeps the customer signed out", async () => {
+    portalLoginMock.mockResolvedValue({
+      customer: null,
+      pending_2fa: true,
+      totp_enrolled: true,
+      passkey_enrolled: false,
+    });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let res: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      res = await result.current.login("customer1", "pw");
+    });
+
+    expect(res?.pending_2fa).toBe(true);
+    expect(result.current.pending2fa).toBe(true);
+    expect(result.current.pendingFactors).toEqual({ totp: true, passkey: false });
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+
+  it("verifyTotp() completes the pending sign-in", async () => {
+    portalLoginMock.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    totpVerifyMock.mockResolvedValue({ customer: authedCustomer });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+
+    portalMeMock.mockResolvedValue(authedCustomer);
+    await act(async () => {
+      await result.current.verifyTotp("123456");
+    });
+
+    expect(totpVerifyMock).toHaveBeenCalledWith("123456");
+    expect(result.current.pending2fa).toBe(false);
+    expect(result.current.pendingFactors).toBeNull();
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+  });
+
+  it("verifyPasskey() runs begin, the browser ceremony and finish, then signs in", async () => {
+    portalLoginMock.mockResolvedValue({
+      customer: null,
+      pending_2fa: true,
+      passkey_enrolled: true,
+    });
+    passkeyBeginMock.mockResolvedValue({ challenge: "c" });
+    startAuthenticationMock.mockResolvedValue({ id: "cred" });
+    passkeyFinishMock.mockResolvedValue({ customer: authedCustomer });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+
+    portalMeMock.mockResolvedValue(authedCustomer);
+    await act(async () => {
+      await result.current.verifyPasskey();
+    });
+
+    expect(startAuthenticationMock).toHaveBeenCalledWith({ optionsJSON: { challenge: "c" } });
+    expect(passkeyFinishMock).toHaveBeenCalledWith({ id: "cred" });
+    expect(result.current.pending2fa).toBe(false);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+  });
+
+  it("verifyPasskey() failing leaves the pending state intact", async () => {
+    portalLoginMock.mockResolvedValue({ customer: null, pending_2fa: true, passkey_enrolled: true });
+    passkeyBeginMock.mockResolvedValue({ challenge: "c" });
+    startAuthenticationMock.mockRejectedValue(new Error("NotAllowedError"));
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+
+    await act(async () => {
+      await expect(result.current.verifyPasskey()).rejects.toThrow("NotAllowedError");
+    });
+
+    expect(passkeyFinishMock).not.toHaveBeenCalled();
+    expect(result.current.pending2fa).toBe(true);
+    expect(result.current.pendingFactors).toEqual({ totp: false, passkey: true });
+  });
+
+  it("cancelPending() clears the pending second-factor state", async () => {
+    portalLoginMock.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+    expect(result.current.pending2fa).toBe(true);
+
+    act(() => result.current.cancelPending());
+
+    expect(result.current.pending2fa).toBe(false);
+    expect(result.current.pendingFactors).toBeNull();
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+
+  it("logout() of an SSO session submits the SSO logout form instead of the plain API call", async () => {
+    portalMeMock.mockResolvedValue({ ...authedCustomer, sso_logout: true });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(submitSsoLogoutMock).toHaveBeenCalledWith("/api/portal/auth/sso/logout");
+    expect(portalLogoutMock).not.toHaveBeenCalled();
+  });
+
+  it("logout() of a password session does not use the SSO form", async () => {
+    portalMeMock.mockResolvedValue({ ...authedCustomer, sso_logout: false });
+    portalLogoutMock.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+    portalMeMock.mockResolvedValue(null);
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(portalLogoutMock).toHaveBeenCalled();
+    expect(submitSsoLogoutMock).not.toHaveBeenCalled();
   });
 
   it("refresh() re-fetches /portal/me", async () => {

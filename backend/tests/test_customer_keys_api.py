@@ -114,6 +114,7 @@ async def session(mariadb_znuny_url: str) -> AsyncIterator[AsyncSession]:
         with sync.begin() as conn:
             for table in ("smime_keys", "tiqora_crypto_key"):
                 conn.execute(text(f"DELETE FROM {table}"))  # noqa: S608 — fixed names
+            conn.execute(text("DELETE FROM sessions WHERE session_id LIKE 'GI8962%'"))
             conn.execute(text("DELETE FROM customer_preferences WHERE user_id LIKE 'ckapi-%'"))
             conn.execute(text("DELETE FROM customer_user WHERE login LIKE 'ckapi-%'"))
             conn.execute(text("DELETE FROM users WHERE id = :i"), {"i": PLAIN_ID})
@@ -263,6 +264,13 @@ def _request() -> Any:
     return Request({"type": "http", "headers": [], "client": ("127.0.0.1", 1)})
 
 
+def _store() -> Any:
+    from tests.test_session_revocation import _FakeRedis
+    from tiqora.domain.customer_auth import CustomerSessionStore
+
+    return CustomerSessionStore(_FakeRedis(), Settings(secret_key="unit-test-secret-key"))  # type: ignore[arg-type]
+
+
 async def test_portal_preferences_language_and_keys(
     session: AsyncSession, settings: Settings
 ) -> None:
@@ -351,6 +359,7 @@ async def test_portal_password_change(session: AsyncSession) -> None:
             me,
             session,
             limiter,  # type: ignore[arg-type]
+            _store(),
         )
     assert exc.value.status_code == 422 and limiter.failures == 1
     with pytest.raises(HTTPException) as exc:
@@ -360,6 +369,7 @@ async def test_portal_password_change(session: AsyncSession) -> None:
             me,
             session,
             limiter,  # type: ignore[arg-type]
+            _store(),
         )
     assert exc.value.status_code == 422 and "at least" in str(exc.value.detail)
     await portal.change_password(
@@ -370,9 +380,123 @@ async def test_portal_password_change(session: AsyncSession) -> None:
         me,
         session,
         limiter,  # type: ignore[arg-type]
+        _store(),
     )
     stored = (
         await session.execute(text("SELECT pw FROM customer_user WHERE login = :l"), {"l": LOGIN})
     ).scalar_one()
     assert verify_password("new password 456", stored)
     assert limiter.resets == 1
+
+
+async def _put_sessions(session: AsyncSession) -> None:
+    for sid, uid, typ in (
+        ("GI8962MINE", LOGIN, "Customer"),
+        ("GI8962OTHER", "ckapi-someone-else", "Customer"),
+        ("GI8962AGENT", LOGIN, "User"),
+    ):
+        for key, val in (("UserID", uid), ("UserType", typ)):
+            await session.execute(
+                text(
+                    "INSERT INTO sessions (session_id, data_key, data_value, serialized)"
+                    " VALUES (:s, :k, :v, 0)"
+                ),
+                {"s": sid, "k": key, "v": val},
+            )
+    await session.commit()
+
+
+async def _remaining(session: AsyncSession) -> set[str]:
+    rows = await session.execute(
+        text("SELECT DISTINCT session_id FROM sessions WHERE session_id LIKE 'GI8962%'")
+    )
+    return {str(r[0]) for r in rows.all()}
+
+
+async def test_portal_password_change_revokes_customer_znuny_sessions(
+    session: AsyncSession,
+) -> None:
+    from dataclasses import replace
+
+    from tiqora.api.portal import preferences as portal
+
+    me = replace(_customer(), id=await _customer_id(session))
+    await _put_sessions(session)
+    await portal.change_password(
+        portal.PortalPasswordIn(
+            current_password="old password 123", new_password="new password 456"
+        ),
+        _request(),
+        me,
+        session,
+        _Limiter(),  # type: ignore[arg-type]
+        _store(),
+    )
+    assert await _remaining(session) == {"GI8962OTHER", "GI8962AGENT"}
+
+
+async def test_portal_password_change_survives_session_revoke_failure(
+    session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from dataclasses import replace
+
+    from tiqora.api.portal import preferences as portal
+    from tiqora.znuny.password import verify_password
+
+    async def _boom(s: AsyncSession, login: str) -> int:
+        raise RuntimeError("sessions table locked")
+
+    monkeypatch.setattr(portal, "delete_customer_sessions", _boom)
+    me = replace(_customer(), id=await _customer_id(session))
+    limiter = _Limiter()
+    await portal.change_password(
+        portal.PortalPasswordIn(
+            current_password="old password 123", new_password="new password 789"
+        ),
+        _request(),
+        me,
+        session,
+        limiter,  # type: ignore[arg-type]
+        _store(),
+    )
+    stored = (
+        await session.execute(text("SELECT pw FROM customer_user WHERE login = :l"), {"l": LOGIN})
+    ).scalar_one()
+    assert verify_password("new password 789", stored)
+    assert limiter.resets == 1
+
+
+async def test_portal_password_change_revokes_other_portal_sessions(
+    session: AsyncSession,
+) -> None:
+    """Other full sessions and pending 2FA logins end; the caller's session stays."""
+    from dataclasses import replace
+
+    from tiqora.api.portal import preferences as portal
+
+    cid = await _customer_id(session)
+    me = replace(_customer(), id=cid)
+    store = _store()
+    own = await store.create(cid, LOGIN)
+    other = await store.create(cid, LOGIN)
+    pending = await store.create_pending(cid, LOGIN, 300)
+    stranger = await store.create(cid + 1, "ckapi-someone-else")
+    request = _request()
+    request.state.customer_session_token = own
+    await portal.change_password(
+        portal.PortalPasswordIn(
+            current_password="old password 123", new_password="new password 456"
+        ),
+        request,
+        me,
+        session,
+        _Limiter(),  # type: ignore[arg-type]
+        store,
+    )
+    assert await store.get(own) == (cid, LOGIN)
+    assert await store.get(other) is None
+    assert await store.get_pending(pending) is None
+    assert await store.get(stranger) == (cid + 1, "ckapi-someone-else")
+    # The kept token is still indexed, so a later revoke-all still finds it.
+    assert await store.revoke_customer_sessions(cid) == 1
+    assert await store.get(own) is None

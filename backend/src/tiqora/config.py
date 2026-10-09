@@ -213,6 +213,11 @@ class Settings(BaseSettings):
     oidc_scopes: str = Field(default="openid profile email", validation_alias="TIQORA_OIDC_SCOPES")
     oidc_claim: str = Field(default="preferred_username", validation_alias="TIQORA_OIDC_CLAIM")
     oidc_redirect_uri: str = Field(default="", validation_alias="TIQORA_OIDC_REDIRECT_URI")
+    # Back-channel logout of the env OIDC provider: off unless explicitly enabled, so an
+    # upgrade adds no new unauthenticated endpoint for existing installs.
+    oidc_backchannel_logout: bool = Field(
+        default=False, validation_alias="TIQORA_OIDC_BACKCHANNEL_LOGOUT"
+    )
 
     # Kerberos / SPNEGO (Phase 3c). Off by default; requires the optional
     # `kerberos` extra (gssapi) and a keytab reachable via KRB5_KTNAME.
@@ -220,9 +225,11 @@ class Settings(BaseSettings):
     krb5_ktname: str = Field(default="", validation_alias="KRB5_KTNAME")
 
     # LDAP/AD agent auth (Phase 3c). Bind-search-bind against a directory,
-    # mirroring Kernel::System::Auth::LDAP. No auto-provisioning in v1: the
-    # LDAP UID must match an existing, valid `users.login` row or the login
-    # is rejected. Tried as a fallback when local password auth fails.
+    # mirroring Kernel::System::Auth::LDAP. Appears as the read-only identity
+    # provider "env-ldap": no auto-provisioning, the LDAP UID must match an
+    # existing, valid `users.login` row or the login is rejected (directories
+    # with JIT and role sync are configured as identity providers instead).
+    # Tried after local password auth fails, together with those providers.
     ldap_enabled: bool = Field(default=False, validation_alias="TIQORA_LDAP_ENABLED")
     ldap_host: str = Field(default="", validation_alias="TIQORA_LDAP_HOST")
     ldap_port: int = Field(default=389, validation_alias="TIQORA_LDAP_PORT")
@@ -240,6 +247,11 @@ class Settings(BaseSettings):
     ldap_group_dn: str = Field(default="", validation_alias="TIQORA_LDAP_GROUP_DN")
     ldap_access_attr: str = Field(default="memberUid", validation_alias="TIQORA_LDAP_ACCESS_ATTR")
     ldap_user_attr: str = Field(default="DN", validation_alias="TIQORA_LDAP_USER_ATTR")
+    # Verify the directory's TLS certificate (chain against the system CAs + host
+    # name) for LDAPS/StartTLS. Off by default ONLY for compatibility with
+    # installs that predate the switch (self-signed/internal CA); a warning is
+    # logged at startup while it is off. Turn it on.
+    ldap_tls_verify: bool = Field(default=False, validation_alias="TIQORA_LDAP_TLS_VERIFY")
 
     # Customer portal master switch at deployment level. Off by default (opt-in):
     # /api/portal/* answers 404 and the SPA sends "/" straight to the agent
@@ -248,8 +260,9 @@ class Settings(BaseSettings):
     portal_enabled: bool = Field(default=False, validation_alias="TIQORA_PORTAL_ENABLED")
 
     # LDAP/AD customer (portal) auth (Phase 3c), mirroring
-    # Kernel::System::CustomerAuth::LDAP. Same no-auto-provisioning rule:
-    # the LDAP UID must match an existing, valid `customer_user.login`.
+    # Kernel::System::CustomerAuth::LDAP; read-only provider "env-customer-ldap".
+    # Same no-auto-provisioning rule: the LDAP UID must match an existing,
+    # valid `customer_user.login`.
     customer_ldap_enabled: bool = Field(
         default=False, validation_alias="TIQORA_CUSTOMER_LDAP_ENABLED"
     )
@@ -280,6 +293,10 @@ class Settings(BaseSettings):
     )
     customer_ldap_user_attr: str = Field(
         default="DN", validation_alias="TIQORA_CUSTOMER_LDAP_USER_ATTR"
+    )
+    # Same as ldap_tls_verify (off only for existing installs; warning at startup).
+    customer_ldap_tls_verify: bool = Field(
+        default=False, validation_alias="TIQORA_CUSTOMER_LDAP_TLS_VERIFY"
     )
 
     # TOTP 2FA (Phase 3c)
@@ -362,6 +379,12 @@ class Settings(BaseSettings):
         default=False, validation_alias="TIQORA_COMPAT_SESSION_CHECK_REMOTE_IP"
     )
 
+    # GI SessionCreate writes Znuny ``sessions`` rows (valid in both systems, Znuny's idle
+    # and absolute expiry) instead of a Redis token. Off when Tiqora owns the schema.
+    compat_session_write_znuny: bool = Field(
+        default=True, validation_alias="TIQORA_COMPAT_SESSION_WRITE_ZNUNY"
+    )
+
     # How often every API process polls gi_webservice_config for changes made in
     # Znuny (rename / disable / edit) so compat webservices reload without a restart.
     compat_webservice_reload_seconds: int = Field(
@@ -395,6 +418,10 @@ class Settings(BaseSettings):
     # Background job runner (tiqora.jobs): how often the worker looks for queued jobs.
     jobs_poll_interval_seconds: int = Field(
         default=2, ge=1, le=60, validation_alias="TIQORA_JOBS_POLL_INTERVAL_SECONDS"
+    )
+    # How often the worker deletes expired Znuny `sessions` rows.
+    znuny_session_purge_interval_seconds: int = Field(
+        default=300, ge=5, le=86400, validation_alias="TIQORA_ZNUNY_SESSION_PURGE_INTERVAL_SECONDS"
     )
     # Outbound SMTP. Disabled by default so agent email replies store the
     # article without 502ing when no relay is configured (prod often has no
@@ -435,6 +462,12 @@ class Settings(BaseSettings):
     # Znuny's sync tables are empty (ruling F31).
     deploy_watch_interval_seconds: int = Field(
         default=30, ge=5, le=3600, validation_alias="TIQORA_DEPLOY_WATCH_INTERVAL_SECONDS"
+    )
+
+    # Report data upkeep (facts, events, daily snapshots). ``daemon.report_facts.enabled``
+    # (default ON) switches it off; this is only the poll interval.
+    report_facts_interval_seconds: int = Field(
+        default=60, validation_alias="TIQORA_REPORT_FACTS_INTERVAL"
     )
 
     # AI worker (tiqora-ai-worker, separate process/compose service — see

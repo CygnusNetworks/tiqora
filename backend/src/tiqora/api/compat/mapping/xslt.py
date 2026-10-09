@@ -56,7 +56,7 @@ class _OtrsFunctionsResolver(etree.Resolver):  # type: ignore[misc]
     def resolve(self, url: str, pubid: str, context: Any) -> Any:
         if urlparse(url).path.endswith(_OTRS_FUNCTIONS_FILE):
             return self.resolve_string(OTRS_FUNCTIONS_XSL, context)
-        raise MappingError(f"Externe Datei {url!r} ist in Tiqora nicht erlaubt")
+        raise MappingError(f"External file {url!r} is not allowed in Tiqora")
 
 
 def _parser(huge_xml: bool, *, with_resolver: bool = False) -> Any:
@@ -158,7 +158,7 @@ class XsltMapper:
             try:
                 self._xslt = etree.XSLT(doc, access_control=etree.XSLTAccessControl.DENY_ALL)
             except MappingError:
-                raise  # resolver refusal: readable "Externe Datei ... nicht erlaubt"
+                raise  # resolver refusal: readable "External file ... is not allowed in Tiqora"
             except (etree.XSLTParseError, etree.XMLSyntaxError, etree.LxmlError) as exc:
                 if isinstance(exc.__cause__, MappingError):
                     raise exc.__cause__ from exc
@@ -187,7 +187,8 @@ class XsltMapper:
                 raise MappingError("Could not merge DataInclude into non-hash Data")
             merged = copy.deepcopy(data)
             for name in include:
-                if data_include.get(name):
+                # XSLT.pm:211 `next if !$Param{DataInclude}->{$Module}` ({} true, "0" false)
+                if perl_truthy(data_include.get(name)):
                     merged.setdefault("DataInclude", {})[name] = copy.deepcopy(data_include[name])
             data = merged
         elif self._pre:

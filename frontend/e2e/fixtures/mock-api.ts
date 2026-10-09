@@ -1,4 +1,7 @@
 import type { Page, Route } from "@playwright/test";
+import type { ReportRunIn } from "../../src/lib/reportsApi";
+// Reports reuse the demo's pure report data (catalogue definitions + deterministic results).
+import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoReport, resolveReportRun } from "../../src/demo/reportsMock";
 
 const user = {
   id: 1,
@@ -674,7 +677,30 @@ export async function mockApi(page: Page) {
       return;
     }
 
-    // Stats / reports
+    // Reports (/agent/reports): catalogue, one definition, runs answered from the request body.
+    if (path.endsWith("/api/v1/reports") && method === "GET") {
+      await json(route, 200, DEMO_REPORT_CATALOGUE);
+      return;
+    }
+    if (path.endsWith("/api/v1/reports/run") && method === "POST") {
+      await json(route, 200, resolveReportRun(req.postDataJSON() as ReportRunIn));
+      return;
+    }
+    if (path.endsWith("/api/v1/reports/export") && method === "POST") {
+      await json(route, 202, { job_id: 9201, status: "queued" });
+      return;
+    }
+    if (path.match(/\/api\/v1\/reports\/builtin\.[a-z_]+$/) && method === "GET") {
+      const report = demoReport(decodeURIComponent(path.split("/").pop() as string));
+      await json(route, report ? 200 : 404, report ?? { detail: "Not found" });
+      return;
+    }
+    if (path.endsWith("/api/v1/reporting/status") && method === "GET") {
+      await json(route, 200, DEMO_FACTS);
+      return;
+    }
+
+    // Stats (the /api/v1/stats wrappers stay for API clients)
     if (path.endsWith("/api/v1/stats/volume") && method === "GET") {
       await json(route, 200, {
         granularity: "day",

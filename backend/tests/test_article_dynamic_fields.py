@@ -50,8 +50,7 @@ def _cleanup(conn: Any) -> None:
         f"DELETE FROM ticket_history WHERE ticket_id = {TICKET_ID}",
         f"DELETE FROM tiqora_event_outbox WHERE ticket_id = {TICKET_ID}",
         f"DELETE FROM tiqora_cache_invalidation WHERE ticket_id = {TICKET_ID}",
-        "DELETE FROM dynamic_field_value WHERE object_id IN"
-        f" (SELECT id FROM article WHERE ticket_id = {TICKET_ID})",
+        # only this module's fields: other modules' values with the same object ids stay
         f"DELETE FROM dynamic_field_value WHERE field_id IN ({ART_FIELD}, {TICKET_FIELD})",
         f"DELETE FROM dynamic_field WHERE id IN ({ART_FIELD}, {TICKET_FIELD})",
         "DELETE FROM article_data_mime WHERE article_id IN"
@@ -266,4 +265,24 @@ async def test_article_dynamic_field_rejects_invalid_values(env: Any) -> None:
     article_id = await _article(factory)
     with pytest.raises(DynamicFieldValueError):
         await _set(factory, article_id, ["a", "b"])
+    assert _values(url) == []
+
+
+async def test_article_of_another_ticket_is_refused(env: Any) -> None:
+    from tiqora.domain.ticket_write_service import InvalidInput
+
+    url, factory = env
+    article_id = await _article(factory)
+    async with factory() as session, session.begin():
+        field = await load_article_dynamic_field(session, "WaveArtText")
+        assert field is not None
+        with pytest.raises(InvalidInput):
+            await set_article_dynamic_field(
+                session,
+                ticket_id=TICKET_ID + 1,  # not the article's ticket
+                article_id=article_id,
+                field=field,
+                values=["x"],
+                user_id=AGENT,
+            )
     assert _values(url) == []

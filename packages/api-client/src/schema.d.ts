@@ -72,6 +72,319 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/auth/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portal sign-in options
+         * @description Discovery endpoint of the portal login page (customer-audience providers only).
+         */
+        get: operations["portal_auth_methods_api_portal_auth_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/oidc/{slug}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC callback of a portal provider */
+        get: operations["portal_oidc_callback_api_portal_auth_oidc__slug__callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Passkey List */
+        get: operations["passkey_list_api_portal_auth_passkey_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/authenticate/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Passkey Authenticate Begin
+         * @description Start a passkey assertion; the challenge is bound to the pending token.
+         */
+        post: operations["passkey_authenticate_begin_api_portal_auth_passkey_authenticate_begin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/authenticate/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Passkey Authenticate Finish */
+        post: operations["passkey_authenticate_finish_api_portal_auth_passkey_authenticate_finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/register/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Passkey Register Begin */
+        post: operations["passkey_register_begin_api_portal_auth_passkey_register_begin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/register/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Passkey Register Finish */
+        post: operations["passkey_register_finish_api_portal_auth_passkey_register_finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/passkey/{passkey_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Passkey Delete */
+        delete: operations["passkey_delete_api_portal_auth_passkey__passkey_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/saml/{slug}/acs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SAML assertion consumer service (portal)
+         * @description The IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/portal/login``.
+         */
+        post: operations["portal_saml_acs_api_portal_auth_saml__slug__acs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/sso/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log out of the portal and, where supported, of the identity provider */
+        post: operations["portal_sso_logout_api_portal_auth_sso_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/sso/{slug}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start a portal SSO login
+         * @description Starts a customer login, or (``test=``) an admin's test run of a customer provider.
+         *
+         *     A test run needs the admin's AGENT session cookie; without one the answer is 403 and
+         *     never a real login. The run itself never creates a session (see ``finish_*``).
+         */
+        get: operations["portal_sso_login_api_portal_auth_sso__slug__login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Totp Disable */
+        delete: operations["totp_disable_api_portal_auth_totp_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Totp Confirm */
+        post: operations["totp_confirm_api_portal_auth_totp_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Totp Enroll
+         * @description Start (or replace) a TOTP enrollment; replacing a live factor needs its code.
+         *
+         *     Adding TOTP to a passkey-only account needs a recent sign-in (the passkey
+         *     gate), or a stolen session could attach an authenticator it controls.
+         */
+        post: operations["totp_enroll_api_portal_auth_totp_enroll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/enroll/qr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Totp Enroll Qr */
+        get: operations["totp_enroll_qr_api_portal_auth_totp_enroll_qr_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Totp Status */
+        get: operations["totp_status_api_portal_auth_totp_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/totp/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Totp Verify
+         * @description Promote a pending-2FA session to a full session after a valid TOTP code.
+         */
+        post: operations["totp_verify_api_portal_auth_totp_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/kb/articles/{slug_or_id}": {
         parameters: {
             query?: never;
@@ -152,6 +465,9 @@ export interface paths {
         /**
          * Change Password
          * @description Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.
+         *
+         *     Afterwards every other session of the customer ends: Znuny/GI sessions and the
+         *     portal's Redis sessions, pending 2FA logins included. The calling session stays.
          */
         post: operations["change_password_api_portal_preferences_password_post"];
         delete?: never;
@@ -1388,6 +1704,10 @@ export interface paths {
         /**
          * Reset 2Fa
          * @description Admin force-disable: delete TOTP enrollment and all passkeys for the agent.
+         *
+         *     Also clears a pending TOTP enrollment and revokes every session of the agent
+         *     (pending ones included): with no factor left, a surviving session could
+         *     attach one of its own without a step-up.
          */
         post: operations["reset_2fa_api_v1_admin_auth_config__user_id__reset_2fa_post"];
         delete?: never;
@@ -2018,6 +2338,33 @@ export interface paths {
         patch: operations["update_customer_user_api_v1_admin_customer_users__customer_user_id__patch"];
         trace?: never;
     };
+    "/api/v1/admin/customer-users/{customer_user_id}/reset-2fa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Customer User 2Fa
+         * @description Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+         *
+         *     Also clears a pending TOTP enrollment and revokes every session of the customer
+         *     (pending ones included): with no factor left, a surviving session could attach
+         *     one of its own without a step-up.
+         *
+         *     Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
+         *     no code needed); the log line is the audit trail.
+         */
+        post: operations["reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/customer-users/{customer_user_login}/companies": {
         parameters: {
             query?: never;
@@ -2589,6 +2936,213 @@ export interface paths {
          * @description Agents with full (``rw``) access to *group_id* — reverse of user↔groups.
          */
         get: operations["get_group_users_api_v1_admin_groups__group_id__users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Providers */
+        get: operations["list_identity_providers_api_v1_admin_identity_providers_get"];
+        put?: never;
+        /** Create Identity Provider */
+        post: operations["create_identity_provider_api_v1_admin_identity_providers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Identity Capabilities */
+        get: operations["identity_capabilities_api_v1_admin_identity_providers_capabilities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Kinds */
+        get: operations["list_identity_kinds_api_v1_admin_identity_providers_kinds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Presets */
+        get: operations["list_identity_presets_api_v1_admin_identity_providers_presets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Identity Provider */
+        get: operations["get_identity_provider_api_v1_admin_identity_providers__provider_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Identity Provider */
+        delete: operations["delete_identity_provider_api_v1_admin_identity_providers__provider_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Identity Provider */
+        patch: operations["update_identity_provider_api_v1_admin_identity_providers__provider_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Identity Links */
+        get: operations["list_identity_links_api_v1_admin_identity_providers__provider_id__links_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Identity Link */
+        delete: operations["delete_identity_link_api_v1_admin_identity_providers__provider_id__links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/managed-assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Managed Assignments */
+        get: operations["list_managed_assignments_api_v1_admin_identity_providers__provider_id__managed_assignments_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Identity Mapping */
+        post: operations["preview_identity_mapping_api_v1_admin_identity_providers__provider_id__preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/refresh-metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Identity Provider Metadata */
+        post: operations["refresh_identity_provider_metadata_api_v1_admin_identity_providers__provider_id__refresh_metadata_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Identity Test */
+        post: operations["start_identity_test_api_v1_admin_identity_providers__provider_id__tests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/identity-providers/{provider_id}/tests/{test_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Identity Test */
+        get: operations["get_identity_test_api_v1_admin_identity_providers__provider_id__tests__test_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3171,6 +3725,46 @@ export interface paths {
         post?: never;
         /** Revoke Queue Template */
         delete: operations["revoke_queue_template_api_v1_admin_queues__queue_id__templates__standard_template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reporting/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start Backfill
+         * @description Queue the (re)build of the report data; a second request joins the pending job.
+         *
+         *     With ``restart`` the data counts as "not ready" again, unless a job is already
+         *     active: that job owns the state and is joined as it is.
+         */
+        post: operations["start_backfill_api_v1_admin_reporting_backfill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reporting/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Reporting Status */
+        get: operations["get_reporting_status_api_v1_admin_reporting_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3875,7 +4469,8 @@ export interface paths {
         post?: never;
         /**
          * Deactivate User
-         * @description Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users.
+         * @description Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users. The
+         *     account's sessions (Znuny rows and Redis) end with it.
          */
         delete: operations["deactivate_user_api_v1_admin_users__user_id__delete"];
         options?: never;
@@ -4325,7 +4920,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Callback */
+        /**
+         * Oidc Callback
+         * @description Alias of ``/auth/oidc/env-oidc/callback`` (browsers: 302 to ``next``; API clients: JSON).
+         */
         get: operations["oidc_callback_api_v1_auth_oidc_callback_get"];
         put?: never;
         post?: never;
@@ -4342,8 +4940,50 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Login */
+        /**
+         * Oidc Login
+         * @description Alias of ``/auth/sso/env-oidc/login`` (production env OIDC keeps its URLs).
+         */
         get: operations["oidc_login_api_v1_auth_oidc_login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/{slug}/backchannel-logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * OIDC back-channel logout (called by the identity provider)
+         * @description Server-to-server POST of a signed logout token (form field ``logout_token``).
+         *
+         *     Ends every matching agent and customer session; answers with ``Cache-Control: no-store``.
+         */
+        post: operations["oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/oidc/{slug}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC callback of a provider */
+        get: operations["oidc_provider_callback_api_v1_auth_oidc__slug__callback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -4517,6 +5157,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/saml/{slug}/acs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SAML assertion consumer service
+         * @description Receives the IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/login``.
+         */
+        post: operations["saml_acs_api_v1_auth_saml__slug__acs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/saml/{slug}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** SAML service provider metadata */
+        get: operations["saml_metadata_api_v1_auth_saml__slug__metadata_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/saml/{slug}/sls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SAML single logout service (redirect binding)
+         * @description The IdP's LogoutResponse; bound to a stored request id, always ends on the login page.
+         */
+        get: operations["saml_sls_get_api_v1_auth_saml__slug__sls_get"];
+        put?: never;
+        /**
+         * SAML single logout service (POST binding)
+         * @description Same as the GET form; CSRF-exempt because the IdP posts cross-site.
+         */
+        post: operations["saml_sls_post_api_v1_auth_saml__slug__sls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/spnego": {
         parameters: {
             query?: never;
@@ -4536,6 +5237,43 @@ export interface paths {
          *     bare 401, so the browser never shows a native Negotiate popup.
          */
         get: operations["spnego_api_v1_auth_spnego_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log out of Tiqora and, where supported, of the identity provider
+         * @description Ends the local session first, then redirects to the IdP logout or the login page.
+         */
+        post: operations["sso_logout_route_api_v1_auth_sso_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/{slug}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start an SSO login */
+        get: operations["sso_login_api_v1_auth_sso__slug__login_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6445,6 +7183,129 @@ export interface paths {
          * @description Valid ticket types for create/zoom pickers.
          */
         get: operations["list_types_api_v1_reference_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reporting/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sources
+         * @description Report sources with their dimensions, measures and filter fields (builder, filters).
+         */
+        get: operations["list_sources_api_v1_reporting_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reporting/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Facts Status
+         * @description Whether the report data is ready (banner while the first build runs).
+         */
+        get: operations["get_facts_status_api_v1_reporting_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Reports
+         * @description The built-in reports (catalogue order) and the readiness of the report data.
+         */
+        get: operations["list_reports_api_v1_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Report
+         * @description Queue an XLSX/CSV export (always a job; the file is ``<title slug>.xlsx|.csv``).
+         *
+         *     The request is checked now (422 for invalid definitions or parameters);
+         *     the worker evaluates access and the viewer's scope again when it runs.
+         */
+        post: operations["export_report_api_v1_reports_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Report Endpoint
+         * @description Run a built-in report (``report_key``) or an inline ``definition``.
+         *
+         *     200 with ``result`` (inline or from the cache), or 202 with ``job`` when
+         *     the report is large; poll ``GET /jobs/{id}``, the job result is the report.
+         */
+        post: operations["run_report_endpoint_api_v1_reports_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Report */
+        get: operations["get_report_api_v1_reports__report_key__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8371,6 +9232,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AbsoluteTimeRange
+         * @description Local dates in the report time zone, both inclusive.
+         */
+        AbsoluteTimeRange: {
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "absolute";
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+        };
         /**
          * AclCreate
          * @description Create a Znuny ``acl`` row. YAML fields stored as text 1:1.
@@ -10332,6 +11214,26 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * AttributeMap
+         * @description Ordered source attribute names per profile field; first non-empty wins.
+         *
+         *     ``"_text"`` = fixed value ``"text"`` (Znuny UserSyncMap convention).
+         */
+        AttributeMap: {
+            /** Customer Id */
+            customer_id?: string[];
+            /** Email */
+            email?: string[];
+            /** First Name */
+            first_name?: string[];
+            /** Last Name */
+            last_name?: string[];
+            /** Login */
+            login?: string[];
+            /** Mobile */
+            mobile?: string[];
+        };
         /** AuditLogDetailOut */
         AuditLogDetailOut: {
             /** Acting User Id */
@@ -10541,6 +11443,13 @@ export interface components {
              * @default true
              */
             portal_enabled: boolean;
+            /** Providers */
+            providers?: components["schemas"]["LoginProviderOut"][];
+            /**
+             * Saml
+             * @default false
+             */
+            saml: boolean;
             /**
              * Spnego
              * @default false
@@ -10729,6 +11638,25 @@ export interface components {
             state_id?: number | null;
             /** To Address */
             to_address: string;
+        };
+        /** BuiltinReportOut */
+        BuiltinReportOut: {
+            /** Category */
+            category: string;
+            definition: components["schemas"]["ReportDefinition"];
+            /** Description Key */
+            description_key: string;
+            /** Key */
+            key: string;
+            /** Overview */
+            overview: boolean;
+            /**
+             * Read Only
+             * @default true
+             */
+            read_only: boolean;
+            /** Title Key */
+            title_key: string;
         };
         /** CalendarOut */
         CalendarOut: {
@@ -11388,7 +12316,22 @@ export interface components {
         };
         /** CustomerLoginResponse */
         CustomerLoginResponse: {
-            customer: components["schemas"]["CustomerMe"];
+            customer?: components["schemas"]["CustomerMe"] | null;
+            /**
+             * Passkey Enrolled
+             * @default false
+             */
+            passkey_enrolled: boolean;
+            /**
+             * Pending 2Fa
+             * @default false
+             */
+            pending_2fa: boolean;
+            /**
+             * Totp Enrolled
+             * @default false
+             */
+            totp_enrolled: boolean;
         };
         /** CustomerMe */
         CustomerMe: {
@@ -11404,6 +12347,11 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /**
+             * Sso Logout
+             * @default false
+             */
+            sso_logout: boolean;
         };
         /** CustomerPgpKeyIn */
         CustomerPgpKeyIn: {
@@ -11926,6 +12874,17 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** DimensionRef */
+        DimensionRef: {
+            /** Choices */
+            choices?: string[];
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** Key */
+            key: string;
+            /** Top N */
+            top_n?: number | null;
+        };
         /** DraftIn */
         DraftIn: {
             /** Action */
@@ -12233,6 +13192,25 @@ export interface components {
             key: string;
             /** Sdk Stable */
             sdk_stable: boolean;
+        };
+        /**
+         * FactsStatusOut
+         * @description Whether the derived report data is usable, and how far the first build is.
+         */
+        FactsStatusOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Backfill Job Id */
+            backfill_job_id: number | null;
+            /** Backfill Progress */
+            backfill_progress: number | null;
+            /**
+             * Backfill Status
+             * @enum {string}
+             */
+            backfill_status: "pending" | "running" | "done";
+            /** Ready */
+            ready: boolean;
         };
         /**
          * FeatureGrantsOut
@@ -12695,6 +13673,13 @@ export interface components {
              */
             valid_id: number;
         };
+        /** GroupGrant */
+        GroupGrant: {
+            /** Group Id */
+            group_id: number;
+            /** Permissions */
+            permissions?: ("ro" | "move_into" | "create" | "note" | "owner" | "priority" | "rw")[];
+        };
         /** GroupOut */
         GroupOut: {
             /** Change Time */
@@ -12709,6 +13694,15 @@ export interface components {
             name: string;
             /** Valid Id */
             valid_id: number;
+        };
+        /** GroupPermRefOut */
+        GroupPermRefOut: {
+            /** Group Id */
+            group_id: number;
+            /** Group Name */
+            group_name: string;
+            /** Permission Key */
+            permission_key: string;
         };
         /** GroupRoleAssignment */
         GroupRoleAssignment: {
@@ -12802,6 +13796,257 @@ export interface components {
             memory_used_bytes?: number | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** IdentityCapabilitiesOut */
+        IdentityCapabilitiesOut: {
+            /** Public Base Url Set */
+            public_base_url_set: boolean;
+            /** Saml Available */
+            saml_available: boolean;
+            /** Saml Missing */
+            saml_missing: ("package" | "xmlsec1") | null;
+            /** Webauthn */
+            webauthn: boolean;
+        };
+        /** IdentityKindOut */
+        IdentityKindOut: {
+            /** Hidden Fields */
+            hidden_fields: string[];
+            /** I18N Prefix */
+            i18n_prefix: string;
+            /** Json Schema */
+            json_schema: {
+                [key: string]: unknown;
+            };
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Read Only Fields */
+            read_only_fields: string[];
+        };
+        /** IdentityLinkOut */
+        IdentityLinkOut: {
+            /**
+             * First Seen
+             * Format: date-time
+             */
+            first_seen: string;
+            /** Id */
+            id: number;
+            /**
+             * Last Seen
+             * Format: date-time
+             */
+            last_seen: string;
+            /** Subject */
+            subject: string;
+            /** User Id */
+            user_id: number;
+            /**
+             * User Kind
+             * @enum {string}
+             */
+            user_kind: "agent" | "customer";
+            /** User Login */
+            user_login: string;
+        };
+        /** IdentityPresetOut */
+        IdentityPresetOut: {
+            /**
+             * Audience Default
+             * @enum {string}
+             */
+            audience_default: "agent" | "customer" | "both";
+            /** Button Icon */
+            button_icon: string | null;
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Name Key */
+            name_key: string;
+        };
+        /** IdentityProviderCreate */
+        IdentityProviderCreate: {
+            /**
+             * Audience
+             * @default agent
+             * @enum {string}
+             */
+            audience: "agent" | "customer" | "both";
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string;
+            /** Slug */
+            slug: string;
+        };
+        /** IdentityProviderOut */
+        IdentityProviderOut: {
+            attribute_map: components["schemas"]["AttributeMap"];
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "agent" | "customer" | "both";
+            /** Button Icon */
+            button_icon: string | null;
+            /** Button Label */
+            button_label: string | null;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /** Enabled */
+            enabled: boolean;
+            endpoints: components["schemas"]["ProviderEndpointsOut"];
+            /** Id */
+            id: number;
+            jit_defaults: components["schemas"]["JitDefaults"];
+            /** Jit Enabled */
+            jit_enabled: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Link Count */
+            link_count: number;
+            /**
+             * Match By
+             * @enum {string}
+             */
+            match_by: "login" | "email";
+            /** Metadata Error */
+            metadata_error: string | null;
+            /** Metadata Fetched At */
+            metadata_fetched_at: string | null;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string | null;
+            /** Read Only */
+            read_only: boolean;
+            /** Require Sso Opt In */
+            require_sso_opt_in: boolean;
+            /** Role Rules */
+            role_rules: components["schemas"]["RoleRule"][];
+            /** Secrets Set */
+            secrets_set: string[];
+            /** Slug */
+            slug: string;
+            /** Sort */
+            sort: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "db" | "env";
+            /**
+             * Sync Mode
+             * @enum {string}
+             */
+            sync_mode: "managed" | "authoritative";
+        };
+        /** IdentityProviderSummaryOut */
+        IdentityProviderSummaryOut: {
+            /**
+             * Audience
+             * @enum {string}
+             */
+            audience: "agent" | "customer" | "both";
+            /** Button Icon */
+            button_icon: string | null;
+            /** Button Label */
+            button_label: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /** Jit Enabled */
+            jit_enabled: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml" | "ldap";
+            /** Link Count */
+            link_count: number;
+            /** Metadata Error */
+            metadata_error: string | null;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string | null;
+            /** Read Only */
+            read_only: boolean;
+            /** Slug */
+            slug: string;
+            /** Sort */
+            sort: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "db" | "env";
+        };
+        /** IdentityTestResultOut */
+        IdentityTestResultOut: {
+            /** Attributes */
+            attributes: {
+                [key: string]: string[];
+            };
+            /** Error */
+            error: string | null;
+            plan: components["schemas"]["LoginPlanOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "started" | "done" | "failed";
+            /** Subject */
+            subject: string | null;
+        };
+        /** IdentityTestStartIn */
+        IdentityTestStartIn: {
+            /**
+             * Audience
+             * @default agent
+             * @enum {string}
+             */
+            audience: "agent" | "customer";
+            draft?: components["schemas"]["ProviderChanges"] | null;
+        };
+        /** IdentityTestStartOut */
+        IdentityTestStartOut: {
+            /** Login Url */
+            login_url: string;
+            /** Test Id */
+            test_id: string;
+        };
+        /** JitDefaults */
+        JitDefaults: {
+            /** Allowed Email Domains */
+            allowed_email_domains?: string[];
+            /**
+             * Customer Id
+             * @default
+             */
+            customer_id: string;
+            /** Initial Groups */
+            initial_groups?: components["schemas"]["GroupGrant"][];
+            /** Initial Role Ids */
+            initial_role_ids?: number[];
+            /**
+             * Update Profile On Login
+             * @default true
+             */
+            update_profile_on_login: boolean;
         };
         /**
          * JobAccepted
@@ -13248,6 +14493,59 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /** LoginPlanOut */
+        LoginPlanOut: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "login" | "create" | "reject";
+            /** Groups Add */
+            groups_add: components["schemas"]["GroupPermRefOut"][];
+            /** Groups Remove */
+            groups_remove: components["schemas"]["GroupPermRefOut"][];
+            /** Login */
+            login: string | null;
+            /** Matched By */
+            matched_by: ("link" | "login" | "email" | "jit") | null;
+            /** Profile */
+            profile: {
+                [key: string]: string | null;
+            };
+            /** Profile Changes */
+            profile_changes: {
+                [key: string]: (string | null)[];
+            };
+            /** Reject Code */
+            reject_code: string | null;
+            /** Reject Message */
+            reject_message: string | null;
+            /** Roles Add */
+            roles_add: components["schemas"]["NamedRefOut"][];
+            /** Roles Remove */
+            roles_remove: components["schemas"]["NamedRefOut"][];
+            /** User Id */
+            user_id: number | null;
+            /**
+             * User Kind
+             * @enum {string}
+             */
+            user_kind: "agent" | "customer";
+        };
+        /** LoginProviderOut */
+        LoginProviderOut: {
+            /** Icon */
+            icon?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oidc" | "saml";
+            /** Label */
+            label: string;
+            /** Slug */
+            slug: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /** Login */
@@ -13495,6 +14793,48 @@ export interface components {
             /** Timeout Seconds */
             timeout_seconds?: number | null;
         };
+        /** ManagedAssignmentOut */
+        ManagedAssignmentOut: {
+            /**
+             * Created
+             * Format: date-time
+             */
+            created: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "role" | "group";
+            /** Login */
+            login: string;
+            /** Permission Key */
+            permission_key: string;
+            /** Target Id */
+            target_id: number;
+            /** Target Name */
+            target_name: string;
+            /** User Id */
+            user_id: number;
+        };
+        /** MappingPreviewIn */
+        MappingPreviewIn: {
+            /** Attributes */
+            attributes: {
+                [key: string]: string[];
+            };
+            /**
+             * Audience
+             * @default agent
+             * @enum {string}
+             */
+            audience: "agent" | "customer";
+            draft?: components["schemas"]["ProviderChanges"] | null;
+            /**
+             * Subject
+             * @default preview
+             */
+            subject: string;
+        };
         /** McpClientCreate */
         McpClientCreate: {
             /** Auth Token */
@@ -13586,6 +14926,11 @@ export interface components {
             /** Mutating */
             mutating?: boolean | null;
         };
+        /** MeasureRef */
+        MeasureRef: {
+            /** Key */
+            key: string;
+        };
         /** MentionCreate */
         MentionCreate: {
             /** Article Id */
@@ -13676,6 +15021,13 @@ export interface components {
             new: number;
             /** Open */
             open: number;
+        };
+        /** NamedRefOut */
+        NamedRefOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
         };
         /**
          * NewProcessTicketIn
@@ -14609,6 +15961,24 @@ export interface components {
             /** Attachment Ids */
             attachment_ids: number[];
         };
+        /**
+         * PortalAuthMethodsOut
+         * @description Sign-in options of the customer portal login page.
+         */
+        PortalAuthMethodsOut: {
+            /**
+             * Password
+             * @default true
+             */
+            password: boolean;
+            /** Providers */
+            providers?: components["schemas"]["LoginProviderOut"][];
+            /**
+             * Webauthn
+             * @default false
+             */
+            webauthn: boolean;
+        };
         /** PortalLanguageIn */
         PortalLanguageIn: {
             /** Language */
@@ -14913,6 +16283,63 @@ export interface components {
              * @default
              */
             state_name: string;
+        };
+        /**
+         * ProviderChanges
+         * @description Admin PATCH body (also the "draft" of a test login).
+         */
+        ProviderChanges: {
+            attribute_map?: components["schemas"]["AttributeMap"] | null;
+            /** Audience */
+            audience?: ("agent" | "customer" | "both") | null;
+            /** Button Icon */
+            button_icon?: string | null;
+            /** Button Label */
+            button_label?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            jit_defaults?: components["schemas"]["JitDefaults"] | null;
+            /** Jit Enabled */
+            jit_enabled?: boolean | null;
+            /** Match By */
+            match_by?: ("login" | "email") | null;
+            /** Name */
+            name?: string | null;
+            /** Require Sso Opt In */
+            require_sso_opt_in?: boolean | null;
+            /** Role Rules */
+            role_rules?: components["schemas"]["RoleRule"][] | null;
+            /** Slug */
+            slug?: string | null;
+            /** Sort */
+            sort?: number | null;
+            /** Sync Mode */
+            sync_mode?: ("managed" | "authoritative") | null;
+        };
+        /** ProviderEndpointsOut */
+        ProviderEndpointsOut: {
+            /** Agent Acs Url */
+            agent_acs_url: string | null;
+            /** Agent Redirect Uri */
+            agent_redirect_uri: string | null;
+            /** Backchannel Logout Url */
+            backchannel_logout_url: string | null;
+            /** Base Url Missing */
+            base_url_missing: boolean;
+            /** Customer Acs Url */
+            customer_acs_url: string | null;
+            /** Customer Redirect Uri */
+            customer_redirect_uri: string | null;
+            /** Slo Url */
+            slo_url: string | null;
+            /** Sp Entity Id */
+            sp_entity_id: string | null;
+            /** Sp Metadata Url */
+            sp_metadata_url: string | null;
         };
         /** ProviderTemplateOut */
         ProviderTemplateOut: {
@@ -15272,6 +16699,26 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** RelativeTimeRange */
+        RelativeTimeRange: {
+            /** Count */
+            count: number;
+            /**
+             * Include Current
+             * @default false
+             */
+            include_current: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "relative";
+            /**
+             * Unit
+             * @enum {string}
+             */
+            unit: "day" | "week" | "month" | "quarter" | "year";
+        };
         /** RemoteModelsOut */
         RemoteModelsOut: {
             /** Models */
@@ -15307,12 +16754,317 @@ export interface components {
             /** To Address */
             to_address?: string | null;
         };
+        /** ReportBackfillIn */
+        ReportBackfillIn: {
+            /**
+             * Restart
+             * @default true
+             */
+            restart: boolean;
+            /** Since */
+            since?: string | null;
+            /**
+             * Snapshots
+             * @default true
+             */
+            snapshots: boolean;
+        };
+        /** ReportCatalogueOut */
+        ReportCatalogueOut: {
+            facts: components["schemas"]["FactsStatusOut"];
+            /** Reports */
+            reports: components["schemas"]["BuiltinReportOut"][];
+        };
+        /** ReportDefinition */
+        ReportDefinition: {
+            /** Dimensions */
+            dimensions?: components["schemas"]["DimensionRef"][];
+            filter?: components["schemas"]["Filter"] | null;
+            /** Limit */
+            limit?: number | null;
+            /** Measures */
+            measures: components["schemas"]["MeasureRef"][];
+            /** Parameters */
+            parameters?: components["schemas"]["ReportParameter"][];
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Sort */
+            sort?: components["schemas"]["SortSpec"][];
+            /** Source */
+            source: string;
+            /** Time Field */
+            time_field?: string | null;
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+            /** Time Zone */
+            time_zone?: string | null;
+            totals?: components["schemas"]["Totals"];
+            visualization?: components["schemas"]["Visualization"];
+        };
+        /** ReportExportIn */
+        ReportExportIn: {
+            /** Column Labels */
+            column_labels?: {
+                [key: string]: string;
+            };
+            /**
+             * Compare Previous
+             * @default false
+             */
+            compare_previous: boolean;
+            definition?: components["schemas"]["ReportDefinition"] | null;
+            /** Dimension Choices */
+            dimension_choices?: {
+                [key: string]: string;
+            };
+            /**
+             * Force Job
+             * @default false
+             */
+            force_job: boolean;
+            /**
+             * Format
+             * @default xlsx
+             * @enum {string}
+             */
+            format: "xlsx" | "csv";
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** Info Lines */
+            info_lines?: string[];
+            /**
+             * No Cache
+             * @default false
+             */
+            no_cache: boolean;
+            /** Parameters */
+            parameters?: {
+                [key: string]: (string | number)[] | string | number | boolean | null;
+            };
+            /** Report Key */
+            report_key?: string | null;
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+            /** Time Zone */
+            time_zone?: string | null;
+            /**
+             * Title
+             * @default Bericht
+             */
+            title: string;
+            /**
+             * Totals Label
+             * @default Summe
+             */
+            totals_label: string;
+            /** Value Labels */
+            value_labels?: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
+        /**
+         * ReportParameter
+         * @description Znuny "changeable at runtime".
+         */
+        ReportParameter: {
+            /** Allowed Values */
+            allowed_values?: (string | number)[] | null;
+            /** Default */
+            default?: (string | number)[] | null;
+            /** Field */
+            field: string;
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key?: string | null;
+            /**
+             * Op
+             * @default in
+             * @enum {string}
+             */
+            op: "in" | "eq" | "is_true" | "is_false";
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+        };
+        /** ReportResultOut */
+        ReportResultOut: {
+            /** Cached */
+            cached: boolean;
+            /** Columns */
+            columns: components["schemas"]["ResultColumnOut"][];
+            facts: components["schemas"]["FactsStatusOut"];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Labels */
+            labels: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+            previous: components["schemas"]["ReportTotalsOut"] | null;
+            /** Report Key */
+            report_key: string | null;
+            /** Row Count */
+            row_count: number;
+            /** Rows */
+            rows: (string | number | null)[][];
+            time_window: components["schemas"]["TimeWindowOut"] | null;
+            totals: components["schemas"]["ReportTotalsOut"] | null;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * ReportRunIn
+         * @description Body of ``POST /reports/run``: exactly one of ``report_key`` / ``definition``.
+         *
+         *     Unknown fields are rejected (422): ``window_override``, ``extra_filter`` and
+         *     ``last_snapshot_date`` exist only internally (``RunParams``) for the
+         *     ``/stats`` wrappers and the engine, never as request fields.
+         */
+        ReportRunIn: {
+            /**
+             * Compare Previous
+             * @default false
+             */
+            compare_previous: boolean;
+            definition?: components["schemas"]["ReportDefinition"] | null;
+            /** Dimension Choices */
+            dimension_choices?: {
+                [key: string]: string;
+            };
+            /**
+             * Force Job
+             * @default false
+             */
+            force_job: boolean;
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /**
+             * No Cache
+             * @default false
+             */
+            no_cache: boolean;
+            /** Parameters */
+            parameters?: {
+                [key: string]: (string | number)[] | string | number | boolean | null;
+            };
+            /** Report Key */
+            report_key?: string | null;
+            /** Time Range */
+            time_range?: (components["schemas"]["RelativeTimeRange"] | components["schemas"]["AbsoluteTimeRange"]) | null;
+            /** Time Zone */
+            time_zone?: string | null;
+        };
+        /**
+         * ReportRunOut
+         * @description 200: ``result`` (inline run or cache hit); 202: ``job`` (background run).
+         */
+        ReportRunOut: {
+            job?: components["schemas"]["JobAccepted"] | null;
+            result?: components["schemas"]["ReportResultOut"] | null;
+        };
+        /** ReportSourceOut */
+        ReportSourceOut: {
+            /** Default Time Field */
+            default_time_field: string | null;
+            /** Dimensions */
+            dimensions: components["schemas"]["SourceDimensionOut"][];
+            /** Filter Fields */
+            filter_fields: components["schemas"]["SourceDimensionOut"][];
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key: string;
+            /** Measures */
+            measures: components["schemas"]["SourceMeasureOut"][];
+        };
+        /** ReportTotalsOut */
+        ReportTotalsOut: {
+            /** Columns */
+            columns?: {
+                [key: string]: (string | number | null)[];
+            };
+            /** Grand */
+            grand?: (string | number | null)[] | null;
+            /** Rows */
+            rows?: {
+                [key: string]: (string | number | null)[];
+            };
+        };
+        /**
+         * ReportingStatusOut
+         * @description Admin view: the status plus the bookkeeping behind it.
+         */
+        ReportingStatusOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Backfill Job Id */
+            backfill_job_id: number | null;
+            /** Backfill Progress */
+            backfill_progress: number | null;
+            /**
+             * Backfill Status
+             * @enum {string}
+             */
+            backfill_status: "pending" | "running" | "done";
+            /** Dirty Count */
+            dirty_count: number;
+            /** Event Rows */
+            event_rows: number;
+            /** Fact Rows */
+            fact_rows: number;
+            /** Gap Count */
+            gap_count: number;
+            /** History Lag */
+            history_lag: number;
+            /** Last History Id */
+            last_history_id: number;
+            /** Last Snapshot Date */
+            last_snapshot_date: string | null;
+            /** Ready */
+            ready: boolean;
+            /** Snapshot Time Zone */
+            snapshot_time_zone: string | null;
+        };
         /** ResolvedCustomerLink */
         ResolvedCustomerLink: {
             /** Label */
             label: string | null;
             /** Url */
             url: string | null;
+        };
+        /** ResultColumnOut */
+        ResultColumnOut: {
+            /** Grain */
+            grain?: ("day" | "week" | "month" | "quarter" | "year") | null;
+            /** I18N Values */
+            i18n_values?: string | null;
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "dimension" | "measure";
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "id" | "string" | "enum" | "date" | "hour" | "weekday" | "count" | "number" | "minutes" | "hours" | "days" | "units" | "percent";
         };
         /** RevisionOut */
         RevisionOut: {
@@ -15361,6 +17113,17 @@ export interface components {
             name: string;
             /** Valid Id */
             valid_id: number;
+        };
+        /** RoleRule */
+        RoleRule: {
+            /** Attribute */
+            attribute: string;
+            /** Groups */
+            groups?: components["schemas"]["GroupGrant"][];
+            /** Role Ids */
+            role_ids?: number[];
+            /** Value */
+            value: string;
         };
         /** RoleUpdate */
         RoleUpdate: {
@@ -15924,6 +17687,53 @@ export interface components {
         SmsSendResponse: {
             /** Article Id */
             article_id: number;
+        };
+        /** SortSpec */
+        SortSpec: {
+            /**
+             * Direction
+             * @default desc
+             * @enum {string}
+             */
+            direction: "asc" | "desc";
+            /** Key */
+            key: string;
+        };
+        /**
+         * SourceDimensionOut
+         * @description A dimension, or (in ``filter_fields``) a filter-only field of a source.
+         *
+         *     Filter-only fields have ``kind`` = their filter type, ``labels`` "none",
+         *     no ``i18n_values`` / ``options_source`` and ``time_field`` false.
+         */
+        SourceDimensionOut: {
+            /** Filter Type */
+            filter_type: string | null;
+            /** I18N Values */
+            i18n_values: string | null;
+            /** Key */
+            key: string;
+            /** Kind */
+            kind: string;
+            /** Label Key */
+            label_key: string;
+            /** Labels */
+            labels: string;
+            /** Options Source */
+            options_source: string | null;
+            /** Time Field */
+            time_field: boolean;
+        };
+        /** SourceMeasureOut */
+        SourceMeasureOut: {
+            /** Agg */
+            agg: string;
+            /** Key */
+            key: string;
+            /** Label Key */
+            label_key: string;
+            /** Unit */
+            unit: string;
         };
         /** SplitRequest */
         SplitRequest: {
@@ -17263,6 +19073,49 @@ export interface components {
             /** Total Units */
             total_units: number;
         };
+        /** TimeWindowOut */
+        TimeWindowOut: {
+            /**
+             * End
+             * Format: date-time
+             */
+            end: string;
+            /**
+             * End Date
+             * Format: date
+             */
+            end_date: string;
+            /**
+             * Start
+             * Format: date-time
+             */
+            start: string;
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Time Zone */
+            time_zone: string;
+        };
+        /** Totals */
+        Totals: {
+            /**
+             * Columns
+             * @default false
+             */
+            columns: boolean;
+            /**
+             * Grand
+             * @default false
+             */
+            grand: boolean;
+            /**
+             * Rows
+             * @default false
+             */
+            rows: boolean;
+        };
         /** TypeRefOut */
         TypeRefOut: {
             /** Id */
@@ -17357,6 +19210,11 @@ export interface components {
             last_name: string;
             /** Login */
             login: string;
+            /**
+             * Sso Logout
+             * @default false
+             */
+            sso_logout: boolean;
             /** Time Zone */
             time_zone?: string | null;
         };
@@ -17495,6 +19353,19 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** Visualization */
+        Visualization: {
+            /** Chart Measures */
+            chart_measures?: number[] | null;
+            /** Series Dimension */
+            series_dimension?: number | null;
+            /**
+             * Type
+             * @default table
+             * @enum {string}
+             */
+            type: "table" | "pivot" | "bar" | "stacked_bar" | "line" | "area" | "donut" | "heatmap" | "kpi";
         };
         /** VolumePointOut */
         VolumePointOut: {
@@ -17690,6 +19561,530 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_auth_methods_api_portal_auth_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalAuthMethodsOut"];
+                };
+            };
+        };
+    };
+    portal_oidc_callback_api_portal_auth_oidc__slug__callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_list_api_portal_auth_passkey_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_authenticate_begin_api_portal_auth_passkey_authenticate_begin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    passkey_authenticate_finish_api_portal_auth_passkey_authenticate_finish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyAuthenticateFinishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_register_begin_api_portal_auth_passkey_register_begin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_register_finish_api_portal_auth_passkey_register_finish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyRegisterFinishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_delete_api_portal_auth_passkey__passkey_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                passkey_id: number;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_saml_acs_api_portal_auth_saml__slug__acs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_sso_logout_api_portal_auth_sso_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    portal_sso_login_api_portal_auth_sso__slug__login_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+                test?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_disable_api_portal_auth_totp_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TOTPCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_confirm_api_portal_auth_totp_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TOTPCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_enroll_api_portal_auth_totp_enroll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["TOTPEnrollIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPEnrollOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_enroll_qr_api_portal_auth_totp_enroll_qr_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_status_api_portal_auth_totp_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    totp_verify_api_portal_auth_totp_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TOTPCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLoginResponse"];
                 };
             };
             /** @description Validation Error */
@@ -23034,6 +25429,39 @@ export interface operations {
             };
         };
     };
+    reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_customer_user_companies_api_v1_admin_customer_users__customer_user_login__companies_get: {
         parameters: {
             query?: never;
@@ -24530,6 +26958,539 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_providers_api_v1_admin_identity_providers_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_identity_provider_api_v1_admin_identity_providers_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityProviderCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    identity_capabilities_api_v1_admin_identity_providers_capabilities_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCapabilitiesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_kinds_api_v1_admin_identity_providers_kinds_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityKindOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_presets_api_v1_admin_identity_providers_presets_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityPresetOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_identity_provider_api_v1_admin_identity_providers__provider_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_identity_provider_api_v1_admin_identity_providers__provider_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_identity_provider_api_v1_admin_identity_providers__provider_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProviderChanges"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_identity_links_api_v1_admin_identity_providers__provider_id__links_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityLinkOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_identity_link_api_v1_admin_identity_providers__provider_id__links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+                link_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_managed_assignments_api_v1_admin_identity_providers__provider_id__managed_assignments_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManagedAssignmentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_identity_mapping_api_v1_admin_identity_providers__provider_id__preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MappingPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_identity_provider_metadata_api_v1_admin_identity_providers__provider_id__refresh_metadata_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityProviderOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_identity_test_api_v1_admin_identity_providers__provider_id__tests_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityTestStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityTestStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_identity_test_api_v1_admin_identity_providers__provider_id__tests__test_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                provider_id: number;
+                test_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityTestResultOut"];
                 };
             };
             /** @description Validation Error */
@@ -26582,6 +29543,76 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_backfill_api_v1_admin_reporting_backfill_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportBackfillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_reporting_status_api_v1_admin_reporting_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportingStatusOut"];
+                };
             };
             /** @description Validation Error */
             422: {
@@ -30211,7 +33242,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Successful Response */
+            /** @description API clients: the session as JSON */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -30233,7 +33264,9 @@ export interface operations {
     };
     oidc_login_api_v1_auth_oidc_login_get: {
         parameters: {
-            query?: never;
+            query?: {
+                next?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -30247,6 +33280,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    logout_token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sessions of the logout token ended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Invalid logout token or the logout failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No OIDC provider with back-channel logout under this slug */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    oidc_provider_callback_api_v1_auth_oidc__slug__callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -30506,6 +33640,131 @@ export interface operations {
             };
         };
     };
+    saml_acs_api_v1_auth_saml__slug__acs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_metadata_api_v1_auth_saml__slug__metadata_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/samlmetadata+xml": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_sls_get_api_v1_auth_saml__slug__sls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    saml_sls_post_api_v1_auth_saml__slug__sls_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     spnego_api_v1_auth_spnego_get: {
         parameters: {
             query?: {
@@ -30515,6 +33774,60 @@ export interface operations {
                 authorization?: string | null;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sso_logout_route_api_v1_auth_sso_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    sso_login_api_v1_auth_sso__slug__login_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+                test?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -34607,6 +37920,223 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TypeRefOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_v1_reporting_sources_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSourceOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_facts_status_api_v1_reporting_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactsStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_reports_api_v1_reports_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportCatalogueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_report_api_v1_reports_export_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportExportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAccepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_endpoint_api_v1_reports_run_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunOut"];
+                };
+            };
+            /** @description Runs as a background job. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_report_api_v1_reports__report_key__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                report_key: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuiltinReportOut"];
                 };
             };
             /** @description Validation Error */

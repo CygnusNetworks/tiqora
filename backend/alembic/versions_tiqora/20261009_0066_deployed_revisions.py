@@ -1,8 +1,8 @@
 """Create tiqora_process_revision and tiqora_acl_revision (deployed snapshots).
 
-Revision ID: 20261008_0062
-Revises: 20261008_0061
-Create Date: 2026-10-08
+Revision ID: 20261009_0066
+Revises: 20261009_0065
+Create Date: 2026-10-09
 
 ``config`` is the canonical JSON dump of the deployed process/ACL configuration,
 ``MEDIUMTEXT`` on MariaDB (plain ``TEXT`` stops at 64 KiB). ``deployed_at`` is
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
 
-revision: str = "20261008_0062"
-down_revision: str | None = "20261008_0061"
+revision: str = "20261009_0066"
+down_revision: str | None = "20261009_0065"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

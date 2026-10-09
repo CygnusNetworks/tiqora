@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import contextlib
-import secrets
 from html import escape as html_escape
 from typing import Annotated, Any
 from urllib.parse import quote
@@ -35,9 +34,7 @@ from tiqora.domain.auth import (
     user_to_dict,
 )
 from tiqora.domain.auth_config import AuthConfigService
-from tiqora.domain.auth_ldap import LdapAuthService
 from tiqora.domain.feature_grants import CUSTOMER_DIRECTORY, CUSTOMER_EDIT, FeatureGrantService
-from tiqora.domain.oidc import OIDCError, OIDCService
 from tiqora.domain.passkey import two_factor_enabled, webauthn_enabled
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
 from tiqora.domain.password_setup import redeem_token, resolve_token
@@ -68,17 +65,24 @@ from tiqora.domain.template_permission import TemplatePermissionService
 from tiqora.domain.timezones import default_time_zone, user_time_zone_preference, valid_time_zone
 from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
+from tiqora.identity.http import safe_next as _safe_next
+from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
+from tiqora.identity.login_providers import login_providers
+from tiqora.identity.saml_runtime import saml_availability
+from tiqora.identity.sso_routes import (
+    finish_oidc_callback,
+    session_sso_state,
+    start_sso_login,
+)
+from tiqora.identity.types import ENV_OIDC_SLUG
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
+from tiqora.znuny.sessions import delete_agent_sessions
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-_OIDC_STATE_PREFIX = "tiqora:oidc:state:"
-_OIDC_STATE_TTL = 300
-_OIDC_STATE_COOKIE = "tiqora_oidc_state"
 
 
 async def _load_user_language(session: AsyncSession, user_id: int) -> str | None:
@@ -169,20 +173,6 @@ def _clear_session_cookie(response: Response, settings: AppSettings) -> None:
         httponly=True,
         samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
     )
-
-
-def _safe_next(next_path: str | None, *, default: str = "/") -> str:
-    """Same-site absolute path only — reject protocol-relative (``//evil``),
-    backslash tricks (``/\\evil``) and anything carrying a scheme/host, so the
-    post-SSO redirect can never be turned into an open redirect."""
-    if (
-        isinstance(next_path, str)
-        and next_path.startswith("/")
-        and not next_path.startswith("//")
-        and not next_path.startswith("/\\")
-    ):
-        return next_path
-    return default
 
 
 def _sso_failure_redirect(safe_next: str) -> RedirectResponse:
@@ -300,6 +290,8 @@ async def auth_methods(settings: AppSettings, session: DbSession) -> AuthMethods
         ldap=settings.ldap_enabled,
         webauthn=webauthn_enabled(settings),
         portal_enabled=await resolve_portal_enabled(session, settings),
+        providers=await login_providers(session, settings),
+        saml=saml_availability().available,
     )
 
 
@@ -365,6 +357,15 @@ async def complete_password_setup(
     await session.commit()
     # Setting a password through a one-time link is also a recovery path: drop
     # any session that predates the new credential (security review M-2).
+    # DB rows first (own try + rollback), then Redis: a Redis outage must not skip the DB side.
+    try:
+        await delete_agent_sessions(session, user_id)
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001 — password already committed
+        await session.rollback()
+        logger.warning(
+            "password_setup_znuny_session_revoke_failed", user_id=user_id, error=str(exc)
+        )
     try:
         await SessionStore(redis_client, settings).revoke_user_sessions(user_id)
     except Exception as exc:  # noqa: BLE001 — password already committed
@@ -391,15 +392,22 @@ async def login(
         raise _rate_limit_http_exception(pre)
 
     user = await auth.authenticate_password(body.login, body.password)
-    if user is None and settings.ldap_enabled:
-        # LDAP is tried as a fallback when local password auth fails,
-        # mirroring Znuny's chained AuthModule::LDAP behaviour. No
-        # auto-provisioning in v1: the resolved LDAP UID must match an
-        # existing, valid `users.login` row.
-        ldap_service = LdapAuthService(settings)
-        ldap_uid = await ldap_service.authenticate(body.login, body.password)
-        if ldap_uid is not None:
-            user = await auth.get_user_by_login(ldap_uid, auth_method="ldap")
+    if user is None:
+        # Then the LDAP directories (Znuny's chained AuthModules), first bind wins.
+        try:
+            account_login = await ldap_sign_in(
+                session, settings, login=body.login, password=body.password, user_kind="agent"
+            )
+        except LdapSignInUnavailable as exc:
+            # Counted like a failure (no free retries), but honest: try again later.
+            locked = await limiter.record_failure(login=body.login, ip=ip)
+            if locked is not None:
+                raise _rate_limit_http_exception(locked) from exc
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=exc.message
+            ) from exc
+        if account_login is not None:
+            user = await auth.get_user_by_login(account_login, auth_method="ldap")
     if user is None:
         locked = await limiter.record_failure(login=body.login, ip=ip)
         if locked is not None:
@@ -432,14 +440,34 @@ async def login(
     return LoginResponse(user=await _user_me(session, user))
 
 
+async def _sso_logout_extra(
+    request: Request, session: AsyncSession, settings: AppSettings
+) -> dict[str, Any]:
+    """``{"sso_logout": bool}`` for the current agent session (False without SSO info)."""
+    token = getattr(request.state, "session_token", None) or request.cookies.get(
+        settings.session_cookie_name
+    )
+    try:
+        redis = await get_redis(request)
+    except Exception:  # noqa: BLE001 - never fail /me for the logout hint
+        return {"sso_logout": False}
+    return {
+        "sso_logout": await session_sso_state(redis, session, settings, token, user_kind="agent")
+    }
+
+
 @router.get("/me", response_model=UserMe)
-async def me(user: CurrentUser, session: DbSession) -> UserMe:
-    return await _user_me(session, user)
+async def me(
+    request: Request, user: CurrentUser, session: DbSession, settings: AppSettings
+) -> UserMe:
+    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
 
 
 @router.put("/me/language", response_model=UserMe)
 async def set_my_language(
     body: UserLanguageUpdate,
+    request: Request,
+    settings: AppSettings,
     user: CurrentUser,
     session: DbSession,
     auth: Annotated[AuthService, Depends(get_auth_service)],
@@ -452,12 +480,14 @@ async def set_my_language(
             detail=f"Unsupported language code: {body.language!r}",
         )
     await auth.set_user_language(user.id, code)
-    return await _user_me(session, user)
+    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
 
 
 @router.put("/me/time-zone", response_model=UserMe)
 async def set_my_time_zone(
     body: UserTimeZoneUpdate,
+    request: Request,
+    settings: AppSettings,
     user: CurrentUser,
     session: DbSession,
     auth: Annotated[AuthService, Depends(get_auth_service)],
@@ -472,7 +502,7 @@ async def set_my_time_zone(
                 detail=f"Unknown time zone: {body.time_zone!r}",
             )
     await auth.set_user_time_zone(user.id, zone)
-    return await _user_me(session, user)
+    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -542,6 +572,7 @@ async def totp_verify(
 async def totp_enroll(
     user: EnrollableUser,
     totp: TOTPServiceDep,
+    webauthn: WebAuthnServiceDep,
     request: Request,
     settings: AppSettings,
     body: TOTPEnrollIn | None = None,
@@ -576,6 +607,10 @@ async def totp_enroll(
         await limiter.reset(login=rl_key, ip=ip)
         return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
 
+    # Adding TOTP to a passkey-only account is changing the account's factors:
+    # same recent-sign-in rule as registering a passkey (no-op for ENROLL sessions).
+    if await webauthn.has_passkey(user.id):
+        await _require_recent_auth(request, settings, user.id, totp, webauthn)
     secret, uri = await totp.enroll(user.id, user.login)
     return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
 
@@ -881,117 +916,53 @@ async def passkey_authenticate_finish(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/oidc/login")
-async def oidc_login(request: Request, settings: AppSettings) -> RedirectResponse:
+@router.get("/oidc/login", response_model=None)
+async def oidc_login(
+    request: Request,
+    settings: AppSettings,
+    session: DbSession,
+    next: Annotated[str | None, Query()] = None,
+) -> Response:
+    """Alias of ``/auth/sso/env-oidc/login`` (production env OIDC keeps its URLs)."""
     if not settings.oidc_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OIDC is not enabled")
-    redis_client = await get_redis(request)
-    state = secrets.token_urlsafe(24)
-    oidc = OIDCService(settings)
-    # PKCE when the provider advertises S256 (security review L-5). The verifier
-    # is stored server-side under the state key, so it never touches the browser
-    # and the callback can only redeem a code it actually initiated.
-    code_verifier = secrets.token_urlsafe(64) if await oidc.supports_pkce() else None
-    await redis_client.set(f"{_OIDC_STATE_PREFIX}{state}", code_verifier or "1", ex=_OIDC_STATE_TTL)
-    try:
-        url = await oidc.authorize_url(state, code_verifier=code_verifier)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("oidc_discovery_failed", error=str(exc))
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="OIDC provider unreachable"
-        ) from exc
-    resp = RedirectResponse(url, status_code=status.HTTP_302_FOUND)
-    # Bind the state to THIS browser: the callback requires this cookie to match
-    # the returned state, so an attacker cannot replay a state/code they minted
-    # into a victim's session (OIDC login CSRF / session fixation — security review).
-    resp.set_cookie(
-        key=_OIDC_STATE_COOKIE,
-        value=state,
-        httponly=True,
-        secure=settings.session_cookie_secure,
-        samesite="lax",  # sent on the top-level IdP → callback redirect
-        max_age=_OIDC_STATE_TTL,
-        path="/",
+    return await start_sso_login(
+        request,
+        slug=ENV_OIDC_SLUG,
+        user_kind="agent",
+        next_path=next,
+        test_id=None,
+        session=session,
+        settings=settings,
+        current_admin_id=None,
     )
-    return resp
 
 
-@router.get("/oidc/callback", response_model=LoginResponse)
+@router.get(
+    "/oidc/callback",
+    response_model=None,
+    responses={200: {"model": LoginResponse, "description": "API clients: the session as JSON"}},
+)
 async def oidc_callback(
     request: Request,
-    response: Response,
-    auth: Annotated[AuthService, Depends(get_auth_service)],
-    totp: TOTPServiceDep,
     settings: AppSettings,
     session: DbSession,
     code: str | None = None,
     state: str | None = None,
-) -> LoginResponse:
+) -> Response:
+    """Alias of ``/auth/oidc/env-oidc/callback`` (browsers: 302 to ``next``; API clients: JSON)."""
     if not settings.oidc_enabled:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OIDC is not enabled")
-    if not code or not state:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing code/state")
-    redis_client = await get_redis(request)
-    state_key = f"{_OIDC_STATE_PREFIX}{state}"
-    cookie_state = request.cookies.get(_OIDC_STATE_COOKIE)
-    stored_state = await redis_client.get(state_key)
-    # State must exist server-side AND match the per-browser cookie set at /login.
-    if not cookie_state or not secrets.compare_digest(cookie_state, state) or not stored_state:
-        response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired state"
-        )
-    await redis_client.delete(state_key)
-    response.delete_cookie(_OIDC_STATE_COOKIE, path="/")
-
-    # "1" is the sentinel for a flow started without PKCE (provider does not
-    # advertise S256); anything else is the code_verifier.
-    if isinstance(stored_state, bytes):
-        stored_state = stored_state.decode("utf-8")
-    code_verifier = None if stored_state == "1" else str(stored_state)
-
-    oidc = OIDCService(settings)
-    try:
-        claims = await oidc.fetch_claims(code, code_verifier=code_verifier)
-    except OIDCError as exc:
-        logger.warning("oidc_exchange_failed", error=str(exc))
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
-
-    login_value = claims.get(settings.oidc_claim)
-    if not login_value or not isinstance(login_value, str):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"OIDC claim '{settings.oidc_claim}' missing from userinfo response",
-        )
-
-    user = await auth.get_user_by_login(login_value, auth_method="sso")
-    if user is None:
-        # No auto-provisioning in v1: unknown users are rejected outright.
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"No local user matches SSO identity '{login_value}'",
-        )
-
-    # Per-account SSO gate, consistent with the SPNEGO path (security review L-1).
-    if not (await AuthConfigService(session).get(user.id)).sso_eligible:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="SSO not enabled for this account",
-        )
-
-    # Best-effort Google/OIDC profile picture (userinfo ``picture`` claim).
-    picture_raw = claims.get("picture")
-    avatar_url: str | None = None
-    if isinstance(picture_raw, str):
-        picture = picture_raw.strip()
-        if picture.startswith(("http://", "https://")):
-            avatar_url = picture
-
-    # SSO is the strong factor — skip the TOTP pending branch entirely.
-    _ = totp
-    token = await auth.create_session(user, avatar_url=avatar_url)
-    _set_session_cookie(response, settings, token)
-    return LoginResponse(user=await _user_me(session, user, extra={"avatar_url": avatar_url}))
+    return await finish_oidc_callback(
+        request,
+        slug=ENV_OIDC_SLUG,
+        user_kind="agent",
+        code=code,
+        state=state,
+        session=session,
+        settings=settings,
+        json_response=not _wants_html(request),
+    )
 
 
 # ---------------------------------------------------------------------------

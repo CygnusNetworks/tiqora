@@ -22,10 +22,10 @@ after a new ticket / follow-up has been created. Behaviour ported:
 
 from __future__ import annotations
 
-import re
 from email.message import EmailMessage
 from typing import TYPE_CHECKING, Literal
 
+import regex
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -127,14 +127,25 @@ async def _secure_auto_response(
     return False
 
 
+# The pattern is admin configuration, the address comes from a remote mail: like the GI
+# mapping regexes, run it on the ``regex`` package with a per-match time budget.
+_NO_AUTO_REGEX_TIMEOUT_SECONDS = 0.2
+
+
 def _matches_no_auto_response(pattern: str, address: str) -> bool:
-    """``$Email =~ /$NoAutoRegExp/i`` (a pattern Python cannot compile never matches)."""
+    """``$Email =~ /$NoAutoRegExp/i``; a pattern that does not compile or runs out of time
+    never matches (logged)."""
     if not pattern:
         return False
     try:
-        return re.search(pattern, address, re.IGNORECASE) is not None
-    except re.error:
+        compiled = regex.compile(pattern, regex.IGNORECASE)
+    except (regex.error, RecursionError, OverflowError):
         logger.warning("autoresponse_bad_no_auto_regexp", pattern=pattern)
+        return False
+    try:
+        return compiled.search(address, timeout=_NO_AUTO_REGEX_TIMEOUT_SECONDS) is not None
+    except TimeoutError:
+        logger.warning("autoresponse_no_auto_regexp_timeout", pattern=pattern)
         return False
 
 

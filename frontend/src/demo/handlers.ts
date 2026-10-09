@@ -1,5 +1,30 @@
 import { http, HttpResponse } from "msw";
-import { resolveData, demoPortalUser, demoPortalTickets, demoPortalProcess, demoRefine } from "./mockData";
+import {
+  resolveData,
+  resolveReportRun,
+  demoPortalUser,
+  demoPortalTickets,
+  demoPortalProcess,
+  demoRefine,
+} from "./mockData";
+import { setDemoFactsBuilding } from "./reportsMock";
+import type { ReportRunIn } from "@/lib/reportsApi";
+
+/**
+ * Demo switch for the "report data is still being built" state: open any page
+ * with `?demo_facts=building` (and `?demo_facts=ready` to end it). Kept for the
+ * tab in sessionStorage because the app drops unknown search params.
+ */
+function syncDemoFacts(): void {
+  try {
+    const flag = new URLSearchParams(window.location.search).get("demo_facts");
+    if (flag === "building") sessionStorage.setItem("tiqora-demo-facts", "building");
+    if (flag === "ready") sessionStorage.removeItem("tiqora-demo-facts");
+    setDemoFactsBuilding(sessionStorage.getItem("tiqora-demo-facts") === "building");
+  } catch {
+    // no storage (private mode): keep the current state
+  }
+}
 
 /**
  * MSW request handlers for the public demo build. Delegates to the shared pure
@@ -7,9 +32,30 @@ import { resolveData, demoPortalUser, demoPortalTickets, demoPortalProcess, demo
  * "logged in" as the mock agent) + the portal plane. Any unmatched /api call
  * returns an empty payload so no screen errors on a missing endpoint.
  */
+// Customer TOTP in the demo: enrolling and confirming flips the status for the session.
+let demoPortalTotpEnabled = false;
+
 function respond(pathname: string, method: string): unknown {
   // Portal plane (checked before the shared resolver's generic /auth/me).
-  if (pathname.endsWith("/api/portal/auth/methods")) return { password: true };
+  // One customer-audience provider (the admin demo's "microsoft", audience "both") so the
+  // portal SSO button is visible in demo mode.
+  if (pathname.endsWith("/api/portal/auth/methods"))
+    return {
+      password: true,
+      providers: [{ slug: "microsoft", kind: "oidc", label: "Mit Microsoft anmelden", icon: "microsoft" }],
+      webauthn: false,
+    };
+  if (pathname.endsWith("/api/portal/auth/totp/status")) return { enabled: demoPortalTotpEnabled };
+  if (pathname.endsWith("/api/portal/auth/totp/enroll"))
+    return { secret: "JBSWY3DPEHPK3PXP", otpauth_uri: "otpauth://totp/Tiqora:demo?secret=JBSWY3DPEHPK3PXP" };
+  if (pathname.endsWith("/api/portal/auth/totp/confirm")) {
+    demoPortalTotpEnabled = true;
+    return { enabled: true };
+  }
+  if (pathname.endsWith("/api/portal/auth/totp") && method === "DELETE") {
+    demoPortalTotpEnabled = false;
+    return { enabled: false };
+  }
   if (pathname.endsWith("/api/portal/auth/me")) return demoPortalUser;
   if (pathname.endsWith("/api/portal/tickets")) return demoPortalTickets;
   if (pathname.startsWith("/api/portal/process")) {
@@ -18,15 +64,42 @@ function respond(pathname: string, method: string): unknown {
   }
   if (pathname.startsWith("/api/portal/")) return method === "GET" ? [] : {};
 
+  if (pathname.includes("/api/v1/report")) syncDemoFacts();
   const data = resolveData(pathname, method);
   if (data !== undefined) return data;
   return method === "GET" ? [] : {};
 }
 
+const DEMO_QR_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21" width="200" height="200"><rect width="21" height="21" fill="#fff"/><path d="M0 0h7v7H0zM14 0h7v7h-7zM0 14h7v7H0z" fill="none" stroke="#000" stroke-width="2"/><path d="M2 2h3v3H2zM16 2h3v3h-3zM2 16h3v3H2zM9 1h2v2H9zM9 5h3v2H9zM8 9h2v2H8zM12 9h3v2h-3zM10 13h2v3h-2zM14 14h3v2h-3zM18 17h2v3h-2zM12 18h3v2h-3z" fill="#000"/></svg>';
+
 export const handlers = [
+  // Demo QR code for the customer TOTP enrolment (a placeholder, not a real secret).
+  http.get(
+    "*/api/portal/auth/totp/enroll/qr",
+    () => new HttpResponse(DEMO_QR_SVG, { headers: { "Content-Type": "image/svg+xml" } }),
+  ),
   // AI refine needs the request body (the segments to rewrite).
   http.post("*/api/v1/ai/refine", async ({ request }) =>
     HttpResponse.json(demoRefine((await request.json()) as Parameters<typeof demoRefine>[0])),
+  ),
+  // Report runs need the request body (report_key / definition), which resolveData never sees.
+  http.post("*/api/v1/reports/run", async ({ request }) => {
+    syncDemoFacts();
+    const out = resolveReportRun((await request.json()) as ReportRunIn);
+    // A long range runs in the background, like on a real server.
+    return HttpResponse.json(out, { status: out.job ? 202 : 200 });
+  }),
+  // Report export download: a tiny XLSX-typed body (declared before the CSV catch-all below).
+  http.get(
+    "*/api/v1/jobs/9201/files/*",
+    () =>
+      new HttpResponse("PK demo", {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": 'attachment; filename="bericht.xlsx"',
+        },
+      }),
   ),
   // No pictures in the demo: the avatar proxy "has nothing", so every
   // avatar shows its initials (the catch-all's JSON would be a broken image).

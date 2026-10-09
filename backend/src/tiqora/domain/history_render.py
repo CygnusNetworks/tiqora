@@ -27,7 +27,7 @@ from tiqora.domain.timezones import format_in_zone
 UserResolver = Callable[[int | str | None], str | None]
 
 
-def _split(name: str) -> list[str]:
+def split_history_name(name: str) -> list[str]:
     """Split a Znuny ``%%``-prefixed history name into its positional values.
 
     ``"%%a%%b%%c"`` -> ``["a", "b", "c"]``. A leading ``%%`` is required by
@@ -37,6 +37,9 @@ def _split(name: str) -> list[str]:
     """
     stripped = name[2:] if name.startswith("%%") else name
     return stripped.split("%%")
+
+
+_split = split_history_name
 
 
 def _get(values: list[str], idx: int, default: str = "") -> str:

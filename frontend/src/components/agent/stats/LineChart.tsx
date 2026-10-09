@@ -1,3 +1,10 @@
+import { useState } from "react";
+import { useChartFormat } from "./chartLocale";
+import { ChartLegend } from "./ChartLegend";
+import { ChartTooltip } from "./ChartTooltip";
+import { ChartFrame, EmptyChart, GridLines, YAxisLabels } from "./chartKit";
+import { niceTicks } from "./chartMath";
+
 export type LineSeries = {
   name: string;
   color: string;
@@ -8,103 +15,175 @@ export type LineChartProps = {
   /** Shared x-axis labels (buckets), same length as each series' `values`. */
   labels: string[];
   series: LineSeries[];
+  /** Fill the area under each line. */
+  area?: boolean;
   height?: number;
   emptyLabel?: string;
   testId?: string;
+  formatValue?: (v: number) => string;
 };
 
 /**
- * Minimal hand-rolled multi-series line chart (no charting dependency).
+ * Hand-rolled multi-series line chart (no charting dependency).
  *
- * Used for time-bucketed reports (ticket volume, backlog trend). Scales
- * each series against the combined min/max across all series so created
- * vs. closed (or backlog) stay visually comparable.
+ * Used for time-bucketed reports (ticket volume, backlog trend). One y axis
+ * starting at zero, 2 px lines, a crosshair + tooltip per bucket and a legend
+ * for two or more series. A single bucket gets a persistent marker per series.
+ * Negative values extend the axis below zero. Hit rects are programmatically focusable but out of
+ * the tab order (dense); each keeps role="img" and an aria-label with the values.
  */
 export function LineChart({
   labels,
   series,
+  area = false,
   height = 160,
-  emptyLabel = "No data",
+  emptyLabel,
   testId,
+  formatValue,
 }: LineChartProps) {
+  const { t, number } = useChartFormat();
+  const fmt = formatValue ?? number;
+  const [hover, setHover] = useState<number | null>(null);
   const points = labels.length;
   if (points === 0 || series.every((s) => s.values.length === 0)) {
-    return (
-      <div
-        className="flex items-center justify-center rounded-lg border border-hairline bg-surface text-xs text-muted"
-        style={{ height }}
-        data-testid={testId}
-      >
-        {emptyLabel}
-      </div>
-    );
+    return <EmptyChart height={height} label={emptyLabel ?? t("reports.chart.noData")} testId={testId} />;
   }
 
   const allValues = series.flatMap((s) => s.values);
-  const max = Math.max(1, ...allValues);
-  const min = Math.min(0, ...allValues);
-  const range = max - min || 1;
+  const lowest = Math.min(0, ...allValues);
+  // Negative values get their own gridlines below zero.
+  const negTicks = lowest < 0 ? niceTicks(-lowest).slice(1).map((v) => -v).reverse() : [];
+  const ticks = [...negTicks, ...niceTicks(Math.max(1, ...allValues))];
+  const dataMin = ticks[0];
+  const max = ticks[ticks.length - 1];
+  const range = max - dataMin || 1;
   const chartHeight = height - 40;
+  const yOf = (v: number) => chartHeight - 2 - ((v - dataMin) / range) * (chartHeight - 6);
   const stepX = points > 1 ? 100 / (points - 1) : 0;
+  const xOf = (i: number) => (points > 1 ? i * stepX : 50);
 
-  const toPoints = (values: number[]) =>
-    values
-      .map((v, i) => {
-        const x = points > 1 ? i * stepX : 50;
-        const y = chartHeight - ((v - min) / range) * (chartHeight - 4);
-        return `${x},${y}`;
-      })
-      .join(" ");
+  const linePoints = (values: number[]) => values.map((v, i) => `${xOf(i)},${yOf(v)}`).join(" ");
+  const areaPath = (values: number[]) =>
+    `M${xOf(0)},${yOf(0)}L${linePoints(values).replace(/ /g, "L")}L${xOf(values.length - 1)},${yOf(0)}Z`;
 
   return (
-    <div
-      className="rounded-lg border border-hairline bg-surface p-3"
-      data-testid={testId}
+    <ChartFrame
+      testId={testId}
+      onLeave={() => setHover(null)}
+      axis={<YAxisLabels ticks={ticks} yOf={yOf} format={fmt} />}
+      footer={
+        <>
+          <div className="ml-9 mt-2 flex items-center justify-between text-[10px] text-muted">
+            <span>{labels[0]}</span>
+            {labels.length > 1 && <span>{labels[labels.length - 1]}</span>}
+          </div>
+          {series.length >= 2 && (
+            <ChartLegend
+              testId={testId ? `${testId}-legend` : undefined}
+              items={series.map((s) => ({ key: s.name, label: s.name, color: s.color }))}
+            />
+          )}
+        </>
+      }
     >
       <svg
         viewBox={`0 0 100 ${chartHeight}`}
         preserveAspectRatio="none"
         className="w-full"
         style={{ height: chartHeight }}
-        role="img"
-        aria-label="line chart"
+        role="group"
+        aria-label={`${series.map((s) => s.name).join(", ")}: ${labels[0]}${points > 1 ? ` – ${labels[points - 1]}` : ""}`}
       >
-        <line
-          x1={0}
-          y1={chartHeight - 1}
-          x2={100}
-          y2={chartHeight - 1}
-          stroke="var(--color-hairline)"
-          strokeWidth={0.3}
-        />
+        <GridLines ticks={ticks} yOf={yOf} />
+        {area &&
+          series.map((s) =>
+            s.values.length > 0 ? (
+              <path
+                key={`a-${s.name}`}
+                d={areaPath(s.values)}
+                fill={s.color}
+                fillOpacity={0.15}
+                stroke="none"
+                data-testid={testId ? `${testId}-area-${s.name}` : undefined}
+              />
+            ) : null,
+          )}
         {series.map((s) => (
           <polyline
             key={s.name}
-            points={toPoints(s.values)}
+            points={linePoints(s.values)}
             fill="none"
             stroke={s.color}
-            strokeWidth={1.2}
+            strokeWidth={2}
+            strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
             data-testid={testId ? `${testId}-series-${s.name}` : undefined}
           />
         ))}
+        {hover !== null && (
+          <line
+            x1={xOf(hover)}
+            x2={xOf(hover)}
+            y1={0}
+            y2={chartHeight}
+            stroke="var(--color-muted)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+            vectorEffect="non-scaling-stroke"
+            data-testid={testId ? `${testId}-crosshair` : undefined}
+          />
+        )}
+        {labels.map((label, i) => {
+          const w = points > 1 ? stepX : 100;
+          const x = points > 1 ? Math.max(0, xOf(i) - w / 2) : 0;
+          const edge = points > 1 && (i === 0 || i === points - 1);
+          return (
+            <rect
+              key={`h-${i}`}
+              x={x}
+              y={0}
+              width={edge ? w / 2 : w}
+              height={chartHeight}
+              fill="transparent"
+              tabIndex={-1}
+              role="img"
+              aria-label={`${label}: ${series.map((s) => `${s.name} ${s.values[i] === undefined ? "—" : fmt(s.values[i])}`).join(", ")}`}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(null)}
+              onMouseEnter={() => setHover(i)}
+              onMouseMove={() => setHover(i)}
+              data-testid={testId ? `${testId}-hit-${i}` : undefined}
+            >
+              <title>{label}</title>
+            </rect>
+          );
+        })}
       </svg>
-      <div className="mt-2 flex items-center justify-between text-[10px] text-muted">
-        <span>{labels[0]}</span>
-        {labels.length > 1 && <span>{labels[labels.length - 1]}</span>}
-      </div>
-      <div className="mt-1 flex flex-wrap gap-3 text-[11px]">
-        {series.map((s) => (
-          <span key={s.name} className="flex items-center gap-1.5">
+      {(hover !== null || points === 1) &&
+        series.map((s) =>
+          s.values[hover ?? 0] === undefined ? null : (
             <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: s.color }}
+              key={`m-${s.name}`}
+              data-testid={testId ? `${testId}-marker-${s.name}` : undefined}
+              className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface"
+              style={{ left: `${xOf(hover ?? 0)}%`, top: yOf(s.values[hover ?? 0]), backgroundColor: s.color }}
               aria-hidden
             />
-            <span className="text-muted">{s.name}</span>
-          </span>
-        ))}
-      </div>
-    </div>
+          ),
+        )}
+      {hover !== null && (
+        <ChartTooltip
+          testId={testId ? `${testId}-tooltip` : undefined}
+          x={xOf(hover)}
+          y={Math.min(...series.map((s) => (s.values[hover] === undefined ? chartHeight : yOf(s.values[hover])))) - 8}
+          title={labels[hover]}
+          rows={series.map((s) => ({
+            label: s.name,
+            value: s.values[hover] === undefined ? "—" : fmt(s.values[hover]),
+            color: s.color,
+          }))}
+        />
+      )}
+    </ChartFrame>
   );
 }

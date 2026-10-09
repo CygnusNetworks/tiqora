@@ -58,6 +58,15 @@ def _tzinfo(tz_name: str) -> Any:
         return UTC
 
 
+def _vacation_set(name: object) -> bool:
+    """Perl truthiness of a vacation-day name (DateTime.pm:503-504, 869-870).
+
+    ``!$TimeVacationDays->{$Month}->{$Day}`` treats undef, ``""`` and ``"0"`` as
+    "no vacation", so a blank or ``0`` name does not block a working day.
+    """
+    return name is not None and str(name) not in ("", "0")
+
+
 def destination_time_epoch(
     start_epoch: int,
     minutes: int,
@@ -93,9 +102,8 @@ def destination_time_epoch(
 
         dt = datetime.fromtimestamp(current, tz=tz)
         day_abbr = _DAY_ABBR[dt.weekday()]
-        is_vacation = (
-            vacation_days.get(dt.month, {}).get(dt.day) is not None
-            or vacation_days_once.get(dt.year, {}).get(dt.month, {}).get(dt.day) is not None
+        is_vacation = _vacation_set(vacation_days.get(dt.month, {}).get(dt.day)) or _vacation_set(
+            vacation_days_once.get(dt.year, {}).get(dt.month, {}).get(dt.day)
         )
         day_hours = hour_sets.get(day_abbr, set())
         is_working_day = not is_vacation and bool(day_hours)
@@ -130,6 +138,79 @@ def destination_time_epoch(
             current += secs_to_next_hour
 
     return current
+
+
+def working_seconds_between(
+    start_epoch: int,
+    stop_epoch: int,
+    working_hours: WorkingHours,
+    vacation_days: VacationDays,
+    vacation_days_once: VacationDaysOneTime,
+    tz_name: str,
+) -> int:
+    """Seconds of working time in ``[start_epoch, stop_epoch)``.
+
+    Literal port of ``Kernel/System/DateTime.pm::Delta(ForWorkingTime => 1)``
+    (DateTime.pm:777-945). ``stop <= start`` and "no working hours configured"
+    both give 0 (DateTime.pm:819-831, loop condition at 846). A whole day is
+    taken in one chunk only at local midnight of a 24-hour day *and* when more
+    than 86400 s remain (DateTime.pm:889-895); a working day then adds
+    ``len(hours) * 3600`` only if the remaining time exceeds that (904), otherwise
+    the hour loop handles it. Otherwise per hour: a working hour adds
+    ``min(seconds to the next hour, remaining)`` (DateTime.pm:929-936).
+    """
+    if stop_epoch <= start_epoch:
+        return 0
+    if not any(hours for hours in working_hours.values()):
+        return 0
+
+    tz = _tzinfo(tz_name)
+    hour_sets: dict[str, set[int]] = {day: set(hours) for day, hours in working_hours.items()}
+
+    current = start_epoch
+    working = 0
+    guard = 0
+    while current < stop_epoch:
+        guard += 1
+        if guard > 5_000_000:
+            raise RuntimeError("working_seconds_between: loop protection triggered")
+
+        remaining = stop_epoch - current
+        dt = datetime.fromtimestamp(current, tz=tz)
+        day_hours = hour_sets.get(_DAY_ABBR[dt.weekday()], set())
+        is_vacation = _vacation_set(vacation_days.get(dt.month, {}).get(dt.day)) or _vacation_set(
+            vacation_days_once.get(dt.year, {}).get(dt.month, {}).get(dt.day)
+        )
+        is_working_day = not is_vacation and bool(day_hours)
+
+        if dt.hour == 0 and dt.minute == 0 and dt.second == 0:
+            next_epoch = current + 24 * _SECS_PER_HOUR
+            next_day = datetime.fromtimestamp(next_epoch, tz=tz)
+            if (
+                next_day.hour == 0
+                and next_day.minute == 0
+                and next_day.second == 0
+                and next_day.day != dt.day
+                and remaining > 24 * _SECS_PER_HOUR
+            ):
+                full_day = True
+                if is_working_day:
+                    day_secs = len(day_hours) * _SECS_PER_HOUR
+                    if remaining > day_secs:
+                        working += day_secs
+                    else:
+                        full_day = False
+                if full_day:
+                    current = next_epoch
+                    continue
+
+        step = _SECS_PER_HOUR - (dt.minute * 60 + dt.second)
+        if is_working_day and dt.hour in day_hours:
+            step = min(step, remaining)
+            working += step
+        current += step
+
+    return working
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +322,7 @@ async def _solution_done(session: AsyncSession, ticket_id: int) -> bool:
     return row is not None and row[0] is not None
 
 
-async def _escalation_preferences(
+async def escalation_preferences(
     session: AsyncSession, sla_id: int | None, queue_id: int
 ) -> tuple[int, int, int, str | None]:
     """Return (first_response, update, solution) minutes and calendar name."""
@@ -271,7 +352,7 @@ async def _escalation_preferences(
     return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0), calendar
 
 
-async def _calendar_config(
+async def calendar_config(
     sysconfig: SysConfig, calendar: str | None
 ) -> tuple[WorkingHours, VacationDays, VacationDaysOneTime, str]:
     """Fetch working hours / vacation days / time zone, honouring calendar suffix.
@@ -307,13 +388,13 @@ async def _calendar_config(
         if isinstance(hours, list)
     }
     vacation_days: VacationDays = {
-        int(m): {int(d): str(name) for d, name in days.items()}
+        int(m): {int(d): "" if name is None else str(name) for d, name in days.items()}
         for m, days in raw_vd.items()
         if isinstance(days, dict)
     }
     vacation_once: VacationDaysOneTime = {
         int(y): {
-            int(m): {int(d): str(name) for d, name in days.items()}
+            int(m): {int(d): "" if name is None else str(name) for d, name in days.items()}
             for m, days in months.items()
             if isinstance(days, dict)
         }
@@ -323,7 +404,7 @@ async def _calendar_config(
     return working_hours, vacation_days, vacation_once, tz
 
 
-def _to_epoch(value: Any, tz_name: str) -> int:
+def to_epoch(value: Any, tz_name: str) -> int:
     """Convert a DB datetime/string (OTRSTimeZone wall clock) to epoch seconds."""
     if isinstance(value, datetime):
         dt = value
@@ -386,15 +467,15 @@ async def escalation_index_build(
             await _set_column(session, ticket_id, column, 0, user_id)
         return
 
-    first_response_min, update_min, solution_min, calendar = await _escalation_preferences(
+    first_response_min, update_min, solution_min, calendar = await escalation_preferences(
         session, sla_id, queue_id
     )
-    working_hours, vacation_days, vacation_once, tz = await _calendar_config(sysconfig, calendar)
+    working_hours, vacation_days, vacation_once, tz = await calendar_config(sysconfig, calendar)
     # DB timestamps are OTRSTimeZone wall clock; only the working-hours walk
     # runs in the calendar's zone. Mixing them shifts every deadline by the
     # calendar's UTC offset.
     storage_tz = await sysconfig.otrs_time_zone()
-    create_epoch = _to_epoch(create_time, storage_tz)
+    create_epoch = to_epoch(create_time, storage_tz)
 
     escalation_time = 0
 
@@ -415,7 +496,7 @@ async def escalation_index_build(
         last_time = await _last_sender_time(session, ticket_id)
         if last_time is not None:
             dest = destination_time_epoch(
-                _to_epoch(last_time, storage_tz),
+                to_epoch(last_time, storage_tz),
                 update_min,
                 working_hours,
                 vacation_days,
@@ -443,7 +524,16 @@ async def escalation_index_build(
     await _set_column(session, ticket_id, "escalation_time", escalation_time, user_id)
 
 
+# Backwards-compatible private aliases (worker modules import these names).
+_escalation_preferences = escalation_preferences
+_calendar_config = calendar_config
+_to_epoch = to_epoch
+
 __all__ = [
+    "calendar_config",
     "destination_time_epoch",
     "escalation_index_build",
+    "escalation_preferences",
+    "to_epoch",
+    "working_seconds_between",
 ]

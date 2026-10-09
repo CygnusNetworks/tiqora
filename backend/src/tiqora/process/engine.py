@@ -63,7 +63,6 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.channels.email.placeholder import PlaceholderContext
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
@@ -134,6 +133,7 @@ from tiqora.process.ticket_state import (
     TicketProcessCandidates,
     get_ticket_process_state,
 )
+from tiqora.util.perl import perl_truthy
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
 from tiqora.znuny.history import (
     TYPE_ADD_NOTE,

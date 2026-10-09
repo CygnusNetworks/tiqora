@@ -102,8 +102,16 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   const body = err.detail as { detail?: unknown } | string | null;
   // A proxy's HTML error page (e.g. nginx 413) is no message.
   if (typeof body === "string") return body.trim() && !body.trim().startsWith("<") ? body.trim() : fallback;
+  // Wave-0 shapes without a `detail` wrapper: `{message}` / `{message, path}`.
+  const top = body && typeof body === "object" ? (body as { message?: unknown }).message : null;
+  if (typeof top === "string" && top && !(body as { detail?: unknown }).detail) return top;
   const inner = body && typeof body === "object" ? body.detail : null;
   if (typeof inner === "string" && inner) return inner;
+  // `{"detail": {"message": "…", "errors": {…}}}` (admin identity API).
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+    const message = (inner as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+  }
   if (Array.isArray(inner)) {
     const msg = (inner[0] as { msg?: unknown } | undefined)?.msg;
     if (typeof msg === "string" && msg) return msg;

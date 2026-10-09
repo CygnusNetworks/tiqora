@@ -1,49 +1,66 @@
-"""Ticket statistics and reporting aggregations.
+"""Ticket statistics and reporting aggregations (thin wrappers over the report engine).
 
-Permission-filtered (by the caller's ``ro`` queues, same scoping as
-:class:`tiqora.domain.ticket_service.TicketService`) SQL aggregations over
-the legacy ``ticket``/``article``/``ticket_history`` tables, backing the
-``/api/v1/stats/*`` REST endpoints and the agent Reports UI.
+Backs the ``/api/v1/stats/*`` REST endpoints. Since the reporting foundation every
+method runs the built-in reports (``builtin.volume``, ``builtin.open_now``) or small
+inline definitions through :func:`tiqora.reporting.engine.run_report`, so the
+numbers of the old Reports page and the new reports page agree. Scoping to the
+caller's ``ro`` queues is done by the report compiler, as for every report.
 
-This is a modern equivalent of Znuny's ``Kernel::System::Stats`` /
-AgentStatistics module, not a port: instead of Znuny's dynamic
-report-object framework (arbitrary user-defined X/Y-axis stat objects), it
-provides a fixed set of purpose-built reports (volume, backlog, open
-snapshot, SLA, agent workload) with typed parameters and dataclass results.
+Public methods, dataclasses and response shapes are unchanged; the semantics follow
+the report data (``tiqora_report_ticket_fact`` / ``tiqora_report_ticket_event``):
 
-Bucketing (day/week/month) is done in Python after fetching bare
-``(id, timestamp)`` pairs rather than with dialect-specific SQL date-trunc
-functions, so the same code runs unmodified against both the MySQL and
-PostgreSQL backends the rest of the codebase supports.
+* closes are counted per transition into a closed state (a note added to a closed
+  ticket is no second close); solution minutes use the LAST close (Znuny
+  ``_TicketGetClosed`` is a MAX), the old code took the first close;
+* SLA breaches come from the history, so they survive closing a ticket (the old
+  code read the ``escalation_*`` columns, which Znuny zeroes on close);
+* ``open_snapshot`` labels owners with "<First> <Last>" instead of the login;
+* ``open_snapshot`` and the "owned open" side of ``agent_workload`` describe the
+  tickets that are open now and ignore ``date_from``/``date_to`` (as before);
+* every row is returned: the built-ins' ``top_n`` (15 plus ``__other__``) is removed
+  from the copies these wrappers run.
+
+A result cut by the row cap or the percentile sample cap is recorded in
+:attr:`StatsService.truncated` (the API turns it into ``X-Tiqora-Truncated``).
+
+All queries of one :class:`StatsService` (= one request) share one inline time
+budget (R-INLINEBUDGET); a used-up budget raises
+:class:`~tiqora.reporting.sql.ReportQueryTimeout`, which the API maps to 504.
+Until the first report-data build has finished (``facts.ready`` false) the history
+based numbers are incomplete.
+
+Bucketing helper :func:`_bucket_key` is kept for the time-zone tests.
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.db.legacy.article import Article, ArticleSenderType
-from tiqora.db.legacy.queue import Queue
-from tiqora.db.legacy.ticket import (
-    Ticket,
-    TicketHistory,
-    TicketPriority,
-    TicketState,
-    TicketStateType,
-)
 from tiqora.db.legacy.user import Users
-from tiqora.domain.queue_service import OPEN_STATE_TYPES
 from tiqora.domain.timezones import to_zone
-from tiqora.permissions.engine import PermissionEngine
+from tiqora.extensions.core import get_registry
+from tiqora.filters import AllOf, Condition, Filter, FilterNode
+from tiqora.jobs.service import utc_now
+from tiqora.reporting.catalogue import BUILTIN_REPORTS, QUEUE_PARAM_FIELD
+from tiqora.reporting.compiler import RunParams
+from tiqora.reporting.definition import ReportDefinition, TimeWindow
+from tiqora.reporting.engine import QueryBudget, raw_measure_values, run_report
+from tiqora.reporting.schemas import Cell, ReportResultOut
+from tiqora.reporting.settings import ReportingSettings
 
 Granularity = Literal["day", "week", "month"]
 Dimension = Literal["queue", "state", "priority", "owner"]
+
+#: window start when ``date_from`` is not given (the report definition limit)
+DEFAULT_SPAN_DAYS = 3660
+#: wrappers return every row; the engine's row cap at its configured maximum
+STATS_ROW_CAP = 10_000
 
 
 # ---------------------------------------------------------------------------
@@ -141,85 +158,150 @@ def _bucket_key(dt: datetime | date, granularity: Granularity, zone: str = "UTC"
     return d.replace(day=1)
 
 
+#: extra-filter field names per source (all current ticket values, as the old code filtered)
+_TICKET_FIELDS = {
+    "state": "state",
+    "priority": "priority",
+    "type": "type",
+    "customer": "customer",
+}
+_EVENT_FIELDS = {
+    "state": "ticket_state",
+    "priority": "ticket_priority",
+    "type": "ticket_type",
+    "customer": "customer",
+}
+
+
+def _extra_filter(filters: StatsFilters, names: Mapping[str, str]) -> Filter | None:
+    conditions: list[FilterNode] = []
+    for attr, value in (
+        ("state", filters.state_id),
+        ("priority", filters.priority_id),
+        ("type", filters.type_id),
+        ("customer", filters.customer_id),
+    ):
+        if value is not None:
+            conditions.append(Condition(field=names[attr], op="eq", value=value))
+    if not conditions:
+        return None
+    return Filter(where=conditions[0] if len(conditions) == 1 else AllOf(all=conditions))
+
+
+def _window(filters: StatsFilters, now: datetime) -> TimeWindow | None:
+    """Exact UTC bounds, end exclusive; ``None`` for an empty (inverted) range."""
+    start = filters.date_from or now - timedelta(days=DEFAULT_SPAN_DAYS)
+    end = filters.date_to + timedelta(microseconds=1) if filters.date_to is not None else now
+    if end <= start:
+        return None
+    zone = filters.time_zone
+    return TimeWindow(
+        start_utc=start,
+        end_utc=end,
+        start_date=to_zone(start, zone).date(),
+        end_date=to_zone(end - timedelta(microseconds=1), zone).date(),
+        time_zone=zone,
+    )
+
+
+def _builtin(key: str) -> ReportDefinition:
+    """Copy of a built-in definition with ``top_n`` removed (no ``__other__`` row)."""
+    report = get_registry().get(BUILTIN_REPORTS, key)
+    assert report is not None, key
+    defn = report.definition
+    return defn.model_copy(
+        update={"dimensions": [d.model_copy(update={"top_n": None}) for d in defn.dimensions]}
+    )
+
+
+def _inline(
+    source: str, measures: list[str], dimensions: list[str] | None = None
+) -> ReportDefinition:
+    return ReportDefinition.model_validate(
+        {
+            "source": source,
+            "dimensions": [{"key": d} for d in dimensions or []],
+            "measures": [{"key": m} for m in measures],
+            "parameters": [{"key": "queues", "field": QUEUE_PARAM_FIELD[source], "op": "in"}],
+        }
+    )
+
+
+def _int(cell: Cell) -> int:
+    return int(cell) if cell is not None else 0
+
+
 class StatsService:
-    def __init__(self, session: AsyncSession) -> None:
+    """One instance per request: its inline time budget is shared by all its queries.
+
+    ``reporting`` defaults to the section defaults (the API passes the stored
+    settings); ``budget`` defaults to a fresh :meth:`QueryBudget.inline`.
+    """
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        reporting: ReportingSettings | None = None,
+        budget: QueryBudget | None = None,
+    ) -> None:
         self._session = session
-        self._perms = PermissionEngine(session)
-
-    # -- permission scoping ---------------------------------------------
-
-    async def _allowed_queue_ids(self, user_id: int, queue_id: int | None) -> set[int]:
-        """Permission-filtered queue id set for *user_id* (``ro``).
-
-        Empty set means "no visible data" — every report treats it as zero
-        rows rather than raising.
-        """
-        allowed_groups = await self._perms.groups_for_permission(user_id, "ro")
-        if not allowed_groups:
-            return set()
-        rows = await self._session.execute(
-            select(Queue.id).where(Queue.group_id.in_(allowed_groups), Queue.valid_id == 1)
+        self._reporting = (
+            reporting if reporting is not None else ReportingSettings.model_validate({})
         )
-        allowed = set(rows.scalars().all())
-        if not allowed:
-            return set()
-        if queue_id is not None:
-            return {queue_id} if queue_id in allowed else set()
-        return allowed
+        self._budget = budget if budget is not None else QueryBudget.inline(self._reporting)
+        #: why a result of this request is incomplete ("rows", "samples"); see the API header
+        self.truncated: list[str] = []
 
-    # -- shared lookups ----------------------------------------------------
+    # -- engine access ---------------------------------------------------
 
-    async def _open_state_ids(self) -> set[int]:
-        rows = await self._session.execute(
-            select(TicketState.id)
-            .join(TicketStateType, TicketStateType.id == TicketState.type_id)
-            .where(TicketStateType.name.in_(OPEN_STATE_TYPES), TicketState.valid_id == 1)
+    def _params(
+        self,
+        filters: StatsFilters,
+        names: Mapping[str, str],
+        window: TimeWindow | None,
+        **extra: Any,
+    ) -> RunParams:
+        parameters = {} if filters.queue_id is None else {"queues": [filters.queue_id]}
+        return RunParams(
+            time_zone=filters.time_zone,
+            parameters=parameters,
+            window_override=window,
+            extra_filter=_extra_filter(filters, names),
+            **extra,
         )
-        return set(rows.scalars().all())
 
-    async def _closed_state_ids(self) -> set[int]:
-        rows = await self._session.execute(
-            select(TicketState.id)
-            .join(TicketStateType, TicketStateType.id == TicketState.type_id)
-            .where(TicketStateType.name == "closed")
+    async def _run(
+        self, user_id: int, defn: ReportDefinition, params: RunParams
+    ) -> ReportResultOut:
+        result = await run_report(
+            self._session,
+            defn=defn,
+            params=params,
+            user_id=user_id,
+            report_key=None,
+            reporting=self._reporting,
+            row_cap=STATS_ROW_CAP,
+            use_cache=False,
+            budget=self._budget,
         )
-        return set(rows.scalars().all())
+        if result.truncated:
+            self.truncated.append("rows")
+        return result
 
-    def _apply_filters(
-        self, stmt: Select[Any], filters: StatsFilters, allowed_queues: set[int]
-    ) -> Select[Any]:
-        stmt = stmt.where(Ticket.queue_id.in_(allowed_queues))
-        if filters.state_id is not None:
-            stmt = stmt.where(Ticket.ticket_state_id == filters.state_id)
-        if filters.priority_id is not None:
-            stmt = stmt.where(Ticket.ticket_priority_id == filters.priority_id)
-        if filters.type_id is not None:
-            stmt = stmt.where(Ticket.type_id == filters.type_id)
-        if filters.customer_id is not None:
-            stmt = stmt.where(Ticket.customer_id == filters.customer_id)
-        return stmt
-
-    async def _labels_for(self, dimension: Dimension, ids: Iterable[int]) -> dict[int, str]:
-        id_list = list(ids)
-        if not id_list:
-            return {}
-        if dimension == "queue":
-            rows = await self._session.execute(
-                select(Queue.id, Queue.name).where(Queue.id.in_(id_list))
-            )
-        elif dimension == "state":
-            rows = await self._session.execute(
-                select(TicketState.id, TicketState.name).where(TicketState.id.in_(id_list))
-            )
-        elif dimension == "priority":
-            rows = await self._session.execute(
-                select(TicketPriority.id, TicketPriority.name).where(TicketPriority.id.in_(id_list))
-            )
-        else:
-            rows = await self._session.execute(
-                select(Users.id, Users.login).where(Users.id.in_(id_list))
-            )
-        return {i: n for i, n in rows.all()}
+    async def _raw(
+        self, user_id: int, defn: ReportDefinition, measure: str, params: RunParams
+    ) -> list[float]:
+        return await raw_measure_values(
+            self._session,
+            defn=defn,
+            measure_key=measure,
+            params=params,
+            user_id=user_id,
+            reporting=self._reporting,
+            budget=self._budget,
+            on_capped=lambda: self.truncated.append("samples"),
+        )
 
     # -- reports -------------------------------------------------------
 
@@ -229,199 +311,112 @@ class StatsService:
         filters: StatsFilters,
         granularity: Granularity = "day",
     ) -> list[VolumePoint]:
-        """Tickets created vs. closed per bucket (day/week/month)."""
-        allowed = await self._allowed_queue_ids(user_id, filters.queue_id)
-        if not allowed:
+        """Tickets created vs. closed per bucket (day/week/month); buckets with data only."""
+        window = _window(filters, utc_now())
+        if window is None:
             return []
-
-        created_stmt = self._apply_filters(select(Ticket.create_time), filters, allowed)
-        if filters.date_from is not None:
-            created_stmt = created_stmt.where(Ticket.create_time >= filters.date_from)
-        if filters.date_to is not None:
-            created_stmt = created_stmt.where(Ticket.create_time <= filters.date_to)
-        created_counts: dict[date, int] = defaultdict(int)
-        for (ct,) in (await self._session.execute(created_stmt)).all():
-            created_counts[_bucket_key(ct, granularity, filters.time_zone)] += 1
-
-        closed_state_ids = await self._closed_state_ids()
-        closed_counts: dict[date, int] = defaultdict(int)
-        if closed_state_ids:
-            hist_stmt = self._apply_filters(
-                select(TicketHistory.create_time).join(
-                    Ticket, Ticket.id == TicketHistory.ticket_id
-                ),
-                filters,
-                allowed,
-            ).where(TicketHistory.state_id.in_(closed_state_ids))
-            if filters.date_from is not None:
-                hist_stmt = hist_stmt.where(TicketHistory.create_time >= filters.date_from)
-            if filters.date_to is not None:
-                hist_stmt = hist_stmt.where(TicketHistory.create_time <= filters.date_to)
-            for (ct,) in (await self._session.execute(hist_stmt)).all():
-                closed_counts[_bucket_key(ct, granularity, filters.time_zone)] += 1
-
-        buckets = sorted(set(created_counts) | set(closed_counts))
+        result = await self._run(
+            user_id,
+            _builtin("builtin.volume"),
+            self._params(filters, _EVENT_FIELDS, window, grain=granularity),
+        )
+        created: dict[str, int] = {}
+        closed: dict[str, int] = {}
+        for bucket, kind, events in result.rows:
+            count = _int(events)
+            if count <= 0 or bucket is None:
+                continue  # zero-filled buckets
+            target = created if kind == "create" else closed
+            key = str(bucket)[:10]
+            target[key] = target.get(key, 0) + count
         return [
-            VolumePoint(
-                bucket=b.isoformat(),
-                created=created_counts.get(b, 0),
-                closed=closed_counts.get(b, 0),
-            )
-            for b in buckets
+            VolumePoint(bucket=b, created=created.get(b, 0), closed=closed.get(b, 0))
+            for b in sorted(set(created) | set(closed))
         ]
 
     async def open_snapshot(
         self, user_id: int, filters: StatsFilters, dimension: Dimension
     ) -> list[DimensionCount]:
         """Current open-ticket count grouped by *dimension* (queue/state/priority/owner)."""
-        allowed = await self._allowed_queue_ids(user_id, filters.queue_id)
-        if not allowed:
-            return []
-        open_state_ids = await self._open_state_ids()
-        if not open_state_ids:
-            return []
-
-        stmt = self._apply_filters(select(Ticket), filters, allowed).where(
-            Ticket.ticket_state_id.in_(open_state_ids),
-            Ticket.archive_flag == 0,
-        )
-        rows = (await self._session.execute(stmt)).scalars().all()
-
-        counts: dict[int, int] = defaultdict(int)
-        for t in rows:
-            key = {
-                "queue": t.queue_id,
-                "state": t.ticket_state_id,
-                "priority": t.ticket_priority_id,
-                "owner": t.user_id,
-            }[dimension]
-            counts[key] += 1
-
-        labels = await self._labels_for(dimension, counts.keys())
+        result = await self._open_by(user_id, filters, dimension)
+        labels = result.labels.get(dimension, {})
+        counts: list[tuple[Cell, int]] = [(row[0], _int(row[1])) for row in result.rows]
+        counts.sort(key=lambda kv: -kv[1])
         return [
-            DimensionCount(id=k, label=labels.get(k, str(k)), count=c)
-            for k, c in sorted(counts.items(), key=lambda kv: -kv[1])
+            DimensionCount(
+                id=int(k) if k is not None else None,
+                label=labels.get(str(k), str(k)),
+                count=c,
+            )
+            for k, c in counts
         ]
 
+    async def _open_by(
+        self, user_id: int, filters: StatsFilters, dimension: Dimension
+    ) -> ReportResultOut:
+        """``builtin.open_now`` grouped by *dimension*; not date-bound (the tickets open now)."""
+        return await self._run(
+            user_id,
+            _builtin("builtin.open_now"),
+            self._params(filters, _TICKET_FIELDS, None, dimension_choices={0: dimension}),
+        )
+
     async def sla_stats(self, user_id: int, filters: StatsFilters) -> SlaStats:
-        """Escalation snapshot + first-response/solution time distributions."""
-        allowed = await self._allowed_queue_ids(user_id, filters.queue_id)
-        if not allowed:
-            return SlaStats(
-                total=0,
-                escalated=0,
-                first_response_breached=0,
-                update_breached=0,
-                solution_breached=0,
-            )
-
-        stmt = self._apply_filters(select(Ticket), filters, allowed)
-        if filters.date_from is not None:
-            stmt = stmt.where(Ticket.create_time >= filters.date_from)
-        if filters.date_to is not None:
-            stmt = stmt.where(Ticket.create_time <= filters.date_to)
-        tickets = list((await self._session.execute(stmt)).scalars().all())
-
-        total = len(tickets)
-        now_epoch = int(datetime.now(UTC).timestamp())
-        escalated = sum(1 for t in tickets if t.escalation_time and t.escalation_time <= now_epoch)
-        fr_breached = sum(
-            1
-            for t in tickets
-            if t.escalation_response_time and t.escalation_response_time <= now_epoch
+        """Tickets created in the window: breaches from the history, plus time samples."""
+        now = utc_now()
+        window = _window(filters, now)
+        if window is None:
+            return SlaStats(0, 0, 0, 0, 0)
+        params = self._params(filters, _TICKET_FIELDS, window)
+        kpis = _inline(
+            "tickets",
+            ["tickets", "response_breaches", "update_breached_tickets", "solution_breaches"],
         )
-        upd_breached = sum(
-            1 for t in tickets if t.escalation_update_time and t.escalation_update_time <= now_epoch
+        rows = (await self._run(user_id, kpis, params)).rows
+        total, fr_breached, upd_breached, sol_breached = (
+            [_int(c) for c in rows[0]] if rows else [0, 0, 0, 0]
         )
-        sol_breached = sum(
-            1
-            for t in tickets
-            if t.escalation_solution_time and t.escalation_solution_time <= now_epoch
+        # currently escalated open tickets created in the window (as before)
+        esc_rows = (await self._run(user_id, _inline("open_tickets", ["escalated"]), params)).rows
+        escalated = _int(esc_rows[0][0]) if esc_rows else 0
+        first_response = await self._raw(
+            user_id,
+            _inline("tickets", ["first_response_clock_p50"]),
+            "first_response_clock_p50",
+            params,
         )
-
-        first_response_minutes: list[float] = []
-        solution_minutes: list[float] = []
-        ticket_ids = [t.id for t in tickets]
-        create_by_id = {t.id: t.create_time for t in tickets}
-
-        if ticket_ids:
-            fr_rows = await self._session.execute(
-                select(Article.ticket_id, func.min(Article.create_time))
-                .join(ArticleSenderType, ArticleSenderType.id == Article.article_sender_type_id)
-                .where(
-                    Article.ticket_id.in_(ticket_ids),
-                    ArticleSenderType.name == "agent",
-                    Article.is_visible_for_customer == 1,
-                )
-                .group_by(Article.ticket_id)
-            )
-            for tid, first_time in fr_rows.all():
-                ct = create_by_id.get(tid)
-                if ct is not None and first_time is not None:
-                    first_response_minutes.append((first_time - ct).total_seconds() / 60)
-
-            closed_ids = await self._closed_state_ids()
-            if closed_ids:
-                sol_rows = await self._session.execute(
-                    select(TicketHistory.ticket_id, func.min(TicketHistory.create_time))
-                    .where(
-                        TicketHistory.ticket_id.in_(ticket_ids),
-                        TicketHistory.state_id.in_(closed_ids),
-                    )
-                    .group_by(TicketHistory.ticket_id)
-                )
-                for tid, closed_time in sol_rows.all():
-                    ct = create_by_id.get(tid)
-                    if ct is not None and closed_time is not None:
-                        solution_minutes.append((closed_time - ct).total_seconds() / 60)
-
+        solution = await self._raw(
+            user_id, _inline("tickets", ["solution_clock_p50"]), "solution_clock_p50", params
+        )
         return SlaStats(
             total=total,
             escalated=escalated,
             first_response_breached=fr_breached,
             update_breached=upd_breached,
             solution_breached=sol_breached,
-            first_response_minutes=first_response_minutes,
-            solution_minutes=solution_minutes,
+            first_response_minutes=first_response,
+            solution_minutes=solution,
         )
 
     async def agent_workload(self, user_id: int, filters: StatsFilters) -> list[AgentWorkloadItem]:
         """Per-agent open-ticket ownership + tickets closed in the filtered period."""
-        allowed = await self._allowed_queue_ids(user_id, filters.queue_id)
-        if not allowed:
-            return []
-
-        open_state_ids = await self._open_state_ids()
-        owned_stmt = self._apply_filters(
-            select(Ticket.user_id, func.count()), filters, allowed
-        ).where(Ticket.archive_flag == 0)
-        if open_state_ids:
-            owned_stmt = owned_stmt.where(Ticket.ticket_state_id.in_(open_state_ids))
-        owned_stmt = owned_stmt.group_by(Ticket.user_id)
-        owned_counts: dict[int, int] = {
-            uid: cnt for uid, cnt in (await self._session.execute(owned_stmt)).all()
+        owned = {
+            int(row[0]): _int(row[1])
+            for row in (await self._open_by(user_id, filters, "owner")).rows
+            if row[0] is not None
         }
+        closed: dict[int, int] = {}
+        window = _window(filters, utc_now())
+        if window is not None:
+            by_owner = _inline("tickets", ["closed_tickets"], ["owner"]).model_copy(
+                update={"time_field": "closed"}
+            )
+            result = await self._run(
+                user_id, by_owner, self._params(filters, _TICKET_FIELDS, window)
+            )
+            closed = {int(r[0]): _int(r[1]) for r in result.rows if r[0] is not None and _int(r[1])}
 
-        closed_ids = await self._closed_state_ids()
-        closed_counts: dict[int, int] = {}
-        if closed_ids:
-            hist_stmt = self._apply_filters(
-                select(Ticket.user_id, func.count(func.distinct(TicketHistory.ticket_id))).join(
-                    TicketHistory, TicketHistory.ticket_id == Ticket.id
-                ),
-                filters,
-                allowed,
-            ).where(TicketHistory.state_id.in_(closed_ids))
-            if filters.date_from is not None:
-                hist_stmt = hist_stmt.where(TicketHistory.create_time >= filters.date_from)
-            if filters.date_to is not None:
-                hist_stmt = hist_stmt.where(TicketHistory.create_time <= filters.date_to)
-            hist_stmt = hist_stmt.group_by(Ticket.user_id)
-            closed_counts = {
-                uid: cnt for uid, cnt in (await self._session.execute(hist_stmt)).all()
-            }
-
-        user_ids = set(owned_counts) | set(closed_counts)
+        user_ids = set(owned) | set(closed)
         if not user_ids:
             return []
         # Exclude soft-invalidated agents (valid_id != 1): a departed agent
@@ -436,8 +431,8 @@ class StatsService:
                 user_id=uid,
                 login=login,
                 name=f"{fn} {ln}".strip(),
-                owned_open=owned_counts.get(uid, 0),
-                closed_in_period=closed_counts.get(uid, 0),
+                owned_open=owned.get(uid, 0),
+                closed_in_period=closed.get(uid, 0),
             )
             for uid, login, fn, ln in rows.all()
         ]

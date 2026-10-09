@@ -1,0 +1,106 @@
+---
+Debugger:
+  DebugThreshold: error
+  TestMode: '0'
+Description: Golden mapping webservice (Simple, XSLT, OutOfOffice)
+FrameworkVersion: 6.5
+Provider:
+  Operation:
+    Login:
+      Description: SessionCreate with renamed credentials
+      Type: Session::SessionCreate
+      MappingInbound:
+        Type: Simple
+        Config:
+          KeyMapExact:
+            User: UserLogin
+            Pass: Password
+          KeyMapDefault:
+            MapType: Keep
+            MapTo: ''
+          ValueMapDefault:
+            MapType: Keep
+            MapTo: ''
+      MappingOutbound: {}
+    Make:
+      Description: TicketCreate with TicketID renamed to Id and a converted constant date
+      Type: Ticket::TicketCreate
+      MappingInbound: {}
+      MappingOutbound:
+        Type: XSLT
+        Config:
+          Template: |
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xsl:stylesheet version="1.0"
+              xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+              xmlns:otrs="http://otrs.org"
+              extension-element-prefixes="otrs">
+            <xsl:import href="/opt/otrs/Kernel/GenericInterface/Mapping/OTRSFunctions.xsl" />
+            <xsl:output method="xml" encoding="utf-8" indent="yes"/>
+            <xsl:template match="/RootElement">
+              <RootElement>
+                <Id><xsl:value-of select="TicketID"/></Id>
+                <Stamp><xsl:value-of select="otrs:date-iso-to-xsd('2026-03-01 12:34:56')"/></Stamp>
+                <xsl:copy-of select="*[not(self::TicketID)]"/>
+              </RootElement>
+            </xsl:template>
+            </xsl:stylesheet>
+    Fetch:
+      Description: TicketGet with forced Article array and *ID keys renamed to *Number
+      Type: Ticket::TicketGet
+      MappingInbound: {}
+      MappingOutbound:
+        Type: XSLT
+        Config:
+          ForceArray: Article
+          PostRegExFilter:
+            - Search: '^(\D*)ID$'
+              Replace: '$1Number'
+          Template: |
+            <?xml version="1.0" encoding="UTF-8"?>
+            <xsl:stylesheet version="1.0"
+              xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+            <xsl:output method="xml" encoding="utf-8" indent="yes"/>
+            <xsl:template match="/RootElement">
+              <RootElement>
+                <xsl:copy-of select="*"/>
+              </RootElement>
+            </xsl:template>
+            </xsl:stylesheet>
+    Away:
+      Description: OutOfOffice with CSV mapping
+      Type: User::OutOfOffice
+      MappingInbound:
+        Type: OutOfOffice
+      MappingOutbound: {}
+  Transport:
+    Config:
+      AdditionalHeaders: ~
+      KeepAlive: '1'
+      MaxLength: '100000000'
+      RouteOperationMapping:
+        Login:
+          ParserBackend: JSON
+          RequestMethod:
+            - POST
+          Route: /Login
+        Make:
+          ParserBackend: JSON
+          RequestMethod:
+            - POST
+          Route: /Make
+        Fetch:
+          ParserBackend: JSON
+          RequestMethod:
+            - GET
+          Route: /Fetch/:TicketID
+        Away:
+          ParserBackend: JSON
+          RequestMethod:
+            - POST
+          Route: /Away
+    Type: HTTP::REST
+RemoteSystem: ''
+Requester:
+  Transport:
+    Type: ''

@@ -1,6 +1,8 @@
 """WebserviceRegistry against real ``gi_webservice_config`` rows (MariaDB and PostgreSQL).
 
-Seed ids use 8900-8919 (GI band); every row is deleted again after the module.
+Seed ids use 8900-8919 (GI band) for ``gi_webservice_config`` rows only - the agents, groups
+and queues 8900-8929 belong to ``test_compat_ticket_create_parity``; every row is deleted again
+after the module.
 """
 
 from __future__ import annotations
@@ -354,3 +356,23 @@ def test_get_registry_is_created_lazily_per_app() -> None:
     first = get_registry(App)
     assert isinstance(first, WebserviceRegistry)
     assert get_registry(App) is first
+
+
+def test_unexpected_error_in_one_row_does_not_block_the_others(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review Focus 1: whatever one row raises, every other webservice is still built."""
+    from tiqora.api.compat import webservices
+
+    real = webservices.parse_webservice
+
+    def _parse(ws_id: int, name: str, config: dict[str, Any], *, huge_xml: bool) -> Any:
+        if ws_id == 8901:
+            raise KeyError("surprise")
+        return real(ws_id, name, config, huge_xml=huge_xml)
+
+    monkeypatch.setattr(webservices, "parse_webservice", _parse)
+    by_name, by_id = webservices._build_snapshot(
+        [(8900, "Good", {"Provider": {}}), (8901, "Odd", {"Provider": {}})], {}, False
+    )
+    assert set(by_name) == {"Good"} and set(by_id) == {8900}

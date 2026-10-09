@@ -20,6 +20,7 @@ from tiqora.api.spa import mount_spa, spa_is_available
 from tiqora.api.v1 import api_v1_router
 from tiqora.config import Settings, get_settings
 from tiqora.db.engine import check_database, get_session_factory
+from tiqora.identity.env_providers import ensure_env_providers, env_ldap_tls_warnings
 from tiqora.logging_setup import configure_logging
 
 logger = structlog.get_logger(__name__)
@@ -161,6 +162,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         app.state.legacy_schema_profile = None
 
+    try:
+        async with app.state.session_factory() as _identity_session:
+            await ensure_env_providers(_identity_session, settings)
+    except Exception as _exc:  # noqa: BLE001
+        logger.warning("identity_env_sync_skipped", error=str(_exc))
+    for _flag in env_ldap_tls_warnings(settings):
+        logger.warning(
+            "ldap_tls_verification_off",
+            setting=_flag,
+            hint="the directory certificate is not checked; set it to true",
+        )
     await _crypto_self_check(app, settings)
 
     # Compat webservices: initial load (never fatal) + background hot reload (D12).

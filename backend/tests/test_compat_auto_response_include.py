@@ -3,21 +3,32 @@
 DB tests on MariaDB and PostgreSQL. Seed ids live in the GI band 7650-7669 (agent 7650, group
 7650, queue 7651, auto responses 7650 "auto reply" / 7651 "auto follow up"); every row, including
 the tickets the operations create in queue 7651, is deleted afterwards. The outbound relay is a
-monkeypatched ``CapturingMailSender``.
+monkeypatched ``CapturingMailSender``. The operations only queue their mails (``tiqora_job``
+kind ``gi_mail``); ``_call`` runs the queued jobs afterwards like the worker unless
+``drain=False``.
 """
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import time
 from collections.abc import Generator
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
+import aiosmtplib
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests._gi_mail_jobs import (
+    delete_gi_mail_jobs,
+    drain_gi_mail_jobs,
+    gi_mail_jobs,
+    make_due,
+    max_job_id,
+)
 from tests._row_cleanup import delete_rows_above, snapshot_max_ids
 from tiqora.api.compat.operations import op_ticket_create, op_ticket_update
 from tiqora.api.compat.webservices import OperationConfig, parse_webservice
@@ -29,6 +40,7 @@ from tiqora.znuny.sysconfig import SysConfig
 T0 = datetime(2024, 6, 1, 12, 0, 0)
 AGENT, GROUP, QUEUE = 7650, 7650, 7651
 AR_REPLY, AR_FOLLOW_UP = 7650, 7651
+_OTHER_QUEUE = 7653  # a queue without auto responses (created by its test)
 SESSION = "GI7650AGENTSESSION"
 CUSTOMER_MAIL = "kim7650@example.org"
 CUSTOMER_FROM = f"Kim Kunde <{CUSTOMER_MAIL}>"
@@ -40,6 +52,8 @@ DAEMON_MAIL = "MAILER-DAEMON@example.org"
 TITLE = "GI7650 ticket"
 
 _SEEDED: list[str] = []
+# tiqora_job: this module's gi_mail jobs are the ones above the watermark taken at first seed
+_JOB_WATERMARK: dict[str, int] = {}
 _COUNTER_TABLES = ("tiqora_event_outbox", "tiqora_cache_invalidation", "ticket_number_counter")
 _SNAPSHOTS: dict[str, dict[str, int]] = {}
 _IN_QUEUE = f"(SELECT id FROM ticket WHERE queue_id = {QUEUE})"
@@ -53,6 +67,7 @@ def _cleanup_statements() -> tuple[str, ...]:
         f"DELETE FROM tiqora_event_outbox WHERE ticket_id IN {_IN_QUEUE}",
         f"DELETE FROM tiqora_cache_invalidation WHERE ticket_id IN {_IN_QUEUE}",
         f"DELETE FROM tiqora_mail_log WHERE ticket_id IN {_IN_QUEUE}",
+        f"DELETE FROM article_data_mime_send_error WHERE article_id IN {_IN_QUEUE_ARTICLES}",
         f"DELETE FROM article_data_mime_attachment WHERE article_id IN {_IN_QUEUE_ARTICLES}",
         f"DELETE FROM article_data_mime WHERE article_id IN {_IN_QUEUE_ARTICLES}",
         f"DELETE FROM article WHERE ticket_id IN {_IN_QUEUE}",
@@ -64,7 +79,7 @@ def _cleanup_statements() -> tuple[str, ...]:
         f"DELETE FROM queue_auto_response WHERE queue_id = {QUEUE}",
         f"DELETE FROM auto_response WHERE id IN ({AR_REPLY}, {AR_FOLLOW_UP})",
         "DELETE FROM sessions WHERE session_id LIKE 'GI7650%'",
-        f"DELETE FROM queue WHERE id = {QUEUE}",
+        f"DELETE FROM queue WHERE id IN ({QUEUE}, {_OTHER_QUEUE})",
         f"DELETE FROM group_user WHERE group_id = {GROUP}",
         f"DELETE FROM permission_groups WHERE id = {GROUP}",
         f"DELETE FROM users WHERE id = {AGENT}",
@@ -79,6 +94,7 @@ def _delete_seeded_rows() -> Generator[None, None, None]:
         with engine.begin() as conn:
             for stmt in _cleanup_statements():
                 conn.execute(text(stmt))
+            delete_gi_mail_jobs(conn, above_id=_JOB_WATERMARK[sync_url])
         engine.dispose()
         delete_rows_above(sync_url, _SNAPSHOTS[sync_url])
     _SEEDED.clear()
@@ -102,9 +118,11 @@ def _seed(sync_url: str) -> None:
         TiqoraBase.metadata.create_all(conn)
     if sync_url not in _SNAPSHOTS:  # once per module: the fixture re-seeds for every test
         _SNAPSHOTS[sync_url] = snapshot_max_ids(sync_url, _COUNTER_TABLES)
+        _JOB_WATERMARK[sync_url] = max_job_id(sync_url)
     with engine.begin() as conn:
         for stmt in _cleanup_statements():
             conn.execute(text(stmt))
+        delete_gi_mail_jobs(conn, above_id=_JOB_WATERMARK[sync_url])
         for stmt in (
             "INSERT INTO users (id, login, pw, first_name, last_name, valid_id, create_time,"
             " create_by, change_time, change_by)"
@@ -241,6 +259,24 @@ def _query(sync_url: str, sql: str, **params: Any) -> list[Any]:
 
 
 async def _call(
+    sync_url: str,
+    operation: str,
+    params: dict[str, Any],
+    *,
+    operation_config: OperationConfig | None = None,
+    customer: bool = False,
+    drain: bool = True,
+) -> dict[str, Any]:
+    """Run the operation; then (``drain``) the mail jobs it queued, like the worker."""
+    result = await _operation(
+        sync_url, operation, params, operation_config=operation_config, customer=customer
+    )
+    if drain:
+        await drain_gi_mail_jobs(sync_url)
+    return result
+
+
+async def _operation(
     sync_url: str,
     operation: str,
     params: dict[str, Any],
@@ -560,20 +596,35 @@ async def test_canonical_route_never_includes_ticket_data(
 # ---------------------------------------------------------------------------
 
 
-class _ScriptedSender:
-    """Records mails; the n-th send (1-based) listed in ``fail_on`` raises like an SMTP outage."""
+def _permanent() -> Exception:
+    return aiosmtplib.SMTPResponseException(550, "5.1.1 mailbox unavailable")
 
-    def __init__(self, fail_on: tuple[int, ...] = ()) -> None:
+
+def _temporary() -> Exception:
+    return OSError("connection refused")
+
+
+class _ScriptedSender:
+    """Records mails; the n-th send (1-based) listed in ``fail_on`` raises ``error()`` - by
+    default a permanent 5xx reply (recorded at once, like Znuny's ``MailQueue``)."""
+
+    def __init__(
+        self, fail_on: tuple[int, ...] = (), error: Any = _permanent, block: bool = False
+    ) -> None:
         self.sent: list[Any] = []
         self.attempts = 0
         self.fail_on = fail_on
+        self.error = error
+        self.block = block  # hang inside SMTP (an interrupted send)
         self.last_smtp_code: int | None = 250
         self.last_smtp_detail: str | None = "250 OK"
 
     async def send(self, message: Any, *, envelope_from: str | None = None) -> None:
         self.attempts += 1
+        if self.block:
+            await asyncio.Event().wait()
         if self.attempts in self.fail_on:
-            raise OSError("connection refused")
+            raise self.error()
         self.sent.append(message)
 
 
@@ -599,6 +650,11 @@ def _use_relay(monkeypatch: pytest.MonkeyPatch, sender: Any) -> None:
     monkeypatch.setattr(mail_outbound, "build_outbound_sender", _build)
 
 
+def _jobs(sync_url: str) -> list[dict[str, Any]]:
+    """This module's gi_mail jobs."""
+    return gi_mail_jobs(sync_url, above_id=_JOB_WATERMARK[sync_url])
+
+
 def _send_article(subject: str) -> dict[str, Any]:
     return {
         "Subject": subject,
@@ -618,6 +674,73 @@ def _mail_log(sync_url: str) -> list[tuple[str, int | None]]:
     return [(str(r[0]), None if r[1] is None else int(r[1])) for r in rows]
 
 
+def _send_errors(sync_url: str) -> list[tuple[int, str | None, str]]:
+    rows = _query(
+        sync_url,
+        "SELECT article_id, message_id, log_message FROM article_data_mime_send_error"
+        f" WHERE article_id IN {_IN_QUEUE_ARTICLES} ORDER BY article_id",
+    )
+    return [(int(r[0]), None if r[1] is None else str(r[1]), str(r[2] or "")) for r in rows]
+
+
+@pytest.mark.db
+async def test_request_answers_before_any_mail_and_the_worker_sends(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url,
+        "create",
+        {"Ticket": _ticket(), "Article": [_send_article("Eins"), _customer_article("Zwei")]},
+        drain=False,
+    )
+    assert "Error" not in result, result
+    # nothing was sent inside the request: the mails wait as jobs, committed with the ticket
+    assert sender.attempts == 0 and sender.sent == []
+    assert _mail_log(sync_url) == []
+    jobs = _jobs(sync_url)
+    assert [j["status"] for j in jobs] == ["queued", "queued"]
+    send_id, customer_id = result["ArticleID"]
+    assert [
+        (j["payload"]["kind"], j["payload"]["article_id"], j["payload"]["auto_response_type"])
+        for j in jobs
+    ] == [("article_send", send_id, ""), ("auto_response", customer_id, "auto reply")]
+    assert all(j["payload"]["ticket_id"] == result["TicketID"] for j in jobs)
+
+    done = await drain_gi_mail_jobs(sync_url)
+    assert [d["status"] for d in done] == ["succeeded", "succeeded"]
+    assert [str(m["Subject"]).rsplit(" ", 1)[-1] for m in sender.sent][0] == "Eins"
+    assert len(sender.sent) == 2  # the ArticleSend mail and the auto reply
+    assert ("sent", send_id) in _mail_log(sync_url)
+    assert _history_names(sync_url, result["TicketID"]).count("SendAutoReply") == 1
+
+
+@pytest.mark.db
+async def test_send_failure_is_recorded_like_the_mail_queue(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender(fail_on=(1,))
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}, drain=False
+    )
+    # the answer no longer depends on the relay (Znuny: the mail sits in the MailQueue)
+    assert "Error" not in result, result
+    done = await drain_gi_mail_jobs(sync_url)
+    assert [d["status"] for d in done] == ["failed"]
+    article_id = result["ArticleID"]
+    message_id = _query(
+        sync_url, "SELECT a_message_id FROM article_data_mime WHERE article_id = :a", a=article_id
+    )[0][0]
+    # MailQueue _SetArticleTransmissionError -> ArticleCreateTransmissionError
+    errors = _send_errors(sync_url)
+    assert [(a, m) for a, m, _ in errors] == [(article_id, message_id)]
+    assert "5.1.1 mailbox unavailable" in errors[0][2]
+    assert _mail_log(sync_url) == [("failed", article_id)]
+    assert _article_count(sync_url, result["TicketID"]) == 1  # the article stays
+
+
 @pytest.mark.db
 async def test_article_send_failure_keeps_the_data_and_sends_the_rest(
     sync_url: str, monkeypatch: pytest.MonkeyPatch
@@ -632,26 +755,20 @@ async def test_article_send_failure_keeps_the_data_and_sends_the_rest(
             "Article": [_send_article("Eins"), _send_article("Zwei"), _send_article("Drei")],
         },
     )
-    assert result == {
-        "Error": {
-            "ErrorCode": "TicketCreate.OperationFailed",
-            "ErrorMessage": (
-                "TicketCreate: Article could not be created, please contact the system"
-                " administrator"
-            ),
-        }
-    }
+    assert "Error" not in result, result
     # ticket and all articles persist; the 1st and 3rd mail went out; every outcome is logged
     tickets = _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE)
     assert len(tickets) == 1
     ids = _article_ids(sync_url, int(tickets[0][0]))
-    assert len(ids) == 3
+    assert len(ids) == 3 and result["ArticleID"] == ids
     assert [str(m["Subject"]).rsplit(" ", 1)[-1] for m in sender.sent] == ["Eins", "Drei"]
     assert _mail_log(sync_url) == [("sent", ids[0]), ("failed", ids[1]), ("sent", ids[2])]
+    assert [a for a, _, _ in _send_errors(sync_url)] == [ids[1]]
+    assert [j["status"] for j in _jobs(sync_url)] == ["succeeded", "failed", "succeeded"]
 
 
 @pytest.mark.db
-async def test_every_failing_article_send_is_logged_and_the_first_error_wins(
+async def test_every_failing_article_send_is_logged(
     sync_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sender = _ScriptedSender(fail_on=(1, 2))
@@ -661,11 +778,12 @@ async def test_every_failing_article_send_is_logged_and_the_first_error_wins(
         "create",
         {"Ticket": _ticket(), "Article": [_send_article("Eins"), _send_article("Zwei")]},
     )
-    assert result["Error"]["ErrorCode"] == "TicketCreate.OperationFailed"
+    assert "Error" not in result, result
     ids = _article_ids(
         sync_url, int(_query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE)[0][0])
     )
     assert _mail_log(sync_url) == [("failed", ids[0]), ("failed", ids[1])]
+    assert [a for a, _, _ in _send_errors(sync_url)] == ids
 
 
 @pytest.mark.db
@@ -681,8 +799,14 @@ async def test_unbuildable_sender_is_logged_as_a_failure(
     result = await _call(
         sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}
     )
-    assert result["Error"]["ErrorCode"] == "TicketCreate.OperationFailed"
-    assert [status for status, _ in _mail_log(sync_url)] == ["failed"]
+    assert "Error" not in result, result
+    # no SMTP reply at all: temporary like in Znuny, so the mail is tried three times
+    for _ in range(2):
+        make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+        await drain_gi_mail_jobs(sync_url)
+    assert [status for status, _ in _mail_log(sync_url)] == ["failed"] * 3
+    assert "oauth token fetch failed" in _send_errors(sync_url)[0][2]
+    assert [(j["status"], j["attempts"]) for j in _jobs(sync_url)] == [("failed", 3)]
 
 
 @pytest.mark.db
@@ -740,6 +864,7 @@ async def test_no_mail_when_validation_fails(
     assert result["Error"]["ErrorMessage"].endswith("HistoryType parameter is invalid!")
     assert sender.sent == [] and sender.attempts == 0
     assert _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE) == []
+    assert _jobs(sync_url) == []  # no job without its ticket
 
 
 @pytest.mark.db
@@ -763,7 +888,7 @@ async def test_failing_auto_response_never_fails_the_call(
 
 
 @pytest.mark.db
-async def test_raising_add_article_in_auto_response_leaves_no_partial_rows(
+async def test_auto_response_sent_but_not_stored_is_reported_and_never_resent(
     sync_url: str, relay: CapturingMailSender, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from tiqora.channels.email import autoresponse
@@ -777,12 +902,29 @@ async def test_raising_add_article_in_auto_response_leaves_no_partial_rows(
     )
     assert "Error" not in result, result
     ticket_id = result["TicketID"]
-    assert _article_count(sync_url, ticket_id) == 1
+    assert _article_count(sync_url, ticket_id) == 1  # no partial auto reply article
     assert "SendAutoReply" not in _history_names(sync_url, ticket_id)
+    # but the mail did go out: never sent again, reported truthfully, logged as sent and
+    # counted by the loop protection
+    from tiqora.jobs.handlers.gi_mail import FAILED_AFTER_SEND_MESSAGE
+
+    assert len(relay.sent) == 1
+    assert [(j["status"], j["error"]) for j in _jobs(sync_url)] == [
+        ("failed", FAILED_AFTER_SEND_MESSAGE)
+    ]
+    assert _mail_log(sync_url) == [("sent", None)]
+    assert "storing its article failed: database went away" in _log_details(sync_url)[0]
     assert (
-        _query(sync_url, "SELECT 1 FROM ticket_loop_protection WHERE sent_to = :a", a=CUSTOMER_MAIL)
-        == []
+        len(
+            _query(
+                sync_url, "SELECT 1 FROM ticket_loop_protection WHERE sent_to = :a", a=CUSTOMER_MAIL
+            )
+        )
+        == 1
     )
+    make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+    assert await drain_gi_mail_jobs(sync_url) == []
+    assert len(relay.sent) == 1
 
 
 @pytest.mark.db
@@ -936,3 +1078,489 @@ async def test_invalid_customer_user_still_yields_a_full_name_from(
         a=result["ArticleID"],
     )[0][0]
     assert from_header == f'"Kim Kunde" <{CUST_MAIL}>'
+
+
+# ---------------------------------------------------------------------------
+# GI mail delivery like Znuny's MailQueue: retries, interruption, queue snapshot
+# ---------------------------------------------------------------------------
+
+
+def _due_in_minutes(job: dict[str, Any]) -> float:
+    from tiqora.jobs.service import utc_now
+
+    assert job["due_at"] is not None
+    return float((job["due_at"] - utc_now()).total_seconds()) / 60
+
+
+def _log_details(sync_url: str) -> list[str]:
+    rows = _query(
+        sync_url,
+        f"SELECT detail FROM tiqora_mail_log WHERE ticket_id IN {_IN_QUEUE} ORDER BY id",
+    )
+    return [str(r[0] or "") for r in rows]
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    "error",
+    [
+        _temporary,
+        lambda: aiosmtplib.SMTPResponseException(451, "4.3.0 try again later"),
+        lambda: aiosmtplib.SMTPRecipientsRefused(
+            [aiosmtplib.SMTPRecipientRefused(450, "4.2.0 mailbox busy", CUSTOMER_MAIL)]
+        ),
+    ],
+    ids=["connection", "4xx-reply", "4xx-recipient"],
+)
+async def test_temporary_send_error_is_retried_without_a_transmission_error(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch, error: Any
+) -> None:
+    sender = _ScriptedSender(fail_on=(1,), error=error)
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}
+    )
+    assert "Error" not in result, result
+    article_id = result["ArticleID"]
+    (job,) = _jobs(sync_url)
+    # MailQueue::_SendError for a temporary error: attempts 1, due in 1 * 2 minutes
+    assert (job["status"], job["attempts"], job["checkpoint"]) == ("queued", 1, None)
+    assert 1.5 < _due_in_minutes(job) <= 2.0
+    assert _send_errors(sync_url) == []
+    assert _mail_log(sync_url) == [("failed", article_id)]
+    assert "temporary error, attempt 1 of 3, next attempt in 2 min" in _log_details(sync_url)[0]
+    # not due yet: draining again sends nothing
+    assert await drain_gi_mail_jobs(sync_url) == []
+    make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+    done = await drain_gi_mail_jobs(sync_url)
+    assert [d["status"] for d in done] == ["succeeded"]
+    assert len(sender.sent) == 1 and sender.attempts == 2
+    assert _mail_log(sync_url) == [("failed", article_id), ("sent", article_id)]
+    assert _send_errors(sync_url) == []
+    assert [(j["status"], j["attempts"]) for j in _jobs(sync_url)] == [("succeeded", 2)]
+
+
+@pytest.mark.db
+async def test_third_temporary_failure_is_final_like_item_max_attempts(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender(fail_on=(1, 2, 3, 4), error=_temporary)
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}
+    )
+    article_id = result["ArticleID"]
+    make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+    await drain_gi_mail_jobs(sync_url)
+    (job,) = _jobs(sync_url)
+    assert (job["status"], job["attempts"]) == ("queued", 2)
+    assert 3.5 < _due_in_minutes(job) <= 4.0  # attempts * IncrementAttemptDelayInMinutes
+    assert _send_errors(sync_url) == []
+    make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+    done = await drain_gi_mail_jobs(sync_url)
+    assert [d["status"] for d in done] == ["failed"]
+    assert sender.attempts == 3 and sender.sent == []
+    assert _mail_log(sync_url) == [("failed", article_id)] * 3
+    errors = _send_errors(sync_url)
+    assert [a for a, _, _ in errors] == [article_id]
+    assert "connection refused" in errors[0][2]
+    # a failed job is never picked up again
+    make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+    assert await drain_gi_mail_jobs(sync_url) == []
+
+
+@pytest.mark.db
+async def test_temporary_auto_response_error_is_retried(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender(fail_on=(1,), error=_temporary)
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article("Wieder")}
+    )
+    ticket_id = result["TicketID"]
+    (job,) = _jobs(sync_url)
+    assert (job["status"], job["attempts"]) == ("queued", 1)
+    assert _article_count(sync_url, ticket_id) == 1  # nothing of the failed attempt stays
+    assert _mail_log(sync_url) == [("failed", None)]
+    make_due(sync_url, above_id=_JOB_WATERMARK[sync_url])
+    assert [d["status"] for d in await drain_gi_mail_jobs(sync_url)] == ["succeeded"]
+    assert len(sender.sent) == 1
+    assert _history_names(sync_url, ticket_id).count("SendAutoReply") == 1
+
+
+async def _reap_as_interrupted(sync_url: str, *, checkpoint: str | None) -> int:
+    """Make this module's queued gi_mail job look like the claim of a worker that died, then
+    let another worker's reaper settle it. Returns the reaped count."""
+    from datetime import timedelta
+
+    from sqlalchemy import update
+
+    from tiqora.config import get_settings
+    from tiqora.db.tiqora.models import TiqoraJob
+    from tiqora.extensions import get_registry
+    from tiqora.jobs.runner import JobRunner
+    from tiqora.jobs.service import utc_now
+
+    (job,) = _jobs(sync_url)
+    old = utc_now() - timedelta(minutes=10)
+    engine = create_async_engine(_async_url(sync_url))
+    try:
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            await session.execute(
+                update(TiqoraJob)
+                .where(TiqoraJob.id == job["id"])
+                .values(
+                    status="running",
+                    worker_id="dead:1",
+                    started_at=old,
+                    heartbeat_at=old,
+                    attempts=1,
+                    checkpoint=checkpoint,
+                )
+            )
+            await session.commit()
+        runner = JobRunner(
+            session_factory=factory, settings=get_settings(), registry=get_registry()
+        )
+        return await runner._reap()
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.db
+async def test_mail_interrupted_before_sending_is_requeued_and_sent_once(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}, drain=False
+    )
+    assert await _reap_as_interrupted(sync_url, checkpoint=None) >= 1
+    (job,) = _jobs(sync_url)
+    assert (job["status"], job["attempts"]) == ("queued", 1)
+    assert _send_errors(sync_url) == [] and _mail_log(sync_url) == []
+    assert [d["status"] for d in await drain_gi_mail_jobs(sync_url)] == ["succeeded"]
+    assert len(sender.sent) == 1
+    assert _mail_log(sync_url) == [("sent", result["ArticleID"])]
+
+
+@pytest.mark.db
+async def test_mail_interrupted_while_sending_is_recorded_and_never_resent(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.jobs.handlers.gi_mail import INTERRUPTED_SEND_ERROR
+
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}, drain=False
+    )
+    article_id = result["ArticleID"]
+    assert await _reap_as_interrupted(sync_url, checkpoint="sending") >= 1
+    (job,) = _jobs(sync_url)
+    assert job["status"] == "failed"
+    # recorded like a final MailQueue failure: transmission error + failed mail-log row
+    errors = _send_errors(sync_url)
+    assert [(a, e) for a, _, e in errors] == [(article_id, INTERRUPTED_SEND_ERROR)]
+    assert _mail_log(sync_url) == [("failed", article_id)]
+    assert await drain_gi_mail_jobs(sync_url) == []
+    assert sender.attempts == 0
+
+
+@pytest.mark.db
+async def test_worker_shutdown_during_smtp_records_the_mail(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The real handler sets its checkpoint before SMTP; a shutdown that cuts the send off
+    leaves a recorded failure, not an article that looks sent."""
+    from tiqora.config import get_settings
+    from tiqora.extensions import get_registry
+    from tiqora.jobs.handlers.gi_mail import INTERRUPTED_SEND_ERROR
+    from tiqora.jobs.runner import JobRunner
+
+    sender = _ScriptedSender(block=True)
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}, drain=False
+    )
+    (job,) = _jobs(sync_url)
+    engine = create_async_engine(_async_url(sync_url))
+    try:
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        runner = JobRunner(
+            session_factory=factory, settings=get_settings(), registry=get_registry()
+        )
+        attempt = await runner._claim(job["id"])
+        task = asyncio.create_task(
+            runner._execute(job["id"], "gi_mail", _payload_json(job), None, attempt=attempt)
+        )
+        runner._active[job["id"]] = task
+        for _ in range(200):
+            if sender.attempts:
+                break
+            await asyncio.sleep(0.05)
+        assert sender.attempts == 1
+        await runner.shutdown(grace_seconds=0.1)
+    finally:
+        await engine.dispose()
+    (job,) = _jobs(sync_url)
+    assert (job["status"], job["checkpoint"]) == ("failed", "sending")
+    assert [(a, e) for a, _, e in _send_errors(sync_url)] == [
+        (result["ArticleID"], INTERRUPTED_SEND_ERROR)
+    ]
+    assert _mail_log(sync_url) == [("failed", result["ArticleID"])]
+
+
+def _payload_json(job: dict[str, Any]) -> str:
+    import json
+
+    return json.dumps(job["payload"])
+
+
+@pytest.mark.db
+async def test_auto_response_queue_is_decided_when_the_article_is_stored(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    result = await _call(
+        sync_url,
+        "create",
+        {"Ticket": _ticket(), "Article": _customer_article("Vorher")},
+        drain=False,
+    )
+    ticket_id = result["TicketID"]
+    (job,) = _jobs(sync_url)
+    assert job["payload"]["queue_id"] == QUEUE
+    # the ticket moves (e.g. triage) before the worker runs: Znuny already decided the auto
+    # response in ArticleCreate, so the old queue's auto reply goes out
+    _query(
+        sync_url,
+        "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+        " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
+        f" change_time, change_by) VALUES ({_OTHER_QUEUE}, 'GI7653Queue', {GROUP}, 1, 1, 1,"
+        " 1, 0, 1, :t, 1, :t, 1)",
+        t=T0,
+    )
+    try:
+        _query(sync_url, f"UPDATE ticket SET queue_id = {_OTHER_QUEUE} WHERE id = {ticket_id}")
+        assert [d["status"] for d in await drain_gi_mail_jobs(sync_url)] == ["succeeded"]
+    finally:
+        # back, so the module cleanup finds it (the queue row goes with the cleanup)
+        _query(sync_url, f"UPDATE ticket SET queue_id = {QUEUE} WHERE id = {ticket_id}")
+    assert len(relay.sent) == 1
+    assert _history_names(sync_url, ticket_id).count("SendAutoReply") == 1
+
+
+def test_gi_mail_runs_in_its_own_serial_lane_with_mail_queue_attempts() -> None:
+    from tiqora.jobs.handlers.gi_mail import GI_MAIL_JOB
+    from tiqora.jobs.registry import LANE_SLOTS, MAIL_LANE
+
+    assert GI_MAIL_JOB.lane == MAIL_LANE and LANE_SLOTS[MAIL_LANE] == 1
+    assert GI_MAIL_JOB.max_attempts == 3  # MailQueue###ItemMaxAttempts default
+    assert GI_MAIL_JOB.requeue_if_interrupted and GI_MAIL_JOB.on_interrupted is not None
+
+
+@pytest.mark.db
+async def test_interruption_while_building_the_sender_requeues_the_mail(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The checkpoint is set right before SMTP starts: a worker stopped while the sender is
+    still being built (e.g. an OAuth token fetch) did not send anything, so the mail goes
+    back into the queue instead of being recorded as failed."""
+    from tiqora.config import get_settings
+    from tiqora.extensions import get_registry
+    from tiqora.jobs.runner import JobRunner
+
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    building = asyncio.Event()
+
+    async def _slow_build(session: Any, **kwargs: Any) -> Any:
+        building.set()
+        await asyncio.Event().wait()
+        return sender
+
+    monkeypatch.setattr(mail_outbound, "build_outbound_sender", _slow_build)
+    await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}, drain=False
+    )
+    (job,) = _jobs(sync_url)
+    engine = create_async_engine(_async_url(sync_url))
+    try:
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        runner = JobRunner(
+            session_factory=factory, settings=get_settings(), registry=get_registry()
+        )
+        attempt = await runner._claim(job["id"])
+        task = asyncio.create_task(
+            runner._execute(job["id"], "gi_mail", _payload_json(job), None, attempt=attempt)
+        )
+        runner._active[job["id"]] = task
+        await asyncio.wait_for(building.wait(), 10)
+        await runner.shutdown(grace_seconds=0.1)
+    finally:
+        await engine.dispose()
+    (job,) = _jobs(sync_url)
+    assert (job["status"], job["checkpoint"], job["attempts"]) == ("queued", None, 1)
+    assert _send_errors(sync_url) == [] and _mail_log(sync_url) == []
+    assert sender.attempts == 0
+
+
+# ---------------------------------------------------------------------------
+# PendingTime (Znuny Common.pm ValidatePendingTime)
+# ---------------------------------------------------------------------------
+
+PENDING_REMINDER = 6  # initial_insert: "pending reminder"
+
+
+def _until_time(sync_url: str, ticket_id: int) -> int:
+    return int(_query(sync_url, "SELECT until_time FROM ticket WHERE id = :t", t=ticket_id)[0][0])
+
+
+@pytest.mark.db
+@pytest.mark.parametrize(
+    "pending",
+    [
+        {"Diff": "1e300"},
+        {"Diff": 10**12},
+        {"Diff": "-5"},
+        {"Diff": "1.5"},
+        {"Diff": 60, "Year": 2030},
+        {"Year": 2030, "Month": 13, "Day": 1, "Hour": 0, "Minute": 0},
+        {"Year": 2030, "Month": 2, "Day": 30},
+        {"Year": "", "Month": 1, "Day": 1},
+        {"Year": 2030, "Month": 1, "Day": 1, "Hour": -1},
+        {"Year": 2030, "Month": 1},
+        {"Year": 10**12, "Month": 1, "Day": 1},
+        # below the signed 32-bit until_time (1901-12-13): refused like the upper bound
+        {"Year": "1901", "Month": "1", "Day": "1", "Hour": "0", "Minute": "0"},
+        {"Year": 1, "Month": 1, "Day": 1, "Hour": 0, "Minute": 0},
+        {"Year": 2038, "Month": 1, "Day": 19, "Hour": 3, "Minute": 15},
+        {"Year": 2030, "Month": 1, "Day": 1, "Days": 3},
+        "tomorrow",
+    ],
+)
+async def test_invalid_pending_time_is_refused_like_znuny(
+    sync_url: str, relay: CapturingMailSender, pending: Any
+) -> None:
+    ticket = {**_ticket(), "StateID": PENDING_REMINDER, "PendingTime": pending}
+    result = await _call(sync_url, "create", {"Ticket": ticket, "Article": _customer_article()})
+    assert result["Error"] == {
+        "ErrorCode": "TicketCreate.InvalidParameter",
+        "ErrorMessage": "TicketCreate: Ticket->PendingTime parameter is invalid!",
+    }
+    assert _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE) == []
+
+    created = await _call(sync_url, "create", {"Ticket": _ticket(), "Article": _customer_article()})
+    ticket_id = created["TicketID"]
+    updated = await _call(
+        sync_url,
+        "update",
+        {
+            "TicketID": ticket_id,
+            "Ticket": {
+                "Title": "GI7650 changed",
+                "StateID": PENDING_REMINDER,
+                "PendingTime": pending,
+            },
+        },
+    )
+    assert updated["Error"] == {
+        "ErrorCode": "TicketUpdate.InvalidParameter",
+        "ErrorMessage": "TicketUpdate: Ticket->PendingTime parameter is invalid!",
+    }
+    # validated before the first write: nothing changed
+    assert _query(sync_url, "SELECT title FROM ticket WHERE id = :t", t=ticket_id) == [(TITLE,)]
+
+
+@pytest.mark.db
+async def test_valid_pending_time_sets_the_until_time(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    ticket = {**_ticket(), "StateID": PENDING_REMINDER, "PendingTime": {"Diff": " 60 "}}
+    before = int(time.time())
+    created = await _call(sync_url, "create", {"Ticket": ticket, "Article": _customer_article()})
+    assert "Error" not in created, created
+    assert before + 3600 - 5 <= _until_time(sync_url, created["TicketID"]) <= before + 3600 + 60
+    absolute = {"Year": "2030", "Month": 1, "Day": 2, "Hour": 3, "Minute": 4}
+    updated = await _call(
+        sync_url,
+        "update",
+        {"TicketID": created["TicketID"], "Ticket": {"PendingTime": absolute}},
+    )
+    assert "Error" not in updated, updated
+    assert _until_time(sync_url, created["TicketID"]) == int(
+        datetime(2030, 1, 2, 3, 4, tzinfo=UTC).timestamp()
+    )
+
+
+@pytest.mark.db
+async def test_pending_time_without_hour_or_minute_is_never_midnight(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    """ValidatePendingTime accepts {Year, Month, Day}, but TicketPendingTimeSet needs Hour and
+    Minute ("Need Hour!", Ticket.pm:3958-3966): TicketCreate creates the ticket without a
+    pending time, TicketUpdate to a pending state fails with Success => 0 (a fault)."""
+    from tiqora.api.compat.operations import OPERATION_FAILED_MESSAGE
+    from tiqora.api.compat.provider import OperationFault
+
+    day_only = {"Year": 2030, "Month": 1, "Day": 2}
+    ticket = {**_ticket(), "StateID": PENDING_REMINDER, "PendingTime": day_only}
+    created = await _call(sync_url, "create", {"Ticket": ticket, "Article": _customer_article()})
+    assert "Error" not in created, created
+    ticket_id = created["TicketID"]
+    assert _until_time(sync_url, ticket_id) == 0  # no midnight 2030-01-02
+
+    with pytest.raises(OperationFault) as fault:
+        await _operation(
+            sync_url,
+            "update",
+            {
+                "TicketID": ticket_id,
+                "Ticket": {
+                    "Title": "GI7650 changed",
+                    "StateID": PENDING_REMINDER,
+                    "PendingTime": {"Year": 2030, "Month": 1, "Day": 2, "Hour": 9},
+                },
+            },
+        )
+    assert fault.value.message == OPERATION_FAILED_MESSAGE
+    assert _query(sync_url, "SELECT title FROM ticket WHERE id = :t", t=ticket_id) == [(TITLE,)]
+
+    # without a pending target state Znuny never calls TicketPendingTimeSet: accepted, nothing set
+    updated = await _call(
+        sync_url,
+        "update",
+        {"TicketID": ticket_id, "Ticket": {"Title": "GI7650 changed", "PendingTime": day_only}},
+    )
+    assert "Error" not in updated, updated
+    assert _until_time(sync_url, ticket_id) == 0
+
+
+async def test_canonical_ticket_update_answers_an_operation_fault_with_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from starlette.requests import Request
+
+    from tiqora.api.compat import router
+    from tiqora.api.compat.provider import OperationFault
+
+    async def _params(request: Any) -> dict[str, Any]:
+        return {}
+
+    async def _fail(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise OperationFault("OperationObject returned an error, cancelling Request")
+
+    monkeypatch.setattr(router, "_merge_params", _params)
+    monkeypatch.setattr(router, "_dispatch_operation", _fail)
+    request = Request({"type": "http", "method": "PATCH", "path": "/", "headers": []})
+    response = await router.canonical_ticket_update(
+        ticket_id=1,
+        request=request,
+        session=None,  # type: ignore[arg-type]
+        session_store=None,  # type: ignore[arg-type]
+    )
+    assert response.status_code == 500
+    assert b"OperationObject returned an error, cancelling Request" in bytes(response.body)

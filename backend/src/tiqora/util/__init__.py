@@ -1,1 +1,1 @@
-"""Small helpers shared across Tiqora packages."""
+"""Small dependency-free helpers shared across Tiqora packages."""

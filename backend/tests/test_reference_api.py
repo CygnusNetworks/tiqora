@@ -344,6 +344,32 @@ async def test_reference_compose_context(mariadb_znuny_url: str) -> None:
 
 
 @pytest.mark.asyncio
+async def test_reference_compose_context_rich_text_string_zero(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Znuny stores a disabled checkbox as ``--- '0'`` (the string "0", truthy in Python)."""
+    from tiqora.znuny.sysconfig import SysConfig
+
+    original = SysConfig._resolve_raw
+
+    async def resolve(self: SysConfig, name: str) -> Any:
+        if name == "Frontend::RichText":
+            return b"--- '0'\n"
+        return await original(self, name)
+
+    monkeypatch.setattr(SysConfig, "_resolve_raw", resolve)
+    ids = _seed(mariadb_znuny_url)
+    client, engine = await _client_for(mariadb_znuny_url, ids)
+    async with client:
+        resp = await client.get(
+            "/api/v1/reference/compose-context", params={"queue_id": ids["queue_id"]}
+        )
+    await engine.dispose()
+    assert resp.status_code == 200
+    assert resp.json()["rich_text"] is False
+
+
+@pytest.mark.asyncio
 async def test_reference_compose_context_unknown_queue(mariadb_znuny_url: str) -> None:
     ids = _seed(mariadb_znuny_url)
     client, engine = await _client_for(mariadb_znuny_url, ids)

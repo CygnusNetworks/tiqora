@@ -554,7 +554,7 @@ async def compose_context(
     except InvalidInput as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     sysconfig = SysConfig(session)
-    rich_text = bool(await sysconfig.get("Frontend::RichText", 1))
+    rich_text = await sysconfig.get_bool("Frontend::RichText", True)
     signature = sig_text or ""
     if signature.strip():
         signature = await expand_placeholders(

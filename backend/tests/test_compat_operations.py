@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import time
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
@@ -144,8 +145,40 @@ async def _create_tiqora_tables(session: AsyncSession) -> None:
     await session.commit()
 
 
+# SessionCreate writes Znuny ``sessions`` rows (default since wave 1): delete every row the
+# module added, per database it seeded (the rest of the module is on db_leak_baseline.txt).
+_SESSION_MAX_ID: dict[str, int] = {}
+
+
+def _remember_sessions_watermark(sync_url: str) -> None:
+    if sync_url in _SESSION_MAX_ID:
+        return
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            _SESSION_MAX_ID[sync_url] = int(
+                conn.execute(text("SELECT COALESCE(MAX(id), 0) FROM sessions")).scalar_one()
+            )
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _delete_new_session_rows() -> Iterator[None]:
+    yield
+    for sync_url, max_id in _SESSION_MAX_ID.items():
+        engine = create_engine(sync_url)
+        try:
+            with engine.begin() as conn:
+                conn.execute(text("DELETE FROM sessions WHERE id > :m"), {"m": max_id})
+        finally:
+            engine.dispose()
+    _SESSION_MAX_ID.clear()
+
+
 def _seed_compat_data(sync_url: str) -> dict[str, Any]:
     """Seed data for compat tests and return IDs."""
+    _remember_sessions_watermark(sync_url)
     engine = create_engine(sync_url)
     ids: dict[str, Any] = {}
 

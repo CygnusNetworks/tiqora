@@ -602,3 +602,53 @@ def test_output_size_is_capped(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(xslt_module, "MAX_OUTPUT_BYTES", 100)
     with pytest.raises(MappingError, match="Could not map data"):
         XsltMapper({"Template": IDENTITY}).map({"k": "v" * 1000})
+
+
+def test_data_include_uses_perl_truthiness() -> None:
+    # XSLT.pm:211 `next if !$Param{DataInclude}->{$Module}`: {} is true, "0" is false
+    template = _simple_template(
+        "<NewRootElement>"
+        '<E><xsl:value-of select="count(/RootElement/DataInclude/Empty)"/></E>'
+        '<Z><xsl:value-of select="count(/RootElement/DataInclude/Zero)"/></Z>'
+        "</NewRootElement>"
+    )
+    out = XsltMapper({"Template": template, "DataInclude": ["Empty", "Zero"]}).map(
+        {"Key": "Value"}, {"Empty": {}, "Zero": "0"}
+    )
+    assert out == {"E": "1", "Z": "0"}
+
+
+@pytest.mark.parametrize(
+    "href",
+    [
+        "/opt/otrs/OTRSFunctions.xsl/../../etc/evil.xsl",
+        "/opt/otrs/OTRSFunctions.xsl.bak",
+        "https://example.org/OTRSFunctions.xsl?x=/etc/passwd&y=1.xsl",
+    ],
+)
+def test_href_containing_otrs_functions_not_at_the_end_is_refused(href: str) -> None:
+    tmpl = IDENTITY.replace("<xsl:template", f'<xsl:import href="{href}"/><xsl:template', 1)
+    with pytest.raises(MappingError) as exc:
+        XsltMapper({"Template": tmpl}).map({"a": "b"})
+    assert "not allowed" in str(exc.value) or "Could not" in str(exc.value)
+
+
+def test_foreign_import_message_is_english() -> None:
+    tmpl = IDENTITY.replace("<xsl:template", '<xsl:import href="/etc/hosts.xsl"/><xsl:template', 1)
+    with pytest.raises(MappingError) as exc:
+        XsltMapper({"Template": tmpl}).map({"a": "b"})
+    assert "is not allowed in Tiqora" in str(exc.value)
+    assert "nicht" not in str(exc.value)
+
+
+def test_text_output_that_is_not_xml_is_an_error() -> None:
+    # Znuny parses the transform result with XMLin: plain text is no XML document
+    tmpl = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
+        '<xsl:output method="text"/>'
+        '<xsl:template match="/">plain <xsl:value-of select="/RootElement/a"/></xsl:template>'
+        "</xsl:stylesheet>"
+    )
+    with pytest.raises(MappingError):
+        XsltMapper({"Template": tmpl}).map({"a": "b"})

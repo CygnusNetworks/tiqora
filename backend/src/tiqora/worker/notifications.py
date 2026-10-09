@@ -671,13 +671,6 @@ async def _render_message(
 _SECURITY_LOG_LEVELS = {"error": "error", "notice": "info"}
 
 
-def _sysconfig_flag(value: object) -> bool:
-    """SysConfig checkbox values arrive as ``1``/``0`` ints or strings."""
-    if isinstance(value, str):
-        return value.strip() not in ("", "0")
-    return bool(value)
-
-
 async def _notification_security(
     session: AsyncSession,
     sysconfig: SysConfig,
@@ -708,7 +701,7 @@ async def _notification_security(
             )
         ).first()
         default_sign_key = str(row[0]) if row is not None and row[0] else None
-    rich_text = _sysconfig_flag(await sysconfig.get("Frontend::RichText", 1))
+    rich_text = await sysconfig.get_bool("Frontend::RichText", True)
     decision = await asyncio.to_thread(
         notification_security_sync,
         config,

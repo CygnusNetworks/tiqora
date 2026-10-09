@@ -21,8 +21,9 @@ Ticket (``Kernel/System/Ticket.pm`` ``TicketGet``, called without ``UserID`` det
 Known gaps (documented, not faked): the working-time based keys ``FirstResponseInMin``,
 ``FirstResponseDiffInMin``, ``SolutionInMin``, ``SolutionDiffInMin`` and the escalation detail
 keys of ``TicketEscalationDateCalculation`` (``EscalationDestinationIn`` ...) need a calendar
-working-time calculation that Tiqora does not have; ``EscalationTime`` and the other
-escalation base values are the stored columns, not recomputed.
+working-time calculation that Tiqora does not have; the other escalation base
+values are the stored columns, not recomputed; ``EscalationTime`` is the seconds until the
+nearest destination time like Znuny.
 
 Article (``Article.pm`` ``_MetaArticleList`` + ``MIMEBase.pm`` ``ArticleGet``; the GenericInterface
 never passes ``RealNames``, so there are no ``*Realname`` keys)::
@@ -349,6 +350,23 @@ async def build_ticket_entry(
     else:
         until_time = real_till - calendar.timegm(now.timetuple())
 
+    # TicketEscalationDateCalculation (Ticket.pm:2771-2909), called by TicketGet (Ticket.pm:1430):
+    # for an escalating ticket (not merged/closed/removed) EscalationTime is the seconds from
+    # now to the nearest of the response/update/solution destination times, else the column.
+    escalation_time = row["escalation_time"]
+    if state_type not in ("merged", "closed", "removed"):
+        destinations = [
+            int(row[col] or 0)
+            for col in (
+                "escalation_response_time",
+                "escalation_update_time",
+                "escalation_solution_time",
+            )
+            if row[col]
+        ]
+        if destinations:
+            escalation_time = min(destinations) - calendar.timegm(now.timetuple())
+
     responsible_id = int(row["responsible_user_id"] or 0) or 1
     type_id = int(row["type_id"] or 0) or 1
     service_id = int(row["service_id"] or 0)
@@ -376,7 +394,7 @@ async def build_ticket_entry(
         "SLAID": sla_id or "",
         "EscalationResponseTime": row["escalation_response_time"],
         "EscalationSolutionTime": row["escalation_solution_time"],
-        "EscalationTime": row["escalation_time"],
+        "EscalationTime": escalation_time,
         "ArchiveFlag": "y" if row["archive_flag"] else "n",
         "CreateBy": row["create_by"],
         "ChangeBy": row["change_by"],

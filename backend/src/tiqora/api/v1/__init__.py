@@ -6,6 +6,7 @@ from tiqora.api.v1 import (
     agents,
     ai,
     auth,
+    auth_sso,
     avatars,
     calendar,
     channels_phone,
@@ -25,6 +26,7 @@ from tiqora.api.v1 import (
     process,
     queues,
     reference,
+    reports,
     search,
     stats,
     templates,
@@ -38,6 +40,7 @@ from tiqora.api.v1.admin import admin_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth.router)
+api_v1_router.include_router(auth_sso.router)
 api_v1_router.include_router(oauth2_callback.router)
 api_v1_router.include_router(agents.router)
 api_v1_router.include_router(calendar.router)
@@ -69,6 +72,8 @@ api_v1_router.include_router(channels_whatsapp.router)
 api_v1_router.include_router(channels_telegram.router)
 api_v1_router.include_router(channels_phone.router)
 api_v1_router.include_router(stats.router)
+api_v1_router.include_router(reports.router)
+api_v1_router.include_router(reports.sources_router)
 api_v1_router.include_router(integrations.router)
 api_v1_router.include_router(jobs.router)
 api_v1_router.include_router(admin_router)
