@@ -109,6 +109,12 @@ class ReportSource:
     time_fields: tuple[str, ...] = ()  # date / local_date dimension keys
     default_time_field: str | None = None
     requires_facts: bool = True
+    #: Condition that drops archived tickets; the compiler ANDs it unless the viewer's
+    #: scope includes archived tickets (same rule as ``GET /tickets``). ``None`` = the
+    #: source has no per-ticket archive flag or keeps archived rows on purpose
+    #: (``accounted_time``: historical totals; ``daily_snapshot``: stocks per day;
+    #: ``open_tickets`` drops archived tickets always in ``base_where`` like the dashboard).
+    archive_exclusion: BoolFn | None = None
 
     def dimension(self, key: str) -> Dimension | None:
         for d in self.dimensions:

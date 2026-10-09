@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, FromClause, and_, not_, or_, true
+from sqlalchemy import ColumnElement, FromClause, and_, false, not_, or_, true
 
 from tiqora.db.tiqora.models import TiqoraReportTicketFact
 from tiqora.reporting.semantic import BoolFn, CompileContext, Measure, ReportSource
@@ -207,4 +207,5 @@ def tickets_source() -> ReportSource:
         ),
         time_fields=("created", "closed", "first_response"),
         default_time_field="created",
+        archive_exclusion=lambda ctx: F.c.archived.is_(false()),
     )

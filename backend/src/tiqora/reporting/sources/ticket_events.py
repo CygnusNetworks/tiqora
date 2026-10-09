@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import ColumnElement, FromClause, case, null
+from sqlalchemy import ColumnElement, FromClause, case, false, null
 
 from tiqora.db.tiqora.models import TiqoraReportTicketEvent, TiqoraReportTicketFact
 from tiqora.reporting.history_events import EVENT_KINDS
@@ -108,4 +108,5 @@ def ticket_events_source() -> ReportSource:
         ),
         time_fields=("occurred",),
         default_time_field="occurred",
+        archive_exclusion=lambda ctx: F.c.archived.is_(false()),
     )

@@ -180,6 +180,11 @@ def _shift_unit(unit: str, start: date, count: int) -> date:
     return date(start.year + count, 1, 1)
 
 
+#: Public names for the compiler's stock-date buckets (same week/quarter rules as windows).
+unit_start = _unit_start
+shift_unit = _shift_unit
+
+
 def _local_midnight_utc(d: date, tz: ZoneInfo) -> datetime:
     return datetime.combine(d, time.min, tz).astimezone(UTC).replace(tzinfo=None)
 
