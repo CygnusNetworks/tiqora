@@ -35,6 +35,12 @@ def register_core(registry: Registry) -> None:
     registry.add(JOB_HANDLERS, GI_MAIL_JOB)
     registry.add(JOB_HANDLERS, REPORT_BACKFILL_JOB)
 
+    from tiqora.reporting.semantic import REPORT_SOURCES
+    from tiqora.reporting.sources import core_report_sources
+
+    for s in core_report_sources():
+        registry.add(REPORT_SOURCES, s)
+
 
 def get_registry() -> Registry:
     global _REGISTRY

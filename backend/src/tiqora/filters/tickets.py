@@ -10,16 +10,13 @@ column behaves like "not that value" and includes the NULL rows.
 
 from __future__ import annotations
 
-import calendar
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
-    BigInteger,
     ColumnElement,
     Select,
-    SmallInteger,
     and_,
     exists,
     false,
@@ -27,7 +24,6 @@ from sqlalchemy import (
     not_,
     or_,
     select,
-    true,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,11 +49,19 @@ from tiqora.domain.ticket_service import (
 from tiqora.filters.catalog import (
     FilterError,
     FilterFieldSpec,
-    parse_datetime_value,
-    relative_delta,
     validate_filter,
 )
 from tiqora.filters.model import AllOf, AnyOf, Condition, Filter, FilterNode, Not
+from tiqora.filters.predicates import (
+    INT32,
+    NEGATED_OPS,
+    column_predicate,
+    const_compare,
+    epoch_of,
+    fit_int_condition,
+    non_empty,
+    positive_predicate,
+)
 from tiqora.permissions.engine import PermissionEngine
 
 DF_FIELD_PREFIX = "df."
@@ -233,158 +237,14 @@ def _utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
 
-def _epoch(dt: datetime) -> int:
-    return calendar.timegm(dt.timetuple())
+_epoch = epoch_of
 
 
-def _like(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _is_nullable(col: Any) -> bool:
-    return bool(getattr(col.property.columns[0], "nullable", True))
-
-
-def _datetime_bound(value: Any, path: str) -> datetime:
-    return parse_datetime_value(value, path=path)
-
-
-def _datetime_predicate(
-    col: Any, cond: Condition, path: str, now: datetime, *, epoch: bool
-) -> ColumnElement[bool]:
-    """Positive datetime comparison. ``epoch`` columns hold seconds, 0 = unset."""
-
-    def cmp(op_: str, dt: datetime) -> ColumnElement[bool]:
-        if not epoch:
-            return {"lt": col < dt, "lte": col <= dt, "gt": col > dt, "gte": col >= dt}[op_]  # type: ignore[no-any-return]
-        return _compare(col, op_, _epoch(dt), *_INT32)
-
-    op, value = cond.op, cond.value
-    if op == "before":
-        pred = cmp("lt", _datetime_bound(value, path))
-    elif op == "after":
-        pred = cmp("gt", _datetime_bound(value, path))
-    elif op == "between":
-        pred = and_(
-            cmp("gte", _datetime_bound(value["from"], f"{path}.from")),
-            cmp("lt", _datetime_bound(value["to"], f"{path}.to")),
-        )
-    elif op in ("within_last", "older_than"):
-        try:
-            limit = now - relative_delta(value, path=path)
-        except OverflowError:
-            raise FilterError("Der Zeitraum ist zu groß.", path=path) from None
-        pred = cmp("gte" if op == "within_last" else "lt", limit)
-    else:  # pragma: no cover - validate_filter limits the ops
-        raise FilterError(f"„{op}“ ist für Datumsfelder nicht möglich.", path=path)
-    return and_(col > 0, pred) if epoch else pred
-
-
-def _positive_predicate(
-    col: Any, spec_type: str, cond: Condition, path: str, now: datetime, *, epoch: bool = False
-) -> ColumnElement[bool]:
-    """Condition on a value column, for ops that mean "a value that ...".
-
-    ``neq`` / ``not_in`` / ``is_empty`` are handled by the callers (they differ
-    between ticket columns and EXISTS-based dynamic fields).
-    """
-    op, value = cond.op, cond.value
-    if spec_type == "datetime":
-        if op == "is_not_empty":
-            return (col > 0) if epoch else col.is_not(None)  # type: ignore[no-any-return]
-        return _datetime_predicate(col, cond, path, now, epoch=epoch)
-    if op == "eq":
-        return col == value  # type: ignore[no-any-return]
-    if op == "in":
-        return col.in_(value)  # type: ignore[no-any-return]
-    if op == "contains":
-        return col.ilike(f"%{_like(value)}%", escape="\\")  # type: ignore[no-any-return]
-    if op == "starts_with":
-        return col.ilike(f"{_like(value)}%", escape="\\")  # type: ignore[no-any-return]
-    if op == "is_not_empty":
-        return and_(col.is_not(None), col != "")
-    if op == "lt":
-        return col < value  # type: ignore[no-any-return]
-    if op == "lte":
-        return col <= value  # type: ignore[no-any-return]
-    if op == "gt":
-        return col > value  # type: ignore[no-any-return]
-    if op == "gte":
-        return col >= value  # type: ignore[no-any-return]
-    if op == "between":
-        return and_(col >= value["from"], col <= value["to"])
-    raise FilterError(f"„{op}“ ist hier nicht möglich.", path=path)  # pragma: no cover
-
-
-_NEGATED_OPS = {"neq": "eq", "not_in": "in"}
-
-_INT32 = (-(2**31), 2**31 - 1)
-_INT16 = (-(2**15), 2**15 - 1)
-_INT64 = (-(2**63), 2**63 - 1)
-
-
-def _int_bounds(col: Any) -> tuple[int, int]:
-    """Value range the column's integer type can hold (asyncpg refuses to bind more)."""
-    ctype = col.property.columns[0].type if hasattr(col, "property") else col.type
-    if isinstance(ctype, SmallInteger):
-        return _INT16
-    if isinstance(ctype, BigInteger):
-        return _INT64
-    return _INT32
-
-
-def _const_compare(op: str, v: int, lo: int, hi: int) -> bool | None:
-    """Constant answer of ``col <op> v`` for a column in ``[lo, hi]``, else None."""
-    if op == "lt":
-        return True if v > hi else False if v <= lo else None
-    if op == "lte":
-        return True if v >= hi else False if v < lo else None
-    if op == "gt":
-        return True if v < lo else False if v >= hi else None
-    if op == "gte":
-        return True if v <= lo else False if v > hi else None
-    raise ValueError(op)  # pragma: no cover
-
-
-def _compare(col: Any, op: str, v: int, lo: int, hi: int) -> ColumnElement[bool]:
-    """``col <op> v`` for an integer column; out-of-range values are never bound."""
-    const = _const_compare(op, v, lo, hi)
-    if const is not None:
-        return true() if const else false()
-    return {"lt": col < v, "lte": col <= v, "gt": col > v, "gte": col >= v}[op]  # type: ignore[no-any-return]
-
-
-def _fit_int_condition(cond: Condition, lo: int, hi: int) -> Condition | ColumnElement[bool]:
-    """Keep out-of-range values away from the database.
-
-    Returns the condition (possibly with values dropped/clamped) or a constant
-    predicate when the answer does not depend on the column.
-    """
-    op, value = cond.op, cond.value
-
-    def fits(v: int) -> bool:
-        return lo <= v <= hi
-
-    if op == "eq":
-        return cond if fits(value) else false()
-    if op == "neq":
-        return cond if fits(value) else true()
-    if op in ("in", "not_in"):
-        kept = [v for v in value if fits(v)]
-        if kept:
-            return cond.model_copy(update={"value": kept})
-        return false() if op == "in" else true()
-    if op in ("lt", "lte", "gt", "gte"):
-        const = _const_compare(op, value, lo, hi)
-        if const is None:
-            return cond
-        return true() if const else false()
-    if op == "between":
-        low, high = value["from"], value["to"]
-        if low > hi or high < lo:
-            return false()
-        return cond.model_copy(update={"value": {"from": max(low, lo), "to": min(high, hi)}})
-    return cond
+# Shared predicate helpers live in :mod:`tiqora.filters.predicates`; the
+# private aliases keep the historic names importable.
+_INT32 = INT32
+_const_compare = const_compare
+_fit_int_condition = fit_int_condition
 
 
 class _Compiler:
@@ -459,29 +319,9 @@ class _Compiler:
         return await self._special(key, cond)
 
     def _column(self, key: str, cond: Condition, vpath: str) -> ColumnElement[bool]:
-        col = _COLUMNS[key]
         spec = TICKET_FILTER_FIELDS[key]
         epoch = key == "pending_until"
-        nullable = epoch is False and _is_nullable(col)
-        if spec.type in ("id", "int"):
-            fitted = _fit_int_condition(cond, *_int_bounds(col))
-            if not isinstance(fitted, Condition):
-                if nullable and cond.op not in _NEGATED_OPS:
-                    return and_(col.is_not(None), fitted)
-                return fitted
-            cond = fitted
-        op = cond.op
-        if op == "is_empty":
-            if spec.type == "datetime":
-                return col == 0 if epoch else col.is_(None)  # type: ignore[no-any-return]
-            return or_(col.is_(None), col == "")
-        if op in _NEGATED_OPS:
-            positive = _positive_predicate(
-                col, spec.type, cond.model_copy(update={"op": _NEGATED_OPS[op]}), vpath, self._now
-            )
-            return or_(col.is_(None), not_(positive)) if nullable else not_(positive)
-        positive = _positive_predicate(col, spec.type, cond, vpath, self._now, epoch=epoch)
-        return and_(col.is_not(None), positive) if nullable else positive
+        return column_predicate(_COLUMNS[key], spec.type, cond, vpath, self._now, epoch=epoch)
 
     def _dynamic_field(
         self, info: _DynamicFieldInfo, cond: Condition, vpath: str
@@ -501,13 +341,13 @@ class _Compiler:
             checked = has(col == 1)
             return checked if op == "is_true" else not_(checked)
         if op == "is_empty":
-            return not_(has(col.is_not(None) if ftype == "datetime" else _non_empty(col)))
-        if op in _NEGATED_OPS:
-            positive = _positive_predicate(
-                col, ftype, cond.model_copy(update={"op": _NEGATED_OPS[op]}), vpath, self._now
+            return not_(has(col.is_not(None) if ftype == "datetime" else non_empty(col)))
+        if op in NEGATED_OPS:
+            positive = positive_predicate(
+                col, ftype, cond.model_copy(update={"op": NEGATED_OPS[op]}), vpath, self._now
             )
             return not_(has(positive))
-        return has(_positive_predicate(col, ftype, cond, vpath, self._now))
+        return has(positive_predicate(col, ftype, cond, vpath, self._now))
 
     async def _special(self, key: str, cond: Condition) -> ColumnElement[bool]:
         op, value = cond.op, cond.value
@@ -563,10 +403,6 @@ class _Compiler:
         if key == "archived":
             return Ticket.archive_flag == (1 if op == "is_true" else 0)
         raise FilterError(f"Unbekanntes Feld „{key}“.", path="where.field")  # pragma: no cover
-
-
-def _non_empty(col: Any) -> ColumnElement[bool]:
-    return and_(col.is_not(None), col != "")
 
 
 async def compile_ticket_filter(
