@@ -141,6 +141,7 @@ export function PortalProcessWidget({ ticketId }: { ticketId: number }) {
               <ProcessStartForm
                 key={picked}
                 api={portalProcessApi}
+                queryKeyPrefix={["portal", "process"]}
                 processEntityId={picked}
                 ticketId={ticketId}
                 pending={enrollM.isPending}

@@ -5,6 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
 import i18n from "@/i18n";
 import { AclDetailPage } from "./AclDetailPage";
+import { DEPLOY_STATUS_QUERY_KEY } from "@/components/process/DeployStatusCard";
 
 let currentAclId = "2";
 
@@ -40,13 +41,15 @@ function renderPage() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const invalidate = vi.spyOn(qc, "invalidateQueries");
+  const view = render(
     <QueryClientProvider client={qc}>
       <I18nextProvider i18n={i18n}>
         <AclDetailPage />
       </I18nextProvider>
     </QueryClientProvider>,
   );
+  return { ...view, invalidate };
 }
 
 const sampleAcl = {
@@ -103,6 +106,22 @@ describe("AclDetailPage", () => {
     });
     expect(updateAcl.mock.calls[0][0]).toBe(2);
     expect(updateAcl.mock.calls[0][1].name).toBe("Renamed");
+  });
+
+  it("refreshes the deploy status after a save and after a delete (every ACL write is a draft)", async () => {
+    getAcl.mockResolvedValue(sampleAcl);
+    updateAcl.mockResolvedValue(sampleAcl);
+    deleteAcl.mockResolvedValue(undefined);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { invalidate } = renderPage();
+    await waitFor(() => expect(screen.getByTestId("acl-detail-name")).toHaveValue("RestrictPriority"));
+
+    fireEvent.click(screen.getByTestId("acl-detail-save"));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: DEPLOY_STATUS_QUERY_KEY }));
+
+    invalidate.mockClear();
+    fireEvent.click(screen.getByTestId("acl-detail-delete"));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: DEPLOY_STATUS_QUERY_KEY }));
   });
 
   it("requests a different ACL when the route id changes", async () => {

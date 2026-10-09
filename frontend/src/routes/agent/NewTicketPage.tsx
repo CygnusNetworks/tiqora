@@ -186,6 +186,16 @@ export function NewTicketPage() {
     { action: "AgentTicketPhone", queue_id: queue === "" ? undefined : queue },
     { enabled: ticketType === "phone" && queue !== "" },
   );
+  const ownerLoaded = ownerOptions.loaded;
+  const ownerItems = ownerOptions.items;
+  // An owner picked for another queue (or by a call prefill) that the new queue's list does not offer is dropped:
+  // the default (the creator) takes over, instead of submitting a stale id.
+  useEffect(() => {
+    if (!ownerLoaded) return;
+    setPhoneFields((f) =>
+      f.ownerId !== null && !ownerItems.some((i) => i.value === f.ownerId) ? { ...f, ownerId: null } : f,
+    );
+  }, [ownerLoaded, ownerItems]);
   const ownerAgents = useMemo(
     () => ownerOptions.items.map((i) => ({ id: i.value, full_name: i.label, login: "" })),
     [ownerOptions.items],

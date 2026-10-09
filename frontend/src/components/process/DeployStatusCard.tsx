@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toBcp47 } from "@/i18n";
-import { ApiError } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/avatarApi";
 import { deployStatusApi, type DeployKind } from "@/lib/deployStatusApi";
 import { formatDateTime } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
@@ -89,7 +89,7 @@ export function DeployStatusCard({ kind, testId }: { kind: DeployKind; testId?: 
       )}
       {deployM.isError && (
         <p className="text-xs text-danger" role="alert" data-testid="deploy-status-error">
-          {deployM.error instanceof ApiError ? deployM.error.message : t("admin.deploy.deployFailed")}
+          {apiErrorMessage(deployM.error, t("admin.deploy.deployFailed"))}
         </p>
       )}
     </div>

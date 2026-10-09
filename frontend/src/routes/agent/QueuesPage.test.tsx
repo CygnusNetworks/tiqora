@@ -482,7 +482,7 @@ describe("QueuesPage selection", () => {
     await waitFor(() =>
       expect(fieldOptionsFetch).toHaveBeenCalledWith(
         {
-          fields: ["state", "priority", "queue", "owner", "responsible"],
+          fields: ["state", "priority", "queue", "owner"],
           context: { action: "AgentTicketBulk", ticket_ids: [101, 102], queue_id: undefined },
         },
         expect.anything(),
@@ -532,7 +532,7 @@ describe("QueuesPage selection", () => {
     await waitFor(() =>
       expect(fieldOptionsFetch).toHaveBeenCalledWith(
         {
-          fields: ["state", "priority", "queue", "owner", "responsible"],
+          fields: ["state", "priority", "queue", "owner"],
           context: { action: "AgentTicketBulk", ticket_ids: [101], queue_id: 9 },
         },
         expect.anything(),

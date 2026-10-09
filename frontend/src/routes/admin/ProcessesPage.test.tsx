@@ -61,6 +61,13 @@ describe("ProcessesPage", () => {
     expect(within(rowA).getByText("4")).toBeInTheDocument();
   });
 
+  it("shows who can start each process", async () => {
+    renderPage();
+    await screen.findByTestId("process-link-Process-a");
+    expect(screen.getByTestId("process-interfaces-Process-a")).toHaveTextContent(i18n.t("admin.processes.interfaceAgent"));
+    expect(screen.getByTestId("process-interfaces-Process-b")).toHaveTextContent("—");
+  });
+
   it("shows the process deploy status card", async () => {
     renderPage();
     await screen.findByTestId("process-link-Process-a");

@@ -10,7 +10,14 @@ const { status, deploy } = vi.hoisted(() => ({ status: vi.fn(), deploy: vi.fn() 
 
 vi.mock("@/lib/deployStatusApi", () => ({ deployStatusApi: { status, deploy } }));
 vi.mock("@/lib/api", () => ({
-  ApiError: class ApiError extends Error {},
+  ApiError: class ApiError extends Error {
+    constructor(
+      public status: number,
+      public detail: unknown,
+    ) {
+      super(`HTTP ${status}`);
+    }
+  },
 }));
 
 const kind = (over: Partial<DeployStatus["process"]> = {}): DeployStatus["process"] => ({
@@ -80,6 +87,19 @@ describe("DeployStatusCard", () => {
     fireEvent.click(await screen.findByTestId("deploy-status-deploy"));
     await waitFor(() => expect(deploy).toHaveBeenCalledWith("acl"));
     expect(screen.getByTestId("deploy-status-acl")).toBeInTheDocument();
+    // the card re-reads the status after a deploy
+    await waitFor(() => expect(status).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows the server's message for a failed deploy, never [object Object]", async () => {
+    status.mockResolvedValue(body({ can_deploy_from_tiqora: true, acl: kind({ pending_changes: 2 }) }));
+    const { ApiError } = await import("@/lib/api");
+    deploy.mockRejectedValue(new ApiError(422, { detail: [{ msg: "Unknown kind" }] }, "/x"));
+    renderCard("acl");
+    fireEvent.click(await screen.findByTestId("deploy-status-deploy"));
+    const err = await screen.findByTestId("deploy-status-error");
+    expect(err).toHaveTextContent("Unknown kind");
+    expect(err).not.toHaveTextContent("object Object");
   });
 
   it("hides the deploy button when nothing is pending, even if Tiqora may deploy", async () => {

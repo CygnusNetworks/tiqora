@@ -1364,8 +1364,8 @@
       "keysDesc": "Upload your PGP key or S/MIME certificate so that we can send you encrypted email. It must contain your email address {{email}}."
     },
     "process": {
-      "start": "Start a process",
-      "title": "Start a process",
+      "start": "New process ticket",
+      "title": "New process ticket",
       "empty": "There is no process you can start.",
       "chooseProcess": "Choose a process",
       "loadError": "Processes could not be loaded.",
@@ -2699,6 +2699,9 @@
       "name": "Name",
       "entityId": "Entity ID",
       "activityCount": "Activities",
+      "startInterfaces": "Can be started by",
+      "interfaceAgent": "Agent",
+      "interfaceCustomer": "Customer",
       "readOnlyNote": "Process design must be done in Znuny's admin interface; this is a read-only view.",
       "startActivity": "Start activity",
       "activities": "Activities",
@@ -3032,7 +3035,7 @@
       },
       "takeoverBadge": "Takeover",
       "settingsLink": "Settings",
-      "deployLive": "No deployment detected yet: Tiqora runs the drafts directly. Please deploy once in Znuny."
+      "deployLive": "No deployment detected yet: Tiqora runs the draft state. Please deploy once in Znuny."
     },
     "mailLog": {
       "title": "Email communication log",

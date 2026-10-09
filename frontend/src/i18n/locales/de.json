@@ -1364,8 +1364,8 @@
       "keysDesc": "Laden Sie Ihren PGP-Schlüssel oder Ihr S/MIME-Zertifikat hoch, damit wir Ihnen verschlüsselte E-Mails senden können. Er muss Ihre E-Mail-Adresse {{email}} enthalten."
     },
     "process": {
-      "start": "Prozess starten",
-      "title": "Prozess starten",
+      "start": "Neues Prozessticket",
+      "title": "Neues Prozessticket",
       "empty": "Es gibt keinen Prozess, den Sie starten können.",
       "chooseProcess": "Prozess wählen",
       "loadError": "Prozesse konnten nicht geladen werden.",
@@ -2699,6 +2699,9 @@
       "name": "Name",
       "entityId": "Entity-ID",
       "activityCount": "Aktivitäten",
+      "startInterfaces": "Startbar für",
+      "interfaceAgent": "Agent",
+      "interfaceCustomer": "Kunde",
       "readOnlyNote": "Die Prozessgestaltung muss in der Znuny-Administration erfolgen; dies ist eine reine Leseansicht.",
       "startActivity": "Startaktivität",
       "activities": "Aktivitäten",
@@ -3026,13 +3029,13 @@
           "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."
         },
         "deploy_watch": {
-          "name": "Deploy-Wächter",
+          "name": "Bereitstellung beobachten",
           "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."
         }
       },
       "takeoverBadge": "Übernahme",
       "settingsLink": "Einstellungen",
-      "deployLive": "Noch keine Bereitstellung erkannt: Tiqora nutzt die Entwürfe direkt. Bitte in Znuny einmal bereitstellen."
+      "deployLive": "Noch keine Bereitstellung erkannt: Tiqora nutzt den Entwurfsstand. Bitte in Znuny einmal bereitstellen."
     },
     "mailLog": {
       "title": "E-Mail-Kommunikationsprotokoll",

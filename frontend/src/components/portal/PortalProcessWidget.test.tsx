@@ -92,6 +92,8 @@ describe("PortalProcessWidget", () => {
     api.ticketState.mockResolvedValue({ ...notInProcess, can_start: false });
     wrap(<PortalProcessWidget ticketId={5} />);
     await waitFor(() => expect(api.ticketState).toHaveBeenCalled());
+    // give the resolved state a chance to render before asserting the absence
+    await new Promise((r) => setTimeout(r, 30));
     expect(screen.queryByTestId("portal-process-start")).toBeNull();
     expect(screen.queryByTestId("portal-process-widget")).toBeNull();
   });

@@ -157,6 +157,8 @@ describe("AclPage", () => {
     });
     const body = createAcl.mock.calls[0][0];
     expect(body.name).toBe("NewAcl");
+    // the new draft shows up in the deploy card on the same page
+    await waitFor(() => expect(deployStatus).toHaveBeenCalledTimes(2));
   });
 
   it("shows the ACL deploy status with the number of undeployed edits", async () => {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
@@ -89,6 +89,15 @@ export function PhoneTicketFields({
     { action: "AgentTicketPhone", queue_id: queueId ?? undefined },
     { enabled: queueId !== null },
   );
+  // A responsible chosen for another queue is cleared once the new queue's list is loaded without them.
+  const responsibleLoaded = responsibleOptions.loaded;
+  const responsibleItems = responsibleOptions.items;
+  const responsibleId = value.responsibleId;
+  useEffect(() => {
+    if (!responsibleLoaded || responsibleId === null) return;
+    if (!responsibleItems.some((i) => i.value === responsibleId)) onChange({ ...value, responsibleId: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responsibleLoaded, responsibleItems, responsibleId]);
   const typesQ = useQuery({ queryKey: ["reference", "types"], queryFn: () => api.listReferenceTypes() });
   const servicesQ = useQuery({ queryKey: ["reference", "services"], queryFn: () => api.listReferenceServices() });
   const slasQ = useQuery({

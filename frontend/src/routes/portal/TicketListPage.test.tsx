@@ -43,7 +43,7 @@ describe("portal TicketListPage process link", () => {
 
     const link = (await screen.findByTestId("portal-new-process")).closest("a");
     expect(link).toHaveAttribute("href", "/portal/process/new");
-    expect(link).toHaveTextContent("Prozess starten");
+    expect(link).toHaveTextContent("Neues Prozessticket");
   });
 
   it("hides the link when nothing is startable", async () => {

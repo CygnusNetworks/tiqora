@@ -816,6 +816,39 @@ describe("NewTicketPage compact phone ticket", () => {
     expect(createTicket.mock.calls[0][0]).toMatchObject({ owner_id: 7, state_id: 11 });
   });
 
+  it("drops an owner the new queue's scoped list does not offer, so a stale id is not submitted", async () => {
+    listQueues.mockResolvedValue([queue, { id: 2, name: "Hotline", group_id: 1, valid: true }]);
+    // queue 2 only knows agent 5; queue 1 offers 5 and 7
+    fieldOptionsFetch.mockImplementation(
+      async (body: { fields: string[]; context?: { queue_id?: number } }) => ({
+        options: {
+          [body.fields[0]]:
+            body.context?.queue_id === 2
+              ? [{ value: "5", label: "Agent One" }]
+              : [
+                  { value: "5", label: "Agent One" },
+                  { value: "7", label: "Jana Wolff" },
+                ],
+        },
+      }),
+    );
+    searchParams.current = popupSearch({ owner_id: 7 });
+    wrap(<NewTicketPage />);
+    await waitFor(() => expect(screen.getByTestId("new-ticket-owner-value")).toHaveTextContent("Jana Wolff"));
+
+    fireEvent.click(screen.getByTestId("new-ticket-queue"));
+    fireEvent.click(await screen.findByTestId("new-ticket-queue-panel-option-2"));
+    await waitFor(() => expect(screen.getByTestId("new-ticket-owner-value")).toHaveTextContent("Agent One"));
+
+    fireEvent.click(await screen.findByTestId("new-ticket-skip-customer"));
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), { target: { value: "Router" } });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), { target: { value: "Neu gestartet." } });
+    await waitFor(() => expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+    await waitFor(() => expect(createTicket).toHaveBeenCalledTimes(1));
+    expect(createTicket.mock.calls[0][0]).toMatchObject({ owner_id: 5, queue_id: 2 });
+  });
+
   it("opened by hand: toggle, the current user as owner without source, open status", async () => {
     searchParams.current = { type: "phone" };
     wrap(<NewTicketPage />);

@@ -526,7 +526,7 @@ export function QueuesPage() {
     queryFn: ({ signal }) =>
       fieldOptionsApi.fetch(
         {
-          fields: ["state", "priority", "queue", "owner", "responsible"],
+          fields: ["state", "priority", "queue", "owner"],
           context: { action: "AgentTicketBulk", ticket_ids: bulkIds, queue_id: draft.queue_id },
         },
         signal,

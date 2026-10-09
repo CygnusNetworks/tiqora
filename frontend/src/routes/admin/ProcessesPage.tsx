@@ -61,6 +61,21 @@ export function ProcessesPage() {
       header: t("admin.processes.activityCount"),
       render: (r) => <Badge tone="muted">{r.activity_count}</Badge>,
     },
+    {
+      key: "startInterfaces",
+      header: t("admin.processes.startInterfaces"),
+      render: (r) => (
+        <span className="flex flex-wrap gap-1" data-testid={`process-interfaces-${r.entity_id}`}>
+          {r.start_interfaces.length === 0
+            ? "—"
+            : r.start_interfaces.map((i) => (
+                <Badge key={i} tone="muted">
+                  {i === "CustomerInterface" ? t("admin.processes.interfaceCustomer") : t("admin.processes.interfaceAgent")}
+                </Badge>
+              ))}
+        </span>
+      ),
+    },
   ];
 
   return (

@@ -1585,6 +1585,47 @@ const demoAdminProcesses = [
   { entity_id: "Process-old", name: "Altprozess Beschaffung", state_entity_id: "S3", state_name: "FadeAway", activity_count: 3, start_interfaces: [] },
 ];
 
+// Single process of the admin detail page (ProcessDetailOut): the list rows plus two activities.
+function demoProcessDetail(entityId: string) {
+  const row = demoAdminProcesses.find((r) => r.entity_id === entityId) ?? demoAdminProcesses[0];
+  return {
+    id: demoAdminProcesses.indexOf(row) + 1,
+    entity_id: row.entity_id,
+    name: row.name,
+    state_entity_id: row.state_entity_id,
+    start_activity_entity_id: "Activity-1",
+    activities: [
+      { entity_id: "Activity-1", name: "Antrag erfassen", activity_dialogs: [{ entity_id: "AD-1", name: "Antrag" }] },
+      {
+        entity_id: "Activity-2",
+        name: "Genehmigung",
+        activity_dialogs: [
+          { entity_id: "AD-2", name: "Genehmigen" },
+          { entity_id: "AD-3", name: "Rückfrage" },
+        ],
+      },
+    ],
+  };
+}
+// Daemons page: the deploy watcher runs in live mode (the banner under its name).
+const demoDaemons = {
+  services: [
+    {
+      slug: "deploy_watch",
+      enabled: true,
+      toggleable: true,
+      schedule: "interval",
+      interval_seconds: 30,
+      interval_overridden: false,
+      tick_timeout_seconds: 60,
+      last_run_at: "2026-10-08T10:00:00Z",
+      last_ok_at: "2026-10-08T10:00:00Z",
+      last_error: null,
+      last_result: { mode: "live" },
+    },
+  ],
+};
+
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Auth
@@ -1630,6 +1671,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/admin/deploy") && method === "POST")
     return { action: "recorded", checksum: "demo", kind: "process", revision_id: 4 };
   if (p.endsWith("/api/v1/admin/processes")) return demoAdminProcesses;
+  if (p.endsWith("/api/v1/admin/daemons") && method === "GET") return demoDaemons;
   if (p.endsWith("/api/v1/phone/calls/active")) return [];
   if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;
   // Background jobs: the ticket CSV export finishes at once in the demo.
@@ -1705,6 +1747,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/process/tickets") && method === "POST") return { ticket_id: 1, ticket_number: "2026100001", activity_changed: true, unsupported_actions: [], state: processTicketState };
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/start$/) && method === "POST") return processTicketState;
   if (p.match(/\/api\/v1\/process\/?$/) && method === "GET") return [{ id: 1, entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active" }];
+  // One process of the admin detail page; ids that are not a process (ticket/, tickets) fall through.
+  const processDetail = p.match(/\/api\/v1\/process\/([^/?]+)$/);
+  if (processDetail && method === "GET") return demoProcessDetail(decodeURIComponent(processDetail[1]));
   if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};
   // Admin — assignment editors (before the generic list handler)
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }

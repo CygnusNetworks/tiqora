@@ -20,9 +20,14 @@ export function useAgentOptions(
   field: AgentField,
   context: Partial<FieldOptionsContext>,
   { enabled = true }: { enabled?: boolean } = {},
-): { items: SelectMenuItem<number>[]; isLoading: boolean } {
+): { items: SelectMenuItem<number>[]; isLoading: boolean; loaded: boolean } {
   const q = useQuery({
-    queryKey: ["reference", "field-options", "agents", field, context],
+    // A ticket's lists live under ["tickets", id]: whatever changes the ticket (queue pill, process dialog, patch)
+    // invalidates that prefix, so the owner / responsible choices follow the new queue.
+    queryKey:
+      context.ticket_id !== undefined
+        ? ["tickets", context.ticket_id, "agent-options", field, context]
+        : ["reference", "field-options", "agents", field, context],
     queryFn: ({ signal }) =>
       fieldOptionsApi.fetch(
         { fields: [field], context: { action: AGENT_FIELD_ACTION[field], ...context } },
@@ -31,5 +36,5 @@ export function useAgentOptions(
     enabled,
   });
   const items = (q.data?.options[field] ?? []).map((o) => ({ value: Number(o.value), label: o.label }));
-  return { items, isLoading: enabled && q.isLoading };
+  return { items, isLoading: enabled && q.isLoading, loaded: enabled && q.isSuccess };
 }

@@ -80,6 +80,7 @@ export function NewProcessTicketPage() {
             <ProcessStartForm
               key={processId}
               api={portalProcessApi}
+              queryKeyPrefix={["portal", "process"]}
               processEntityId={processId}
               pending={createM.isPending}
               error={createM.isError ? processStartErrorMessage(createM.error, t, "portal.process.submitError") : null}
