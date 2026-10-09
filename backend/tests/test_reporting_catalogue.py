@@ -1,8 +1,10 @@
-"""Built-in report catalogue v1: definitions (pure) and one execution per report on both dialects.
+"""Built-in report catalogue v1: definitions (pure) and exact results on both dialects.
 
-Seed ids: 47790-47809 (names contain ``rep47``): user 47790 (``ro`` on group 47791), group
-and queue 47791, tickets 47795 (new, agent reply, closed) and 47796 (open, moved), bookings
-47800/47801, one snapshot day. Every row this module writes is deleted again.
+Seed ids: 47790-47809 (names contain ``rep47``): user 47790 (``ro`` on group 47791), readable
+queue 47791 (first response target 20 min, solution target 1400 min), foreign queue 47792
+(no access), tickets 47795 (closed, response breached), 47796 (open), 47797 (reopened),
+47798 (created in the foreign queue, moved over), 47799 (away and back), 47802/47803 (foreign),
+bookings 47800/47801/47804, one snapshot day. Every row this module writes is deleted again.
 """
 
 from __future__ import annotations
@@ -15,20 +17,18 @@ from typing import Any
 import pytest
 from pydantic import TypeAdapter
 from sqlalchemy import create_engine, text
-from sqlalchemy.dialects import mysql, postgresql
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.extensions.core import register_core
 from tiqora.extensions.registry import Registry
-from tiqora.filters.tickets import TicketQueryScope
 from tiqora.reporting.catalogue import (
     BUILTIN_REPORTS,
     QUEUE_PARAM_FIELD,
     BuiltinReport,
     core_builtin_reports,
 )
-from tiqora.reporting.compiler import RunParams, compile_report
+from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import TimeRange, validate_definition
 from tiqora.reporting.engine import run_report
 from tiqora.reporting.facts_store import rebuild_ticket_facts
@@ -66,8 +66,12 @@ EXPECTED = [
 ]
 URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 LO, HI = 47790, 47809
-AGENT, QUEUE = 47790, 47791
-T_DONE, T_OPEN = 47795, 47796
+AGENT, QUEUE, FOREIGN = 47790, 47791, 47792  # FOREIGN: queue the agent cannot read
+T_DONE, T_OPEN, T_REOPEN, T_MOVED, T_PING = 47795, 47796, 47797, 47798, 47799
+T_FOREIGN_DONE, T_FOREIGN_OPEN = 47802, 47803
+MY_TICKETS = (T_DONE, T_OPEN, T_REOPEN, T_MOVED, T_PING)
+ALL_TICKETS = (*MY_TICKETS, T_FOREIGN_DONE, T_FOREIGN_OPEN)
+FOREIGN_NAME = "rep47-queue-47792"
 NOW = datetime(2024, 6, 20, 12, 0)
 BUILT = datetime(2024, 6, 20, 11, 0)
 SNAPSHOT_DAY = date(2024, 6, 18)
@@ -200,25 +204,6 @@ def test_specific_definitions() -> None:
     assert by["time_in_state"].definition.visualization.chart_measures == [1]
 
 
-@pytest.mark.parametrize("dialect", [mysql.dialect(), postgresql.dialect()], ids=["mysql", "pg"])
-def test_every_builtin_compiles_on_both_dialects(dialect: Any) -> None:
-    reg = _registry()
-    scope = TicketQueryScope(user_id=AGENT, queue_ids=frozenset({QUEUE}))
-    for r in reg.items(BUILTIN_REPORTS):
-        c = compile_report(
-            r.definition,
-            RunParams(time_zone="Europe/Berlin"),
-            scope,
-            now=NOW,
-            near_miss_percent=10,
-            registry=reg,
-        )
-        assert c.stmt is not None, r.key
-        sql = str(c.stmt.compile(dialect=dialect, compile_kwargs={"literal_binds": True}))
-        assert sql.lstrip().upper().startswith("SELECT"), r.key
-        assert [m.key for m in c.measures] == [m.key for m in r.definition.measures]
-
-
 # ---------------------------------------------------------------- DB
 
 
@@ -265,23 +250,25 @@ def _seed(sync_url: str) -> None:
             ),
             {"id": AGENT, "t": t0},
         )
-        conn.execute(
-            text(
-                "INSERT INTO permission_groups (id, name, valid_id,"
-                " create_time, create_by, change_time, change_by)"
-                " VALUES (:id, 'rep47-group-47791', 1, :t, 1, :t, 1)"
-            ),
-            {"id": QUEUE, "t": t0},
-        )
-        conn.execute(
-            text(
-                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
-                " signature_id, follow_up_id, follow_up_lock, valid_id,"
-                " create_time, create_by, change_time, change_by)"
-                " VALUES (:id, 'rep47-queue-47791', :id, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
-            ),
-            {"id": QUEUE, "t": t0},
-        )
+        for gid, first, solution in ((QUEUE, 20, 1400), (FOREIGN, 0, 0)):
+            conn.execute(
+                text(
+                    "INSERT INTO permission_groups (id, name, valid_id,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, :n, 1, :t, 1, :t, 1)"
+                ),
+                {"id": gid, "n": f"rep47-group-{gid}", "t": t0},
+            )
+            # first response 20 min, solution 1400 min (working minutes) on the readable queue
+            conn.execute(
+                text(
+                    "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                    " signature_id, follow_up_id, follow_up_lock, first_response_time,"
+                    " solution_time, valid_id, create_time, create_by, change_time, change_by)"
+                    " VALUES (:id, :n, :id, 1, 1, 1, 1, 0, :fr, :sol, 1, :t, 1, :t, 1)"
+                ),
+                {"id": gid, "n": f"rep47-queue-{gid}", "fr": first, "sol": solution, "t": t0},
+            )
         conn.execute(
             text(
                 "INSERT INTO group_user (user_id, group_id, permission_key,"
@@ -308,7 +295,7 @@ def _seed(sync_url: str) -> None:
         )
         counter = {"history": LO, "article": LO}
 
-        def ticket(tid: int, state: str, at: datetime) -> None:
+        def ticket(tid: int, state: str, at: datetime, queue: int = QUEUE) -> None:
             conn.execute(
                 text(
                     "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
@@ -324,7 +311,7 @@ def _seed(sync_url: str) -> None:
                     "id": tid,
                     "tn": f"20240600{tid}",
                     "title": f"rep47 ticket {tid}",
-                    "q": QUEUE,
+                    "q": queue,
                     "u": AGENT,
                     "s": st[state],
                     "c": CUSTOMER,
@@ -333,7 +320,9 @@ def _seed(sync_url: str) -> None:
                 },
             )
 
-        def history(tid: int, htype: int, name: str, state: str, at: datetime) -> None:
+        def history(
+            tid: int, htype: int, name: str, state: str, at: datetime, queue: int = QUEUE
+        ) -> None:
             counter["history"] += 1
             conn.execute(
                 text(
@@ -347,7 +336,7 @@ def _seed(sync_url: str) -> None:
                     "n": name,
                     "ht": htype,
                     "tid": tid,
-                    "q": QUEUE,
+                    "q": queue,
                     "o": AGENT,
                     "s": st[state],
                     "t": at,
@@ -373,19 +362,67 @@ def _seed(sync_url: str) -> None:
                 },
             )
 
-        new_name = "%%2024060047795%%rep47-queue-47791%%3 normal%%new%%47795"
-        ticket(T_DONE, "closed", datetime(2024, 6, 3, 8))
-        history(T_DONE, h_new, new_name, "new", datetime(2024, 6, 3, 8))
-        article(T_DONE, s_customer, datetime(2024, 6, 3, 8))
-        article(T_DONE, s_agent, datetime(2024, 6, 3, 8, 30))
-        history(T_DONE, h_state, "%%new%%closed successful", "closed", datetime(2024, 6, 3, 10))
-        ticket(T_OPEN, "open", datetime(2024, 6, 10, 9))
-        history(T_OPEN, h_new, new_name.replace("47795", "47796"), "new", datetime(2024, 6, 10, 9))
-        article(T_OPEN, s_customer, datetime(2024, 6, 10, 9))
-        history(T_OPEN, h_state, "%%new%%open", "open", datetime(2024, 6, 10, 10))
+        h_move = _id(conn, "SELECT id FROM ticket_history_type WHERE name = 'Move'")
+
+        def created(
+            tid: int, state: str, at: datetime, queue: int = QUEUE, current: int | None = None
+        ) -> None:
+            ticket(tid, state, at, current or queue)
+            name = f"%%2024060{tid}%%rep47-queue-{queue}%%3 normal%%new%%{tid}"
+            history(tid, h_new, name, "new", at, queue)
+            article(tid, s_customer, at)
+
+        def closed(tid: int, old: str, at: datetime) -> None:
+            names = {"new": "new", "open": "open", "closed": "closed successful"}
+            history(tid, h_state, f"%%{names[old]}%%closed successful", "closed", at)
+
+        def d(day: int, hour: int, minute: int = 0) -> datetime:
+            return datetime(2024, 6, day, hour, minute)
+
+        # DONE: Mon 06-03 08:00, reply after 30 min (target 20: breached), closed after 2 h
+        created(T_DONE, "closed", d(3, 8))
+        article(T_DONE, s_agent, d(3, 8, 30))
+        closed(T_DONE, "new", d(3, 10))
+        # OPEN: Mon 06-10 09:00, set to open after 1 h, no reply
+        created(T_OPEN, "open", d(10, 9))
+        history(T_OPEN, h_state, "%%new%%open", "open", d(10, 10))
+        # REOPEN: Tue 06-04 08:00, reply after 10 min, closed, reopened, closed again
+        created(T_REOPEN, "closed", d(4, 8))
+        article(T_REOPEN, s_agent, d(4, 8, 10))
+        closed(T_REOPEN, "new", d(4, 10))
+        history(T_REOPEN, h_state, "%%closed successful%%open", "open", d(5, 10))
+        closed(T_REOPEN, "open", d(6, 10))
+        # MOVED: created in the foreign queue Tue 06-11 08:00, moved to QUEUE after 30 min
+        created(T_MOVED, "new", d(11, 8), FOREIGN, current=QUEUE)
+        article(T_MOVED, s_agent, d(11, 8, 5))
+        history(
+            T_MOVED,
+            h_move,
+            f"%%rep47-queue-{QUEUE}%%{QUEUE}%%rep47-queue-{FOREIGN}%%{FOREIGN}",
+            "new",
+            d(11, 8, 30),
+        )
+        # PING: Wed 06-12 08:00 in QUEUE, reply after 19 min (near miss), away and back
+        created(T_PING, "new", d(12, 8))
+        article(T_PING, s_agent, d(12, 8, 19))
+        for to, frm, at in ((FOREIGN, QUEUE, d(12, 9)), (QUEUE, FOREIGN, d(12, 10))):
+            history(
+                T_PING,
+                h_move,
+                f"%%rep47-queue-{to}%%{to}%%rep47-queue-{frm}%%{frm}",
+                "new",
+                at,
+                to,
+            )
+        # foreign queue: one closed (with a booking), one open ticket
+        created(T_FOREIGN_DONE, "closed", d(3, 8), FOREIGN)
+        article(T_FOREIGN_DONE, s_agent, d(3, 8, 5))
+        history(T_FOREIGN_DONE, h_state, "%%new%%closed successful", "closed", d(3, 9), FOREIGN)
+        created(T_FOREIGN_OPEN, "new", d(12, 8), FOREIGN)
         for taid, tid, units, at in (
             (47800, T_DONE, "1.50", datetime(2024, 5, 20, 10)),
             (47801, T_DONE, "2.00", datetime(2024, 6, 3, 10)),
+            (47804, T_FOREIGN_DONE, "3.00", datetime(2024, 5, 21, 10)),
         ):
             conn.execute(
                 text(
@@ -396,6 +433,19 @@ def _seed(sync_url: str) -> None:
                 {"id": taid, "tid": tid, "u": Decimal(units), "t": at, "by": AGENT},
             )
     engine.dispose()
+
+
+class _WorkingHours(SysConfig):
+    """Mon-Fri 08:00-18:00 UTC: every seeded reply lies inside the working hours."""
+
+    async def get(self, name: str, default: Any = None) -> Any:
+        if name == "TimeWorkingHours":
+            return {day: list(range(8, 18)) for day in ("Mon", "Tue", "Wed", "Thu", "Fri")}
+        if name in ("TimeVacationDays", "TimeVacationDaysOneTime"):
+            return {}
+        if name == "OTRSTimeZone":
+            return "UTC"
+        return await super().get(name, default)
 
 
 async def _factory(
@@ -409,7 +459,7 @@ async def _factory(
         _clean(sync_url)
         _seed(sync_url)
         async with factory() as s:
-            await rebuild_ticket_facts(s, [T_DONE, T_OPEN], sysconfig=SysConfig(s), now=BUILT)
+            await rebuild_ticket_facts(s, ALL_TICKETS, sysconfig=_WorkingHours(s), now=BUILT)
             await s.commit()
         await snapshot_days(factory, [SNAPSHOT_DAY], zone="UTC", now=BUILT)
         _SEEDED.add(sync_url)
@@ -430,40 +480,126 @@ async def _run(factory: async_sessionmaker[AsyncSession], r: BuiltinReport, **pa
         )
 
 
+JUNE = TypeAdapter(TimeRange).validate_python(
+    {"kind": "absolute", "start": "2024-06-01", "end": "2024-06-30"}
+)
+
+
+_JUNE_KW = {"time_range": JUNE}
+#: reports whose own window (March-May) is empty in the seed run over June instead
+_JUNE_RUNS = {
+    "sla_compliance",
+    "sla_by_customer",
+    "first_contact_resolution",
+    "top_customers",
+}
+E = CUSTOMER
+EXPECTED_ROWS: dict[str, list[list[Any]]] = {
+    "ticket_kpis": [[5, 2, 0.4, 14.5, 720.0]],
+    "volume": [
+        ["2024-06-03", "close", 3],
+        ["2024-06-03", "create", 2],
+        ["2024-06-10", "create", 3],
+    ],
+    "backlog_trend": [["2024-06-18", 3]],
+    "open_now": [[QUEUE, 3]],
+    "agent_activity": [[AGENT, "reply", 4], [AGENT, "close", 3]],
+    "volume_by_channel": [["2024-06-03", "email", 2], ["2024-06-10", "email", 3]],
+    "channel_mix": [["email", 5]],
+    "volume_by_queue": [[QUEUE, 5, 2]],
+    "backlog_by_state": [["2024-06-18", "new", 2], ["2024-06-18", "open", 1]],
+    "backlog_aging": [[QUEUE, 0, 0, 0, 3, 0]],
+    # tickets, sla_met, response breach, solution breach, near misses (2), update breaches
+    "sla_compliance": [[QUEUE, 5, 0.2, 0.4, 0.6, 1, 1, 0]],
+    "sla_times": [
+        ["2024-06-03", 20.0, 28.0, 720.0, 1200.0],
+        ["2024-06-10", 12.0, 17.6, None, None],
+    ],
+    "sla_by_customer": [[E, 5, 0.2, 2, 3, 14.5, 720.0]],
+    "first_contact_resolution": [[QUEUE, 2, 0.5, 0.5]],
+    "reopen_trend": [["2024-06-03", 0.5, 1, 2]],
+    # (-1 = a queue the viewer cannot read)
+    "queue_transfers": [[-1, QUEUE, 2, 2], [QUEUE, -1, 1, 1]],
+    "pingpong": [[QUEUE, 5, 1, 0.6]],
+    "time_by_customer": [[E, 1.5, 1, 1]],
+    "time_by_queue": [[QUEUE, 1.5, 1, 1]],
+    "time_by_agent": [[AGENT, 1.5, 1, 1]],
+    "time_by_agent_month": [[AGENT, "2024-05-01", 1.5], [AGENT, "2024-06-01", 2.0]],
+    "top_customers": [[E, 5, 2, 720.0, 3.5]],
+    "created_heatmap": [[1, 10, 1], [1, 11, 1], [2, 10, 2], [3, 10, 1]],
+}
+
+
+def _data_rows(rows: list[list[Any]], width: int) -> list[list[Any]]:
+    """Rows with data: zero-filled buckets (all measures 0 / None) are dropped."""
+    return sorted(
+        (r for r in rows if any(c not in (0, None) for c in r[width:])),
+        key=lambda r: [str(c) for c in r],
+    )
+
+
+def _kwargs(r: BuiltinReport) -> dict[str, Any]:
+    return _JUNE_KW if r.name in _JUNE_RUNS else {}
+
+
+async def _run_all(factory: async_sessionmaker[AsyncSession], **extra: Any) -> dict[str, Any]:
+    out = {}
+    for r in core_builtin_reports():
+        out[r.name] = await _run(factory, r, **_kwargs(r), **extra)
+    return out
+
+
 @pytest.mark.db
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", URLS)
-async def test_every_builtin_runs(url_fixture: str, request: pytest.FixtureRequest) -> None:
+async def test_every_builtin_runs_and_has_exact_values(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """Executes (hence compiles) all 25 on this dialect; exact rows for every seeded report.
+
+    Run once without and once with the ``queues`` parameter: the viewer's own scope already
+    limits the data, so the parameter must change nothing here.
+    """
     factory = await _factory(request, url_fixture)
     engine = factory.kw["bind"]
     try:
-        results = {}
-        for r in core_builtin_reports():
-            res = await _run(factory, r, parameters={"queues": [QUEUE]})
-            expected = [d.key for d in r.definition.dimensions] + [
-                m.key for m in r.definition.measures
-            ]
-            assert [c.key for c in res.columns] == expected, r.key
-            assert [c.role for c in res.columns] == ["dimension"] * len(r.definition.dimensions) + [
-                "measure"
-            ] * len(r.definition.measures)
-            assert all(len(row) == len(expected) for row in res.rows), r.key
-            assert res.report_key == r.key
-            results[r.key] = res
-        # the seed is visible through the catalogue, not just executable
-        kpis = results["builtin.ticket_kpis"]
-        assert kpis.rows[0][:2] == [2, 1]
-        open_now = results["builtin.open_now"]
-        assert [row[-1] for row in open_now.rows] == [1]
-        assert open_now.labels["queue"][str(QUEUE)] == "rep47-queue-47791"
-        assert results["builtin.backlog_trend"].rows
-        june = TypeAdapter(TimeRange).validate_python(
-            {"kind": "absolute", "start": "2024-06-01", "end": "2024-06-30"}
-        )
-        top = next(b for b in core_builtin_reports() if b.key == "builtin.top_customers")
-        res = await _run(factory, top, time_range=june, parameters={"queues": [QUEUE]})
-        assert res.rows[0][:3] == [CUSTOMER, 2, 1]
-        assert res.labels["customer"][CUSTOMER] == "Rep47 Example GmbH"
+        for extra in ({}, {"parameters": {"queues": [QUEUE]}}):
+            results = await _run_all(factory, **extra)
+            for r in core_builtin_reports():
+                res = results[r.name]
+                width = len(r.definition.dimensions)
+                expected = [d.key for d in r.definition.dimensions] + [
+                    m.key for m in r.definition.measures
+                ]
+                assert [c.key for c in res.columns] == expected, r.key
+                assert [c.role for c in res.columns] == ["dimension"] * width + ["measure"] * len(
+                    r.definition.measures
+                )
+                assert all(len(row) == len(expected) for row in res.rows), r.key
+                assert res.report_key == r.key
+                if r.name in EXPECTED_ROWS:
+                    got = _data_rows(res.rows, width)
+                    want = sorted(EXPECTED_ROWS[r.name], key=lambda x: [str(c) for c in x])
+                    assert len(got) == len(want), (r.key, extra, got)
+                    for g, w in zip(got, want, strict=True):
+                        assert g == [pytest.approx(c) if isinstance(c, float) else c for c in w], (
+                            r.key,
+                            extra,
+                        )
+            # dwell time per previous state, keyed by label (state ids differ per database)
+            dwell = results["time_in_state"]
+            by_state = {dwell.labels["from_state"][str(row[0])]: row[1:] for row in dwell.rows}
+            assert by_state == {
+                "new": [3, 2.0, 2.0, pytest.approx(5 / 3)],
+                "closed successful": [1, 24.0, 24.0, 24.0],
+                "open": [1, 24.0, 24.0, 24.0],
+            }
+            # bookings by type: one type, May booking of the readable ticket only
+            assert [row[1:] for row in results["time_by_type"].rows] == [[1.5, 1, 1]]
+            assert results["time_by_queue"].totals is not None
+            assert results["time_by_queue"].totals.grand[1:] == [1.5, 1, 1]
+            assert results["time_by_agent_month"].totals.rows[str(AGENT)][2] == 3.5  # type: ignore[union-attr]
+            assert results["queue_transfers"].totals.grand[2:] == [3, 2]  # type: ignore[union-attr]
     finally:
         await engine.dispose()
 
@@ -471,14 +607,30 @@ async def test_every_builtin_runs(url_fixture: str, request: pytest.FixtureReque
 @pytest.mark.db
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", URLS)
-async def test_queue_parameter_scopes_the_report(
+async def test_foreign_queue_is_invisible_in_every_builtin(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
     factory = await _factory(request, url_fixture)
     engine = factory.kw["bind"]
     try:
-        r = next(b for b in core_builtin_reports() if b.key == "builtin.open_now")
-        assert (await _run(factory, r, parameters={"queues": [QUEUE]})).rows
-        assert (await _run(factory, r, parameters={"queues": [QUEUE + 5000]})).rows == []
+        for extra in ({}, {"parameters": {"queues": [QUEUE]}}):
+            for name, res in (await _run_all(factory, **extra)).items():
+                dumped = res.model_dump_json()
+                assert FOREIGN_NAME not in dumped, name
+                assert str(FOREIGN) not in dumped, name
+        results = await _run_all(factory)
+        # the foreign tickets are not counted anywhere (5 readable tickets, 3 open)
+        assert results["ticket_kpis"].rows[0][0] == 5
+        assert results["open_now"].rows == [[QUEUE, 3]]
+        assert results["backlog_trend"].rows == [["2024-06-18", 3]]
+        assert [row[1:] for row in results["time_by_queue"].rows] == [[1.5, 1, 1]]
+        # the hidden side of a queue move is shown as "Andere Queue"
+        transfers = results["queue_transfers"]
+        assert transfers.labels["from_queue"]["-1"] == "Andere Queue"
+        assert transfers.labels["to_queue"]["-1"] == "Andere Queue"
+        # a parameter naming the foreign queue still finds nothing
+        r = next(b for b in core_builtin_reports() if b.name == "open_now")
+        res = await _run(factory, r, parameters={"queues": [FOREIGN]})
+        assert res.rows == [] and FOREIGN_NAME not in res.model_dump_json()
     finally:
         await engine.dispose()
