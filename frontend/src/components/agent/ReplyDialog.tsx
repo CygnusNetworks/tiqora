@@ -17,17 +17,10 @@ import {
 } from "@/lib/replyDrafts";
 import { postComposerExtras } from "@/lib/composerExtras";
 import type { PickedMention } from "@/lib/mentions";
-import { ArticleBodyRenderer } from "./ArticleBodyRenderer";
 import { useComposerLock } from "@/lib/composerLock";
 import { ComposerLockBanner } from "./ComposerLock";
-import { ComposerTimeChip } from "./ComposerTimeChip";
-import { AttachmentChips } from "./telegram/ComposerChips";
-import {
-  MAX_ATTACHMENTS,
-  MAX_ATTACHMENT_BYTES,
-  formatBytes,
-  useChatAttachments,
-} from "./telegram/useChatAttachments";
+import { ComposerEditorFrame } from "./ComposerEditorFrame";
+import { useChatAttachments } from "./telegram/useChatAttachments";
 import { EmailSecurityControl } from "./EmailSecurityControl";
 import { useEmailSecurity } from "./useEmailSecurity";
 import { MentionTextarea } from "./MentionTextarea";
@@ -121,8 +114,6 @@ export function ReplyDialog({
   const [mentions, setMentions] = useState<PickedMention[]>([]);
   const [timeUnits, setTimeUnits] = useState("");
   const attachments = useChatAttachments();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
   /** What happens to the ticket once the reply is sent (see `NEXT_STATES`). */
   const [nextState, setNextState] = useState<NextState>("keep");
   /** Reminder date (local, `YYYY-MM-DD`) for "Wartend". */
@@ -789,27 +780,39 @@ export function ReplyDialog({
             </label>
           )}
           {/* One framed editor: the text, the signature that will be appended,
-              and a toolbar (refine, time) along its bottom edge. */}
-          <div
-            className={cn(
-              "overflow-hidden rounded-lg border border-hairline bg-surface-subtle/40 focus-within:border-accent/60",
-              dragOver && "border-accent ring-1 ring-accent",
-            )}
-            data-testid="reply-editor"
-            onDragOver={(e) => {
-              if (extrasFailed.length > 0 || !e.dataTransfer.types.includes("Files")) return;
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
-            }}
-            onDrop={(e) => {
-              if (extrasFailed.length > 0 || e.dataTransfer.files.length === 0) return;
-              e.preventDefault();
-              setDragOver(false);
-              attachments.add(e.dataTransfer.files);
-            }}
+              the files, and a toolbar (refine, files, time) along its bottom edge. */}
+          <ComposerEditorFrame
+            testIdPrefix="reply"
+            attachments={attachments}
+            timeUnits={timeUnits}
+            onTimeUnitsChange={setTimeUnits}
+            locked={extrasFailed.length > 0}
+            // Telegram never appends a signature.
+            signature={
+              isTelegram || !draftQ.data
+                ? null
+                : { text: draftQ.data.signature, isHtml: draftQ.data.signature_is_html }
+            }
+            refine={
+              // Rewrites only the agent's own text; the quoted original below
+              // it is re-assembled from the untouched original (see replyQuote).
+              // Not offered on Telegram — a chat reply has no tone/length to
+              // refine against a quoted original.
+              !isTelegram && (
+                <RefineControls
+                  target={{ ticket_id: ticketId }}
+                  body={body}
+                  onChange={refineReview.onEdit}
+                  disabled={extrasFailed.length > 0}
+                  testIdPrefix="reply-refine"
+                  variant="toolbar"
+                  onRefined={refineReview.onRefined}
+                  appliedStats={refineReview.applied?.stats ?? null}
+                  onShowChanges={refineReview.showChanges}
+                  reviewOpen={refineReview.review !== null}
+                />
+              )
+            }
           >
             {refineReview.review ? (
               <RefineDiffView
@@ -823,114 +826,22 @@ export function ReplyDialog({
                 className="min-h-[19rem]"
               />
             ) : (
-            <MentionTextarea
-              value={body}
-              onChange={refineReview.onEdit}
-              mentions={mentions}
-              onMentionsChange={setMentions}
-              rows={12}
-              bare
-              className="font-mono text-[12.5px] leading-relaxed"
-              testId="reply-body"
-              ariaLabel={t("ticket.replyAnswer")}
-              // The article is already sent at this point; editing on would
-              // only resurrect a draft for a reply that no longer exists.
-              readOnly={extrasFailed.length > 0}
-            />
-            )}
-            {/* Read-only signature preview — backend appends on send; do not
-                put this into the editable body (would double on send).
-                Telegram never appends a signature. */}
-            {!isTelegram && Boolean(draftQ.data?.signature?.trim()) && (
-              <div
-                className="mx-3 mb-2.5 border-t border-dashed border-hairline pt-2"
-                data-testid="reply-signature-preview"
-              >
-                <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-muted">
-                  {t("ticket.signatureAppended")}
-                </p>
-                {draftQ.data?.signature_is_html ? (
-                  <ArticleBodyRenderer
-                    body={draftQ.data.signature}
-                    isHtml
-                    className="text-xs text-muted"
-                  />
-                ) : (
-                  <pre
-                    className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[11.5px] leading-relaxed text-muted"
-                    data-testid="reply-signature-plain"
-                  >
-                    {draftQ.data?.signature}
-                  </pre>
-                )}
-              </div>
-            )}
-            {attachments.items.length > 0 && (
-              <div
-                className="flex flex-wrap gap-1.5 border-t border-hairline px-3 py-2"
-                data-testid="reply-attachments"
-              >
-                <AttachmentChips
-                  items={attachments.items}
-                  onRemove={extrasFailed.length > 0 ? () => undefined : attachments.remove}
-                />
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-2 border-t border-hairline bg-surface px-2 py-1.5">
-              {/* Rewrites only the agent's own text; the quoted original below
-                  it is re-assembled from the untouched original (see replyQuote).
-                  Not offered on Telegram — a chat reply has no tone/length to
-                  refine against a quoted original. */}
-              {!isTelegram && (
-                <RefineControls
-                  target={{ ticket_id: ticketId }}
-                  body={body}
-                  onChange={refineReview.onEdit}
-                  disabled={extrasFailed.length > 0}
-                  testIdPrefix="reply-refine"
-                  variant="toolbar"
-                  onRefined={refineReview.onRefined}
-                  appliedStats={refineReview.applied?.stats ?? null}
-                  onShowChanges={refineReview.showChanges}
-                  reviewOpen={refineReview.review !== null}
-                />
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                data-testid="reply-attach"
-                disabled={extrasFailed.length > 0}
-                title={t("ticket.telegram.composer.attach")}
-                onClick={() => fileRef.current?.click()}
-              >
-                <span aria-hidden>📎</span> {t("newTicket.attachFile")}
-              </Button>
-              <input
-                ref={fileRef}
-                type="file"
-                multiple
-                className="hidden"
-                data-testid="reply-attach-input"
-                onChange={(e) => {
-                  if (e.target.files) attachments.add(e.target.files);
-                  // Same file again must fire onChange after a removal.
-                  e.target.value = "";
-                }}
+              <MentionTextarea
+                value={body}
+                onChange={refineReview.onEdit}
+                mentions={mentions}
+                onMentionsChange={setMentions}
+                rows={12}
+                bare
+                className="font-mono text-[12.5px] leading-relaxed"
+                testId="reply-body"
+                ariaLabel={t("ticket.replyAnswer")}
+                // The article is already sent at this point; editing on would
+                // only resurrect a draft for a reply that no longer exists.
+                readOnly={extrasFailed.length > 0}
               />
-              <span className="ml-auto">
-                <ComposerTimeChip value={timeUnits} onChange={setTimeUnits} testId="reply-time" />
-              </span>
-            </div>
-          </div>
-          {attachments.error && (
-            <p className="text-xs text-danger" data-testid="reply-attach-error">
-              {attachments.error === "tooLarge"
-                ? t("ticket.telegram.composer.attachTooLarge", { max: formatBytes(MAX_ATTACHMENT_BYTES) })
-                : attachments.error === "tooMany"
-                  ? t("ticket.telegram.composer.attachTooMany", { max: MAX_ATTACHMENTS })
-                  : t("ticket.telegram.composer.attachReadFailed")}
-            </p>
-          )}
+            )}
+          </ComposerEditorFrame>
           {!isTelegram && <EmailSecurityControl security={security} testId="reply-security" />}
           {sendMutation.isError && (
             <p className="text-xs text-danger" data-testid="reply-send-error">

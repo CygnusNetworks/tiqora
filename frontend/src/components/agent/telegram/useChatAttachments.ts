@@ -134,3 +134,5 @@ export function useChatAttachments() {
     payloadIds: ready.map((a) => a.id),
   };
 }
+
+export type ChatAttachments = ReturnType<typeof useChatAttachments>;
