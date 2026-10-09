@@ -6,7 +6,6 @@ Seed band 47000-47099. Provider slugs use the ``idplogin-`` prefix.
 from __future__ import annotations
 
 import dataclasses
-import logging
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
@@ -20,6 +19,7 @@ from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.identity import links as links_module
+from tiqora.identity import login as login_module
 from tiqora.identity.links import (
     LinkConflictError,
     delete_link,
@@ -562,24 +562,24 @@ async def _system_user_id(s: AsyncSession) -> int:
 
 
 async def test_system_user_never_matched_by_login_or_link(
-    env: tuple[AsyncSession, str], caplog: pytest.LogCaptureFixture
+    env: tuple[AsyncSession, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """M10: an IdP user who picks the username root@localhost gets the generic no_match."""
     s, _ = env
+    # Recorded on the module logger itself: other tests' logging setup may disable
+    # existing stdlib loggers, which would make caplog order-dependent.
+    warnings: list[str] = []
+    monkeypatch.setattr(login_module.log, "warning", lambda msg, *args: warnings.append(msg % args))
     root = await _system_user_id(s)
     p = await _oidc(s, "root-login", jit_enabled=True)
-    with caplog.at_level(logging.WARNING, logger="tiqora.identity.login"):
-        for name in ("root@localhost", "ROOT@localhost"):
-            plan = await _plan(s, p, f"sub-{name}", preferred_username=name)
-            assert (plan.decision, plan.reject_code, plan.user_id) == (
-                "reject",
-                "no_match",
-                None,
-            )
-            with pytest.raises(LoginRejected) as exc:
-                await apply_login(s, p, _ident(p.id, f"sub-{name}"), plan, settings=SETTINGS)
-            assert exc.value.reject_code == "no_match"
-    assert "system user" in caplog.text
+    for name in ("root@localhost", "ROOT@localhost"):
+        plan = await _plan(s, p, f"sub-{name}", preferred_username=name)
+        assert (plan.decision, plan.reject_code, plan.user_id) == ("reject", "no_match", None)
+        with pytest.raises(LoginRejected) as exc:
+            await apply_login(s, p, _ident(p.id, f"sub-{name}"), plan, settings=SETTINGS)
+        assert exc.value.reject_code == "no_match"
+    assert len(warnings) == 2
+    assert all("system user" in w and f"{SLUG}root-login" in w for w in warnings)
     assert await list_links(s, provider_id=p.id) == []
     # A link onto the system user (e.g. stored before this guard) is refused as well.
     await upsert_link(
