@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useJob } from "@/components/jobs/useJob";
 import { TERMINAL_JOB_STATUSES, jobsApi } from "@/lib/jobsApi";
 import { reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsApi";
@@ -15,6 +15,7 @@ import { reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsAp
  * component unmounts, so quick preset changes do not fill the per-user job cap.
  */
 export function useReportRun(body: ReportRunIn | null, opts: { enabled?: boolean } = {}) {
+  const queryClient = useQueryClient();
   const enabled = body != null && opts.enabled !== false;
   const run = useQuery({
     queryKey: ["reports", "run", body],
@@ -43,8 +44,11 @@ export function useReportRun(body: ReportRunIn | null, opts: { enabled?: boolean
         const status = statuses.get(jobId);
         if (status && TERMINAL_JOB_STATUSES.has(status as never)) return;
         void Promise.resolve(jobsApi.cancel(jobId)).catch(() => {});
+        // Forget the cancelled run: coming back to this request must rerun it, not show "cancelled".
+        queryClient.removeQueries({ queryKey: ["reports", "run", body], exact: true });
       }, 0);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- body only names the cache entry of this job
   }, [jobId]);
 
   let result: ReportResult | undefined = run.data?.result ?? undefined;

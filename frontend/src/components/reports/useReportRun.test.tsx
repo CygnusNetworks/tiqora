@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { ApiError } from "@/lib/api";
 import { jobsApi, type Job } from "@/lib/jobsApi";
 import { reportErrorMessage, reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsApi";
@@ -22,14 +22,17 @@ const resultOf = (rows: number): ReportResult =>
 const job = (status: Job["status"], extra: Partial<Job> = {}): Job =>
   ({ id: 5, status, result: null, error: null, files: [], ...extra }) as Job;
 
-function wrapper() {
+function wrapper(strict = false) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
-  );
+  return ({ children }: { children: ReactNode }) => {
+    const inner = <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    return strict ? <StrictMode>{inner}</StrictMode> : inner;
+  };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Let the deferred cancels of the previous test's unmounted hooks fire first.
+  await new Promise((r) => setTimeout(r, 10));
   vi.mocked(reportsApi.run).mockReset();
   vi.mocked(jobsApi.get).mockReset();
   vi.mocked(jobsApi.cancel).mockReset();
@@ -152,5 +155,55 @@ describe("useReportRun", () => {
     releaseOld({ result: resultOf(99), job: null });
     await new Promise((r) => setTimeout(r, 20));
     expect(result.current.result?.row_count).toBe(2);
+  });
+
+  it("reruns a request whose job was cancelled when the user comes back to it", async () => {
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: null, job: { job_id: 5, status: "queued" } });
+    vi.mocked(jobsApi.get).mockResolvedValue(job("running"));
+    const other = { report_key: "builtin.backlog_trend" } as ReportRunIn;
+    const { result, rerender } = renderHook(({ b }) => useReportRun(b), {
+      wrapper: wrapper(),
+      initialProps: { b: body },
+    });
+    await waitFor(() => expect(result.current.jobId).toBe(5));
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: resultOf(1), job: null });
+    rerender({ b: other });
+    await waitFor(() => expect(jobsApi.cancel).toHaveBeenCalledWith(5));
+    await waitFor(() => expect(result.current.result?.row_count).toBe(1));
+
+    vi.mocked(jobsApi.get).mockResolvedValue(job("cancelled"));
+    vi.mocked(reportsApi.run).mockClear();
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: resultOf(8), job: null });
+    rerender({ b: body });
+    await waitFor(() => expect(result.current.result?.row_count).toBe(8));
+    expect(reportsApi.run).toHaveBeenCalledTimes(1);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("does not cancel a job when the user switches away and back within one tick", async () => {
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: null, job: { job_id: 5, status: "queued" } });
+    vi.mocked(jobsApi.get).mockResolvedValue(job("running"));
+    const other = { report_key: "builtin.backlog_trend" } as ReportRunIn;
+    const { result, rerender } = renderHook(({ b }) => useReportRun(b), {
+      wrapper: wrapper(),
+      initialProps: { b: body },
+    });
+    await waitFor(() => expect(result.current.jobId).toBe(5));
+    rerender({ b: other });
+    rerender({ b: body });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(jobsApi.cancel).not.toHaveBeenCalled();
+    expect(result.current.jobId).toBe(5);
+  });
+
+  it("does not cancel a live job under StrictMode's remount", async () => {
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: null, job: { job_id: 5, status: "queued" } });
+    vi.mocked(jobsApi.get).mockResolvedValue(job("running"));
+    const { result, unmount } = renderHook(() => useReportRun(body), { wrapper: wrapper(true) });
+    await waitFor(() => expect(result.current.jobId).toBe(5));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(jobsApi.cancel).not.toHaveBeenCalled();
+    unmount();
+    await waitFor(() => expect(jobsApi.cancel).toHaveBeenCalledWith(5));
   });
 });
