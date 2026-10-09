@@ -166,8 +166,39 @@ def _parse_date(value: str) -> datetime | None:
         return None
 
 
+_INT32_MIN, _INT32_MAX = -(2**31), 2**31 - 1
+
+
 def _epoch(moment: datetime) -> int:
-    return int(moment.replace(tzinfo=UTC).timestamp())
+    # the epoch columns (escalation_*_time, until_time) are 32-bit INTEGER in Znuny's schema
+    return max(_INT32_MIN, min(_INT32_MAX, int(moment.replace(tzinfo=UTC).timestamp())))
+
+
+_FAR_PAST = datetime.min  # noqa: DTZ901 - naive UTC like every bound here
+_FAR_FUTURE = datetime.max.replace(microsecond=0)  # noqa: DTZ901
+
+
+def minutes_before(now: datetime, minutes: Any) -> datetime | None:
+    """``now`` minus ``minutes`` (Perl-numified), like Znuny's ``DateTime->Subtract``.
+
+    ``None`` when the result lies outside the dates Python can represent ("1e300"): Znuny's
+    CPAN DateTime does not fail there but saturates to a date like
+    ``-292277022601-11-04``; see :func:`clamped_minutes_before`.
+    """
+    try:
+        return now - timedelta(minutes=perl_int(minutes))
+    except OverflowError:
+        return None
+
+
+def clamped_minutes_before(now: datetime, minutes: Any) -> datetime:
+    """:func:`minutes_before`, saturated like Znuny: far past for a huge positive value,
+    far future for a huge negative one (``create_time <= far past`` matches nothing,
+    ``>= far past`` everything - the same rows Znuny's saturated date selects)."""
+    moment = minutes_before(now, minutes)
+    if moment is not None:
+        return moment
+    return _FAR_PAST if perl_int(minutes) > 0 else _FAR_FUTURE
 
 
 _CLOSE_HISTORY = (
@@ -230,7 +261,7 @@ def time_filters(
                 continue
             if escalation:
                 conditions.append(f"{column} != 0")
-            moment = now - timedelta(minutes=perl_int(raw))
+            moment = clamped_minutes_before(now, raw)
             conditions.append(f"{column} {op} {bind(target(moment))}")
 
         older_date: datetime | None = None
@@ -268,9 +299,12 @@ def time_filters(
         for bound in ("Older", "Newer"):
             minutes = _scalar(data, f"{prefix}{bound}Minutes")
             if minutes is not None:
-                dates[bound] = (now - timedelta(minutes=perl_int(minutes))).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                )
+                bound_moment = minutes_before(now, minutes)
+                if bound_moment is None:
+                    # Znuny formats the saturated date ("-292277022601-...") and refuses it:
+                    # "Invalid time format" -> TicketSearch returns nothing
+                    return False
+                dates[bound] = bound_moment.strftime("%Y-%m-%d %H:%M:%S")
             else:
                 dates[bound] = _scalar(data, f"{prefix}{bound}Date")
 

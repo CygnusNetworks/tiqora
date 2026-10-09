@@ -37,6 +37,7 @@ from tiqora.api.compat.mapping.perl import perl_is_string, perl_str, perl_truthy
 from tiqora.api.compat.provider import OperationFault
 from tiqora.api.compat.search_filters import (
     article_text_filters,
+    clamped_minutes_before,
     create_time_settings,
     created_filters,
     sanitize_id_filters,
@@ -119,7 +120,6 @@ from tiqora.znuny.password import (
     needs_rehash,
     verify_password,
 )
-from tiqora.znuny.perl_format import perl_int
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = structlog.get_logger(__name__)
@@ -2508,10 +2508,10 @@ async def op_ticket_search(
         _add_join("JOIN article a_ct ON a_ct.ticket_id = t.id", "article_ct")
         if m := data.get("ArticleCreateTimeNewerMinutes"):
             conditions.append("a_ct.create_time >= :act_nm")
-            params["act_nm"] = now_naive - timedelta(minutes=perl_int(m))
+            params["act_nm"] = clamped_minutes_before(now_naive, m)
         if m := data.get("ArticleCreateTimeOlderMinutes"):
             conditions.append("a_ct.create_time <= :act_om")
-            params["act_om"] = now_naive - timedelta(minutes=perl_int(m))
+            params["act_om"] = clamped_minutes_before(now_naive, m)
         if m := data.get("ArticleCreateTimeNewerDate"):
             conditions.append("a_ct.create_time >= :act_nd")
             params["act_nd"] = m

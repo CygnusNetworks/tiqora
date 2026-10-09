@@ -439,6 +439,31 @@ async def test_soap_max_length_answers_413_before_reading(sync_url: str) -> None
     await engine.dispose()
 
 
+async def test_soap_max_length_stops_reading_a_chunked_body(sync_url: str) -> None:
+    """Without Content-Length the body is counted while it streams in: 413 as soon as it
+    passes MaxLength, the rest is never read."""
+    client, engine = await _client_for(sync_url)
+    pulled: list[int] = []
+    total = 200
+
+    async def chunks() -> Any:
+        for i in range(total):
+            pulled.append(i)
+            yield b"<!-- padding padding padding padding padding -->"
+
+    async with client:
+        resp = await client.post(
+            "/znuny-compat/Webservice/SmallSOAP",
+            content=chunks(),
+            headers={"Content-Type": "text/xml"},
+        )
+        assert resp.status_code == 413
+        assert resp.headers["content-type"].startswith("text/plain")
+        assert resp.text == "Request Entity Too Large"
+    assert len(pulled) < total  # refused while streaming, not after reading everything
+    await engine.dispose()
+
+
 async def test_soap_operation_error_is_a_client_fault(sync_url: str) -> None:
     client, engine = await _client_for(sync_url)
     envelope = (

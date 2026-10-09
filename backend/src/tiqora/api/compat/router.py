@@ -350,6 +350,20 @@ def _soap_response(content: bytes, version: str, status_code: int) -> Response:
     )
 
 
+async def _read_body_capped(request: Request, max_length: int) -> bytes | None:
+    """The request body, or ``None`` as soon as more than ``max_length`` bytes arrived."""
+    chunks: list[bytes] = []
+    received = 0
+    async for chunk in request.stream():
+        received += len(chunk)
+        if received > max_length:
+            return None
+        chunks.append(chunk)
+    body = b"".join(chunks)
+    request._body = body  # Starlette's cache: a later request.body() returns it again
+    return body
+
+
 async def _handle_soap_request(
     request: Request,
     session: AsyncSession,
@@ -374,9 +388,14 @@ async def _handle_soap_request(
             declared = 0
         if declared > max_length:
             return _text_error(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large")
-    body_bytes = await request.body()
-    if max_length is not None and len(body_bytes) > max_length:
-        return _text_error(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large")
+        # a body without Content-Length (chunked) is read with a running count and refused
+        # as soon as it passes the limit - never read completely first
+        body = await _read_body_capped(request, max_length)
+        if body is None:
+            return _text_error(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large")
+        body_bytes = body
+    else:
+        body_bytes = await request.body()
     soap_action = request.headers.get("SOAPAction") or request.headers.get("soapaction")
 
     try:

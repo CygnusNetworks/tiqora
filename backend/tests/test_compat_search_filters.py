@@ -226,3 +226,36 @@ def test_sanitize_id_filters_no_match_unless_names_can_still_match() -> None:
     assert no_match is False
     out, no_match = sanitize_id_filters({"QueueIDs": ["5", 2**40], "Title": "x"})
     assert (out["QueueIDs"], no_match) == ([5], False)
+
+
+def test_huge_minutes_saturate_like_znuny_datetime() -> None:
+    """Minutes "1e300": Znuny's CPAN DateTime saturates to a far-past date (no error); the
+    direct comparisons get the earliest / latest date instead of an OverflowError."""
+    conditions: list[str] = []
+    params: dict[str, Any] = {}
+    assert time_filters(
+        {
+            "TicketCreateTimeOlderMinutes": "1e300",
+            "TicketCreateTimeNewerMinutes": "-1e300",
+            "TicketEscalationTimeOlderMinutes": "1e300",
+        },
+        conditions,
+        params,
+        [],
+        now=NOW,
+    )
+    assert params["tw1"] == datetime.min
+    assert params["tw2"] == datetime.max.replace(microsecond=0)
+    assert params["tw3"] == -(2**31)  # the epoch column is a 32-bit INTEGER
+
+
+def test_huge_minutes_in_history_families_give_no_result() -> None:
+    # Znuny formats the saturated date ("-292277022601-11-04 ...") and refuses it with
+    # "Invalid time format" -> TicketSearch returns nothing
+    for key in (
+        "TicketChangeTimeOlderMinutes",
+        "TicketLastChangeTimeNewerMinutes",
+        "TicketCloseTimeOlderMinutes",
+        "TicketPendingTimeNewerMinutes",
+    ):
+        assert time_filters({key: "1e300"}, [], {}, [], now=NOW) is False, key

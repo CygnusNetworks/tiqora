@@ -350,6 +350,20 @@ async def test_invalid_date_returns_empty_object(sync_url: str) -> None:
     assert await _search(sync_url, {"TicketCreateTimeOlderDate": "2026-02-30 00:00:00"}) == {}
 
 
+async def test_huge_exponent_minutes_never_fail(sync_url: str) -> None:
+    """Minutes "1e300" used to raise OverflowError (HTTP 500). Znuny's DateTime saturates to a
+    far-past date: "older than" matches nothing, "newer than" what any huge value matches."""
+    far = 10**9  # about 1900 years: representable, older than every ticket
+    for family in ("TicketCreateTime", "ArticleCreateTime"):
+        assert await _ids(sync_url, {f"{family}OlderMinutes": "1e300"}) == []
+        assert await _ids(sync_url, {f"{family}NewerMinutes": "1e300"}) == await _ids(
+            sync_url, {f"{family}NewerMinutes": far}
+        )
+    assert await _ids(sync_url, {"TicketEscalationTimeNewerMinutes": "1e300"}) == [T_C]
+    assert await _search(sync_url, {"TicketChangeTimeOlderMinutes": "1e300"}) == {}
+    assert await _search(sync_url, {"TicketPendingTimeNewerMinutes": "-1e300"}) == {}
+
+
 async def test_ticket_id_filter(sync_url: str) -> None:
     assert await _ids(sync_url, {"TicketID": T_B}) == [T_B]
     assert await _ids(sync_url, {"TicketID": [T_A, T_C, 99999999]}) == [T_A, T_C]
