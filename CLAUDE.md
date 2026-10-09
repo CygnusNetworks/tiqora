@@ -1,3 +1,9 @@
+# Git workflow
+
+- Local branches are fine (and preferred for larger work, e.g. `roadmap-wave1`). Small fixes may go straight to `main`.
+- No branches and no PRs on GitHub: the `github` remote is a release mirror (`main` + `v*` tags), pushed only after explicit approval.
+- A push to `origin main` deploys production — ask before pushing. Don't push other branches unless asked.
+
 <!-- rtk-instructions v2 -->
 # RTK (Rust Token Killer) - Token-Optimized Commands
 
