@@ -28,7 +28,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.deps import get_redis
-from tiqora.api.portal.deps import AppSettings, CurrentCustomer, DbSession
+from tiqora.api.portal.deps import (
+    AppSettings,
+    CurrentCustomer,
+    DbSession,
+    get_customer_session_store,
+)
 from tiqora.api.v1.customer_keys import (
     CustomerCryptoKeysOut,
     CustomerPgpKeyIn,
@@ -40,7 +45,7 @@ from tiqora.api.v1.customer_keys import (
 from tiqora.crypto import customer_keys as ck
 from tiqora.crypto.config import load_crypto_config, setting_is_valid
 from tiqora.db.legacy.customer import CustomerUser
-from tiqora.domain.customer_auth import AuthenticatedCustomer
+from tiqora.domain.customer_auth import AuthenticatedCustomer, CustomerSessionStore
 from tiqora.domain.password_policy import PasswordPolicyError, validate_password
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 from tiqora.znuny.password import hash_password, verify_password
@@ -158,8 +163,13 @@ async def change_password(
     customer: CurrentCustomer,
     session: DbSession,
     limiter: PasswordLimiter,
+    sessions: Annotated[CustomerSessionStore, Depends(get_customer_session_store)],
 ) -> None:
-    """Znuny ``Preferences::Password`` (customer): verify the current one, store the new one."""
+    """Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.
+
+    Afterwards every other session of the customer ends: Znuny/GI sessions and the
+    portal's Redis sessions, pending 2FA logins included. The calling session stays.
+    """
     await _require(session, GROUP_PASSWORD)
     ip = client_ip(request)
     key = f"portal-password:{customer.login}"
@@ -197,6 +207,15 @@ async def change_password(
     except Exception as exc:  # noqa: BLE001 — password already committed
         await session.rollback()
         logger.warning("portal_znuny_session_revoke_failed", error=str(exc))
+    # Same for the portal's own sessions (full and pending 2FA), keeping the caller's.
+    # Without a known own token everything goes (fail secure).
+    own_token = getattr(request.state, "customer_session_token", None)
+    try:
+        await sessions.revoke_customer_sessions(
+            customer.id, keep_token=str(own_token) if own_token else None
+        )
+    except Exception as exc:  # noqa: BLE001 — password already committed
+        logger.warning("portal_redis_session_revoke_failed", error=str(exc))
     await limiter.reset(login=key, ip=ip)
 
 

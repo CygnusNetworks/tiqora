@@ -35,7 +35,7 @@ from tiqora.domain.user_provisioning import ProvisioningError
 from tiqora.identity import provisioning
 from tiqora.identity.config_models import AttributeMap, GroupGrant, RoleRule
 from tiqora.identity.links import upsert_link
-from tiqora.identity.login import ExternalIdentity, apply_login, plan_login
+from tiqora.identity.login import ExternalIdentity, LoginRejected, apply_login, plan_login
 from tiqora.identity.mapping import AssignmentDiff
 from tiqora.identity.store import ProviderChanges, ProviderRecord, update_provider
 
@@ -457,9 +457,11 @@ async def test_root_user_never_synced(env: Env) -> None:
         provider_id=p.id, subject="sub-root", attributes={"groups": ("support",)}
     )
     plan = await plan_login(env.s, p, ident, user_kind="agent", settings=SETTINGS)
-    assert plan.decision == "login" and plan.user_id == 1
+    # The system user never logs in via an IdP (M10), so it is never synced either.
+    assert (plan.decision, plan.reject_code, plan.user_id) == ("reject", "no_match", None)
     assert plan.assignments.empty
-    await apply_login(env.s, p, ident, plan, settings=SETTINGS)
+    with pytest.raises(LoginRejected):
+        await apply_login(env.s, p, ident, plan, settings=SETTINGS)
     after = await env.rows("SELECT role_id FROM role_user WHERE user_id = 1 ORDER BY role_id")
     assert after == before
     assert await env.managed(1) == set()

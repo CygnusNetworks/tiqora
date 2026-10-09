@@ -5,6 +5,8 @@ Seed band 47000-47099. Provider slugs use the ``idplogin-`` prefix.
 
 from __future__ import annotations
 
+import dataclasses
+import logging
 from collections.abc import AsyncIterator, Iterator
 
 import pytest
@@ -33,7 +35,7 @@ from tiqora.identity.login import (
     plan_login,
     plan_to_dict,
 )
-from tiqora.identity.types import subject_hash
+from tiqora.identity.types import SYSTEM_USER_ID, subject_hash
 
 pytestmark = pytest.mark.db
 
@@ -548,3 +550,138 @@ async def test_audience_mismatch_rejects(env: tuple[AsyncSession, str]) -> None:
     p = await _oidc(s, "aud", audience="customer")
     plan = await _plan(s, p, "a", preferred_username="idp.anna.47001")
     assert (plan.decision, plan.reject_code) == ("reject", "no_match")
+
+
+async def _system_user_id(s: AsyncSession) -> int:
+    """The Znuny seed's superuser; the guard keys on id 1, so the seed must agree."""
+    uid = (
+        await s.execute(text("SELECT id FROM users WHERE login = 'root@localhost'"))
+    ).scalar_one()
+    assert uid == SYSTEM_USER_ID
+    return int(uid)
+
+
+async def test_system_user_never_matched_by_login_or_link(
+    env: tuple[AsyncSession, str], caplog: pytest.LogCaptureFixture
+) -> None:
+    """M10: an IdP user who picks the username root@localhost gets the generic no_match."""
+    s, _ = env
+    root = await _system_user_id(s)
+    p = await _oidc(s, "root-login", jit_enabled=True)
+    with caplog.at_level(logging.WARNING, logger="tiqora.identity.login"):
+        for name in ("root@localhost", "ROOT@localhost"):
+            plan = await _plan(s, p, f"sub-{name}", preferred_username=name)
+            assert (plan.decision, plan.reject_code, plan.user_id) == (
+                "reject",
+                "no_match",
+                None,
+            )
+            with pytest.raises(LoginRejected) as exc:
+                await apply_login(s, p, _ident(p.id, f"sub-{name}"), plan, settings=SETTINGS)
+            assert exc.value.reject_code == "no_match"
+    assert "system user" in caplog.text
+    assert await list_links(s, provider_id=p.id) == []
+    # A link onto the system user (e.g. stored before this guard) is refused as well.
+    await upsert_link(
+        s,
+        provider_id=p.id,
+        user_kind="agent",
+        subject="sub-root",
+        user_id=root,
+        user_login="root@localhost",
+    )
+    await s.commit()
+    plan = await _plan(s, p, "sub-root", preferred_username="someone.else")
+    assert (plan.decision, plan.reject_code, plan.link_exists) == ("reject", "no_match", True)
+    # Directory logins (LDAP) take the same chain.
+    ldap = await make_provider(s, slug=f"{SLUG}root-ldap", kind="ldap", settings=SETTINGS)
+    plan = await plan_login(
+        s,
+        ldap,
+        _ident(ldap.id, "uid-root", uid="root@localhost"),
+        user_kind="agent",
+        settings=SETTINGS,
+    )
+    assert (plan.decision, plan.reject_code) == ("reject", "no_match")
+
+
+async def test_system_user_never_matched_by_email(env: tuple[AsyncSession, str]) -> None:
+    s, _ = env
+    root = await _system_user_id(s)
+    existing = (
+        await s.execute(
+            text(
+                "SELECT preferences_value FROM user_preferences"
+                " WHERE user_id = :u AND preferences_key = 'UserEmail'"
+            ),
+            {"u": root},
+        )
+    ).scalar_one_or_none()
+    inserted = existing is None
+    if inserted:
+        email = "idp.root.m10@example.org"
+        await s.execute(
+            text(
+                "INSERT INTO user_preferences (user_id, preferences_key, preferences_value)"
+                " VALUES (:u, 'UserEmail', :v)"
+            ),
+            {"u": root, "v": email},
+        )
+        await s.commit()
+    else:
+        raw = existing
+        email = bytes(raw).decode() if isinstance(raw, bytes | memoryview) else str(raw)
+    try:
+        p = await _oidc(s, "root-email", match_by="email", jit_enabled=True)
+        ident = ExternalIdentity(
+            provider_id=p.id, subject="e-root", attributes={"email": (email,)}, email_verified=True
+        )
+        plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+        # Refused outright: neither a login nor a JIT account for that address.
+        assert (plan.decision, plan.reject_code, plan.user_id) == ("reject", "no_match", None)
+    finally:
+        if inserted:
+            await s.rollback()
+            await s.execute(
+                text(
+                    "DELETE FROM user_preferences"
+                    " WHERE user_id = :u AND preferences_key = 'UserEmail'"
+                ),
+                {"u": root},
+            )
+            await s.commit()
+
+
+async def test_jit_cannot_reach_the_system_user(env: tuple[AsyncSession, str]) -> None:
+    """JIT never creates or reuses root@localhost, and apply_login refuses a plan onto id 1."""
+    s, _ = env
+    await _system_user_id(s)
+    await seed_agent(s, 47001, "idp.anna.47001")
+    p = await _oidc(
+        s,
+        "root-jit",
+        match_by="email",
+        jit_enabled=True,
+    )
+    ident = ExternalIdentity(
+        provider_id=p.id,
+        subject="j-root",
+        attributes={
+            "preferred_username": ("root@localhost",),
+            "email": ("idp.nobody.m10@example.org",),
+            "given_name": ("Root",),
+            "family_name": ("Jit",),
+        },
+        email_verified=True,
+    )
+    plan = await plan_login(s, p, ident, user_kind="agent", settings=SETTINGS)
+    assert (plan.decision, plan.reject_code) == ("reject", "login_taken")
+    # Backstop: a plan pointing at id 1 that did not come from plan_login.
+    ok = await _plan(s, p, "j-anna", preferred_username="idp.anna.47001")
+    forged = dataclasses.replace(
+        ok, decision="login", matched_by="login", user_id=SYSTEM_USER_ID, login="root@localhost"
+    )
+    with pytest.raises(LoginRejected) as exc:
+        await apply_login(s, p, ident, forged, settings=SETTINGS)
+    assert exc.value.reject_code == "no_match"
+    assert await list_links(s, provider_id=p.id) == []

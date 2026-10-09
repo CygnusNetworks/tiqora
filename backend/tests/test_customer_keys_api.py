@@ -264,6 +264,13 @@ def _request() -> Any:
     return Request({"type": "http", "headers": [], "client": ("127.0.0.1", 1)})
 
 
+def _store() -> Any:
+    from tests.test_session_revocation import _FakeRedis
+    from tiqora.domain.customer_auth import CustomerSessionStore
+
+    return CustomerSessionStore(_FakeRedis(), Settings(secret_key="unit-test-secret-key"))  # type: ignore[arg-type]
+
+
 async def test_portal_preferences_language_and_keys(
     session: AsyncSession, settings: Settings
 ) -> None:
@@ -352,6 +359,7 @@ async def test_portal_password_change(session: AsyncSession) -> None:
             me,
             session,
             limiter,  # type: ignore[arg-type]
+            _store(),
         )
     assert exc.value.status_code == 422 and limiter.failures == 1
     with pytest.raises(HTTPException) as exc:
@@ -361,6 +369,7 @@ async def test_portal_password_change(session: AsyncSession) -> None:
             me,
             session,
             limiter,  # type: ignore[arg-type]
+            _store(),
         )
     assert exc.value.status_code == 422 and "at least" in str(exc.value.detail)
     await portal.change_password(
@@ -371,6 +380,7 @@ async def test_portal_password_change(session: AsyncSession) -> None:
         me,
         session,
         limiter,  # type: ignore[arg-type]
+        _store(),
     )
     stored = (
         await session.execute(text("SELECT pw FROM customer_user WHERE login = :l"), {"l": LOGIN})
@@ -420,6 +430,7 @@ async def test_portal_password_change_revokes_customer_znuny_sessions(
         me,
         session,
         _Limiter(),  # type: ignore[arg-type]
+        _store(),
     )
     assert await _remaining(session) == {"GI8962OTHER", "GI8962AGENT"}
 
@@ -446,9 +457,46 @@ async def test_portal_password_change_survives_session_revoke_failure(
         me,
         session,
         limiter,  # type: ignore[arg-type]
+        _store(),
     )
     stored = (
         await session.execute(text("SELECT pw FROM customer_user WHERE login = :l"), {"l": LOGIN})
     ).scalar_one()
     assert verify_password("new password 789", stored)
     assert limiter.resets == 1
+
+
+async def test_portal_password_change_revokes_other_portal_sessions(
+    session: AsyncSession,
+) -> None:
+    """Other full sessions and pending 2FA logins end; the caller's session stays."""
+    from dataclasses import replace
+
+    from tiqora.api.portal import preferences as portal
+
+    cid = await _customer_id(session)
+    me = replace(_customer(), id=cid)
+    store = _store()
+    own = await store.create(cid, LOGIN)
+    other = await store.create(cid, LOGIN)
+    pending = await store.create_pending(cid, LOGIN, 300)
+    stranger = await store.create(cid + 1, "ckapi-someone-else")
+    request = _request()
+    request.state.customer_session_token = own
+    await portal.change_password(
+        portal.PortalPasswordIn(
+            current_password="old password 123", new_password="new password 456"
+        ),
+        request,
+        me,
+        session,
+        _Limiter(),  # type: ignore[arg-type]
+        store,
+    )
+    assert await store.get(own) == (cid, LOGIN)
+    assert await store.get(other) is None
+    assert await store.get_pending(pending) is None
+    assert await store.get(stranger) == (cid + 1, "ckapi-someone-else")
+    # The kept token is still indexed, so a later revoke-all still finds it.
+    assert await store.revoke_customer_sessions(cid) == 1
+    assert await store.get(own) is None

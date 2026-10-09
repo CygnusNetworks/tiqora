@@ -4,7 +4,9 @@
 account is gone/invalid) -> login (exact first, then a unique case-insensitive hit)
 -> e-mail -> just-in-time creation (step 5, ``jit_enabled``). Profile changes (7) are
 planned for every login; role/group sync (8) is planned for agents only (managed
-assignments are agent-only) and never touches the system user (id 1).
+assignments are agent-only) and never touches the system user (id 1). No external
+identity ever logs in as the system user either: link, login and e-mail matches onto
+``users.id = 1`` are refused like "no account" (``no_match``) and logged.
 
 Every lookup is by id/login/e-mail of ONE Znuny table; nothing joins ``tiqora_*``
 with Znuny tables on strings (mixed collations on production MariaDB).
@@ -435,6 +437,18 @@ async def plan_login(
     if account is None:
         return await _plan_jit(session, provider, identity, profile, user_kind)
 
+    if user_kind == "agent" and account.id == SYSTEM_USER_ID:
+        # Znuny's superuser (users.id 1, root@localhost) is never an external identity:
+        # an IdP whose users pick their own username/e-mail must not reach it. Same
+        # generic answer as "no account", the reason only goes to the log.
+        log.warning(
+            "external login refused for the system user (id %s): provider %s, matched by %s",
+            SYSTEM_USER_ID,
+            provider.slug,
+            matched_by,
+        )
+        return _reject(user_kind, profile, "no_match", link_exists=link is not None)
+
     if (
         user_kind == "agent"
         and provider.kind in SSO_KINDS
@@ -565,6 +579,10 @@ async def apply_login(
     """
     if plan.decision == "reject":
         raise LoginRejected(plan.reject_code or "no_match")
+    if plan.user_kind == "agent" and plan.user_id == SYSTEM_USER_ID:
+        # Backstop for plans not built by plan_login (which already refuses it).
+        log.warning("external login refused for the system user: provider %s", provider.slug)
+        raise LoginRejected("no_match")
     if plan.decision == "create":
         try:
             user_id, login = await _create_account(session, provider, plan)
