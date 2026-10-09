@@ -8,6 +8,7 @@ Znuny references: ``TicketACL.pm:155-175`` (principal), ``:1118-1146`` (Process 
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator, Generator
 from datetime import datetime
 from typing import Any
@@ -19,12 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tiqora.deployed import clear_revision_cache
 from tiqora.domain.ticket_acl import (
     AclPrincipal,
+    apply_possible_filters,
     apply_ticket_acl,
+    build_checks,
     filter_process_options,
     load_customer_user_checks,
 )
 from tiqora.process.actor import ProcessActor
-from tiqora.znuny.sysconfig import yaml_encode_effective
+from tiqora.znuny.sysconfig import SysConfig, yaml_encode_effective
 
 T0 = datetime(2026, 3, 4, 5, 6, 7)
 
@@ -289,10 +292,11 @@ async def test_customer_groups_feed_checks(session: AsyncSession, sync_url: str)
     engine.dispose()
 
     checks = await load_customer_user_checks(session, "cu-884002")
-    assert checks["Group_rw"] == ["support-884"]
-    assert checks["Group_ro"] == ["other-884", "support-884"]
+    # "users" is CustomerGroupAlwaysGroups' default (CustomerGroup.pm:358-372).
+    assert checks["Group_rw"] == ["support-884", "users"]
+    assert checks["Group_ro"] == ["other-884", "support-884", "users"]
     nobody = await load_customer_user_checks(session, "cu-884003")
-    assert nobody["Group_ro"] == [] and nobody["Group_rw"] == []
+    assert nobody["Group_ro"] == ["users"] and nobody["Group_rw"] == ["users"]
 
     # ... and an ACL keyed on Group_rw sees it (new snapshot: the ACL row is inserted after
     # this session's first read).
@@ -411,7 +415,7 @@ async def test_action_acl(session: AsyncSession, sync_url: str) -> None:
         "principal": AclPrincipal.agent(AGENT),
         "kind": "Action",
         "items": ["AgentTicketProcess"],
-        "action": "AgentTicketZoom",
+        "action": "AgentTicketProcess",
     }
     assert await filter_process_options(session, **common, ticket_id=TICKET_A) == []
     assert await filter_process_options(session, **common, ticket_id=TICKET_B) == [
@@ -481,3 +485,123 @@ async def test_existing_agent_call_shape_still_works(session: AsyncSession, sync
         return_sub_type="State",
     )
     assert filtered == {4: "open"}
+
+
+# --- fix round 1 ---
+
+
+@pytest.mark.parametrize("section", ["Possible", "PossibleAdd", "PossibleNot"])
+@pytest.mark.parametrize("kind", ["Process", "ActivityDialog", "Action"])
+@pytest.mark.parametrize("bad", [[], "Process-884001", None, {}])
+def test_special_kinds_ignore_empty_or_scalar_rules(section: str, kind: str, bad: Any) -> None:
+    # TicketACL.pm:559/621/674: only a non-empty list is a rule and counts as "used".
+    current = {"a": "a", "b": "b"}
+    out, used = apply_possible_filters(
+        {"a": "a", "b": "b", "c": "c"},
+        current,
+        {section: {kind: bad}},
+        return_type=kind,
+        return_sub_type="-",
+    )
+    assert (out, used) == (current, False)
+
+
+def test_special_kinds_apply_non_empty_lists() -> None:
+    data = {"a": "a", "b": "b", "c": "c"}
+    for section, expected in (
+        ("Possible", {"a": "a"}),
+        ("PossibleNot", {"b": "b", "c": "c"}),
+    ):
+        out, used = apply_possible_filters(
+            data,
+            dict(data),
+            {section: {"Process": ["a"]}},
+            return_type="Process",
+            return_sub_type="-",
+        )
+        assert (out, used) == (expected, True)
+    out, used = apply_possible_filters(
+        data,
+        {"b": "b"},
+        {"PossibleAdd": {"Process": ["a"]}},
+        return_type="Process",
+        return_sub_type="-",
+    )
+    assert (out, used) == ({"a": "a", "b": "b"}, True)
+
+
+async def test_empty_special_rule_does_not_hide_or_stop_later_acls(
+    session: AsyncSession, sync_url: str
+) -> None:
+    _add_acl(sync_url, 1, "a-empty", "{}\n", "Possible:\n  Process: []\n")
+    _add_acl(sync_url, 2, "b-hide", "{}\n", _HIDE_PROCESS)
+    assert await _processes(session, AclPrincipal.agent(AGENT)) == ["Process-884002"]
+
+
+async def test_no_principal_logs_error_and_user_id_is_required(
+    session: AsyncSession, sync_url: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    _add_acl(sync_url, 1, "hide-for-all", "{}\n", _HIDE_PROCESS)
+    with caplog.at_level(logging.ERROR, logger="tiqora.domain.ticket_acl"):
+        out = await apply_ticket_acl(
+            session, user_id=None, data={"x": "x"}, return_type="Process", return_sub_type="-"
+        )
+    assert out == {"x": "x"}
+    assert "Need UserID or CustomerUserID" in caplog.text
+    with pytest.raises(TypeError):
+        await apply_ticket_acl(  # type: ignore[call-arg]
+            session, data={"x": "x"}, return_type="Process", return_sub_type="-"
+        )
+
+
+async def test_user_id_1_with_customer_still_bypasses(session: AsyncSession, sync_url: str) -> None:
+    _add_acl(sync_url, 1, "hide-for-all", "{}\n", _HIDE_PROCESS)
+    out = await apply_ticket_acl(
+        session,
+        user_id=1,
+        customer_user_login="cu-884001",
+        data=dict.fromkeys(_PROCESSES, "x"),
+        return_type="Process",
+        return_sub_type="-",
+    )
+    assert list(out) == _PROCESSES  # TicketACL.pm:175
+
+
+async def test_always_groups_and_canonical_login(session: AsyncSession, sync_url: str) -> None:
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        _set_customer_group_support(conn, 1)
+        _grant(conn, "cu-884002", GROUP_A, "ro")
+    engine.dispose()
+    # The lookup is case-insensitive, so is the group row match (canonical login).
+    upper = await load_customer_user_checks(session, "CU-884002")
+    assert upper["Group_ro"] == ["support-884", "users"]
+    assert upper["Group_rw"] == ["users"]
+
+    async def fetch(name: str) -> Any:
+        values = {
+            "CustomerGroupSupport": 1,
+            "CustomerGroupAlwaysGroups": ["other-884", "no-such-group", "invalid-884"],
+        }
+        return yaml_encode_effective(values[name]) if name in values else None
+
+    custom = await load_customer_user_checks(session, "cu-884002", sysconfig=SysConfig(fetch=fetch))
+    # Only valid, existing groups are added; the invalid one and the unknown one are skipped.
+    assert custom["Group_ro"] == ["other-884", "support-884"]
+    assert custom["Group_rw"] == ["other-884"]
+
+
+def test_customer_actor_without_login_raises() -> None:
+    actor = ProcessActor(interface="CustomerInterface", user_id=5)
+    with pytest.raises(ValueError, match="customer_user_login"):
+        _ = actor.acl_principal
+
+
+async def test_database_side_customer_is_a_copy(session: AsyncSession) -> None:
+    live, db = await build_checks(
+        session, user_id=AGENT, ticket_id=TICKET_A, customer_user_id="cu-884003"
+    )
+    assert live["CustomerUser"] == db["CustomerUser"]
+    assert live["CustomerUser"] is not db["CustomerUser"]
+    live["CustomerUser"]["UserLogin"] = "changed"
+    assert db["CustomerUser"]["UserLogin"] == "cu-884003"

@@ -310,6 +310,10 @@ def apply_possible_filters(
             return None
         if special:
             raw = root.get(return_type)
+            # TicketACL.pm:559/621/674: only a non-empty list is a rule (IsArrayRefWithData);
+            # anything else is ignored and does not count as "used".
+            if not isinstance(raw, list) or not raw:
+                return None
         else:
             ticket = root.get("Ticket")
             if not isinstance(ticket, dict):
@@ -525,21 +529,30 @@ async def load_customer_user_checks(
         return checks
 
     # CustomerGroup.pm:270-281: only permitted groups; ``rw`` stands in for every key.
+    # The group query uses the canonical login (the lookup above is case-insensitive).
+    canonical = row.login if row is not None else login
     keys_by_group: dict[int, set[str]] = {}
     for group_id, key in (
         await session.execute(
             select(GroupCustomerUser.group_id, GroupCustomerUser.permission_key).where(
-                GroupCustomerUser.user_id == login, GroupCustomerUser.permission_value == 1
+                GroupCustomerUser.user_id == canonical,
+                GroupCustomerUser.permission_value == 1,
             )
         )
     ).all():
         keys_by_group.setdefault(group_id, set()).add(key)
+    # CustomerGroup.pm:358-372: CustomerGroupAlwaysGroups (Framework.xml:3502-3510, default
+    # ['users']) are added to every permission type when they name a valid group.
+    always = await cfg.get("CustomerGroupAlwaysGroups", ["users"])
+    always_names = {str(n) for n in always} if isinstance(always, list) else set()
+    always_ids = {gid for gid, name in valid_groups.items() if name in always_names}
     for perm in permissions:
-        checks[f"Group_{perm}"] = sorted(
-            valid_groups[gid]
+        member_ids = {
+            gid
             for gid, keys in keys_by_group.items()
             if gid in valid_groups and (perm in keys or "rw" in keys)
-        )
+        }
+        checks[f"Group_{perm}"] = sorted(valid_groups[gid] for gid in member_ids | always_ids)
     return checks
 
 
@@ -692,6 +705,7 @@ async def build_checks(
 
     # TicketACL.pm:1118-1146: process entity ids passed as parameters go to the live side only
     # (the ticket's own come from its dynamic fields on both sides, above).
+    cfg = sysconfig or SysConfig(session)
     param_process = {k: v for k, v in (process or {}).items() if v}
     if param_process:
         checks_live.setdefault("Process", {}).update(param_process)
@@ -700,9 +714,7 @@ async def build_checks(
     if customer_user_id:
         # TicketACL.pm:1253-1275: live CustomerUser from the param; it also overrides the
         # ticket's CustomerUserID/CustomerID.
-        customer_block = await load_customer_user_checks(
-            session, customer_user_id, sysconfig=sysconfig
-        )
+        customer_block = await load_customer_user_checks(session, customer_user_id, sysconfig=cfg)
         checks_live["CustomerUser"] = customer_block
         ticket_live = checks_live.setdefault("Ticket", {})
         if isinstance(ticket_live, dict):
@@ -711,17 +723,17 @@ async def build_checks(
     elif ticket_customer:
         # TicketACL.pm:1276-1292: otherwise the ticket's customer.
         checks_live["CustomerUser"] = await load_customer_user_checks(
-            session, ticket_customer, sysconfig=sysconfig
+            session, ticket_customer, sysconfig=cfg
         )
     # TicketACL.pm:1296-1332: database side = the ticket's customer (reuse the live one when
     # it is the same login).
     if ticket_customer:
         live_customer = checks_live.get("CustomerUser") or {}
         if live_customer.get("UserLogin") == ticket_customer:
-            checks_db["CustomerUser"] = live_customer
+            checks_db["CustomerUser"] = dict(live_customer)
         else:
             checks_db["CustomerUser"] = await load_customer_user_checks(
-                session, ticket_customer, sysconfig=sysconfig
+                session, ticket_customer, sysconfig=cfg
             )
 
     # Merge caller-supplied form overrides into Checks (not ChecksDatabase).
@@ -791,7 +803,7 @@ async def load_valid_acls(session: AsyncSession) -> list[AclRule]:
 async def apply_ticket_acl(
     session: AsyncSession,
     *,
-    user_id: int | None = None,
+    user_id: int | None,
     data: dict[Any, str],
     return_type: str,
     return_sub_type: str,
@@ -819,6 +831,8 @@ async def apply_ticket_acl(
 
     effective_customer = customer_user_login or customer_user_id
     if user_id is None and not effective_customer:
+        # TicketACL.pm:155-160 logs the error and returns without ACL data.
+        logger.error("Need UserID or CustomerUserID")
         return original
     if user_id is not None and user_id == _ROOT_USER_ID:
         return original
@@ -882,6 +896,7 @@ async def filter_id_name_map(
     checks: dict[str, Any] | None = None,
     customer_user_id: str | None = None,
     return_type: str = "Ticket",
+    sysconfig: SysConfig | None = None,
 ) -> dict[int, str]:
     """Convenience wrapper: filter an id→name map for a Ticket return subtype."""
     if isinstance(items, list):
@@ -898,6 +913,7 @@ async def filter_id_name_map(
         action=action,
         checks=checks,
         customer_user_id=customer_user_id,
+        sysconfig=sysconfig,
     )
     out: dict[int, str] = {}
     for key, value in filtered.items():

@@ -200,6 +200,9 @@ async def collect_ticket_field_options(
     )
     checks: dict[str, Any] | None = {"Ticket": dict(ticket_ctx)} if ticket_ctx else None
 
+    from tiqora.znuny.sysconfig import SysConfig
+
+    sysconfig = SysConfig(session)  # one reader for every field's ACL pass
     acl_maps: dict[str, dict[int, str]] = {}
     for field, mapping in base.items():
         subtype = _FIELD_TO_SUBTYPE[field]
@@ -211,6 +214,7 @@ async def collect_ticket_field_options(
             ticket_id=ticket_id,
             action=action,
             checks=checks,
+            sysconfig=sysconfig,
         )
         acl_maps[field] = filtered
 

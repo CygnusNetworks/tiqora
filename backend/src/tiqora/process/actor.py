@@ -51,6 +51,9 @@ class ProcessActor:
         # Imported here: domain.ticket_acl -> deployed.store -> process.dump -> this package.
         from tiqora.domain.ticket_acl import AclPrincipal
 
-        if self.interface == "CustomerInterface" and self.customer_user_login:
+        if self.interface == "CustomerInterface":
+            if not self.customer_user_login:
+                # Falling back to agent(user_id) would hand a customer the agent bypass/checks.
+                raise ValueError("CustomerInterface actor without customer_user_login")
             return AclPrincipal.customer(self.customer_user_login)
         return AclPrincipal.agent(self.user_id)
