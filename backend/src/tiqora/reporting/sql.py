@@ -11,6 +11,7 @@ which PostgreSQL rejects as a different expression (GroupingError).
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -233,6 +234,16 @@ def is_timeout_error(exc: BaseException) -> bool:
     return False
 
 
+async def _invalidate_quietly(session: AsyncSession) -> None:
+    try:
+        conn = await session.connection()
+        await conn.invalidate()
+    except BaseException as exc:  # noqa: BLE001 - best effort
+        logger.warning("report_statement_timeout_invalidate_failed", error=str(exc))
+        if isinstance(exc, asyncio.CancelledError):
+            raise
+
+
 @asynccontextmanager
 async def statement_timeout(session: AsyncSession, seconds: int) -> AsyncIterator[None]:
     """Bound every statement in the block to ``seconds``.
@@ -240,8 +251,11 @@ async def statement_timeout(session: AsyncSession, seconds: int) -> AsyncIterato
     PostgreSQL: ``SET LOCAL`` (dies with the transaction, nothing to reset).
     MariaDB/MySQL: session variable, reset in a best-effort ``finally``; when
     the reset itself fails (connection broken by a cancelled call) the
-    connection is invalidated so the pool never reuses it. A timeout raises
-    ``ReportQueryTimeout``.
+    connection is invalidated so the pool never reuses it (a server-side abort
+    leaves a clean connection; client-side cancellation is the caller's
+    business). A timeout raises ``ReportQueryTimeout``. ``SET LOCAL`` ends with
+    the transaction, so a commit inside the block drops the limit; MySQL's
+    ``max_execution_time`` only bounds SELECT.
     """
     if seconds < 1:
         raise ValueError("statement_timeout: seconds must be >= 1")
@@ -272,12 +286,11 @@ async def statement_timeout(session: AsyncSession, seconds: int) -> AsyncIterato
         if reset_sql is not None:
             try:
                 await session.execute(sa_text(reset_sql))
-            except BaseException as reset_exc:  # noqa: BLE001 - best effort, never mask
+            except asyncio.CancelledError:
+                await _invalidate_quietly(session)
+                raise
+            except Exception as reset_exc:  # noqa: BLE001 - best effort, never mask
                 logger.warning("report_statement_timeout_reset_failed", error=str(reset_exc))
-                try:
-                    conn = await session.connection()
-                    await conn.invalidate()
-                except Exception:  # noqa: BLE001
-                    pass
+                await _invalidate_quietly(session)
     if timed_out is not None:
         raise ReportQueryTimeout(f"statement exceeded {seconds}s") from timed_out

@@ -292,28 +292,62 @@ async def test_statement_timeout(url_fixture, request) -> None:  # type: ignore[
     engine, session = await _session_for(request, url_fixture)
     try:
         dialect = session.get_bind().dialect
-        sleep = "SELECT SLEEP(3)" if dialect.name in ("mysql", "mariadb") else "SELECT pg_sleep(3)"
+        mysql_like = dialect.name in ("mysql", "mariadb")
+        # CPU-bound on MariaDB (SLEEP is ended early without an error there)
+        slow = (
+            (
+                "SELECT COUNT(*) FROM information_schema.columns a, "
+                "information_schema.columns b, information_schema.columns c"
+            )
+            if mysql_like
+            else "SELECT pg_sleep(30)"
+        )
         started = time.monotonic()
-        raised: BaseException | None = None
-        try:
+        with pytest.raises(ReportQueryTimeout) as info:
             async with statement_timeout(session, 1):
-                await session.execute(text(sleep))
-        except ReportQueryTimeout as exc:
-            raised = exc
-        elapsed = time.monotonic() - started
-        if raised is not None:
-            assert is_timeout_error(raised.__cause__)  # type: ignore[arg-type]
-        else:
-            assert elapsed < 2.5  # MariaDB may end SLEEP early without an error
-        if dialect.name == "postgresql":
+                await session.execute(text(slow))
+        assert time.monotonic() - started < 10
+        assert is_timeout_error(info.value.__cause__)  # type: ignore[arg-type]
+        if not mysql_like:
             await session.rollback()  # the aborted transaction owns the SET LOCAL
         assert (await session.execute(text("SELECT 1"))).scalar_one() == 1
-        if dialect.name in ("mysql", "mariadb"):
+        if mysql_like:
             var = "max_statement_time" if dialect.is_mariadb else "max_execution_time"
             value = (await session.execute(text(f"SELECT @@{var}"))).scalar_one()
             assert float(value) == 0
         else:
             assert (await session.execute(text("SHOW statement_timeout"))).scalar_one() == "0"
+    finally:
+        await session.close()
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_reset_failure_invalidates_connection(cancel, request) -> None:  # type: ignore[no-untyped-def]
+    import asyncio
+
+    engine, session = await _session_for(request, "mariadb_znuny_url")
+    try:
+        conn = await session.connection()
+        fairy = await conn.get_raw_connection()
+        real_execute = session.execute
+
+        async def failing(stmt, *a, **kw):  # type: ignore[no-untyped-def]
+            if "= 0" in str(stmt):
+                raise asyncio.CancelledError() if cancel else RuntimeError("reset boom")
+            return await real_execute(stmt, *a, **kw)
+
+        session.execute = failing  # type: ignore[method-assign]
+        if cancel:
+            with pytest.raises(asyncio.CancelledError):
+                async with statement_timeout(session, 5):
+                    pass
+        else:
+            async with statement_timeout(session, 5):
+                pass
+        session.execute = real_execute  # type: ignore[method-assign]
+        assert fairy.is_valid is False
     finally:
         await session.close()
         await engine.dispose()
