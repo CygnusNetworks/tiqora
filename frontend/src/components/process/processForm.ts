@@ -88,7 +88,7 @@ function asText(v: unknown): string {
 const DEFAULT_PENDING_OFFSET_SECONDS = 86400;
 
 /**
- * Start value of a PendingTime field. The server sends the dialog's `DefaultValue`, a time offset in seconds
+ * Start value of a PendingTime field. The server sends the resolved offset in seconds
  * (Znuny `BuildDateSelection(DiffTime => DefaultValue || PendingDiffTime || 86400)`): now + offset in the display
  * zone. A UTC timestamp default is taken as the date itself.
  */

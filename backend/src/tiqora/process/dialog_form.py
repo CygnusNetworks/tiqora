@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, ServiceCustomerUser, ServiceSla, Sla
 from tiqora.db.legacy.ticket import Ticket
@@ -574,6 +575,21 @@ def _initial_value(
     return configured
 
 
+# BuildDateSelection's last resort when neither the dialog nor the SysConfig gives an offset.
+_PENDING_DIFF_FALLBACK = 86400
+
+
+async def _pending_time_offset(configured: Any, sysconfig: SysConfig) -> Any:
+    """The PendingTime default offset, as ``AgentTicketProcess.pm:2528-2530`` hands it to
+    ``BuildDateSelection``: ``DefaultValue || Ticket::Frontend::PendingDiffTime || 86400``
+    (Perl ``||``: ``""`` and ``"0"`` fall through). Only the system-wide setting is read; Znuny's
+    per-agent override of ``PendingDiffTime`` (UserModificationActive) is not modelled."""
+    if perl_truthy(configured):
+        return configured
+    diff = await sysconfig.get("Ticket::Frontend::PendingDiffTime")
+    return diff if perl_truthy(diff) else _PENDING_DIFF_FALLBACK
+
+
 async def build_dialog_form(
     session: AsyncSession,
     *,
@@ -656,6 +672,9 @@ async def build_dialog_form(
             ]
         else:
             field_options = options.get(name, [])
+        default = _initial_value(name, cfg, df, kind, required, now)
+        if name == "PendingTime":
+            default = await _pending_time_offset(default, SysConfig(session))
         fields.append(
             ProcessDialogFieldOut(
                 name=name,
@@ -664,7 +683,7 @@ async def build_dialog_form(
                 required=required,
                 description_short=cfg.description_short,
                 description_long=cfg.description_long,
-                default=_initial_value(name, cfg, df, kind, required, now),
+                default=default,
                 options=field_options,
             )
         )

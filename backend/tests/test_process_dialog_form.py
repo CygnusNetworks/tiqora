@@ -564,6 +564,42 @@ async def test_field_kinds_lock_and_agent_pickers(client: AsyncClient, sync_url:
 
 
 @pytest.mark.db
+@pytest.mark.parametrize(
+    ("dialog_default", "diff_time", "expected"),
+    [
+        (None, None, 86400),  # neither dialog nor SysConfig: BuildDateSelection's 86400
+        (None, "7200", "7200"),  # Ticket::Frontend::PendingDiffTime
+        ("3600", "7200", "3600"),  # the dialog DefaultValue wins
+        ("0", "7200", "7200"),  # Perl ||: "0" falls through
+        ("0", "0", 86400),
+    ],
+)
+async def test_pending_time_default_follows_znuny_order(
+    client: AsyncClient,
+    sync_url: str,
+    dialog_default: str | None,
+    diff_time: str | None,
+    expected: object,
+) -> None:
+    """``DiffTime => DefaultValue || Ticket::Frontend::PendingDiffTime || 86400``
+    (AgentTicketProcess.pm:2528-2530)."""
+    body = "Display: '1'"
+    if dialog_default is not None:
+        body = f"{{Display: '1', DefaultValue: '{dialog_default}'}}"
+
+    def setup(conn: Any) -> None:
+        if diff_time is not None:
+            _set_sysconfig(conn, {"Ticket::Frontend::PendingDiffTime": diff_time})
+        _add_dialog(conn, 1, {"Title": "Display: '1'", "PendingTime": body})
+        _add_process(conn, 1, start_dialog=1, dialogs=[1])
+
+    _build(sync_url, setup)
+    resp = await _start_form(client, AGENT)
+    assert resp.status_code == 200, resp.text
+    assert _by_name(resp.json())["PendingTime"]["default"] == expected
+
+
+@pytest.mark.db
 async def test_unsupported_df_type_is_marked(client: AsyncClient, sync_url: str) -> None:
     def setup(conn: Any) -> None:
         _add_dialog(
