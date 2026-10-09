@@ -58,6 +58,15 @@ def _tzinfo(tz_name: str) -> Any:
         return UTC
 
 
+def _vacation_set(name: object) -> bool:
+    """Perl truthiness of a vacation-day name (DateTime.pm:503-504, 869-870).
+
+    ``!$TimeVacationDays->{$Month}->{$Day}`` treats undef, ``""`` and ``"0"`` as
+    "no vacation", so a blank or ``0`` name does not block a working day.
+    """
+    return name is not None and str(name) not in ("", "0")
+
+
 def destination_time_epoch(
     start_epoch: int,
     minutes: int,
@@ -93,9 +102,8 @@ def destination_time_epoch(
 
         dt = datetime.fromtimestamp(current, tz=tz)
         day_abbr = _DAY_ABBR[dt.weekday()]
-        is_vacation = (
-            vacation_days.get(dt.month, {}).get(dt.day) is not None
-            or vacation_days_once.get(dt.year, {}).get(dt.month, {}).get(dt.day) is not None
+        is_vacation = _vacation_set(vacation_days.get(dt.month, {}).get(dt.day)) or _vacation_set(
+            vacation_days_once.get(dt.year, {}).get(dt.month, {}).get(dt.day)
         )
         day_hours = hour_sets.get(day_abbr, set())
         is_working_day = not is_vacation and bool(day_hours)
@@ -143,13 +151,13 @@ def working_seconds_between(
     """Seconds of working time in ``[start_epoch, stop_epoch)``.
 
     Literal port of ``Kernel/System/DateTime.pm::Delta(ForWorkingTime => 1)``
-    (DateTime.pm:777-929). ``stop <= start`` and "no working hours configured"
-    both give 0 (DateTime.pm:824-832, loop condition at 838). A whole day is
+    (DateTime.pm:777-945). ``stop <= start`` and "no working hours configured"
+    both give 0 (DateTime.pm:819-831, loop condition at 846). A whole day is
     taken in one chunk only at local midnight of a 24-hour day *and* when more
-    than 86400 s remain (DateTime.pm:875-882); a working day then adds
-    ``len(hours) * 3600`` only if the remaining time exceeds that, otherwise the
-    hour loop handles it (DateTime.pm:887-897). Otherwise per hour: a working
-    hour adds ``min(seconds to the next hour, remaining)`` (DateTime.pm:920-927).
+    than 86400 s remain (DateTime.pm:889-895); a working day then adds
+    ``len(hours) * 3600`` only if the remaining time exceeds that (904), otherwise
+    the hour loop handles it. Otherwise per hour: a working hour adds
+    ``min(seconds to the next hour, remaining)`` (DateTime.pm:929-936).
     """
     if stop_epoch <= start_epoch:
         return 0
@@ -170,9 +178,8 @@ def working_seconds_between(
         remaining = stop_epoch - current
         dt = datetime.fromtimestamp(current, tz=tz)
         day_hours = hour_sets.get(_DAY_ABBR[dt.weekday()], set())
-        is_vacation = (
-            vacation_days.get(dt.month, {}).get(dt.day) is not None
-            or vacation_days_once.get(dt.year, {}).get(dt.month, {}).get(dt.day) is not None
+        is_vacation = _vacation_set(vacation_days.get(dt.month, {}).get(dt.day)) or _vacation_set(
+            vacation_days_once.get(dt.year, {}).get(dt.month, {}).get(dt.day)
         )
         is_working_day = not is_vacation and bool(day_hours)
 
@@ -381,13 +388,13 @@ async def calendar_config(
         if isinstance(hours, list)
     }
     vacation_days: VacationDays = {
-        int(m): {int(d): str(name) for d, name in days.items()}
+        int(m): {int(d): "" if name is None else str(name) for d, name in days.items()}
         for m, days in raw_vd.items()
         if isinstance(days, dict)
     }
     vacation_once: VacationDaysOneTime = {
         int(y): {
-            int(m): {int(d): str(name) for d, name in days.items()}
+            int(m): {int(d): "" if name is None else str(name) for d, name in days.items()}
             for m, days in months.items()
             if isinstance(days, dict)
         }

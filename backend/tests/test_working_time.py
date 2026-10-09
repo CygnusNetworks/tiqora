@@ -1,7 +1,7 @@
 """Working time between two instants + the calendar resolver + the reporting settings round trip.
 
-Seed ids: 47520-47529 (queue 47520; names contain ``rep47``). The session-scoped
-containers are shared, so every row this module writes is deleted again.
+Seed ids: 47520-47529 (queue 47520, sysconfig_default 47520; names contain ``rep47``).
+The session-scoped containers are shared, so every row this module writes is deleted again.
 """
 
 from __future__ import annotations
@@ -12,11 +12,12 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, delete, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.reporting.settings import (
     REPORTING_SECTION,
     ReportingSettings,
@@ -41,6 +42,8 @@ WH = {d: list(range(8, 17)) for d in ("Mon", "Tue", "Wed", "Thu", "Fri")}  # 08:
 TZ = "Europe/Berlin"
 QUEUE_ID = 47520
 _URLS: set[str] = set()
+SYSCONFIG_ID = 47520
+SETTING_FIELDS = ("time_zone", "near_miss_percent", "access")
 
 
 def _epoch(s: str) -> int:
@@ -144,6 +147,59 @@ def test_inverse_of_destination_time(start: str, minutes: int) -> None:  # both 
     assert working_seconds_between(s, dest, WH, {}, {}, TZ) == minutes * 60
 
 
+@pytest.mark.parametrize("name", ["", "0", None])
+def test_falsy_vacation_name_is_no_vacation_day_like_perl(name: str | None) -> None:
+    # DateTime.pm:869-870 `!$TimeVacationDays->{$M}->{$D}`: undef/""/"0" do not block the day.
+    vd = {12: {25: name}}
+    once = {2024: {12: {25: name}}}
+    # Tue 24.12. 16:00 -> Thu 26.12. 09:00 = 1 h + 9 h (Wed) + 1 h
+    for vacation, vacation_once in ((vd, {}), ({}, once)):
+        assert (
+            working_seconds_between(
+                _epoch("2024-12-24T16:00"),
+                _epoch("2024-12-26T09:00"),
+                WH,
+                vacation,  # type: ignore[arg-type]
+                vacation_once,  # type: ignore[arg-type]
+                TZ,
+            )
+            == 11 * 3600
+        )
+        # Add: 2 working hours from Tue 16:00 end Wed 09:00 (Wed is a working day)
+        assert destination_time_epoch(
+            _epoch("2024-12-24T16:00"),
+            120,
+            WH,
+            vacation,  # type: ignore[arg-type]
+            vacation_once,  # type: ignore[arg-type]
+            TZ,
+        ) == _epoch("2024-12-25T09:00")
+
+
+def test_truthy_vacation_name_still_blocks_destination_time() -> None:
+    assert destination_time_epoch(
+        _epoch("2024-12-24T16:00"), 120, WH, {12: {25: "Weihnachten"}}, {}, TZ
+    ) == _epoch("2024-12-26T09:00")
+
+
+def test_working_hours_on_dst_days_count_local_hours() -> None:
+    sunday = {"Sun": [1, 2, 3]}
+    # 2024-10-27 has 25 local hours (02:00 occurs twice): hours 1, 2, 2, 3 = 4 h
+    assert (
+        working_seconds_between(
+            _epoch("2024-10-27T00:00"), _epoch("2024-10-28T00:00"), sunday, {}, {}, TZ
+        )
+        == 4 * 3600
+    )
+    # 2024-03-31 has 23 local hours (02:00 does not exist): hours 1, 3 = 2 h
+    assert (
+        working_seconds_between(
+            _epoch("2024-03-31T00:00"), _epoch("2024-04-01T00:00"), sunday, {}, {}, TZ
+        )
+        == 2 * 3600
+    )
+
+
 def test_working_minutes_none_without_hours() -> None:
     cal = WorkingCalendar(
         name=None, working_hours={}, vacation_days={}, vacation_days_once={}, time_zone=TZ
@@ -190,19 +246,31 @@ def test_to_epoch_is_the_escalation_function() -> None:
 
 # --------------------------------------------------------------------------- DB
 
+URL_FIXTURES = ["mariadb_znuny_url", "postgres_znuny_url"]
+
 
 def _to_async_url(sync_url: str) -> str:
+    if sync_url.startswith("postgresql+psycopg2://"):
+        return sync_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+    if sync_url.startswith("postgresql://"):
+        return sync_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     if sync_url.startswith("mysql+pymysql://"):
         return sync_url.replace("mysql+pymysql://", "mysql+aiomysql://", 1)
     return sync_url
 
 
 def _clean(sync_url: str) -> None:
+    """Delete only this module's rows; the tiqora_* tables may not exist yet."""
     engine = create_engine(sync_url)
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": QUEUE_ID})
-        conn.execute(text("DELETE FROM tiqora_settings WHERE `key` LIKE 'reporting.%'"))
-    engine.dispose()
+    try:
+        TiqoraBase.metadata.create_all(engine, tables=[TiqoraSettings.__table__])  # type: ignore[list-item]
+        keys = [REPORTING_SECTION.storage_key(name) for name in SETTING_FIELDS]
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": QUEUE_ID})
+            conn.execute(text("DELETE FROM sysconfig_default WHERE id = :id"), {"id": SYSCONFIG_ID})
+            conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key.in_(keys)))
+    finally:
+        engine.dispose()
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -227,11 +295,15 @@ def _sysconfig_values() -> dict[str, Any]:
 
 
 @pytest.mark.db
-async def test_calendar_resolver_targets_and_caching(mariadb_znuny_url: str) -> None:
-    _URLS.add(mariadb_znuny_url)
-    sync = create_engine(mariadb_znuny_url)
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_calendar_resolver_targets_and_caching(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    sync_url: str = request.getfixturevalue(url_fixture)
+    _URLS.add(sync_url)
+    _clean(sync_url)
+    sync = create_engine(sync_url)
     with sync.begin() as conn:
-        conn.execute(text("DELETE FROM queue WHERE id = :id"), {"id": QUEUE_ID})
         conn.execute(
             text(
                 "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
@@ -252,7 +324,7 @@ async def test_calendar_resolver_targets_and_caching(mariadb_znuny_url: str) -> 
         fetched.append(name)
         return values.get(name)
 
-    engine = create_async_engine(_to_async_url(mariadb_znuny_url))
+    engine = create_async_engine(_to_async_url(sync_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as s:
@@ -289,25 +361,55 @@ async def test_calendar_resolver_targets_and_caching(mariadb_znuny_url: str) -> 
         await engine.dispose()
 
 
+async def test_calendar_config_keeps_null_vacation_names_falsy() -> None:
+    values = _sysconfig_values()
+    values["TimeVacationDays::Calendar1"] = yaml_encode_effective({12: {25: None, 26: "Stefan"}})
+    values["TimeVacationDaysOneTime::Calendar1"] = yaml_encode_effective({2024: {6: {4: None}}})
+
+    async def fetch(name: str) -> Any | None:
+        return values.get(name)
+
+    _, vacation, once, _tz = await escalation.calendar_config(
+        SysConfig(fetch=fetch, ttl_seconds=0), "1"
+    )
+    assert vacation == {12: {25: "", 26: "Stefan"}}  # not the string "None"
+    assert once == {2024: {6: {4: ""}}}
+
+
 @pytest.mark.db
-async def test_reporting_settings_round_trip(mariadb_znuny_url: str) -> None:
-    _URLS.add(mariadb_znuny_url)
-    sync = create_engine(mariadb_znuny_url)
-    TiqoraBase.metadata.create_all(sync)
+@pytest.mark.parametrize("url_fixture", URL_FIXTURES)
+async def test_reporting_settings_round_trip(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    sync_url: str = request.getfixturevalue(url_fixture)
+    _URLS.add(sync_url)
+    _clean(sync_url)  # also creates tiqora_settings
+    sync = create_engine(sync_url)
+    with sync.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO sysconfig_default (id, name, description, navigation,"
+                " is_invisible, is_readonly, is_required, is_valid, has_configlevel,"
+                " user_modification_possible, user_modification_active, xml_content_raw,"
+                " xml_content_parsed, xml_filename, effective_value, is_dirty,"
+                " exclusive_lock_guid, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, 'OTRSTimeZone', 'rep47', 'Core', 0, 0, 0, 1, 0, 0, 0, 'x', 'x',"
+                " 'Framework.xml', :eff, 0, '0', current_timestamp, 1, current_timestamp, 1)"
+            ),
+            {"id": SYSCONFIG_ID, "eff": yaml_encode_effective("Europe/Paris").decode()},
+        )
     sync.dispose()
-    _clean(mariadb_znuny_url)
 
     settings = Settings()
-    engine = create_async_engine(_to_async_url(mariadb_znuny_url))
+    engine = create_async_engine(_to_async_url(sync_url))
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
         async with factory() as s:
             defaults = await load_reporting_settings(s, settings)
             assert defaults == ReportingSettings()
             assert defaults.time_zone == ""
-            # empty zone falls back to the Znuny default zone (UserDefaultTimeZone/OTRSTimeZone)
-            fallback = await reporting_time_zone(s, defaults)
-            assert fallback == await _default_zone(s)
+            # empty zone falls back to the Znuny default zone (seeded OTRSTimeZone)
+            assert await reporting_time_zone(s, defaults) == "Europe/Paris"
 
             await save_section_values(
                 s,
@@ -325,12 +427,6 @@ async def test_reporting_settings_round_trip(mariadb_znuny_url: str) -> None:
 
             # an invalid stored zone is ignored -> default zone again
             bad = loaded.model_copy(update={"time_zone": "Mars/Olympus"})
-            assert await reporting_time_zone(s, bad) == fallback
+            assert await reporting_time_zone(s, bad) == "Europe/Paris"
     finally:
         await engine.dispose()
-
-
-async def _default_zone(s: Any) -> str:
-    from tiqora.domain.timezones import default_time_zone
-
-    return await default_time_zone(SysConfig(s))
