@@ -547,26 +547,90 @@ async def test_no_permission_returns_empty(env: Env) -> None:
         assert await svc.backlog_trend(unrelated_user_id, StatsFilters()) == []
 
 
-class _CountingBudget(QueryBudget):
-    """Counts the statements/lookups that ask the budget for their time."""
+async def test_every_wrapper_method_passes_the_request_budget(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``budget=None`` would mean job mode: every engine call must get the shared object."""
+    import tiqora.stats.service as service
 
-    calls = 0
+    seen: dict[str, list[Any]] = {"run": [], "raw": []}
+    real_run, real_raw = service.run_report, service.raw_measure_values
 
-    def statement_seconds(self) -> int:
-        type(self).calls += 1
-        return super().statement_seconds()
+    async def run_spy(*args: Any, **kwargs: Any) -> Any:
+        seen["run"].append(kwargs.get("budget"))
+        return await real_run(*args, **kwargs)
 
+    async def raw_spy(*args: Any, **kwargs: Any) -> Any:
+        seen["raw"].append(kwargs.get("budget"))
+        return await real_raw(*args, **kwargs)
 
-async def test_every_engine_call_uses_the_request_budget(env: Env) -> None:
-    """``budget=None`` would mean job mode: every query of a request must take the shared one."""
+    monkeypatch.setattr(service, "run_report", run_spy)
+    monkeypatch.setattr(service, "raw_measure_values", raw_spy)
+    uid = env.ids["user_id"]
+    calls: dict[str, tuple[int, int]] = {  # method -> (run_report calls, raw calls)
+        "ticket_volume": (1, 0),
+        "backlog_trend": (1, 0),
+        "open_snapshot": (1, 0),
+        "sla_stats": (2, 2),
+        "agent_workload": (2, 0),
+    }
     from tiqora.stats.service import StatsFilters, StatsService
 
-    _CountingBudget.calls = 0
-    budget = _CountingBudget(per_query_seconds=60, deadline=1e12, clock=lambda: 0.0)
+    for method, (runs, raws) in calls.items():
+        seen["run"].clear()
+        seen["raw"].clear()
+        budget = QueryBudget(per_query_seconds=60, deadline=1e12, clock=lambda: 0.0)
+        async with env.factory() as session:
+            svc = StatsService(session, budget=budget)
+            args: tuple[Any, ...] = (uid, StatsFilters())
+            if method == "open_snapshot":
+                args += ("queue",)
+            await getattr(svc, method)(*args)
+        assert len(seen["run"]) == runs, method
+        assert len(seen["raw"]) == raws, method
+        assert all(b is budget for b in seen["run"] + seen["raw"]), method
+
+
+async def test_foreign_queue_id_shows_no_numbers(env: Env) -> None:
+    from tiqora.stats.service import StatsFilters, StatsService
+
+    uid = env.ids["user_id"]
+    foreign = StatsFilters(queue_id=env.ids["denied_queue_id"])
     async with env.factory() as session:
-        await StatsService(session, budget=budget).sla_stats(env.ids["user_id"], StatsFilters())
-    # kpis, escalated, two raw percentile queries - each fetch asks the budget once
-    assert _CountingBudget.calls >= 4
+        svc = StatsService(session)
+        assert await svc.ticket_volume(uid, foreign) == []
+        assert await svc.backlog_trend(uid, foreign) == []
+        sla = await svc.sla_stats(uid, foreign)
+        assert (sla.total, sla.escalated, sla.first_response_breached) == (0, 0, 0)
+        assert (sla.first_response_minutes, sla.solution_minutes) == ([], [])
+        assert await svc.agent_workload(uid, foreign) == []
+
+
+async def test_truncation_is_recorded(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    import tiqora.reporting.engine as engine
+    import tiqora.stats.service as service
+    from tiqora.stats.service import StatsFilters, StatsService
+
+    uid = env.ids["user_id"]
+    async with env.factory() as session:
+        normal = StatsService(session)
+        await normal.ticket_volume(uid, StatsFilters())
+        await normal.sla_stats(uid, StatsFilters())
+        assert normal.truncated == []
+
+    monkeypatch.setattr(service, "STATS_ROW_CAP", 1)
+    async with env.factory() as session:
+        svc = StatsService(session)
+        await svc.ticket_volume(uid, StatsFilters())
+        assert svc.truncated == ["rows"]
+
+    monkeypatch.setattr(service, "STATS_ROW_CAP", 10_000)
+    monkeypatch.setattr(engine, "PERCENTILE_SAMPLE_CAP", 1)
+    async with env.factory() as session:
+        svc = StatsService(session)
+        sla = await svc.sla_stats(uid, StatsFilters())
+        assert svc.truncated == ["samples", "samples"]
+        assert len(sla.first_response_minutes) == 1 and len(sla.solution_minutes) == 1
 
 
 async def test_used_up_budget_raises_report_query_timeout(env: Env) -> None:

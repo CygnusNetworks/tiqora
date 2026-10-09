@@ -20,6 +20,9 @@ the report data (``tiqora_report_ticket_fact`` / ``tiqora_report_ticket_event``)
 * every row is returned: the built-ins' ``top_n`` (15 plus ``__other__``) is removed
   from the copies these wrappers run.
 
+A result cut by the row cap or the percentile sample cap is recorded in
+:attr:`StatsService.truncated` (the API turns it into ``X-Tiqora-Truncated``).
+
 All queries of one :class:`StatsService` (= one request) share one inline time
 budget (R-INLINEBUDGET); a used-up budget raises
 :class:`~tiqora.reporting.sql.ReportQueryTimeout`, which the API maps to 504.
@@ -247,6 +250,8 @@ class StatsService:
             reporting if reporting is not None else ReportingSettings.model_validate({})
         )
         self._budget = budget if budget is not None else QueryBudget.inline(self._reporting)
+        #: why a result of this request is incomplete ("rows", "samples"); see the API header
+        self.truncated: list[str] = []
 
     # -- engine access ---------------------------------------------------
 
@@ -269,7 +274,7 @@ class StatsService:
     async def _run(
         self, user_id: int, defn: ReportDefinition, params: RunParams
     ) -> ReportResultOut:
-        return await run_report(
+        result = await run_report(
             self._session,
             defn=defn,
             params=params,
@@ -280,6 +285,9 @@ class StatsService:
             use_cache=False,
             budget=self._budget,
         )
+        if result.truncated:
+            self.truncated.append("rows")
+        return result
 
     async def _raw(
         self, user_id: int, defn: ReportDefinition, measure: str, params: RunParams
@@ -292,6 +300,7 @@ class StatsService:
             user_id=user_id,
             reporting=self._reporting,
             budget=self._budget,
+            on_capped=lambda: self.truncated.append("samples"),
         )
 
     # -- reports -------------------------------------------------------

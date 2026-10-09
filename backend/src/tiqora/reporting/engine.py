@@ -880,8 +880,12 @@ async def raw_measure_values(
     registry: Registry | None = None,
     include_archived: bool = False,
     budget: QueryBudget | None = None,
+    on_capped: Callable[[], None] | None = None,
 ) -> list[float]:
-    """The sample values of one percentile measure over the whole report (≤ the sample cap)."""
+    """The sample values of one percentile measure over the whole report (≤ the sample cap).
+
+    ``on_capped`` is called when more samples existed than the cap (the list is cut).
+    """
     plan = await plan_report(
         session,
         defn=defn,
@@ -900,7 +904,11 @@ async def raw_measure_values(
     label = f"v_{measure_key}"
     rows = await _fetch(
         session,
-        compiled.raw_stmt.limit(PERCENTILE_SAMPLE_CAP),
+        compiled.raw_stmt.limit(PERCENTILE_SAMPLE_CAP + 1),
         resolve_budget(budget, reporting),
     )
+    if len(rows) > PERCENTILE_SAMPLE_CAP:
+        rows = rows[:PERCENTILE_SAMPLE_CAP]
+        if on_capped is not None:
+            on_capped()
     return [float(r._mapping[label]) for r in rows if r._mapping[label] is not None]

@@ -16,12 +16,13 @@ nginx's 90 s), a used-up budget answers 504 with a JSON ``detail.message`` like
 from __future__ import annotations
 
 import csv
+import logging
 import zoneinfo
 from collections.abc import AsyncGenerator, Awaitable, Iterable
 from datetime import datetime, time, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +47,9 @@ from tiqora.stats.service import Dimension, Granularity, StatsFilters, StatsServ
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/stats", tags=["stats"])
+logger = logging.getLogger(__name__)
+
+TRUNCATED_HEADER = "X-Tiqora-Truncated"
 
 
 async def _stats_service(
@@ -127,6 +131,14 @@ async def _guard[R](call: Awaitable[R]) -> R:
         raise _timeout() from None
 
 
+def _truncation(svc: StatsService, endpoint: str) -> dict[str, str]:
+    """``X-Tiqora-Truncated: 1`` when a result was cut (one warning per request)."""
+    if not svc.truncated:
+        return {}
+    logger.warning("stats %s truncated (%s)", endpoint, ", ".join(sorted(set(svc.truncated))))
+    return {TRUNCATED_HEADER: "1"}
+
+
 async def _csv_stream(header: list[str], rows: Iterable[list[str]]) -> AsyncGenerator[bytes, None]:
     writer = csv.writer(_EchoWriter(), delimiter=";")
     yield b"\xef\xbb\xbf"  # UTF-8 BOM
@@ -145,6 +157,7 @@ async def ticket_volume(
     user: CurrentUser,
     session: DbSession,
     svc: Stats,
+    response: Response,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     queue_id: int | None = None,
@@ -168,6 +181,7 @@ async def ticket_volume(
         customer_id,
     )
     points = await _guard(svc.ticket_volume(user.id, filters, granularity))
+    response.headers.update(_truncation(svc, "volume"))
     return TicketVolumeOut(
         granularity=granularity, points=[VolumePointOut.from_dataclass(p) for p in points]
     )
@@ -205,7 +219,10 @@ async def ticket_volume_csv(
     return StreamingResponse(
         _csv_stream(["Bucket", "Created", "Closed"], rows),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="ticket-volume.csv"'},
+        headers={
+            **_truncation(svc, "volume.csv"),
+            "Content-Disposition": 'attachment; filename="ticket-volume.csv"',
+        },
     )
 
 
@@ -219,6 +236,7 @@ async def open_snapshot(
     user: CurrentUser,
     session: DbSession,
     svc: Stats,
+    response: Response,
     dimension: Dimension = "queue",
     date_from: datetime | None = None,
     date_to: datetime | None = None,
@@ -242,6 +260,7 @@ async def open_snapshot(
         customer_id,
     )
     items = await _guard(svc.open_snapshot(user.id, filters, dimension))
+    response.headers.update(_truncation(svc, "open-snapshot"))
     return OpenSnapshotOut(
         dimension=dimension, items=[DimensionCountOut.from_dataclass(i) for i in items]
     )
@@ -279,7 +298,10 @@ async def open_snapshot_csv(
     return StreamingResponse(
         _csv_stream(["Id", "Label", "Count"], rows),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="open-snapshot.csv"'},
+        headers={
+            **_truncation(svc, "open-snapshot.csv"),
+            "Content-Disposition": 'attachment; filename="open-snapshot.csv"',
+        },
     )
 
 
@@ -293,6 +315,7 @@ async def sla_stats(
     user: CurrentUser,
     session: DbSession,
     svc: Stats,
+    response: Response,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     queue_id: int | None = None,
@@ -315,6 +338,7 @@ async def sla_stats(
         customer_id,
     )
     stats = await _guard(svc.sla_stats(user.id, filters))
+    response.headers.update(_truncation(svc, "sla"))
     return SlaStatsOut.from_dataclass(stats)
 
 
@@ -371,7 +395,10 @@ async def sla_stats_csv(
     return StreamingResponse(
         gen(),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="sla-stats.csv"'},
+        headers={
+            **_truncation(svc, "sla.csv"),
+            "Content-Disposition": 'attachment; filename="sla-stats.csv"',
+        },
     )
 
 
@@ -385,6 +412,7 @@ async def agent_workload(
     user: CurrentUser,
     session: DbSession,
     svc: Stats,
+    response: Response,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     queue_id: int | None = None,
@@ -407,6 +435,7 @@ async def agent_workload(
         customer_id,
     )
     items = await _guard(svc.agent_workload(user.id, filters))
+    response.headers.update(_truncation(svc, "agent-workload"))
     return [AgentWorkloadItemOut.from_dataclass(i) for i in items]
 
 
@@ -441,7 +470,10 @@ async def agent_workload_csv(
     return StreamingResponse(
         _csv_stream(["Login", "Name", "OwnedOpen", "ClosedInPeriod"], rows),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="agent-workload.csv"'},
+        headers={
+            **_truncation(svc, "agent-workload.csv"),
+            "Content-Disposition": 'attachment; filename="agent-workload.csv"',
+        },
     )
 
 
@@ -455,6 +487,7 @@ async def backlog_trend(
     user: CurrentUser,
     session: DbSession,
     svc: Stats,
+    response: Response,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
     queue_id: int | None = None,
@@ -478,6 +511,7 @@ async def backlog_trend(
         customer_id,
     )
     points = await _guard(svc.backlog_trend(user.id, filters, granularity))
+    response.headers.update(_truncation(svc, "backlog"))
     return BacklogTrendOut(
         granularity=granularity, points=[BacklogPointOut.from_dataclass(p) for p in points]
     )
@@ -515,5 +549,8 @@ async def backlog_trend_csv(
     return StreamingResponse(
         _csv_stream(["Bucket", "OpenCount"], rows),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="backlog-trend.csv"'},
+        headers={
+            **_truncation(svc, "backlog.csv"),
+            "Content-Disposition": 'attachment; filename="backlog-trend.csv"',
+        },
     )

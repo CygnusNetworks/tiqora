@@ -193,6 +193,32 @@ async def test_every_wrapper_accepts_every_filter(api: Api) -> None:
     assert resp.json()["items"] == []
 
 
+async def test_truncated_results_set_the_header(api: Api, monkeypatch: pytest.MonkeyPatch) -> None:
+    import tiqora.reporting.engine as engine
+    import tiqora.stats.service as service
+
+    async def get_all() -> dict[str, str | None]:
+        out: dict[str, str | None] = {}
+        for route in ROUTES:
+            for suffix in ("", ".csv"):
+                # two owners have open tickets, so an owner snapshot has more than one row
+                params = {"dimension": "owner"} if route == "open-snapshot" else {}
+                resp = await api.client.get(f"/api/v1/stats/{route}{suffix}", params=params)
+                assert resp.status_code == 200, (route, suffix)
+                out[route + suffix] = resp.headers.get("x-tiqora-truncated")
+        return out
+
+    assert set((await get_all()).values()) == {None}, "normal case: no header"
+
+    monkeypatch.setattr(service, "STATS_ROW_CAP", 1)
+    monkeypatch.setattr(engine, "PERCENTILE_SAMPLE_CAP", 1)
+    flagged = await get_all()
+    assert set(flagged.values()) == {"1"}, flagged
+    # the body keeps its shape
+    body = (await api.client.get("/api/v1/stats/volume")).json()
+    assert set(body) == {"granularity", "points"}
+
+
 async def test_used_up_inline_budget_is_504_with_json_message(
     api: Api, monkeypatch: pytest.MonkeyPatch
 ) -> None:
