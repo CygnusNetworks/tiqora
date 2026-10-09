@@ -745,6 +745,23 @@ describe("NewTicketPage compact phone ticket", () => {
     expect(await screen.findByTestId("new-ticket-responsible-panel")).toHaveTextContent("Jana Wolff");
   });
 
+  it("shows the current user's name as owner when the scoped list does not contain them", async () => {
+    fieldOptionsFetch.mockImplementation(async (body: { fields: string[] }) => ({
+      options: { [body.fields[0]]: [{ value: "7", label: "Jana Wolff" }] },
+    }));
+    searchParams.current = { type: "phone" };
+    wrap(<NewTicketPage />);
+    await waitFor(() =>
+      expect(fieldOptionsFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ fields: ["owner"] }),
+        expect.anything(),
+      ),
+    );
+    const value = await screen.findByTestId("new-ticket-owner-value");
+    await waitFor(() => expect(value).not.toHaveTextContent(/select|choose|—/i));
+    expect(value).toHaveTextContent("Agent One");
+  });
+
   it("phone mode has no owner choices before a queue is known", async () => {
     defaultQueue.mockReset().mockReturnValue(new Promise(() => {}));
     suggestedQueue.mockReset().mockReturnValue(new Promise(() => {}));

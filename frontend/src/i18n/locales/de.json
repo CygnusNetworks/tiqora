@@ -383,7 +383,8 @@
       "applyMany": "{{count}} Änderungen anwenden",
       "apply_one": "1 Ticket ändern",
       "apply_other": "{{count}} Tickets ändern",
-      "discard": "Verwerfen"
+      "discard": "Verwerfen",
+      "ownerLimit": "Die Auswahl der Besitzer gilt nur für die ersten {{max}} Tickets."
     },
     "countBadge_one": "1 Ticket",
     "countBadge_other": "{{count}} Tickets",
@@ -2707,8 +2708,8 @@
       "stateLabel": "Status",
       "states": {
         "Active": "Aktiv",
-        "Inactive": "Inaktiv",
-        "FadeAway": "Auslaufend"
+        "Inactive": "Abgeschaltet",
+        "FadeAway": "Läuft aus"
       }
     },
     "mailOutbound": {

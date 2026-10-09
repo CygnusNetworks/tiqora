@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
@@ -531,8 +531,9 @@ export function QueuesPage() {
         },
         signal,
       ),
-    enabled: hasSelection && bulkIds.length > 0,
-    placeholderData: keepPreviousData,
+    // Only while the panel is open; no placeholder data, so owners of an older selection or
+    // move target are never clickable while the new answer is on its way.
+    enabled: hasSelection && panelOpen && bulkIds.length > 0,
   });
   const bulkOptions = bulkOptionsQ.data?.options;
   const allowedIds = (field: string): Set<number> | null =>
@@ -1037,6 +1038,11 @@ export function QueuesPage() {
         <BulkEditPanel
           count={selectedIds.length}
           known={selectedKnown}
+          ownerNotice={
+            selectedIds.length > BULK_OPTIONS_MAX
+              ? t("queue.bulk.ownerLimit", { max: BULK_OPTIONS_MAX })
+              : undefined
+          }
           refs={{
             states: bulkStates,
             priorities: bulkPriorities,

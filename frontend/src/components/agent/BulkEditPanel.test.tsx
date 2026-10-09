@@ -14,7 +14,11 @@ const refs: BulkRefs = {
   queues: [{ value: 9, label: "Sales" }],
 };
 
-function renderPanel(over: Partial<BulkRefs> = {}, draft: BulkDraft = { owner_id: 6, state_id: 4, queue_id: 9 }) {
+function renderPanel(
+  over: Partial<BulkRefs> = {},
+  draft: BulkDraft = { owner_id: 6, state_id: 4, queue_id: 9 },
+  ownerNotice?: string,
+) {
   return render(
     <I18nextProvider i18n={i18n}>
       <BulkEditPanel
@@ -28,6 +32,7 @@ function renderPanel(over: Partial<BulkRefs> = {}, draft: BulkDraft = { owner_id
         onApply={vi.fn()}
         onDiscard={vi.fn()}
         onClose={vi.fn()}
+        ownerNotice={ownerNotice}
       />
     </I18nextProvider>,
   );
@@ -51,5 +56,13 @@ describe("BulkEditPanel pickers", () => {
     fireEvent.click(screen.getByTestId("queue-bulk-owner-select"));
     expect(screen.queryByTestId("queue-bulk-owner-select-menu-option-5")).not.toBeInTheDocument();
     expect(screen.queryByTestId("queue-bulk-owner-select-menu-option-6")).not.toBeInTheDocument();
+  });
+
+  it("shows the owner notice only when one is given", () => {
+    const { unmount } = renderPanel();
+    expect(screen.queryByTestId("queue-bulk-owner-notice")).not.toBeInTheDocument();
+    unmount();
+    renderPanel({}, undefined, "Nur die ersten 500");
+    expect(screen.getByTestId("queue-bulk-owner-notice")).toHaveTextContent("Nur die ersten 500");
   });
 });

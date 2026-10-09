@@ -383,7 +383,8 @@
       "applyMany": "Apply {{count}} changes",
       "apply_one": "Change 1 ticket",
       "apply_other": "Change {{count}} tickets",
-      "discard": "Discard"
+      "discard": "Discard",
+      "ownerLimit": "The owner choice is only checked against the first {{max}} tickets."
     },
     "countBadge_one": "1 bilietas",
     "countBadge_other": "{{count}} bilietai",
@@ -2699,8 +2700,8 @@
       "stateLabel": "State",
       "states": {
         "Active": "Active",
-        "Inactive": "Inactive",
-        "FadeAway": "Fading out"
+        "Inactive": "Switched off",
+        "FadeAway": "Phasing out"
       }
     },
     "mailOutbound": {

@@ -474,6 +474,10 @@ describe("QueuesPage selection", () => {
     await screen.findByTestId("ticket-row-101");
     fireEvent.click(screen.getByTestId("queue-row-check-101"));
     fireEvent.click(screen.getByTestId("queue-row-check-102"));
+    // Nothing is asked while the panel is closed.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fieldOptionsFetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
 
     await waitFor(() =>
       expect(fieldOptionsFetch).toHaveBeenCalledWith(
@@ -506,8 +510,8 @@ describe("QueuesPage selection", () => {
     await screen.findByTestId("ticket-row-101");
     fireEvent.click(screen.getByTestId("queue-row-check-101"));
 
-    await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-mine")).toBeDisabled());
     fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-mine")).toBeDisabled());
     fireEvent.click(await screen.findByTestId("queue-bulk-field-owner"));
     fireEvent.click(await screen.findByTestId("queue-bulk-owner-select"));
     await screen.findByTestId("queue-bulk-owner-select-menu");
@@ -536,6 +540,44 @@ describe("QueuesPage selection", () => {
     );
   });
 
+  it("says the owner check covers only the first 500 tickets when more are selected", async () => {
+    const bigTotal = 600;
+    const firstPage = Array.from({ length: 3 }, (_, i) => makeTicket({ id: 100 + i }));
+    listTickets.mockImplementation(async (params: ListParams = {}) => {
+      if (params.escalating_within != null) return page([]);
+      const offset = params.offset ?? 0;
+      const limit = params.limit ?? 50;
+      if (limit === 50) return page(firstPage, bigTotal);
+      const items = [];
+      for (let i = offset; i < Math.min(offset + limit, bigTotal); i++) items.push(makeTicket({ id: 1000 + i }));
+      return page(items, bigTotal);
+    });
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-100");
+    fireEvent.click(screen.getByTestId("queue-row-check-100"));
+    fireEvent.click(await screen.findByTestId("queue-select-all-matches"));
+    await waitFor(() =>
+      expect(screen.getByTestId("queue-select-all-status").textContent).toMatch(/600/),
+    );
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    await screen.findByTestId("queue-bulk-panel");
+    fireEvent.click(await screen.findByTestId("queue-bulk-quick-mine"));
+    expect(await screen.findByTestId("queue-bulk-owner-notice")).toHaveTextContent("500");
+    await waitFor(() => {
+      const ids = fieldOptionsFetch.mock.calls.at(-1)?.[0].context.ticket_ids as number[];
+      expect(ids).toHaveLength(500);
+    });
+  });
+
+  it("shows no owner notice for a small selection", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-mine"));
+    await screen.findByTestId("queue-bulk-panel");
+    expect(screen.queryByTestId("queue-bulk-owner-notice")).not.toBeInTheDocument();
+  });
+
   it("filters the bulk state and priority pickers by the ACL result", async () => {
     serveFieldOptions({
       state: [
@@ -548,10 +590,10 @@ describe("QueuesPage selection", () => {
     await screen.findByTestId("ticket-row-101");
     fireEvent.click(screen.getByTestId("queue-row-check-101"));
 
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
     // Closing is not allowed by the ACL: the quick action has no state to prefill.
     await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-close")).toBeDisabled());
     expect(screen.getByTestId("queue-bulk-quick-pending")).toBeDisabled();
-    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
     await screen.findByTestId("queue-bulk-priority-3");
     expect(screen.queryByTestId("queue-bulk-priority-4")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("queue-bulk-state-select"));

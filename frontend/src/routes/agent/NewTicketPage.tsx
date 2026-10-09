@@ -843,6 +843,10 @@ export function NewTicketPage() {
                   ? {
                       agents: ownerAgents,
                       value: phoneFields.ownerId ?? user?.id ?? null,
+                      fallbackName:
+                        (phoneFields.ownerId ?? user?.id) === user?.id
+                          ? [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.login
+                          : `#${phoneFields.ownerId}`,
                       onChange: (id) => setPhoneFields((f) => ({ ...f, ownerId: id })),
                       source:
                         search.owner_id !== undefined && phoneFields.ownerId === search.owner_id
