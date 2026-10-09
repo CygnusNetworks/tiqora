@@ -7232,7 +7232,7 @@
             "type": "string"
           },
           "selections": {
-            "description": "JSON: [{\"index\", \"login\", \"photo\", \"fields\"}]",
+            "description": "JSON: [{\"index\", \"login\", \"photo\", \"fields\", \"replace\"}]",
             "title": "Selections",
             "type": "string"
           }
@@ -7250,6 +7250,19 @@
             "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Compare every card with this customer instead of its match (a card dropped on one customer).",
+            "title": "Login"
           }
         },
         "required": [
@@ -26218,6 +26231,37 @@
         "title": "UserUpdate",
         "type": "object"
       },
+      "VCardFieldConflict": {
+        "description": "A field the customer already has with a different value than the card.",
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "field": {
+            "enum": [
+              "first_name",
+              "last_name",
+              "email",
+              "phone",
+              "mobile"
+            ],
+            "title": "Field",
+            "type": "string"
+          },
+          "incoming": {
+            "title": "Incoming",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "current",
+          "incoming"
+        ],
+        "title": "VCardFieldConflict",
+        "type": "object"
+      },
       "VCardImportApplied": {
         "properties": {
           "filled": {
@@ -26234,12 +26278,20 @@
           "photo": {
             "title": "Photo",
             "type": "boolean"
+          },
+          "replaced": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Replaced",
+            "type": "array"
           }
         },
         "required": [
           "login",
           "photo",
-          "filled"
+          "filled",
+          "replaced"
         ],
         "title": "VCardImportApplied",
         "type": "object"
@@ -26262,6 +26314,13 @@
       },
       "VCardImportCard": {
         "properties": {
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/VCardFieldConflict"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -26407,6 +26466,7 @@
           "match_login",
           "match_name",
           "fill_fields",
+          "conflicts",
           "has_existing_avatar"
         ],
         "title": "VCardImportCard",
@@ -58098,7 +58158,7 @@
     },
     "/api/v1/customers/vcard-import/apply": {
       "post": {
-        "description": "Fill blank fields and/or store photos for the selected cards.",
+        "description": "Fill blank fields, replace chosen conflicts and/or store photos per selected card.",
         "operationId": "apply_vcard_import_api_v1_customers_vcard_import_apply_post",
         "parameters": [
           {

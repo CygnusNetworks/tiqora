@@ -5135,7 +5135,7 @@ export interface paths {
         put?: never;
         /**
          * Apply Vcard Import
-         * @description Fill blank fields and/or store photos for the selected cards.
+         * @description Fill blank fields, replace chosen conflicts and/or store photos per selected card.
          */
         post: operations["apply_vcard_import_api_v1_customers_vcard_import_apply_post"];
         delete?: never;
@@ -10358,7 +10358,7 @@ export interface components {
             file: string;
             /**
              * Selections
-             * @description JSON: [{"index", "login", "photo", "fields"}]
+             * @description JSON: [{"index", "login", "photo", "fields", "replace"}]
              */
             selections: string;
         };
@@ -10366,6 +10366,11 @@ export interface components {
         Body_preview_vcard_import_api_v1_customers_vcard_import_preview_post: {
             /** File */
             file: string;
+            /**
+             * Login
+             * @description Compare every card with this customer instead of its match (a card dropped on one customer).
+             */
+            login?: string | null;
         };
         /** Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post */
         Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post: {
@@ -16647,6 +16652,21 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /**
+         * VCardFieldConflict
+         * @description A field the customer already has with a different value than the card.
+         */
+        VCardFieldConflict: {
+            /** Current */
+            current: string;
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "first_name" | "last_name" | "email" | "phone" | "mobile";
+            /** Incoming */
+            incoming: string;
+        };
         /** VCardImportApplied */
         VCardImportApplied: {
             /** Filled */
@@ -16655,6 +16675,8 @@ export interface components {
             login: string;
             /** Photo */
             photo: boolean;
+            /** Replaced */
+            replaced: string[];
         };
         /** VCardImportApplyOut */
         VCardImportApplyOut: {
@@ -16663,6 +16685,8 @@ export interface components {
         };
         /** VCardImportCard */
         VCardImportCard: {
+            /** Conflicts */
+            conflicts: components["schemas"]["VCardFieldConflict"][];
             /** Display Name */
             display_name: string;
             /** Emails */

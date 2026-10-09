@@ -101,12 +101,17 @@ describe("CustomerDetailPage actions", () => {
     listTickets.mockImplementation((params: { state_type?: string }) =>
       Promise.resolve(
         params.state_type === "open"
-          ? { items: [], total: 2, offset: 0, limit: 1 }
-          : {
-              items: [{ id: 42, tn: "2026100710000142", title: "VPN bricht ab", state: "open", age_seconds: 7200 }],
-              total: 1,
+          ? {
+              items: [{ id: 41, tn: "2026100710000141", title: "Drucker offline", state: "open", age_seconds: 600 }],
+              total: 2,
               offset: 0,
-              limit: 8,
+              limit: 15,
+            }
+          : {
+              items: [{ id: 42, tn: "2026100710000142", title: "VPN bricht ab", state: "closed successful", age_seconds: 7200 }],
+              total: 5,
+              offset: 0,
+              limit: 15,
             },
       ),
     );
@@ -116,8 +121,15 @@ describe("CustomerDetailPage actions", () => {
       "/agent/tickets/new",
     );
     expect(screen.getByTestId("customer-phone-ticket-jane.doe")).toBeInTheDocument();
+    // Open tickets first, all of them one click away.
+    expect(await screen.findByTestId("customer-ticket-41")).toHaveTextContent("Drucker offline");
+    expect(screen.queryByTestId("customer-ticket-42")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("customer-ticket-filter-open")).toHaveTextContent(/2$/),
+    );
+    expect(screen.getByTestId("customer-ticket-filter-all")).toHaveTextContent(/5$/);
+    fireEvent.click(screen.getByTestId("customer-ticket-filter-all"));
     expect(await screen.findByTestId("customer-ticket-42")).toHaveTextContent("VPN bricht ab");
-    expect(screen.getByTestId("customer-open-count")).toHaveTextContent(/^2 /);
     expect(listTickets).toHaveBeenCalledWith(
       expect.objectContaining({ customer_user_id: "jane.doe" }),
       expect.anything(),
@@ -126,6 +138,24 @@ describe("CustomerDetailPage actions", () => {
       expect.objectContaining({ customer_id: "CUST1" }),
       expect.anything(),
     );
+  });
+
+  it("shows all tickets when none is open", async () => {
+    listTickets.mockImplementation((params: { state_type?: string }) =>
+      Promise.resolve(
+        params.state_type === "open"
+          ? { items: [], total: 0, offset: 0, limit: 15 }
+          : {
+              items: [{ id: 43, tn: "2026100710000143", title: "Rechnung erklärt", state: "closed successful", age_seconds: 90000 }],
+              total: 1,
+              offset: 0,
+              limit: 15,
+            },
+      ),
+    );
+    renderPage();
+    expect(await screen.findByTestId("customer-ticket-43")).toHaveTextContent("Rechnung erklärt");
+    expect(screen.getByTestId("customer-ticket-filter-all")).toHaveAttribute("aria-checked", "true");
   });
 
   it("stars and unstars the customer for the agent", async () => {

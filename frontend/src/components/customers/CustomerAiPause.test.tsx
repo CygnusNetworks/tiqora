@@ -34,9 +34,8 @@ describe("CustomerAiPause", () => {
     set.mockResolvedValue({ ...off, active: true });
     wrap(<CustomerAiPause scope="user" customerKey="anna" canEdit />);
 
-    fireEvent.change(await screen.findByTestId("customer-ai-pause-days"), {
-      target: { value: "30" },
-    });
+    fireEvent.click(await screen.findByTestId("customer-ai-pause-switch"));
+    fireEvent.click(screen.getByTestId("customer-ai-pause-days-30"));
     fireEvent.change(screen.getByTestId("customer-ai-pause-reason"), {
       target: { value: "Streit" },
     });
@@ -54,7 +53,7 @@ describe("CustomerAiPause", () => {
     expect(await screen.findByTestId("customer-ai-pause-state")).toHaveTextContent(
       "Switched off until lifted.",
     );
-    fireEvent.click(screen.getByTestId("customer-ai-pause-lift"));
+    fireEvent.click(screen.getByTestId("customer-ai-pause-switch"));
     await waitFor(() => expect(lift).toHaveBeenCalledWith("company", "ACME"));
   });
 

@@ -154,7 +154,7 @@ describe("AutopilotSwitch", () => {
 
     fireEvent.click(await screen.findByTestId("autopilot-switch"));
     fireEvent.click(await screen.findByTestId("autopilot-scope-user"));
-    fireEvent.change(screen.getByTestId("autopilot-stop-days"), { target: { value: "30" } });
+    fireEvent.click(screen.getByTestId("autopilot-stop-days-30"));
     fireEvent.click(screen.getByTestId("autopilot-stop"));
     await waitFor(() =>
       expect(customerPause).toHaveBeenCalledWith(7, { scope: "user", days: 30 }),

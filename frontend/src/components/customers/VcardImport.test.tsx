@@ -32,6 +32,7 @@ const card = (overrides: Partial<VCardPreviewCard>): VCardPreviewCard => ({
   match_login: "ibrenner",
   match_name: "Ilka Brenner",
   fill_fields: ["phone"],
+  conflicts: [],
   has_existing_avatar: false,
   ...overrides,
 });
@@ -50,7 +51,9 @@ function wrap(ui: React.ReactNode) {
 beforeEach(() => {
   void i18n.changeLanguage("de");
   previewVcards.mockReset();
-  applyVcards.mockReset().mockResolvedValue({ applied: [{ login: "ibrenner", photo: true, filled: ["phone"] }] });
+  applyVcards.mockReset().mockResolvedValue({
+    applied: [{ login: "ibrenner", photo: true, filled: ["phone"], replaced: [] }],
+  });
 });
 
 describe("VcardImportDialog", () => {
@@ -67,9 +70,34 @@ describe("VcardImportDialog", () => {
 
     await waitFor(() => expect(applyVcards).toHaveBeenCalledOnce());
     expect(applyVcards).toHaveBeenCalledWith(file, [
-      { index: 0, login: "ibrenner", photo: false, fields: true },
+      { index: 0, login: "ibrenner", photo: false, fields: true, replace: [] },
     ]);
     expect(await screen.findByTestId("vcard-import-result")).toHaveTextContent("1 Kunde aktualisiert.");
+  });
+
+  it("replaces differing fields only when their box is ticked", async () => {
+    previewVcards.mockResolvedValue({
+      cards: [
+        card({
+          has_photo: false,
+          fill_fields: [],
+          conflicts: [{ field: "phone", current: "+49 30 9999", incoming: "+49 30 1234" }],
+        }),
+      ],
+      truncated: false,
+    });
+    wrap(<VcardImportDialog file={file} onClose={vi.fn()} onCreate={vi.fn()} />);
+
+    expect(await screen.findByTestId("vcard-card-0")).toHaveTextContent("+49 30 9999");
+    // Opt-in: nothing selected yet.
+    expect(screen.getByTestId("vcard-import-apply")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("vcard-card-0-replace"));
+    fireEvent.click(screen.getByTestId("vcard-import-apply"));
+    await waitFor(() =>
+      expect(applyVcards).toHaveBeenCalledWith(file, [
+        { index: 0, login: "ibrenner", photo: false, fields: false, replace: ["phone"] },
+      ]),
+    );
   });
 
   it("offers unmatched cards to the create form, prefilled", async () => {
@@ -104,7 +132,11 @@ describe("VcardApplyDialog", () => {
   } as unknown as CustomerUserOut;
 
   it("fills only the customer's blank fields and takes the photo", async () => {
-    previewVcards.mockResolvedValue({ cards: [card({ mobile: "+49 170 1" })], truncated: false });
+    // The preview is asked for this customer, so it lists their blank fields.
+    previewVcards.mockResolvedValue({
+      cards: [card({ mobile: "+49 170 1", fill_fields: ["phone", "mobile"] })],
+      truncated: false,
+    });
     const onApplied = vi.fn();
     wrap(<VcardApplyDialog file={file} customer={customer} onClose={vi.fn()} onApplied={onApplied} />);
 
@@ -115,8 +147,40 @@ describe("VcardApplyDialog", () => {
 
     fireEvent.click(screen.getByTestId("vcard-apply-confirm"));
     await waitFor(() => expect(onApplied).toHaveBeenCalledWith(true));
+    expect(previewVcards).toHaveBeenCalledWith(file, "ibrenner");
     expect(applyVcards).toHaveBeenCalledWith(file, [
-      { index: 0, login: "ibrenner", photo: true, fields: true },
+      { index: 0, login: "ibrenner", photo: true, fields: true, replace: [] },
+    ]);
+  });
+
+  it("keeps differing fields unless the card's value is picked", async () => {
+    previewVcards.mockResolvedValue({
+      cards: [
+        card({
+          has_photo: false,
+          fill_fields: [],
+          conflicts: [
+            { field: "last_name", current: "Brenner", incoming: "Brenner-Wolf" },
+            { field: "phone", current: "+49 30 9999", incoming: "+49 30 1234" },
+          ],
+        }),
+      ],
+      truncated: false,
+    });
+    const onApplied = vi.fn();
+    wrap(<VcardApplyDialog file={file} customer={customer} onClose={vi.fn()} onApplied={onApplied} />);
+
+    const conflicts = await screen.findByTestId("vcard-conflicts");
+    expect(conflicts).toHaveTextContent("2 Felder weichen ab");
+    expect(screen.getByTestId("vcard-conflict-phone-keep")).toHaveAttribute("aria-checked", "true");
+    // Nothing to do until a card value is picked.
+    expect(screen.getByTestId("vcard-apply-confirm")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("vcard-conflict-last_name-take"));
+    fireEvent.click(screen.getByTestId("vcard-apply-confirm"));
+    await waitFor(() => expect(onApplied).toHaveBeenCalledWith(false));
+    expect(applyVcards).toHaveBeenCalledWith(file, [
+      { index: 0, login: "ibrenner", photo: false, fields: false, replace: ["last_name"] },
     ]);
   });
 

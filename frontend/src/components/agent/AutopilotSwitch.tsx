@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Popover } from "@/components/ui/Popover";
 import { usePopoverClose } from "@/components/ui/popoverContext";
 import { Spinner } from "@/components/ui/Spinner";
+import { DEFAULT_PAUSE_DAYS, PauseDurationPicker } from "@/components/customers/CustomerAiPause";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -19,9 +20,6 @@ const DEFAULT_RUNS = 3;
 
 /** What stopping the autopilot applies to. */
 type StopScope = "ticket" | "user" | "company";
-/** Durations for a customer-wide stop; `null` = until lifted. */
-const PAUSE_DAY_CHOICES: (number | null)[] = [1, 3, 7, 14, 30, null];
-const DEFAULT_PAUSE_DAYS = 7;
 
 const KNOWN_REASONS = new Set([
   "max_clarifications",
@@ -221,23 +219,11 @@ function AutopilotPanel({ ticketId, auto }: { ticketId: number; auto: AiAutopilo
                 </label>
               ))}
               {stopScope !== "ticket" && (
-                <select
-                  value={stopDays === null ? "forever" : String(stopDays)}
-                  onChange={(e) =>
-                    setStopDays(e.target.value === "forever" ? null : Number(e.target.value))
-                  }
-                  aria-label={t("customerAiPause.duration")}
-                  data-testid="autopilot-stop-days"
-                  className="h-8 w-full rounded-md border border-hairline bg-surface px-2 text-sm text-ink"
-                >
-                  {PAUSE_DAY_CHOICES.map((d) => (
-                    <option key={d ?? "forever"} value={d === null ? "forever" : String(d)}>
-                      {d === null
-                        ? t("customerAiPause.untilLifted")
-                        : t("customerAiPause.days", { count: d })}
-                    </option>
-                  ))}
-                </select>
+                <PauseDurationPicker
+                  value={stopDays}
+                  onChange={setStopDays}
+                  testId="autopilot-stop-days"
+                />
               )}
             </div>
           )}

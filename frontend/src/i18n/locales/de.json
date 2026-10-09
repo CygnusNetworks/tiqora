@@ -4181,7 +4181,17 @@
     "favorites": "Favoriten",
     "favorite": "Favorit",
     "favoriteAdd": "Zu Favoriten hinzufügen",
-    "favoriteRemove": "Aus Favoriten entfernen"
+    "favoriteRemove": "Aus Favoriten entfernen",
+    "vcardDrag": "Klicken zum Herunterladen – oder auf den Schreibtisch bzw. in Kontakte ziehen",
+    "filterOpen": "Offen {{n}}",
+    "filterAll": "Alle {{n}}",
+    "ticketFilter": "Tickets zeigen",
+    "noOpenTickets": "Keine offenen Tickets.",
+    "details": "Kundendetails",
+    "contactSection": "Kontakt",
+    "phone": "Telefon",
+    "mobile": "Mobil",
+    "vcardTileHint": "Ziehen oder klicken"
   },
   "customerPicker": {
     "title": "Kunde des Tickets",
@@ -4221,7 +4231,7 @@
     "import": "vCards importieren",
     "importHint": "Fotos und fehlende Kontaktdaten aus einer .vcf-Datei übernehmen – oder Kontakte aus Apple Kontakte auf diese Seite ziehen.",
     "importTitle": "vCards importieren",
-    "importDescription": "Jede Karte wird über ihre E-Mail-Adressen einem Kunden zugeordnet. Übernommen werden nur das Foto und leere Felder.",
+    "importDescription": "Jede Karte wird über ihre E-Mail-Adressen einem Kunden zugeordnet. Foto und leere Felder werden übernommen, abweichende Daten nur, wenn du sie auswählst.",
     "dropHere": "vCard-Datei zum Importieren ablegen",
     "wrongFile": "Das ist keine vCard-Datei (.vcf).",
     "applyTitle": "Aus vCard übernehmen",
@@ -4251,7 +4261,17 @@
       "email": "E-Mail",
       "phone": "Telefon",
       "mobile": "Mobil"
-    }
+    },
+    "noCardInDrag": "Der Browser hat keinen Kontakt mitgeliefert (angekommen: {{types}}). Zieh den Kontakt zuerst aus Kontakte auf den Schreibtisch und die .vcf-Datei dann hierher.",
+    "dropEmptyHint": "Kontakte aus Apple Kontakte oder .vcf-Dateien hierher ziehen, um Fotos und Kontaktdaten zu übernehmen.",
+    "conflictsTitle_one": "1 Feld weicht ab",
+    "conflictsTitle_other": "{{count}} Felder weichen ab",
+    "keepAll": "Alle behalten",
+    "takeAll": "Alle aus der vCard",
+    "keepCurrent": "Behalten",
+    "takeIncoming": "Aus der vCard",
+    "replaceList_one": "1 abweichendes Feld ersetzen",
+    "replaceList_other": "{{count}} abweichende Felder ersetzen"
   },
   "customerAiPause": {
     "title": "KI-Automatik",
@@ -4268,6 +4288,11 @@
     "reason": "Grund",
     "reasonPlaceholder": "Grund (optional)",
     "hint": "Stoppt Auto-Antwort, Triage und Auto-Zusammenfassung für alle Tickets dieses Kunden. Der manuelle Assistent bleibt verfügbar.",
-    "error": "Die Änderung konnte nicht gespeichert werden."
+    "error": "Die Änderung konnte nicht gespeichert werden.",
+    "durationDays": "Dauer in Tagen",
+    "switchLabel": "KI-Automatik für diesen Kunden",
+    "pauseForDays_one": "{{count}} Tag abschalten",
+    "pauseForDays_other": "{{count}} Tage abschalten",
+    "pauseForever": "Bis zur Aufhebung abschalten"
   }
 }

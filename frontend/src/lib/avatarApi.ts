@@ -26,17 +26,30 @@ export type VCardPreviewCard = {
   /** Customer matched by any of the card's addresses. */
   match_login: string | null;
   match_name: string | null;
-  /** Blank fields on the match the card would fill. */
+  /** Blank fields on the target (match, or the `login` asked for) the card would fill. */
   fill_fields: string[];
+  /** Fields the target has with another value than the card. */
+  conflicts: VCardConflict[];
   has_existing_avatar: boolean;
 };
 
+export type VCardField = "first_name" | "last_name" | "email" | "phone" | "mobile";
+
+export type VCardConflict = { field: VCardField; current: string; incoming: string };
+
 export type VCardImportPreview = { cards: VCardPreviewCard[]; truncated: boolean };
 
-export type VCardSelection = { index: number; login: string; photo: boolean; fields: boolean };
+export type VCardSelection = {
+  index: number;
+  login: string;
+  photo: boolean;
+  fields: boolean;
+  /** Conflicting fields to overwrite with the card's value. */
+  replace?: VCardField[];
+};
 
 export type VCardImportApplyOut = {
-  applied: { login: string; photo: boolean; filled: string[] }[];
+  applied: { login: string; photo: boolean; filled: string[]; replaced: string[] }[];
 };
 
 export type AvatarSettings = { gravatar_enabled: boolean; favicon_enabled: boolean };
@@ -71,9 +84,12 @@ export const avatarApi = {
       `/api/v1/customers/companies/${encodeURIComponent(customerId)}/logo`,
     );
   },
-  previewVcards(file: File) {
+  /** `login`: compare every card with that customer instead of its address match. */
+  previewVcards(file: File, login?: string) {
+    const form = fileForm(file);
+    if (login) form.append("login", login);
     return api.request<VCardImportPreview>("POST", "/api/v1/customers/vcard-import/preview", {
-      body: fileForm(file),
+      body: form,
     });
   },
   applyVcards(file: File, selections: VCardSelection[]) {

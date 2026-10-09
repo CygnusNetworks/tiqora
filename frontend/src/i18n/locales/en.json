@@ -4181,7 +4181,17 @@
     "favorites": "Favorites",
     "favorite": "Favorite",
     "favoriteAdd": "Add to favorites",
-    "favoriteRemove": "Remove from favorites"
+    "favoriteRemove": "Remove from favorites",
+    "vcardDrag": "Click to download — or drag it to the desktop or into Contacts",
+    "filterOpen": "Open {{n}}",
+    "filterAll": "All {{n}}",
+    "ticketFilter": "Show tickets",
+    "noOpenTickets": "No open tickets.",
+    "details": "Customer details",
+    "contactSection": "Contact",
+    "phone": "Phone",
+    "mobile": "Mobile",
+    "vcardTileHint": "Drag or click"
   },
   "customerPicker": {
     "title": "Ticket customer",
@@ -4221,7 +4231,7 @@
     "import": "Import vCards",
     "importHint": "Take photos and missing contact details from a .vcf file — or drag contacts from Apple Contacts onto this page.",
     "importTitle": "Import vCards",
-    "importDescription": "Each card is matched to a customer by its e-mail addresses. Only the photo and empty fields are taken over.",
+    "importDescription": "Each card is matched to a customer through its e-mail addresses. The photo and empty fields are taken over; differing data only when you tick it.",
     "dropHere": "Drop a vCard file to import it",
     "wrongFile": "That is not a vCard file (.vcf).",
     "applyTitle": "Update from vCard",
@@ -4251,7 +4261,17 @@
       "email": "E-mail",
       "phone": "Phone",
       "mobile": "Mobile"
-    }
+    },
+    "noCardInDrag": "The browser handed over no contact (received: {{types}}). Drag the contact from Contacts to the desktop first, then drop the .vcf file here.",
+    "dropEmptyHint": "Drag contacts from Apple Contacts or .vcf files here to take over photos and contact data.",
+    "conflictsTitle_one": "1 field differs",
+    "conflictsTitle_other": "{{count}} fields differ",
+    "keepAll": "Keep all",
+    "takeAll": "Take all from the card",
+    "keepCurrent": "Keep",
+    "takeIncoming": "From the card",
+    "replaceList_one": "Replace 1 differing field",
+    "replaceList_other": "Replace {{count}} differing fields"
   },
   "customerAiPause": {
     "title": "AI automation",
@@ -4268,6 +4288,11 @@
     "reason": "Reason",
     "reasonPlaceholder": "Reason (optional)",
     "hint": "Stops auto-reply, triage and auto-summary for all tickets of this customer. Manual Assist stays available.",
-    "error": "Could not save the change."
+    "error": "Could not save the change.",
+    "durationDays": "Duration in days",
+    "switchLabel": "AI automation for this customer",
+    "pauseForDays_one": "Switch off for {{count}} day",
+    "pauseForDays_other": "Switch off for {{count}} days",
+    "pauseForever": "Switch off until lifted"
   }
 }
