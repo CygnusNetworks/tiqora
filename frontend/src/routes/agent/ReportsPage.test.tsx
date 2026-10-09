@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
 import i18n from "@/i18n";
-import { DEMO_REPORT_CATALOGUE, resolveReportRun } from "@/demo/reportsMock";
+import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoSources, resolveReportRun } from "@/demo/reportsMock";
+import { ApiError } from "@/lib/api";
 import { dateRangeForPreset } from "@/lib/dateRanges";
 import { reportsApi, type ReportRunIn } from "@/lib/reportsApi";
 import { ReportsPage } from "./ReportsPage";
@@ -42,7 +43,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/reportsApi", async (orig) => ({
   ...(await orig<typeof import("@/lib/reportsApi")>()),
-  reportsApi: { catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn() },
+  reportsApi: { catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn(), sources: vi.fn(), factsStatus: vi.fn() },
 }));
 
 vi.mock("@/lib/api", async (orig) => ({
@@ -80,6 +81,8 @@ beforeEach(() => {
   vi.mocked(reportsApi.run)
     .mockReset()
     .mockImplementation(async (body) => resolveReportRun(body));
+  vi.mocked(reportsApi.sources).mockReset().mockResolvedValue(demoSources());
+  vi.mocked(reportsApi.factsStatus).mockReset().mockResolvedValue(DEMO_FACTS);
 });
 
 describe("ReportsPage", () => {
@@ -88,9 +91,40 @@ describe("ReportsPage", () => {
       ...DEMO_REPORT_CATALOGUE,
       facts: { ready: false, as_of: null, backfill_status: "running", backfill_job_id: 77, backfill_progress: 0.42 },
     });
+    vi.mocked(reportsApi.factsStatus).mockResolvedValue({
+      ready: false, as_of: null, backfill_status: "running", backfill_job_id: 77, backfill_progress: 0.42,
+    });
     renderPage();
     const banner = await screen.findByTestId("reports-facts-banner");
     expect(banner).toHaveTextContent("Die Berichtsdaten werden aufgebaut (42 %)");
+  });
+
+  it("re-reads the build progress for agents and drops the banner once it is done", async () => {
+    vi.mocked(reportsApi.catalogue).mockResolvedValue({
+      ...DEMO_REPORT_CATALOGUE,
+      facts: { ready: false, as_of: null, backfill_status: "running", backfill_job_id: 77, backfill_progress: 0.42 },
+    });
+    vi.mocked(reportsApi.factsStatus).mockResolvedValueOnce({
+      ready: false, as_of: null, backfill_status: "running", backfill_job_id: 77, backfill_progress: 0.6,
+    });
+    renderPage();
+    // the polled status replaces the catalogue's (stale) 42 %
+    await waitFor(() => expect(screen.getByTestId("reports-facts-banner")).toHaveTextContent("(60 %)"));
+    expect(reportsApi.factsStatus).toHaveBeenCalled();
+  });
+
+  it("hides the banner when the polled status says the data is ready", async () => {
+    vi.mocked(reportsApi.catalogue)
+      .mockResolvedValueOnce({
+        ...DEMO_REPORT_CATALOGUE,
+        facts: { ready: false, as_of: null, backfill_status: "running", backfill_job_id: 77, backfill_progress: 0.9 },
+      })
+      .mockResolvedValue(DEMO_REPORT_CATALOGUE);
+    renderPage();
+    await waitFor(() => expect(reportsApi.factsStatus).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByTestId("reports-facts-banner")).not.toBeInTheDocument());
+    // finished: the catalogue is loaded again with complete numbers
+    await waitFor(() => expect(vi.mocked(reportsApi.catalogue).mock.calls.length).toBeGreaterThan(1));
   });
 
   it("shows no facts banner once the data is ready", async () => {
@@ -147,7 +181,7 @@ describe("ReportsPage", () => {
     const table = await screen.findByTestId("stats-workload-table");
     await waitFor(() => expect(table).toHaveTextContent("Anna Beispiel"));
     expect(within(table).getAllByRole("columnheader").map((c) => c.textContent)).toEqual([
-      "Mitarbeiter",
+      "Agent",
       "Offen",
       "Antworten",
       "Notizen",
@@ -185,18 +219,74 @@ describe("ReportsPage", () => {
     const section = await screen.findByTestId("stats-chart-open-snapshot");
     await waitFor(() => expect(section).toHaveTextContent("Support"));
     expect(screen.getByRole("tab", { name: "Queue" })).toHaveAttribute("aria-selected", "true");
+    const stateRuns = () =>
+      runCalls().filter((b) => b.report_key === "builtin.open_now" && b.dimension_choices?.["0"] === "state");
+    // before any click nothing asks for the split by state, and the chart shows queues, not agents
+    expect(stateRuns()).toHaveLength(0);
+    expect(screen.getByTestId("stats-chart-open-snapshot-chart")).not.toHaveTextContent("Anna Beispiel");
 
     fireEvent.click(screen.getByRole("tab", { name: "Status" }));
+    await waitFor(() => expect(stateRuns()).toHaveLength(1));
+    expect(screen.getByRole("tab", { name: "Status" })).toHaveAttribute("aria-selected", "true");
+
+    // owner: same request as the agent table (answered from the cache), so check the chart itself
+    fireEvent.click(screen.getByRole("tab", { name: "Besitzer" }));
+    expect(screen.getByRole("tab", { name: "Besitzer" })).toHaveAttribute("aria-selected", "true");
     await waitFor(() =>
-      expect(runCalls()).toContainEqual(
-        expect.objectContaining({ report_key: "builtin.open_now", dimension_choices: { "0": "state" } }),
-      ),
+      expect(screen.getByTestId("stats-chart-open-snapshot-chart")).toHaveTextContent("Anna Beispiel"),
     );
-    fireEvent.click(screen.getByRole("tab", { name: "Bearbeiter" }));
-    expect(screen.getByRole("tab", { name: "Bearbeiter" })).toHaveAttribute("aria-selected", "true");
-    expect(runCalls()).toContainEqual(
-      expect.objectContaining({ report_key: "builtin.open_now", dimension_choices: { "0": "owner" } }),
+    expect(screen.getByTestId("stats-chart-open-snapshot-chart")).not.toHaveTextContent("Support");
+  });
+
+  it("shows the server's message when a card's run is refused (429), not a spinner", async () => {
+    const msg = "Es laufen schon drei Berichte für Sie. Bitte warten Sie, bis einer fertig ist.";
+    vi.mocked(reportsApi.run).mockImplementation(async (body) => {
+      if (body.report_key === "builtin.volume") {
+        throw new ApiError(429, { detail: { message: msg } }, "/api/v1/reports/run");
+      }
+      return resolveReportRun(body);
+    });
+    renderPage();
+    expect(await screen.findByTestId("stats-chart-volume-error")).toHaveTextContent(msg);
+    expect(screen.queryByTestId("stats-chart-volume-loading")).not.toBeInTheDocument();
+    // the other cards are unaffected
+    expect(await screen.findByTestId("stats-chart-backlog-chart")).toBeInTheDocument();
+  });
+
+  it("opens a trend chart in the viewer with the overview's range, queues and buckets", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByTestId("stats-preset-last7Days"));
+    const link = await screen.findByTestId("stats-chart-volume-open");
+    expect(link.getAttribute("href")).toBe("/agent/reports/builtin.volume?preset=last7Days&grain=day");
+    // "open now" has no date buckets
+    expect(screen.getByTestId("stats-chart-open-snapshot-open").getAttribute("href")).toBe(
+      "/agent/reports/builtin.open_now",
     );
-    await waitFor(() => expect(screen.getByTestId("stats-chart-open-snapshot")).toHaveTextContent("Anna Beispiel"));
+  });
+
+  it("does not run anything for a start date after the end date", async () => {
+    renderPage();
+    await screen.findByTestId("stats-chart-volume-chart");
+    const before = runCalls().length;
+    fireEvent.change(screen.getByTestId("reports-filter-from"), { target: { value: "2026-09-20" } });
+    fireEvent.change(screen.getByTestId("reports-filter-to"), { target: { value: "2026-09-10" } });
+    expect(await screen.findByTestId("reports-filter-range-error")).toHaveTextContent(
+      "Das Startdatum liegt nach dem Enddatum",
+    );
+    const after = runCalls().slice(before);
+    expect(after.some((b) => b.time_range?.kind === "absolute" && b.time_range.start === "2026-09-20" && b.time_range.end === "2026-09-10")).toBe(false);
+  });
+
+  it("formats the agent table numbers", async () => {
+    vi.mocked(reportsApi.run).mockImplementation(async (body) => {
+      const out = resolveReportRun(body);
+      if (body.report_key === "builtin.agent_activity" && out.result) {
+        out.result = { ...out.result, rows: [["2", "reply", 1234]], labels: { actor: { "2": "Anna Beispiel" } } };
+      }
+      return out;
+    });
+    renderPage();
+    const row = await screen.findByTestId("stats-workload-row-2");
+    await waitFor(() => expect(row).toHaveTextContent("1.234"));
   });
 });

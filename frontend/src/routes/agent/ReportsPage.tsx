@@ -4,9 +4,9 @@ import { Link, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { FactsBanner } from "@/components/reports/FactsBanner";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
-import { filterRange, toRunIn, type ReportFilterState } from "@/components/reports/reportFilter";
+import { filterRange, rangeInvalid, toRunIn, type ReportFilterState } from "@/components/reports/reportFilter";
 import { ReportView } from "@/components/reports/ReportView";
-import { cellLabel, OTHER_KEY, toSeries } from "@/components/reports/reportFormat";
+import { cellLabel, formatMeasure, OTHER_KEY, toSeries } from "@/components/reports/reportFormat";
 import { useReportRun } from "@/components/reports/useReportRun";
 import { Spinner } from "@/components/ui/Spinner";
 import { Tabs } from "@/components/ui/Tabs";
@@ -60,8 +60,12 @@ function initialFilter(): ReportFilterState {
 }
 
 /** Runs one overview report once its definition is known (body kept stable by value). */
-function useOverviewRun(report: BuiltinReport | undefined, make: (r: BuiltinReport) => ReportRunIn) {
-  const raw = report ? make(report) : null;
+function useOverviewRun(
+  report: BuiltinReport | undefined,
+  make: (r: BuiltinReport) => ReportRunIn,
+  blocked: boolean,
+) {
+  const raw = report && !blocked ? make(report) : null;
   const key = JSON.stringify(raw);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the body changes exactly when its JSON does
   const body = useMemo(() => raw, [key]);
@@ -75,9 +79,12 @@ function OverviewCard({
   testId,
   search,
   actions,
+  blocked = false,
   children,
 }: {
   report: BuiltinReport | undefined;
+  /** The chosen range is invalid: nothing runs. */
+  blocked?: boolean;
   title?: string;
   run: ReturnType<typeof useReportRun>;
   testId: string;
@@ -104,7 +111,9 @@ function OverviewCard({
         </div>
         {actions}
       </div>
-      {run.error ? (
+      {blocked ? (
+        <p className="py-6 text-center text-sm text-muted">{t("reports.rangeInvalid")}</p>
+      ) : run.error ? (
         <p className="text-sm text-danger" role="alert" data-testid={`${testId}-error`}>
           {reportErrorMessage(run.error, t("reports.error"))}
         </p>
@@ -115,8 +124,11 @@ function OverviewCard({
           <ReportView report={{ key: report.key, definition: report.definition }} result={run.result} testId={testId} compact />
         )
       ) : (
-        <div className="flex min-h-[8rem] items-center justify-center" aria-label={t("reports.loading")}>
+        <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2" data-testid={`${testId}-loading`}>
           <Spinner />
+          <span className="text-xs text-muted">
+            {run.jobId != null ? t("reports.runningInBackground") : t("reports.loading")}
+          </span>
         </div>
       )}
     </section>
@@ -165,7 +177,8 @@ function agentRows(owned: ReportResult | undefined, activity: ReportResult | und
 
 /** `/agent/reports`: the overview (key figures, trends, open tickets, agents) and the report catalogue. */
 export function ReportsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.resolvedLanguage ?? i18n.language ?? "de";
   const search = useSearch({ from: "/agent/reports" }) as ReportsSearch;
   const [filter, setFilter] = useState<ReportFilterState>(initialFilter);
   const [openTab, setOpenTab] = useState<OpenNowTab>("queue");
@@ -176,17 +189,23 @@ export function ReportsPage() {
   });
   const reports = useMemo(() => catalogueQ.data?.reports ?? [], [catalogueQ.data]);
   const byKey = useMemo(() => new Map(reports.map((r) => [r.key, r])), [reports]);
+  const blocked = rangeInvalid(filter);
   const grain = overviewGrain(filter);
   const viewSearch = searchFromFilter(filter);
+  // "Bericht öffnen" on a trend chart opens it with the buckets the overview shows.
+  const trendSearch = { ...viewSearch, grain: grain ?? undefined };
 
-  const kpis = useOverviewRun(byKey.get(KPIS), (r) => ({ ...toRunIn(r.key, filter, r.definition), compare_previous: true }));
-  const volume = useOverviewRun(byKey.get(VOLUME), (r) => toRunIn(r.key, { ...filter, grain }, r.definition));
-  const backlog = useOverviewRun(byKey.get(BACKLOG), (r) => toRunIn(r.key, { ...filter, grain }, r.definition));
-  const openNow = useOverviewRun(byKey.get(OPEN_NOW), (r) =>
-    toRunIn(r.key, { ...filter, choice: openTab === "queue" ? null : openTab }, r.definition),
+  const kpis = useOverviewRun(byKey.get(KPIS), (r) => ({ ...toRunIn(r.key, filter, r.definition), compare_previous: true }), blocked);
+  const volume = useOverviewRun(byKey.get(VOLUME), (r) => toRunIn(r.key, { ...filter, grain }, r.definition), blocked);
+  const backlog = useOverviewRun(byKey.get(BACKLOG), (r) => toRunIn(r.key, { ...filter, grain }, r.definition), blocked);
+  const openNow = useOverviewRun(
+    byKey.get(OPEN_NOW),
+    (r) => toRunIn(r.key, { ...filter, choice: openTab === "queue" ? null : openTab }, r.definition),
+    // "open now" ignores the date range, so a wrong range does not stop it
+    false,
   );
-  const owned = useOverviewRun(byKey.get(OPEN_NOW), (r) => toRunIn(r.key, { ...filter, choice: "owner" }, r.definition));
-  const activity = useOverviewRun(byKey.get(ACTIVITY), (r) => toRunIn(r.key, filter, r.definition));
+  const owned = useOverviewRun(byKey.get(OPEN_NOW), (r) => toRunIn(r.key, { ...filter, choice: "owner" }, r.definition), false);
+  const activity = useOverviewRun(byKey.get(ACTIVITY), (r) => toRunIn(r.key, filter, r.definition), blocked);
 
   const sparklines = useMemo(() => {
     const def = byKey.get(VOLUME)?.definition;
@@ -233,7 +252,7 @@ export function ReportsPage() {
 
             {kpiReport && (
               <div>
-                {kpis.error ? (
+                {blocked ? null : kpis.error ? (
                   <p className="text-sm text-danger" role="alert">
                     {reportErrorMessage(kpis.error, t("reports.error"))}
                   </p>
@@ -253,8 +272,8 @@ export function ReportsPage() {
             )}
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <OverviewCard report={byKey.get(VOLUME)} run={volume} testId="stats-chart-volume" search={viewSearch} />
-              <OverviewCard report={byKey.get(BACKLOG)} run={backlog} testId="stats-chart-backlog" search={viewSearch} />
+              <OverviewCard report={byKey.get(VOLUME)} run={volume} testId="stats-chart-volume" search={trendSearch} blocked={blocked} />
+              <OverviewCard report={byKey.get(BACKLOG)} run={backlog} testId="stats-chart-backlog" search={trendSearch} blocked={blocked} />
             </div>
 
             <OverviewCard
@@ -277,6 +296,7 @@ export function ReportsPage() {
               run={owned.error ? owned : activity}
               testId="stats-workload"
               search={viewSearch}
+              blocked={blocked}
             >
               {() =>
                 agents.length === 0 ? (
@@ -308,7 +328,7 @@ export function ReportsPage() {
                             </th>
                             {[a.open, a.reply, a.note, a.close].map((v, i) => (
                               <td key={i} className="border-b border-hairline px-3 py-1.5 text-right font-mono tabular-nums text-ink">
-                                {v ?? "—"}
+                                {formatMeasure(v, "count", lang)}
                               </td>
                             ))}
                           </tr>

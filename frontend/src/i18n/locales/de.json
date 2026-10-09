@@ -4946,7 +4946,7 @@
       "backlog": "Bestand",
       "sla": "SLA",
       "quality": "Qualität",
-      "agents": "Mitarbeiter",
+      "agents": "Agenten",
       "time": "Zeitbuchungen",
       "customers": "Kunden",
       "patterns": "Muster"
@@ -4966,11 +4966,11 @@
       },
       "open_now": {
         "title": "Offene Tickets jetzt",
-        "description": "Alle gerade offenen Tickets, standardmäßig je Queue. Wahlweise lassen sie sich statt nach Queue nach Status, Priorität, Bearbeiter, Typ oder Service gruppieren."
+        "description": "Alle gerade offenen Tickets, standardmäßig je Queue. Wahlweise lassen sie sich statt nach Queue nach Status, Priorität, Besitzer, Typ oder Service gruppieren."
       },
       "agent_activity": {
-        "title": "Aktivität der Mitarbeiter",
-        "description": "Antworten, Notizen und Schließungen je Mitarbeiter in den letzten 30 Tagen (einschließlich heute)."
+        "title": "Aktivität der Agenten",
+        "description": "Antworten, Notizen und Schließungen je Agent in den letzten 30 Tagen (einschließlich heute)."
       },
       "volume_by_channel": {
         "title": "Tickets nach Kanal",
@@ -5033,16 +5033,16 @@
         "description": "Die auf Tickets gebuchte Zeit pro Queue im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
       },
       "time_by_agent": {
-        "title": "Gebuchte Zeit je Mitarbeiter",
-        "description": "Die von jedem Mitarbeiter gebuchte Zeit im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
+        "title": "Gebuchte Zeit je Agent",
+        "description": "Die von jedem Agenten gebuchte Zeit im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
       },
       "time_by_type": {
         "title": "Gebuchte Zeit je Typ",
         "description": "Die auf Tickets gebuchte Zeit pro Tickettyp im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
       },
       "time_by_agent_month": {
-        "title": "Gebuchte Zeit je Mitarbeiter und Monat",
-        "description": "Gebuchte Zeit je Mitarbeiter und Monat, die letzten 12 Monate (einschließlich des laufenden). Entspricht der Znuny-Statistik „Gebuchte Zeit“."
+        "title": "Gebuchte Zeit je Agent und Monat",
+        "description": "Gebuchte Zeit je Agent und Monat, die letzten 12 Monate (einschließlich des laufenden). Entspricht der Znuny-Statistik „Gebuchte Zeit“."
       },
       "top_customers": {
         "title": "Top-Kunden",
@@ -5062,7 +5062,7 @@
       "type": "Typ",
       "service": "Service",
       "sla": "SLA",
-      "owner": "Bearbeiter",
+      "owner": "Besitzer",
       "responsible": "Verantwortlicher",
       "customer": "Kunde",
       "customer_user": "Ansprechpartner",
@@ -5077,7 +5077,7 @@
       "occurred": "Zeitpunkt",
       "occurred_hour": "Uhrzeit",
       "occurred_weekday": "Wochentag",
-      "actor": "Mitarbeiter",
+      "actor": "Agent",
       "from_queue": "Von Queue",
       "to_queue": "Nach Queue",
       "from_state": "Von Status",
@@ -5089,7 +5089,7 @@
       "ticket_priority": "Priorität des Tickets",
       "ticket_type": "Typ des Tickets",
       "snapshot": "Stichtag",
-      "agent": "Mitarbeiter",
+      "agent": "Agent",
       "ticket": "Ticket",
       "booked": "Gebucht",
       "booked_weekday": "Wochentag der Buchung",
@@ -5099,7 +5099,7 @@
       "has_first_response": "Mit Erstreaktion",
       "ai_triaged": "Von der KI einsortiert",
       "ai_auto_replied": "Von der KI beantwortet",
-      "ai_handed_off": "An Mitarbeiter übergeben"
+      "ai_handed_off": "An Agent übergeben"
     },
     "measures": {
       "tickets": "Tickets",
@@ -5128,7 +5128,7 @@
       "solution_near_misses": "Lösungszeit knapp eingehalten",
       "sla_met_rate": "SLA eingehalten",
       "accounted_time": "Gebuchte Zeit",
-      "agent_touches_avg": "Bearbeiter pro Ticket (Durchschnitt)",
+      "agent_touches_avg": "Agenten pro Ticket (Durchschnitt)",
       "queue_moves_avg": "Queue-Wechsel pro Ticket (Durchschnitt)",
       "pingpong_tickets": "Tickets mit Hin und Her",
       "events": "Ereignisse",
@@ -5141,7 +5141,7 @@
       "age_7_30d": "7 bis 30 Tage",
       "age_30d_plus": "Über 30 Tage",
       "escalated": "Eskaliert",
-      "unassigned": "Ohne Bearbeiter",
+      "unassigned": "Ohne Besitzer",
       "time_units": "Gebuchte Zeit",
       "bookings": "Buchungen"
     },
@@ -5173,7 +5173,7 @@
         "close": "Geschlossen",
         "reopen": "Wiedereröffnet",
         "queue": "Queue-Wechsel",
-        "owner": "Bearbeiterwechsel",
+        "owner": "Besitzerwechsel",
         "responsible": "Wechsel des Verantwortlichen",
         "priority": "Prioritätswechsel",
         "type": "Typwechsel",
@@ -5236,11 +5236,12 @@
       "queues": "Queues: {{queues}}"
     },
     "agentTable": {
-      "agent": "Mitarbeiter",
+      "agent": "Agent",
       "open": "Offen",
       "replies": "Antworten",
       "notes": "Notizen",
       "closed": "Geschlossen"
-    }
+    },
+    "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren."
   }
 }

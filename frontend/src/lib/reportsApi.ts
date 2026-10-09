@@ -24,6 +24,7 @@ export type ReportCatalogue = Schemas["ReportCatalogueOut"];
 export type FactsStatus = Schemas["FactsStatusOut"];
 export type ReportingStatus = Schemas["ReportingStatusOut"];
 export type ReportBackfillIn = Schemas["ReportBackfillIn"];
+export type ReportSource = Schemas["ReportSourceOut"];
 export type ReportCell = string | number | null;
 /** Time buckets of a date dimension (`Grain` in backend/src/tiqora/reporting/definition.py). */
 export type Grain = "day" | "week" | "month" | "quarter" | "year";
@@ -44,6 +45,10 @@ export const reportsApi = {
   },
   export(body: ReportExportIn) {
     return api.request<JobAccepted>("POST", "/api/v1/reports/export", { body });
+  },
+  /** Sources with their dimensions and measures (incl. each measure's aggregation). */
+  sources(signal?: AbortSignal) {
+    return api.request<ReportSource[]>("GET", "/api/v1/reporting/sources", { signal });
   },
   factsStatus(signal?: AbortSignal) {
     return api.request<FactsStatus>("GET", "/api/v1/reporting/status", { signal });

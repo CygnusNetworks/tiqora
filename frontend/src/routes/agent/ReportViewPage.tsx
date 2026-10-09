@@ -6,7 +6,13 @@ import { flattenQueues } from "@/components/agent/QueueTree";
 import { FactsBanner } from "@/components/reports/FactsBanner";
 import { ReportExportButton } from "@/components/reports/ReportExportButton";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
-import { filterRange, hasQueueParameter, toRunIn, type ReportFilterState } from "@/components/reports/reportFilter";
+import {
+  filterRange,
+  hasQueueParameter,
+  rangeInvalid,
+  toRunIn,
+  type ReportFilterState,
+} from "@/components/reports/reportFilter";
 import { ReportView } from "@/components/reports/ReportView";
 import { useReportRun } from "@/components/reports/useReportRun";
 import { Button } from "@/components/ui/Button";
@@ -34,7 +40,8 @@ export function ReportViewPage() {
   const definition = report?.definition;
   const state = useMemo(() => filterFromSearch(search, definition), [search, definition]);
   const body = useMemo(
-    () => (definition ? toRunIn(reportKey, state, definition) : null),
+    // A start after the end is never sent; the filter bar says what to fix.
+    () => (definition && !rangeInvalid(state) ? toRunIn(reportKey, state, definition) : null),
     [reportKey, state, definition],
   );
   const run = useReportRun(body);
@@ -107,6 +114,7 @@ export function ReportViewPage() {
             }
           />
 
+          {body && (
           <section className="space-y-3 rounded-lg border border-hairline bg-surface p-4" aria-live="polite">
             {(rangeText || result) && (
               <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted" data-testid="report-view-meta">
@@ -146,6 +154,7 @@ export function ReportViewPage() {
               </div>
             )}
           </section>
+          )}
         </>
       )}
     </div>

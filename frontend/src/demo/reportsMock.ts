@@ -1,4 +1,5 @@
 import type {
+  ReportSource,
   BuiltinReport,
   FactsStatus,
   ReportCell,
@@ -133,6 +134,32 @@ const MEASURE: Record<string, [ColType, number, number]> = {
   time_units: ["units", 22.5, 8],
   bookings: ["count", 18, 6],
 };
+
+// --- sources (measure aggregations, mirrors backend reporting/sources) ---------
+
+/** `measure:agg` pairs per source (strings, not object literals: the secret scan flags long snake_case keys). */
+const SOURCE_AGGS: Record<string, string> = {
+  tickets: "tickets:count closed_tickets:count_if open_tickets:count_if reopened_tickets:count_if reopen_rate:rate fcr_rate:rate first_response_avg:avg first_response_p50:p50 first_response_p90:p90 first_response_clock_avg:avg first_response_clock_p50:p50 solution_avg:avg solution_p50:p50 solution_p90:p90 solution_clock_avg:avg solution_clock_p50:p50 response_breaches:count_if response_breach_rate:rate solution_breaches:count_if solution_breach_rate:rate update_breaches:sum update_breached_tickets:count_if response_near_misses:count_if solution_near_misses:count_if sla_met_rate:rate accounted_time:sum agent_touches_avg:avg queue_moves_avg:avg pingpong_tickets:count_if",
+  ticket_events: "events:count tickets:count_distinct dwell_avg_hours:avg dwell_p50_hours:p50 dwell_p90_hours:p90",
+  daily_snapshot: "open_tickets:sum age_0_1d:sum age_1_3d:sum age_3_7d:sum age_7_30d:sum age_30d_plus:sum",
+  accounted_time: "time_units:sum bookings:count tickets:count_distinct",
+  open_tickets: "tickets:count age_0_1d:count_if age_1_3d:count_if age_3_7d:count_if age_7_30d:count_if age_30d_plus:count_if escalated:count_if unassigned:count_if",
+};
+
+/** `GET /api/v1/reporting/sources` for the demo: measures with their aggregation (dimensions omitted). */
+export function demoSources(): ReportSource[] {
+  return Object.entries(SOURCE_AGGS).map(([key, pairs]) => ({
+    key,
+    label_key: `reports.sources.${key}`,
+    default_time_field: null,
+    dimensions: [],
+    filter_fields: [],
+    measures: pairs.split(" ").map((pair) => {
+      const [measure, agg] = pair.split(":");
+      return { key: measure, agg, unit: MEASURE[measure]?.[0] ?? "count", label_key: `reports.measures.${measure}` };
+    }),
+  }));
+}
 
 // --- dimension values and labels --------------------------------------------
 

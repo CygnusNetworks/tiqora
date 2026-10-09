@@ -9,7 +9,7 @@
  * auto-authenticated).
  */
 
-import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob } from "./reportsMock";
+import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob, demoSources } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
 
@@ -1237,23 +1237,6 @@ const timeAccountingReport = {
   total_units: timeAccountingRows.reduce((sum, r) => sum + r.time_unit, 0),
 };
 
-// ── Stats (14-day series, richer) ───────────────────────────────────────────
-const days = Array.from({ length: 14 }, (_, i) => `2026-07-${String(i + 8).padStart(2, "0")}`);
-const volume = { granularity: "day", points: days.map((d, i) => ({ bucket: d, created: 6 + ((i * 3) % 7), closed: 4 + ((i * 2) % 6) })) };
-const backlog = { granularity: "day", points: days.map((d, i) => ({ bucket: d, open_count: 40 + ((i * 5) % 18) })) };
-const openSnapshot = { dimension: "queue", items: [
-  { id: 2, label: "Support::Level 1", count: 13 }, { id: 3, label: "Support::Level 2", count: 6 },
-  { id: 4, label: "Incidents", count: 12 }, { id: 5, label: "Sales", count: 9 }, { id: 6, label: "Billing", count: 8 },
-] };
-const sla = { total: 58, escalated: 6, first_response_breached: 3, update_breached: 1, solution_breached: 2,
-  first_response_minutes: [12, 20, 35, 44, 51, 63, 22, 18], solution_minutes: [120, 240, 90, 310, 150] };
-const agentWorkload = [
-  { user_id: 1, login: "aturner", name: "Alex Turner", owned_open: 9, closed_in_period: 21 },
-  { user_id: 2, login: "bshah", name: "Bianca Shah", owned_open: 7, closed_in_period: 18 },
-  { user_id: 3, login: "cmorris", name: "Chris Morris", owned_open: 5, closed_in_period: 14 },
-  { user_id: 4, login: "dpark", name: "Dana Park", owned_open: 4, closed_in_period: 11 },
-];
-
 const calendars = [{ id: 1, name: "Support on-call", color: "#2563eb", valid_id: 1 }];
 const occurrences = [
   { id: 800, calendar_id: 1, title: "On-call: Alex", start_time: "2026-07-20T08:00:00Z", end_time: "2026-07-20T17:00:00Z", all_day: false, location: "Remote" },
@@ -1771,6 +1754,7 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/reports") && method === "GET") return demoCatalogue();
   if (p.match(/\/api\/v1\/reports\/builtin\.[a-z_]+$/) && method === "GET")
     return demoReport(decodeURIComponent(p.split("/").pop() as string));
+  if (p.endsWith("/api/v1/reporting/sources")) return demoSources();
   if (p.endsWith("/api/v1/reporting/status")) return demoFacts();
   if (p.endsWith("/api/v1/admin/reporting/status")) return demoReportingStatus();
   if (p.endsWith("/api/v1/admin/reporting/backfill") && method === "POST") return { job_id: 9202, status: "queued" };
@@ -1838,11 +1822,6 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/api\/v1\/kb\/articles\/\d+$/) && method === "GET") return kbArticleDetail;
   if (p.endsWith("/api/v1/kb/articles")) return kbArticleItems;
   if (p.endsWith("/api/v1/kb/assignable-groups")) return [{ id: 2, name: "users" }, { id: 3, name: "support" }];
-  if (p.endsWith("/api/v1/stats/volume")) return volume;
-  if (p.endsWith("/api/v1/stats/backlog")) return backlog;
-  if (p.endsWith("/api/v1/stats/open-snapshot")) return openSnapshot;
-  if (p.endsWith("/api/v1/stats/sla")) return sla;
-  if (p.endsWith("/api/v1/stats/agent-workload")) return agentWorkload;
   if (p.endsWith("/api/v1/calendar/calendars")) return calendars;
   if (p.endsWith("/api/v1/calendar/appointments")) return occurrences;
   if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};

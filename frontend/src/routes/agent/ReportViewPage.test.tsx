@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
 import i18n from "@/i18n";
-import { demoReport, resolveReportRun } from "@/demo/reportsMock";
+import { DEMO_FACTS, demoReport, demoSources, resolveReportRun } from "@/demo/reportsMock";
 import { ApiError } from "@/lib/api";
 import { jobsApi, type Job } from "@/lib/jobsApi";
 import { reportsApi, type ReportExportIn, type ReportRunIn } from "@/lib/reportsApi";
@@ -28,7 +28,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@/lib/reportsApi", async (orig) => ({
   ...(await orig<typeof import("@/lib/reportsApi")>()),
-  reportsApi: { catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn() },
+  reportsApi: { catalogue: vi.fn(), run: vi.fn(), get: vi.fn(), export: vi.fn(), sources: vi.fn(), factsStatus: vi.fn() },
 }));
 
 vi.mock("@/lib/jobsApi", async (orig) => ({
@@ -73,6 +73,8 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation(async (body) => resolveReportRun(body));
   vi.mocked(reportsApi.export).mockReset().mockResolvedValue({ job_id: 9201, status: "queued" });
+  vi.mocked(reportsApi.sources).mockReset().mockResolvedValue(demoSources());
+  vi.mocked(reportsApi.factsStatus).mockReset().mockResolvedValue(DEMO_FACTS);
   vi.mocked(jobsApi.get)
     .mockReset()
     .mockResolvedValue({
@@ -194,5 +196,34 @@ describe("ReportViewPage", () => {
     );
     renderPage();
     expect(await screen.findByTestId("report-error")).toHaveTextContent(msg);
+  });
+
+  it("asks for the previous period for key figures, so the tiles show the change", async () => {
+    routeParams = { reportKey: "builtin.ticket_kpis" };
+    renderPage();
+    await screen.findByTestId("report-view-kpis");
+    expect(vi.mocked(reportsApi.run).mock.calls.at(-1)![0]).toMatchObject({
+      report_key: "builtin.ticket_kpis",
+      compare_previous: true,
+    });
+    expect(await screen.findByTestId("report-view-kpi-tickets-delta")).toBeInTheDocument();
+  });
+
+  it("does not ask for the previous period for other reports", async () => {
+    renderPage();
+    await screen.findByTestId("report-view-chart");
+    expect(vi.mocked(reportsApi.run).mock.calls.at(-1)![0].compare_previous).toBe(false);
+  });
+
+  it("says what is wrong with a start after the end and runs nothing", async () => {
+    searchParams = { preset: "custom", from: "2026-09-30", to: "2026-09-01" };
+    renderPage();
+    expect(await screen.findByTestId("report-filter-range-error")).toHaveTextContent(
+      "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren.",
+    );
+    expect(screen.getByTestId("report-filter-from")).toHaveAttribute("aria-invalid", "true");
+    expect(reportsApi.run).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("report-loading")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-export-xlsx")).not.toBeInTheDocument();
   });
 });

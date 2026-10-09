@@ -60,6 +60,11 @@ export function filterRange(state: ReportFilterState): { from: string; to: strin
   return dateRangeForPreset(state.preset);
 }
 
+/** A typed own range whose start lies after its end (never sent: the server would answer 422). */
+export function rangeInvalid(state: ReportFilterState): boolean {
+  return state.preset === "custom" && state.from !== "" && state.to !== "" && state.from > state.to;
+}
+
 /** Builds the run request; the definition's own range applies while no range is chosen. */
 export function toRunIn(
   reportKey: string,
@@ -69,7 +74,8 @@ export function toRunIn(
   const body: ReportRunIn = {
     report_key: reportKey,
     time_zone: displayTimeZone(),
-    compare_previous: false,
+    // Key figures always come with the previous period (the tiles show the change).
+    compare_previous: definition?.visualization?.type === "kpi",
     force_job: false,
     no_cache: false,
   };

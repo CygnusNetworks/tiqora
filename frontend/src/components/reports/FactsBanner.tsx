@@ -1,8 +1,13 @@
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/AuthContext";
 import { JobProgress } from "@/components/jobs/JobProgress";
 import { useJob } from "@/components/jobs/useJob";
-import type { FactsStatus } from "@/lib/reportsApi";
+import { reportsApi, type FactsStatus } from "@/lib/reportsApi";
+
+/** How often the build progress is re-read while the data is being built. */
+const FACTS_POLL_MS = 15_000;
 
 /**
  * Notice while the report data is still being built (first start, rebuild):
@@ -18,12 +23,27 @@ export function FactsBanner({
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const building = facts != null && !facts.ready;
-  const jobId = building && user?.is_admin ? (facts.backfill_job_id ?? null) : null;
+  const queryClient = useQueryClient();
+  // The page's own status (catalogue/result) is read once; while building, re-read it so
+  // everyone sees the percentage move and the banner goes away when the build is done.
+  const statusQ = useQuery({
+    queryKey: ["reports", "facts"],
+    queryFn: ({ signal }) => reportsApi.factsStatus(signal),
+    enabled: facts != null && !facts.ready,
+    refetchInterval: FACTS_POLL_MS,
+  });
+  const current = facts != null && !facts.ready ? (statusQ.data ?? facts) : facts;
+  const building = current != null && !current.ready;
+  const finished = facts != null && !facts.ready && statusQ.data?.ready === true;
+  useEffect(() => {
+    // Built meanwhile: reload the catalogue and the reports with complete numbers.
+    if (finished) void queryClient.invalidateQueries({ queryKey: ["reports"] });
+  }, [finished, queryClient]);
+  const jobId = building && user?.is_admin ? (current.backfill_job_id ?? null) : null;
   const { job } = useJob(jobId);
   if (!building) return null;
 
-  const progress = facts.backfill_progress;
+  const progress = current.backfill_progress;
   const text =
     progress != null && progress > 0 && progress < 1
       ? t("reports.factsBuildingProgress", { percent: Math.floor(progress * 100) })

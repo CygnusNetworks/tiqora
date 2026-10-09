@@ -8,37 +8,19 @@ import { LineChart } from "@/components/agent/stats/LineChart";
 import { StackedBarChart } from "@/components/agent/stats/StackedBarChart";
 import {
   CHANNEL_ORDER,
+  EVENT_KIND_ORDER,
   OTHER_SERIES_KEY,
   SERIES_SLOTS,
   STATE_TYPE_ORDER,
-  assignSeriesSlots,
+  displaySlots,
   keyColor,
 } from "@/components/agent/stats/chartColors";
 import { cn } from "@/lib/cn";
 import type { ReportColumn, ReportDefinition, ReportResult } from "@/lib/reportsApi";
 import { PivotTable } from "./PivotTable";
 import { ReportTable } from "./ReportTable";
+import { ADDITIVE_AGGS, useMeasureAggs } from "./useMeasureAggs";
 import { cellLabel, formatMeasure, toSeries } from "./reportFormat";
-
-/** Event kinds in a fixed colour order (create/close first: the volume pair). */
-const EVENT_KIND_ORDER = [
-  "create",
-  "close",
-  "reopen",
-  "reply",
-  "note",
-  "customer_message",
-  "state",
-  "queue",
-  "owner",
-  "responsible",
-  "priority",
-  "type",
-  "service",
-  "sla",
-  "merge",
-  "process_activity",
-] as const;
 
 /** Enum dimensions keep their colour whatever the filter leaves over. */
 const FIXED_ORDER: Record<string, readonly string[]> = {
@@ -68,7 +50,7 @@ function colouredSeries(
   const dims = result.columns.filter((c) => c.role === "dimension");
   const seriesDim = viz?.series_dimension != null ? dims[viz.series_dimension] : undefined;
   const fixed = seriesDim ? FIXED_ORDER[seriesDim.key] : series.map((s) => s.key);
-  const slots = assignSeriesSlots(
+  const slots = displaySlots(
     series.map((s) => s.key),
     fixed,
   );
@@ -164,6 +146,7 @@ export function ReportView({
   const [showTable, setShowTable] = useState(false);
   const regionId = useId();
   const { definition } = report;
+  const aggs = useMeasureAggs(definition.source);
   const type = definition.visualization?.type ?? "table";
   const height = compact ? 200 : 280;
   const dims = result.columns.filter((c) => c.role === "dimension");
@@ -217,6 +200,7 @@ export function ReportView({
               <PivotTable
                 result={result}
                 measureIndex={result.columns.indexOf(m)}
+                summable={ADDITIVE_AGGS.has(aggs?.get(m.key) ?? "")}
                 stock={stock}
                 testId={shown.length > 1 ? `${id}-${m.key}` : id}
               />
@@ -266,7 +250,7 @@ export function ReportView({
     const { categories, series } = colouredSeries(result, definition, t);
     if (type === "donut") {
       const values = series[0]?.values ?? [];
-      const slots = assignSeriesSlots(
+      const slots = displaySlots(
         categories.map((c) => c.key),
         dims[0] ? FIXED_ORDER[dims[0].key] : undefined,
       );

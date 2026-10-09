@@ -1,11 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import type { ReportCell, ReportColumn, ReportResult } from "@/lib/reportsApi";
+import type { ReportCell, ReportResult } from "@/lib/reportsApi";
 import { ReportTable } from "./ReportTable";
 import { useCellText } from "./useCellText";
-
-/** Measure types whose totals may be summed when the server sent none. */
-const ADDITIVE = new Set<ReportColumn["type"]>(["count", "units"]);
 
 function distinct(result: ReportResult, at: number): string[] {
   const seen = new Set<string>();
@@ -39,10 +36,16 @@ const totalCls = "bg-surface-subtle font-semibold text-ink";
 export function PivotTable({
   result,
   measureIndex,
+  summable = false,
   stock = false,
   testId = "pivot",
 }: {
   result: ReportResult;
+  /**
+   * The measure adds up across groups (aggregation count/count_if/sum): missing
+   * totals are summed here. Otherwise only server totals are shown, else "—".
+   */
+  summable?: boolean;
   /** Stock measure (a day's state): never summed over a date dimension. */
   stock?: boolean;
   /** Column index of the measure to show; default the first measure. */
@@ -68,7 +71,7 @@ export function PivotTable({
     return typeof v === "number" ? v : null;
   };
 
-  const additive = ADDITIVE.has(measure.type);
+  const additive = summable;
   // Summing a stock over days is meaningless; over queues/states on one day it is the total.
   const sumOverCols = additive && !(stock && colDim.type === "date");
   const sumOverRows = additive && !(stock && rowDim.type === "date");

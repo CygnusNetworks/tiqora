@@ -42,6 +42,27 @@ export function assignSeriesSlots(
   return slots;
 }
 
+/**
+ * Slots for the series actually shown. Up to SERIES_SLOTS series each keep a
+ * colour of their own: keys whose fixed slot is free keep it, the others take
+ * the lowest free slot (so "internal", 7th in the channel order, is not
+ * folded away when only two channels occur). With more series the stable
+ * `assignSeriesSlots` order applies and slots >= SERIES_SLOTS fold into "Weitere".
+ */
+export function displaySlots(keys: readonly string[], fixedOrder?: readonly string[]): Map<string, number> {
+  const slots = assignSeriesSlots(keys, fixedOrder);
+  if (slots.size > SERIES_SLOTS) return slots;
+  const used = new Set([...slots.values()].filter((s) => s < SERIES_SLOTS));
+  const overflow = [...slots].filter(([, s]) => s >= SERIES_SLOTS).sort((a, b) => a[1] - b[1]);
+  for (const [key] of overflow) {
+    let free = 0;
+    while (used.has(free)) free += 1;
+    used.add(free);
+    slots.set(key, free);
+  }
+  return slots;
+}
+
 /** Colour of a series key: `__other__` is always the neutral muted token, others follow their slot. */
 export function keyColor(key: string, slots: ReadonlyMap<string, number>): string {
   if (key === OTHER_SERIES_KEY) return "var(--color-muted)";
@@ -60,6 +81,26 @@ export function sequentialColor(t: number): string {
 }
 
 export const CHANNEL_ORDER = ["email", "phone", "telegram", "webchat", "sms", "whatsapp", "internal"] as const;
+/** Event kinds in a fixed colour order (create/close first: the volume pair). */
+export const EVENT_KIND_ORDER = [
+  "create",
+  "close",
+  "reopen",
+  "reply",
+  "note",
+  "customer_message",
+  "state",
+  "queue",
+  "owner",
+  "responsible",
+  "priority",
+  "type",
+  "service",
+  "sla",
+  "merge",
+  "process_activity",
+] as const;
+
 export const STATE_TYPE_ORDER = [
   "new",
   "open",

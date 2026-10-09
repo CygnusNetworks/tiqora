@@ -5233,6 +5233,7 @@
       "replies": "Replies",
       "notes": "Notes",
       "closed": "Closed"
-    }
+    },
+    "rangeInvalid": "The start date is after the end date. Please correct the period."
   }
 }

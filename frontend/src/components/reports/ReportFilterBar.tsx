@@ -20,6 +20,7 @@ import {
   filterRange,
   hasQueueParameter,
   hasTimeRange,
+  rangeInvalid,
   type ReportFilterState,
 } from "./reportFilter";
 
@@ -112,6 +113,8 @@ export function ReportFilterBar({
                 className={inputCls}
                 value={shown.from}
                 max={shown.to || undefined}
+                aria-invalid={rangeInvalid(value) || undefined}
+                aria-describedby={rangeInvalid(value) ? `${id}-range-error` : undefined}
                 onChange={(e) => setDate("from", e.target.value)}
                 data-testid={`${testId}-from`}
               />
@@ -123,6 +126,8 @@ export function ReportFilterBar({
                 className={inputCls}
                 value={shown.to}
                 min={shown.from || undefined}
+                aria-invalid={rangeInvalid(value) || undefined}
+                aria-describedby={rangeInvalid(value) ? `${id}-range-error` : undefined}
                 onChange={(e) => setDate("to", e.target.value)}
                 data-testid={`${testId}-to`}
               />
@@ -168,6 +173,11 @@ export function ReportFilterBar({
           </div>
         )}
       </div>
+      {withRange && rangeInvalid(value) && (
+        <p id={`${id}-range-error`} role="alert" className="text-xs text-danger" data-testid={`${testId}-range-error`}>
+          {t("reports.rangeInvalid")}
+        </p>
+      )}
       {dim && (
         <div className="flex flex-wrap items-center gap-2" data-testid={`${testId}-choice`}>
           <span className="text-xs text-muted">{t("reports.groupBy")}</span>

@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import type { ReactNode } from "react";
@@ -7,6 +7,13 @@ import i18n from "@/i18n";
 import { demoReport } from "@/demo/reportsMock";
 import type { ReportDefinition, ReportResult } from "@/lib/reportsApi";
 import { ReportView } from "./ReportView";
+
+// Measure aggregations (which totals may be summed) come from GET /reporting/sources.
+vi.mock("@/lib/reportsApi", async (orig) => {
+  const actual = await orig<typeof import("@/lib/reportsApi")>();
+  const { demoSources } = await import("@/demo/reportsMock");
+  return { ...actual, reportsApi: { ...actual.reportsApi, sources: vi.fn(async () => demoSources()) } };
+});
 
 function Providers({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -169,7 +176,7 @@ describe("ReportView", () => {
     expect(screen.queryByTestId("report-view-toggle-table")).not.toBeInTheDocument();
   });
 
-  it("pivot shows row and column totals", () => {
+  it("pivot shows row and column totals", async () => {
     const def = defOf("builtin.agent_activity");
     render(
       <Providers>
@@ -197,7 +204,8 @@ describe("ReportView", () => {
     expect(screen.getByTestId("report-view-pivot-row-2")).toHaveTextContent("Anna Beispiel");
     expect(screen.getByTestId("report-view-pivot-rowtotal-2")).toHaveTextContent("14");
     expect(screen.getByTestId("report-view-pivot-rowtotal-3")).toHaveTextContent("6");
-    expect(screen.getByTestId("report-view-pivot-coltotal-reply")).toHaveTextContent("16");
+    // summed once the source says "events" is a plain count
+    await waitFor(() => expect(screen.getByTestId("report-view-pivot-coltotal-reply")).toHaveTextContent("16"));
     expect(screen.getByTestId("report-view-pivot-coltotal-close")).toHaveTextContent("4");
     expect(screen.getByTestId("report-view-pivot-grand")).toHaveTextContent("20");
     // a missing combination is a dash, not 0
@@ -253,5 +261,89 @@ describe("ReportView", () => {
     expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-__other__")).toHaveAttribute("fill", "var(--color-muted)");
     expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-email")).toHaveAttribute("fill", "var(--color-series-1)");
     expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-whatsapp")).toHaveAttribute("fill", "var(--color-series-6)");
+  });
+
+  it("keeps a late channel as its own series when few channels occur", () => {
+    const def = defOf("builtin.volume_by_channel");
+    render(
+      <Providers>
+        <ReportView
+          report={{ key: "builtin.volume_by_channel", definition: def }}
+          result={resultOf({
+            columns: [
+              { key: "created", role: "dimension", type: "date", label_key: "reports.dimensions.created", grain: "week", i18n_values: null },
+              { key: "channel", role: "dimension", type: "enum", label_key: "reports.dimensions.channel", grain: null, i18n_values: "reports.values.channel" },
+              { key: "tickets", role: "measure", type: "count", label_key: "reports.measures.tickets", grain: null, i18n_values: null },
+            ],
+            rows: [
+              ["2024-06-03", "email", 8],
+              ["2024-06-03", "internal", 3],
+            ],
+          })}
+        />
+      </Providers>,
+    );
+    const legend = screen.getByTestId("report-view-stacked-legend");
+    expect(within(legend).getAllByRole("listitem")).toHaveLength(2);
+    expect(legend).toHaveTextContent(i18n.t("reports.values.channel.internal"));
+    expect(legend).not.toHaveTextContent("Weitere");
+    expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-email")).toHaveAttribute("fill", "var(--color-series-1)");
+    expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-internal")).toHaveAttribute("fill", "var(--color-series-2)");
+    expect(screen.queryByTestId("report-view-stacked-seg-2024-06-03-__other__")).not.toBeInTheDocument();
+  });
+
+  it("names the folded tail 'Weitere' in the table view too", () => {
+    render(
+      <Providers>
+        <ReportView
+          report={{ key: "builtin.open_now", definition: defOf("builtin.open_now") }}
+          result={resultOf({
+            columns: [
+              { key: "queue", role: "dimension", type: "id", label_key: "reports.dimensions.queue", grain: null, i18n_values: null },
+              { key: "tickets", role: "measure", type: "count", label_key: "reports.measures.tickets", grain: null, i18n_values: null },
+            ],
+            rows: [
+              ["1", 12],
+              ["__other__", 5],
+            ],
+            labels: { queue: { "1": "Support" } },
+          })}
+        />
+      </Providers>,
+    );
+    fireEvent.click(screen.getByTestId("report-view-toggle-table"));
+    const table = screen.getByTestId("report-view-table");
+    const rows = within(table).getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("Support12");
+    expect(rows[2]).toHaveTextContent("Weitere5");
+  });
+
+  it("sums only additive measures in a cross table without server totals", async () => {
+    render(
+      <Providers>
+        <ReportView
+          report={{ key: "builtin.queue_transfers", definition: defOf("builtin.queue_transfers") }}
+          result={resultOf({
+            columns: [
+              { key: "from_queue", role: "dimension", type: "id", label_key: "reports.dimensions.from_queue", grain: null, i18n_values: null },
+              { key: "to_queue", role: "dimension", type: "id", label_key: "reports.dimensions.to_queue", grain: null, i18n_values: null },
+              { key: "events", role: "measure", type: "count", label_key: "reports.measures.events", grain: null, i18n_values: null },
+              { key: "tickets", role: "measure", type: "count", label_key: "reports.measures.tickets", grain: null, i18n_values: null },
+            ],
+            rows: [
+              ["1", "2", 5, 4],
+              ["1", "3", 2, 2],
+            ],
+            labels: { from_queue: { "1": "Support" }, to_queue: { "2": "Vertrieb", "3": "Technik" } },
+          })}
+        />
+      </Providers>,
+    );
+    // events = count: summed
+    expect(await screen.findByTestId("report-view-pivot-events-rowtotal-1")).toHaveTextContent("7");
+    // tickets = count_distinct: the same ticket may move twice, so no client-side sum
+    expect(screen.getByTestId("report-view-pivot-tickets-cell-1-2")).toHaveTextContent("4");
+    expect(screen.queryByTestId("report-view-pivot-tickets-rowtotal-1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("report-view-pivot-tickets-grand")).not.toBeInTheDocument();
   });
 });

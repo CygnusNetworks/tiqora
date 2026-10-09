@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   assignSeriesSlots,
+  displaySlots,
   seriesColor,
   sequentialColor,
   keyColor,
@@ -57,5 +58,21 @@ describe("chartColors", () => {
     expect(valueTextColor(0.5)).toBe("#0d1b2e");
     expect(valueTextColor(0.6)).toBe("#ffffff");
     expect(valueTextColor(1)).toBe("#ffffff");
+  });
+
+  it("gives a late fixed-order key a free colour while at most six series show", () => {
+    // "internal" is 7th in the channel order: alone with email it takes the next free slot.
+    const two = displaySlots(["email", "internal"], CHANNEL_ORDER);
+    expect(two.get("email")).toBe(0);
+    expect(two.get("internal")).toBe(1);
+    // keys that own a slot keep it; the late key fills the lowest gap
+    const some = displaySlots(["phone", "internal", "webchat"], CHANNEL_ORDER);
+    expect(some.get("phone")).toBe(1);
+    expect(some.get("webchat")).toBe(3);
+    expect(some.get("internal")).toBe(0);
+    // seven series: the stable order applies and the 7th folds (slot >= SERIES_SLOTS)
+    const all = displaySlots([...CHANNEL_ORDER], CHANNEL_ORDER);
+    expect(all.get("internal")).toBe(6);
+    expect(all.get("internal")! >= SERIES_SLOTS).toBe(true);
   });
 });

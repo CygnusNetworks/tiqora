@@ -115,6 +115,19 @@ describe("report demo runs follow the request", () => {
     expect(done.result.rows.length).toBeGreaterThan(0);
   });
 
+  it("serves the sources with each measure's aggregation", () => {
+    const sources = resolveData("/api/v1/reporting/sources", "GET") as { key: string; measures: { key: string; agg: string }[] }[];
+    const agg = (src: string, m: string) => sources.find((s) => s.key === src)?.measures.find((x) => x.key === m)?.agg;
+    expect(agg("ticket_events", "events")).toBe("count");
+    expect(agg("ticket_events", "tickets")).toBe("count_distinct");
+    expect(agg("daily_snapshot", "open_tickets")).toBe("sum");
+    expect(agg("tickets", "reopen_rate")).toBe("rate");
+    // every measure a built-in uses is described
+    for (const r of DEMO_REPORTS) {
+      for (const m of r.definition.measures) expect(agg(r.definition.source, m.key), `${r.key} ${m.key}`).toBeTruthy();
+    }
+  });
+
   it("switches the catalogue, status and results to 'still building'", () => {
     setDemoFactsBuilding(true);
     try {

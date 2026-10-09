@@ -29,10 +29,10 @@ const base: ReportResult = {
   facts: { ready: true, as_of: null, backfill_status: "done", backfill_job_id: null, backfill_progress: 1 },
 };
 
-function renderPivot(result: ReportResult = base) {
+function renderPivot(result: ReportResult = base, props: { summable?: boolean; stock?: boolean } = { summable: true }) {
   return render(
     <I18nextProvider i18n={i18n}>
-      <PivotTable result={result} testId="pv" />
+      <PivotTable result={result} testId="pv" {...props} />
     </I18nextProvider>,
   );
 }
@@ -46,7 +46,7 @@ describe("PivotTable", () => {
     renderPivot();
     const headerCells = within(screen.getByTestId("pv-head")).getAllByRole("columnheader");
     // corner (first dimension name), June, July, total
-    expect(headerCells.map((c) => c.textContent)).toEqual(["Mitarbeiter", "Juni 2024", "Juli 2024", "Summe"]);
+    expect(headerCells.map((c) => c.textContent)).toEqual(["Agent", "Juni 2024", "Juli 2024", "Summe"]);
     expect(screen.getByTestId("pv-row-2")).toHaveTextContent("Anna Beispiel");
     expect(screen.getByTestId("pv-row-3")).toHaveTextContent("Ben Muster");
     expect(screen.getByTestId("pv-cell-2-2024-07-01")).toHaveTextContent("3,50");
@@ -63,7 +63,8 @@ describe("PivotTable", () => {
   });
 
   it("prefers the server totals (non-additive measures stay correct)", () => {
-    renderPivot({
+    renderPivot(
+      {
       ...base,
       columns: [
         base.columns[0],
@@ -75,7 +76,9 @@ describe("PivotTable", () => {
         ["2", "2024-07-01", 50],
       ],
       totals: { grand: [null, null, 42], rows: { "2": ["2", null, 41] }, columns: { "2024-06-01": [null, "2024-06-01", 30] } },
-    });
+      },
+      { summable: false },
+    );
     expect(screen.getByTestId("pv-rowtotal-2")).toHaveTextContent("41 min");
     expect(screen.getByTestId("pv-coltotal-2024-06-01")).toHaveTextContent("30 min");
     // a median is not summed: no server value -> dash
@@ -91,5 +94,40 @@ describe("PivotTable", () => {
     expect(screen.getByTestId("pv-row-2").className).toContain("left-0");
     expect(screen.getByTestId("pv-row-2").tagName).toBe("TH");
     expect(screen.getByTestId("pv-row-2")).toHaveAttribute("scope", "row");
+  });
+
+  it("never sums a non-additive measure (distinct counts, rates): no totals without the server", () => {
+    renderPivot(base, { summable: false });
+    expect(screen.queryByTestId("pv-rowtotal-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pv-coltotal-2024-06-01")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pv-grand")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("pv-head")).queryByText("Summe")).not.toBeInTheDocument();
+  });
+
+  it("adds a stock up within one day but never over days", () => {
+    renderPivot(
+      {
+        ...base,
+        columns: [
+          { key: "snapshot", role: "dimension", type: "date", label_key: "reports.dimensions.snapshot", grain: "day", i18n_values: null },
+          { key: "state_type", role: "dimension", type: "enum", label_key: "reports.dimensions.state_type", grain: null, i18n_values: "reports.values.state_type" },
+          { key: "open_tickets", role: "measure", type: "count", label_key: "reports.measures.open_tickets", grain: null, i18n_values: null },
+        ],
+        rows: [
+          ["2024-06-01", "new", 4],
+          ["2024-06-01", "open", 10],
+          ["2024-06-02", "new", 3],
+          ["2024-06-02", "open", 12],
+        ],
+        labels: {},
+      },
+      { summable: true, stock: true },
+    );
+    // per day across the states: the day's open tickets
+    expect(screen.getByTestId("pv-rowtotal-2024-06-01")).toHaveTextContent("14");
+    expect(screen.getByTestId("pv-rowtotal-2024-06-02")).toHaveTextContent("15");
+    // per state across days would count the same tickets again: no totals row
+    expect(screen.queryByTestId("pv-coltotal-new")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("pv-grand")).not.toBeInTheDocument();
   });
 });
