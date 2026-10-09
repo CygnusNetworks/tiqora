@@ -31,6 +31,7 @@ T0 = datetime(2026, 3, 4, 5, 6, 7)
 AGENT = 887110
 DF_MULTI, DF_TEXT, DF_UNSET, DF_DATE = 887120, 887121, 887122, 887123
 TICKET_DATA, TICKET_TYPE, TICKET_TAG, TICKET_INACTIVE = 887140, 887141, 887142, 887143
+TICKET_BROKEN = 887144
 TYPE_ID = 30887  # ticket_type.id is a SMALLINT; outside the band, unique by value
 SERVICE_ID = 887160
 SLA_ID = 887170
@@ -93,8 +94,13 @@ def _cond(fields_yaml: str) -> str:
     return f"{head}{fields_yaml}    Type: and\n  Type: and\nConditionLinking: and\n"
 
 
-def _add_process(conn: Any, n: int, condition: str, *, state: str = "S1") -> None:
-    """Process ``n``: activity A (one dialog setting Type) -> activity B via one transition."""
+def _add_process(
+    conn: Any, n: int, condition: str, *, state: str = "S1", second_condition: str | None = None
+) -> None:
+    """Process ``n``: activity A (one dialog setting Type) -> activity B via one transition.
+
+    ``second_condition`` adds a second transition (entity id sorts after the first).
+    """
     act_a, act_b = _eid("Activity", n, n), _eid("Activity", n, n + 1)
     dialog, trans = _eid("ActivityDialog", n), _eid("T", n)
     conn.execute(
@@ -111,7 +117,12 @@ def _add_process(conn: Any, n: int, condition: str, *, state: str = "S1") -> Non
             "cfg": (
                 f"StartActivity: {act_a}\nStartActivityDialog: {dialog}\n"
                 f"Path:\n  {act_a}:\n    {trans}:\n      ActivityEntityID: {act_b}\n"
-                f"  {act_b}: {{}}\n"
+                + (
+                    f"    {trans}b:\n      ActivityEntityID: {act_b}\n"
+                    if second_condition is not None
+                    else ""
+                )
+                + f"  {act_b}: {{}}\n"
             ),
         },
     )
@@ -144,6 +155,11 @@ def _add_process(conn: Any, n: int, condition: str, *, state: str = "S1") -> Non
         text(_PM_INSERT.format(table="pm_transition")),
         {"id": 887400 + n, "eid": trans, "name": f"T{n}", "cfg": condition},
     )
+    if second_condition is not None:
+        conn.execute(
+            text(_PM_INSERT.format(table="pm_transition")),
+            {"id": 887410 + n, "eid": f"{trans}b", "name": f"T{n}b", "cfg": second_condition},
+        )
 
 
 def _add_ticket(conn: Any, tid: int, *, title: str, type_id: int = 1, full: bool = False) -> None:
@@ -236,6 +252,7 @@ def _seed(conn: Any) -> None:
     _add_ticket(conn, TICKET_TYPE, title="Type ticket")
     _add_ticket(conn, TICKET_TAG, title="Postmaster")
     _add_ticket(conn, TICKET_INACTIVE, title="Inactive ticket", type_id=TYPE_ID)
+    _add_ticket(conn, TICKET_BROKEN, title="Broken ticket", type_id=TYPE_ID)
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -275,6 +292,15 @@ def sync_url(mariadb_znuny_url: str) -> str:
             3,
             _cond("      Type:\n        Match: Incident-887\n        Type: String\n"),
             state="S2",
+        )
+        # First transition has no Condition (a config error), the second would match.
+        _add_process(
+            conn,
+            4,
+            "ConditionLinking: and\n",
+            second_condition=_cond(
+                "      Type:\n        Match: Incident-887\n        Type: String\n"
+            ),
         )
     engine.dispose()
     return mariadb_znuny_url
@@ -440,3 +466,22 @@ async def test_run_transitions_skips_inactive_process(
         )
     assert fired.activity_changed is True
     assert fired.new_activity_entity_id == _eid("Activity", 3, 4)
+
+
+@pytest.mark.db
+async def test_broken_transition_config_stops_all_transitions(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Transition.pm:322-327: the bare ``return`` leaves TransitionCheck, so the valid second
+    transition does not fire either."""
+    await _put_in_process(factory, TICKET_BROKEN, 4, _eid("Activity", 4, 4))
+    async with factory() as session, session.begin():
+        outcome = await run_transitions(
+            session, ticket_id=TICKET_BROKEN, user_id=AGENT, sysconfig=_sysconfig()
+        )
+    assert outcome.activity_changed is False
+    assert outcome.transition_entity_id is None
+    async with factory() as session:
+        state = await get_ticket_process_state(session, TICKET_BROKEN)
+    assert state is not None
+    assert state.activity_entity_id == _eid("Activity", 4, 4)

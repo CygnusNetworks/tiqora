@@ -7,11 +7,13 @@ from typing import Any
 import pytest
 
 from tiqora.process.conditions import (
-    evaluate_condition_field as ev,
-)
-from tiqora.process.conditions import (
+    ConditionConfigError,
+    check_transition,
     evaluate_transition,
     resolve_transition_tags,
+)
+from tiqora.process.conditions import (
+    evaluate_condition_field as ev,
 )
 from tiqora.process.config import TransitionConditionField as C
 from tiqora.process.config import TransitionConfig
@@ -275,3 +277,19 @@ def test_and_linking_with_or_block_and_or_linking_with_and_block() -> None:
         ),
         data,
     )
+
+
+def test_config_errors_raise_from_check_transition() -> None:
+    # Transition.pm:322-327 etc.: Znuny's bare ``return`` leaves TransitionCheck altogether, so
+    # check_transition raises (run_transitions then fires nothing); evaluate_transition says False.
+    for raw in (
+        {},
+        {"ConditionLinking": "nand", "Condition": {"1": _fields(Queue="Raw")}},
+        {"Condition": {"1": {"Type": "and", "Fields": {}}}},
+        {"Condition": {"1": {"Type": "nand", "Fields": {"Queue": "Raw"}}}},
+        {"Condition": {"1": _fields(Queue={"Type": "Bogus", "Match": "Raw"})}},
+    ):
+        cfg = _transition(raw)
+        with pytest.raises(ConditionConfigError):
+            check_transition(cfg, {"Queue": "Raw"})
+        assert evaluate_transition(cfg, {"Queue": "Raw"}) is False

@@ -56,8 +56,10 @@ BASE_CONDITION_TYPES = frozenset(
 
 __all__ = [
     "BASE_CONDITION_TYPES",
+    "ConditionConfigError",
     "ConditionData",
     "ConditionValue",
+    "check_transition",
     "evaluate_condition_field",
     "evaluate_transition",
     "get_condition_data",
@@ -469,7 +471,29 @@ def evaluate_condition_field(
 _LINKINGS = ("and", "or", "xor")
 
 
+class ConditionConfigError(Exception):
+    """A transition configuration Znuny rejects with ``return;`` inside ``TransitionCheck``.
+
+    That bare ``return`` leaves the whole check, so no transition of the activity fires --
+    not only the broken one (Transition.pm:322-327, 345-355, 359-366, 372-381, 460-466).
+    """
+
+
 def evaluate_transition(
+    transition_config: TransitionConfig,
+    ticket_attrs: Mapping[str, Any],
+    *,
+    tags: Mapping[str, str] | None = None,
+) -> bool:
+    """:func:`check_transition` with a configuration error reported as "no match"."""
+    try:
+        return check_transition(transition_config, ticket_attrs, tags=tags)
+    except ConditionConfigError as exc:
+        logger.warning("transition condition: %s", exc)
+        return False
+
+
+def check_transition(
     transition_config: TransitionConfig,
     ticket_attrs: Mapping[str, Any],
     *,
@@ -478,31 +502,31 @@ def evaluate_transition(
     """``TransitionCheck`` for one transition, including its counting quirks.
 
     Linking and block types ``and``/``or``/``xor``. A transition without a condition, a block
-    without fields or an unknown type is a configuration error in Znuny and never matches
-    (Transition.pm:322-327, 359-366, 372-381, 460-466).
+    without fields, an unknown linking / block / field type or a malformed ``Match`` is a
+    configuration error and raises :class:`ConditionConfigError`.
     """
     if not transition_config.conditions:
-        return False
+        raise ConditionConfigError("no conditions")
     linking = transition_config.condition_linking.lower()
     if linking not in _LINKINGS:
-        logger.warning("invalid ConditionLinking %r", transition_config.condition_linking)
-        return False
+        raise ConditionConfigError(
+            f"invalid ConditionLinking {transition_config.condition_linking!r}"
+        )
 
     cond_success = cond_fail = 0
     for block in transition_config.conditions:
         if not block.fields:
-            return False
+            raise ConditionConfigError("condition block without Fields")
         cond_type = (block.type_ or "and").lower()
         if cond_type not in _LINKINGS:
-            logger.warning("invalid condition block Type %r", block.type_)
-            return False
+            raise ConditionConfigError(f"invalid condition block Type {block.type_!r}")
 
         field_success = field_fail = 0
         skip_block = False
         for name in sorted(block.fields):
             result = _evaluate_field(name, block.fields[name], ticket_attrs, tags)
             if result == _ERROR:
-                return False
+                raise ConditionConfigError(f"invalid condition field {name!r}")
             if result == _MATCH:
                 field_success += 1
                 if linking == "or" and cond_type == "or":

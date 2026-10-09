@@ -95,9 +95,11 @@ from tiqora.domain.ticket_write_service import (
 from tiqora.process.actor import ProcessActor
 from tiqora.process.availability import RUNNING_STATES, assert_can_submit
 from tiqora.process.conditions import (
+    ConditionConfigError,
     ConditionData,
     _as_integer,  # noqa: PLC2701 -- shared Base.pm helpers
     _value_validate,  # noqa: PLC2701
+    check_transition,
     evaluate_transition,
     get_condition_data,
     resolve_transition_tags,
@@ -1476,8 +1478,13 @@ async def run_transitions(
         render=_render,
     )
     for transition in sorted(activity.outgoing_transitions, key=lambda t: t.entity_id):
-        if not evaluate_transition(transition.config, data, tags=tags):
-            continue
+        try:
+            if not check_transition(transition.config, data, tags=tags):
+                continue
+        except ConditionConfigError as exc:
+            # Znuny's bare ``return`` leaves TransitionCheck: nothing fires (Transition.pm:322).
+            logger.error("transition %s: %s; no transition runs", transition.entity_id, exc)
+            return _NO_TRANSITION
         unsupported: list[str] = []
         for action_node in transition.actions:
             skipped = await execute_transition_action(
