@@ -4457,64 +4457,6 @@
     "newCategory": "Noua categorie",
     "editorNoCategories": "Salvarea unui articol necesită o categorie - încă nu există."
   },
-  "stats": {
-    "title": "Rapoarte",
-    "subtitle": "Volumul biletelor, întârzierea, SLA și volumul de lucru în cozile dvs.",
-    "empty": "Nu există date pentru filtrele actuale.",
-    "exportCsv": "Exportați CSV",
-    "filters": {
-      "queue": "coadă",
-      "dateFrom": "De la",
-      "dateTo": "Pentru a",
-      "granularity": "Granularitatea",
-      "granularityOptions": {
-        "day": "Ziua",
-        "week": "Săptămâna",
-        "month": "luna"
-      }
-    },
-    "presets": {
-      "today": "Astăzi",
-      "yesterday": "Ieri",
-      "thisWeek": "Săptămâna aceasta",
-      "last7Days": "Ultimele 7 zile",
-      "thisMonth": "Luna aceasta",
-      "lastMonth": "Luna trecută",
-      "thisQuarter": "Trimestrul acesta",
-      "lastQuarter": "Ultimul trimestru",
-      "thisYear": "Anul acesta",
-      "lastYear": "Anul trecut",
-      "last30Days": "Ultimele 30 de zile",
-      "reset": "Resetați"
-    },
-    "tiles": {
-      "total": "bilete",
-      "escalated": "A escaladat",
-      "firstResponseBreached": "Primul răspuns a întârziat",
-      "avgFirstResponse": "Mediu primul răspuns",
-      "avgSolution": "Mediu timp de rezolvare"
-    },
-    "sections": {
-      "volume": "Volumul biletului",
-      "backlog": "Tendință de backlog",
-      "openSnapshot": "Deschideți bilete",
-      "agentWorkload": "Volumul de lucru al agentului"
-    },
-    "dimension": {
-      "queue": "coadă",
-      "state": "de stat",
-      "priority": "Prioritate",
-      "owner": "Proprietar"
-    },
-    "table": {
-      "created": "Creat",
-      "closed": "Închis",
-      "login": "Agent",
-      "name": "Nume",
-      "ownedOpen": "Deschis (deținut)",
-      "closedInPeriod": "Inchis in perioada"
-    }
-  },
   "calendar": {
     "title": "Calendar",
     "sidebar": "Calendare",
@@ -4994,7 +4936,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5006,23 +4947,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5307,6 +5243,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5314,6 +5251,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5327,6 +5265,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import type { TimeAccountingReportEntry } from "@tiqora/api-client";
+import { useAuth } from "@/auth/AuthContext";
 import { toBcp47 } from "@/i18n";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
@@ -98,6 +99,7 @@ const dateInputCls =
  */
 export function TimeAccountingReportPage() {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const locale = toBcp47(i18n.language);
   const navigate = useNavigate({ from: "/agent/time-accounting" });
   const search = useSearch({ from: "/agent/time-accounting" }) as TimeAccountingSearch;
@@ -239,15 +241,17 @@ export function TimeAccountingReportPage() {
           {t("timeAccounting.title")}
         </h1>
         <p className="mt-0.5 text-[12.5px] text-muted">{t("timeAccounting.hint")}</p>
-        <Link
-          to="/agent/reports"
-          search={{ category: "time" }}
-          className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-          data-testid="time-accounting-reports-link"
-        >
-          {t("timeAccounting.reportsLink")}
-          <span aria-hidden>→</span>
-        </Link>
+        {user?.can_view_reports && (
+          <Link
+            to="/agent/reports"
+            search={{ category: "time" }}
+            className="mt-2 inline-flex items-center gap-1 text-[12.5px] font-medium text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+            data-testid="time-accounting-reports-link"
+          >
+            {t("timeAccounting.reportsLink")}
+            <span aria-hidden>→</span>
+          </Link>
+        )}
       </div>
 
       {/* Filters: presets first, then the free-form fields they write into. */}

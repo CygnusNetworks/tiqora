@@ -4457,64 +4457,6 @@
     "newCategory": "नई श्रेणी",
     "editorNoCategories": "किसी लेख को सहेजने के लिए एक श्रेणी की आवश्यकता होती है - अभी तक कोई भी मौजूद नहीं है।"
   },
-  "stats": {
-    "title": "रिपोर्ट",
-    "subtitle": "आपकी कतारों में टिकट की मात्रा, बैकलॉग, एसएलए और कार्यभार।",
-    "empty": "वर्तमान फ़िल्टर के लिए कोई डेटा नहीं.",
-    "exportCsv": "सीएसवी निर्यात करें",
-    "filters": {
-      "queue": "कतार",
-      "dateFrom": "से",
-      "dateTo": "को",
-      "granularity": "ग्रैन्युलैरिटी",
-      "granularityOptions": {
-        "day": "दिन",
-        "week": "सप्ताह",
-        "month": "महीना"
-      }
-    },
-    "presets": {
-      "today": "आज",
-      "yesterday": "कल",
-      "thisWeek": "इस सप्ताह",
-      "last7Days": "पिछले 7 दिन",
-      "thisMonth": "इस महीने",
-      "lastMonth": "पिछले महीने",
-      "thisQuarter": "इस तिमाही",
-      "lastQuarter": "अंतिम तिमाही",
-      "thisYear": "इस साल",
-      "lastYear": "पिछले साल",
-      "last30Days": "पिछले 30 दिन",
-      "reset": "रीसेट करें"
-    },
-    "tiles": {
-      "total": "टिकट",
-      "escalated": "बढ़ा हुआ",
-      "firstResponseBreached": "पहली प्रतिक्रिया अतिदेय",
-      "avgFirstResponse": "औसत पहली प्रतिक्रिया",
-      "avgSolution": "औसत समाधान का समय"
-    },
-    "sections": {
-      "volume": "टिकट की मात्रा",
-      "backlog": "बैकलॉग प्रवृत्ति",
-      "openSnapshot": "खुले टिकट",
-      "agentWorkload": "एजेंट का कार्यभार"
-    },
-    "dimension": {
-      "queue": "कतार",
-      "state": "राज्य",
-      "priority": "प्राथमिकता",
-      "owner": "मालिक"
-    },
-    "table": {
-      "created": "बनाया गया",
-      "closed": "बंद",
-      "login": "एजेंट",
-      "name": "नाम",
-      "ownedOpen": "खुला (स्वामित्व वाला)",
-      "closedInPeriod": "अवधि में बंद"
-    }
-  },
   "calendar": {
     "title": "कैलेंडर",
     "sidebar": "कैलेंडर",
@@ -4994,7 +4936,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5006,23 +4947,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5307,6 +5243,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5314,6 +5251,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5327,6 +5265,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

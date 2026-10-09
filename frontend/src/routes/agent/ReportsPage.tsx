@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import { FactsBanner } from "@/components/reports/FactsBanner";
 import { ReportFilterBar } from "@/components/reports/ReportFilterBar";
 import { filterRange, rangeInvalid, toRunIn, type ReportFilterState } from "@/components/reports/reportFilter";
+import { ReportsAccessGate } from "@/components/reports/ReportsAccessGate";
+import { RunState } from "@/components/reports/RunState";
 import { ReportView } from "@/components/reports/ReportView";
 import { cellLabel, formatMeasure, OTHER_KEY, toSeries } from "@/components/reports/reportFormat";
 import { useReportRun } from "@/components/reports/useReportRun";
@@ -114,9 +116,7 @@ function OverviewCard({
       {blocked ? (
         <p className="py-6 text-center text-sm text-muted">{t("reports.rangeInvalid")}</p>
       ) : run.error ? (
-        <p className="text-sm text-danger" role="alert" data-testid={`${testId}-error`}>
-          {reportErrorMessage(run.error, t("reports.error"))}
-        </p>
+        <RunState run={run} testId={testId} />
       ) : run.result ? (
         children ? (
           children(run.result)
@@ -124,27 +124,37 @@ function OverviewCard({
           <ReportView report={{ key: report.key, definition: report.definition }} result={run.result} testId={testId} compact />
         )
       ) : (
-        <div className="flex min-h-[8rem] flex-col items-center justify-center gap-2" data-testid={`${testId}-loading`}>
-          <Spinner />
-          <span className="text-xs text-muted">
-            {run.jobId != null ? t("reports.runningInBackground") : t("reports.loading")}
-          </span>
-        </div>
+        <RunState run={run} testId={testId} />
       )}
     </section>
   );
 }
 
-type AgentRow = { key: string; name: string; open: number | null; reply: number; note: number; close: number };
+type AgentRow = {
+  key: string;
+  name: string;
+  /** `null` = not in that report's top list ("—"), never a made-up zero. */
+  open: number | null;
+  reply: number | null;
+  note: number | null;
+  close: number | null;
+  /** The folded "Weitere" tail of one report; it only fills that report's columns. */
+  tail?: "open" | "activity";
+};
 
-/** Agents: own open tickets now (open_now by owner) next to replies, notes and closings in the range. */
+/**
+ * Agents: own open tickets now (open_now by owner, top 15) next to replies, notes and closings in the
+ * range (agent_activity, top 25). The two reports rank different people, so an agent missing from one
+ * shows "—" there, and each report's "Weitere" tail stays a row of its own.
+ */
 function agentRows(owned: ReportResult | undefined, activity: ReportResult | undefined, t: ReturnType<typeof useTranslation>["t"]): AgentRow[] {
   const rows = new Map<string, AgentRow>();
-  const row = (key: string, name: string) => {
-    let r = rows.get(key);
+  const row = (key: string, name: string, tail?: AgentRow["tail"]) => {
+    const id = tail ? `${OTHER_KEY}:${tail}` : key;
+    let r = rows.get(id);
     if (!r) {
-      r = { key, name, open: null, reply: 0, note: 0, close: 0 };
-      rows.set(key, r);
+      r = { key: id, name, open: null, reply: null, note: null, close: null, tail };
+      rows.set(id, r);
     }
     return r;
   };
@@ -154,7 +164,8 @@ function agentRows(owned: ReportResult | undefined, activity: ReportResult | und
     for (const cells of owned.rows) {
       const key = String(cells[dim]);
       const v = cells[m];
-      row(key, cellLabel(owned, owned.columns[dim].key, key, t)).open = typeof v === "number" ? v : null;
+      row(key, cellLabel(owned, owned.columns[dim].key, key, t), key === OTHER_KEY ? "open" : undefined).open =
+        typeof v === "number" ? v : null;
     }
   }
   if (activity) {
@@ -164,19 +175,22 @@ function agentRows(owned: ReportResult | undefined, activity: ReportResult | und
       const key = String(cells[actor]);
       const k = String(cells[kind]);
       const v = typeof cells[m] === "number" ? (cells[m] as number) : 0;
-      const r = row(key, cellLabel(activity, activity.columns[actor].key, key, t));
-      if (k === "reply" || k === "note" || k === "close") r[k] += v;
+      const r = row(key, cellLabel(activity, activity.columns[actor].key, key, t), key === OTHER_KEY ? "activity" : undefined);
+      // First sight in the activity list: the agent is ranked there, so a missing kind really is 0.
+      r.reply ??= 0;
+      r.note ??= 0;
+      r.close ??= 0;
+      if (k === "reply" || k === "note" || k === "close") r[k] = (r[k] ?? 0) + v;
     }
   }
   return [...rows.values()].sort((a, b) => {
-    if (a.key === OTHER_KEY) return 1;
-    if (b.key === OTHER_KEY) return -1;
-    return (b.open ?? 0) - (a.open ?? 0) || b.reply - a.reply || a.name.localeCompare(b.name);
+    if (a.tail || b.tail) return a.tail ? (b.tail ? (a.tail === "open" ? -1 : 1) : 1) : -1;
+    return (b.open ?? 0) - (a.open ?? 0) || (b.reply ?? 0) - (a.reply ?? 0) || a.name.localeCompare(b.name);
   });
 }
 
 /** `/agent/reports`: the overview (key figures, trends, open tickets, agents) and the report catalogue. */
-export function ReportsPage() {
+function ReportsPageContent() {
   const { t, i18n } = useTranslation();
   const lang = i18n.resolvedLanguage ?? i18n.language ?? "de";
   const search = useSearch({ from: "/agent/reports" }) as ReportsSearch;
@@ -252,11 +266,7 @@ export function ReportsPage() {
 
             {kpiReport && (
               <div>
-                {blocked ? null : kpis.error ? (
-                  <p className="text-sm text-danger" role="alert">
-                    {reportErrorMessage(kpis.error, t("reports.error"))}
-                  </p>
-                ) : kpis.result ? (
+                {blocked ? null : kpis.result ? (
                   <ReportView
                     report={{ key: KPIS, definition: kpiReport.definition }}
                     result={kpis.result}
@@ -264,8 +274,8 @@ export function ReportsPage() {
                     kpiSparklines={sparklines}
                   />
                 ) : (
-                  <div className="flex min-h-[6rem] items-center justify-center rounded-lg border border-hairline bg-surface">
-                    <Spinner />
+                  <div className="rounded-lg border border-hairline bg-surface p-3">
+                    <RunState run={kpis} testId="stats-kpis" minHeight="min-h-[5rem]" />
                   </div>
                 )}
               </div>
@@ -375,6 +385,7 @@ export function ReportsPage() {
                           params={{ reportKey: r.key }}
                           className="flex h-full flex-col gap-1 rounded-lg border border-hairline bg-surface p-3 transition-colors hover:border-accent/60 hover:bg-surface-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
                           data-testid={`reports-card-${r.key}`}
+                          title={t(r.description_key)}
                         >
                           <span className="text-sm font-medium text-ink">{t(r.title_key)}</span>
                           <span className="line-clamp-3 text-xs text-muted">{t(r.description_key)}</span>
@@ -389,5 +400,13 @@ export function ReportsPage() {
         </>
       )}
     </div>
+  );
+}
+
+export function ReportsPage() {
+  return (
+    <ReportsAccessGate>
+      <ReportsPageContent />
+    </ReportsAccessGate>
   );
 }

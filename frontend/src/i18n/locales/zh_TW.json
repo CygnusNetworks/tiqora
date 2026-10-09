@@ -4457,64 +4457,6 @@
     "newCategory": "新類別",
     "editorNoCategories": "保存文章需要一個類別——目前還不存在。"
   },
-  "stats": {
-    "title": "報告",
-    "subtitle": "隊列中的票務量、積壓、SLA 和工作負載。",
-    "empty": "當前過濾器沒有資料。",
-    "exportCsv": "匯出 CSV",
-    "filters": {
-      "queue": "佇列",
-      "dateFrom": "來自",
-      "dateTo": "至",
-      "granularity": "粒徑",
-      "granularityOptions": {
-        "day": "日",
-        "week": "週",
-        "month": "月"
-      }
-    },
-    "presets": {
-      "today": "今天",
-      "yesterday": "昨天",
-      "thisWeek": "本週",
-      "last7Days": "過去 7 天",
-      "thisMonth": "這個月",
-      "lastMonth": "上個月",
-      "thisQuarter": "本季",
-      "lastQuarter": "上季",
-      "thisYear": "今年",
-      "lastYear": "去年",
-      "last30Days": "過去 30 天",
-      "reset": "重置"
-    },
-    "tiles": {
-      "total": "門票",
-      "escalated": "升級",
-      "firstResponseBreached": "第一次回覆逾期",
-      "avgFirstResponse": "平均。第一反應",
-      "avgSolution": "平均。求解時間"
-    },
-    "sections": {
-      "volume": "門票量",
-      "backlog": "積壓趨勢",
-      "openSnapshot": "開放門票",
-      "agentWorkload": "座席工作量"
-    },
-    "dimension": {
-      "queue": "佇列",
-      "state": "狀態",
-      "priority": "優先權",
-      "owner": "業主"
-    },
-    "table": {
-      "created": "已創建",
-      "closed": "關閉",
-      "login": "服務人員",
-      "name": "名稱",
-      "ownedOpen": "開放（擁有）",
-      "closedInPeriod": "期間關閉"
-    }
-  },
   "calendar": {
     "title": "日曆",
     "sidebar": "日曆",
@@ -4994,7 +4936,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5006,23 +4947,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5307,6 +5243,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5314,6 +5251,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5327,6 +5265,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

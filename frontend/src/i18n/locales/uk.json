@@ -4457,64 +4457,6 @@
     "newCategory": "Нова категорія",
     "editorNoCategories": "Щоб зберегти статтю, потрібна категорія — такої ще немає."
   },
-  "stats": {
-    "title": "Звіти",
-    "subtitle": "Обсяг заявок, відставання, SLA та робоче навантаження у ваших чергах.",
-    "empty": "Немає даних для поточних фільтрів.",
-    "exportCsv": "Експорт CSV",
-    "filters": {
-      "queue": "Черга",
-      "dateFrom": "Від",
-      "dateTo": "до",
-      "granularity": "Зернистість",
-      "granularityOptions": {
-        "day": "День",
-        "week": "тиждень",
-        "month": "місяць"
-      }
-    },
-    "presets": {
-      "today": "Сьогодні",
-      "yesterday": "вчора",
-      "thisWeek": "Цього тижня",
-      "last7Days": "Останні 7 днів",
-      "thisMonth": "Цей місяць",
-      "lastMonth": "Останній місяць",
-      "thisQuarter": "Цей квартал",
-      "lastQuarter": "Остання чверть",
-      "thisYear": "Цього року",
-      "lastYear": "Минулого року",
-      "last30Days": "Останні 30 днів",
-      "reset": "Скинути"
-    },
-    "tiles": {
-      "total": "квитки",
-      "escalated": "Ескалація",
-      "firstResponseBreached": "Перша відповідь прострочена",
-      "avgFirstResponse": "Середнє перша відповідь",
-      "avgSolution": "Середнє час вирішення"
-    },
-    "sections": {
-      "volume": "Обсяг квитка",
-      "backlog": "Тенденція відставання",
-      "openSnapshot": "Відкрити квитки",
-      "agentWorkload": "Завантаженість агента"
-    },
-    "dimension": {
-      "queue": "Черга",
-      "state": "Стан",
-      "priority": "Пріоритет",
-      "owner": "Власник"
-    },
-    "table": {
-      "created": "Створено",
-      "closed": "Закрито",
-      "login": "Агент",
-      "name": "Ім'я",
-      "ownedOpen": "Відкритий (у власності)",
-      "closedInPeriod": "Закрито в період"
-    }
-  },
   "calendar": {
     "title": "Календар",
     "sidebar": "Календарі",
@@ -4994,7 +4936,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5006,23 +4947,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5307,6 +5243,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5314,6 +5251,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5327,6 +5265,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

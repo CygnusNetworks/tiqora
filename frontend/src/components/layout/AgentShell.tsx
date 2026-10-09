@@ -583,13 +583,15 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             testId="agent-nav-calendar"
             onNavigate={onNavigate}
           />
-          <NavItem
-            to="/agent/reports"
-            label={t("sidebar.stats")}
-            icon={<ChartIcon />}
-            testId="agent-nav-stats"
-            onNavigate={onNavigate}
-          />
+          {user?.can_view_reports && (
+            <NavItem
+              to="/agent/reports"
+              label={t("sidebar.stats")}
+              icon={<ChartIcon />}
+              testId="agent-nav-stats"
+              onNavigate={onNavigate}
+            />
+          )}
           <NavItem
             to="/agent/time-accounting"
             label={t("sidebar.timeAccounting")}

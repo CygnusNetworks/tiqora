@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useJob } from "@/components/jobs/useJob";
+import { ApiError } from "@/lib/api";
 import { TERMINAL_JOB_STATUSES, jobsApi } from "@/lib/jobsApi";
 import { reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsApi";
 
@@ -14,7 +15,15 @@ import { reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsAp
  * A still-active job is cancelled (best effort) when the request changes or the
  * component unmounts, so quick preset changes do not fill the per-user job cap.
  */
-export function useReportRun(body: ReportRunIn | null, opts: { enabled?: boolean } = {}) {
+/** Tries after the first answer "429: too many active report jobs" (3 retries, backoff 3 s, 6 s, 12 s). */
+export const RUN_429_RETRIES = 3;
+/** Mutable only so tests can shorten the backoff. */
+export const runRetry = { baseMs: 3000 };
+
+export function useReportRun(
+  body: ReportRunIn | null,
+  opts: { enabled?: boolean; retryBaseMs?: number } = {},
+) {
   const queryClient = useQueryClient();
   const enabled = body != null && opts.enabled !== false;
   const run = useQuery({
@@ -23,8 +32,12 @@ export function useReportRun(body: ReportRunIn | null, opts: { enabled?: boolean
     enabled,
     // Live reports ("open now") must not stay frozen after a remount.
     staleTime: 60_000,
-    retry: false,
+    // The per-user job cap answers 429 while earlier (cancelled) runs still wind down: wait, don't fail.
+    retry: (count, err) => err instanceof ApiError && err.status === 429 && count < RUN_429_RETRIES,
+    retryDelay: (count) => (opts.retryBaseMs ?? runRetry.baseMs) * 2 ** count,
   });
+  const waitingForSlot =
+    run.isFetching && run.failureCount > 0 && run.failureReason instanceof ApiError && run.failureReason.status === 429;
 
   const jobId = run.data?.job?.job_id ?? null;
   const { job, error: jobLoadError } = useJob(jobId);
@@ -74,6 +87,8 @@ export function useReportRun(body: ReportRunIn | null, opts: { enabled?: boolean
     jobId,
     isLoading: enabled && (run.isPending || run.isFetching || jobPending) && !error,
     error: error ?? null,
+    /** Retrying after "too many active jobs": show a waiting hint instead of an error. */
+    waitingForSlot,
     refetch: () => {
       void run.refetch();
     },

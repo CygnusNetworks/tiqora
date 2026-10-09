@@ -43,6 +43,11 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
+const authFlags = vi.hoisted(() => ({ canViewReports: true }));
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: 1, can_view_reports: authFlags.canViewReports } }),
+}));
+
 vi.mock("@/lib/api", () => ({
   api: {
     listTimeAccountingReport: (...args: unknown[]) => listTimeAccountingReport(...args),
@@ -113,6 +118,17 @@ describe("TimeAccountingReportPage", () => {
       "ta-filter-clear",
     ]) {
       expect(screen.getByTestId(id)).toBeInTheDocument();
+    }
+  });
+
+  it("does not offer the reports link to an agent without report access", async () => {
+    authFlags.canViewReports = false;
+    try {
+      renderPage();
+      await screen.findByTestId("time-accounting-report");
+      expect(screen.queryByTestId("time-accounting-reports-link")).not.toBeInTheDocument();
+    } finally {
+      authFlags.canViewReports = true;
     }
   });
 

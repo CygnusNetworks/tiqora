@@ -13,6 +13,8 @@ const user = {
   // extra capability probe. Override via route when testing the access denied
   // path (see e2e/admin-access.spec.ts).
   is_admin: true,
+  // The reports nav entry and routes need this (the server decides: reporting.access).
+  can_view_reports: true,
 };
 
 const queues = [

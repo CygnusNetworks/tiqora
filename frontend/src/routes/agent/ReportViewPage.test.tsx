@@ -46,7 +46,10 @@ vi.mock("@/lib/api", async (orig) => ({
   },
 }));
 
-vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { is_admin: false } }) }));
+const authFlags = vi.hoisted(() => ({ canViewReports: true }));
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: { is_admin: false, can_view_reports: authFlags.canViewReports } }),
+}));
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -97,6 +100,18 @@ beforeEach(() => {
 });
 
 describe("ReportViewPage", () => {
+  it("shows a notice and runs nothing for an agent without report access", async () => {
+    authFlags.canViewReports = false;
+    try {
+      renderPage();
+      expect(await screen.findByTestId("reports-denied")).toHaveTextContent("Kein Zugriff auf Berichte");
+      expect(reportsApi.run).not.toHaveBeenCalled();
+      expect(vi.mocked(reportsApi.get)).not.toHaveBeenCalled();
+    } finally {
+      authFlags.canViewReports = true;
+    }
+  });
+
   it("loads the definition, runs it and exports XLSX via a background job", async () => {
     searchParams = { preset: "custom", from: "2026-09-01", to: "2026-09-30", queues: "1,2" };
     renderPage();

@@ -18,7 +18,7 @@ const REFETCH_INTERVAL_MS = 10_000;
 /** Admin page "Berichtsdaten": state of the report data plus a full rebuild. */
 export function ReportingAdminPage() {
   const { t, i18n } = useTranslation();
-  const locale = toBcp47(i18n.language);
+  const locale = toBcp47(i18n.resolvedLanguage ?? i18n.language);
   const qc = useQueryClient();
   const [since, setSince] = useState("");
   const [confirming, setConfirming] = useState(false);

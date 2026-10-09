@@ -40,7 +40,7 @@ vi.mock("@/components/agent/AccountMenu", () => ({
   AccountMenu: () => <div data-testid="account-menu-stub" />,
 }));
 
-const authFlags = vi.hoisted(() => ({ canUseDirectory: false }));
+const authFlags = vi.hoisted(() => ({ canUseDirectory: false, canViewReports: true }));
 vi.mock("@/auth/AuthContext", () => ({
   useAuth: () => ({
     user: {
@@ -48,6 +48,7 @@ vi.mock("@/auth/AuthContext", () => ({
       login: "agent",
       can_edit_templates: false,
       can_use_customer_directory: authFlags.canUseDirectory,
+      can_view_reports: authFlags.canViewReports,
     },
   }),
 }));
@@ -130,6 +131,17 @@ describe("AgentShell sidebar", () => {
     await renderShell();
     const link = await screen.findByTestId("agent-nav-customers");
     expect(link).toHaveAttribute("href", "/agent/customers");
+  });
+
+  it("hides the reports entry from an agent without report access", async () => {
+    authFlags.canViewReports = false;
+    try {
+      await renderShell();
+      expect(await screen.findByTestId("agent-nav-calendar")).toBeInTheDocument();
+      expect(screen.queryByTestId("agent-nav-stats")).toBeNull();
+    } finally {
+      authFlags.canViewReports = true;
+    }
   });
 
   it("renders all groups expanded by default", async () => {

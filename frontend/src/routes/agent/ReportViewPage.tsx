@@ -13,6 +13,7 @@ import {
   toRunIn,
   type ReportFilterState,
 } from "@/components/reports/reportFilter";
+import { ReportsAccessGate } from "@/components/reports/ReportsAccessGate";
 import { ReportView } from "@/components/reports/ReportView";
 import { useReportRun } from "@/components/reports/useReportRun";
 import { Button } from "@/components/ui/Button";
@@ -24,7 +25,7 @@ import { reportErrorMessage, reportsApi } from "@/lib/reportsApi";
 import { filterFromSearch, searchFromFilter, type ReportViewSearch } from "./reportViewSearch";
 
 /** `/agent/reports/$reportKey`: one report with its filters, chart/table and export. */
-export function ReportViewPage() {
+function ReportViewPageContent() {
   const { t, i18n } = useTranslation();
   const bcp = toBcp47(i18n.resolvedLanguage ?? i18n.language ?? "de");
   const { reportKey } = useParams({ from: "/agent/reports/$reportKey" });
@@ -146,7 +147,7 @@ export function ReportViewPage() {
                 </Button>
               </div>
             ) : result ? (
-              <ReportView report={{ key: reportKey, definition }} result={result} />
+              <ReportView key={reportKey} report={{ key: reportKey, definition }} result={result} />
             ) : (
               <div className="flex items-center gap-3 py-10 text-sm text-muted" data-testid="report-loading">
                 <Spinner />
@@ -158,5 +159,13 @@ export function ReportViewPage() {
         </>
       )}
     </div>
+  );
+}
+
+export function ReportViewPage() {
+  return (
+    <ReportsAccessGate>
+      <ReportViewPageContent />
+    </ReportsAccessGate>
   );
 }

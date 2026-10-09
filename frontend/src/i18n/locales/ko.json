@@ -4457,64 +4457,6 @@
     "newCategory": "새로운 카테고리",
     "editorNoCategories": "기사를 저장하려면 카테고리가 필요합니다. 아직 카테고리가 없습니다."
   },
-  "stats": {
-    "title": "보고서",
-    "subtitle": "대기열 전체의 티켓 볼륨, 백로그, SLA 및 워크로드.",
-    "empty": "현재 필터에 대한 데이터가 없습니다.",
-    "exportCsv": "CSV 내보내기",
-    "filters": {
-      "queue": "대기열",
-      "dateFrom": "에서",
-      "dateTo": "받는 사람",
-      "granularity": "세분성",
-      "granularityOptions": {
-        "day": "일",
-        "week": "주",
-        "month": "월"
-      }
-    },
-    "presets": {
-      "today": "오늘",
-      "yesterday": "어제",
-      "thisWeek": "이번 주",
-      "last7Days": "지난 7일",
-      "thisMonth": "이번 달",
-      "lastMonth": "지난달",
-      "thisQuarter": "이번 분기",
-      "lastQuarter": "지난 분기",
-      "thisYear": "올해",
-      "lastYear": "작년",
-      "last30Days": "지난 30일",
-      "reset": "재설정"
-    },
-    "tiles": {
-      "total": "티켓",
-      "escalated": "에스컬레이션됨",
-      "firstResponseBreached": "첫 번째 응답 기한이 지났습니다.",
-      "avgFirstResponse": "평균 첫 번째 응답",
-      "avgSolution": "평균 해결 시간"
-    },
-    "sections": {
-      "volume": "티켓 수량",
-      "backlog": "백로그 동향",
-      "openSnapshot": "오픈 티켓",
-      "agentWorkload": "상담사 업무량"
-    },
-    "dimension": {
-      "queue": "대기열",
-      "state": "상태",
-      "priority": "우선순위",
-      "owner": "소유자"
-    },
-    "table": {
-      "created": "생성됨",
-      "closed": "휴무",
-      "login": "대리인",
-      "name": "이름",
-      "ownedOpen": "공개(소유)",
-      "closedInPeriod": "휴관기간"
-    }
-  },
   "calendar": {
     "title": "달력",
     "sidebar": "달력",
@@ -4994,7 +4936,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5006,23 +4947,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5307,6 +5243,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5314,6 +5251,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5327,6 +5265,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

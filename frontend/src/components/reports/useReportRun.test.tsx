@@ -5,7 +5,7 @@ import { StrictMode, type ReactNode } from "react";
 import { ApiError } from "@/lib/api";
 import { jobsApi, type Job } from "@/lib/jobsApi";
 import { reportErrorMessage, reportsApi, type ReportResult, type ReportRunIn } from "@/lib/reportsApi";
-import { useReportRun } from "./useReportRun";
+import { RUN_429_RETRIES, useReportRun } from "./useReportRun";
 
 vi.mock("@/lib/reportsApi", async (orig) => ({
   ...(await orig<typeof import("@/lib/reportsApi")>()),
@@ -86,12 +86,47 @@ describe("useReportRun", () => {
     vi.mocked(reportsApi.run).mockRejectedValue(
       new ApiError(429, { detail: { message: msg } }, "/api/v1/reports/run"),
     );
-    const { result } = renderHook(() => useReportRun(body), { wrapper: wrapper() });
+    const { result } = renderHook(() => useReportRun(body, { retryBaseMs: 1 }), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.error).toBeTruthy());
     expect(reportErrorMessage(result.current.error, "Fehler")).toBe(msg);
     expect(result.current.isLoading).toBe(false);
     expect(reportErrorMessage(new Error("Zu groß"), "Fehler")).toBe("Zu groß");
     expect(reportErrorMessage("boom", "Fehler")).toBe("Fehler");
+  });
+
+  it("retries a 429 with backoff and recovers once a slot is free", async () => {
+    const cap = new ApiError(429, { detail: { message: "Zu viele Berichte" } }, "/api/v1/reports/run");
+    vi.mocked(reportsApi.run)
+      .mockRejectedValueOnce(cap)
+      .mockRejectedValueOnce(cap)
+      .mockResolvedValue({ result: resultOf(4), job: null });
+    const { result } = renderHook(() => useReportRun(body, { retryBaseMs: 30 }), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.waitingForSlot).toBe(true));
+    expect(result.current.error).toBeNull();
+    expect(result.current.isLoading).toBe(true);
+    await waitFor(() => expect(result.current.result?.row_count).toBe(4));
+    expect(reportsApi.run).toHaveBeenCalledTimes(3);
+    expect(result.current.error).toBeNull();
+    expect(result.current.waitingForSlot).toBe(false);
+  });
+
+  it("gives up after three 429 retries and offers a manual refetch", async () => {
+    const cap = new ApiError(429, { detail: { message: "Zu viele Berichte" } }, "/api/v1/reports/run");
+    vi.mocked(reportsApi.run).mockRejectedValue(cap);
+    const { result } = renderHook(() => useReportRun(body, { retryBaseMs: 1 }), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.error).toBe(cap));
+    expect(reportsApi.run).toHaveBeenCalledTimes(1 + RUN_429_RETRIES);
+    expect(result.current.waitingForSlot).toBe(false);
+    vi.mocked(reportsApi.run).mockResolvedValue({ result: resultOf(6), job: null });
+    result.current.refetch();
+    await waitFor(() => expect(result.current.result?.row_count).toBe(6));
+  });
+
+  it("does not retry other errors", async () => {
+    vi.mocked(reportsApi.run).mockRejectedValue(new ApiError(504, { detail: { message: "Zeit" } }, "/x"));
+    const { result } = renderHook(() => useReportRun(body, { retryBaseMs: 1 }), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.error).toBeTruthy());
+    expect(reportsApi.run).toHaveBeenCalledTimes(1);
   });
 
   it("cancels the old job when the request changes", async () => {

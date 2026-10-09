@@ -159,9 +159,10 @@ describe("ReportView", () => {
     const ticketsDelta = screen.getByTestId("report-view-kpi-tickets-delta");
     expect(ticketsDelta).toHaveTextContent("+20 %");
     expect(ticketsDelta.className).toContain("text-green");
-    // fewer breaches is an improvement: -20 % in green
+    // rates change in percentage points: 12,5 % -> 10 % is -2,5 Pp. (an improvement, green)
     const breachDelta = screen.getByTestId("report-view-kpi-response_breach_rate-delta");
-    expect(breachDelta).toHaveTextContent("−20 %");
+    expect(breachDelta).toHaveTextContent("−2,5 Pp.");
+    expect(breachDelta).not.toHaveTextContent("%");
     expect(breachDelta.className).toContain("text-green");
     expect(screen.getByTestId("report-view-kpi-response_breach_rate")).toHaveTextContent("10 %");
     // slower first response is worse: +50 % in red
@@ -288,8 +289,59 @@ describe("ReportView", () => {
     expect(legend).toHaveTextContent(i18n.t("reports.values.channel.internal"));
     expect(legend).not.toHaveTextContent("Weitere");
     expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-email")).toHaveAttribute("fill", "var(--color-series-1)");
-    expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-internal")).toHaveAttribute("fill", "var(--color-series-2)");
+    expect(screen.getByTestId("report-view-stacked-seg-2024-06-03-internal")).toHaveAttribute("fill", "var(--color-series-6)");
     expect(screen.queryByTestId("report-view-stacked-seg-2024-06-03-__other__")).not.toBeInTheDocument();
+  });
+
+  it("draws a ranking (queues) as horizontal bars with the full name in a title and no tab stops when dense", () => {
+    const rows = Array.from({ length: 14 }, (_, i) => [String(i + 1), 20 - i] as [string, number]);
+    render(
+      <Providers>
+        <ReportView
+          report={{ key: "builtin.open_now", definition: defOf("builtin.open_now") }}
+          result={resultOf({
+            columns: [
+              { key: "queue", role: "dimension", type: "id", label_key: "reports.dimensions.queue", grain: null, i18n_values: null },
+              { key: "tickets", role: "measure", type: "count", label_key: "reports.measures.tickets", grain: null, i18n_values: null },
+            ],
+            rows,
+            labels: { queue: { "1": "Support Netzwerk Süd-West Rechenzentrum" } },
+          })}
+        />
+      </Providers>,
+    );
+    expect(screen.getByTestId("report-view-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("report-view-bar-hit-0")).not.toBeInTheDocument();
+    const first = screen.getByTestId("report-view-bar-row-0");
+    expect(first).toHaveAttribute("aria-label", "Support Netzwerk Süd-West Rechenzentrum: 20");
+    expect(first.querySelector("[title]")).toHaveAttribute("title", "Support Netzwerk Süd-West Rechenzentrum");
+    expect(first).toHaveAttribute("tabindex", "-1");
+    expect(screen.getByTestId("report-view-bar-bar-0")).toHaveStyle({ width: "100%" });
+    expect(screen.getByTestId("report-view-bar-bar-13")).toHaveStyle({ width: "35%" });
+  });
+
+  it("time buckets without data leave a gap in the line and read '—', not 0", () => {
+    render(
+      <Providers>
+        <ReportView
+          report={{ key: "builtin.volume", definition: volumeDef }}
+          result={{
+            ...volumeResult,
+            rows: [
+              ["2024-06-03", "create", 12],
+              ["2024-06-10", "close", 4],
+              ["2024-06-17", "create", 7],
+            ],
+          }}
+        />
+      </Providers>,
+    );
+    // create: weeks 23 and 25 with nothing in 24 -> two subpaths
+    const create = screen.getByTestId("report-view-line-series-Erstellt");
+    expect((create.getAttribute("d") ?? "").match(/M/g)).toHaveLength(2);
+    expect(screen.getByTestId("report-view-line-hit-1")).toHaveAttribute("aria-label", expect.stringContaining("Erstellt —"));
+    fireEvent.mouseEnter(screen.getByTestId("report-view-line-hit-1"));
+    expect(screen.getByTestId("report-view-line-tooltip")).toHaveTextContent("—");
   });
 
   it("names the folded tail 'Weitere' in the table view too", () => {

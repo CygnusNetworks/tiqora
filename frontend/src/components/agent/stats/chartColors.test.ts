@@ -61,15 +61,19 @@ describe("chartColors", () => {
   });
 
   it("gives a late fixed-order key a free colour while at most six series show", () => {
-    // "internal" is 7th in the channel order: alone with email it takes the next free slot.
+    // "internal" is 7th in the channel order: it takes the highest free slot, so it keeps that colour
+    // whichever of the early channels a filter leaves over.
     const two = displaySlots(["email", "internal"], CHANNEL_ORDER);
     expect(two.get("email")).toBe(0);
-    expect(two.get("internal")).toBe(1);
-    // keys that own a slot keep it; the late key fills the lowest gap
+    expect(two.get("internal")).toBe(5);
     const some = displaySlots(["phone", "internal", "webchat"], CHANNEL_ORDER);
     expect(some.get("phone")).toBe(1);
     expect(some.get("webchat")).toBe(3);
-    expect(some.get("internal")).toBe(0);
+    expect(some.get("internal")).toBe(5);
+    // the slot of an early key is never taken: with whatsapp present, internal moves to the next free one
+    const withWhatsapp = displaySlots(["email", "whatsapp", "internal"], CHANNEL_ORDER);
+    expect(withWhatsapp.get("whatsapp")).toBe(5);
+    expect(withWhatsapp.get("internal")).toBe(4);
     // seven series: the stable order applies and the 7th folds (slot >= SERIES_SLOTS)
     const all = displaySlots([...CHANNEL_ORDER], CHANNEL_ORDER);
     expect(all.get("internal")).toBe(6);

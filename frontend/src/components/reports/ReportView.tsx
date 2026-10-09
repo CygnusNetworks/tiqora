@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { BarChart } from "@/components/agent/stats/BarChart";
 import { DonutChart } from "@/components/agent/stats/DonutChart";
 import { HeatmapChart } from "@/components/agent/stats/HeatmapChart";
+import { HorizontalBarChart } from "@/components/agent/stats/HorizontalBarChart";
 import { KpiTile } from "@/components/agent/stats/KpiTile";
 import { LineChart } from "@/components/agent/stats/LineChart";
 import { StackedBarChart } from "@/components/agent/stats/StackedBarChart";
@@ -97,10 +98,13 @@ function KpiRow({
         const value = row[ci] ?? null;
         const prev = previous?.[ci] ?? null;
         let delta;
-        if (typeof value === "number" && typeof prev === "number" && prev !== 0) {
-          const change = (value - prev) / Math.abs(prev);
+        // Rates change in percentage points; a relative change of a rate misleads.
+        const asPoints = col.type === "percent";
+        if (typeof value === "number" && typeof prev === "number" && (asPoints || prev !== 0)) {
+          const change = asPoints ? value - prev : (value - prev) / Math.abs(prev);
           delta = {
             value: change,
+            unit: asPoints ? "points" : "relative",
             direction: change > 0 ? "up" : change < 0 ? "down" : "flat",
             goodWhen: goodWhen(col.key),
           } as const;
@@ -275,7 +279,7 @@ export function ReportView({
           area={type === "area"}
           height={height}
           labels={categories.map((c) => c.label)}
-          series={series.map((s) => ({ name: s.label, color: s.color, values: s.values.map((v) => v ?? 0) }))}
+          series={series.map((s) => ({ name: s.label, color: s.color, values: s.values }))}
           formatValue={fmt}
         />
       );
@@ -283,13 +287,23 @@ export function ReportView({
       chart = (
         <StackedBarChart testId={`${testId}-stacked`} height={height} categories={categories} series={series} formatValue={fmt} />
       );
+    } else if (dims[0] != null && !["date", "hour", "weekday"].includes(dims[0].type)) {
+      // Rankings (queues, customers, owners ...): horizontal bars keep long names and top-25 lists readable.
+      chart = (
+        <HorizontalBarChart
+          testId={`${testId}-bar`}
+          color="var(--color-series-1)"
+          data={categories.map((c, i) => ({ label: c.label, value: series[0]?.values[i] ?? null }))}
+          formatValue={fmt}
+        />
+      );
     } else {
       chart = (
         <BarChart
           testId={`${testId}-bar`}
           height={height}
           color="var(--color-series-1)"
-          data={categories.map((c, i) => ({ label: c.label, value: series[0]?.values[i] ?? 0 }))}
+          data={categories.map((c, i) => ({ label: c.label, value: series[0]?.values[i] ?? null }))}
           formatValue={fmt}
         />
       );

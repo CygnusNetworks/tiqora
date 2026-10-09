@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
@@ -8,6 +8,7 @@ import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, demoSources, resolveReportRun } from
 import { ApiError } from "@/lib/api";
 import { dateRangeForPreset } from "@/lib/dateRanges";
 import { reportsApi, type ReportRunIn } from "@/lib/reportsApi";
+import { runRetry } from "@/components/reports/useReportRun";
 import { ReportsPage } from "./ReportsPage";
 
 let searchParams: Record<string, unknown> = {};
@@ -56,7 +57,10 @@ vi.mock("@/lib/api", async (orig) => ({
   },
 }));
 
-vi.mock("@/auth/AuthContext", () => ({ useAuth: () => ({ user: { is_admin: false } }) }));
+const authFlags = vi.hoisted(() => ({ canViewReports: true }));
+vi.mock("@/auth/AuthContext", () => ({
+  useAuth: () => ({ user: { is_admin: false, can_view_reports: authFlags.canViewReports } }),
+}));
 
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -86,6 +90,18 @@ beforeEach(() => {
 });
 
 describe("ReportsPage", () => {
+  it("shows a notice and runs nothing for an agent without report access", async () => {
+    authFlags.canViewReports = false;
+    try {
+      renderPage();
+      expect(await screen.findByTestId("reports-denied")).toHaveTextContent("Kein Zugriff auf Berichte");
+      expect(reportsApi.run).not.toHaveBeenCalled();
+      expect(vi.mocked(reportsApi.catalogue)).not.toHaveBeenCalled();
+    } finally {
+      authFlags.canViewReports = true;
+    }
+  });
+
   it("shows the facts banner while data is being built", async () => {
     vi.mocked(reportsApi.catalogue).mockResolvedValue({
       ...DEMO_REPORT_CATALOGUE,
@@ -238,19 +254,49 @@ describe("ReportsPage", () => {
     expect(screen.getByTestId("stats-chart-open-snapshot-chart")).not.toHaveTextContent("Support");
   });
 
-  it("shows the server's message when a card's run is refused (429), not a spinner", async () => {
+  describe("job cap (429)", () => {
     const msg = "Es laufen schon drei Berichte für Sie. Bitte warten Sie, bis einer fertig ist.";
-    vi.mocked(reportsApi.run).mockImplementation(async (body) => {
-      if (body.report_key === "builtin.volume") {
-        throw new ApiError(429, { detail: { message: msg } }, "/api/v1/reports/run");
-      }
-      return resolveReportRun(body);
+    const cap = () => new ApiError(429, { detail: { message: msg } }, "/api/v1/reports/run");
+    beforeEach(() => {
+      runRetry.baseMs = 1;
     });
-    renderPage();
-    expect(await screen.findByTestId("stats-chart-volume-error")).toHaveTextContent(msg);
-    expect(screen.queryByTestId("stats-chart-volume-loading")).not.toBeInTheDocument();
-    // the other cards are unaffected
-    expect(await screen.findByTestId("stats-chart-backlog-chart")).toBeInTheDocument();
+    afterEach(() => {
+      runRetry.baseMs = 3000;
+    });
+
+    it("waits and retries a refused card, then shows the chart", async () => {
+      let refused = 0;
+      vi.mocked(reportsApi.run).mockImplementation(async (body) => {
+        if (body.report_key === "builtin.volume" && refused < 2) {
+          refused += 1;
+          throw cap();
+        }
+        return resolveReportRun(body);
+      });
+      renderPage();
+      expect(await screen.findByTestId("stats-chart-volume-chart")).toBeInTheDocument();
+      expect(refused).toBe(2);
+      expect(screen.queryByTestId("stats-chart-volume-error")).not.toBeInTheDocument();
+    });
+
+    it("shows the server's message with a retry button on the card and the key figures row", async () => {
+      let open = false;
+      vi.mocked(reportsApi.run).mockImplementation(async (body) => {
+        if (!open && (body.report_key === "builtin.volume" || body.report_key === "builtin.ticket_kpis")) throw cap();
+        return resolveReportRun(body);
+      });
+      renderPage();
+      expect(await screen.findByTestId("stats-chart-volume-error", {}, { timeout: 3000 })).toHaveTextContent(msg);
+      expect(await screen.findByTestId("stats-kpis-error")).toHaveTextContent(msg);
+      expect(screen.queryByTestId("stats-chart-volume-loading")).not.toBeInTheDocument();
+      // the other cards are unaffected
+      expect(await screen.findByTestId("stats-chart-backlog-chart")).toBeInTheDocument();
+      open = true;
+      fireEvent.click(screen.getByTestId("stats-chart-volume-retry"));
+      expect(await screen.findByTestId("stats-chart-volume-chart")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("stats-kpis-retry"));
+      expect(await screen.findByTestId("stats-kpis-kpi-tickets")).toBeInTheDocument();
+    });
   });
 
   it("opens a trend chart in the viewer with the overview's range, queues and buckets", async () => {
@@ -288,5 +334,41 @@ describe("ReportsPage", () => {
     renderPage();
     const row = await screen.findByTestId("stats-workload-row-2");
     await waitFor(() => expect(row).toHaveTextContent("1.234"));
+  });
+
+  it("agent table: dashes for agents missing from a list, and the two 'Weitere' tails stay apart", async () => {
+    vi.mocked(reportsApi.run).mockImplementation(async (body) => {
+      const out = resolveReportRun(body);
+      if (body.report_key === "builtin.open_now" && body.dimension_choices?.["0"] === "owner" && out.result) {
+        out.result = {
+          ...out.result,
+          rows: [["2", 5], ["3", 4], ["__other__", 7]],
+          labels: { owner: { "2": "Anna Beispiel", "3": "Bernd Ohnetaten" } },
+        };
+      }
+      if (body.report_key === "builtin.agent_activity" && out.result) {
+        out.result = {
+          ...out.result,
+          rows: [["2", "reply", 9], ["9", "note", 2], ["__other__", "reply", 11]],
+          labels: { actor: { "2": "Anna Beispiel", "9": "Cora Nuraktiv" } },
+        };
+      }
+      return out;
+    });
+    renderPage();
+    const cells = async (key: string) => {
+      const row = await screen.findByTestId(`stats-workload-row-${key}`);
+      await waitFor(() => expect(row.querySelectorAll("td")).toHaveLength(4));
+      return Array.from(row.querySelectorAll("td")).map((c) => c.textContent);
+    };
+    // open 5; in the activity list with 9 replies, no notes or closings
+    await waitFor(async () => expect(await cells("2")).toEqual(["5", "9", "0", "0"]));
+    // owns tickets but is outside the activity top list: not 0 replies, but unknown
+    expect(await cells("3")).toEqual(["4", "—", "—", "—"]);
+    // active but not among the owners
+    expect(await cells("9")).toEqual(["—", "0", "2", "0"]);
+    // each tail only fills its own report's columns
+    expect(await cells("__other__:open")).toEqual(["7", "—", "—", "—"]);
+    expect(await cells("__other__:activity")).toEqual(["—", "11", "0", "0"]);
   });
 });

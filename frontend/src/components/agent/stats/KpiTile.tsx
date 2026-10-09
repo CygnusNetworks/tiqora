@@ -5,6 +5,8 @@ import { useChartFormat } from "./chartLocale";
 export type KpiDelta = {
   /** Relative change, 0.12 = 12 %; may be negative (-0.08 = down 8 %). The sign drives arrow, text and screen-reader wording. */
   value: number;
+  /** "points": `value` is the difference of two rates (0.02 = +2,0 Pp.), not a relative change. */
+  unit?: "relative" | "points";
   /**
    * Caller contract: only meaningful for colour. `direction === goodWhen` is green, the opposite is red,
    * "flat" is muted. Pass the direction of the change (the sign of `value`); the tile never lets it
@@ -40,7 +42,7 @@ function Arrow({ direction }: { direction: KpiDelta["direction"] }) {
 
 /** Stat tile with a headline value, a change indicator (icon + text, never colour alone) and an optional sparkline. */
 export function KpiTile({ label, value, delta, sparkline, hint, testId }: KpiTileProps) {
-  const { t, percent: formatPercent } = useChartFormat();
+  const { t, percent: formatPercent, points: formatPoints } = useChartFormat();
   const tone = !delta || delta.direction === "flat"
     ? "text-muted"
     : delta.direction === delta.goodWhen
@@ -49,7 +51,11 @@ export function KpiTile({ label, value, delta, sparkline, hint, testId }: KpiTil
   // Arrow, sign and screen-reader text all come from the sign of the number.
   const shown: KpiDelta["direction"] = !delta || delta.value === 0 ? "flat" : delta.value < 0 ? "down" : "up";
   const sign = shown === "down" ? "−" : shown === "up" ? "+" : "";
-  const percent = delta ? `${sign}${formatPercent(Math.abs(delta.value))}` : "";
+  const percent = !delta
+    ? ""
+    : delta.unit === "points"
+      ? `${sign}${t("reports.chart.points", { value: formatPoints(Math.abs(delta.value)) })}`
+      : `${sign}${formatPercent(Math.abs(delta.value))}`;
 
   return (
     <div className="rounded-lg border border-hairline bg-surface p-4" data-testid={testId}>

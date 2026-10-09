@@ -4329,7 +4329,7 @@
       "title": "Report data",
       "subtitle": "State of the data that feeds the reports. Recalculate everything here when needed.",
       "settings": "Report settings",
-      "ready": "Ready: the report data is up to date",
+      "ready": "Ready",
       "building": "Being built",
       "buildingPercent": "Being built ({{percent}}%)",
       "pending": "Not built yet",
@@ -4464,64 +4464,6 @@
     "manageCategories": "Manage categories",
     "newCategory": "New category",
     "editorNoCategories": "Saving an article requires a category — none exist yet."
-  },
-  "stats": {
-    "title": "Reports",
-    "subtitle": "Ticket volume, backlog, SLA and workload across your queues.",
-    "empty": "No data for the current filters.",
-    "exportCsv": "Export CSV",
-    "filters": {
-      "queue": "Queue",
-      "dateFrom": "From",
-      "dateTo": "To",
-      "granularity": "Granularity",
-      "granularityOptions": {
-        "day": "Day",
-        "week": "Week",
-        "month": "Month"
-      }
-    },
-    "presets": {
-      "today": "Today",
-      "yesterday": "Yesterday",
-      "thisWeek": "This week",
-      "last7Days": "Last 7 days",
-      "thisMonth": "This month",
-      "lastMonth": "Last month",
-      "thisQuarter": "This quarter",
-      "lastQuarter": "Last quarter",
-      "thisYear": "This year",
-      "lastYear": "Last year",
-      "last30Days": "Last 30 days",
-      "reset": "Reset"
-    },
-    "tiles": {
-      "total": "Tickets",
-      "escalated": "Escalated",
-      "firstResponseBreached": "First response overdue",
-      "avgFirstResponse": "Avg. first response",
-      "avgSolution": "Avg. solution time"
-    },
-    "sections": {
-      "volume": "Ticket volume",
-      "backlog": "Backlog trend",
-      "openSnapshot": "Open tickets",
-      "agentWorkload": "Agent workload"
-    },
-    "dimension": {
-      "queue": "Queue",
-      "state": "State",
-      "priority": "Priority",
-      "owner": "Owner"
-    },
-    "table": {
-      "created": "Created",
-      "closed": "Closed",
-      "login": "Agent",
-      "name": "Name",
-      "ownedOpen": "Open (owned)",
-      "closedInPeriod": "Closed in period"
-    }
   },
   "calendar": {
     "title": "Calendar",
@@ -5002,7 +4944,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5014,23 +4955,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5099,7 +5035,7 @@
       },
       "first_contact_resolution": {
         "title": "First-contact resolution",
-        "description": "“Closed” counts the tickets that are closed right now. The rates are based on the tickets closed in the period (last complete month). “Resolved on first contact” means: closed, never reopened and at most one outgoing reply."
+        "description": "How many tickets were resolved on first contact: closed, never reopened and at most one outgoing reply. The rates are based on the tickets closed in the period (last complete month); “Closed” counts the tickets that are closed right now."
       },
       "reopen_trend": {
         "title": "Reopenings over time",
@@ -5111,7 +5047,7 @@
       },
       "pingpong": {
         "title": "Back and forth between queues",
-        "description": "Tickets that were moved between queues repeatedly, and how often a ticket changes queue on average (last 30 days, including today)."
+        "description": "Tickets that return to a queue they were already in (e.g. A → B → A), and how often a ticket changes queue on average (last 30 days, including today)."
       },
       "time_in_state": {
         "title": "Time spent in each state",
@@ -5315,6 +5251,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5322,6 +5259,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5335,6 +5273,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

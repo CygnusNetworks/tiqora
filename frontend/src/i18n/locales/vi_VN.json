@@ -4457,64 +4457,6 @@
     "newCategory": "Danh mục mới",
     "editorNoCategories": "Việc lưu một bài viết cần có một danh mục - chưa có danh mục nào tồn tại."
   },
-  "stats": {
-    "title": "Báo cáo",
-    "subtitle": "Khối lượng yêu cầu, tồn đọng, SLA và khối lượng công việc trên hàng đợi của bạn.",
-    "empty": "Không có dữ liệu cho các bộ lọc hiện tại.",
-    "exportCsv": "Xuất CSV",
-    "filters": {
-      "queue": "Hàng đợi",
-      "dateFrom": "Từ",
-      "dateTo": "Đến",
-      "granularity": "Độ chi tiết",
-      "granularityOptions": {
-        "day": "ngày",
-        "week": "Tuần",
-        "month": "Tháng"
-      }
-    },
-    "presets": {
-      "today": "hôm nay",
-      "yesterday": "Hôm qua",
-      "thisWeek": "Tuần này",
-      "last7Days": "7 ngày qua",
-      "thisMonth": "Tháng này",
-      "lastMonth": "Tháng trước",
-      "thisQuarter": "Quý này",
-      "lastQuarter": "Quý trước",
-      "thisYear": "Năm nay",
-      "lastYear": "Năm ngoái",
-      "last30Days": "30 ngày qua",
-      "reset": "Đặt lại"
-    },
-    "tiles": {
-      "total": "Vé",
-      "escalated": "Đã leo thang",
-      "firstResponseBreached": "Phản hồi đầu tiên quá hạn",
-      "avgFirstResponse": "Trung bình phản hồi đầu tiên",
-      "avgSolution": "Trung bình thời gian giải quyết"
-    },
-    "sections": {
-      "volume": "Số lượng vé",
-      "backlog": "Xu hướng tồn đọng",
-      "openSnapshot": "Mở vé",
-      "agentWorkload": "Khối lượng công việc của nhân viên"
-    },
-    "dimension": {
-      "queue": "Hàng đợi",
-      "state": "tiểu bang",
-      "priority": "Ưu tiên",
-      "owner": "chủ sở hữu"
-    },
-    "table": {
-      "created": "Đã tạo",
-      "closed": "Đã đóng",
-      "login": "nhân viên",
-      "name": "Tên",
-      "ownedOpen": "Mở (sở hữu)",
-      "closedInPeriod": "Đóng cửa trong kỳ"
-    }
-  },
   "calendar": {
     "title": "Lịch",
     "sidebar": "Lịch",
@@ -4994,7 +4936,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5006,23 +4947,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5307,6 +5243,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5314,6 +5251,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5327,6 +5265,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

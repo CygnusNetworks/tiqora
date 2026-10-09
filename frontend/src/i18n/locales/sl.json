@@ -4457,64 +4457,6 @@
     "newCategory": "Nova kategorija",
     "editorNoCategories": "Shranjevanje članka zahteva kategorijo - nobena še ne obstaja."
   },
-  "stats": {
-    "title": "Poročila",
-    "subtitle": "Količina prijav, zaostanki, SLA in delovna obremenitev v vaših čakalnih vrstah.",
-    "empty": "Ni podatkov za trenutne filtre.",
-    "exportCsv": "Izvoz CSV",
-    "filters": {
-      "queue": "Čakalna vrsta",
-      "dateFrom": "Od",
-      "dateTo": "Za",
-      "granularity": "Zrnatost",
-      "granularityOptions": {
-        "day": "Dan",
-        "week": "teden",
-        "month": "mesec"
-      }
-    },
-    "presets": {
-      "today": "Danes",
-      "yesterday": "včeraj",
-      "thisWeek": "Ta teden",
-      "last7Days": "Zadnjih 7 dni",
-      "thisMonth": "Ta mesec",
-      "lastMonth": "Prejšnji mesec",
-      "thisQuarter": "To četrtletje",
-      "lastQuarter": "Zadnja četrtina",
-      "thisYear": "Letos",
-      "lastYear": "Lansko leto",
-      "last30Days": "Zadnjih 30 dni",
-      "reset": "Ponastavi"
-    },
-    "tiles": {
-      "total": "Vstopnice",
-      "escalated": "Stopnjeno",
-      "firstResponseBreached": "Prvi odgovor zamuja",
-      "avgFirstResponse": "Povpr. prvi odziv",
-      "avgSolution": "Povpr. čas rešitve"
-    },
-    "sections": {
-      "volume": "Količina vozovnice",
-      "backlog": "Trend zaostankov",
-      "openSnapshot": "Odprte vstopnice",
-      "agentWorkload": "Delovna obremenitev agenta"
-    },
-    "dimension": {
-      "queue": "Čakalna vrsta",
-      "state": "Država",
-      "priority": "Prioriteta",
-      "owner": "Lastnik"
-    },
-    "table": {
-      "created": "Ustvarjeno",
-      "closed": "Zaprto",
-      "login": "Agent",
-      "name": "Ime",
-      "ownedOpen": "Odprto (v lasti)",
-      "closedInPeriod": "Zaprto v obdobju"
-    }
-  },
   "calendar": {
     "title": "Koledar",
     "sidebar": "Koledarji",
@@ -4994,7 +4936,6 @@
     "title": "Reports",
     "subtitle": "Insights into volume, backlog, SLA and booked time",
     "overview": "Overview",
-    "catalogue": "Report list",
     "allReports": "All reports",
     "back": "Back to reports",
     "empty": "There is no data for this period.",
@@ -5006,23 +4947,18 @@
     "export": "Export",
     "exportXlsx": "As Excel file (XLSX)",
     "exportCsv": "As CSV file",
-    "exportTitle": "Report",
     "truncated": "The table is shortened. Narrow the period or export the report.",
     "cached": "Cached",
     "totals": "Total",
-    "previousPeriod": "Previous period",
     "timeRange": "Period",
     "grain": "Time grouping",
     "groupBy": "Split by",
-    "custom": "Custom period",
     "from": "From",
     "to": "To",
-    "apply": "Apply",
     "timeZone": "Time zone",
     "factsBuilding": "The report data is still being built. The figures are incomplete until then.",
     "factsBuildingProgress": "The report data is being built ({{percent}} %). The figures are incomplete until then.",
     "factsAsOf": "As of {{time}}",
-    "timeout": "The report took too long. Narrow the period or start it as an export.",
     "weekLabel": "Wk {{week}}",
     "hourLabel": "{{hour}}:00",
     "categories": {
@@ -5307,6 +5243,7 @@
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
+      "points": "{{value}} pp",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
     },
@@ -5314,6 +5251,7 @@
     "retry": "Try again",
     "exportFailed": "The export could not be started.",
     "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "waitingForSlot": "Waiting for a free slot …",
     "previousPeriodValue": "Previous period: {{value}}",
     "info": {
       "timeRange": "Period: {{range}}",
@@ -5327,6 +5265,8 @@
       "notes": "Notes",
       "closed": "Closed"
     },
-    "rangeInvalid": "The start date is after the end date. Please correct the period."
+    "rangeInvalid": "The start date is after the end date. Please correct the period.",
+    "deniedTitle": "No access to reports",
+    "deniedBody": "Your account is not allowed to view reports. Please contact your administrator."
   }
 }

@@ -5,19 +5,21 @@ export type ChartTooltipProps = {
   x: number;
   /** Vertical anchor in px from the container top. */
   y: number;
+  /** Horizontal anchor in px from the container left; wins over `x` (used where the plot scrolls). */
+  xPx?: number;
   title: string;
   rows: TooltipRow[];
   testId?: string;
 };
 
 /** Hover tooltip: title plus rows with a colour swatch next to ink-coloured text. */
-export function ChartTooltip({ x, y, title, rows, testId }: ChartTooltipProps) {
+export function ChartTooltip({ x, y, xPx, title, rows, testId }: ChartTooltipProps) {
   return (
     <div
       role="tooltip"
       data-testid={testId}
       className="pointer-events-none absolute z-10 min-w-[8rem] -translate-x-1/2 -translate-y-full rounded-md border border-hairline bg-surface-elevated px-2.5 py-1.5 text-xs text-ink shadow-md"
-      style={{ left: `${Math.min(92, Math.max(8, x))}%`, top: Math.max(0, y) }}
+      style={{ left: xPx != null ? `${xPx}px` : `${Math.min(92, Math.max(8, x))}%`, top: Math.max(0, y) }}
     >
       <p className="mb-1 truncate font-medium">{title}</p>
       {rows.map((r, i) => (

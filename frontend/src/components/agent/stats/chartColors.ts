@@ -44,9 +44,10 @@ export function assignSeriesSlots(
 
 /**
  * Slots for the series actually shown. Up to SERIES_SLOTS series each keep a
- * colour of their own: keys whose fixed slot is free keep it, the others take
- * the lowest free slot (so "internal", 7th in the channel order, is not
- * folded away when only two channels occur). With more series the stable
+ * colour of their own: keys whose fixed slot is free keep it, the others (late
+ * keys of a fixed order, e.g. "internal", 7th in the channel order) take the
+ * highest free slot, so they are not folded away and stay put whichever of the
+ * early keys a filter removes. With more series the stable
  * `assignSeriesSlots` order applies and slots >= SERIES_SLOTS fold into "Weitere".
  */
 export function displaySlots(keys: readonly string[], fixedOrder?: readonly string[]): Map<string, number> {
@@ -55,8 +56,8 @@ export function displaySlots(keys: readonly string[], fixedOrder?: readonly stri
   const used = new Set([...slots.values()].filter((s) => s < SERIES_SLOTS));
   const overflow = [...slots].filter(([, s]) => s >= SERIES_SLOTS).sort((a, b) => a[1] - b[1]);
   for (const [key] of overflow) {
-    let free = 0;
-    while (used.has(free)) free += 1;
+    let free = SERIES_SLOTS - 1;
+    while (used.has(free)) free -= 1;
     used.add(free);
     slots.set(key, free);
   }

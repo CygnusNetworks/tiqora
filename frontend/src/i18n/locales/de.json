@@ -2523,7 +2523,7 @@
       "groups": {
         "ticket": "Ticket",
         "customer": "Kunde",
-        "agent": "Bearbeiter",
+        "agent": "Agent",
         "queue": "Queue"
       },
       "items": {
@@ -2536,8 +2536,8 @@
         "customerLastname": "Nachname des Kunden",
         "customerEmail": "E-Mail des Kunden",
         "customerWpnum": "Kundennummer (wpnum)",
-        "currentFirstname": "Vorname des angemeldeten Bearbeiters",
-        "currentLastname": "Nachname des angemeldeten Bearbeiters",
+        "currentFirstname": "Vorname des angemeldeten Agenten",
+        "currentLastname": "Nachname des angemeldeten Agenten",
         "ownerFirstname": "Vorname des Ticket-Besitzers",
         "ownerLastname": "Nachname des Ticket-Besitzers",
         "queueName": "Name der Queue",
@@ -4329,7 +4329,7 @@
       "title": "Berichtsdaten",
       "subtitle": "Zustand der Auswertungsdaten, aus denen die Berichte gespeist werden. Hier lässt sich alles bei Bedarf neu berechnen.",
       "settings": "Einstellungen für Berichte",
-      "ready": "Bereit: die Berichtsdaten sind aktuell",
+      "ready": "Bereit",
       "building": "Wird aufgebaut",
       "buildingPercent": "Wird aufgebaut ({{percent}} %)",
       "pending": "Noch nicht aufgebaut",
@@ -4464,64 +4464,6 @@
     "manageCategories": "Kategorien verwalten",
     "newCategory": "Neue Kategorie",
     "editorNoCategories": "Zum Speichern eines Artikels wird eine Kategorie benötigt — es existiert noch keine."
-  },
-  "stats": {
-    "title": "Berichte",
-    "subtitle": "Ticketvolumen, Rückstand, SLA und Auslastung über Ihre Queues.",
-    "empty": "Keine Daten für die aktuellen Filter.",
-    "exportCsv": "CSV exportieren",
-    "filters": {
-      "queue": "Queue",
-      "dateFrom": "Von",
-      "dateTo": "Bis",
-      "granularity": "Granularität",
-      "granularityOptions": {
-        "day": "Tag",
-        "week": "Woche",
-        "month": "Monat"
-      }
-    },
-    "presets": {
-      "today": "Heute",
-      "yesterday": "Gestern",
-      "thisWeek": "Diese Woche",
-      "last7Days": "Letzte 7 Tage",
-      "thisMonth": "Dieser Monat",
-      "lastMonth": "Letzter Monat",
-      "thisQuarter": "Dieses Quartal",
-      "lastQuarter": "Letztes Quartal",
-      "thisYear": "Dieses Jahr",
-      "lastYear": "Letztes Jahr",
-      "last30Days": "Letzte 30 Tage",
-      "reset": "Zurücksetzen"
-    },
-    "tiles": {
-      "total": "Tickets",
-      "escalated": "Eskaliert",
-      "firstResponseBreached": "Erstreaktion überfällig",
-      "avgFirstResponse": "Ø Erstreaktionszeit",
-      "avgSolution": "Ø Lösungszeit"
-    },
-    "sections": {
-      "volume": "Ticketvolumen",
-      "backlog": "Rückstandsverlauf",
-      "openSnapshot": "Offene Tickets",
-      "agentWorkload": "Agentenauslastung"
-    },
-    "dimension": {
-      "queue": "Queue",
-      "state": "Status",
-      "priority": "Priorität",
-      "owner": "Bearbeiter"
-    },
-    "table": {
-      "created": "Erstellt",
-      "closed": "Geschlossen",
-      "login": "Agent",
-      "name": "Name",
-      "ownedOpen": "Offen (eigene)",
-      "closedInPeriod": "Geschlossen im Zeitraum"
-    }
   },
   "calendar": {
     "title": "Kalender",
@@ -5002,7 +4944,6 @@
     "title": "Berichte",
     "subtitle": "Auswertungen zu Aufkommen, Bestand, SLA und gebuchter Zeit",
     "overview": "Übersicht",
-    "catalogue": "Berichtsliste",
     "allReports": "Alle Berichte",
     "back": "Zurück zu den Berichten",
     "empty": "Für diesen Zeitraum gibt es keine Daten.",
@@ -5014,23 +4955,18 @@
     "export": "Exportieren",
     "exportXlsx": "Als Excel-Datei (XLSX)",
     "exportCsv": "Als CSV-Datei",
-    "exportTitle": "Bericht",
     "truncated": "Die Tabelle ist gekürzt. Bitte den Zeitraum verkleinern oder den Bericht exportieren.",
     "cached": "Zwischengespeichert",
     "totals": "Summe",
-    "previousPeriod": "Vorheriger Zeitraum",
     "timeRange": "Zeitraum",
     "grain": "Gruppierung nach Zeit",
     "groupBy": "Aufteilen nach",
-    "custom": "Eigener Zeitraum",
     "from": "Von",
     "to": "Bis",
-    "apply": "Anwenden",
     "timeZone": "Zeitzone",
     "factsBuilding": "Die Berichtsdaten werden noch aufgebaut. Die Zahlen sind bis dahin unvollständig.",
     "factsBuildingProgress": "Die Berichtsdaten werden aufgebaut ({{percent}} %). Die Zahlen sind bis dahin unvollständig.",
     "factsAsOf": "Stand: {{time}}",
-    "timeout": "Der Bericht hat zu lange gebraucht. Bitte den Zeitraum verkleinern oder ihn als Export starten.",
     "weekLabel": "KW {{week}}",
     "hourLabel": "{{hour}} Uhr",
     "categories": {
@@ -5099,7 +5035,7 @@
       },
       "first_contact_resolution": {
         "title": "Lösung im ersten Kontakt",
-        "description": "„Geschlossen“ zählt die Tickets, die gerade geschlossen sind. Die Quoten beziehen sich auf die Tickets, die im Zeitraum geschlossen wurden (letzter vollständiger Monat). „Im ersten Kontakt gelöst“ heißt: geschlossen, nie wieder geöffnet und höchstens eine ausgehende Antwort."
+        "description": "Wie viele Tickets beim ersten Kontakt gelöst wurden: geschlossen, nie wieder geöffnet und höchstens eine ausgehende Antwort. Die Quoten beziehen sich auf die Tickets, die im Zeitraum geschlossen wurden (letzter vollständiger Monat); „Geschlossen“ zählt die Tickets, die gerade geschlossen sind."
       },
       "reopen_trend": {
         "title": "Wiedereröffnungen im Verlauf",
@@ -5111,7 +5047,7 @@
       },
       "pingpong": {
         "title": "Hin und Her zwischen Queues",
-        "description": "Tickets, die mehrfach zwischen Queues verschoben wurden, und wie oft ein Ticket im Schnitt die Queue wechselt (letzte 30 Tage, einschließlich heute)."
+        "description": "Tickets, die in eine Queue zurückkehren, in der sie schon waren (z. B. A → B → A), und wie oft ein Ticket im Schnitt die Queue wechselt (letzte 30 Tage, einschließlich heute)."
       },
       "time_in_state": {
         "title": "Verweildauer in Status",
@@ -5315,6 +5251,7 @@
       "deltaUp": "Anstieg",
       "deltaDown": "Rückgang",
       "deltaFlat": "Unverändert",
+      "points": "{{value}} Pp.",
       "ofTotal": "{{percent}} vom Gesamtwert",
       "total": "Gesamt"
     },
@@ -5322,6 +5259,7 @@
     "retry": "Erneut versuchen",
     "exportFailed": "Der Export konnte nicht gestartet werden.",
     "runningInBackground": "Der Bericht wird im Hintergrund erstellt. Das kann einen Moment dauern …",
+    "waitingForSlot": "Wartet auf einen freien Platz …",
     "previousPeriodValue": "Vorheriger Zeitraum: {{value}}",
     "info": {
       "timeRange": "Zeitraum: {{range}}",
@@ -5335,6 +5273,8 @@
       "notes": "Notizen",
       "closed": "Geschlossen"
     },
-    "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren."
+    "rangeInvalid": "Das Startdatum liegt nach dem Enddatum. Bitte den Zeitraum korrigieren.",
+    "deniedTitle": "Kein Zugriff auf Berichte",
+    "deniedBody": "Ihr Konto darf die Berichte nicht ansehen. Bitte wenden Sie sich an Ihre Administration."
   }
 }

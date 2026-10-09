@@ -6,7 +6,8 @@ import { barPath, niceTicks } from "./chartMath";
 
 export type BarDatum = {
   label: string;
-  value: number;
+  /** `null` = no data: no bar, "—" as text (not a zero). */
+  value: number | null;
 };
 
 export type BarChartProps = {
@@ -42,7 +43,7 @@ export function BarChart({
     return <EmptyChart height={height} label={emptyLabel ?? t("reports.chart.noData")} testId={testId} />;
   }
 
-  const ticks = niceTicks(Math.max(1, ...data.map((d) => Math.max(0, d.value))));
+  const ticks = niceTicks(Math.max(1, ...data.map((d) => Math.max(0, d.value ?? 0))));
   const max = ticks[ticks.length - 1];
   const barWidth = 100 / data.length;
   const chartHeight = height - 36; // reserve space for labels
@@ -56,8 +57,8 @@ export function BarChart({
       footer={
         <div className="ml-9 mt-2 flex text-[10px] text-muted">
           {data.map((d, i) => (
-            <div key={`${i}-${d.label}`} className="flex-1 truncate px-0.5 text-center" title={`${d.label}: ${d.value}`}>
-              <div className="truncate font-medium text-ink">{fmt(d.value)}</div>
+            <div key={`${i}-${d.label}`} className="flex-1 truncate px-0.5 text-center" title={`${d.label}: ${d.value ?? "—"}`}>
+              <div className="truncate font-medium text-ink">{d.value === null ? "—" : fmt(d.value)}</div>
               <div className="truncate">{d.label}</div>
             </div>
           ))}
@@ -70,11 +71,11 @@ export function BarChart({
         className="w-full"
         style={{ height: chartHeight }}
         role="group"
-        aria-label={data.map((d) => `${d.label}: ${fmt(d.value)}`).join(", ")}
+        aria-label={data.map((d) => `${d.label}: ${d.value === null ? "—" : fmt(d.value)}`).join(", ")}
       >
         <GridLines ticks={ticks} yOf={yOf} />
         {data.map((d, i) => {
-          const h = (Math.max(0, d.value) / max) * (chartHeight - 4);
+          const h = (Math.max(0, d.value ?? 0) / max) * (chartHeight - 4);
           return (
             <path
               key={`${i}-${d.label}`}
@@ -92,9 +93,9 @@ export function BarChart({
             width={barWidth}
             height={chartHeight}
             fill="transparent"
-            tabIndex={0}
+            tabIndex={data.length > 12 ? -1 : 0}
             role="img"
-            aria-label={`${d.label}: ${fmt(d.value)}`}
+            aria-label={`${d.label}: ${d.value === null ? "—" : fmt(d.value)}`}
             onFocus={() => setHover(i)}
             onBlur={() => setHover(null)}
             onMouseEnter={() => setHover(i)}
@@ -107,9 +108,9 @@ export function BarChart({
         <ChartTooltip
           testId={testId ? `${testId}-tooltip` : undefined}
           x={hover * barWidth + barWidth / 2}
-          y={yOf(Math.max(0, data[hover].value)) - 4}
+          y={yOf(Math.max(0, data[hover].value ?? 0)) - 4}
           title={data[hover].label}
-          rows={[{ label: "", value: fmt(data[hover].value), color }]}
+          rows={[{ label: "", value: data[hover].value === null ? "—" : fmt(data[hover].value as number), color }]}
         />
       )}
     </ChartFrame>

@@ -8,7 +8,8 @@ import { niceTicks } from "./chartMath";
 export type LineSeries = {
   name: string;
   color: string;
-  values: number[];
+  /** `null` = no data in that bucket: the line breaks there (a gap, not a zero). */
+  values: (number | null)[];
 };
 
 export type LineChartProps = {
@@ -49,7 +50,7 @@ export function LineChart({
     return <EmptyChart height={height} label={emptyLabel ?? t("reports.chart.noData")} testId={testId} />;
   }
 
-  const allValues = series.flatMap((s) => s.values);
+  const allValues = series.flatMap((s) => s.values).filter((v): v is number => v !== null);
   const lowest = Math.min(0, ...allValues);
   // Negative values get their own gridlines below zero.
   const negTicks = lowest < 0 ? niceTicks(-lowest).slice(1).map((v) => -v).reverse() : [];
@@ -62,9 +63,33 @@ export function LineChart({
   const stepX = points > 1 ? 100 / (points - 1) : 0;
   const xOf = (i: number) => (points > 1 ? i * stepX : 50);
 
-  const linePoints = (values: number[]) => values.map((v, i) => `${xOf(i)},${yOf(v)}`).join(" ");
-  const areaPath = (values: number[]) =>
-    `M${xOf(0)},${yOf(0)}L${linePoints(values).replace(/ /g, "L")}L${xOf(values.length - 1)},${yOf(0)}Z`;
+  /** Runs of consecutive buckets that have data: [first, last] index pairs. */
+  const runsOf = (values: (number | null)[]) => {
+    const runs: [number, number][] = [];
+    values.forEach((v, i) => {
+      if (v === null || v === undefined) return;
+      const last = runs[runs.length - 1];
+      if (last && last[1] === i - 1) last[1] = i;
+      else runs.push([i, i]);
+    });
+    return runs;
+  };
+  const runPoints = (values: (number | null)[], [from, to]: [number, number]) =>
+    Array.from({ length: to - from + 1 }, (_, k) => `${xOf(from + k)},${yOf(values[from + k] as number)}`);
+  // One subpath per run; a lone bucket becomes a zero-length stroke that the round cap draws as a dot.
+  const linePath = (values: (number | null)[]) =>
+    runsOf(values)
+      .map((run) => {
+        const pts = runPoints(values, run);
+        return `M${pts[0]}${pts.length === 1 ? `L${pts[0]}` : `L${pts.slice(1).join("L")}`}`;
+      })
+      .join("");
+  const areaPath = (values: (number | null)[]) =>
+    runsOf(values)
+      .map((run) => `M${xOf(run[0])},${yOf(0)}L${runPoints(values, run).join("L")}L${xOf(run[1])},${yOf(0)}Z`)
+      .join("");
+  const labelCount = Math.min(points, 5);
+  const labelAt = (k: number) => (labelCount > 1 ? Math.round((k * (points - 1)) / (labelCount - 1)) : 0);
 
   return (
     <ChartFrame
@@ -73,9 +98,20 @@ export function LineChart({
       axis={<YAxisLabels ticks={ticks} yOf={yOf} format={fmt} />}
       footer={
         <>
-          <div className="ml-9 mt-2 flex items-center justify-between text-[10px] text-muted">
-            <span>{labels[0]}</span>
-            {labels.length > 1 && <span>{labels[labels.length - 1]}</span>}
+          <div className="relative ml-9 mt-2 h-4 text-[10px] text-muted" data-testid={testId ? `${testId}-xlabels` : undefined}>
+            {Array.from({ length: labelCount }, (_, k) => {
+              const at = labelAt(k);
+              const last = k === labelCount - 1 && labelCount > 1;
+              return (
+                <span
+                  key={at}
+                  className={`absolute top-0 whitespace-nowrap ${labelCount === 5 && k % 2 === 1 ? "hidden sm:block" : ""}`}
+                  style={{ left: `${xOf(at)}%`, transform: k === 0 && labelCount > 1 ? undefined : last ? "translateX(-100%)" : "translateX(-50%)" }}
+                >
+                  {labels[at]}
+                </span>
+              );
+            })}
           </div>
           {series.length >= 2 && (
             <ChartLegend
@@ -97,7 +133,7 @@ export function LineChart({
         <GridLines ticks={ticks} yOf={yOf} />
         {area &&
           series.map((s) =>
-            s.values.length > 0 ? (
+            runsOf(s.values).length > 0 ? (
               <path
                 key={`a-${s.name}`}
                 d={areaPath(s.values)}
@@ -109,13 +145,14 @@ export function LineChart({
             ) : null,
           )}
         {series.map((s) => (
-          <polyline
+          <path
             key={s.name}
-            points={linePoints(s.values)}
+            d={linePath(s.values)}
             fill="none"
             stroke={s.color}
             strokeWidth={2}
             strokeLinejoin="round"
+            strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
             data-testid={testId ? `${testId}-series-${s.name}` : undefined}
           />
@@ -147,7 +184,7 @@ export function LineChart({
               fill="transparent"
               tabIndex={-1}
               role="img"
-              aria-label={`${label}: ${series.map((s) => `${s.name} ${s.values[i] === undefined ? "—" : fmt(s.values[i])}`).join(", ")}`}
+              aria-label={`${label}: ${series.map((s) => `${s.name} ${s.values[i] == null ? "—" : fmt(s.values[i] as number)}`).join(", ")}`}
               onFocus={() => setHover(i)}
               onBlur={() => setHover(null)}
               onMouseEnter={() => setHover(i)}
@@ -161,12 +198,12 @@ export function LineChart({
       </svg>
       {(hover !== null || points === 1) &&
         series.map((s) =>
-          s.values[hover ?? 0] === undefined ? null : (
+          s.values[hover ?? 0] == null ? null : (
             <span
               key={`m-${s.name}`}
               data-testid={testId ? `${testId}-marker-${s.name}` : undefined}
               className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface"
-              style={{ left: `${xOf(hover ?? 0)}%`, top: yOf(s.values[hover ?? 0]), backgroundColor: s.color }}
+              style={{ left: `${xOf(hover ?? 0)}%`, top: yOf(s.values[hover ?? 0] as number), backgroundColor: s.color }}
               aria-hidden
             />
           ),
@@ -175,11 +212,11 @@ export function LineChart({
         <ChartTooltip
           testId={testId ? `${testId}-tooltip` : undefined}
           x={xOf(hover)}
-          y={Math.min(...series.map((s) => (s.values[hover] === undefined ? chartHeight : yOf(s.values[hover])))) - 8}
+          y={Math.min(...series.map((s) => (s.values[hover] == null ? chartHeight : yOf(s.values[hover] as number)))) - 8}
           title={labels[hover]}
           rows={series.map((s) => ({
             label: s.name,
-            value: s.values[hover] === undefined ? "—" : fmt(s.values[hover]),
+            value: s.values[hover] == null ? "—" : fmt(s.values[hover] as number),
             color: s.color,
           }))}
         />

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createInstance } from "i18next";
 import { I18nextProvider } from "react-i18next";
@@ -119,6 +119,60 @@ describe("charts", () => {
     expect(screen.getByTestId("hm-tooltip")).toHaveTextContent("Mo · 9");
   });
 
+  it("heatmap keeps its natural width inside a scroll wrapper and anchors the tooltip on the hovered cell", () => {
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top }) as DOMRect;
+    const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      return this.getAttribute("data-testid") === "hm-cell-1-2" ? rect(200, 160, 32, 24) : rect(20, 100, 330, 300);
+    });
+    try {
+      render(
+        <HeatmapChart
+          testId="hm"
+          rows={[{ key: "r0", label: "Mo" }, { key: "r1", label: "Di" }]}
+          columns={[{ key: "a", label: "8" }, { key: "b", label: "9" }, { key: "c", label: "10" }]}
+          values={[[1, 2, 3], [4, 5, 6]]}
+        />,
+      );
+      const svg = document.querySelector("svg") as SVGSVGElement;
+      expect(svg.style.minWidth).toBe(`${92 + 3 * 32}px`);
+      expect(svg.parentElement?.className).toContain("overflow-x-auto");
+      fireEvent.mouseEnter(screen.getByTestId("hm-cell-1-2"));
+      const tip = screen.getByTestId("hm-tooltip");
+      // cell centre 216 minus the frame's left edge 20; cell top 160 minus frame top 100, minus 2
+      expect(tip.style.left).toBe("196px");
+      expect(tip.style.top).toBe("58px");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("heatmap legend names the ramp ends", () => {
+    render(
+      <HeatmapChart testId="hm" rows={[{ key: "r", label: "Mo" }]} columns={[{ key: "a", label: "8" }]} values={[[42]]} />,
+    );
+    expect(screen.getByTestId("hm-legend")).toHaveTextContent("0");
+    expect(screen.getByTestId("hm-legend")).toHaveTextContent("42");
+  });
+
+  it("line chart labels the x axis at a handful of evenly spaced buckets, not just the ends", () => {
+    const labels = Array.from({ length: 30 }, (_, i) => `T${i}`);
+    render(<LineChart testId="lc" labels={labels} series={[{ name: "A", color: seriesColor(0), values: labels.map((_, i) => i) }]} />);
+    const shown = Array.from(screen.getByTestId("lc-xlabels").querySelectorAll("span")).map((n) => n.textContent);
+    expect(shown).toEqual(["T0", "T7", "T15", "T22", "T29"]);
+    // two buckets: both ends, nothing else
+    const { unmount } = render(<LineChart testId="l2" labels={["a", "b"]} series={[{ name: "A", color: seriesColor(0), values: [1, 2] }]} />);
+    expect(Array.from(screen.getByTestId("l2-xlabels").querySelectorAll("span")).map((n) => n.textContent)).toEqual(["a", "b"]);
+    unmount();
+  });
+
+  it("a bar without data reads '—' and has no bar", () => {
+    render(<BarChart testId="bc" data={[{ label: "A", value: 4 }, { label: "B", value: null }]} />);
+    expect(screen.getByTestId("bc-hit-1")).toHaveAttribute("aria-label", "B: —");
+    expect(screen.getByTestId("bc-bar-1").getAttribute("d")).not.toContain("NaN");
+    expect(screen.getByTestId("bc")).toHaveTextContent("—");
+  });
+
   it("kpi tile shows value, delta direction and sparkline", () => {
     render(
       <KpiTile
@@ -133,6 +187,12 @@ describe("charts", () => {
     expect(screen.getByTestId("k-delta")).toHaveTextContent("+12");
     expect(screen.getByTestId("k-delta")).toHaveClass("text-danger");
     expect(screen.getByTestId("k-sparkline")).toBeInTheDocument();
+  });
+
+  it("kpi delta in percentage points prints the difference of the rates", () => {
+    render(<KpiTile label="T" value="22 %" delta={{ value: 0.02, unit: "points", direction: "up", goodWhen: "up" }} testId="k" />);
+    expect(screen.getByTestId("k-delta")).toHaveTextContent("+2.0 pp");
+    expect(screen.getByTestId("k-delta")).toHaveClass("text-green");
   });
 
   it("kpi delta is green when the direction is the good one and muted when flat", () => {
@@ -266,7 +326,7 @@ describe("charts", () => {
         <BarChart testId="bc" data={[{ label: "A", value: 0 }]} />
       </>,
     );
-    expect(screen.getByTestId("lc-series-Z").getAttribute("points")).not.toContain("NaN");
+    expect(screen.getByTestId("lc-series-Z").getAttribute("d")).not.toContain("NaN");
     expect(screen.getByTestId("bc-bar-0").getAttribute("d")).not.toContain("NaN");
   });
 
