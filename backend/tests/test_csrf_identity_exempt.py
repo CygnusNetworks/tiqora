@@ -1,4 +1,7 @@
-"""CSRF exemption of the SAML POST endpoints only (wave 1, Task 10). Pure, no DB."""
+"""CSRF exemption of the SAML POST endpoints and the OIDC back-channel logout only.
+
+Wave 1, Tasks 10 and 21. Pure, no DB.
+"""
 
 from __future__ import annotations
 
@@ -48,6 +51,8 @@ def _req(method: str, path: str, cookies: dict[str, str] | None = None) -> Reque
         "/api/v1/auth/saml/x/sls",
         "/api/portal/auth/saml/x/acs",
         "/api/v1/auth/saml/idptest-saml-a/acs",
+        "/api/v1/auth/oidc/x/backchannel-logout",
+        "/api/v1/auth/oidc/env-oidc/backchannel-logout",
     ],
 )
 def test_saml_post_endpoints_are_exempt(path: str) -> None:
@@ -62,7 +67,11 @@ def test_saml_post_endpoints_are_exempt(path: str) -> None:
         "/api/v1/auth/saml/X/acs",
         "/api/v1/auth/saml/x/metadata",
         "/api/portal/auth/saml/x/sls",
-        "/api/v1/auth/oidc/x/backchannel-logout",
+        "/api/v1/auth/oidc/x/backchannel-logout/extra",
+        "/api/v1/auth/oidc/x/backchannel-logout/",
+        "/api/v1/auth/oidc/X/backchannel-logout",
+        "/api/portal/auth/oidc/x/backchannel-logout",
+        "/api/v1/auth/oidc/x/callback",
         "/api/v1/auth/logout",
         "/api/v1/auth/sso/logout",
         "/api/v1/tickets",

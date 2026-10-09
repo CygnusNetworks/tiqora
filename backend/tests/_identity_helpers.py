@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+import warnings
 from datetime import datetime
 from typing import Any
 
@@ -57,6 +59,11 @@ class FakeRedis:
             self.ttls[key] = seconds
             return True
         return False
+
+    async def incr(self, key: str) -> int:
+        value = int(self.store.get(key, "0")) + 1
+        self.store[key] = str(value)
+        return value
 
     async def sadd(self, key: str, *members: str) -> int:
         bucket = self.sets.setdefault(key, set())
@@ -205,3 +212,57 @@ def cleanup_statements(
         ("DELETE FROM users WHERE id BETWEEN :lo AND :hi", band),
         ("DELETE FROM customer_user WHERE login LIKE :c", {"c": customer_login_like}),
     )
+
+
+class OidcSigner:
+    """A test IdP's signing key (RSA, generated at test time) plus a JWKS and JWT minting."""
+
+    def __init__(self, kid: str = "k1") -> None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from authlib.jose import JsonWebKey  # noqa: PLC0415
+
+        self.kid = kid
+        self.key = JsonWebKey.generate_key("RSA", 2048, is_private=True, options={"kid": kid})
+        self.extra_keys: list[Any] = []
+
+    def add_key(self, kid: str) -> Any:
+        """Rotate in another key (published in the JWKS from now on)."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from authlib.jose import JsonWebKey  # noqa: PLC0415
+
+        key = JsonWebKey.generate_key("RSA", 2048, is_private=True, options={"kid": kid})
+        self.extra_keys.append(key)
+        return key
+
+    def jwks(self) -> dict[str, Any]:
+        keys = [self.key, *self.extra_keys]
+        return {"keys": [k.as_dict(is_private=False) for k in keys]}
+
+    def sign(
+        self,
+        claims: dict[str, Any],
+        *,
+        key: Any = None,
+        kid: str | None = None,
+        alg: str = "RS256",
+    ) -> str:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            from authlib.jose import jwt  # noqa: PLC0415
+
+        use = key if key is not None else self.key
+        header: dict[str, Any] = {
+            "alg": alg,
+            "kid": kid if kid is not None else use.as_dict()["kid"],
+        }
+        return jwt.encode(header, claims, use).decode("ascii")
+
+    def id_token(self, *, iss: str, aud: str, sub: str, nonce: str | None, **extra: Any) -> str:
+        now = int(time.time())
+        claims: dict[str, Any] = {"iss": iss, "aud": aud, "sub": sub, "iat": now, "exp": now + 300}
+        if nonce is not None:
+            claims["nonce"] = nonce
+        claims.update(extra)
+        return self.sign(claims)

@@ -57872,6 +57872,74 @@
         ]
       }
     },
+    "/api/v1/auth/oidc/{slug}/backchannel-logout": {
+      "post": {
+        "description": "Server-to-server POST of a signed logout token (form field ``logout_token``).\n\nEnds every matching agent and customer session; answers with ``Cache-Control: no-store``.",
+        "operationId": "oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "properties": {
+                  "logout_token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "logout_token"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Sessions of the logout token ended"
+          },
+          "400": {
+            "description": "Invalid logout token or the logout failed"
+          },
+          "404": {
+            "description": "No OIDC provider with back-channel logout under this slug"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        },
+        "summary": "OIDC back-channel logout (called by the identity provider)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/v1/auth/oidc/{slug}/callback": {
       "get": {
         "operationId": "oidc_provider_callback_api_v1_auth_oidc__slug__callback_get",

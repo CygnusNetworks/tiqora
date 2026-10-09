@@ -9,21 +9,36 @@ Uses authlib's :class:`~authlib.integrations.httpx_client.AsyncOAuth2Client`
 for the token exchange so a fake provider can be substituted in tests via
 ``transport=httpx.MockTransport(...)``.
 
-Discovery, token, and userinfo URLs are validated (and discovery/userinfo
-fetches IP-pinned) via :mod:`tiqora.security.outbound` so a malicious or
-compromised issuer cannot target internal addresses.
+Discovery, token, userinfo and JWKS URLs are validated (and fetches IP-pinned)
+via :mod:`tiqora.security.outbound` so a malicious or compromised issuer cannot
+target internal addresses.
+
+An id_token returned by the token endpoint is verified against the provider's JWKS
+(signature with an asymmetric algorithm from :data:`JWT_ALGORITHMS`, ``iss``, ``aud``/
+``azp``, ``exp``, ``iat``, ``nonce``); the JWKS is cached per issuer with a TTL and
+refetched at most once per :data:`_JWKS_REFRESH_MIN_INTERVAL` when a token names an
+unknown key id. The same verifier serves back-channel logout tokens
+(:mod:`tiqora.identity.oidc_backchannel`).
 """
 
 from __future__ import annotations
 
 import base64
+import binascii
 import json
+import secrets
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
+
+with warnings.catch_warnings():
+    # authlib.jose is deprecated in favour of joserfc (authlib 2.0); still supported in 1.x.
+    warnings.simplefilter("ignore", DeprecationWarning)
+    from authlib.jose import JsonWebKey, JsonWebToken
 
 from tiqora.config import Settings
 from tiqora.security.outbound import OutboundURLError, pin_outbound_url
@@ -35,9 +50,35 @@ _DISCOVERY_TTL = 3600.0
 # issuer (+ private-network flag) -> (fetched monotonic, document); shared per process.
 _DISCOVERY_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
 
+# Asymmetric algorithms only: "none" and HS* (an HMAC "keyed" with a public key) never verify.
+JWT_ALGORITHMS: tuple[str, ...] = (
+    "RS256",
+    "RS384",
+    "RS512",
+    "ES256",
+    "ES384",
+    "ES512",
+    "PS256",
+)
+_ALG_KTY: dict[str, str] = {"RS": "RSA", "PS": "RSA", "ES": "EC"}
+JWT_LEEWAY_SECONDS = 120
+MAX_JWT_BYTES = 16 * 1024
+_JWKS_TTL = 600.0
+# A token naming an unknown key id may refetch the JWKS (key rotation), but at most this
+# often per issuer: a flood of tokens with invented key ids must not hammer the IdP.
+_JWKS_REFRESH_MIN_INTERVAL = 60.0
+_JWKS_TIMEOUT = httpx.Timeout(5.0)
+_MAX_JWKS_BYTES = 256 * 1024
+# (issuer, private-network flag) -> (fetched monotonic, JWKS document)
+_JWKS_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
+# (issuer, private-network flag) -> monotonic time of the last forced refetch
+_JWKS_FORCED: dict[tuple[str, bool], float] = {}
+
 
 def clear_discovery_cache() -> None:
     _DISCOVERY_CACHE.clear()
+    _JWKS_CACHE.clear()
+    _JWKS_FORCED.clear()
 
 
 class OIDCError(Exception):
@@ -46,6 +87,14 @@ class OIDCError(Exception):
 
 class OIDCOutboundError(OIDCError):
     """The issuer or one of its endpoints was refused by the SSRF guard."""
+
+
+class OIDCTokenInvalid(OIDCError):  # noqa: N818 - domain term
+    """A JWT (id_token, logout token) failed verification; ``reason`` is for logs only."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"token invalid: {reason}")
+        self.reason = reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +112,7 @@ class OidcClientConfig:
 class OidcLoginResult:
     claims: dict[str, Any]  # userinfo (or token "userinfo" fallback)
     id_token: str | None  # raw, kept only as id_token_hint for logout
-    id_token_claims: dict[str, Any] | None = None  # verified payload (JWKS check: Task 21)
+    id_token_claims: dict[str, Any] | None = None  # verified via JWKS; sid comes from here
 
 
 def oidc_client_config_from_settings(settings: Settings) -> OidcClientConfig:
@@ -88,21 +137,62 @@ def oidc_client_config(cfg: OidcProviderConfig, *, redirect_uri: str) -> OidcCli
     )
 
 
-def _unverified_sub(id_token: str) -> str | None:
-    """``sub`` of an id_token received straight from the token endpoint over TLS.
-
-    Not a signature check (Task 21 adds JWKS verification); only used to refuse a
-    userinfo response that belongs to a different subject (OIDC Core 5.3.2).
-    """
-    parts = id_token.split(".")
+def _jwt_header(token: str) -> dict[str, Any]:
+    """Unverified JOSE header (only used to pick the key; the signature is checked after)."""
+    parts = token.split(".")
     if len(parts) != 3:
-        return None
+        raise OIDCTokenInvalid("format")
     try:
-        payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
-    except (ValueError, TypeError):
+        header = json.loads(base64.urlsafe_b64decode(parts[0] + "=" * (-len(parts[0]) % 4)))
+    except (ValueError, TypeError, binascii.Error) as exc:
+        raise OIDCTokenInvalid("header") from exc
+    if not isinstance(header, dict):
+        raise OIDCTokenInvalid("header")
+    return header
+
+
+def _select_jwk(jwks: dict[str, Any], kid: str | None, alg: str) -> dict[str, Any] | None:
+    """The signing key for *kid*/*alg*; without a kid only an unambiguous single candidate."""
+    keys = jwks.get("keys")
+    if not isinstance(keys, list):
         return None
-    sub = payload.get("sub") if isinstance(payload, dict) else None
-    return sub if isinstance(sub, str) and sub else None
+    kty = _ALG_KTY[alg[:2]]
+    candidates = [
+        k
+        for k in keys
+        if isinstance(k, dict)
+        and k.get("kty") == kty
+        and k.get("use", "sig") == "sig"
+        and k.get("alg", alg) == alg
+    ]
+    if kid is not None:
+        matches = [k for k in candidates if k.get("kid") == kid]
+        return matches[0] if len(matches) == 1 else None
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _num(claims: dict[str, Any], name: str) -> float | None:
+    value = claims.get(name)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def check_audience(claims: dict[str, Any], client_id: str) -> None:
+    """``aud`` holds *client_id*; with several audiences ``azp`` must name it (Core 3.1.3.7)."""
+    aud = claims.get("aud")
+    audiences = [aud] if isinstance(aud, str) else aud
+    if (
+        not isinstance(audiences, list)
+        or not all(isinstance(a, str) for a in audiences)
+        or client_id not in audiences
+    ):
+        raise OIDCTokenInvalid("aud")
+    azp = claims.get("azp")
+    if azp is not None and azp != client_id:
+        raise OIDCTokenInvalid("azp")
+    if len(audiences) > 1 and azp is None:
+        raise OIDCTokenInvalid("azp")
 
 
 class OIDCService:
@@ -160,6 +250,103 @@ class OIDCService:
             return False
         return await self.supports_pkce()
 
+    def _cache_key(self) -> tuple[str, bool]:
+        return (self._config.issuer, self._config.allow_private_network)
+
+    async def expected_issuer(self) -> str:
+        """``iss`` every token must carry: the discovery ``issuer`` (configured issuer fallback)."""
+        value = (await self.discover()).get("issuer")
+        return value if isinstance(value, str) and value else self._config.issuer
+
+    async def jwks(self, *, refresh: bool = False) -> dict[str, Any]:
+        """The provider's JWKS, cached per issuer for ``_JWKS_TTL`` seconds.
+
+        ``refresh=True`` (a token named an unknown key id) refetches, but at most once per
+        ``_JWKS_REFRESH_MIN_INTERVAL`` per issuer; otherwise the cached set is returned.
+        """
+        key = self._cache_key()
+        now = time.monotonic()
+        hit = _JWKS_CACHE.get(key)
+        if refresh and hit is not None:
+            last = _JWKS_FORCED.get(key)
+            if last is not None and now - last < _JWKS_REFRESH_MIN_INTERVAL:
+                return hit[1]
+            _JWKS_FORCED[key] = now
+        elif hit is not None and now - hit[0] < _JWKS_TTL:
+            return hit[1]
+        uri = (await self.discover()).get("jwks_uri")
+        if not isinstance(uri, str) or not uri:
+            raise OIDCError("provider discovery is missing jwks_uri")
+        request_url, headers, extensions = self._safe_get_url(uri)
+        try:
+            async with httpx.AsyncClient(
+                transport=self._transport, follow_redirects=False, timeout=_JWKS_TIMEOUT
+            ) as client:
+                resp = await client.get(request_url, headers=headers, extensions=extensions)
+                resp.raise_for_status()
+                if len(resp.content) > _MAX_JWKS_BYTES:
+                    raise OIDCError("JWKS document too large")
+                doc = resp.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise OIDCError(f"JWKS fetch failed: {exc}") from exc
+        if not isinstance(doc, dict) or not isinstance(doc.get("keys"), list):
+            raise OIDCError("JWKS document has no keys")
+        _JWKS_CACHE[key] = (time.monotonic(), doc)
+        return doc
+
+    async def verify_jwt(self, token: str) -> dict[str, Any]:
+        """Signature check of a compact JWS against the JWKS; returns the (unchecked) claims.
+
+        Only :data:`JWT_ALGORITHMS`; the key is chosen by ``kid`` (and key type), an unknown
+        ``kid`` triggers one rate-limited JWKS refetch. Claim checks are the caller's job.
+        """
+        if not isinstance(token, str) or not token or len(token) > MAX_JWT_BYTES:
+            raise OIDCTokenInvalid("size")
+        header = _jwt_header(token)
+        alg = header.get("alg")
+        if not isinstance(alg, str) or alg not in JWT_ALGORITHMS:
+            raise OIDCTokenInvalid("alg")
+        kid = header.get("kid")
+        if kid is not None and not isinstance(kid, str):
+            raise OIDCTokenInvalid("kid")
+        jwk = _select_jwk(await self.jwks(), kid, alg)
+        if jwk is None:
+            jwk = _select_jwk(await self.jwks(refresh=True), kid, alg)
+        if jwk is None:
+            raise OIDCTokenInvalid("unknown_kid")
+        try:
+            public = {k: v for k, v in jwk.items() if k not in ("d", "p", "q", "dp", "dq", "qi")}
+            claims = JsonWebToken(list(JWT_ALGORITHMS)).decode(token, JsonWebKey.import_key(public))
+        except Exception as exc:  # noqa: BLE001 - bad signature, malformed key or payload
+            raise OIDCTokenInvalid(f"signature:{type(exc).__name__}") from exc
+        return dict(claims)
+
+    async def verify_id_token(self, id_token: str, *, nonce: str | None) -> dict[str, Any]:
+        """Verified id_token claims (OIDC Core 3.1.3.7): signature, iss, aud/azp, exp, iat,
+        ``sub`` and ``nonce`` (when the flow stored one; pre-upgrade env states have none)."""
+        claims = await self.verify_jwt(id_token)
+        if claims.get("iss") != await self.expected_issuer():
+            raise OIDCTokenInvalid("iss")
+        check_audience(claims, self._config.client_id)
+        now = time.time()
+        exp, iat, nbf = _num(claims, "exp"), _num(claims, "iat"), _num(claims, "nbf")
+        if exp is None or now > exp + JWT_LEEWAY_SECONDS:
+            raise OIDCTokenInvalid("exp")
+        if iat is None or iat > now + JWT_LEEWAY_SECONDS:
+            raise OIDCTokenInvalid("iat")
+        if nbf is not None and nbf > now + JWT_LEEWAY_SECONDS:
+            raise OIDCTokenInvalid("nbf")
+        sub = claims.get("sub")
+        if not isinstance(sub, str) or not sub:
+            raise OIDCTokenInvalid("sub")
+        if nonce is not None:
+            got = claims.get("nonce")
+            if not isinstance(got, str) or not secrets.compare_digest(
+                got.encode("utf-8"), nonce.encode("utf-8")
+            ):
+                raise OIDCTokenInvalid("nonce")
+        return claims
+
     async def end_session_endpoint(self) -> str | None:
         value = (await self.discover()).get("end_session_endpoint")
         return value if isinstance(value, str) and value else None
@@ -191,13 +378,23 @@ class OIDCService:
         finally:
             await client.aclose()
 
-    async def fetch_claims(self, code: str, *, code_verifier: str | None = None) -> dict[str, Any]:
+    async def fetch_claims(
+        self, code: str, *, code_verifier: str | None = None, nonce: str | None = None
+    ) -> dict[str, Any]:
         """Exchange *code* for tokens and return the userinfo claims dict."""
-        return (await self.fetch_tokens_and_claims(code, code_verifier=code_verifier)).claims
+        return (
+            await self.fetch_tokens_and_claims(code, code_verifier=code_verifier, nonce=nonce)
+        ).claims
 
     async def fetch_tokens_and_claims(
-        self, code: str, *, code_verifier: str | None = None
+        self, code: str, *, code_verifier: str | None = None, nonce: str | None = None
     ) -> OidcLoginResult:
+        """Exchange *code*; verify the id_token (when one is returned) and fetch userinfo.
+
+        A provider that returns no id_token keeps working as before (userinfo only). When an
+        id_token is present it must verify (:meth:`verify_id_token`) and userinfo ``sub``
+        must equal its ``sub`` (OIDC Core 5.3.2), else :class:`OIDCError`.
+        """
         disc = await self.discover()
         token_endpoint = disc.get("token_endpoint")
         if not token_endpoint or not isinstance(token_endpoint, str):
@@ -237,13 +434,15 @@ class OIDCService:
         raw_id_token = token.get("id_token")
         id_token = raw_id_token if isinstance(raw_id_token, str) and raw_id_token else None
 
+        id_claims = (
+            await self.verify_id_token(id_token, nonce=nonce) if id_token is not None else None
+        )
         claims = await self._userinfo(disc, token)
-        if id_token is not None:
-            id_sub = _unverified_sub(id_token)
+        if id_claims is not None:
             user_sub = claims.get("sub")
-            if id_sub is not None and user_sub is not None and str(user_sub) != id_sub:
+            if user_sub is not None and str(user_sub) != id_claims["sub"]:
                 raise OIDCError("userinfo subject does not match the id_token subject")
-        return OidcLoginResult(claims=claims, id_token=id_token)
+        return OidcLoginResult(claims=claims, id_token=id_token, id_token_claims=id_claims)
 
     async def _userinfo(self, disc: dict[str, Any], token: dict[str, Any]) -> dict[str, Any]:
         userinfo_endpoint = disc.get("userinfo_endpoint")

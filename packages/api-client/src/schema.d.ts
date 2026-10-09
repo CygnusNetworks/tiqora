@@ -4546,6 +4546,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/oidc/{slug}/backchannel-logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * OIDC back-channel logout (called by the identity provider)
+         * @description Server-to-server POST of a signed logout token (form field ``logout_token``).
+         *
+         *     Ends every matching agent and customer session; answers with ``Cache-Control: no-store``.
+         */
+        post: operations["oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/oidc/{slug}/callback": {
         parameters: {
             query?: never;
@@ -31242,6 +31264,64 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    oidc_backchannel_logout_api_v1_auth_oidc__slug__backchannel_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    logout_token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sessions of the logout token ended */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Invalid logout token or the logout failed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No OIDC provider with back-channel logout under this slug */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

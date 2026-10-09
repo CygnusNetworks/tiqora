@@ -12,7 +12,11 @@ this module enforces what pysaml2 does not:
   response was posted to; ``Destination`` (unsigned unless the response is) must
   equal it too when present;
 * an ``InResponseTo`` must be one of the outstanding requests of this browser flow;
-* the issuer must be the configured IdP.
+* the issuer must be the configured IdP;
+* redirect-binding logout messages (IdP LogoutRequest and LogoutResponse) carry a valid
+  ``Signature`` over the raw query octets by a key in the IdP metadata, ``SigAlg`` from the
+  SHA-2 allow-list, the configured issuer and our SLS as ``Destination``; a LogoutRequest
+  must also be fresh (``IssueInstant``, ``NotOnOrAfter``).
 """
 
 from __future__ import annotations
@@ -114,6 +118,12 @@ class SamlAssertionResult:
 class LogoutRequestData:
     name_id: str
     session_indexes: tuple[str, ...]
+    request_id: str = ""  # the LogoutRequest ID (replay cache key)
+
+
+# An IdP LogoutRequest travels IdP -> browser -> SP at once; older ones are refused, and a
+# request id is remembered this long (+ skew) so a captured redirect URL cannot be replayed.
+LOGOUT_REQUEST_MAX_AGE = 600
 
 
 def _sp_conf(
@@ -456,21 +466,83 @@ class SamlServiceProvider:
         )
         return SamlRedirect(request_id=str(req_id), url=_location(http))
 
-    async def parse_logout_response(self, saml_response: str, *, binding: str) -> str | None:
-        """``InResponseTo`` of an IdP LogoutResponse (the caller matches it to its state)."""
+    async def parse_logout_response(
+        self,
+        saml_response: str,
+        *,
+        binding: str,
+        relay_state: str | None = None,
+        sigalg: str | None = None,
+        signature: str | None = None,
+        raw_query: str | None = None,
+    ) -> str | None:
+        """``InResponseTo`` of a verified IdP LogoutResponse (the caller matches it to its state).
+
+        Redirect binding only (the only SLS binding in our metadata): signature over the raw
+        query octets, SHA-2 SigAlg, issuer, destination and Success status are all required.
+        """
         try:
-            return await self._run(self._parse_logout_response_sync, saml_response, binding)
+            return await self._run(
+                self._parse_logout_response_sync,
+                saml_response,
+                binding,
+                relay_state,
+                sigalg,
+                signature,
+                raw_query,
+            )
         except SamlResponseInvalid:
             raise
         except Exception as exc:
             raise SamlResponseInvalid(type(exc).__name__, str(exc)[:300]) from exc
 
-    def _parse_logout_response_sync(self, saml_response: str, binding: str) -> str | None:
+    def _verify_redirect_signature(
+        self,
+        client: Any,
+        param: str,
+        value: str,
+        relay_state: str | None,
+        sigalg: str | None,
+        signature: str | None,
+        raw_query: str | None,
+    ) -> None:
+        if not sigalg or not signature:
+            raise SamlResponseInvalid("logout_unsigned")
+        if sigalg not in REDIRECT_SIGALGS:
+            raise SamlResponseInvalid("logout_sigalg")
+        certs = client.metadata.certs(self._idp_id(), "any", "signing")
+        signed = _redirect_signed_octets(param, value, relay_state, sigalg, signature, raw_query)
+        if not any(_rsa_verify(cert, signed, signature, sigalg) for _name, cert in certs):
+            raise SamlResponseInvalid("logout_signature")
+
+    def _parse_logout_response_sync(
+        self,
+        saml_response: str,
+        binding: str,
+        relay_state: str | None,
+        sigalg: str | None,
+        signature: str | None,
+        raw_query: str | None,
+    ) -> str | None:
+        from saml2 import BINDING_HTTP_REDIRECT  # noqa: PLC0415
+
         client = self._ensure()
+        if binding != BINDING_HTTP_REDIRECT:
+            raise SamlResponseInvalid("logout_binding")
+        # Signature first: nothing of an unverified message is trusted.
+        self._verify_redirect_signature(
+            client, "SAMLResponse", saml_response, relay_state, sigalg, signature, raw_query
+        )
         resp = client.parse_logout_request_response(saml_response, binding)
         if resp is None:
             raise SamlResponseInvalid("no_response")
-        status = getattr(getattr(resp.response, "status", None), "status_code", None)
+        message = resp.response
+        if _text(getattr(message, "issuer", None)) != self._idp_id():
+            raise SamlResponseInvalid("issuer_mismatch")
+        destination = _text_attr(message, "destination")
+        if destination is not None and destination != self._urls.slo_url:
+            raise SamlResponseInvalid("destination_mismatch")
+        status = getattr(getattr(message, "status", None), "status_code", None)
         if getattr(status, "value", None) != STATUS_SUCCESS:
             raise SamlResponseInvalid("logout_status")
         return getattr(resp, "in_response_to", None) or None
@@ -541,12 +613,13 @@ class SamlServiceProvider:
         destination = _text_attr(req.message, "destination")
         if destination != self._urls.slo_url:
             raise SamlResponseInvalid("destination_mismatch")
-        certs = client.metadata.certs(issuer, "any", "signing")
-        signed = _redirect_signed_octets(
-            "SAMLRequest", saml_request, relay_state, sigalg, signature, raw_query
+        self._verify_redirect_signature(
+            client, "SAMLRequest", saml_request, relay_state, sigalg, signature, raw_query
         )
-        if not any(_rsa_verify(cert, signed, signature, sigalg) for _name, cert in certs):
-            raise SamlResponseInvalid("logout_signature")
+        _expect_fresh(req.message, self._cfg.clock_skew_seconds)
+        request_id = _text_attr(req.message, "id")
+        if not request_id:
+            raise SamlResponseInvalid("no_request_id")
         name_id = _text(req.message.name_id)
         if not name_id:
             raise SamlResponseInvalid("no_name_id")
@@ -560,7 +633,27 @@ class SamlServiceProvider:
             response=True,
             sign=True,
         )
-        return LogoutRequestData(name_id=name_id, session_indexes=indexes), _location(http)
+        return (
+            LogoutRequestData(name_id=name_id, session_indexes=indexes, request_id=request_id),
+            _location(http),
+        )
+
+
+def _expect_fresh(message: Any, skew: int) -> None:
+    """IssueInstant within the last LOGOUT_REQUEST_MAX_AGE (+ skew), NotOnOrAfter not passed.
+
+    pysaml2 computes a +-1 day window for IssueInstant but ignores its own result.
+    """
+    now = datetime.now(UTC)
+    issued = _instant(getattr(message, "issue_instant", None))
+    if issued is None:
+        raise SamlResponseInvalid("issue_instant")
+    age = (now - issued).total_seconds()
+    if age > LOGOUT_REQUEST_MAX_AGE + skew or age < -skew:
+        raise SamlResponseInvalid("issue_instant")
+    expires = _instant(getattr(message, "not_on_or_after", None))
+    if expires is not None and (now - expires).total_seconds() > skew:
+        raise SamlResponseInvalid("not_on_or_after")
 
 
 def _reason_for(exc: Exception) -> str:

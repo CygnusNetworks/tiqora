@@ -210,18 +210,50 @@ class SamlTestIdp:
         return str(headers["Location"])
 
     def logout_request_redirect(
-        self, *, sp_slo_url: str, name_id: str, session_index: str, sigalg: str | None = None
+        self,
+        *,
+        sp_slo_url: str,
+        name_id: str,
+        session_index: str,
+        sigalg: str | None = None,
+        issuer: str | None = None,
+        issue_instant: str | None = None,
     ) -> str:
+        """A signed redirect-binding LogoutRequest. ``issuer``/``issue_instant`` rewrite the
+        message BEFORE signing (validly signed by this IdP's key, but lying)."""
         from saml2.saml import NameID  # noqa: PLC0415
 
-        req_id, req = self._server.create_logout_request(
+        _req_id, req = self._server.create_logout_request(
             sp_slo_url,
             self.entity_id,
             name_id=NameID(text=name_id, format=NAMEID_FORMAT_PERSISTENT),
             session_indexes=[session_index],
             sign=False,
         )
-        return self._redirect(str(req), sp_slo_url, response=False, sigalg=sigalg)
+        xml = str(req)
+        if issuer is not None:
+            xml, n = re.subn(r"(<(?:\w+:)?Issuer\b[^>]*>)[^<]*(</)", rf"\g<1>{issuer}\g<2>", xml)
+            assert n == 1, xml
+        if issue_instant is not None:
+            xml, n = re.subn(r'IssueInstant="[^"]+"', f'IssueInstant="{issue_instant}"', xml)
+            assert n == 1, xml
+        return self._redirect(xml, sp_slo_url, response=False, sigalg=sigalg)
+
+    def parse_logout_response(self, url: str) -> ParsedLogoutResponse:
+        """Decode the SP's redirect-binding LogoutResponse; require a SHA-2 signed redirect."""
+        q = parse_qs(urlparse(url).query)
+        assert "Signature" in q and q["SigAlg"] == [SIG_RSA_SHA256], "response must be signed"
+        xml = zlib.decompress(base64.b64decode(q["SAMLResponse"][0]), -15).decode()
+        irt = re.search(r'InResponseTo="([^"]+)"', xml)
+        status = re.search(r'<(?:\w+:)?StatusCode\b[^>]*Value="([^"]+)"', xml)
+        dest = re.search(r'Destination="([^"]+)"', xml)
+        assert irt is not None and status is not None, xml
+        return ParsedLogoutResponse(
+            in_response_to=irt.group(1),
+            status=status.group(1),
+            destination=dest.group(1) if dest else None,
+            relay_state=q.get("RelayState", [None])[0],
+        )
 
     def parse_logout_request(self, url: str) -> ParsedLogoutRequest:
         """Decode the SAMLRequest of an SP-initiated logout redirect; require a signed redirect."""
@@ -258,6 +290,14 @@ class SamlTestIdp:
             destination=sp_slo_url,
         )
         return self._redirect(str(resp), sp_slo_url, response=True)
+
+
+@dataclass(frozen=True)
+class ParsedLogoutResponse:
+    in_response_to: str
+    status: str
+    destination: str | None
+    relay_state: str | None
 
 
 @dataclass(frozen=True)

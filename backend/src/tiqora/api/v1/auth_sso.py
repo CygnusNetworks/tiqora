@@ -11,6 +11,7 @@ from tiqora.api.deps import AppSettings, DbSession
 from tiqora.identity.saml_runtime import saml_availability
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
+    handle_backchannel_logout,
     handle_saml_acs_post,
     handle_sls,
     resolve_admin_id,
@@ -131,3 +132,38 @@ async def saml_sls_post(
 ) -> Response:
     """Same as the GET form; CSRF-exempt because the IdP posts cross-site."""
     return await handle_sls(request, slug=slug, session=session, settings=settings)
+
+
+@router.post(
+    "/oidc/{slug}/backchannel-logout",
+    response_model=None,
+    summary="OIDC back-channel logout (called by the identity provider)",
+    openapi_extra={
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/x-www-form-urlencoded": {
+                    "schema": {
+                        "type": "object",
+                        "required": ["logout_token"],
+                        "properties": {"logout_token": {"type": "string"}},
+                    }
+                }
+            },
+        }
+    },
+    responses={
+        200: {"description": "Sessions of the logout token ended"},
+        400: {"description": "Invalid logout token or the logout failed"},
+        404: {"description": "No OIDC provider with back-channel logout under this slug"},
+        429: {"description": "Too many requests"},
+    },
+)
+async def oidc_backchannel_logout(
+    slug: str, request: Request, settings: AppSettings, session: DbSession
+) -> Response:
+    """Server-to-server POST of a signed logout token (form field ``logout_token``).
+
+    Ends every matching agent and customer session; answers with ``Cache-Control: no-store``.
+    """
+    return await handle_backchannel_logout(request, slug=slug, session=session, settings=settings)

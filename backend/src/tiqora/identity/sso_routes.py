@@ -33,7 +33,7 @@ from tiqora.domain.oidc import (
     OIDCService,
     oidc_client_config,
 )
-from tiqora.identity import flow_state
+from tiqora.identity import flow_state, oidc_backchannel
 from tiqora.identity.config_models import OidcProviderConfig, SamlProviderConfig
 from tiqora.identity.env_providers import (
     ensure_env_providers,
@@ -67,12 +67,13 @@ from tiqora.identity.saml_metadata import (
 )
 from tiqora.identity.saml_runtime import SamlUnavailable, saml_availability
 from tiqora.identity.saml_sp import (
+    LOGOUT_REQUEST_MAX_AGE,
     MAX_RESPONSE_BYTES,
     SamlResponseInvalid,
     SamlServiceProvider,
     decode_saml_b64,
 )
-from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso
+from tiqora.identity.sso_sessions import SsoSessionInfo, load_sso, revoke_sso_sessions
 from tiqora.identity.store import (
     ProviderRecord,
     ProviderValidationError,
@@ -87,6 +88,7 @@ from tiqora.identity.types import (
     subject_hash,
 )
 from tiqora.identity.urls import IdentityUrlsUnavailable, base_url, provider_urls
+from tiqora.security.ratelimit import client_ip
 
 logger = structlog.get_logger(__name__)
 
@@ -566,8 +568,10 @@ async def _finish_oidc_callback(
             )
         )
     try:
+        # The id_token (when returned) is verified against the JWKS incl. the nonce stored
+        # with this state; a pre-upgrade env state has none (signature etc. still checked).
         result = await new_oidc_service(client_config).fetch_tokens_and_claims(
-            code, code_verifier=login_state.code_verifier
+            code, code_verifier=login_state.code_verifier, nonce=login_state.nonce
         )
     except OIDCOutboundError as exc:
         logger.warning("oidc_exchange_blocked", slug=slug, error=str(exc))
@@ -604,12 +608,17 @@ async def _finish_oidc_callback(
     if subject:
         attributes["oidc:sub"] = (subject,)
     verified = claims.get("email_verified")
+    sid_raw = (result.id_token_claims or {}).get("sid")
     identity = ExternalIdentity(
         provider_id=record.id,
         subject=subject,
         attributes=attributes,
         email_verified=verified if isinstance(verified, bool) else None,
-        sso=SsoSessionDraft(id_token_hint=result.id_token),
+        sso=SsoSessionDraft(
+            id_token_hint=result.id_token,
+            # only from the VERIFIED id_token: the back-channel logout selects sessions by it
+            sid=sid_raw if isinstance(sid_raw, str) and 0 < len(sid_raw) <= 1024 else None,
+        ),
     )
     return await complete_login(
         request,
@@ -1194,6 +1203,12 @@ def _text_field(value: object) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
+def _raw_query(request: Request) -> str:
+    """The undecoded query string: redirect-binding signatures cover the original octets."""
+    raw = request.scope.get("query_string", b"")
+    return raw.decode("latin-1") if isinstance(raw, bytes) else str(raw)
+
+
 async def handle_sls(
     request: Request,
     *,
@@ -1204,26 +1219,37 @@ async def handle_sls(
     """SAML single logout service (GET redirect binding, POST binding).
 
     A ``SAMLResponse`` is the IdP's answer to our LogoutRequest. The local session is already
-    gone, so every outcome lands on the login page. A response only matters when it names a
-    request id we stored for THIS provider (a redirect-binding signature cannot be verified
-    here), and it is one-shot. A ``SAMLRequest`` (IdP-initiated logout) arrives with Task 21.
+    gone, so every outcome lands on the login page; the response only consumes the stored
+    request when its redirect signature verifies and it names a request id we stored for THIS
+    provider (one-shot). A ``SAMLRequest`` is a logout started at the IdP: verified (redirect
+    signature, issuer, destination, freshness, replay), the matching sessions of both
+    audiences are revoked and the browser goes back to the IdP with a signed LogoutResponse.
     """
     fields: Any = request.query_params
     binding = _BINDING_REDIRECT
+    raw_query: str | None = _raw_query(request)
     if request.method == "POST":
         binding = _BINDING_POST
+        raw_query = None
         try:
             fields = await request.form()
         except Exception:  # noqa: BLE001 - malformed body: treat as empty
             fields = {}
     saml_response = _text_field(fields.get("SAMLResponse"))
     saml_request = _text_field(fields.get("SAMLRequest"))
+    relay_state = _text_field(fields.get("RelayState"))
+    sigalg = _text_field(fields.get("SigAlg"))
+    signature = _text_field(fields.get("Signature"))
     if saml_response:
         state = await _consume_logout_response(
             request,
             slug=slug,
             saml_response=saml_response,
             binding=binding,
+            relay_state=relay_state,
+            sigalg=sigalg,
+            signature=signature,
+            raw_query=raw_query,
             settings=settings,
             session=session,
         )
@@ -1234,13 +1260,91 @@ async def handle_sls(
         )
         return RedirectResponse(logged_out_path(user_kind), status_code=status.HTTP_303_SEE_OTHER)
     if saml_request:
-        # Task 21 implements IdP-initiated single logout.
-        return JSONResponse(
-            {"detail": "IdP-initiated logout not supported yet"},
-            status_code=status.HTTP_400_BAD_REQUEST,
+        return await _idp_logout_request(
+            request,
+            slug=slug,
+            saml_request=saml_request,
+            binding=binding,
+            relay_state=relay_state,
+            sigalg=sigalg,
+            signature=signature,
+            raw_query=raw_query,
+            session=session,
+            settings=settings,
         )
     fallback = await _sls_fallback_kind(session, settings, slug)
     return RedirectResponse(logged_out_path(fallback), status_code=status.HTTP_303_SEE_OTHER)
+
+
+def _logout_request_rejected() -> Response:
+    # One generic answer for every failure: no hint which check failed.
+    return JSONResponse(
+        {"detail": "Invalid logout request"},
+        status_code=status.HTTP_400_BAD_REQUEST,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+async def _idp_logout_request(
+    request: Request,
+    *,
+    slug: str,
+    saml_request: str,
+    binding: str,
+    relay_state: str | None,
+    sigalg: str | None,
+    signature: str | None,
+    raw_query: str | None,
+    session: AsyncSession,
+    settings: Settings,
+) -> Response:
+    """IdP-initiated single logout: verify, revoke, answer with a signed LogoutResponse."""
+    try:
+        record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sso_provider_lookup_failed", slug=slug, error=type(exc).__name__)
+        return _logout_request_rejected()
+    if record is None or record.kind != "saml" or not saml_availability().available:
+        return _logout_request_rejected()
+    cfg = record.config
+    if not isinstance(cfg, SamlProviderConfig):
+        return _logout_request_rejected()
+    try:
+        data, reply_url = await SamlServiceProvider(
+            record, settings=settings
+        ).handle_logout_request(
+            saml_request,
+            binding=binding,
+            relay_state=relay_state,
+            sigalg=sigalg,
+            signature=signature,
+            raw_query=raw_query,
+        )
+    except SamlResponseInvalid as exc:
+        logger.warning("saml_logout_request_rejected", slug=slug, reason=exc.reason)
+        return _logout_request_rejected()
+    except (SamlUnavailable, SamlMetadataError, IdentityUrlsUnavailable) as exc:
+        logger.warning("saml_logout_request_rejected", slug=slug, reason=type(exc).__name__)
+        return _logout_request_rejected()
+    redis = await get_redis(request)
+    ttl = LOGOUT_REQUEST_MAX_AGE + 2 * cfg.clock_skew_seconds
+    if not await flow_state.mark_logout_request_seen(redis, record.id, data.request_id, ttl):
+        logger.warning("saml_logout_request_rejected", slug=slug, reason="replay")
+        return _logout_request_rejected()
+    # Subject AND (when named) the IdP session indexes: never another subject's session.
+    try:
+        removed = await revoke_sso_sessions(
+            redis,
+            settings,
+            provider_id=record.id,
+            subject_hash=subject_hash(data.name_id),
+            session_indexes=data.session_indexes,
+        )
+    except Exception as exc:  # noqa: BLE001 - never answer "logged out" when it failed
+        logger.error("saml_idp_logout_failed", slug=slug, error=type(exc).__name__)
+        return _logout_request_rejected()
+    logger.info("saml_idp_logout", slug=slug, sessions=removed)
+    return RedirectResponse(reply_url, status_code=status.HTTP_302_FOUND)
 
 
 async def _sls_fallback_kind(session: AsyncSession, settings: Settings, slug: str) -> UserKind:
@@ -1259,6 +1363,10 @@ async def _consume_logout_response(
     slug: str,
     saml_response: str,
     binding: str,
+    relay_state: str | None,
+    sigalg: str | None,
+    signature: str | None,
+    raw_query: str | None,
     settings: Settings,
     session: AsyncSession,
 ) -> LogoutState | None:
@@ -1267,7 +1375,12 @@ async def _consume_logout_response(
         if record is None or record.kind != "saml" or not saml_availability().available:
             return None
         in_response_to = await SamlServiceProvider(record, settings=settings).parse_logout_response(
-            saml_response, binding=binding
+            saml_response,
+            binding=binding,
+            relay_state=relay_state,
+            sigalg=sigalg,
+            signature=signature,
+            raw_query=raw_query,
         )
         if not in_response_to:
             return None
@@ -1276,3 +1389,105 @@ async def _consume_logout_response(
     except Exception as exc:  # noqa: BLE001 - a bad response changes nothing: session is gone
         logger.info("saml_logout_response_ignored", slug=slug, error=type(exc).__name__)
         return None
+
+
+# ---------------------------------------------------------------------------- OIDC back-channel
+
+_BACKCHANNEL_MAX_BODY = 64 * 1024
+_NO_STORE: Final = {"Cache-Control": "no-store"}
+
+
+def _backchannel_error(http_status: int = status.HTTP_400_BAD_REQUEST) -> Response:
+    # Back-Channel Logout 1.0 section 2.8: 400 for an invalid request OR a failed logout; the
+    # body names no validation step (the reason is logged only).
+    return JSONResponse({"error": "invalid_request"}, status_code=http_status, headers=_NO_STORE)
+
+
+async def handle_backchannel_logout(
+    request: Request,
+    *,
+    slug: str,
+    session: AsyncSession,
+    settings: Settings,
+) -> Response:
+    """OIDC Back-Channel Logout 1.0 receiver (server to server, cookie-less, CSRF-exempt).
+
+    404 when the slug is no OIDC provider or back-channel logout is switched off; 429 over the
+    per-IP limit; 400 for every invalid token, a replayed ``jti`` or a failed revocation; 200
+    with ``Cache-Control: no-store`` after the matching sessions of both audiences are gone.
+    """
+    try:
+        record = await _load_provider(session, settings, slug)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sso_provider_lookup_failed", slug=slug, error=type(exc).__name__)
+        return _backchannel_error()
+    cfg = runtime_config(record, settings) if record is not None else None
+    if (
+        record is None
+        or record.kind != "oidc"
+        or not isinstance(cfg, OidcProviderConfig)
+        or not cfg.backchannel_logout
+    ):
+        return JSONResponse(
+            {"detail": "Not Found"}, status_code=status.HTTP_404_NOT_FOUND, headers=_NO_STORE
+        )
+    redis = await get_redis(request)
+    retry_after = await oidc_backchannel.rate_limited(
+        redis, record.id, client_ip(request, settings.trusted_proxies)
+    )
+    if retry_after:
+        logger.warning("oidc_backchannel_rate_limited", slug=slug)
+        return JSONResponse(
+            {"error": "rate_limited"},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={**_NO_STORE, "Retry-After": str(retry_after)},
+        )
+
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    declared = request.headers.get("content-length", "")
+    if content_type != "application/x-www-form-urlencoded" or (
+        declared.isdigit() and int(declared) > _BACKCHANNEL_MAX_BODY
+    ):
+        logger.warning("oidc_backchannel_rejected", slug=slug, reason="request_format")
+        return _backchannel_error()
+    try:
+        form = await request.form()
+    except Exception:  # noqa: BLE001 - malformed body
+        logger.warning("oidc_backchannel_rejected", slug=slug, reason="form")
+        return _backchannel_error()
+    token = form.get("logout_token")
+    if not isinstance(token, str) or not token:
+        logger.warning("oidc_backchannel_rejected", slug=slug, reason="no_token")
+        return _backchannel_error()
+
+    try:
+        service = new_oidc_service(oidc_client_config(cfg, redirect_uri=""))
+        issuer = await service.expected_issuer()
+        verified = await oidc_backchannel.verify_logout_token(
+            token, service=service, client_id=cfg.client_id, issuer=issuer
+        )
+    except oidc_backchannel.LogoutTokenInvalid as exc:
+        logger.warning("oidc_backchannel_rejected", slug=slug, reason=exc.reason)
+        return _backchannel_error()
+    except (OIDCError, httpx.HTTPError, ValueError) as exc:  # discovery unreachable
+        logger.warning("oidc_backchannel_rejected", slug=slug, reason=type(exc).__name__)
+        return _backchannel_error()
+    if not await flow_state.mark_jti_seen(redis, record.id, verified.jti):
+        logger.warning("oidc_backchannel_rejected", slug=slug, reason="replay")
+        return _backchannel_error()
+    try:
+        # Exactly one selector: the IdP session (sid) when named, else every session of sub.
+        if verified.sid is not None:
+            removed = await revoke_sso_sessions(
+                redis, settings, provider_id=record.id, sid=verified.sid
+            )
+        else:
+            assert verified.sub is not None
+            removed = await revoke_sso_sessions(
+                redis, settings, provider_id=record.id, subject_hash=subject_hash(verified.sub)
+            )
+    except Exception as exc:  # noqa: BLE001 - "the logout failed" (section 2.8) -> 400
+        logger.error("oidc_backchannel_revoke_failed", slug=slug, error=type(exc).__name__)
+        return _backchannel_error()
+    logger.info("oidc_backchannel_logout", slug=slug, sessions=removed)
+    return Response(status_code=status.HTTP_200_OK, headers=_NO_STORE)

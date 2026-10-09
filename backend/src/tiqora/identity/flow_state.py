@@ -1,4 +1,4 @@
-"""Short-lived Redis state of SSO flows (D10): OIDC state and admin test runs.
+"""Short-lived Redis state of SSO flows (D10): OIDC state, admin test runs, replay caches.
 
 One-shot keys are read with GET + DELETE ("pop"). The SAML request state is read
 non-destructively first (``get_saml_request``) and only deleted once the response
@@ -30,6 +30,9 @@ LOGOUT_REQUEST_PREFIX = "tiqora:saml:logout:"
 LOGOUT_REQUEST_TTL = 600
 TEST_PREFIX = "tiqora:idp:test:"
 TEST_TTL = 900
+OIDC_JTI_PREFIX = "tiqora:oidc:jti:"
+OIDC_JTI_TTL = 600  # >= logout-token max age (300 s) + clock leeway
+SAML_LOGOUT_SEEN_PREFIX = "tiqora:saml:logout-seen:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +166,20 @@ async def mark_assertion_seen(redis: Any, provider_id: int, assertion_id: str, t
     """Record an assertion id; False when it was already seen (replay)."""
     digest = hashlib.sha256(assertion_id.encode()).hexdigest()
     key = f"{SAML_SEEN_PREFIX}{provider_id}:{digest}"
+    return bool(await redis.set(key, "1", ex=max(ttl, 60), nx=True))
+
+
+async def mark_jti_seen(redis: Any, provider_id: int, jti: str) -> bool:
+    """Record a back-channel logout token id; False when it was already seen (replay)."""
+    digest = hashlib.sha256(jti.encode("utf-8")).hexdigest()
+    key = f"{OIDC_JTI_PREFIX}{provider_id}:{digest}"
+    return bool(await redis.set(key, "1", ex=OIDC_JTI_TTL, nx=True))
+
+
+async def mark_logout_request_seen(redis: Any, provider_id: int, request_id: str, ttl: int) -> bool:
+    """Record an IdP LogoutRequest ID; False when it was already answered (replay)."""
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    key = f"{SAML_LOGOUT_SEEN_PREFIX}{provider_id}:{digest}"
     return bool(await redis.set(key, "1", ex=max(ttl, 60), nx=True))
 
 

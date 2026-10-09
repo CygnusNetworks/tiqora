@@ -5,7 +5,10 @@ from __future__ import annotations
 import base64
 import re
 import urllib.parse
+import zlib
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import defusedxml.ElementTree as safe_et
 import pytest
@@ -558,8 +561,7 @@ async def test_parse_logout_response_returns_in_response_to(
     sp: SamlServiceProvider, idp: SamlTestIdp
 ) -> None:
     url = idp.logout_response_redirect(sp_slo_url=SP_SLO, in_response_to="id-logout-1")
-    q = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()}
-    got = await sp.parse_logout_response(q["SAMLResponse"], binding=REDIRECT)
+    got = await sp.parse_logout_response(**_response_call(url))
     assert got == "id-logout-1"
 
 
@@ -569,10 +571,93 @@ async def test_parse_logout_response_requires_success_status(
     url = idp.logout_response_redirect(
         sp_slo_url=SP_SLO, in_response_to="id-logout-2", success=False
     )
-    q = {k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()}
     with pytest.raises(SamlResponseInvalid) as err:
-        await sp.parse_logout_response(q["SAMLResponse"], binding=REDIRECT)
+        await sp.parse_logout_response(**_response_call(url))
     assert err.value.reason == "StatusError"  # pysaml2 refuses a non-Success status itself
+
+
+def _response_call(url: str, **over: object) -> dict[str, Any]:
+    raw = urllib.parse.urlparse(url).query
+    q = {k: v[-1] for k, v in urllib.parse.parse_qs(raw).items()}
+    args: dict[str, Any] = {
+        "saml_response": q["SAMLResponse"],
+        "binding": REDIRECT,
+        "relay_state": q.get("RelayState"),
+        "sigalg": q.get("SigAlg"),
+        "signature": q.get("Signature"),
+        "raw_query": raw,
+    }
+    args.update(over)
+    return args
+
+
+async def _response_reject(sp: SamlServiceProvider, args: dict[str, Any]) -> str:
+    with pytest.raises(SamlResponseInvalid) as err:
+        await sp.parse_logout_response(**args)
+    return err.value.reason
+
+
+async def test_logout_response_must_be_signed(sp: SamlServiceProvider, idp: SamlTestIdp) -> None:
+    url = idp.logout_response_redirect(sp_slo_url=SP_SLO, in_response_to="id-logout-3")
+    unsigned = _response_call(url, sigalg=None, signature=None, raw_query=None)
+    assert await _response_reject(sp, unsigned) == "logout_unsigned"
+    forged = _response_call(url, signature=base64.b64encode(b"x" * 256).decode(), raw_query=None)
+    assert await _response_reject(sp, forged) == "logout_signature"
+    sha1 = _response_call(url, sigalg="http://www.w3.org/2000/09/xmldsig#rsa-sha1")
+    assert await _response_reject(sp, sha1) == "logout_sigalg"
+
+
+async def test_logout_response_signed_by_foreign_key_rejected(
+    sp: SamlServiceProvider, tmp_path: Path
+) -> None:
+    impostor = SamlTestIdp(tmp_path)  # same entity id, key not in the metadata
+    url = impostor.logout_response_redirect(sp_slo_url=SP_SLO, in_response_to="id-logout-4")
+    assert await _response_reject(sp, _response_call(url)) == "logout_signature"
+
+
+async def test_logout_response_post_binding_refused(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    url = idp.logout_response_redirect(sp_slo_url=SP_SLO, in_response_to="id-logout-5")
+    post = _response_call(url, binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST")
+    assert await _response_reject(sp, post) == "logout_binding"
+
+
+async def test_handle_logout_request_returns_request_id(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    url = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="u-1001", session_index="s1")
+    args = _logout_call(url)
+    data, _reply = await sp.handle_logout_request(str(args.pop("saml_request")), **args)  # type: ignore[arg-type]
+    xml = zlib.decompress(
+        base64.b64decode(urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["SAMLRequest"][0]),
+        -15,
+    ).decode()
+    assert f'ID="{data.request_id}"' in xml and data.request_id
+
+
+@pytest.mark.parametrize("age", [timedelta(hours=1), timedelta(minutes=-30)])
+async def test_stale_or_future_logout_request_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp, age: timedelta
+) -> None:
+    when = (datetime.now(UTC) - age).strftime("%Y-%m-%dT%H:%M:%SZ")
+    url = idp.logout_request_redirect(
+        sp_slo_url=SP_SLO, name_id="u-1001", session_index="s1", issue_instant=when
+    )
+    assert await _logout_reject(sp, _logout_call(url)) == "issue_instant"
+
+
+async def test_logout_request_with_foreign_issuer_rejected(
+    sp: SamlServiceProvider, idp: SamlTestIdp
+) -> None:
+    # Signed with the trusted key, but claims to come from another entity.
+    url = idp.logout_request_redirect(
+        sp_slo_url=SP_SLO,
+        name_id="u-1001",
+        session_index="s1",
+        issuer="https://other.example.org/saml",
+    )
+    assert await _logout_reject(sp, _logout_call(url)) == "issuer_mismatch"
 
 
 # --------------------------------------------------------------------------- round 2

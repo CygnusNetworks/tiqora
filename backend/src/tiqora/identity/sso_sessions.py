@@ -138,11 +138,28 @@ async def drop_sso(redis: Any, audience: AudienceKey, token: str) -> None:
     await redis.delete(sso_key(audience, token))
 
 
-async def _members(redis: Any, key: str) -> set[str]:
+async def _members(redis: Any, audience: AudienceKey, key: str) -> set[str]:
+    """Live tokens of index set *key*; members whose SSO info expired are pruned from it.
+
+    Index sets live as long as their newest member, so an active subject would otherwise
+    accumulate the tokens of every expired session.
+    """
     try:
-        return {_text(m) for m in (await redis.smembers(key) or set())}
+        members = {_text(m) for m in (await redis.smembers(key) or set())}
     except Exception:  # noqa: BLE001 — a missing index must not break logout
         return set()
+    live: set[str] = set()
+    for token in members:
+        try:
+            alive = bool(await redis.exists(sso_key(audience, token)))
+        except Exception:  # noqa: BLE001 - when in doubt, keep it (revoking twice is harmless)
+            alive = True
+        if alive:
+            live.add(token)
+            continue
+        with contextlib.suppress(Exception):
+            await redis.srem(key, token)
+    return live
 
 
 async def tokens_for(
@@ -154,16 +171,20 @@ async def tokens_for(
     sid: str | None = None,
     session_indexes: Sequence[str] = (),
 ) -> set[str]:
-    """Tokens matching the given selectors (union; subject AND session index when both given)."""
+    """Live tokens matching the given selectors.
+
+    Subject AND session index when both are given; ``sid`` is unioned with the rest, so
+    callers that want a pure sid match (OIDC back-channel) pass ``sid`` alone.
+    """
     base = f"tiqora:sso:idx:{audience}:{provider_id}"
     by_subject: set[str] | None = None
     if subject_hash is not None:
-        by_subject = await _members(redis, f"{base}:sub:{subject_hash}")
+        by_subject = await _members(redis, audience, f"{base}:sub:{subject_hash}")
     by_index: set[str] | None = None
     if session_indexes:
         by_index = set()
         for si in session_indexes:
-            by_index |= await _members(redis, f"{base}:si:{_sha(si)}")
+            by_index |= await _members(redis, audience, f"{base}:si:{_sha(si)}")
     found: set[str] = set()
     if by_subject is not None and by_index is not None:
         found |= by_subject & by_index
@@ -172,7 +193,7 @@ async def tokens_for(
     elif by_index is not None:
         found |= by_index
     if sid is not None:
-        found |= await _members(redis, f"{base}:sid:{_sha(sid)}")
+        found |= await _members(redis, audience, f"{base}:sid:{_sha(sid)}")
     return found
 
 

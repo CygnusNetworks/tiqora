@@ -39,7 +39,7 @@ from tiqora.domain.customer_auth import CustomerSessionStore
 from tiqora.domain.oidc import OidcClientConfig, OIDCService, clear_discovery_cache
 from tiqora.domain.settings_store import KEY_PORTAL_ENABLED, set_setting
 from tiqora.identity import flow_state, sso_routes
-from tiqora.identity.config_models import AttributeMap, JitDefaults
+from tiqora.identity.config_models import AttributeMap, GroupGrant, JitDefaults, RoleRule
 from tiqora.identity.flow_state import TestRun
 from tiqora.identity.http import safe_portal_next
 from tiqora.identity.saml_sp import MAX_RESPONSE_BYTES
@@ -541,7 +541,7 @@ async def test_sessions_use_separate_cookies_and_stores(env: Env) -> None:
 
 
 async def test_customer_jit_creates_a_customer_user_row(env: Env) -> None:
-    await _oidc_provider(
+    provider = await _oidc_provider(
         env,
         "jit",
         jit_enabled=True,
@@ -553,6 +553,25 @@ async def test_customer_jit_creates_a_customer_user_row(env: Env) -> None:
             last_name=["family_name"],
         ),
     )
+    # A rule this login satisfies: role/group sync must still never run for a customer. The
+    # filler row keeps the JIT customer off id 1, where the system-user guard would hide it.
+    await seed_customer(env.session, "idp.kunde.47265-filler@example.org")
+    await update_provider(
+        env.session,
+        provider.id,
+        ProviderChanges(
+            role_rules=[
+                RoleRule(
+                    attribute="family_name",
+                    value="Kunde",
+                    groups=[GroupGrant(group_id=1, permissions=["ro"])],
+                )
+            ]
+        ),
+        secret_key=KEY,
+        actor_id=1,
+    )
+    await env.session.commit()
     env.oidc.claims["c"] = {
         "sub": "s-jit",
         "preferred_username": "idp.kunde.47265@example.org",
@@ -568,12 +587,13 @@ async def test_customer_jit_creates_a_customer_user_row(env: Env) -> None:
     assert resp.status_code == 302 and resp.headers["location"] == "/portal", resp.text
     row = (
         await env.session.execute(
-            text("SELECT email, customer_id, first_name FROM customer_user WHERE login = :l"),
+            text("SELECT email, customer_id, first_name, id FROM customer_user WHERE login = :l"),
             {"l": "idp.kunde.47265@example.org"},
         )
     ).first()
     assert row is not None
-    assert tuple(row) == ("idp.kunde.47265@example.test", "idp-jit-co", "Jana")
+    assert tuple(row)[:3] == ("idp.kunde.47265@example.test", "idp-jit-co", "Jana")
+    assert row[3] != 1
     me = await env.client.get("/api/portal/auth/me")
     assert me.status_code == 200 and me.json()["customer_id"] == "idp-jit-co"
     # JIT customers are never agents and get no role/group assignments
@@ -583,8 +603,12 @@ async def test_customer_jit_creates_a_customer_user_row(env: Env) -> None:
             {"l": "idp.kunde.47265@example.org"},
         )
     ).scalar_one() == 0
+    # ... although the provider has a rule that this login's claims satisfy (agent-only guard)
     assert (
-        await env.session.execute(text("SELECT COUNT(*) FROM tiqora_identity_managed_assignment"))
+        await env.session.execute(
+            text("SELECT COUNT(*) FROM tiqora_identity_managed_assignment WHERE provider_id = :p"),
+            {"p": provider.id},
+        )
     ).scalar_one() == 0
 
 

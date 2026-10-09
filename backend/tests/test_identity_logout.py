@@ -9,7 +9,6 @@ when pysaml2 / xmlsec1 are missing; everything else runs without them.
 
 from __future__ import annotations
 
-import base64
 import json
 import re
 from collections.abc import AsyncIterator, Iterator
@@ -22,7 +21,13 @@ import pytest_asyncio
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from tests._identity_helpers import FakeRedis, cleanup_statements, make_provider, seed_agent
+from tests._identity_helpers import (
+    FakeRedis,
+    OidcSigner,
+    cleanup_statements,
+    make_provider,
+    seed_agent,
+)
 from tests._saml_idp import IDP_SLO_URL, SamlTestIdp, require_saml
 from tests.test_identity_store import _to_async_url
 from tiqora.api.app import create_app
@@ -71,19 +76,13 @@ def _cleanup_rows() -> Iterator[None]:
     _URLS.clear()
 
 
-def _jwt(payload: dict[str, Any]) -> str:
-    def b64(raw: bytes) -> str:
-        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
-
-    return ".".join([b64(b'{"alg":"none"}'), b64(json.dumps(payload).encode()), b64(b"sig")])
-
-
 class FakeOidcIdp:
     def __init__(self) -> None:
         self.end_session: str | None = None
         self.claims: dict[str, dict[str, Any]] = {}
         self.id_tokens: dict[str, str] = {}
         self.discovery_down = False
+        self.signer = OidcSigner()
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         host, path = request.headers["host"], request.url.path
@@ -97,10 +96,13 @@ class FakeOidcIdp:
                 "authorization_endpoint": f"{base}/authorize",
                 "token_endpoint": f"{base}/token",
                 "userinfo_endpoint": f"{base}/userinfo",
+                "jwks_uri": f"{base}/jwks",
             }
             if self.end_session:
                 doc["end_session_endpoint"] = self.end_session
             return httpx.Response(200, json=doc)
+        if path.endswith("/jwks"):
+            return httpx.Response(200, json=self.signer.jwks())
         if path.endswith("/token"):
             code = parse_qs(request.content.decode())["code"][0]
             body: dict[str, Any] = {"access_token": code, "token_type": "Bearer"}
@@ -281,10 +283,16 @@ async def _kc(env: Env) -> None:
 async def _oidc_login(env: Env, user_id: int) -> str:
     await env.agent(user_id, f"idp.lo.{user_id}")
     env.oidc.claims["c"] = {"sub": f"kc-{user_id}", "preferred_username": f"idp.lo.{user_id}"}
-    env.oidc.id_tokens["c"] = _jwt({"sub": f"kc-{user_id}", "iss": "x"})
     start = await env.client.get(f"/api/v1/auth/sso/{OIDC_SLUG}/login")
     assert start.status_code == 302, start.text
-    state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+    query = parse_qs(urlparse(start.headers["location"]).query)
+    state = query["state"][0]
+    env.oidc.id_tokens["c"] = env.oidc.signer.id_token(
+        iss="https://kc.example.org/realms/y",
+        aud="tiqora",
+        sub=f"kc-{user_id}",
+        nonce=query["nonce"][0],
+    )
     cb = await env.client.get(
         f"/api/v1/auth/oidc/{OIDC_SLUG}/callback", params={"code": "c", "state": state}
     )
@@ -310,7 +318,7 @@ async def test_oidc_end_session(env: Env) -> None:
         in loc
     )
     q = parse_qs(urlparse(loc).query)
-    assert q["id_token_hint"] == [_jwt({"sub": "kc-47461", "iss": "x"})]
+    assert q["id_token_hint"] == [env.oidc.id_tokens["c"]]
     assert q["client_id"] == ["tiqora"]
     assert await env.store.get(token) is None
     assert await env.store.get_sso(token) is None
@@ -447,17 +455,6 @@ async def test_saml_logout_response_must_match_a_stored_request(env: Env, idp: S
 
     empty = await env.client.get(SLS_PATH)
     assert (empty.status_code, empty.headers["location"]) == (303, LOGGED_OUT)
-
-
-@pytest.mark.saml
-async def test_saml_idp_initiated_logout_request_not_supported_yet(
-    env: Env, idp: SamlTestIdp
-) -> None:
-    await _saml_provider(env, idp)
-    url = idp.logout_request_redirect(sp_slo_url=SP_SLS, name_id="u-1", session_index="s1")
-    r = await env.client.get(f"{SLS_PATH}?{urlparse(url).query}")
-    assert r.status_code == 400
-    assert "IdP-initiated logout not supported yet" in r.text
 
 
 @pytest.mark.saml

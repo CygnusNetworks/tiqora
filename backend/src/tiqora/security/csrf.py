@@ -24,10 +24,13 @@ _PROTECTED_PREFIXES = ("/api/v1", "/api/portal")
 # Cross-site form POSTs by design: the IdP's browser POST to the SAML ACS / SLS can carry
 # either session cookie and a foreign Origin. Each is authenticated by its XML signature,
 # a Redis-held request id and (ACS) a per-browser cookie, not by the session cookie.
-# Nothing else is exempt (the OIDC back-channel POST is server-to-server, cookie-less).
+# The OIDC back-channel logout is a server-to-server POST authenticated only by its signed
+# logout token; it never reads a session cookie, so a stray cookie must not make it fail.
+# Nothing else is exempt (full-path matches only).
 _CSRF_EXEMPT = (
     re.compile(r"/api/v1/auth/saml/[a-z0-9-]+/(acs|sls)"),
     re.compile(r"/api/portal/auth/saml/[a-z0-9-]+/acs"),
+    re.compile(r"/api/v1/auth/oidc/[a-z0-9-]+/backchannel-logout"),
 )
 
 

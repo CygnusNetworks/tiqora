@@ -7,8 +7,6 @@ authorization code doubles as the access token so each test picks its claims.
 
 from __future__ import annotations
 
-import base64
-import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -20,7 +18,13 @@ from fastapi import FastAPI
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from tests._identity_helpers import FakeRedis, cleanup_statements, make_provider, seed_agent
+from tests._identity_helpers import (
+    FakeRedis,
+    OidcSigner,
+    cleanup_statements,
+    make_provider,
+    seed_agent,
+)
 from tests.test_identity_store import _to_async_url
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_db
@@ -93,13 +97,6 @@ def _settings(**kw: Any) -> Settings:
     return Settings(**base)
 
 
-def _jwt(payload: dict[str, Any]) -> str:
-    def b64(raw: bytes) -> str:
-        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
-
-    return ".".join([b64(b'{"alg":"none"}'), b64(json.dumps(payload).encode()), b64(b"sig")])
-
-
 class FakeIdp:
     """Discovery + token + userinfo for any host; the code is the access token."""
 
@@ -107,6 +104,8 @@ class FakeIdp:
         self.claims: dict[str, dict[str, Any]] = {}
         self.id_tokens: dict[str, str] = {}
         self.token_forms: list[dict[str, list[str]]] = []
+        self.signer = OidcSigner()
+        self.jwks_requests = 0
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         host = request.headers["host"]
@@ -122,9 +121,13 @@ class FakeIdp:
                     "authorization_endpoint": f"{base}/authorize",
                     "token_endpoint": f"{base}/token",
                     "userinfo_endpoint": f"{base}/userinfo",
+                    "jwks_uri": f"{base}/jwks",
                     "code_challenge_methods_supported": ["S256"],
                 },
             )
+        if path.endswith("/jwks"):
+            self.jwks_requests += 1
+            return httpx.Response(200, json=self.signer.jwks())
         if path.endswith("/token"):
             form = parse_qs(request.content.decode())
             self.token_forms.append(form)
@@ -436,11 +439,17 @@ async def test_avatar_picture_kept(env: Env) -> None:
     assert avatar == "https://cdn.example.org/a.png"
 
 
+def _env_id_token(env: Env, q: dict[str, list[str]], sub: str) -> str:
+    return env.idp.signer.id_token(
+        iss=f"https://{ENV_ISSUER_HOST}/realms/x", aud="tiqora", sub=sub, nonce=q["nonce"][0]
+    )
+
+
 async def test_userinfo_sub_must_match_id_token_sub(env: Env) -> None:
     await _agent(env, 47908, "idp.env.47908")
     env.idp.claims["c"] = {"sub": "real-sub", "preferred_username": "idp.env.47908"}
-    env.idp.id_tokens["c"] = _jwt({"sub": "other-sub", "iss": "x"})
     q = await env.start("/api/v1/auth/oidc/login")
+    env.idp.id_tokens["c"] = _env_id_token(env, q, "other-sub")
     resp = await env.client.get(
         "/api/v1/auth/oidc/callback",
         params={"code": "c", "state": q["state"][0]},
@@ -450,9 +459,9 @@ async def test_userinfo_sub_must_match_id_token_sub(env: Env) -> None:
     assert parse_qs(urlparse(resp.headers["location"]).query)["sso_error"] == ["oidc_failed"]
     assert env.client.cookies.get("tiqora_session") is None
 
-    # a matching sub still logs in
-    env.idp.id_tokens["c"] = _jwt({"sub": "real-sub", "iss": "x"})
+    # a matching sub (verified id_token) still logs in
     q = await env.start("/api/v1/auth/oidc/login")
+    env.idp.id_tokens["c"] = _env_id_token(env, q, "real-sub")
     ok = await env.client.get(
         "/api/v1/auth/oidc/callback", params={"code": "c", "state": q["state"][0]}, headers=JSON
     )
