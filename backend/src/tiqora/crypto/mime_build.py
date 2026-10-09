@@ -203,12 +203,21 @@ def content_entity(msg: EmailMessage) -> bytes:
 
 def _assemble(outer: bytes, entity: bytes, bcc: str | None) -> tuple[SecuredEmailMessage, bytes]:
     raw = outer + b"MIME-Version: 1.0\r\n" + entity
+    return secured_message_from_raw(raw, bcc), raw
+
+
+def secured_message_from_raw(raw: bytes, bcc: str | None) -> SecuredEmailMessage:
+    """The sendable message for stored secured bytes (``tiqora_raw`` = *raw*, unchanged).
+
+    *bcc* is put on the object only (for the envelope), never into the bytes - the same
+    shape :func:`secure_message` returns, so a stored secured mail can be sent later.
+    """
     parsed = message_from_bytes(raw, _class=SecuredEmailMessage, policy=email_policy.SMTP)
     assert isinstance(parsed, SecuredEmailMessage)
     parsed.tiqora_raw = raw
     if bcc:
         parsed["Bcc"] = bcc
-    return parsed, raw
+    return parsed
 
 
 # ------------------------------------------------------------------- PGP/MIME

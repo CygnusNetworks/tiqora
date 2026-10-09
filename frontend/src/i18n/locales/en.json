@@ -4351,7 +4351,8 @@
     "kinds": {
       "core": {
         "ticket_export": "Ticket export"
-      }
+      },
+      "gi_mail": "Send email from a web service request"
     },
     "ticketExport": {
       "title": "Export tickets as CSV",

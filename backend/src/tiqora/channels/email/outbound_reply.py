@@ -727,14 +727,114 @@ async def store_agent_email_for_dispatch(
     )
 
 
+async def load_pending_agent_email(
+    session: AsyncSession, sysconfig: SysConfig, *, article_id: int
+) -> PendingAgentEmail | None:
+    """Rebuild the mail of a stored agent email article (the worker side of ArticleSend).
+
+    The request stored the fully prepared article (:func:`store_agent_email_for_dispatch`)
+    and, for a signed/encrypted mail, the secured bytes in ``article_data_mime_plain``. The
+    mail is rebuilt from exactly that: the plain message from the article columns, the
+    secured one from its stored bytes (sent unchanged), plus today's banner headers. ``None``
+    when the article no longer exists.
+    """
+    from tiqora.crypto.article_view import load_raw_mail
+    from tiqora.crypto.mime_build import secured_message_from_raw
+
+    row = (
+        (
+            await session.execute(
+                text(
+                    "SELECT a.ticket_id, t.queue_id, m.a_from, m.a_reply_to, m.a_to, m.a_cc,"
+                    " m.a_bcc, m.a_subject, m.a_message_id, m.a_in_reply_to, m.a_references,"
+                    " m.a_content_type, m.a_body"
+                    " FROM article a JOIN article_data_mime m ON m.article_id = a.id"
+                    " JOIN ticket t ON t.id = a.ticket_id WHERE a.id = :aid"
+                ),
+                {"aid": article_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if row is None:
+        return None
+    body = row["a_body"]
+    if isinstance(body, (bytes, bytearray, memoryview)):
+        body = bytes(body).decode("utf-8", "replace")
+    prepared = ArticleIn(
+        sender_type="agent",
+        is_visible_for_customer=True,
+        subject=str(row["a_subject"] or ""),
+        body=str(body or ""),
+        content_type=str(row["a_content_type"] or "text/plain; charset=utf-8"),
+        from_address=row["a_from"] or None,
+        to_address=row["a_to"] or None,
+        cc=row["a_cc"] or None,
+        bcc=row["a_bcc"] or None,
+        reply_to=row["a_reply_to"] or None,
+        message_id=row["a_message_id"] or None,
+        in_reply_to=row["a_in_reply_to"] or None,
+        references=row["a_references"] or None,
+        channel="email",
+    )
+    raw = await load_raw_mail(session, article_id)
+    message = secured_message_from_raw(raw, prepared.bcc) if raw else None
+    try:
+        _from, queue_name, _sig, _sig_ct = await _queue_outbound_meta(session, int(row["queue_id"]))
+    except Exception:
+        logger.warning("agent_email_queue_meta_failed", queue_id=row["queue_id"], exc_info=True)
+        queue_name = None
+    return PendingAgentEmail(
+        article_id=article_id,
+        ticket_id=int(row["ticket_id"]),
+        prepared=prepared,
+        message=message,
+        extra_headers=await sysconfig.mail_banner_headers(),
+        queue_name=queue_name,
+    )
+
+
+async def record_transmission_error(
+    session: AsyncSession, *, article_id: int, message_id: str | None, message: str
+) -> None:
+    """Znuny ``MailQueue::_SetArticleTransmissionError`` for a mail that could not be sent.
+
+    Creates the article's ``article_data_mime_send_error`` row
+    (``ArticleCreateTransmissionError``) or, when one exists, updates its message
+    (``ArticleUpdateTransmissionError``). The caller commits.
+    """
+    exists = (
+        await session.execute(
+            text("SELECT 1 FROM article_data_mime_send_error WHERE article_id = :a"),
+            {"a": article_id},
+        )
+    ).first()
+    if exists is not None:
+        await session.execute(
+            text("UPDATE article_data_mime_send_error SET log_message = :m WHERE article_id = :a"),
+            {"m": message, "a": article_id},
+        )
+        return
+    await session.execute(
+        text(
+            "INSERT INTO article_data_mime_send_error"
+            " (article_id, message_id, log_message, create_time)"
+            " VALUES (:a, :mid, :m, current_timestamp)"
+        ),
+        {"a": article_id, "mid": (message_id or None), "m": message},
+    )
+
+
 async def dispatch_pending_agent_email(
     session: AsyncSession, sysconfig: SysConfig, pending: PendingAgentEmail
 ) -> None:
-    """Send a stored agent email (after the commit) and record the outcome in the mail log.
+    """Send a stored agent email (after the commit) and record the outcome.
 
     Without an outbound relay nothing is sent and a ``queued`` row is logged. A send
-    failure is logged to ``tiqora_mail_log`` and raised as :class:`OutboundMailError`;
-    the stored article stays.
+    failure is logged to ``tiqora_mail_log``, recorded as the article's transmission error
+    (:func:`record_transmission_error`, the caller commits) and raised as
+    :class:`OutboundMailError`; the stored article stays.
     """
     from tiqora.domain import mail_outbound
 
@@ -776,6 +876,12 @@ async def dispatch_pending_agent_email(
             duration_ms=int((time.perf_counter() - t0) * 1000),
             **common,
         )
+        await record_transmission_error(
+            session,
+            article_id=pending.article_id,
+            message_id=prepared.message_id,
+            message=str(exc),
+        )
         raise
     smtp_code = getattr(sender, "last_smtp_code", None)
     smtp_detail = getattr(sender, "last_smtp_detail", None)
@@ -798,6 +904,8 @@ __all__ = [
     "OutboundMailError",
     "PendingAgentEmail",
     "dispatch_pending_agent_email",
+    "load_pending_agent_email",
+    "record_transmission_error",
     "store_agent_email_for_dispatch",
     "append_signature",
     "build_agent_email_message",

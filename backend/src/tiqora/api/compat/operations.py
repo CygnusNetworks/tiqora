@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import re
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -26,7 +26,6 @@ from tiqora.api.compat.article_input import (
     normalize_article_list,
     parse_gi_articles,
     parse_gi_dynamic_fields,
-    send_gi_auto_response,
 )
 from tiqora.api.compat.history_at import queues_at
 from tiqora.api.compat.mapping import MappingError
@@ -56,8 +55,6 @@ from tiqora.api.compat.znuny_session import (
 )
 from tiqora.channels.email.outbound_reply import OutboundMailError as _OutboundMailError
 from tiqora.channels.email.outbound_reply import (
-    PendingAgentEmail,
-    dispatch_pending_agent_email,
     store_agent_email_for_dispatch,
 )
 from tiqora.config import Settings, get_settings
@@ -82,7 +79,6 @@ from tiqora.domain.portal_ticket_service import (
     customer_can_access_ticket,
     customer_ticket_scope_filter,
 )
-from tiqora.domain.quoting import html_to_plaintext
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     InvalidInput,
@@ -720,12 +716,36 @@ def _as_send_article(article_in: ArticleIn, art_data: dict[str, Any]) -> Article
     )
 
 
-@dataclass
-class _MailJob:
-    """A mail to send after the request's database work is committed."""
+async def _queue_gi_mail(
+    session: AsyncSession,
+    *,
+    kind: str,
+    ticket_id: int,
+    article_id: int,
+    user_id: int,
+    auto_response_type: str = "",
+) -> None:
+    """Queue one mail of the request as a worker job, in the request transaction.
 
-    pending: PendingAgentEmail | None = None  # ArticleSend: the stored article's mail
-    auto_response: GiArticle | None = None  # auto reply / auto follow up for this article
+    The job row commits together with the ticket and article (never a job whose article
+    could still roll back, never a committed article whose mail is lost). The request
+    answers without waiting for SMTP - Znuny queues these mails in its MailQueue too.
+    """
+    from tiqora.jobs.handlers.gi_mail import GI_MAIL_KIND, GiMailPayload
+    from tiqora.jobs.service import enqueue_job
+
+    await enqueue_job(
+        session,
+        kind=GI_MAIL_KIND,
+        payload=GiMailPayload(
+            kind=kind,  # type: ignore[arg-type]
+            ticket_id=ticket_id,
+            article_id=article_id,
+            user_id=user_id,
+            auto_response_type=auto_response_type,
+        ),
+        created_by=None,  # a system job: not listed as anyone's own background task
+    )
 
 
 async def _write_gi_article(
@@ -736,12 +756,13 @@ async def _write_gi_article(
     *,
     ticket_id: int,
     user_id: int,
-    jobs: list[_MailJob],
 ) -> int:
-    """Store one request article, book its TimeUnit and queue its mail (sent after the commit).
+    """Store one request article, book its TimeUnit and queue its mail for the worker.
 
-    ``ArticleSend`` stores the article now and sends the mail later; every other article
-    queues its auto response (Znuny sends it from ``ArticleCreate``, never for ``ArticleSend``).
+    ``ArticleSend`` stores the prepared (and secured) article now; the worker sends it.
+    Every other article queues its auto response (Znuny sends it from ``ArticleCreate``,
+    never for ``ArticleSend``) - only while an outbound relay is configured, because without
+    one no auto response is ever sent.
     """
     if gi.send:
         queue_row = (
@@ -758,7 +779,13 @@ async def _write_gi_article(
             article=_as_send_article(gi.article, gi.raw),
         )
         article_id = pending.article_id
-        jobs.append(_MailJob(pending=pending))
+        await _queue_gi_mail(
+            session,
+            kind="article_send",
+            ticket_id=ticket_id,
+            article_id=article_id,
+            user_id=user_id,
+        )
     else:
         article_id = await add_article(
             session,
@@ -767,8 +794,15 @@ async def _write_gi_article(
             user_id=user_id,
             sysconfig=sysconfig,
         )
-        if gi.auto_response_type:
-            jobs.append(_MailJob(auto_response=gi))
+        if gi.auto_response_type and await _outbound_relay_enabled(session):
+            await _queue_gi_mail(
+                session,
+                kind="auto_response",
+                ticket_id=ticket_id,
+                article_id=article_id,
+                user_id=user_id,
+                auto_response_type=gi.auto_response_type,
+            )
     if gi.time_unit is not None:
         await add_time_accounting(
             session,
@@ -778,6 +812,12 @@ async def _write_gi_article(
             user_id=user_id,
         )
     return article_id
+
+
+async def _outbound_relay_enabled(session: AsyncSession) -> bool:
+    from tiqora.domain import mail_outbound
+
+    return bool((await mail_outbound.resolve_outbound_smtp(session)).enabled)
 
 
 async def _write_ticket_dynamic_fields(
@@ -1204,7 +1244,6 @@ async def op_ticket_create(
         article=None,
     )
 
-    jobs: list[_MailJob] = []
     try:
         async with session.begin_nested():
             ticket_id = await create_ticket(
@@ -1265,7 +1304,6 @@ async def op_ticket_create(
                     gi,
                     ticket_id=ticket_id,
                     user_id=write_user_id,
-                    jobs=jobs,
                 )
                 article_ids.append(article_id)
                 await _write_article_dynamic_fields(
@@ -1313,12 +1351,6 @@ async def op_ticket_create(
     except _OutboundMailError as e:
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
-
-    mail_error = await _run_mail_jobs(
-        session_factory, sysconfig, jobs, op=op, ticket_id=ticket_id, user_id=write_user_id
-    )
-    if mail_error is not None:
-        return mail_error
 
     return await _with_ticket_data(
         article_id_result(
@@ -1380,77 +1412,6 @@ async def _queue_label(session: AsyncSession, queue_name: Any, queue_id: int) ->
         await session.execute(text("SELECT name FROM queue WHERE id = :i"), {"i": queue_id})
     ).first()
     return str(row[0]) if row else ""
-
-
-async def _run_mail_jobs(
-    session_factory: async_sessionmaker[AsyncSession],
-    sysconfig: SysConfig,
-    jobs: list[_MailJob],
-    *,
-    op: str,
-    ticket_id: int,
-    user_id: int,
-) -> dict[str, Any] | None:
-    """Send the queued mails, in article order, once everything is committed.
-
-    Each mail runs in its own short transaction. A failing ``ArticleSend`` mail is
-    recorded in ``tiqora_mail_log`` and logged; the remaining mails are still sent and the
-    first failure is answered with Znuny's text (the committed data stays). A failing auto
-    response is only logged: Znuny ignores ``SendAutoResponse``'s result.
-    """
-    first_error: dict[str, Any] | None = None
-    for job in jobs:
-        if job.pending is not None:
-            try:
-                async with session_factory() as mail_session:
-                    await dispatch_pending_agent_email(mail_session, sysconfig, job.pending)
-            except Exception:
-                logger.error(
-                    "compat_article_send_failed",
-                    ticket_id=ticket_id,
-                    article_id=job.pending.article_id,
-                    exc_info=True,
-                )
-                if first_error is None:
-                    first_error = _err(
-                        f"{op}.OperationFailed",
-                        f"{op}: Article could not be created, please contact the system"
-                        " administrator",
-                    )
-        elif job.auto_response is not None:
-            gi = job.auto_response
-            try:
-                async with session_factory() as mail_session:
-                    queue_id = (
-                        await mail_session.execute(
-                            text("SELECT queue_id FROM ticket WHERE id = :tid"),
-                            {"tid": ticket_id},
-                        )
-                    ).scalar_one()
-                    plain_body = gi.article.body
-                    if "html" in gi.article.content_type.lower():
-                        plain_body = html_to_plaintext(plain_body)
-                    await send_gi_auto_response(
-                        mail_session,
-                        session_factory,
-                        sysconfig,
-                        ticket_id=ticket_id,
-                        queue_id=int(queue_id),
-                        auto_response_type=gi.auto_response_type,
-                        from_header=gi.article.from_address or "",
-                        subject=gi.article.subject,
-                        body=plain_body,
-                        user_id=user_id,
-                    )
-                    await mail_session.commit()
-            except Exception:
-                logger.warning(
-                    "compat_auto_response_failed",
-                    ticket_id=ticket_id,
-                    type=gi.auto_response_type,
-                    exc_info=True,
-                )
-    return first_error
 
 
 async def _default_from(
@@ -1633,7 +1594,6 @@ async def op_ticket_update(
         if isinstance(follow_ups, dict):
             return follow_ups
         article_ids: list[int] = []
-        jobs: list[_MailJob] = []
         customer_from = await _default_from(session, login, None)
         try:
             async with session.begin_nested():
@@ -1648,7 +1608,6 @@ async def op_ticket_update(
                             gi,
                             ticket_id=ticket_id,
                             user_id=PORTAL_SYSTEM_USER_ID,
-                            jobs=jobs,
                         )
                     )
             await session.commit()
@@ -1661,16 +1620,6 @@ async def op_ticket_update(
         except InvalidInput as e:
             await session.rollback()
             return _err(f"{op}.InvalidParameter", str(e))
-        mail_error = await _run_mail_jobs(
-            session_factory,
-            sysconfig,
-            jobs,
-            op=op,
-            ticket_id=ticket_id,
-            user_id=PORTAL_SYSTEM_USER_ID,
-        )
-        if mail_error is not None:
-            return mail_error
         return await _with_ticket_data(
             article_id_result(
                 {"TicketID": ticket_id, "TicketNumber": await _get_tn(session, ticket_id)},
@@ -1714,7 +1663,6 @@ async def op_ticket_update(
             return own
         article_fields.append(own)
 
-    jobs = []
     try:
         async with session.begin_nested():
             # Title
@@ -1927,7 +1875,6 @@ async def op_ticket_update(
                     gi,
                     ticket_id=ticket_id,
                     user_id=user_id,
-                    jobs=jobs,
                 )
                 article_ids.append(article_id)
                 await _write_ticket_dynamic_fields(
@@ -1961,12 +1908,6 @@ async def op_ticket_update(
     except _OutboundMailError as e:
         await session.rollback()
         return _err(f"{op}.OperationFailed", f"{op}: Could not send article: {e}")
-
-    mail_error = await _run_mail_jobs(
-        session_factory, sysconfig, jobs, op=op, ticket_id=ticket_id, user_id=user_id
-    )
-    if mail_error is not None:
-        return mail_error
 
     return await _with_ticket_data(
         article_id_result(

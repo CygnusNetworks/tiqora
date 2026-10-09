@@ -174,7 +174,8 @@ def _compute(raw: bytes | None, body: str | None, config: CryptoConfig) -> Decry
     return view
 
 
-async def _raw_mail(session: AsyncSession, article_id: int) -> bytes | None:
+async def load_raw_mail(session: AsyncSession, article_id: int) -> bytes | None:
+    """The stored raw mail of an article (``article_data_mime_plain``), as bytes."""
     row = (
         await session.execute(
             select(ArticleDataMimePlain.body)
@@ -232,7 +233,7 @@ async def article_crypto_view(
     config = await load_crypto_config(session)
     if not (config.pgp.enabled or config.smime.enabled):
         return known, None
-    raw = await _raw_mail(session, article_id)
+    raw = await load_raw_mail(session, article_id)
     if not encrypted and raw is None:
         return known, None
     view = await asyncio.to_thread(_compute, raw, body, config)

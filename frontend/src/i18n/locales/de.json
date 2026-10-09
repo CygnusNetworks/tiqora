@@ -4351,7 +4351,8 @@
     "kinds": {
       "core": {
         "ticket_export": "Ticket-Export"
-      }
+      },
+      "gi_mail": "E-Mail aus einer Webservice-Anfrage versenden"
     },
     "ticketExport": {
       "title": "Tickets als CSV exportieren",

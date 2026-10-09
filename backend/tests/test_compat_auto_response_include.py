@@ -3,7 +3,9 @@
 DB tests on MariaDB and PostgreSQL. Seed ids live in the GI band 7650-7669 (agent 7650, group
 7650, queue 7651, auto responses 7650 "auto reply" / 7651 "auto follow up"); every row, including
 the tickets the operations create in queue 7651, is deleted afterwards. The outbound relay is a
-monkeypatched ``CapturingMailSender``.
+monkeypatched ``CapturingMailSender``. The operations only queue their mails (``tiqora_job``
+kind ``gi_mail``); ``_call`` runs the queued jobs afterwards like the worker unless
+``drain=False``.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests._gi_mail_jobs import drain_gi_mail_jobs, gi_mail_jobs
 from tests._row_cleanup import delete_rows_above, snapshot_max_ids
 from tiqora.api.compat.operations import op_ticket_create, op_ticket_update
 from tiqora.api.compat.webservices import OperationConfig, parse_webservice
@@ -40,7 +43,12 @@ DAEMON_MAIL = "MAILER-DAEMON@example.org"
 TITLE = "GI7650 ticket"
 
 _SEEDED: list[str] = []
-_COUNTER_TABLES = ("tiqora_event_outbox", "tiqora_cache_invalidation", "ticket_number_counter")
+_COUNTER_TABLES = (
+    "tiqora_event_outbox",
+    "tiqora_cache_invalidation",
+    "ticket_number_counter",
+    "tiqora_job",
+)
 _SNAPSHOTS: dict[str, dict[str, int]] = {}
 _IN_QUEUE = f"(SELECT id FROM ticket WHERE queue_id = {QUEUE})"
 _IN_QUEUE_ARTICLES = f"(SELECT id FROM article WHERE ticket_id IN {_IN_QUEUE})"
@@ -53,6 +61,8 @@ def _cleanup_statements() -> tuple[str, ...]:
         f"DELETE FROM tiqora_event_outbox WHERE ticket_id IN {_IN_QUEUE}",
         f"DELETE FROM tiqora_cache_invalidation WHERE ticket_id IN {_IN_QUEUE}",
         f"DELETE FROM tiqora_mail_log WHERE ticket_id IN {_IN_QUEUE}",
+        f"DELETE FROM article_data_mime_send_error WHERE article_id IN {_IN_QUEUE_ARTICLES}",
+        "DELETE FROM tiqora_job WHERE kind = 'gi_mail'",
         f"DELETE FROM article_data_mime_attachment WHERE article_id IN {_IN_QUEUE_ARTICLES}",
         f"DELETE FROM article_data_mime WHERE article_id IN {_IN_QUEUE_ARTICLES}",
         f"DELETE FROM article WHERE ticket_id IN {_IN_QUEUE}",
@@ -241,6 +251,24 @@ def _query(sync_url: str, sql: str, **params: Any) -> list[Any]:
 
 
 async def _call(
+    sync_url: str,
+    operation: str,
+    params: dict[str, Any],
+    *,
+    operation_config: OperationConfig | None = None,
+    customer: bool = False,
+    drain: bool = True,
+) -> dict[str, Any]:
+    """Run the operation; then (``drain``) the mail jobs it queued, like the worker."""
+    result = await _operation(
+        sync_url, operation, params, operation_config=operation_config, customer=customer
+    )
+    if drain:
+        await drain_gi_mail_jobs(sync_url)
+    return result
+
+
+async def _operation(
     sync_url: str,
     operation: str,
     params: dict[str, Any],
@@ -618,6 +646,73 @@ def _mail_log(sync_url: str) -> list[tuple[str, int | None]]:
     return [(str(r[0]), None if r[1] is None else int(r[1])) for r in rows]
 
 
+def _send_errors(sync_url: str) -> list[tuple[int, str | None, str]]:
+    rows = _query(
+        sync_url,
+        "SELECT article_id, message_id, log_message FROM article_data_mime_send_error"
+        f" WHERE article_id IN {_IN_QUEUE_ARTICLES} ORDER BY article_id",
+    )
+    return [(int(r[0]), None if r[1] is None else str(r[1]), str(r[2] or "")) for r in rows]
+
+
+@pytest.mark.db
+async def test_request_answers_before_any_mail_and_the_worker_sends(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender()
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url,
+        "create",
+        {"Ticket": _ticket(), "Article": [_send_article("Eins"), _customer_article("Zwei")]},
+        drain=False,
+    )
+    assert "Error" not in result, result
+    # nothing was sent inside the request: the mails wait as jobs, committed with the ticket
+    assert sender.attempts == 0 and sender.sent == []
+    assert _mail_log(sync_url) == []
+    jobs = gi_mail_jobs(sync_url)
+    assert [j["status"] for j in jobs] == ["queued", "queued"]
+    send_id, customer_id = result["ArticleID"]
+    assert [
+        (j["payload"]["kind"], j["payload"]["article_id"], j["payload"]["auto_response_type"])
+        for j in jobs
+    ] == [("article_send", send_id, ""), ("auto_response", customer_id, "auto reply")]
+    assert all(j["payload"]["ticket_id"] == result["TicketID"] for j in jobs)
+
+    done = await drain_gi_mail_jobs(sync_url)
+    assert [d["status"] for d in done] == ["succeeded", "succeeded"]
+    assert [str(m["Subject"]).rsplit(" ", 1)[-1] for m in sender.sent][0] == "Eins"
+    assert len(sender.sent) == 2  # the ArticleSend mail and the auto reply
+    assert ("sent", send_id) in _mail_log(sync_url)
+    assert _history_names(sync_url, result["TicketID"]).count("SendAutoReply") == 1
+
+
+@pytest.mark.db
+async def test_send_failure_is_recorded_like_the_mail_queue(
+    sync_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = _ScriptedSender(fail_on=(1,))
+    _use_relay(monkeypatch, sender)
+    result = await _call(
+        sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}, drain=False
+    )
+    # the answer no longer depends on the relay (Znuny: the mail sits in the MailQueue)
+    assert "Error" not in result, result
+    done = await drain_gi_mail_jobs(sync_url)
+    assert [d["status"] for d in done] == ["failed"]
+    article_id = result["ArticleID"]
+    message_id = _query(
+        sync_url, "SELECT a_message_id FROM article_data_mime WHERE article_id = :a", a=article_id
+    )[0][0]
+    # MailQueue _SetArticleTransmissionError -> ArticleCreateTransmissionError
+    errors = _send_errors(sync_url)
+    assert [(a, m) for a, m, _ in errors] == [(article_id, message_id)]
+    assert "connection refused" in errors[0][2]
+    assert _mail_log(sync_url) == [("failed", article_id)]
+    assert _article_count(sync_url, result["TicketID"]) == 1  # the article stays
+
+
 @pytest.mark.db
 async def test_article_send_failure_keeps_the_data_and_sends_the_rest(
     sync_url: str, monkeypatch: pytest.MonkeyPatch
@@ -632,26 +727,20 @@ async def test_article_send_failure_keeps_the_data_and_sends_the_rest(
             "Article": [_send_article("Eins"), _send_article("Zwei"), _send_article("Drei")],
         },
     )
-    assert result == {
-        "Error": {
-            "ErrorCode": "TicketCreate.OperationFailed",
-            "ErrorMessage": (
-                "TicketCreate: Article could not be created, please contact the system"
-                " administrator"
-            ),
-        }
-    }
+    assert "Error" not in result, result
     # ticket and all articles persist; the 1st and 3rd mail went out; every outcome is logged
     tickets = _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE)
     assert len(tickets) == 1
     ids = _article_ids(sync_url, int(tickets[0][0]))
-    assert len(ids) == 3
+    assert len(ids) == 3 and result["ArticleID"] == ids
     assert [str(m["Subject"]).rsplit(" ", 1)[-1] for m in sender.sent] == ["Eins", "Drei"]
     assert _mail_log(sync_url) == [("sent", ids[0]), ("failed", ids[1]), ("sent", ids[2])]
+    assert [a for a, _, _ in _send_errors(sync_url)] == [ids[1]]
+    assert [j["status"] for j in gi_mail_jobs(sync_url)] == ["succeeded", "failed", "succeeded"]
 
 
 @pytest.mark.db
-async def test_every_failing_article_send_is_logged_and_the_first_error_wins(
+async def test_every_failing_article_send_is_logged(
     sync_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     sender = _ScriptedSender(fail_on=(1, 2))
@@ -661,11 +750,12 @@ async def test_every_failing_article_send_is_logged_and_the_first_error_wins(
         "create",
         {"Ticket": _ticket(), "Article": [_send_article("Eins"), _send_article("Zwei")]},
     )
-    assert result["Error"]["ErrorCode"] == "TicketCreate.OperationFailed"
+    assert "Error" not in result, result
     ids = _article_ids(
         sync_url, int(_query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE)[0][0])
     )
     assert _mail_log(sync_url) == [("failed", ids[0]), ("failed", ids[1])]
+    assert [a for a, _, _ in _send_errors(sync_url)] == ids
 
 
 @pytest.mark.db
@@ -681,8 +771,9 @@ async def test_unbuildable_sender_is_logged_as_a_failure(
     result = await _call(
         sync_url, "create", {"Ticket": _ticket(), "Article": _send_article("Eins")}
     )
-    assert result["Error"]["ErrorCode"] == "TicketCreate.OperationFailed"
+    assert "Error" not in result, result
     assert [status for status, _ in _mail_log(sync_url)] == ["failed"]
+    assert "oauth token fetch failed" in _send_errors(sync_url)[0][2]
 
 
 @pytest.mark.db
@@ -740,6 +831,7 @@ async def test_no_mail_when_validation_fails(
     assert result["Error"]["ErrorMessage"].endswith("HistoryType parameter is invalid!")
     assert sender.sent == [] and sender.attempts == 0
     assert _query(sync_url, "SELECT id FROM ticket WHERE title = :t", t=TITLE) == []
+    assert gi_mail_jobs(sync_url) == []  # no job without its ticket
 
 
 @pytest.mark.db

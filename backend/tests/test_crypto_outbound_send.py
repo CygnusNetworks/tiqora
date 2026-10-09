@@ -67,6 +67,7 @@ def _cleanup(conn: Any) -> None:
             f"DELETE FROM article_data_mime_attachment WHERE article_id IN {arts}",
             f"DELETE FROM article_data_mime WHERE article_id IN {arts}",
             f"DELETE FROM article_data_mime_plain WHERE article_id IN {arts}",
+            f"DELETE FROM article_data_mime_send_error WHERE article_id IN {arts}",
             f"DELETE FROM article_flag WHERE article_id IN {arts}",
             f"DELETE FROM article_search_index WHERE ticket_id = {tid}",
             f"DELETE FROM article WHERE ticket_id = {tid}",
@@ -79,6 +80,7 @@ def _cleanup(conn: Any) -> None:
         ):
             conn.execute(text(sql))
     for sql in (
+        "DELETE FROM tiqora_job WHERE kind = 'gi_mail'",
         "DELETE FROM tiqora_mail_log WHERE subject LIKE 'crypto-out %'"
         " OR subject LIKE '%crypto-out %'",
         f"DELETE FROM queue WHERE id = {QUEUE_ID}",
@@ -476,6 +478,11 @@ async def test_generic_interface_article_send_with_email_security(
             SysConfig(fetch=_fetch),
         )
     assert "TicketID" in result, result
+    # the request only queued the mail; the worker sends the stored secured bytes unchanged
+    assert sent.calls == []
+    from tests._gi_mail_jobs import drain_with_factory
+
+    assert [d["status"] for d in await drain_with_factory(factory)] == ["succeeded"]
     raw = _raw(sent)
     assert b"multipart/signed" in raw
     walked = walk_message(raw, _customer_config(world))
