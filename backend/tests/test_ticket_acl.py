@@ -419,4 +419,4 @@ async def test_owner_options_use_login_acl_and_full_name_labels(
     )
     assert "1" not in got.owner  # root@localhost removed by PossibleNot Owner
     assert "1" in got.responsible  # the ACL names Owner only
-    assert got.responsible["1"].strip() != "root@localhost"
+    assert got.responsible["1"] == "Admin Znuny"  # the seeded full name, not the login

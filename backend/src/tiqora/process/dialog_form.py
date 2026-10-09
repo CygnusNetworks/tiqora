@@ -14,9 +14,12 @@ Option sources:
 * customers -- :func:`collect_customer_field_options` (same tables, customer principal,
   ``Action => CustomerTicketProcess``).
 
-Known limitations: agent option ACLs see the ticket's own process (its dynamic fields) but not
-the ``ProcessEntityID``/``ActivityDialogEntityID`` of the dialog being opened (the wave-0 option
-source has no such parameter); the customer SLA list is the union over the customer's services
+Agent option lists get the dialog's process context (``ProcessEntityID``/``ActivityDialogEntityID``)
+for live ``Process`` ACL checks. Owner/Responsible choices follow the queue group permissions like
+Znuny's ``_GetOwners``/``_GetResponsibles`` (ticket queue; for start forms the dialog's default
+Queue, else ``Process::DefaultQueue``; everyone with ``Ticket::ChangeOwnerToEveryone``).
+
+Known limitations: the customer SLA list is the union over the customer's services
 (the form has no selected service yet), and the customer Queue list keeps the system intake
 queues (Postmaster/Raw/Junk) hidden on top of Znuny's create-group rule (Tiqora hardening).
 """
@@ -91,7 +94,6 @@ _ATTRIBUTE_KEY = {
     "Owner": "owner",
     "Responsible": "responsible",
 }
-_AGENT_PICKERS = frozenset({"Owner", "Responsible"})
 _DF_KINDS: dict[str, FieldKind] = {
     "Text": "text",
     "TextArea": "textarea",
@@ -130,7 +132,7 @@ async def _load_dynamic_fields(
 
 
 def _field_kind(name: str, dynamic_fields: Mapping[str, DynamicField]) -> FieldKind:
-    if name in _ATTRIBUTE_KEY or name in _AGENT_PICKERS or name == "Lock":
+    if name in _ATTRIBUTE_KEY or name == "Lock":
         return "select"
     if name == "Title":
         return "text"
@@ -367,8 +369,15 @@ async def _agent_options(
     out: dict[str, list[ProcessDialogOptionOut]] = {}
     if requested:
         queue_id = None
-        if ticket_id is None and "Queue" in dialog_fields:
-            queue_id = await _default_queue_id(session, dialog_fields["Queue"].default_value)
+        if ticket_id is None:
+            if "Queue" in dialog_fields:
+                queue_id = await _default_queue_id(session, dialog_fields["Queue"].default_value)
+            if queue_id is None:
+                # AgentTicketProcess.pm:6420 -- no Queue yet: scope the agent pickers to
+                # Process::DefaultQueue.
+                queue_id = await _default_queue_id(
+                    session, await SysConfig(session).get("Process::DefaultQueue", "Raw")
+                )
         collected = await collect_field_options(
             session,
             user,

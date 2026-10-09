@@ -140,7 +140,7 @@ async def test_compat_ticket_update_ignores_acls(mariadb_znuny_url: str) -> None
     try:
         async with factory() as session:
             # The ACL is live: the same rule set filters the agent UI's state list.
-            assert [r.name for r in await load_valid_acls(session)] == ["gi884500-no-closed"]
+            assert "gi884500-no-closed" in [r.name for r in await load_valid_acls(session)]
             states = {1: "new", 2: "closed successful"}
             assert await apply_ticket_acl(
                 session,

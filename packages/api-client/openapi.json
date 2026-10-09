@@ -12265,6 +12265,14 @@
             ],
             "title": "Ticket Id"
           },
+          "ticket_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "title": "Ticket Ids",
+            "type": "array"
+          },
           "type_id": {
             "anyOf": [
               {

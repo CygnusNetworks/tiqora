@@ -12296,6 +12296,8 @@ export interface components {
             state_id?: number | null;
             /** Ticket Id */
             ticket_id?: number | null;
+            /** Ticket Ids */
+            ticket_ids?: number[];
             /** Type Id */
             type_id?: number | null;
         };

@@ -23,10 +23,14 @@ pytestmark = pytest.mark.db
 NOW = datetime(2024, 6, 1, 12, 0, 0)
 
 AGENT, OTHER_AGENT = 886501, 886502
-GROUP, GROUP_HIDDEN = 886510, 886511
-Q_BILLING, Q_SUPPORT, Q_HIDDEN = 886520, 886521, 886522
-T_BILLING, T_SUPPORT, T_HIDDEN = 886530, 886531, 886532
+AGENT_RO, AGENT_ROLE, AGENT_SECOND, AGENT_RW2 = 886503, 886504, 886505, 886506
+ROLE = 886550
+GROUP, GROUP_HIDDEN, GROUP_SECOND = 886510, 886511, 886512
+Q_BILLING, Q_SUPPORT, Q_HIDDEN, Q_SECOND = 886520, 886521, 886522, 886523
+T_BILLING, T_SUPPORT, T_HIDDEN, T_SECOND = 886530, 886531, 886532, 886533
+SYSCONFIG_BASE = 886560  # sysconfig_default/_modified ids 886560-886569
 ACL_CLOSE, ACL_BULK, ACL_ZOOM_OWNER = 886540, 886541, 886542
+ACL_NO_ZOOM, ACL_WHITELIST = 886543, 886544
 BILLING = "Billing-886"
 
 _SEEDED: list[str] = []
@@ -41,6 +45,11 @@ def _seed_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
         ("DELETE FROM acl WHERE id BETWEEN 886540 AND 886549", {}),
         ("DELETE FROM ticket WHERE id BETWEEN 886530 AND 886539", {}),
         ("DELETE FROM queue WHERE id BETWEEN 886520 AND 886529", {}),
+        ("DELETE FROM group_role WHERE role_id BETWEEN 886550 AND 886559", {}),
+        ("DELETE FROM role_user WHERE role_id BETWEEN 886550 AND 886559", {}),
+        ("DELETE FROM roles WHERE id BETWEEN 886550 AND 886559", {}),
+        ("DELETE FROM sysconfig_modified WHERE id BETWEEN 886560 AND 886569", {}),
+        ("DELETE FROM sysconfig_default WHERE id BETWEEN 886560 AND 886569", {}),
         ("DELETE FROM group_user WHERE group_id BETWEEN 886510 AND 886519", {}),
         ("DELETE FROM permission_groups WHERE id BETWEEN 886510 AND 886519", {}),
         ("DELETE FROM users WHERE id BETWEEN 886501 AND 886509", {}),
@@ -76,7 +85,41 @@ def _insert_acl(conn: Any, acl_id: int, name: str, match: str, change: str) -> N
     )
 
 
-def _seed(sync_url: str, acls: tuple[tuple[int, str, str, str], ...] = ()) -> None:
+def _set_sysconfig(conn: Any, settings: dict[str, Any]) -> None:
+    """Effective SysConfig values (Znuny's sysconfig_default + sysconfig_modified rows)."""
+    from tiqora.znuny.sysconfig import yaml_encode_effective
+
+    for i, (name, value) in enumerate(settings.items()):
+        enc = yaml_encode_effective(value)
+        conn.execute(
+            text(
+                "INSERT INTO sysconfig_default (id, name, description, navigation,"
+                " is_invisible, is_readonly, is_required, is_valid, has_configlevel,"
+                " user_modification_possible, user_modification_active, xml_content_raw,"
+                " xml_content_parsed, xml_filename, effective_value, is_dirty,"
+                " exclusive_lock_guid, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :n, 'x', 'x', 0, 0, 1, 1, 0, 0, 0, 'x', 'x', 'Ticket.xml',"
+                " :e, 0, '0', current_timestamp, 1, current_timestamp, 1)"
+            ),
+            {"id": SYSCONFIG_BASE + i, "n": name, "e": enc},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO sysconfig_modified (id, sysconfig_default_id, name, user_id,"
+                " is_valid, user_modification_active, effective_value, is_dirty,"
+                " reset_to_default, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :did, :n, NULL, 1, 0, :e, 0, 0, current_timestamp, 1,"
+                " current_timestamp, 1)"
+            ),
+            {"id": SYSCONFIG_BASE + i, "did": SYSCONFIG_BASE + i, "n": name, "e": enc},
+        )
+
+
+def _seed(
+    sync_url: str,
+    acls: tuple[tuple[int, str, str, str], ...] = (),
+    sysconfig: dict[str, Any] | None = None,
+) -> None:
     _SEEDED.append(sync_url)
     clear_revision_cache()
     engine = create_engine(sync_url)
@@ -86,6 +129,10 @@ def _seed(sync_url: str, acls: tuple[tuple[int, str, str, str], ...] = ()) -> No
         for uid, login, first, last in (
             (AGENT, "agent-886001", "Alma", "Billing"),
             (OTHER_AGENT, "agent-886002", "Bruno", "Support"),
+            (AGENT_RO, "agent-886003", "Cora", "Readonly"),
+            (AGENT_ROLE, "agent-886004", "Dora", "Role"),
+            (AGENT_SECOND, "agent-886005", "Emil", "Second"),
+            (AGENT_RW2, "agent-886006", "Aaron", "Rw"),  # login sorts last, label first
         ):
             conn.execute(
                 text(
@@ -95,7 +142,11 @@ def _seed(sync_url: str, acls: tuple[tuple[int, str, str, str], ...] = ()) -> No
                 ),
                 {"id": uid, "l": login, "f": first, "s": last, "t": NOW},
             )
-        for gid, name in ((GROUP, "acl886-grp"), (GROUP_HIDDEN, "acl886-hidden")):
+        for gid, name in (
+            (GROUP, "acl886-grp"),
+            (GROUP_HIDDEN, "acl886-hidden"),
+            (GROUP_SECOND, "acl886-second"),
+        ):
             conn.execute(
                 text(
                     "INSERT INTO permission_groups (id, name, valid_id,"
@@ -104,18 +155,54 @@ def _seed(sync_url: str, acls: tuple[tuple[int, str, str, str], ...] = ()) -> No
                 ),
                 {"id": gid, "n": name, "t": NOW},
             )
+        # Alma: ro+owner; Bruno and Aaron: rw; Cora: ro only; Dora: owner via a role;
+        # Emil: owner on the second group; Alma has ro on the second group, too.
+        for uid, gid, key in (
+            (AGENT, GROUP, "ro"),
+            (AGENT, GROUP, "owner"),
+            (AGENT, GROUP_SECOND, "ro"),
+            (AGENT, GROUP_SECOND, "owner"),
+            (OTHER_AGENT, GROUP, "rw"),
+            (OTHER_AGENT, GROUP_SECOND, "rw"),
+            (AGENT_RW2, GROUP, "rw"),
+            (AGENT_RO, GROUP, "ro"),
+            (AGENT_SECOND, GROUP_SECOND, "owner"),
+        ):
+            conn.execute(
+                text(
+                    "INSERT INTO group_user (user_id, group_id, permission_key,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:u, :g, :k, :t, 1, :t, 1)"
+                ),
+                {"u": uid, "g": gid, "k": key, "t": NOW},
+            )
         conn.execute(
             text(
-                "INSERT INTO group_user (user_id, group_id, permission_key,"
-                " create_time, create_by, change_time, change_by)"
-                " VALUES (:u, :g, 'ro', :t, 1, :t, 1)"
+                "INSERT INTO roles (id, name, valid_id, create_time, create_by, change_time,"
+                " change_by) VALUES (:r, 'acl886-role', 1, :t, 1, :t, 1)"
             ),
-            {"u": AGENT, "g": GROUP, "t": NOW},
+            {"r": ROLE, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO role_user (user_id, role_id, create_time, create_by, change_time,"
+                " change_by) VALUES (:u, :r, :t, 1, :t, 1)"
+            ),
+            {"u": AGENT_ROLE, "r": ROLE, "t": NOW},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO group_role (role_id, group_id, permission_key, permission_value,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:r, :g, 'owner', 1, :t, 1, :t, 1)"
+            ),
+            {"r": ROLE, "g": GROUP, "t": NOW},
         )
         for qid, name, gid in (
             (Q_BILLING, BILLING, GROUP),
             (Q_SUPPORT, "Support-886", GROUP),
             (Q_HIDDEN, "Hidden-886", GROUP_HIDDEN),
+            (Q_SECOND, "Second-886", GROUP_SECOND),
         ):
             conn.execute(
                 text(
@@ -126,7 +213,12 @@ def _seed(sync_url: str, acls: tuple[tuple[int, str, str, str], ...] = ()) -> No
                 ),
                 {"id": qid, "n": name, "g": gid, "t": NOW},
             )
-        for tid, qid in ((T_BILLING, Q_BILLING), (T_SUPPORT, Q_SUPPORT), (T_HIDDEN, Q_HIDDEN)):
+        for tid, qid in (
+            (T_BILLING, Q_BILLING),
+            (T_SUPPORT, Q_SUPPORT),
+            (T_HIDDEN, Q_HIDDEN),
+            (T_SECOND, Q_SECOND),
+        ):
             conn.execute(
                 text(
                     "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id,"
@@ -142,6 +234,8 @@ def _seed(sync_url: str, acls: tuple[tuple[int, str, str, str], ...] = ()) -> No
             )
         for acl in acls:
             _insert_acl(conn, *acl)
+        if sysconfig:
+            _set_sysconfig(conn, sysconfig)
     engine.dispose()
 
 
@@ -162,6 +256,26 @@ ZOOM_OWNER_NOT_BRUNO = (
     "acl886-zoom-owner",
     "---\nProperties:\n  Frontend:\n    Action:\n    - AgentTicketZoom\n",
     "---\nPossibleNot:\n  Ticket:\n    Responsible:\n    - agent-886002\n",
+)
+
+
+NO_ZOOM_IN_BILLING = (
+    ACL_NO_ZOOM,
+    "acl886-no-zoom-in-billing",
+    f"---\nProperties:\n  Ticket:\n    Queue:\n    - {BILLING}\n",
+    "---\nPossibleNot:\n  Action:\n  - AgentTicketZoom\n",
+)
+WHITELIST_NOTE_ZOOM = (
+    ACL_WHITELIST,
+    "acl886-whitelist",
+    f"---\nProperties:\n  Ticket:\n    Queue:\n    - {BILLING}\n",
+    "---\nPossible:\n  Action:\n  - AgentTicketZoom\n  - AgentTicketNote\n",
+)
+WHITELIST_WITHOUT_ZOOM = (
+    ACL_WHITELIST,
+    "acl886-whitelist-no-zoom",
+    f"---\nProperties:\n  Ticket:\n    Queue:\n    - {BILLING}\n",
+    "---\nPossible:\n  Action:\n  - AgentTicketNote\n",
 )
 
 
@@ -287,10 +401,190 @@ async def test_responsible_options_filtered_for_ticket(
         )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["responsible"][str(AGENT)] == "Alma Billing"
-    assert str(OTHER_AGENT) not in body["responsible"]
+    # responsible = rw on the group (Bruno, Aaron); the ACL then removes Bruno.
+    assert body["responsible"] == {str(AGENT_RW2): "Aaron Rw"}
     assert str(OTHER_AGENT) in body["owner"]  # PossibleNot names Responsible only
     assert posted.status_code == 200, posted.text
     options = posted.json()["options"]
-    assert str(OTHER_AGENT) not in {o["value"] for o in options["responsible"]}
+    assert options["responsible"] == [{"value": str(AGENT_RW2), "label": "Aaron Rw"}]
     assert {"value": str(OTHER_AGENT), "label": "Bruno Support"} in options["owner"]
+
+
+@pytest.mark.asyncio
+async def test_owner_responsible_follow_queue_group_permissions(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    _seed(url)
+    async with _client(factory) as client:
+        resp = await client.get(
+            f"/api/v1/tickets/{T_BILLING}/field-options",
+            params={"fields": "owner,responsible", "action": "AgentTicketOwner"},
+        )
+        posted = await client.post(
+            "/api/v1/reference/field-options",
+            json={
+                "fields": ["owner", "responsible"],
+                "context": {"ticket_id": T_BILLING, "action": "AgentTicketOwner"},
+            },
+        )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # owner = `owner` or `rw` on the queue's group, roles included; Cora (ro only) and
+    # Emil (owner on another group) are not offered.
+    assert body["owner"] == {
+        str(AGENT_RW2): "Aaron Rw",
+        str(AGENT): "Alma Billing",
+        str(OTHER_AGENT): "Bruno Support",
+        str(AGENT_ROLE): "Dora Role",
+    }
+    # `responsible` is not in System::Permission by default -> `rw` is required.
+    assert body["responsible"] == {str(AGENT_RW2): "Aaron Rw", str(OTHER_AGENT): "Bruno Support"}
+    # Option lists are sorted by full name (Aaron's login sorts last), not by login/id.
+    labels = [o["label"] for o in posted.json()["options"]["owner"]]
+    assert labels == ["Aaron Rw", "Alma Billing", "Bruno Support", "Dora Role"]
+
+
+@pytest.mark.asyncio
+async def test_responsible_uses_responsible_key_when_configured(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    permissions = ["ro", "move_into", "create", "note", "owner", "priority", "responsible", "rw"]
+    _seed(url, sysconfig={"System::Permission": permissions})
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO group_user (user_id, group_id, permission_key, create_time,"
+                " create_by, change_time, change_by)"
+                " VALUES (:u, :g, 'responsible', :t, 1, :t, 1)"
+            ),
+            {"u": AGENT_RO, "g": GROUP, "t": NOW},
+        )
+    engine.dispose()
+    async with _client(factory) as client:
+        resp = await client.get(
+            f"/api/v1/tickets/{T_BILLING}/field-options",
+            params={"fields": "responsible", "action": "AgentTicketResponsible"},
+        )
+    assert resp.status_code == 200, resp.text
+    # the `responsible` key now counts (Cora), and rw still implies it
+    assert resp.json()["responsible"] == {
+        str(AGENT_RW2): "Aaron Rw",
+        str(OTHER_AGENT): "Bruno Support",
+        str(AGENT_RO): "Cora Readonly",
+    }
+
+
+@pytest.mark.asyncio
+async def test_change_owner_to_everyone_offers_all_valid_agents(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    _seed(url, sysconfig={"Ticket::ChangeOwnerToEveryone": 1})
+    async with _client(factory) as client:
+        resp = await client.get(
+            f"/api/v1/tickets/{T_BILLING}/field-options",
+            params={"fields": "owner,responsible", "action": "AgentTicketOwner"},
+        )
+    assert resp.status_code == 200, resp.text
+    everyone = {AGENT, OTHER_AGENT, AGENT_RO, AGENT_ROLE, AGENT_SECOND, AGENT_RW2}
+    for field in ("owner", "responsible"):
+        assert {int(i) for i in resp.json()[field]} >= everyone
+
+
+@pytest.mark.asyncio
+async def test_new_ticket_form_scopes_pickers_by_selected_queue(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    _seed(url)
+    async with _client(factory) as client:
+        scoped = await client.get(
+            "/api/v1/reference/ticket-field-options",
+            params={"fields": "owner", "action": "AgentTicketPhone", "queue_id": Q_SECOND},
+        )
+        unscoped = await client.get(
+            "/api/v1/reference/ticket-field-options",
+            params={"fields": "owner", "action": "AgentTicketPhone"},
+        )
+    assert scoped.status_code == 200, scoped.text
+    assert scoped.json()["owner"] == {
+        str(AGENT): "Alma Billing",
+        str(OTHER_AGENT): "Bruno Support",
+        str(AGENT_SECOND): "Emil Second",
+    }
+    # no queue chosen yet: nothing to scope by
+    assert {AGENT_RO, AGENT_SECOND} <= {int(i) for i in unscoped.json()["owner"]}
+
+
+@pytest.mark.asyncio
+async def test_bulk_owner_choices_intersect_selected_ticket_queues(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    _seed(url)
+
+    async def bulk(client: Any, tickets: list[int]) -> Any:
+        return await client.post(
+            "/api/v1/reference/field-options",
+            json={
+                "fields": ["owner", "responsible"],
+                "context": {"action": "AgentTicketBulk", "ticket_ids": tickets},
+            },
+        )
+
+    async with _client(factory) as client:
+        both = await bulk(client, [T_BILLING, T_SECOND])
+        single = await bulk(client, [T_SECOND])
+        foreign = await bulk(client, [T_BILLING, T_HIDDEN])
+        missing = await bulk(client, [T_BILLING, 886539])
+    assert both.status_code == 200, both.text
+    options = both.json()["options"]
+    # Billing group owners {Aaron, Alma, Bruno, Dora} / second group {Alma, Bruno, Emil}
+    assert [o["label"] for o in options["owner"]] == ["Alma Billing", "Bruno Support"]
+    assert [o["label"] for o in options["responsible"]] == ["Bruno Support"]
+    assert [o["label"] for o in single.json()["options"]["owner"]] == [
+        "Alma Billing",
+        "Bruno Support",
+        "Emil Second",
+    ]
+    assert foreign.status_code == 403  # no ro on the hidden ticket's queue
+    assert missing.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_zoom_refused_when_acl_removes_agent_ticket_zoom(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    _seed(url, (NO_ZOOM_IN_BILLING,))
+    async with _client(factory) as client:
+        refused = await client.get(f"/api/v1/tickets/{T_BILLING}")
+        other = await client.get(f"/api/v1/tickets/{T_SUPPORT}")
+        menu = await client.get(f"/api/v1/tickets/{T_BILLING}/acl-actions")
+    assert refused.status_code == 403
+    assert "AgentTicketZoom" in refused.json()["detail"]
+    assert other.status_code == 200, other.text  # the ACL only matches Billing
+    assert other.json()["id"] == T_SUPPORT
+    assert menu.json()["allowed"] == list(ZOOM_ACTIONS)  # Zoom is not a menu entry
+
+
+@pytest.mark.asyncio
+async def test_possible_action_whitelist_limits_menu_and_zoom(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    _seed(url, (WHITELIST_NOTE_ZOOM,))
+    async with _client(factory) as client:
+        menu = await client.get(f"/api/v1/tickets/{T_BILLING}/acl-actions")
+        zoom = await client.get(f"/api/v1/tickets/{T_BILLING}")
+        untouched = await client.get(f"/api/v1/tickets/{T_SUPPORT}/acl-actions")
+    assert menu.json()["allowed"] == ["AgentTicketNote"]
+    assert zoom.status_code == 200, zoom.text  # AgentTicketZoom is whitelisted
+    assert untouched.json()["allowed"] == list(ZOOM_ACTIONS)
+    _seed(url, (WHITELIST_WITHOUT_ZOOM,))
+    async with _client(factory) as client:
+        locked = await client.get(f"/api/v1/tickets/{T_BILLING}")
+    assert locked.status_code == 403  # a whitelist without AgentTicketZoom refuses the zoom

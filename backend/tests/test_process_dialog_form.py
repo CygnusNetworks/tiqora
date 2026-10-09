@@ -34,6 +34,7 @@ from tiqora.domain.customer_auth import AuthenticatedCustomer
 T0 = datetime(2026, 3, 4, 5, 6, 7)
 
 AGENT_A, AGENT_B = 889010, 889011  # both rw on the queues' group
+AGENT_C = 889012  # only ro on that group: never offered as owner/responsible
 GROUP = 889020
 QUEUE_SUPPORT, QUEUE_JUNK = 889030, 889031
 Q_SUPPORT, Q_JUNK = "Support-889", "Junk-889"
@@ -45,6 +46,7 @@ CUSTOMER_ID_ROW = 889001
 CUSTOMER_LOGIN = "cu-889001"
 CUSTOMER_COMPANY = "cust-889"
 ACL_BASE = 889450
+SYSCONFIG_BASE = 889460  # sysconfig_default/_modified ids 889460-889469
 
 BOTH = ["AgentInterface", "CustomerInterface"]
 AGENT_ONLY = ["AgentInterface"]
@@ -79,6 +81,8 @@ def dialog_eid(n: int) -> str:
 def _cleanup(conn: Any) -> None:
     for stmt in (
         f"DELETE FROM acl WHERE id BETWEEN {ACL_BASE} AND {ACL_BASE + 49}",
+        "DELETE FROM sysconfig_modified WHERE id BETWEEN 889460 AND 889469",
+        "DELETE FROM sysconfig_default WHERE id BETWEEN 889460 AND 889469",
         "DELETE FROM dynamic_field_value WHERE object_id BETWEEN 889040 AND 889049",
         "DELETE FROM dynamic_field WHERE id BETWEEN 889050 AND 889069",
         "DELETE FROM ticket_history WHERE ticket_id BETWEEN 889040 AND 889049",
@@ -198,7 +202,11 @@ def _add_process(
 
 
 def _seed(conn: Any) -> None:
-    for uid, login, first in ((AGENT_A, "agent-889a", "Ada"), (AGENT_B, "agent-889b", "Bo")):
+    for uid, login, first in (
+        (AGENT_A, "agent-889a", "Ada"),
+        (AGENT_B, "agent-889b", "Bo"),
+        (AGENT_C, "agent-889c", "Cy"),
+    ):
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id, create_time,"
@@ -222,6 +230,13 @@ def _seed(conn: Any) -> None:
             ),
             {"u": uid, "g": GROUP, "t": T0},
         )
+    conn.execute(
+        text(
+            "INSERT INTO group_user (user_id, group_id, permission_key, create_time,"
+            " create_by, change_time, change_by) VALUES (:u, :g, 'ro', :t, 1, :t, 1)"
+        ),
+        {"u": AGENT_C, "g": GROUP, "t": T0},
+    )
     for qid, name in ((QUEUE_SUPPORT, Q_SUPPORT), (QUEUE_JUNK, Q_JUNK)):
         conn.execute(
             text(
@@ -315,6 +330,41 @@ def sync_url(mariadb_znuny_url: str) -> str:
         _seed(conn)
     engine.dispose()
     return mariadb_znuny_url
+
+
+def _set_sysconfig(conn: Any, settings: dict[str, Any]) -> None:
+    """Effective SysConfig values (Znuny's sysconfig_default + sysconfig_modified rows)."""
+    from tiqora.znuny.sysconfig import yaml_encode_effective
+
+    for table in ("sysconfig_modified", "sysconfig_default"):
+        conn.execute(
+            text(f"DELETE FROM {table} WHERE id BETWEEN {SYSCONFIG_BASE} AND {SYSCONFIG_BASE + 9}")
+        )
+    for i, (name, value) in enumerate(settings.items()):
+        enc = yaml_encode_effective(value)
+        conn.execute(
+            text(
+                "INSERT INTO sysconfig_default (id, name, description, navigation,"
+                " is_invisible, is_readonly, is_required, is_valid, has_configlevel,"
+                " user_modification_possible, user_modification_active, xml_content_raw,"
+                " xml_content_parsed, xml_filename, effective_value, is_dirty,"
+                " exclusive_lock_guid, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :n, 'x', 'x', 0, 0, 1, 1, 0, 0, 0, 'x', 'x', 'Ticket.xml',"
+                " :e, 0, '0', current_timestamp, 1, current_timestamp, 1)"
+            ),
+            {"id": SYSCONFIG_BASE + i, "n": name, "e": enc},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO sysconfig_modified (id, sysconfig_default_id, name, user_id,"
+                " is_valid, user_modification_active, effective_value, is_dirty,"
+                " reset_to_default, create_time, create_by, change_time, change_by)"
+                " VALUES (:id, :did, :n, NULL, 1, 0, :e, 0, 0, current_timestamp, 1,"
+                " current_timestamp, 1)"
+            ),
+            {"id": SYSCONFIG_BASE + i, "did": SYSCONFIG_BASE + i, "n": name, "e": enc},
+        )
+    clear_revision_cache()
 
 
 def _build(url: str, setup: Callable[[Any], None]) -> None:
@@ -480,6 +530,7 @@ async def test_form_lists_visible_fields_in_order_with_kinds(
 @pytest.mark.db
 async def test_field_kinds_lock_and_agent_pickers(client: AsyncClient, sync_url: str) -> None:
     def setup(conn: Any) -> None:
+        _set_sysconfig(conn, {"Process::DefaultQueue": Q_SUPPORT})
         _add_dialog(
             conn,
             1,
@@ -528,8 +579,8 @@ async def test_field_kinds_lock_and_agent_pickers(client: AsyncClient, sync_url:
         ("unlock", "unlock"),
     ]
     agents = [(o["value"], o["label"]) for o in fields["Owner"]["options"]]
-    assert (str(AGENT_A), "Ada Agent889") in agents
-    assert (str(AGENT_B), "Bo Agent889") in agents
+    # Process::DefaultQueue scopes the start form: owner/rw on its group, sorted by full name.
+    assert agents == [(str(AGENT_A), "Ada Agent889"), (str(AGENT_B), "Bo Agent889")]
     assert fields["Responsible"]["options"] == fields["Owner"]["options"]
     assert _labels(fields["DynamicField_Tags889"]) == ["Alpha", "Beta"]
     assert "open" in _labels(fields["State"])
@@ -941,6 +992,7 @@ async def test_owner_responsible_options_acl_filtered_with_process_context(
         _add_dialog(conn, 1, {"Owner": "Display: '1'", "Responsible": "Display: '1'"})
         _add_process(conn, 1, start_dialog=1, dialogs=[1])
         _add_process(conn, 2, start_dialog=1, dialogs=[1])
+        _set_sysconfig(conn, {"Process::DefaultQueue": Q_SUPPORT})  # scopes the agent pickers
 
     _build(sync_url, setup)
     login_a = _query_login(sync_url, AGENT_A)
@@ -967,6 +1019,33 @@ async def test_owner_responsible_options_acl_filtered_with_process_context(
     assert responsibles[str(AGENT_B)] == "Bo Agent889"
     other = _by_name((await _start_form(client, AGENT, 2)).json())
     assert {o["value"] for o in other["Owner"]["options"]} >= {str(AGENT_A), str(AGENT_B)}
+
+
+@pytest.mark.db
+async def test_agent_pickers_follow_default_queue_and_change_owner_to_everyone(
+    client: AsyncClient, sync_url: str
+) -> None:
+    def setup(conn: Any) -> None:
+        _add_dialog(
+            conn,
+            1,
+            {"Owner": "Display: '1'", "Responsible": "Display: '1'"},
+        )
+        _add_process(conn, 1, start_dialog=1, dialogs=[1])
+        _set_sysconfig(conn, {"Process::DefaultQueue": Q_SUPPORT})
+
+    _build(sync_url, setup)
+    fields = _by_name((await _start_form(client, AGENT, 1)).json())
+    for name in ("Owner", "Responsible"):
+        assert [o["value"] for o in fields[name]["options"]] == [str(AGENT_A), str(AGENT_B)]
+    engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        _set_sysconfig(
+            conn, {"Process::DefaultQueue": Q_SUPPORT, "Ticket::ChangeOwnerToEveryone": 1}
+        )
+    engine.dispose()
+    everyone = _by_name((await _start_form(client, AGENT, 1)).json())
+    assert str(AGENT_C) in {o["value"] for o in everyone["Owner"]["options"]}
 
 
 def _query_login(url: str, user_id: int) -> str:

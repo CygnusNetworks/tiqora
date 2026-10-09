@@ -7,7 +7,7 @@ reuse them without an import cycle (``reference.py`` re-imports them).
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -16,15 +16,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, Sla
-from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
+from tiqora.db.legacy.ticket import Ticket, TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.ticket_acl import apply_ticket_acl
-from tiqora.domain.ticket_service import TicketService
+from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.znuny.sysconfig import SysConfig
 
 # Znuny's "valid" list id -- 1 == valid, everything else is invalid/temporary.
 VALID_ID = 1
+
+#: Znuny's default ``System::Permission`` (no ``responsible`` key: the picker falls back to ``rw``).
+DEFAULT_SYSTEM_PERMISSION: tuple[str, ...] = (
+    "ro",
+    "move_into",
+    "create",
+    "note",
+    "owner",
+    "priority",
+    "rw",
+)
 
 ATTRIBUTE_OPTION_FIELDS: tuple[str, ...] = (
     "state",
@@ -75,11 +87,17 @@ async def base_field_maps(
     fields: set[str],
     *,
     queue_id: int | None = None,
+    queue_ids: Sequence[int] | None = None,
 ) -> dict[str, dict[int, str]]:
     """Unfiltered valid id→name maps for the requested fields.
 
     Queues are still permission-gated (``ro``); ACL is additional filtering. *user* may be
     ``None`` (the customer interface) only when ``queue`` is not requested.
+
+    *queue_id* / *queue_ids* scope the owner and responsible pickers like Znuny's
+    ``_GetOwners``/``_GetResponsibles``: unless ``Ticket::ChangeOwnerToEveryone`` is on, only
+    agents with ``owner`` (``responsible``) or ``rw`` on the queue's group are offered; several
+    queues (bulk) keep the agents allowed on all of them. Without a queue the list is unscoped.
     """
     out: dict[str, dict[int, str]] = {}
     if "state" in fields:
@@ -136,8 +154,13 @@ async def base_field_maps(
             )
         ).all()
         agents = {int(r[0]): r[1] for r in rows}
+        scope = list(queue_ids) if queue_ids else ([queue_id] if queue_id else [])
+        everyone = bool(await SysConfig(session).get("Ticket::ChangeOwnerToEveryone", 0))
         for field in AGENT_OPTION_FIELDS & fields:
-            out[field] = dict(agents)
+            allowed = None
+            if scope and not everyone:
+                allowed = await _queue_agents(session, scope, field)
+            out[field] = {i: n for i, n in agents.items() if allowed is None or i in allowed}
     if "queue" in fields:
         if user is None:
             raise ValueError("queue options need an agent user")
@@ -154,8 +177,24 @@ async def base_field_maps(
                 )
             ).all()
             out["queue"] = {int(r[0]): r[1] for r in rows}
-    _ = queue_id  # reserved for form-side Queue checks when callers pass it
     return out
+
+
+async def _queue_agents(session: AsyncSession, queue_ids: Sequence[int], field: str) -> set[int]:
+    """Agents with the field's permission on the group of every queue in *queue_ids*."""
+    configured = await SysConfig(session).get("System::Permission", None)
+    permissions = configured if isinstance(configured, list) else DEFAULT_SYSTEM_PERMISSION
+    # AgentTicketProcess.pm:6401 -- the key is used only when System::Permission lists it.
+    key = field if field in permissions else "rw"
+    allowed: set[int] | None = None
+    pe = PermissionEngine(session)
+    for qid in dict.fromkeys(queue_ids):
+        group_id = (
+            await session.execute(select(Queue.group_id).where(Queue.id == qid))
+        ).scalar_one_or_none()
+        members = set() if group_id is None else await pe.users_for_group_permission(group_id, key)
+        allowed = members if allowed is None else allowed & members
+    return allowed or set()
 
 
 async def _agent_full_names(session: AsyncSession, user_ids: set[int]) -> dict[int, str]:
@@ -221,6 +260,7 @@ async def collect_ticket_field_options(
     ticket_id: int | None = None,
     action: str | None = None,
     queue_id: int | None = None,
+    queue_ids: Sequence[int] | None = None,
     service_id: int | None = None,
     type_id: int | None = None,
     state_id: int | None = None,
@@ -232,12 +272,13 @@ async def collect_ticket_field_options(
 
     *process*: ``ProcessEntityID`` / ``ActivityDialogEntityID`` / ``ActivityEntityID`` of the
     process dialog the lists are built for (live ``Process`` ACL checks,
-    ``TicketACL.pm:1118-1146``).
+    ``TicketACL.pm:1118-1146``). *queue_ids* (bulk: the queues of the selected tickets) scope
+    the owner/responsible pickers, see :func:`base_field_maps`.
     """
     from tiqora.domain.ticket_acl import filter_id_name_map
     from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
 
-    base = await base_field_maps(session, user, fields, queue_id=queue_id)
+    base = await base_field_maps(session, user, fields, queue_id=queue_id, queue_ids=queue_ids)
     ticket_ctx = await ticket_acl_context(
         session,
         queue_id=queue_id,
@@ -277,7 +318,9 @@ async def collect_ticket_field_options(
     if agent_ids:
         names = await _agent_full_names(session, agent_ids)
         for field in AGENT_OPTION_FIELDS & acl_maps.keys():
-            acl_maps[field] = {i: names.get(i, login) for i, login in acl_maps[field].items()}
+            labelled = {i: names.get(i, login) for i, login in acl_maps[field].items()}
+            # BuildSelection sorts by label (full name), not by login.
+            acl_maps[field] = dict(sorted(labelled.items(), key=lambda kv: (kv[1].lower(), kv[0])))
 
     result = TicketFieldOptionsOut()
     for field, mapping in acl_maps.items():
@@ -295,6 +338,9 @@ class FieldOptionsContext(BaseModel):
     priority_id: int | None = None
     sla_id: int | None = None
     customer_user_id: str | None = None
+    #: Bulk: the selected tickets; the owner/responsible lists keep the agents allowed on all
+    #: their queues (``AgentTicketBulk.pm`` ``_GetOwners``/``_GetResponsibles``).
+    ticket_ids: list[int] = Field(default_factory=list, max_length=500)
     #: Current form values by dynamic-field name (feed ``DynamicField_<name>`` ACL checks).
     dynamic_fields: dict[str, list[str]] = Field(default_factory=dict)
 
@@ -322,6 +368,29 @@ def sorted_options(items: dict[str, str]) -> list[FieldOptionOut]:
     # Ties (same label) fall back to the key so the order is deterministic.
     ordered = sorted(items.items(), key=lambda kv: (kv[1].lower(), kv[0]))
     return [FieldOptionOut(value=k, label=v) for k, v in ordered]
+
+
+async def _selected_queue_ids(
+    session: AsyncSession, user: AuthenticatedUser, ticket_ids: Sequence[int]
+) -> list[int] | None:
+    """Queues of the bulk-selected tickets (``None`` without a selection).
+
+    Unknown ids raise :class:`TicketNotFound`, tickets in queues without ``ro`` raise
+    :class:`TicketAccessDenied` (same rule as ``GET /tickets/{id}``).
+    """
+    wanted = {i for i in ticket_ids if i}
+    if not wanted:
+        return None
+    rows = (
+        await session.execute(select(Ticket.id, Ticket.queue_id).where(Ticket.id.in_(wanted)))
+    ).all()
+    if {int(r[0]) for r in rows} != wanted:
+        raise TicketNotFound(f"ticket {sorted(wanted - {int(r[0]) for r in rows})[0]} not found")
+    queue_ids = sorted({int(r[1]) for r in rows})
+    for qid in queue_ids:
+        if not await PermissionEngine(session).check(user.id, qid, "ro"):
+            raise TicketAccessDenied(f"no ro on queue {qid}")
+    return queue_ids
 
 
 async def collect_field_options(
@@ -357,6 +426,7 @@ async def collect_field_options(
             if ids[key] is None:
                 ids[key] = getattr(detail, key, None)
 
+    queue_ids = await _selected_queue_ids(session, user, ctx.ticket_ids)
     attr_fields = [f.strip().lower() for f in req.fields]
     attr_requested = {f for f in attr_fields if f in ATTRIBUTE_OPTION_FIELDS}
     attribute_maps: dict[str, dict[str, str]] = {}
@@ -368,6 +438,7 @@ async def collect_field_options(
             ticket_id=ctx.ticket_id,
             action=ctx.action,
             process=process,
+            queue_ids=queue_ids,
             **ids,
         )
         attribute_maps = {f: getattr(collected, f) for f in attr_requested}
@@ -406,7 +477,10 @@ async def collect_field_options(
         key = requested.strip().lower()
         if key in ATTRIBUTE_OPTION_FIELDS:
             mapping = attribute_maps.get(key, {})
-            options[key] = [FieldOptionOut(value=k, label=v) for k, v in mapping.items()]
+            if key in AGENT_OPTION_FIELDS:
+                options[key] = sorted_options(mapping)
+            else:
+                options[key] = [FieldOptionOut(value=k, label=v) for k, v in mapping.items()]
             continue
         if not requested.startswith(DF_OPTION_PREFIX):
             continue

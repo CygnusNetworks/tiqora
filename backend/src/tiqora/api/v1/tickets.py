@@ -56,7 +56,11 @@ from tiqora.domain.schemas import (
     as_naive_utc,
 )
 from tiqora.domain.search import SearchIndexService
-from tiqora.domain.ticket_action_acl import TicketAclActionsOut, allowed_ticket_actions
+from tiqora.domain.ticket_action_acl import (
+    TicketAclActionsOut,
+    allowed_ticket_actions,
+    zoom_allowed,
+)
 from tiqora.domain.ticket_csv import CSV_HEADER, EchoWriter, ticket_csv_row
 from tiqora.domain.ticket_service import (
     TicketAccessDenied,
@@ -925,9 +929,17 @@ async def get_ticket(
     session: DbSession,
 ) -> TicketDetail:
     try:
-        return await TicketService(session).get_ticket(user.id, ticket_id)
+        detail = await TicketService(session).get_ticket(user.id, ticket_id)
     except (TicketNotFound, TicketAccessDenied) as exc:
         raise _map_exc(exc) from exc
+    # AgentTicketZoom.pm:309-329 -- an ACL that removes AgentTicketZoom itself from the
+    # allowed actions refuses the zoom (NoPermission).
+    if not await zoom_allowed(session, user_id=user.id, ticket_id=ticket_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="A ticket ACL forbids opening this ticket (AgentTicketZoom).",
+        )
+    return detail
 
 
 @router.get("/{ticket_id}/field-options")
