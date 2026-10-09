@@ -27,6 +27,7 @@ export function PortalLoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [providers, setProviders] = useState<LoginProvider[]>([]);
   const [passwordEnabled, setPasswordEnabled] = useState(true);
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
     customerSecurityApi
@@ -54,6 +55,7 @@ export function PortalLoginPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    setExpired(false);
     setSubmitting(true);
     try {
       const res = await login(username, password);
@@ -79,6 +81,7 @@ export function PortalLoginPage() {
           <PortalTwoFactorStep
             factors={pendingFactors ?? { totp: true, passkey: false }}
             onDone={() => void navigate({ to: next })}
+            onExpired={() => setExpired(true)}
           />
         </div>
       </div>
@@ -93,7 +96,16 @@ export function PortalLoginPage() {
           {t("app.name")}
         </h1>
         <p className="mt-1.5 text-center text-sm text-muted">{t("portal.login.subtitle")}</p>
-        {search.logged_out && (
+        {expired && (
+          <p
+            className="mt-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger"
+            role="alert"
+            data-testid="portal-2fa-expired"
+          >
+            {t("portal.login.twoFactorExpired")}
+          </p>
+        )}
+        {search.logged_out === "1" && (
           <p
             className="mt-3 rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-sm text-muted"
             role="status"
@@ -112,51 +124,51 @@ export function PortalLoginPage() {
           </p>
         )}
         {passwordEnabled && (
-        <form
-          onSubmit={(e) => void onSubmit(e)}
-          className="mt-7 space-y-4"
-          data-testid="portal-login-form"
-        >
-          <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("portal.login.email")}</span>
-            <input
-              data-testid="portal-login-username"
-              name="username"
-              autoComplete="username"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-muted">{t("auth.password")}</span>
-            <input
-              data-testid="portal-login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
-            />
-          </label>
-          {error && (
-            <p className="text-sm text-danger" data-testid="portal-login-error" role="alert">
-              {error}
-            </p>
-          )}
-          <Button
-            type="submit"
-            variant="primary"
-            className="w-full"
-            disabled={submitting}
-            data-testid="portal-login-submit"
+          <form
+            onSubmit={(e) => void onSubmit(e)}
+            className="mt-7 space-y-4"
+            data-testid="portal-login-form"
           >
-            {submitting ? <Spinner /> : t("auth.login")}
-          </Button>
-        </form>
+            <label className="block text-sm">
+              <span className="mb-1 block text-muted">{t("portal.login.email")}</span>
+              <input
+                data-testid="portal-login-username"
+                name="username"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1 block text-muted">{t("auth.password")}</span>
+              <input
+                data-testid="portal-login-password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-md border border-hairline bg-surface-subtle px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent focus:border-accent"
+              />
+            </label>
+            {error && (
+              <p className="text-sm text-danger" data-testid="portal-login-error" role="alert">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full"
+              disabled={submitting}
+              data-testid="portal-login-submit"
+            >
+              {submitting ? <Spinner /> : t("auth.login")}
+            </Button>
+          </form>
         )}
         {providers.length > 0 && (
           <>

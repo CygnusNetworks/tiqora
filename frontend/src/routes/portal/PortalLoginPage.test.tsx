@@ -7,12 +7,24 @@ import { CustomerAuthProvider } from "@/auth/CustomerAuthContext";
 import { ApiError } from "@/lib/portalApi";
 import { PortalLoginPage } from "./PortalLoginPage";
 
-const { navigate, portalMe, portalLogin, methods, totpVerify } = vi.hoisted(() => ({
+const {
+  navigate,
+  portalMe,
+  portalLogin,
+  methods,
+  totpVerify,
+  passkeyBegin,
+  passkeyFinish,
+  startAuthentication,
+} = vi.hoisted(() => ({
   navigate: vi.fn(),
   portalMe: vi.fn(),
   portalLogin: vi.fn(),
   methods: vi.fn(),
   totpVerify: vi.fn(),
+  passkeyBegin: vi.fn(),
+  passkeyFinish: vi.fn(),
+  startAuthentication: vi.fn(),
 }));
 let searchParams: { next?: string; sso_error?: string; logged_out?: string } = {};
 
@@ -30,10 +42,14 @@ vi.mock("@/lib/portalSecurityApi", () => ({
   customerSecurityApi: {
     methods: (...a: unknown[]) => methods(...a),
     totpVerify: (...a: unknown[]) => totpVerify(...a),
+    passkeyAuthenticateBegin: (...a: unknown[]) => passkeyBegin(...a),
+    passkeyAuthenticateFinish: (...a: unknown[]) => passkeyFinish(...a),
   },
 }));
 
-vi.mock("@simplewebauthn/browser", () => ({ startAuthentication: vi.fn() }));
+vi.mock("@simplewebauthn/browser", () => ({
+  startAuthentication: (...a: unknown[]) => startAuthentication(...a),
+}));
 
 const customer = {
   id: 5,
@@ -158,5 +174,108 @@ describe("PortalLoginPage", () => {
     renderPage();
     await submitPassword();
     await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/portal" }));
+  });
+
+  it("cancel on the second-factor step returns to the password form", async () => {
+    portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    renderPage();
+    await submitPassword();
+    await screen.findByTestId("portal-2fa-step");
+
+    fireEvent.click(screen.getByTestId("portal-2fa-cancel"));
+    expect(await screen.findByTestId("portal-login-form")).toBeInTheDocument();
+    expect(screen.queryByTestId("portal-2fa-step")).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("an expired pending sign-in goes back to the password form with a message", async () => {
+    portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    totpVerify.mockRejectedValue(new ApiError(401, "No pending session", "/x"));
+    renderPage();
+    await submitPassword();
+    await screen.findByTestId("portal-2fa-step");
+
+    fireEvent.change(screen.getByTestId("portal-2fa-code"), { target: { value: "123456" } });
+    expect(await screen.findByTestId("portal-2fa-expired")).toHaveTextContent(
+      i18n.t("portal.login.twoFactorExpired"),
+    );
+    expect(screen.getByTestId("portal-login-form")).toBeInTheDocument();
+  });
+
+  it("a wrong code (400) keeps the step and says the code is invalid", async () => {
+    portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    totpVerify.mockRejectedValue(new ApiError(400, "Invalid TOTP code", "/x"));
+    renderPage();
+    await submitPassword();
+    await screen.findByTestId("portal-2fa-step");
+    fireEvent.change(screen.getByTestId("portal-2fa-code"), { target: { value: "000000" } });
+    expect(await screen.findByText(i18n.t("portal.login.totpInvalid"))).toBeInTheDocument();
+    expect(screen.getByTestId("portal-2fa-step")).toBeInTheDocument();
+  });
+
+  it("a rate limit (429) has its own message and keeps the step", async () => {
+    portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    totpVerify.mockRejectedValue(new ApiError(429, "Too many failed login attempts", "/x"));
+    renderPage();
+    await submitPassword();
+    await screen.findByTestId("portal-2fa-step");
+    fireEvent.change(screen.getByTestId("portal-2fa-code"), { target: { value: "000000" } });
+    expect(await screen.findByText(i18n.t("portal.login.rateLimited"))).toBeInTheDocument();
+    expect(screen.getByTestId("portal-2fa-step")).toBeInTheDocument();
+  });
+
+  describe("passkey step", () => {
+    beforeEach(() => {
+      portalLogin.mockResolvedValue({
+        customer: null,
+        pending_2fa: true,
+        totp_enrolled: false,
+        passkey_enrolled: true,
+      });
+      passkeyBegin.mockResolvedValue({ challenge: "c" });
+    });
+
+    it("completes the sign-in with a passkey", async () => {
+      const credential = { id: "cred" };
+      startAuthentication.mockResolvedValue(credential);
+      passkeyFinish.mockResolvedValue({ customer });
+      portalMe.mockResolvedValue(customer);
+      renderPage();
+      await submitPassword();
+      fireEvent.click(await screen.findByTestId("portal-2fa-passkey"));
+
+      await waitFor(() => expect(passkeyFinish).toHaveBeenCalledWith(credential));
+      expect(startAuthentication).toHaveBeenCalledWith({ optionsJSON: { challenge: "c" } });
+      await waitFor(() => expect(navigate).toHaveBeenCalledWith({ to: "/portal" }));
+    });
+
+    it("stays silent and on the step when the user cancels the browser prompt", async () => {
+      const err = new Error("The operation either timed out or was not allowed");
+      err.name = "NotAllowedError";
+      startAuthentication.mockRejectedValue(err);
+      renderPage();
+      await submitPassword();
+      fireEvent.click(await screen.findByTestId("portal-2fa-passkey"));
+
+      await waitFor(() => expect(startAuthentication).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getByTestId("portal-2fa-passkey")).not.toBeDisabled());
+      expect(screen.queryByTestId("portal-2fa-error")).toBeNull();
+      expect(screen.getByTestId("portal-2fa-step")).toBeInTheDocument();
+      expect(passkeyFinish).not.toHaveBeenCalled();
+    });
+
+    it("shows an error and keeps the step when the passkey is rejected", async () => {
+      startAuthentication.mockResolvedValue({ id: "cred" });
+      passkeyFinish.mockRejectedValue(new ApiError(401, "Passkey authentication failed", "/x"));
+      renderPage();
+      await submitPassword();
+      fireEvent.click(await screen.findByTestId("portal-2fa-passkey"));
+
+      expect(await screen.findByTestId("portal-2fa-error")).toHaveTextContent(
+        i18n.t("portal.login.passkeyInvalid"),
+      );
+      expect(screen.getByTestId("portal-2fa-step")).toBeInTheDocument();
+      expect(navigate).not.toHaveBeenCalled();
+    });
   });
 });

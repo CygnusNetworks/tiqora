@@ -4,22 +4,37 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CustomerAuthProvider, useCustomerAuth } from "./CustomerAuthContext";
 import { ApiError } from "@/lib/portalApi";
 
-const { portalMeMock, portalLoginMock, portalLogoutMock, totpVerifyMock, submitSsoLogoutMock } =
-  vi.hoisted(() => ({
+const {
+  portalMeMock,
+  portalLoginMock,
+  portalLogoutMock,
+  totpVerifyMock,
+  submitSsoLogoutMock,
+  passkeyBeginMock,
+  passkeyFinishMock,
+  startAuthenticationMock,
+} = vi.hoisted(() => ({
     portalMeMock: vi.fn(),
     portalLoginMock: vi.fn(),
     portalLogoutMock: vi.fn(),
     totpVerifyMock: vi.fn(),
     submitSsoLogoutMock: vi.fn(),
+    passkeyBeginMock: vi.fn(),
+    passkeyFinishMock: vi.fn(),
+    startAuthenticationMock: vi.fn(),
   }));
 
 vi.mock("@/lib/portalSecurityApi", () => ({
-  customerSecurityApi: { totpVerify: totpVerifyMock },
+  customerSecurityApi: {
+    totpVerify: totpVerifyMock,
+    passkeyAuthenticateBegin: passkeyBeginMock,
+    passkeyAuthenticateFinish: passkeyFinishMock,
+  },
 }));
 
 vi.mock("@/lib/ssoLogout", () => ({ submitSsoLogout: submitSsoLogoutMock }));
 
-vi.mock("@simplewebauthn/browser", () => ({ startAuthentication: vi.fn() }));
+vi.mock("@simplewebauthn/browser", () => ({ startAuthentication: startAuthenticationMock }));
 
 vi.mock("@/lib/portalApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/portalApi")>();
@@ -161,6 +176,67 @@ describe("CustomerAuthContext", () => {
     expect(result.current.pending2fa).toBe(false);
     expect(result.current.pendingFactors).toBeNull();
     await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+  });
+
+  it("verifyPasskey() runs begin, the browser ceremony and finish, then signs in", async () => {
+    portalLoginMock.mockResolvedValue({
+      customer: null,
+      pending_2fa: true,
+      passkey_enrolled: true,
+    });
+    passkeyBeginMock.mockResolvedValue({ challenge: "c" });
+    startAuthenticationMock.mockResolvedValue({ id: "cred" });
+    passkeyFinishMock.mockResolvedValue({ customer: authedCustomer });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+
+    portalMeMock.mockResolvedValue(authedCustomer);
+    await act(async () => {
+      await result.current.verifyPasskey();
+    });
+
+    expect(startAuthenticationMock).toHaveBeenCalledWith({ optionsJSON: { challenge: "c" } });
+    expect(passkeyFinishMock).toHaveBeenCalledWith({ id: "cred" });
+    expect(result.current.pending2fa).toBe(false);
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+  });
+
+  it("verifyPasskey() failing leaves the pending state intact", async () => {
+    portalLoginMock.mockResolvedValue({ customer: null, pending_2fa: true, passkey_enrolled: true });
+    passkeyBeginMock.mockResolvedValue({ challenge: "c" });
+    startAuthenticationMock.mockRejectedValue(new Error("NotAllowedError"));
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+
+    await act(async () => {
+      await expect(result.current.verifyPasskey()).rejects.toThrow("NotAllowedError");
+    });
+
+    expect(passkeyFinishMock).not.toHaveBeenCalled();
+    expect(result.current.pending2fa).toBe(true);
+    expect(result.current.pendingFactors).toEqual({ totp: false, passkey: true });
+  });
+
+  it("cancelPending() clears the pending second-factor state", async () => {
+    portalLoginMock.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+    expect(result.current.pending2fa).toBe(true);
+
+    act(() => result.current.cancelPending());
+
+    expect(result.current.pending2fa).toBe(false);
+    expect(result.current.pendingFactors).toBeNull();
+    expect(result.current.isAuthenticated).toBe(false);
   });
 
   it("logout() of an SSO session submits the SSO logout form instead of the plain API call", async () => {

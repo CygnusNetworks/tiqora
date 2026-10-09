@@ -39,6 +39,8 @@ type CustomerAuthContextValue = {
   verifyTotp: (code: string) => Promise<void>;
   /** Finish the pending step with a passkey (begin, browser ceremony, finish). */
   verifyPasskey: () => Promise<void>;
+  /** Abandon a pending second-factor step and return to the password form. */
+  cancelPending: () => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -127,6 +129,11 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
     );
   }, [finishLogin]);
 
+  const cancelPending = useCallback(() => {
+    setPending2fa(false);
+    setPendingFactors(null);
+  }, []);
+
   const ssoLogout = meQuery.data?.sso_logout === true;
 
   const logout = useCallback(async () => {
@@ -163,6 +170,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       login,
       verifyTotp,
       verifyPasskey,
+      cancelPending,
       logout,
       refresh,
     }),
@@ -175,6 +183,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       login,
       verifyTotp,
       verifyPasskey,
+      cancelPending,
       logout,
       refresh,
     ],

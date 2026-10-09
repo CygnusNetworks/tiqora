@@ -15,15 +15,49 @@ function browserSupportsWebAuthn(): boolean {
  * authenticator code and/or a passkey, depending on what the customer has set
  * up. Calls `onDone` once the portal session is complete.
  */
+type StepFailure = "expired" | "rateLimited" | "invalid" | "other";
+
+/**
+ * The backend answers a wrong code with 400/422 (or 401 "Invalid ..."), a
+ * pending sign-in that no longer exists with 401 "No pending session" /
+ * "Session expired", and a locked-out account with 429.
+ */
+function classify(err: unknown): StepFailure {
+  if (!(err instanceof ApiError)) return "other";
+  if (err.status === 429) return "rateLimited";
+  if (err.status === 401 && /no pending session|session expired/i.test(err.message)) {
+    return "expired";
+  }
+  if (err.status === 400 || err.status === 401 || err.status === 422) return "invalid";
+  return "other";
+}
+
 export function PortalTwoFactorStep({
   factors,
   onDone,
+  onExpired,
 }: {
   factors: { totp: boolean; passkey: boolean };
   onDone: () => void;
+  /** Called after the pending sign-in expired and was dropped (back to the password form). */
+  onExpired?: () => void;
 }) {
   const { t } = useTranslation();
-  const { verifyTotp, verifyPasskey } = useCustomerAuth();
+  const { verifyTotp, verifyPasskey, cancelPending } = useCustomerAuth();
+
+  const failureMessage = (err: unknown, passkey: boolean): string | null => {
+    const kind = classify(err);
+    if (kind === "expired") {
+      cancelPending();
+      onExpired?.();
+      return null;
+    }
+    if (kind === "rateLimited") return t("portal.login.rateLimited");
+    if (kind === "invalid") {
+      return passkey ? t("portal.login.passkeyInvalid") : t("portal.login.totpInvalid");
+    }
+    return passkey ? t("portal.login.passkeyFailed") : t("auth.loginFailed");
+  };
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -36,11 +70,7 @@ export function PortalTwoFactorStep({
       await verifyTotp(value);
       onDone();
     } catch (err) {
-      setError(
-        err instanceof ApiError && (err.status === 401 || err.status === 400)
-          ? t("portal.login.totpInvalid")
-          : t("auth.loginFailed"),
-      );
+      setError(failureMessage(err, false));
     } finally {
       setSubmitting(false);
     }
@@ -61,11 +91,7 @@ export function PortalTwoFactorStep({
       if (err instanceof Error && /cancel|abort|notallowed/i.test(err.name + err.message)) {
         return;
       }
-      setError(
-        err instanceof ApiError && (err.status === 401 || err.status === 400)
-          ? t("portal.login.passkeyInvalid")
-          : t("portal.login.passkeyFailed"),
-      );
+      setError(failureMessage(err, true));
     } finally {
       setSubmitting(false);
     }
@@ -143,6 +169,17 @@ export function PortalTwoFactorStep({
           </Button>
         </>
       )}
+
+      <Button
+        type="button"
+        variant="ghost"
+        className="mt-4 w-full"
+        disabled={submitting}
+        data-testid="portal-2fa-cancel"
+        onClick={cancelPending}
+      >
+        {t("portal.login.backToLogin")}
+      </Button>
     </div>
   );
 }

@@ -558,7 +558,8 @@ const portalLoginRoute = createRoute({
     next: typeof s.next === "string" ? s.next : undefined,
     // The router JSON-parses search values: `?sso_error=1` arrives as a number.
     sso_error: searchFlag(s.sso_error),
-    logged_out: searchFlag(s.logged_out),
+    // Only the backend's "1" marks a sign-out; "0"/"false" must not show the note.
+    logged_out: searchFlag(s.logged_out) === "1" ? "1" : undefined,
   }),
   component: () => (
     <RequirePortalEnabled>

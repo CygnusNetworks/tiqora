@@ -1337,7 +1337,10 @@
       "passkeyInvalid": "Der Passkey konnte nicht bestätigt werden.",
       "passkeyFailed": "Die Passkey-Bestätigung ist fehlgeschlagen. Bitte erneut versuchen.",
       "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys.",
-      "cancel": "Abbrechen"
+      "cancel": "Abbrechen",
+      "rateLimited": "Zu viele Fehlversuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.",
+      "twoFactorExpired": "Die Anmeldung ist abgelaufen. Bitte erneut anmelden.",
+      "backToLogin": "Zurück zur Anmeldung"
     },
     "tickets": {
       "title": "Meine Tickets",

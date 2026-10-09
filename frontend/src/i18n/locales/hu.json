@@ -1337,7 +1337,10 @@
       "passkeyInvalid": "The passkey could not be verified.",
       "passkeyFailed": "Passkey confirmation failed. Please try again.",
       "passkeyUnsupported": "This browser does not support passkeys.",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "rateLimited": "Too many failed attempts. Please wait a moment and try again.",
+      "twoFactorExpired": "The sign-in has expired. Please sign in again.",
+      "backToLogin": "Back to sign-in"
     },
     "tickets": {
       "title": "Saját jegyek",
