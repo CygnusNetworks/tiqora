@@ -597,6 +597,18 @@ class InvalidPendingTime(ValueError):
     """``Ticket->PendingTime`` fails Znuny's ``ValidatePendingTime`` (or cannot be stored)."""
 
 
+class PendingTimeNotSet(Exception):
+    """``Ticket->PendingTime`` passes ``ValidatePendingTime`` but ``TicketPendingTimeSet``
+    refuses it: the absolute form without ``Hour`` or ``Minute`` ("Need Hour!",
+    Ticket.pm:3958-3966). TicketCreate then creates the ticket without a pending time,
+    TicketUpdate to a pending state fails (``Success => 0``)."""
+
+
+# Znuny TicketUpdate answers {Success => 0, Errormessage => ...} (sic) when
+# TicketPendingTimeSet fails; Provider.pm finds no ErrorMessage and uses its default summary
+OPERATION_FAILED_MESSAGE = "OperationObject returned an error, cancelling Request"
+
+
 _PENDING_DIFF_RE = re.compile(r"[0-9]+")
 _PENDING_INT_RE = re.compile(r"-?[0-9]+")  # CPAN DateTime's integer check
 # Kernel::System::DateTime passes these on to DateTime->new, which dies on them (they are
@@ -604,7 +616,8 @@ _PENDING_INT_RE = re.compile(r"-?[0-9]+")  # CPAN DateTime's integer check
 _PENDING_DURATION_KEYS = frozenset(
     {"Years", "Months", "Weeks", "Days", "Hours", "Minutes", "Seconds"}
 )
-_UNTIL_TIME_MAX = 2**31 - 1  # ticket.until_time is a 32-bit INTEGER
+# ticket.until_time is a signed 32-bit INTEGER: 1901-12-13 20:45:52 .. 2038-01-19 03:14:07 UTC
+_UNTIL_TIME_MIN, _UNTIL_TIME_MAX = -(2**31), 2**31 - 1
 
 
 def _pending_time(raw: Any, *, now: datetime | None = None) -> datetime | None:
@@ -615,10 +628,13 @@ def _pending_time(raw: Any, *, now: datetime | None = None) -> datetime | None:
     without an empty or negative value that ``Kernel::System::DateTime`` accepts; ``Diff``
     together with any other key is invalid. Raises :class:`InvalidPendingTime`. ``None`` when
     no PendingTime was given (Perl-false) or ``Diff`` is 0 (``TicketPendingTimeSet`` then sets
-    nothing).
+    nothing). A valid absolute form without ``Hour`` or ``Minute`` raises
+    :class:`PendingTimeNotSet` (``TicketPendingTimeSet`` needs both; no default midnight).
 
-    Deviation: a value Znuny validates but whose result does not fit ``until_time`` (a 32-bit
-    epoch) or a Python date (years 1-9999) is invalid too; Znuny fails later in the database.
+    Deviation: a value Znuny validates but whose result does not fit ``until_time`` (a signed
+    32-bit epoch, 1901-12-13 .. 2038-01-19) or a Python date (years 1-9999) is invalid too,
+    whatever the target state; Znuny only writes it for a pending state and then fails in the
+    database (PostgreSQL, strict MariaDB) or stores a clamped value (non-strict MariaDB).
     """
     if not perl_truthy(raw):
         return None
@@ -646,6 +662,7 @@ def _pending_time(raw: Any, *, now: datetime | None = None) -> datetime | None:
         if _PENDING_DURATION_KEYS & values.keys():
             raise InvalidPendingTime
         parts: list[int] = []
+        missing_time = False
         for key, required in (
             ("Year", True),
             ("Month", True),
@@ -657,7 +674,8 @@ def _pending_time(raw: Any, *, now: datetime | None = None) -> datetime | None:
             if value is None:
                 if required:
                     raise InvalidPendingTime  # "Missing parameter Year." (DateTime.pm)
-                parts.append(0)
+                parts.append(0)  # DateTime->new's default: the date is still validated
+                missing_time = True
                 continue
             text_value = perl_str(value)
             if not _PENDING_INT_RE.fullmatch(text_value) or (required and int(text_value) == 0):
@@ -667,9 +685,23 @@ def _pending_time(raw: Any, *, now: datetime | None = None) -> datetime | None:
             moment = datetime(parts[0], parts[1], parts[2], parts[3], parts[4], tzinfo=UTC)
         except (ValueError, OverflowError) as exc:
             raise InvalidPendingTime from exc
-    if moment.timestamp() > _UNTIL_TIME_MAX:
+        if missing_time:
+            raise PendingTimeNotSet
+    if not _UNTIL_TIME_MIN <= moment.timestamp() <= _UNTIL_TIME_MAX:
         raise InvalidPendingTime
     return moment
+
+
+async def _is_pending_state(session: AsyncSession, state_id: int) -> bool:
+    """The state's type starts with "pending" (Znuny ``$StateData{TypeName} =~ /^pending/i``)."""
+    row = (
+        await session.execute(
+            select(TicketStateType.name)
+            .join(TicketState, TicketState.type_id == TicketStateType.id)
+            .where(TicketState.id == state_id)
+        )
+    ).first()
+    return row is not None and str(row[0]).lower().startswith("pending")
 
 
 async def _state_ids_for_type(session: AsyncSession, type_name: str) -> list[int]:
@@ -1258,6 +1290,8 @@ async def op_ticket_create(
     sla_id = await _resolve_sla_id(session, ticket.get("SLA"), ticket.get("SLAID"))
     try:
         pending_time = _pending_time(ticket.get("PendingTime"))
+    except PendingTimeNotSet:
+        pending_time = None  # TicketCreate.pm:1466 ignores TicketPendingTimeSet's failure
     except InvalidPendingTime:
         # TicketCreate.pm:833-838 (ValidatePendingTime)
         return _err(f"{op}.InvalidParameter", f"{op}: Ticket->PendingTime parameter is invalid!")
@@ -1718,6 +1752,14 @@ async def op_ticket_update(
     # Everything is validated before the first write (Run + _CheckArticle + _CheckDynamicField).
     try:
         pending_time = _pending_time(ticket.get("PendingTime"))
+    except PendingTimeNotSet:
+        # TicketUpdate.pm:1738-1755: only a pending target state calls TicketPendingTimeSet;
+        # its failure answers Success => 0 (Znuny has already written the attributes before
+        # the state; Tiqora writes nothing)
+        target_state = await _resolve_state_id(session, ticket.get("State"), ticket.get("StateID"))
+        if target_state is not None and await _is_pending_state(session, target_state):
+            raise OperationFault(OPERATION_FAILED_MESSAGE) from None
+        pending_time = None
     except InvalidPendingTime:
         # TicketUpdate.pm:818-824 (ValidatePendingTime)
         return _err(f"{op}.InvalidParameter", f"{op}: Ticket->PendingTime parameter is invalid!")

@@ -413,7 +413,8 @@ Multiple `Article` entries, `TimeUnit`, `AutoResponseType`, `HistoryType`/`Histo
 | Non-integer element in a TicketSearch id filter | whole search returns empty (as Znuny); an element of more than 16 digits counts as non-integer (`Quote(..., 'Integer')`) | empty |
 | `_` in `MIMEBase_*` / `Fulltext` values | a literal character (as Znuny, `Quote(..., 'Like')`) | same |
 | TicketSearch `*Minutes` beyond the date range (`"1e300"`, `"-1e12"`) | computed like CPAN DateTime: a huge positive value is a far-past date, a negative one a far-future date (a far-past one while the seconds wrap a signed 64-bit integer), and from about `-3.07e17` (`"-1e300"`) the start of today minus one second. Create / article / escalation times compare against the earliest / latest date instead of a far-past / far-future one; change / last change / close / pending times give an empty result for those, and search with the "start of today minus one second" date like Znuny. `"inf"`/`"nan"` count as 0 | the same dates; the far-past / far-future ones are written into the SQL as they are (`-292277022601-11-04 ...`, 5-digit years), which the database compares or rejects; "Invalid time format" (empty) for the history families |
-| `PendingTime` that passes `ValidatePendingTime` but does not fit `until_time` (after 2038-01-19, a 32-bit epoch) or a year beyond 9999 | refused with "Ticket->PendingTime parameter is invalid!" | accepted, then the database write fails (TicketUpdate: "Ticket pendig time could not be updated…", TicketCreate: no pending time) |
+| `PendingTime` that passes `ValidatePendingTime` but lies outside the signed 32-bit `until_time` (before 1901-12-13 20:45:52 or after 2038-01-19 03:14:07 UTC) or beyond the year 9999 | refused with "Ticket->PendingTime parameter is invalid!", whatever the target state | only written for a pending target state: the database write then fails on PostgreSQL and strict-mode MariaDB (TicketCreate: ticket without pending time; TicketUpdate: `Success => 0` fault), non-strict MariaDB stores a clamped value; with any other state the value is ignored and the request succeeds. A year written with fewer than four digits (e.g. `1`) never reaches the database because `Kernel::System::DateTime` cannot parse it: TicketCreate without pending time, TicketUpdate `Success => 0` fault |
+| `PendingTime` refused by `TicketPendingTimeSet` (absolute form without `Hour` or `Minute`) on TicketUpdate to a pending state | 500 fault "OperationObject returned an error, cancelling Request" before anything is written | the same fault, after the ticket attributes handled before the state (title, queue, lock, type) were already saved |
 | Operation errors | keep Tiqora's `ErrorCode` to HTTP status mapping, computed before the outbound mapping: `...AuthFail` 401, `...AccessDenied` 403, `...MissingParameter` / `...InvalidParameter` 400, `...RateLimited` 429 with `Retry-After`, `...NotImplemented` 501, every other error 200 | HTTP 200 for operation errors |
 | Operation answers `Success => 0` (OutOfOffice without entries) | HTTP 500 fault `{"faultcode": "Server", "faultstring": ...}` | same (`Provider.pm` `_GenerateErrorResponse`) |
 | OutOfOffice `UserSearch` | words AND-ed, each matching login / first name / last name as a whole value (`*` wildcard); Znuny's `|`, `AND`/`OR`, `!` and parentheses are not supported | `QueryCondition` |
@@ -515,11 +516,14 @@ client against the list before updating.
   configured), as Znuny does; never for `ArticleSend` articles. Clients that
   relied on silence must turn the queue's auto response off.
 - `Ticket->PendingTime` is validated like Znuny's `ValidatePendingTime`: `{Diff}`
-  alone with digits only, or `Year`/`Month`/`Day` (plus optional `Hour`/`Minute`) forming
-  a real date without empty or negative values; `Diff` together with other keys, or
-  anything else, answers `<Operation>.InvalidParameter` "Ticket->PendingTime parameter is
+  alone with digits only, or `Year`/`Month`/`Day` (plus `Hour`/`Minute`) forming a real
+  date without empty or negative values; `Diff` together with other keys, or anything
+  else, answers `<Operation>.InvalidParameter` "Ticket->PendingTime parameter is
   invalid!" before anything is written (before: silently ignored, or HTTP 500 for a huge
-  `Diff`). `Diff` 0 sets no pending time, as in Znuny.
+  `Diff`). `Diff` 0 sets no pending time, as in Znuny. Without `Hour` or `Minute` no pending
+  time is set, as in Znuny's `TicketPendingTimeSet` ("Need Hour!"): TicketCreate creates the
+  ticket without one, TicketUpdate to a pending state answers a 500 fault (before: midnight
+  was assumed). Times Tiqora cannot store are refused (see the deviations).
 - TicketSearch with a negative `Limit` returns no tickets (Znuny's database refuses
   `LIMIT -5`; before: HTTP 500).
 - `ArticleSend` and auto responses are sent by the worker, not inside the call

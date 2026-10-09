@@ -1434,6 +1434,10 @@ def _until_time(sync_url: str, ticket_id: int) -> int:
         {"Year": 2030, "Month": 1, "Day": 1, "Hour": -1},
         {"Year": 2030, "Month": 1},
         {"Year": 10**12, "Month": 1, "Day": 1},
+        # below the signed 32-bit until_time (1901-12-13): refused like the upper bound
+        {"Year": "1901", "Month": "1", "Day": "1", "Hour": "0", "Minute": "0"},
+        {"Year": 1, "Month": 1, "Day": 1, "Hour": 0, "Minute": 0},
+        {"Year": 2038, "Month": 1, "Day": 19, "Hour": 3, "Minute": 15},
         {"Year": 2030, "Month": 1, "Day": 1, "Days": 3},
         "tomorrow",
     ],
@@ -1490,3 +1494,73 @@ async def test_valid_pending_time_sets_the_until_time(
     assert _until_time(sync_url, created["TicketID"]) == int(
         datetime(2030, 1, 2, 3, 4, tzinfo=UTC).timestamp()
     )
+
+
+@pytest.mark.db
+async def test_pending_time_without_hour_or_minute_is_never_midnight(
+    sync_url: str, relay: CapturingMailSender
+) -> None:
+    """ValidatePendingTime accepts {Year, Month, Day}, but TicketPendingTimeSet needs Hour and
+    Minute ("Need Hour!", Ticket.pm:3958-3966): TicketCreate creates the ticket without a
+    pending time, TicketUpdate to a pending state fails with Success => 0 (a fault)."""
+    from tiqora.api.compat.operations import OPERATION_FAILED_MESSAGE
+    from tiqora.api.compat.provider import OperationFault
+
+    day_only = {"Year": 2030, "Month": 1, "Day": 2}
+    ticket = {**_ticket(), "StateID": PENDING_REMINDER, "PendingTime": day_only}
+    created = await _call(sync_url, "create", {"Ticket": ticket, "Article": _customer_article()})
+    assert "Error" not in created, created
+    ticket_id = created["TicketID"]
+    assert _until_time(sync_url, ticket_id) == 0  # no midnight 2030-01-02
+
+    with pytest.raises(OperationFault) as fault:
+        await _operation(
+            sync_url,
+            "update",
+            {
+                "TicketID": ticket_id,
+                "Ticket": {
+                    "Title": "GI7650 changed",
+                    "StateID": PENDING_REMINDER,
+                    "PendingTime": {"Year": 2030, "Month": 1, "Day": 2, "Hour": 9},
+                },
+            },
+        )
+    assert fault.value.message == OPERATION_FAILED_MESSAGE
+    assert _query(sync_url, "SELECT title FROM ticket WHERE id = :t", t=ticket_id) == [(TITLE,)]
+
+    # without a pending target state Znuny never calls TicketPendingTimeSet: accepted, nothing set
+    updated = await _call(
+        sync_url,
+        "update",
+        {"TicketID": ticket_id, "Ticket": {"Title": "GI7650 changed", "PendingTime": day_only}},
+    )
+    assert "Error" not in updated, updated
+    assert _until_time(sync_url, ticket_id) == 0
+
+
+async def test_canonical_ticket_update_answers_an_operation_fault_with_500(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from starlette.requests import Request
+
+    from tiqora.api.compat import router
+    from tiqora.api.compat.provider import OperationFault
+
+    async def _params(request: Any) -> dict[str, Any]:
+        return {}
+
+    async def _fail(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise OperationFault("OperationObject returned an error, cancelling Request")
+
+    monkeypatch.setattr(router, "_merge_params", _params)
+    monkeypatch.setattr(router, "_dispatch_operation", _fail)
+    request = Request({"type": "http", "method": "PATCH", "path": "/", "headers": []})
+    response = await router.canonical_ticket_update(
+        ticket_id=1,
+        request=request,
+        session=None,  # type: ignore[arg-type]
+        session_store=None,  # type: ignore[arg-type]
+    )
+    assert response.status_code == 500
+    assert b"OperationObject returned an error, cancelling Request" in bytes(response.body)

@@ -260,7 +260,10 @@ async def canonical_ticket_update(
 ) -> Response:
     data = await _merge_params(request)
     data["TicketID"] = ticket_id
-    result = await _dispatch_operation("TicketUpdate", data, session, session_store, request)
+    try:
+        result = await _dispatch_operation("TicketUpdate", data, session, session_store, request)
+    except OperationFault as exc:
+        return _fault_response(exc.message, status.HTTP_500_INTERNAL_SERVER_ERROR)
     return _json_or_501(result)
 
 
