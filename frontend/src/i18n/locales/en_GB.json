@@ -4001,7 +4001,8 @@
       "actions": "Available actions",
       "loadError": "Could not load process state.",
       "noDialogs": "No actions available at this activity.",
-      "noCustomerDialogs": "No customer dialogs available at this step."
+      "noCustomerDialogs": "No customer dialogs available at this step.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Start process",
@@ -4023,6 +4024,35 @@
       "articleSubject": "Subject",
       "articleBody": "Body",
       "fieldFallbackNote": "Plain text input (no dedicated widget for this field type)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

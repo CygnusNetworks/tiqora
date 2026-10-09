@@ -3993,7 +3993,8 @@
       "actions": "Dostupné akcie",
       "loadError": "Stav procesu sa nepodarilo načítať.",
       "noDialogs": "Pri tejto aktivite nie sú dostupné žiadne akcie.",
-      "noCustomerDialogs": "V tomto kroku nie sú k dispozícii žiadne zákaznícke dialógy."
+      "noCustomerDialogs": "V tomto kroku nie sú k dispozícii žiadne zákaznícke dialógy.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Spustiť proces",
@@ -4015,6 +4016,35 @@
       "articleSubject": "Predmet",
       "articleBody": "Telo",
       "fieldFallbackNote": "Zadávanie obyčajného textu (žiadna miniaplikácia pre tento typ poľa)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

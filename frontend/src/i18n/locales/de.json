@@ -4001,7 +4001,8 @@
       "actions": "Verfügbare Aktionen",
       "loadError": "Prozessstatus konnte nicht geladen werden.",
       "noDialogs": "Keine Aktionen bei dieser Aktivität verfügbar.",
-      "noCustomerDialogs": "In diesem Schritt sind keine Kundendialoge verfügbar."
+      "noCustomerDialogs": "In diesem Schritt sind keine Kundendialoge verfügbar.",
+      "inactive": "Dieser Prozess ist abgeschaltet. Es sind keine Schritte möglich."
     },
     "start": {
       "title": "Prozess starten",
@@ -4023,6 +4024,35 @@
       "articleSubject": "Betreff",
       "articleBody": "Text",
       "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp)."
+    },
+    "field": {
+      "Title": "Titel",
+      "Queue": "Queue",
+      "State": "Status",
+      "Priority": "Priorität",
+      "Type": "Typ",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Besitzer",
+      "Responsible": "Verantwortlicher",
+      "Lock": "Sperre",
+      "CustomerUserID": "Kundenbenutzer",
+      "CustomerID": "Kundennummer",
+      "PendingTime": "Erinnerung am",
+      "ArticleSubject": "Betreff",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "Dieses Feld kann hier noch nicht ausgefüllt werden.",
+      "required": "Pflichtfeld",
+      "submit": "Absenden",
+      "cancel": "Abbrechen",
+      "loadError": "Formular konnte nicht geladen werden.",
+      "submitError": "Senden fehlgeschlagen."
+    },
+    "lock": {
+      "lock": "gesperrt",
+      "unlock": "frei"
     }
   },
   "agentTemplates": {

@@ -3993,7 +3993,8 @@
       "actions": "Hành động có sẵn",
       "loadError": "Không thể tải trạng thái quá trình.",
       "noDialogs": "Không có hành động nào có sẵn tại hoạt động này.",
-      "noCustomerDialogs": "Không có hộp thoại khách hàng ở bước này."
+      "noCustomerDialogs": "Không có hộp thoại khách hàng ở bước này.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Bắt đầu quá trình",
@@ -4015,6 +4016,35 @@
       "articleSubject": "Chủ đề",
       "articleBody": "Thân hình",
       "fieldFallbackNote": "Nhập văn bản thuần túy (không có tiện ích dành riêng cho loại trường này)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

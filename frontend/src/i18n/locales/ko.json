@@ -3993,7 +3993,8 @@
       "actions": "사용 가능한 작업",
       "loadError": "프로세스 상태를 로드할 수 없습니다.",
       "noDialogs": "이 활동에는 수행할 수 있는 작업이 없습니다.",
-      "noCustomerDialogs": "이 단계에서는 고객 대화 상자가 없습니다."
+      "noCustomerDialogs": "이 단계에서는 고객 대화 상자가 없습니다.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "프로세스 시작",
@@ -4015,6 +4016,35 @@
       "articleSubject": "주제",
       "articleBody": "본체",
       "fieldFallbackNote": "일반 텍스트 입력(이 필드 유형에 대한 전용 위젯 없음)"
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

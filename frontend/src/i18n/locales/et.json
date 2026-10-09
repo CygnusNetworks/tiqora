@@ -3993,7 +3993,8 @@
       "actions": "Saadaolevad toimingud",
       "loadError": "Protsessi olekut ei saanud laadida.",
       "noDialogs": "Selle tegevuse jaoks pole ühtegi toimingut saadaval.",
-      "noCustomerDialogs": "Selles etapis pole kliendidialooge saadaval."
+      "noCustomerDialogs": "Selles etapis pole kliendidialooge saadaval.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Käivitage protsess",
@@ -4015,6 +4016,35 @@
       "articleSubject": "Teema",
       "articleBody": "Keha",
       "fieldFallbackNote": "Lihtteksti sisestus (selle väljatüübi jaoks pole spetsiaalset vidinat)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

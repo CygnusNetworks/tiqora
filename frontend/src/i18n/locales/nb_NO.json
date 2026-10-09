@@ -3993,7 +3993,8 @@
       "actions": "Tilgjengelige handlinger",
       "loadError": "Kunne ikke laste inn prosesstilstand.",
       "noDialogs": "Ingen handlinger tilgjengelig for denne aktiviteten.",
-      "noCustomerDialogs": "Ingen kundedialoger tilgjengelig i dette steget."
+      "noCustomerDialogs": "Ingen kundedialoger tilgjengelig i dette steget.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Start prosessen",
@@ -4015,6 +4016,35 @@
       "articleSubject": "Emne",
       "articleBody": "Kropp",
       "fieldFallbackNote": "Ren tekst (ingen dedikert widget for denne felttypen)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

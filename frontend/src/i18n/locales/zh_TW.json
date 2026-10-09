@@ -3993,7 +3993,8 @@
       "actions": "可用的操作",
       "loadError": "無法載入進程狀態。",
       "noDialogs": "此活動中沒有可用的操作。",
-      "noCustomerDialogs": "此步驟沒有可用的客戶對話。"
+      "noCustomerDialogs": "此步驟沒有可用的客戶對話。",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "啟動進程",
@@ -4015,6 +4016,35 @@
       "articleSubject": "主題",
       "articleBody": "身體",
       "fieldFallbackNote": "純文字輸入（此欄位類型沒有專用小工具）。"
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

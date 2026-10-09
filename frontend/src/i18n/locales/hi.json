@@ -3993,7 +3993,8 @@
       "actions": "उपलब्ध क्रियाएं",
       "loadError": "प्रक्रिया स्थिति लोड नहीं हो सकी.",
       "noDialogs": "इस गतिविधि पर कोई कार्रवाई उपलब्ध नहीं है.",
-      "noCustomerDialogs": "इस चरण पर कोई ग्राहक संवाद उपलब्ध नहीं।"
+      "noCustomerDialogs": "इस चरण पर कोई ग्राहक संवाद उपलब्ध नहीं।",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "प्रक्रिया प्रारंभ करें",
@@ -4015,6 +4016,35 @@
       "articleSubject": "विषय",
       "articleBody": "शरीर",
       "fieldFallbackNote": "सादा पाठ इनपुट (इस फ़ील्ड प्रकार के लिए कोई समर्पित विजेट नहीं)।"
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

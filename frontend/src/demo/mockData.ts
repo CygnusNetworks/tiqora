@@ -1660,6 +1660,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/stats/agent-workload")) return agentWorkload;
   if (p.endsWith("/api/v1/calendar/calendars")) return calendars;
   if (p.endsWith("/api/v1/calendar/appointments")) return occurrences;
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/state$/)) return processTicketState;
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) || p.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) return processDialogForm;
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/submit$/) && method === "POST") return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: processTicketState };
   if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};
   // Admin — assignment editors (before the generic list handler)
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }
@@ -1779,3 +1782,30 @@ export function resolveData(path: string, method: string): unknown | undefined {
   return undefined;
 }
 
+
+const processTicketState = {
+  process_entity_id: "Process-demo",
+  process_name: "Bestellung",
+  activity_entity_id: "Activity-demo",
+  activity_name: "Freigabe prüfen",
+  available_dialogs: [{ entity_id: "ActivityDialog-demo", name: "Freigabe erteilen", description_short: "" }],
+  available_transitions_count: 1,
+  process_state: "Active",
+  can_start: false,
+};
+
+const processDialogForm = {
+  process_entity_id: "Process-demo",
+  activity_dialog_entity_id: "ActivityDialog-demo",
+  name: "Freigabe erteilen",
+  description_short: "Bitte die Bestellung prüfen und freigeben.",
+  description_long: "",
+  submit_button_text: "Freigeben",
+  submit_advice_text: "",
+  fields: [
+    { name: "Priority", kind: "select", label: "Priority", required: true, description_short: "", description_long: "", default: "3", options: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }] },
+    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [] },
+    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [] },
+    { name: "Attachments", kind: "unsupported", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [] },
+  ],
+};

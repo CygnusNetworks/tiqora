@@ -4001,7 +4001,8 @@
       "actions": "利用可能なアクション",
       "loadError": "プロセス状態をロードできませんでした。",
       "noDialogs": "このアクティビティでは利用可能なアクションはありません。",
-      "noCustomerDialogs": "このステップでは顧客ダイアログはありません。"
+      "noCustomerDialogs": "このステップでは顧客ダイアログはありません。",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "開始プロセス",
@@ -4023,6 +4024,35 @@
       "articleSubject": "件名",
       "articleBody": "本文",
       "fieldFallbackNote": "プレーン テキスト入力 (このフィールド タイプには専用のウィジェットはありません)。"
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

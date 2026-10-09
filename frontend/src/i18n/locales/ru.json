@@ -3993,7 +3993,8 @@
       "actions": "Доступные действия",
       "loadError": "Не удалось загрузить состояние процесса.",
       "noDialogs": "В этом действии нет доступных действий.",
-      "noCustomerDialogs": "На этом шаге нет доступных клиентских диалогов."
+      "noCustomerDialogs": "На этом шаге нет доступных клиентских диалогов.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Начать процесс",
@@ -4015,6 +4016,35 @@
       "articleSubject": "Тема",
       "articleBody": "Текст",
       "fieldFallbackNote": "Ввод обычного текста (для этого типа поля нет специального виджета)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

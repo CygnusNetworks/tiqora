@@ -3993,7 +3993,8 @@
       "actions": "Galimi veiksmai",
       "loadError": "Nepavyko įkelti proceso būsenos.",
       "noDialogs": "Su šia veikla nėra jokių veiksmų.",
-      "noCustomerDialogs": "Šiame žingsnyje nėra kliento dialogų."
+      "noCustomerDialogs": "Šiame žingsnyje nėra kliento dialogų.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Pradėti procesą",
@@ -4015,6 +4016,35 @@
       "articleSubject": "Tema",
       "articleBody": "Kūnas",
       "fieldFallbackNote": "Paprasto teksto įvestis (šiam lauko tipui nėra skirto valdiklio)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

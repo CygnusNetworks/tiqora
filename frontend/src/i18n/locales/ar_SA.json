@@ -3993,7 +3993,8 @@
       "actions": "الإجراءات المتاحة",
       "loadError": "تعذر تحميل حالة العملية.",
       "noDialogs": "لا توجد إجراءات متاحة في هذا النشاط.",
-      "noCustomerDialogs": "لا تتوفر حوارات عميل في هذه الخطوة."
+      "noCustomerDialogs": "لا تتوفر حوارات عميل في هذه الخطوة.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "ابدأ العملية",
@@ -4015,6 +4016,35 @@
       "articleSubject": "الموضوع",
       "articleBody": "الجسم",
       "fieldFallbackNote": "إدخال نص عادي (لا توجد أداة مخصصة لهذا النوع من الحقول)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

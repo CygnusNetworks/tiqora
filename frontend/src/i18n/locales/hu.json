@@ -3993,7 +3993,8 @@
       "actions": "Elérhető műveletek",
       "loadError": "Nem sikerült betölteni a folyamat állapotát.",
       "noDialogs": "Ehhez a tevékenységhez nem állnak rendelkezésre műveletek.",
-      "noCustomerDialogs": "Ezen a lépésen nincsenek ügyfélpárbeszédek."
+      "noCustomerDialogs": "Ezen a lépésen nincsenek ügyfélpárbeszédek.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Indítsa el a folyamatot",
@@ -4015,6 +4016,35 @@
       "articleSubject": "Tárgy",
       "articleBody": "Törzs",
       "fieldFallbackNote": "Egyszerű szövegbevitel (nincs dedikált widget ehhez a mezőtípushoz)."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {

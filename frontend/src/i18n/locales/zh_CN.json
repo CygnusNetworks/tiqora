@@ -3993,7 +3993,8 @@
       "actions": "可用的操作",
       "loadError": "无法加载进程状态。",
       "noDialogs": "此活动中暂无可用操作。",
-      "noCustomerDialogs": "此步骤没有可用的客户对话框。"
+      "noCustomerDialogs": "此步骤没有可用的客户对话框。",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "启动流程",
@@ -4015,6 +4016,35 @@
       "articleSubject": "主题",
       "articleBody": "身体",
       "fieldFallbackNote": "纯文本输入（此字段类型没有专用小部件）。"
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
     }
   },
   "agentTemplates": {
