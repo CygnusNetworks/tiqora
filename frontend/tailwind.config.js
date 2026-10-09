@@ -41,6 +41,23 @@ export default {
         amber: themeColor("--color-amber"),
         red: themeColor("--color-red"),
         purple: themeColor("--color-purple"),
+        series: {
+          1: themeColor("--color-series-1"),
+          2: themeColor("--color-series-2"),
+          3: themeColor("--color-series-3"),
+          4: themeColor("--color-series-4"),
+          5: themeColor("--color-series-5"),
+          6: themeColor("--color-series-6"),
+        },
+        seq: {
+          1: themeColor("--color-seq-1"),
+          2: themeColor("--color-seq-2"),
+          3: themeColor("--color-seq-3"),
+          4: themeColor("--color-seq-4"),
+          5: themeColor("--color-seq-5"),
+          6: themeColor("--color-seq-6"),
+          7: themeColor("--color-seq-7"),
+        },
         channel: {
           telegram: themeColor("--color-channel-telegram"),
           webchat: themeColor("--color-channel-webchat"),

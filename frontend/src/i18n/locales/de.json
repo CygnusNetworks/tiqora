@@ -4415,39 +4415,39 @@
     "builtin": {
       "ticket_kpis": {
         "title": "Kennzahlen",
-        "description": "Die wichtigsten Zahlen im Überblick: erstellte Tickets, verletzte Erstreaktionen sowie mittlere Erstreaktions- und Lösungszeit der letzten 30 Tage. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
+        "description": "Die wichtigsten Zahlen der letzten 30 Tage (einschließlich heute): erstellte Tickets, Anteil verletzter Erstreaktionen sowie mittlere Erstreaktions- und Lösungszeit, gemessen in Arbeitszeit. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
       },
       "volume": {
         "title": "Erstellte und geschlossene Tickets",
-        "description": "Wie viele Tickets pro Woche erstellt und geschlossen wurden (letzte 12 Wochen)."
+        "description": "Wie viele Tickets pro Woche erstellt und geschlossen wurden (letzte 12 vollständige Wochen)."
       },
       "backlog_trend": {
         "title": "Offene Tickets im Verlauf",
-        "description": "Wie viele Tickets an jedem Tag der letzten 30 Tage offen waren (Stand am Tagesende)."
+        "description": "Wie viele Tickets an jedem Tag der letzten 30 Tage (einschließlich heute) offen waren, Stand am Tagesende."
       },
       "open_now": {
         "title": "Offene Tickets jetzt",
-        "description": "Alle gerade offenen Tickets je Queue. Sie lassen sich zusätzlich nach Status, Priorität, Bearbeiter, Typ oder Service aufteilen."
+        "description": "Alle gerade offenen Tickets, standardmäßig je Queue. Wahlweise lassen sie sich statt nach Queue nach Status, Priorität, Bearbeiter, Typ oder Service gruppieren."
       },
       "agent_activity": {
         "title": "Aktivität der Mitarbeiter",
-        "description": "Antworten, Notizen und Schließungen je Mitarbeiter in den letzten 30 Tagen."
+        "description": "Antworten, Notizen und Schließungen je Mitarbeiter in den letzten 30 Tagen (einschließlich heute)."
       },
       "volume_by_channel": {
         "title": "Tickets nach Kanal",
-        "description": "Wie viele Tickets pro Woche über welchen Kanal (E-Mail, Telefon, Telegram …) eingegangen sind."
+        "description": "Wie viele Tickets pro Woche über welchen Kanal (E-Mail, Telefon, Telegram …) eingegangen sind (letzte 12 vollständige Wochen)."
       },
       "channel_mix": {
         "title": "Kanalverteilung",
-        "description": "Aus welchen Kanälen die Tickets der letzten 30 Tage stammen."
+        "description": "Aus welchen Kanälen die Tickets der letzten 30 Tage (einschließlich heute) stammen."
       },
       "volume_by_queue": {
         "title": "Tickets je Queue",
-        "description": "Wie viele Tickets pro Queue erstellt wurden. Optional nach Typ, Service oder Priorität aufteilbar. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
+        "description": "Wie viele Tickets pro Queue in den letzten 30 Tagen (einschließlich heute) erstellt wurden. Wahlweise lassen sie sich statt nach Queue nach Typ, Service oder Priorität gruppieren. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
       },
       "backlog_by_state": {
         "title": "Bestand nach Status",
-        "description": "Offene Tickets je Tag, aufgeteilt nach Statustyp (neu, offen, wartend), letzte 30 Tage."
+        "description": "Offene Tickets je Tag, aufgeteilt nach Statustyp (neu, offen, wartend), letzte 30 Tage (einschließlich heute)."
       },
       "backlog_aging": {
         "title": "Alter der offenen Tickets",
@@ -4455,63 +4455,63 @@
       },
       "sla_compliance": {
         "title": "SLA-Einhaltung",
-        "description": "Wie viele Tickets ihre SLA-Zeiten eingehalten haben, je Queue, im letzten Monat. Dazu verletzte und knapp eingehaltene Zeiten."
+        "description": "Wie viele Tickets ihre SLA-Zeiten eingehalten haben, je Queue, im letzten vollständigen Monat. Dazu verletzte und knapp eingehaltene Zeiten."
       },
       "sla_times": {
         "title": "Reaktions- und Lösungszeiten",
-        "description": "Mittlere (Median) und langsame (90 %) Erstreaktions- und Lösungszeit pro Woche, gemessen in Arbeitszeit."
+        "description": "Mittlere Zeit (Median) und die langsamsten 10 % der Erstreaktions- und Lösungszeiten pro Woche, gemessen in Arbeitszeit (letzte 12 vollständige Wochen)."
       },
       "sla_by_customer": {
         "title": "SLA je Kunde",
-        "description": "Wie gut die SLA-Zeiten pro Kunde eingehalten wurden (letzte 3 Monate), mit Erstreaktions- und Lösungszeit. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
+        "description": "Wie gut die SLA-Zeiten pro Kunde eingehalten wurden (letzte 3 vollständige Monate): erstellte Tickets, verletzte Zeiten sowie mittlere Erstreaktions- und Lösungszeit."
       },
       "first_contact_resolution": {
         "title": "Lösung im ersten Kontakt",
-        "description": "„Geschlossen“ zählt die Tickets, die gerade geschlossen sind. Die Quoten (im ersten Kontakt gelöst, wiedereröffnet) beziehen sich auf die Tickets, die im Zeitraum geschlossen wurden."
+        "description": "„Geschlossen“ zählt die Tickets, die gerade geschlossen sind. Die Quoten beziehen sich auf die Tickets, die im Zeitraum geschlossen wurden (letzter vollständiger Monat). „Im ersten Kontakt gelöst“ heißt: geschlossen, nie wieder geöffnet und höchstens eine ausgehende Antwort."
       },
       "reopen_trend": {
         "title": "Wiedereröffnungen im Verlauf",
-        "description": "Wie oft geschlossene Tickets wieder geöffnet wurden, pro Woche. Maßgeblich ist der Zeitpunkt des Schließens."
+        "description": "Wie oft geschlossene Tickets wieder geöffnet wurden, pro Woche (letzte 12 vollständige Wochen). Maßgeblich ist der Zeitpunkt des Schließens."
       },
       "queue_transfers": {
         "title": "Queue-Wechsel",
-        "description": "Von welcher Queue in welche Queue Tickets verschoben wurden (letzte 30 Tage)."
+        "description": "Von welcher Queue in welche Queue Tickets verschoben wurden (letzte 30 Tage, einschließlich heute)."
       },
       "pingpong": {
         "title": "Hin und Her zwischen Queues",
-        "description": "Tickets, die mehrfach zwischen Queues verschoben wurden, und wie oft ein Ticket im Schnitt die Queue wechselt."
+        "description": "Tickets, die mehrfach zwischen Queues verschoben wurden, und wie oft ein Ticket im Schnitt die Queue wechselt (letzte 30 Tage, einschließlich heute)."
       },
       "time_in_state": {
         "title": "Verweildauer in Status",
-        "description": "Wie lange Tickets in einem Status bleiben, bevor er wechselt: Durchschnitt, Median und langsame 10 %."
+        "description": "Wie lange Tickets in einem Status bleiben, bevor er wechselt: Durchschnitt, Median und langsamste 10 % (letzte 30 Tage, einschließlich heute)."
       },
       "time_by_customer": {
         "title": "Gebuchte Zeit je Kunde",
-        "description": "Die auf Tickets gebuchte Zeit pro Kunde im letzten Monat, mit Buchungen und betroffenen Tickets."
+        "description": "Die auf Tickets gebuchte Zeit pro Kunde im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
       },
       "time_by_queue": {
         "title": "Gebuchte Zeit je Queue",
-        "description": "Die auf Tickets gebuchte Zeit pro Queue im letzten Monat, mit Buchungen und betroffenen Tickets."
+        "description": "Die auf Tickets gebuchte Zeit pro Queue im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
       },
       "time_by_agent": {
         "title": "Gebuchte Zeit je Mitarbeiter",
-        "description": "Die von jedem Mitarbeiter gebuchte Zeit im letzten Monat, mit Buchungen und betroffenen Tickets."
+        "description": "Die von jedem Mitarbeiter gebuchte Zeit im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
       },
       "time_by_type": {
         "title": "Gebuchte Zeit je Typ",
-        "description": "Die auf Tickets gebuchte Zeit pro Tickettyp im letzten Monat, mit Buchungen und betroffenen Tickets."
+        "description": "Die auf Tickets gebuchte Zeit pro Tickettyp im letzten vollständigen Monat, mit Buchungen und betroffenen Tickets."
       },
       "time_by_agent_month": {
         "title": "Gebuchte Zeit je Mitarbeiter und Monat",
-        "description": "Gebuchte Zeit je Mitarbeiter und Monat, die letzten 12 Monate. Entspricht der Znuny-Statistik „Gebuchte Zeit“."
+        "description": "Gebuchte Zeit je Mitarbeiter und Monat, die letzten 12 Monate (einschließlich des laufenden). Entspricht der Znuny-Statistik „Gebuchte Zeit“."
       },
       "top_customers": {
         "title": "Top-Kunden",
-        "description": "Die Kunden mit den meisten Tickets in den letzten 3 Monaten, mit Lösungszeit und gebuchter Zeit. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
+        "description": "Die Kunden mit den meisten Tickets in den letzten 3 vollständigen Monaten, mit Lösungszeit und gebuchter Zeit. „Geschlossen“ zählt die Tickets, die im Zeitraum erstellt und inzwischen geschlossen wurden."
       },
       "created_heatmap": {
         "title": "Wann Tickets eingehen",
-        "description": "Eingegangene Tickets nach Wochentag und Uhrzeit (letzte 12 Wochen) – zeigt, wann am meisten los ist."
+        "description": "Eingegangene Tickets nach Wochentag und Uhrzeit (letzte 12 vollständige Wochen) – zeigt, wann am meisten los ist."
       }
     },
     "dimensions": {
@@ -4676,6 +4676,15 @@
       "month": "Monat",
       "quarter": "Quartal",
       "year": "Jahr"
+    },
+    "chart": {
+      "noData": "Keine Daten",
+      "legend": "Legende",
+      "tooltipOther": "Weitere",
+      "deltaUp": "Anstieg",
+      "deltaDown": "Rückgang",
+      "deltaFlat": "Unverändert",
+      "ofTotal": "{{percent}} vom Gesamtwert"
     }
   }
 }

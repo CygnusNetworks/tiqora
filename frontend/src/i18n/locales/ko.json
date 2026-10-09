@@ -4407,39 +4407,39 @@
     "builtin": {
       "ticket_kpis": {
         "title": "Key figures",
-        "description": "The main figures at a glance: created tickets, breached first responses and the median first-response and solution times of the last 30 days. “Closed” counts the tickets that were created in the period and have been closed since."
+        "description": "The main figures of the last 30 days (including today): created tickets, share of breached first responses and the median first-response and solution times, measured in working time. “Closed” counts the tickets that were created in the period and have been closed since."
       },
       "volume": {
         "title": "Created and closed tickets",
-        "description": "How many tickets were created and closed per week (last 12 weeks)."
+        "description": "How many tickets were created and closed per week (last 12 complete weeks)."
       },
       "backlog_trend": {
         "title": "Open tickets over time",
-        "description": "How many tickets were open on each of the last 30 days (end-of-day count)."
+        "description": "How many tickets were open on each of the last 30 days (including today), counted at the end of the day."
       },
       "open_now": {
         "title": "Open tickets now",
-        "description": "All tickets that are open right now, per queue. They can also be split by state, priority, owner, type or service."
+        "description": "All tickets that are open right now, by queue by default. Alternatively they can be grouped by state, priority, owner, type or service instead of by queue."
       },
       "agent_activity": {
         "title": "Agent activity",
-        "description": "Replies, notes and closings per agent in the last 30 days."
+        "description": "Replies, notes and closings per agent in the last 30 days (including today)."
       },
       "volume_by_channel": {
         "title": "Tickets by channel",
-        "description": "How many tickets arrived per week through which channel (email, phone, Telegram …)."
+        "description": "How many tickets arrived per week through which channel (email, phone, Telegram …), last 12 complete weeks."
       },
       "channel_mix": {
         "title": "Channel mix",
-        "description": "Which channels the tickets of the last 30 days came from."
+        "description": "Which channels the tickets of the last 30 days (including today) came from."
       },
       "volume_by_queue": {
         "title": "Tickets per queue",
-        "description": "How many tickets were created per queue. Can optionally be split by type, service or priority. “Closed” counts the tickets that were created in the period and have been closed since."
+        "description": "How many tickets were created per queue in the last 30 days (including today). Alternatively they can be grouped by type, service or priority instead of by queue. “Closed” counts the tickets that were created in the period and have been closed since."
       },
       "backlog_by_state": {
         "title": "Backlog by state",
-        "description": "Open tickets per day, split by state type (new, open, pending), last 30 days."
+        "description": "Open tickets per day, split by state type (new, open, pending), last 30 days (including today)."
       },
       "backlog_aging": {
         "title": "Age of open tickets",
@@ -4447,63 +4447,63 @@
       },
       "sla_compliance": {
         "title": "SLA compliance",
-        "description": "How many tickets met their SLA times, per queue, for the last month, plus breached and nearly missed times."
+        "description": "How many tickets met their SLA times, per queue, in the last complete month, plus breached and nearly missed times."
       },
       "sla_times": {
         "title": "Response and solution times",
-        "description": "Median and slow (90th percentile) first-response and solution times per week, measured in working time."
+        "description": "Median and slowest 10 % of the first-response and solution times per week, measured in working time (last 12 complete weeks)."
       },
       "sla_by_customer": {
         "title": "SLA by customer",
-        "description": "How well SLA times were met per customer (last 3 months), with first-response and solution times. “Closed” counts the tickets that were created in the period and have been closed since."
+        "description": "How well SLA times were met per customer (last 3 complete months): created tickets, breached times and median first-response and solution times."
       },
       "first_contact_resolution": {
         "title": "First-contact resolution",
-        "description": "“Closed” counts the tickets that are closed right now. The rates (resolved on first contact, reopened) are based on the tickets closed in the period."
+        "description": "“Closed” counts the tickets that are closed right now. The rates are based on the tickets closed in the period (last complete month). “Resolved on first contact” means: closed, never reopened and at most one outgoing reply."
       },
       "reopen_trend": {
         "title": "Reopenings over time",
-        "description": "How often closed tickets were reopened, per week. The time of closing decides which week counts."
+        "description": "How often closed tickets were reopened, per week (last 12 complete weeks). The time of closing decides which week counts."
       },
       "queue_transfers": {
         "title": "Queue transfers",
-        "description": "From which queue to which queue tickets were moved (last 30 days)."
+        "description": "From which queue to which queue tickets were moved (last 30 days, including today)."
       },
       "pingpong": {
         "title": "Back and forth between queues",
-        "description": "Tickets that were moved between queues repeatedly, and how often a ticket changes queue on average."
+        "description": "Tickets that were moved between queues repeatedly, and how often a ticket changes queue on average (last 30 days, including today)."
       },
       "time_in_state": {
         "title": "Time spent in each state",
-        "description": "How long tickets stay in a state before it changes: average, median and slowest 10 %."
+        "description": "How long tickets stay in a state before it changes: average, median and slowest 10 % (last 30 days, including today)."
       },
       "time_by_customer": {
         "title": "Booked time per customer",
-        "description": "The time booked on tickets per customer in the last month, with bookings and tickets involved."
+        "description": "The time booked on tickets per customer in the last complete month, with bookings and tickets involved."
       },
       "time_by_queue": {
         "title": "Booked time per queue",
-        "description": "The time booked on tickets per queue in the last month, with bookings and tickets involved."
+        "description": "The time booked on tickets per queue in the last complete month, with bookings and tickets involved."
       },
       "time_by_agent": {
         "title": "Booked time per agent",
-        "description": "The time each agent booked in the last month, with bookings and tickets involved."
+        "description": "The time each agent booked in the last complete month, with bookings and tickets involved."
       },
       "time_by_type": {
         "title": "Booked time per type",
-        "description": "The time booked on tickets per ticket type in the last month, with bookings and tickets involved."
+        "description": "The time booked on tickets per ticket type in the last complete month, with bookings and tickets involved."
       },
       "time_by_agent_month": {
         "title": "Booked time per agent and month",
-        "description": "Booked time per agent and month for the last 12 months. Matches the Znuny statistic “accounted time”."
+        "description": "Booked time per agent and month for the last 12 months (including the current one). Matches the Znuny statistic “accounted time”."
       },
       "top_customers": {
         "title": "Top customers",
-        "description": "The customers with the most tickets in the last 3 months, with solution time and booked time. “Closed” counts the tickets that were created in the period and have been closed since."
+        "description": "The customers with the most tickets in the last 3 complete months, with solution time and booked time. “Closed” counts the tickets that were created in the period and have been closed since."
       },
       "created_heatmap": {
         "title": "When tickets arrive",
-        "description": "Tickets by weekday and hour of the day (last 12 weeks) – shows when it is busiest."
+        "description": "Tickets by weekday and hour of the day (last 12 complete weeks) – shows when it is busiest."
       }
     },
     "dimensions": {
@@ -4668,6 +4668,15 @@
       "month": "Month",
       "quarter": "Quarter",
       "year": "Year"
+    },
+    "chart": {
+      "noData": "No data",
+      "legend": "Legend",
+      "tooltipOther": "Others",
+      "deltaUp": "Increase",
+      "deltaDown": "Decrease",
+      "deltaFlat": "Unchanged",
+      "ofTotal": "{{percent}} of total"
     }
   }
 }

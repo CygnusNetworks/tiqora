@@ -51,6 +51,23 @@
   --color-border: var(--color-hairline);
   --color-warn: var(--color-escalation);
 
+  /* Chart categorical slots (validated with the dataviz validator against #ffffff;
+     slots 3-5 are below 3:1, so charts need the table view and visible values) */
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #4a3aa7;
+  /* Chart sequential ramp (heatmaps), same steps in both modes */
+  --color-seq-1: #cde2fb;
+  --color-seq-2: #9ec5f4;
+  --color-seq-3: #6da7ec;
+  --color-seq-4: #3987e5;
+  --color-seq-5: #256abf;
+  --color-seq-6: #184f95;
+  --color-seq-7: #0d366b;
+
   --font-sans: "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
   --font-display: "Inter", system-ui, sans-serif;
@@ -102,6 +119,21 @@
   --color-surface-elevated: var(--color-surface);
   --color-border: var(--color-hairline);
   --color-warn: var(--color-escalation);
+
+  /* Chart categorical slots (validated against #151821) */
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
+  --color-series-4: #c98500;
+  --color-series-5: #d55181;
+  --color-series-6: #9085e9;
+  --color-seq-1: #cde2fb;
+  --color-seq-2: #9ec5f4;
+  --color-seq-3: #6da7ec;
+  --color-seq-4: #3987e5;
+  --color-seq-5: #256abf;
+  --color-seq-6: #184f95;
+  --color-seq-7: #0d366b;
 
   color-scheme: dark;
 }
