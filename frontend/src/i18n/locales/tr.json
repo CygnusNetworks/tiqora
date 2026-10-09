@@ -4028,7 +4028,8 @@
       "submitError": "İletişim kutusu gönderilemedi.",
       "articleSubject": "Konu",
       "articleBody": "Gövde",
-      "fieldFallbackNote": "Düz metin girişi (bu alan türü için özel bir widget yoktur)."
+      "fieldFallbackNote": "Düz metin girişi (bu alan türü için özel bir widget yoktur).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

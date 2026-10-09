@@ -4028,7 +4028,8 @@
       "submitError": "संवाद सबमिट नहीं किया जा सका.",
       "articleSubject": "विषय",
       "articleBody": "शरीर",
-      "fieldFallbackNote": "सादा पाठ इनपुट (इस फ़ील्ड प्रकार के लिए कोई समर्पित विजेट नहीं)।"
+      "fieldFallbackNote": "सादा पाठ इनपुट (इस फ़ील्ड प्रकार के लिए कोई समर्पित विजेट नहीं)।",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

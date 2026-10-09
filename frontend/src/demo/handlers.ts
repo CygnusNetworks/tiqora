@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import { resolveData, demoPortalUser, demoPortalTickets, demoRefine } from "./mockData";
+import { resolveData, demoPortalUser, demoPortalTickets, demoPortalProcess, demoRefine } from "./mockData";
 
 /**
  * MSW request handlers for the public demo build. Delegates to the shared pure
@@ -12,9 +12,8 @@ function respond(pathname: string, method: string): unknown {
   if (pathname.endsWith("/api/portal/auth/methods")) return { password: true };
   if (pathname.endsWith("/api/portal/auth/me")) return demoPortalUser;
   if (pathname.endsWith("/api/portal/tickets")) return demoPortalTickets;
-  // Process plane: same payloads as the agent API, so reuse its mocks.
   if (pathname.startsWith("/api/portal/process")) {
-    const data = resolveData(pathname.replace("/api/portal/process", "/api/v1/process"), method);
+    const data = demoPortalProcess(pathname, method);
     if (data !== undefined) return data;
   }
   if (pathname.startsWith("/api/portal/")) return method === "GET" ? [] : {};

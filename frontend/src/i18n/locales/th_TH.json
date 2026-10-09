@@ -4028,7 +4028,8 @@
       "submitError": "ไม่สามารถส่งกล่องโต้ตอบได้",
       "articleSubject": "เรื่อง",
       "articleBody": "ร่างกาย",
-      "fieldFallbackNote": "ป้อนข้อความธรรมดา (ไม่มีวิดเจ็ตเฉพาะสำหรับประเภทฟิลด์นี้)"
+      "fieldFallbackNote": "ป้อนข้อความธรรมดา (ไม่มีวิดเจ็ตเฉพาะสำหรับประเภทฟิลด์นี้)",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

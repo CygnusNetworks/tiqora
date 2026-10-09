@@ -4028,7 +4028,8 @@
       "submitError": "Kunne ikke sende inn dialogboksen.",
       "articleSubject": "Emne",
       "articleBody": "Kropp",
-      "fieldFallbackNote": "Ren tekst (ingen dedikert widget for denne felttypen)."
+      "fieldFallbackNote": "Ren tekst (ingen dedikert widget for denne felttypen).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

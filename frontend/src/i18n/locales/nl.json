@@ -4028,7 +4028,8 @@
       "submitError": "Kan dialoog niet verzenden.",
       "articleSubject": "Onderwerp",
       "articleBody": "Inhoud",
-      "fieldFallbackNote": "Platte-tekstinvoer (geen speciale widget voor dit veldtype)."
+      "fieldFallbackNote": "Platte-tekstinvoer (geen speciale widget voor dit veldtype).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

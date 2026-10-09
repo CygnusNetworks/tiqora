@@ -4028,7 +4028,8 @@
       "submitError": "Impossible de soumettre la boîte de dialogue.",
       "articleSubject": "Sujet",
       "articleBody": "Corps",
-      "fieldFallbackNote": "Saisie de texte brut (pas de widget dédié pour ce type de champ)."
+      "fieldFallbackNote": "Saisie de texte brut (pas de widget dédié pour ce type de champ).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

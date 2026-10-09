@@ -745,6 +745,43 @@ async def test_ticket_dialog_form_agent_and_customer_skips(
 
 
 @pytest.mark.db
+async def test_customer_ticket_dialog_form_never_contains_agent_only_fields(
+    client: AsyncClient, portal_client: AsyncClient, sync_url: str
+) -> None:
+    """Customer dialog on an existing ticket: Owner/Responsible/Lock/PendingTime/CustomerID/
+    CustomerUserID are all configured visible, yet none reaches the customer (the start form is
+    pinned by ``test_customer_form_skips_owner_and_filters_as_customer``); the agent gets them."""
+
+    def setup(conn: Any) -> None:
+        _add_dialog(conn, 1, {"Title": "Display: '1'"})
+        _add_dialog(
+            conn,
+            2,
+            {
+                "Title": "Display: '1'",
+                "Owner": "Display: '1'",
+                "Responsible": "Display: '1'",
+                "Lock": "Display: '1'",
+                "PendingTime": "Display: '1'",
+                "CustomerID": "Display: '1'",
+                "CustomerUserID": "Display: '1'",
+                "Article": "{Display: '2', Config: {CommunicationChannel: Internal}}",
+            },
+        )
+        _add_process(conn, 1, start_dialog=1, dialogs=[1, 2])
+
+    _build(sync_url, setup)
+    await _enroll(client, AGENT, TICKET_1)
+    url = f"/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form"
+    customer = (await portal_client.get(PORTAL + url)).json()
+    assert [f["name"] for f in customer["fields"]] == ["Title", "Article"]
+    agent = (await client.get(AGENT + url)).json()
+    assert {"Owner", "Responsible", "Lock", "PendingTime", "CustomerUserID"} <= {
+        f["name"] for f in agent["fields"]
+    }
+
+
+@pytest.mark.db
 async def test_dialog_form_for_hidden_dialog_is_403(
     client: AsyncClient, portal_client: AsyncClient, sync_url: str
 ) -> None:

@@ -41,7 +41,7 @@ const field = (name: string, kind: string, extra: Partial<ProcessDialogFormData[
   ...extra,
 });
 
-// Customer dialog: the server removed Owner/Responsible/Lock, so none arrives here.
+// Customer dialog form as the server sends it (agent-only fields are dropped server-side).
 const dialogForm: ProcessDialogFormData = {
   process_entity_id: "P",
   activity_dialog_entity_id: "AD-1",
@@ -88,7 +88,7 @@ beforeEach(() => {
 });
 
 describe("PortalProcessWidget", () => {
-  it("opens a dialog through the portal dialog form: article fields, no Owner", async () => {
+  it("opens a dialog through the portal dialog form and renders its article fields", async () => {
     api.ticketState.mockResolvedValue(inProcess);
     api.dialogForm.mockResolvedValue(dialogForm);
     wrap(<PortalProcessWidget ticketId={5} />);
@@ -98,7 +98,6 @@ describe("PortalProcessWidget", () => {
     expect(await screen.findByTestId("portal-process-dialog-submit")).toHaveTextContent("Antworten");
     expect(api.dialogForm).toHaveBeenCalledWith(5, "AD-1", expect.anything());
     expect(screen.getByLabelText(/Betreff/)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Besitzer/)).not.toBeInTheDocument();
   });
 
   it("submits the dialog values through the portal API", async () => {
@@ -120,10 +119,14 @@ describe("PortalProcessWidget", () => {
     );
   });
 
-  it("shows a plain German message when the submit is refused with 409", async () => {
+  it.each([
+    [403, "Sie dürfen diesen Prozess hier nicht starten."],
+    [404, "Dieser Prozess oder dieses Ticket existiert nicht mehr."],
+    [409, "Dieser Schritt ist im Moment nicht möglich."],
+  ])("shows a plain German message when the dialog submit fails with %i", async (status, text) => {
     api.ticketState.mockResolvedValue(inProcess);
     api.dialogForm.mockResolvedValue(dialogForm);
-    api.submit.mockRejectedValue(new ApiError(409, null, "/x"));
+    api.submit.mockRejectedValue(new ApiError(status, null, "/x"));
     wrap(<PortalProcessWidget ticketId={5} />);
 
     fireEvent.click(await screen.findByTestId("portal-process-dialog-AD-1"));
@@ -131,9 +134,22 @@ describe("PortalProcessWidget", () => {
     fireEvent.change(screen.getByLabelText(/Text/), { target: { value: "Danke" } });
     fireEvent.click(screen.getByTestId("portal-process-dialog-submit"));
 
-    expect(await screen.findByTestId("portal-process-error")).toHaveTextContent(
-      "Dieser Prozess kann für dieses Ticket im Moment nicht gestartet werden.",
-    );
+    expect(await screen.findByTestId("portal-process-dialog-error")).toHaveTextContent(text);
+  });
+
+  it.each([
+    [403, "Sie dürfen diesen Prozess hier nicht starten."],
+    [404, "Dieser Prozess oder dieses Ticket existiert nicht mehr."],
+    [500, "Formular konnte nicht geladen werden."],
+  ])("shows a message when the dialog form fails to load with %i", async (status, text) => {
+    api.ticketState.mockResolvedValue(inProcess);
+    api.dialogForm.mockRejectedValue(new ApiError(status, null, "/x"));
+    wrap(<PortalProcessWidget ticketId={5} />);
+
+    fireEvent.click(await screen.findByTestId("portal-process-dialog-AD-1"));
+
+    expect(await screen.findByTestId("portal-process-dialog-load-error")).toHaveTextContent(text);
+    expect(api.submit).not.toHaveBeenCalled();
   });
 
   it("enrolls a ticket through the portal start form with the ticket id", async () => {

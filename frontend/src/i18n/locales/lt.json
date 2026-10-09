@@ -4028,7 +4028,8 @@
       "submitError": "Nepavyko pateikti dialogo.",
       "articleSubject": "Tema",
       "articleBody": "Kūnas",
-      "fieldFallbackNote": "Paprasto teksto įvestis (šiam lauko tipui nėra skirto valdiklio)."
+      "fieldFallbackNote": "Paprasto teksto įvestis (šiam lauko tipui nėra skirto valdiklio).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

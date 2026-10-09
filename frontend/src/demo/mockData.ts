@@ -1812,3 +1812,56 @@ const processDialogForm = {
     { name: "Attachments", kind: "unsupported", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [] },
   ],
 };
+
+// --- Customer portal process plane -------------------------------------------------------
+// Customer-shaped: the server drops Owner/Responsible/Lock/PendingTime/CustomerID/CustomerUserID
+// for customers (CustomerTicketProcess), so these forms carry only title, article and a queue pick.
+const portalField = (name: string, kind: string, extra: Record<string, unknown> = {}) => ({
+  name, kind, label: name, required: false, description_short: "", description_long: "", default: null, options: [], ...extra,
+});
+
+const portalStartForm = {
+  process_entity_id: "Process-demo",
+  activity_dialog_entity_id: "ActivityDialog-start",
+  name: "Bestellung anlegen",
+  description_short: "Beschreiben Sie, was Sie bestellen möchten.",
+  description_long: "",
+  submit_button_text: "Bestellen",
+  submit_advice_text: "",
+  fields: [
+    portalField("Title", "text", { required: true }),
+    portalField("Queue", "select", { required: true, options: [{ value: "2", label: "Support" }, { value: "3", label: "Sales" }] }),
+    portalField("Article", "article", { required: true }),
+  ],
+};
+
+const portalDialogForm = {
+  ...portalStartForm,
+  activity_dialog_entity_id: "ActivityDialog-demo",
+  name: "Rückfrage beantworten",
+  description_short: "",
+  submit_button_text: "Antworten",
+  fields: [portalField("Article", "article", { required: true })],
+};
+
+const portalProcessState = {
+  ...processTicketState,
+  activity_name: "Rückfrage",
+  available_dialogs: [{ entity_id: "ActivityDialog-demo", name: "Rückfrage beantworten", description_short: "" }],
+};
+
+/** Mocks for `/api/portal/process*`; undefined when the path is not a process route. */
+export function demoPortalProcess(pathname: string, method: string): unknown {
+  const p = pathname.replace(/\/+$/, "");
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/state$/)) return portalProcessState;
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/)) return portalDialogForm;
+  if (p.match(/\/api\/portal\/process\/[^/]+\/start-form$/)) return portalStartForm;
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/submit$/) && method === "POST")
+    return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: portalProcessState };
+  if (p.endsWith("/api/portal/process/tickets") && method === "POST")
+    return { ticket_id: 1, ticket_number: "2026100001", activity_changed: true, unsupported_actions: [], state: portalProcessState };
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/start$/) && method === "POST") return portalProcessState;
+  if (p.endsWith("/api/portal/process") && method === "GET")
+    return [{ id: 1, entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active" }];
+  return undefined;
+}

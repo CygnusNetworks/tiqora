@@ -4028,7 +4028,8 @@
       "submitError": "Não foi possível enviar a caixa de diálogo.",
       "articleSubject": "Assunto",
       "articleBody": "Corpo",
-      "fieldFallbackNote": "Entrada de texto simples (sem widget dedicado para este tipo de campo)."
+      "fieldFallbackNote": "Entrada de texto simples (sem widget dedicado para este tipo de campo).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

@@ -4028,7 +4028,8 @@
       "submitError": "Nie udało się wysłać dialogu.",
       "articleSubject": "Temat",
       "articleBody": "Treść",
-      "fieldFallbackNote": "Zwykłe pole tekstowe (brak dedykowanego widżetu dla tego typu pola)."
+      "fieldFallbackNote": "Zwykłe pole tekstowe (brak dedykowanego widżetu dla tego typu pola).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

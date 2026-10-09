@@ -4028,7 +4028,8 @@
       "submitError": "대화 상자를 제출할 수 없습니다.",
       "articleSubject": "주제",
       "articleBody": "본체",
-      "fieldFallbackNote": "일반 텍스트 입력(이 필드 유형에 대한 전용 위젯 없음)"
+      "fieldFallbackNote": "일반 텍스트 입력(이 필드 유형에 대한 전용 위젯 없음)",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

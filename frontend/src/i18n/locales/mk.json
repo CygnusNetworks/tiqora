@@ -4028,7 +4028,8 @@
       "submitError": "Дијалогот не може да се испрати.",
       "articleSubject": "Предмет",
       "articleBody": "Тело",
-      "fieldFallbackNote": "Внесување обичен текст (нема посветен додаток за овој тип на поле)."
+      "fieldFallbackNote": "Внесување обичен текст (нема посветен додаток за овој тип на поле).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

@@ -4028,7 +4028,8 @@
       "submitError": "Dialogen kunne ikke indsendes.",
       "articleSubject": "Emne",
       "articleBody": "Krop",
-      "fieldFallbackNote": "Almindelig tekstinput (ingen dedikeret widget til denne felttype)."
+      "fieldFallbackNote": "Almindelig tekstinput (ingen dedikeret widget til denne felttype).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

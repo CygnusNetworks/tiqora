@@ -4028,7 +4028,8 @@
       "submitError": "Dialógové okno sa nepodarilo odoslať.",
       "articleSubject": "Predmet",
       "articleBody": "Telo",
-      "fieldFallbackNote": "Zadávanie obyčajného textu (žiadna miniaplikácia pre tento typ poľa)."
+      "fieldFallbackNote": "Zadávanie obyčajného textu (žiadna miniaplikácia pre tento typ poľa).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

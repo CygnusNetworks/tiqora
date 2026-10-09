@@ -4028,7 +4028,8 @@
       "submitError": "לא ניתן היה לשלוח תיבת דו-שיח.",
       "articleSubject": "נושא",
       "articleBody": "גוף",
-      "fieldFallbackNote": "קלט טקסט רגיל (ללא יישומון ייעודי לסוג שדה זה)."
+      "fieldFallbackNote": "קלט טקסט רגיל (ללא יישומון ייעודי לסוג שדה זה).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

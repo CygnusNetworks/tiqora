@@ -38,7 +38,7 @@ const summaries = [
   { id: 2, entity_id: "Q", name: "Urlaub", state_entity_id: "S1", state_name: "Active" },
 ];
 
-// A customer start form: the server dropped Owner/Responsible/Lock, only Title remains.
+// A customer start form as the server sends it (agent-only fields are dropped server-side).
 const startFormData: ProcessDialogFormData = {
   process_entity_id: "P",
   activity_dialog_entity_id: "AD-1",
@@ -76,7 +76,7 @@ async function fillTitleAndSubmit() {
 }
 
 describe("portal NewProcessTicketPage", () => {
-  it("renders the customer start form without an Owner field", async () => {
+  it("renders the start form of ?process=P with the dialog's button text and advice", async () => {
     listStartable.mockResolvedValue(summaries);
     startForm.mockResolvedValue(startFormData);
     wrap(<NewProcessTicketPage />);
@@ -84,7 +84,6 @@ describe("portal NewProcessTicketPage", () => {
     expect(await screen.findByTestId("portal-new-process-page")).toBeInTheDocument();
     expect(await screen.findByTestId("portal-new-process-submit")).toHaveTextContent("Bestellen");
     expect(screen.getByText("Danach prüft der Einkauf.")).toBeInTheDocument();
-    expect(screen.queryByLabelText(/Besitzer/)).not.toBeInTheDocument();
     expect(startForm).toHaveBeenCalledWith("P", { ticketId: undefined }, expect.anything());
   });
 
@@ -145,6 +144,26 @@ describe("portal NewProcessTicketPage", () => {
       "Sie dürfen diesen Prozess hier nicht starten.",
     );
     expect(startForm).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when the process list cannot be loaded", async () => {
+    listStartable.mockRejectedValue(new ApiError(500, null, "/x"));
+    wrap(<NewProcessTicketPage />);
+
+    expect(await screen.findByTestId("portal-new-process-error")).toHaveTextContent(
+      "Prozesse konnten nicht geladen werden.",
+    );
+    expect(startForm).not.toHaveBeenCalled();
+  });
+
+  it("shows a plain message when the start form is forbidden or gone", async () => {
+    listStartable.mockResolvedValue(summaries);
+    startForm.mockRejectedValue(new ApiError(404, null, "/x"));
+    wrap(<NewProcessTicketPage />);
+
+    expect(await screen.findByTestId("portal-new-process-load-error")).toHaveTextContent(
+      "Dieser Prozess oder dieses Ticket existiert nicht mehr.",
+    );
   });
 
   it("says so when there is no process to start", async () => {

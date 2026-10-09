@@ -4028,7 +4028,8 @@
       "submitError": "無法提交對話框。",
       "articleSubject": "主題",
       "articleBody": "身體",
-      "fieldFallbackNote": "純文字輸入（此欄位類型沒有專用小工具）。"
+      "fieldFallbackNote": "純文字輸入（此欄位類型沒有專用小工具）。",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

@@ -4028,7 +4028,8 @@
       "submitError": "Nem sikerült elküldeni a párbeszédpanelt.",
       "articleSubject": "Tárgy",
       "articleBody": "Törzs",
-      "fieldFallbackNote": "Egyszerű szövegbevitel (nincs dedikált widget ehhez a mezőtípushoz)."
+      "fieldFallbackNote": "Egyszerű szövegbevitel (nincs dedikált widget ehhez a mezőtípushoz).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

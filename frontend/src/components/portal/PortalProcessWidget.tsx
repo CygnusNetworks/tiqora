@@ -1,19 +1,15 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { portalProcessApi } from "@/lib/portalProcessApi";
-import { displayTimeZone } from "@/lib/timeZone";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog } from "@/components/ui/Dialog";
 import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
-import { validateFieldValues } from "@/components/fields";
-import type { FieldErrors, FieldValue, FieldValues } from "@/components/fields";
-import { ProcessDialogForm } from "@/components/process/ProcessDialogForm";
+import { ProcessFormBody } from "@/components/process/ProcessFormBody";
 import { ProcessStartForm } from "@/components/process/ProcessStartForm";
 import { processStartErrorMessage } from "@/components/process/processStartError";
-import { initialProcessValues, processFieldDefs, toSubmitValues } from "@/components/process/processForm";
 
 /**
  * Customer-facing process widget (Znuny CustomerTicketProcess subset): enroll a ticket through the
@@ -174,8 +170,6 @@ function PortalActivityDialog({
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [values, setValues] = useState<FieldValues>({});
-  const [errors, setErrors] = useState<FieldErrors>({});
 
   const formQ = useQuery({
     queryKey: ["portal", "process", "ticket", ticketId, "dialog-form", dialogEntityId],
@@ -186,46 +180,15 @@ function PortalActivityDialog({
   });
   const form = formQ.data;
 
-  useEffect(() => {
-    if (form) {
-      setValues(initialProcessValues(form));
-      setErrors({});
-    }
-  }, [form]);
-
   const submitM = useMutation({
-    mutationFn: () => {
-      if (!form) throw new Error("form not loaded");
-      return portalProcessApi.submit(ticketId, {
-        activity_dialog_entity_id: dialogEntityId,
-        field_values: toSubmitValues(form, values, displayTimeZone()),
-      });
-    },
+    mutationFn: (fieldValues: Record<string, unknown>) =>
+      portalProcessApi.submit(ticketId, { activity_dialog_entity_id: dialogEntityId, field_values: fieldValues }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["portal", "process", "ticket", ticketId, "state"] });
       await queryClient.invalidateQueries({ queryKey: ["portal", "tickets", ticketId] });
       onClose();
     },
   });
-
-  function setValue(key: string, value: FieldValue) {
-    setValues((v) => ({ ...v, [key]: value }));
-    setErrors((e) => {
-      if (!(key in e)) return e;
-      const rest = { ...e };
-      delete rest[key];
-      return rest;
-    });
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form) return;
-    const found = validateFieldValues(processFieldDefs(form, t), values, t);
-    setErrors(found);
-    if (Object.keys(found).length > 0) return;
-    submitM.mutate();
-  }
 
   return (
     <Dialog open onClose={onClose} title={form?.name ?? t("process.widget.title")} className="max-w-lg">
@@ -238,35 +201,20 @@ function PortalActivityDialog({
           {processStartErrorMessage(formQ.error, t, "process.form.loadError")}
         </p>
       ) : (
-        <form
-          data-testid="portal-process-dialog-form"
-          onSubmit={handleSubmit}
-          className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto"
-        >
-          {form.description_long && <p className="text-sm text-muted">{form.description_long}</p>}
-          <ProcessDialogForm
+        <div className="max-h-[70vh] overflow-y-auto">
+          <ProcessFormBody
             form={form}
-            values={values}
-            onChange={setValue}
-            errors={errors}
-            disabled={submitM.isPending}
-            testId="portal-process-field"
+            pending={submitM.isPending}
+            error={
+              submitM.isError
+                ? processStartErrorMessage(submitM.error, t, "process.form.submitError", "process.dialog.conflict")
+                : null
+            }
+            onSubmit={(fv) => submitM.mutate(fv)}
+            onCancel={onClose}
+            testIdPrefix="portal-process-dialog"
           />
-          {submitM.isError && (
-            <p className="text-sm text-danger" role="alert" data-testid="portal-process-error">
-              {processStartErrorMessage(submitM.error, t, "process.form.submitError")}
-            </p>
-          )}
-          {form.submit_advice_text && <p className="text-xs text-muted">{form.submit_advice_text}</p>}
-          <div className="flex justify-end gap-2 border-t border-hairline pt-3">
-            <Button type="button" variant="ghost" onClick={onClose}>
-              {t("process.form.cancel")}
-            </Button>
-            <Button type="submit" variant="primary" disabled={submitM.isPending} data-testid="portal-process-dialog-submit">
-              {form.submit_button_text || t("process.form.submit")}
-            </Button>
-          </div>
-        </form>
+        </div>
       )}
     </Dialog>
   );

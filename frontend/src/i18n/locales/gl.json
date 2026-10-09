@@ -4028,7 +4028,8 @@
       "submitError": "Non se puido enviar o diálogo.",
       "articleSubject": "Asunto",
       "articleBody": "Corpo",
-      "fieldFallbackNote": "Entrada de texto sen formato (sen widget dedicado a este tipo de campo)."
+      "fieldFallbackNote": "Entrada de texto sen formato (sen widget dedicado a este tipo de campo).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

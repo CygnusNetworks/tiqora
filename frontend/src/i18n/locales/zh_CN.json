@@ -4028,7 +4028,8 @@
       "submitError": "无法提交对话框。",
       "articleSubject": "主题",
       "articleBody": "身体",
-      "fieldFallbackNote": "纯文本输入（此字段类型没有专用小部件）。"
+      "fieldFallbackNote": "纯文本输入（此字段类型没有专用小部件）。",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

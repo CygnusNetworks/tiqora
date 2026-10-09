@@ -4028,7 +4028,8 @@
       "submitError": "No s'ha pogut enviar el diàleg.",
       "articleSubject": "Assumpte",
       "articleBody": "Cos",
-      "fieldFallbackNote": "Entrada de text sense format (no hi ha widget dedicat per a aquest tipus de camp)."
+      "fieldFallbackNote": "Entrada de text sense format (no hi ha widget dedicat per a aquest tipus de camp).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

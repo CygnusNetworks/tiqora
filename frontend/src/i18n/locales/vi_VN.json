@@ -4028,7 +4028,8 @@
       "submitError": "Không thể gửi hộp thoại.",
       "articleSubject": "Chủ đề",
       "articleBody": "Thân hình",
-      "fieldFallbackNote": "Nhập văn bản thuần túy (không có tiện ích dành riêng cho loại trường này)."
+      "fieldFallbackNote": "Nhập văn bản thuần túy (không có tiện ích dành riêng cho loại trường này).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

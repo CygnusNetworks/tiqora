@@ -4028,7 +4028,8 @@
       "submitError": "Не вдалося надіслати діалог.",
       "articleSubject": "Тема",
       "articleBody": "Тіло",
-      "fieldFallbackNote": "Введення звичайного тексту (немає спеціального віджета для цього типу поля)."
+      "fieldFallbackNote": "Введення звичайного тексту (немає спеціального віджета для цього типу поля).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

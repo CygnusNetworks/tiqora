@@ -4028,7 +4028,8 @@
       "submitError": "Tidak dapat menyerahkan dialog.",
       "articleSubject": "Subjek",
       "articleBody": "Badan",
-      "fieldFallbackNote": "Input teks biasa (tiada widget khusus untuk jenis medan ini)."
+      "fieldFallbackNote": "Input teks biasa (tiada widget khusus untuk jenis medan ini).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

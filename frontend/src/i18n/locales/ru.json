@@ -4028,7 +4028,8 @@
       "submitError": "Не удалось отправить диалог.",
       "articleSubject": "Тема",
       "articleBody": "Текст",
-      "fieldFallbackNote": "Ввод обычного текста (для этого типа поля нет специального виджета)."
+      "fieldFallbackNote": "Ввод обычного текста (для этого типа поля нет специального виджета).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

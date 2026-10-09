@@ -4036,7 +4036,8 @@
       "submitError": "Could not submit dialog.",
       "articleSubject": "Subject",
       "articleBody": "Body",
-      "fieldFallbackNote": "Plain text input (no dedicated widget for this field type)."
+      "fieldFallbackNote": "Plain text input (no dedicated widget for this field type).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

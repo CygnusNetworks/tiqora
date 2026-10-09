@@ -4028,7 +4028,8 @@
       "submitError": "Pogovornega okna ni bilo mogoče poslati.",
       "articleSubject": "Predmet",
       "articleBody": "Telo",
-      "fieldFallbackNote": "Vnos navadnega besedila (za to vrsto polja ni namenskega pripomočka)."
+      "fieldFallbackNote": "Vnos navadnega besedila (za to vrsto polja ni namenskega pripomočka).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

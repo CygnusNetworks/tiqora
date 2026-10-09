@@ -4036,7 +4036,8 @@
       "submitError": "Dialog konnte nicht übermittelt werden.",
       "articleSubject": "Betreff",
       "articleBody": "Text",
-      "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp)."
+      "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp).",
+      "conflict": "Dieser Schritt ist im Moment nicht möglich."
     },
     "field": {
       "Title": "Titel",

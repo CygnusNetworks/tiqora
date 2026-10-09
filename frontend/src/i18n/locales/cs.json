@@ -4028,7 +4028,8 @@
       "submitError": "Dialog se nepodařilo odeslat.",
       "articleSubject": "Předmět",
       "articleBody": "Tělo",
-      "fieldFallbackNote": "Prostý textový vstup (pro tento typ pole není dedicovaný widget)."
+      "fieldFallbackNote": "Prostý textový vstup (pro tento typ pole není dedicovaný widget).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

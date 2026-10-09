@@ -4028,7 +4028,8 @@
       "submitError": "Није могуће послати дијалог.",
       "articleSubject": "Предмет",
       "articleBody": "Тело",
-      "fieldFallbackNote": "Унос обичног текста (нема наменског виџета за овај тип поља)."
+      "fieldFallbackNote": "Унос обичног текста (нема наменског виџета за овај тип поља).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

@@ -4028,7 +4028,8 @@
       "submitError": "Nevarēja iesniegt dialogu.",
       "articleSubject": "Priekšmets",
       "articleBody": "Ķermenis",
-      "fieldFallbackNote": "Vienkārša teksta ievade (šim lauka veidam nav speciāla logrīka)."
+      "fieldFallbackNote": "Vienkārša teksta ievade (šim lauka veidam nav speciāla logrīka).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

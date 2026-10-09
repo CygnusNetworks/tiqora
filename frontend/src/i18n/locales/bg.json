@@ -4028,7 +4028,8 @@
       "submitError": "Диалогът не можа да бъде изпратен.",
       "articleSubject": "Предмет",
       "articleBody": "Тяло",
-      "fieldFallbackNote": "Въвеждане на обикновен текст (няма специална джаджа за този тип поле)."
+      "fieldFallbackNote": "Въвеждане на обикновен текст (няма специална джаджа за този тип поле).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

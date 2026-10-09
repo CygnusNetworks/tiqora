@@ -4028,7 +4028,8 @@
       "submitError": "Impossibile inviare la finestra di dialogo.",
       "articleSubject": "Oggetto",
       "articleBody": "Corpo",
-      "fieldFallbackNote": "Inserimento di testo semplice (nessun widget dedicato per questo tipo di campo)."
+      "fieldFallbackNote": "Inserimento di testo semplice (nessun widget dedicato per questo tipo di campo).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

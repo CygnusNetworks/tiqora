@@ -4028,7 +4028,8 @@
       "submitError": "Δεν ήταν δυνατή η υποβολή διαλόγου.",
       "articleSubject": "Θέμα",
       "articleBody": "Σώμα",
-      "fieldFallbackNote": "Εισαγωγή απλού κειμένου (χωρίς αποκλειστικό γραφικό στοιχείο για αυτόν τον τύπο πεδίου)."
+      "fieldFallbackNote": "Εισαγωγή απλού κειμένου (χωρίς αποκλειστικό γραφικό στοιχείο για αυτόν τον τύπο πεδίου).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

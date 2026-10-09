@@ -4028,7 +4028,8 @@
       "submitError": "گفتگو ارسال نشد.",
       "articleSubject": "موضوع",
       "articleBody": "بدن",
-      "fieldFallbackNote": "ورودی متن ساده (ویجت اختصاصی برای این نوع فیلد وجود ندارد)."
+      "fieldFallbackNote": "ورودی متن ساده (ویجت اختصاصی برای این نوع فیلد وجود ندارد).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

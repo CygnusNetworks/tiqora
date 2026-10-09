@@ -4028,7 +4028,8 @@
       "submitError": "Haikuweza kuwasilisha kidirisha.",
       "articleSubject": "Somo",
       "articleBody": "Mwili",
-      "fieldFallbackNote": "Ingizo la maandishi wazi (hakuna wijeti maalum kwa aina hii ya sehemu)."
+      "fieldFallbackNote": "Ingizo la maandishi wazi (hakuna wijeti maalum kwa aina hii ya sehemu).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

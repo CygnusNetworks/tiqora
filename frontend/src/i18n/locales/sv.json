@@ -4028,7 +4028,8 @@
       "submitError": "Det gick inte att skicka dialogrutan.",
       "articleSubject": "Ämne",
       "articleBody": "Kropp",
-      "fieldFallbackNote": "Vanlig textinmatning (ingen dedikerad widget för denna fälttyp)."
+      "fieldFallbackNote": "Vanlig textinmatning (ingen dedikerad widget för denna fälttyp).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",

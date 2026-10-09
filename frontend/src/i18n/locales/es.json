@@ -4028,7 +4028,8 @@
       "submitError": "No se pudo enviar el diálogo.",
       "articleSubject": "Asunto",
       "articleBody": "cuerpo",
-      "fieldFallbackNote": "Entrada de texto plano (no hay widget dedicado para este tipo de campo)."
+      "fieldFallbackNote": "Entrada de texto plano (no hay widget dedicado para este tipo de campo).",
+      "conflict": "This step is not possible right now."
     },
     "field": {
       "Title": "Title",
