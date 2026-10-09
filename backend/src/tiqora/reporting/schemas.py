@@ -1,13 +1,15 @@
-"""API models of the reporting foundation (status, backfill and report results)."""
+"""API models of the reporting foundation (status, backfill, catalogue, runs and results)."""
 
 from __future__ import annotations
 
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.jobs.schemas import JobAccepted
+from tiqora.reporting.definition import ReportDefinition, TimeRange
 from tiqora.reporting.sql import Grain
 
 #: One result cell: dimension values (ids, strings, ISO dates) and measure values.
@@ -101,3 +103,97 @@ class ReportResultOut(BaseModel):
     generated_at: UtcDateTime
     cached: bool
     facts: FactsStatusOut
+
+
+ParameterValue = list[str | int] | str | int | bool | None
+
+
+class ReportRunIn(BaseModel):
+    """Body of ``POST /reports/run``: exactly one of ``report_key`` / ``definition``.
+
+    Unknown fields are rejected (422): ``window_override``, ``extra_filter`` and
+    ``last_snapshot_date`` exist only internally (``RunParams``) for the
+    ``/stats`` wrappers and the engine, never as request fields.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    report_key: str | None = Field(None, max_length=120)
+    definition: ReportDefinition | None = None
+    time_range: TimeRange | None = None
+    grain: Grain | None = None
+    time_zone: str | None = Field(None, max_length=64)
+    parameters: dict[str, ParameterValue] = Field(default_factory=dict)
+    #: dimension index as a string ("0") -> dimension key
+    dimension_choices: dict[str, str] = Field(default_factory=dict)
+    compare_previous: bool = False
+    no_cache: bool = False
+    force_job: bool = False
+
+
+class ReportRunOut(BaseModel):
+    """200: ``result`` (inline run or cache hit); 202: ``job`` (background run)."""
+
+    result: ReportResultOut | None = None
+    job: JobAccepted | None = None
+
+
+class ReportExportIn(ReportRunIn):
+    format: Literal["xlsx", "csv"] = "xlsx"
+    title: str = Field("Bericht", min_length=1, max_length=120)
+    #: frontend-translated column headers (column key -> header)
+    column_labels: dict[str, str] = Field(default_factory=dict)
+    #: frontend-translated enum values (column key -> value -> label)
+    value_labels: dict[str, dict[str, str]] = Field(default_factory=dict)
+    totals_label: str = Field("Summe", max_length=40)
+    #: lines of the "Info" sheet ("Zeitraum: …" etc.)
+    info_lines: list[str] = Field(default_factory=list, max_length=20)
+
+
+class BuiltinReportOut(BaseModel):
+    key: str
+    category: str
+    title_key: str
+    description_key: str
+    #: the catalogue definition as written (parameter controls are built from it)
+    definition: ReportDefinition
+    overview: bool
+    read_only: bool = True
+
+
+class ReportCatalogueOut(BaseModel):
+    reports: list[BuiltinReportOut]
+    facts: FactsStatusOut
+
+
+class SourceDimensionOut(BaseModel):
+    """A dimension, or (in ``filter_fields``) a filter-only field of a source.
+
+    Filter-only fields have ``kind`` = their filter type, ``labels`` "none",
+    no ``i18n_values`` / ``options_source`` and ``time_field`` false.
+    """
+
+    key: str
+    label_key: str
+    kind: str
+    labels: str
+    i18n_values: str | None
+    filter_type: str | None
+    options_source: str | None
+    time_field: bool
+
+
+class SourceMeasureOut(BaseModel):
+    key: str
+    label_key: str
+    agg: str
+    unit: str
+
+
+class ReportSourceOut(BaseModel):
+    key: str
+    label_key: str
+    dimensions: list[SourceDimensionOut]
+    measures: list[SourceMeasureOut]
+    filter_fields: list[SourceDimensionOut]
+    default_time_field: str | None
