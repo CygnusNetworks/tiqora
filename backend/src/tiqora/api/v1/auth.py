@@ -78,7 +78,7 @@ from tiqora.identity.sso_routes import (
     start_sso_login,
 )
 from tiqora.identity.store import ProviderRecord, provider_from_row
-from tiqora.identity.types import ENV_OIDC_SLUG, audience_includes
+from tiqora.identity.types import ENV_OIDC_SLUG, UserKind, audience_includes
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 from tiqora.znuny.sysconfig import SysConfig
@@ -294,8 +294,11 @@ def _login_provider(record: ProviderRecord) -> LoginProviderOut:
     )
 
 
-async def _login_providers(session: AsyncSession, settings: AppSettings) -> list[LoginProviderOut]:
-    """Enabled agent SSO providers ordered by (sort, id); env OIDC never depends on a DB row.
+async def login_providers(
+    session: AsyncSession, settings: AppSettings, audience: UserKind = "agent"
+) -> list[LoginProviderOut]:
+    """Enabled SSO providers of *audience* ordered by (sort, id); env OIDC (agents only)
+    never depends on a DB row.
 
     A row that cannot be loaded (e.g. undecryptable secrets) hides only that provider.
     """
@@ -317,7 +320,9 @@ async def _login_providers(session: AsyncSession, settings: AppSettings) -> list
             except Exception as exc:  # noqa: BLE001 - one bad row must not hide the others
                 logger.warning("auth_methods_provider_unreadable", slug=row.slug, error=str(exc))
                 continue
-            if (rec.kind == "saml" and not saml_ok) or not audience_includes(rec.audience, "agent"):
+            if (rec.kind == "saml" and not saml_ok) or not audience_includes(
+                rec.audience, audience
+            ):
                 continue
             records.append(rec)
     except Exception as exc:  # noqa: BLE001 - any DB trouble must not hide password/env login
@@ -327,7 +332,7 @@ async def _login_providers(session: AsyncSession, settings: AppSettings) -> list
             await session.rollback()
     entries = [(r.sort, r.id, _login_provider(r)) for r in records if r.slug != ENV_OIDC_SLUG]
     env_row = next((r for r in records if r.slug == ENV_OIDC_SLUG), None)
-    if settings.oidc_enabled:
+    if settings.oidc_enabled and audience == "agent":
         if env_row is not None:
             entries.append((env_row.sort, env_row.id, _login_provider(env_row)))
         else:  # synthesised without DB: first
@@ -348,7 +353,7 @@ async def auth_methods(settings: AppSettings, session: DbSession) -> AuthMethods
         ldap=settings.ldap_enabled,
         webauthn=webauthn_enabled(settings),
         portal_enabled=await resolve_portal_enabled(session, settings),
-        providers=await _login_providers(session, settings),
+        providers=await login_providers(session, settings),
         saml=saml_availability().available,
     )
 

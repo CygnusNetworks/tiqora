@@ -633,6 +633,15 @@ class CustomerMe(BaseModel):
     sso_logout: bool = False
 
 
+class PortalAuthMethodsOut(BaseModel):
+    """Sign-in options of the customer portal login page."""
+
+    password: bool = True
+    # Enabled OIDC/SAML providers with the customer audience (sort, id).
+    providers: list[LoginProviderOut] = Field(default_factory=list)
+    webauthn: bool = False
+
+
 class CustomerLoginResponse(BaseModel):
     customer: CustomerMe
 

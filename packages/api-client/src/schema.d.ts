@@ -72,6 +72,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/auth/methods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portal sign-in options
+         * @description Discovery endpoint of the portal login page (customer-audience providers only).
+         */
+        get: operations["portal_auth_methods_api_portal_auth_methods_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/oidc/{slug}/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC callback of a portal provider */
+        get: operations["portal_oidc_callback_api_portal_auth_oidc__slug__callback_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/saml/{slug}/acs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * SAML assertion consumer service (portal)
+         * @description The IdP's browser POST; CSRF-exempt by design, authenticated by signature, stored request
+         *     id and the per-browser cookie. Every failure redirects to ``/portal/login``.
+         */
+        post: operations["portal_saml_acs_api_portal_auth_saml__slug__acs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/sso/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Log out of the portal and, where supported, of the identity provider */
+        post: operations["portal_sso_logout_api_portal_auth_sso_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/auth/sso/{slug}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start a portal SSO login */
+        get: operations["portal_sso_login_api_portal_auth_sso__slug__login_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/kb/articles/{slug_or_id}": {
         parameters: {
             query?: never;
@@ -15057,6 +15149,24 @@ export interface components {
             /** Attachment Ids */
             attachment_ids: number[];
         };
+        /**
+         * PortalAuthMethodsOut
+         * @description Sign-in options of the customer portal login page.
+         */
+        PortalAuthMethodsOut: {
+            /**
+             * Password
+             * @default true
+             */
+            password: boolean;
+            /** Providers */
+            providers?: components["schemas"]["LoginProviderOut"][];
+            /**
+             * Webauthn
+             * @default false
+             */
+            webauthn: boolean;
+        };
         /** PortalLanguageIn */
         PortalLanguageIn: {
             /** Language */
@@ -18098,6 +18208,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerMe"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_auth_methods_api_portal_auth_methods_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortalAuthMethodsOut"];
+                };
+            };
+        };
+    };
+    portal_oidc_callback_api_portal_auth_oidc__slug__callback_get: {
+        parameters: {
+            query?: {
+                code?: string | null;
+                state?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_saml_acs_api_portal_auth_saml__slug__acs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portal_sso_logout_api_portal_auth_sso_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    portal_sso_login_api_portal_auth_sso__slug__login_get: {
+        parameters: {
+            query?: {
+                next?: string | null;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -11,6 +11,7 @@ from tiqora.api.portal.deps import AppSettings, CurrentCustomer, get_customer_au
 from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
 from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest
 from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
+from tiqora.identity.sso_routes import session_sso_state
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 
 router = APIRouter(prefix="/auth", tags=["portal-auth"])
@@ -97,8 +98,21 @@ async def login(
 
 
 @router.get("/me", response_model=CustomerMe)
-async def me(customer: CurrentCustomer) -> CustomerMe:
-    return CustomerMe(**customer_to_dict(customer))
+async def me(
+    request: Request, customer: CurrentCustomer, settings: AppSettings, session: DbSession
+) -> CustomerMe:
+    token = getattr(request.state, "customer_session_token", None)
+    sso_logout = False
+    if token:
+        try:
+            redis_client = await get_redis(request)
+        except Exception:  # noqa: BLE001 - never fail /me for the logout hint
+            redis_client = None
+        if redis_client is not None:
+            sso_logout = await session_sso_state(
+                redis_client, session, settings, token, user_kind="customer"
+            )
+    return CustomerMe(**customer_to_dict(customer), sso_logout=sso_logout)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

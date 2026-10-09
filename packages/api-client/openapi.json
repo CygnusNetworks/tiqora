@@ -19883,6 +19883,30 @@
         "title": "PortalAttachmentUploadResponse",
         "type": "object"
       },
+      "PortalAuthMethodsOut": {
+        "description": "Sign-in options of the customer portal login page.",
+        "properties": {
+          "password": {
+            "default": true,
+            "title": "Password",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/LoginProviderOut"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "webauthn": {
+            "default": false,
+            "title": "Webauthn",
+            "type": "boolean"
+          }
+        },
+        "title": "PortalAuthMethodsOut",
+        "type": "object"
+      },
       "PortalLanguageIn": {
         "properties": {
           "language": {
@@ -29111,6 +29135,216 @@
           }
         },
         "summary": "Me",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/methods": {
+      "get": {
+        "description": "Discovery endpoint of the portal login page (customer-audience providers only).",
+        "operationId": "portal_auth_methods_api_portal_auth_methods_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAuthMethodsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Portal sign-in options",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/oidc/{slug}/callback": {
+      "get": {
+        "operationId": "portal_oidc_callback_api_portal_auth_oidc__slug__callback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "OIDC callback of a portal provider",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/saml/{slug}/acs": {
+      "post": {
+        "description": "The IdP's browser POST; CSRF-exempt by design, authenticated by signature, stored request\nid and the per-browser cookie. Every failure redirects to ``/portal/login``.",
+        "operationId": "portal_saml_acs_api_portal_auth_saml__slug__acs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "SAML assertion consumer service (portal)",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/sso/logout": {
+      "post": {
+        "operationId": "portal_sso_logout_api_portal_auth_sso_logout_post",
+        "responses": {
+          "303": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Log out of the portal and, where supported, of the identity provider",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/sso/{slug}/login": {
+      "get": {
+        "operationId": "portal_sso_login_api_portal_auth_sso__slug__login_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "title": "Slug",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "next",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Next"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start a portal SSO login",
         "tags": [
           "portal-auth"
         ]

@@ -2,10 +2,11 @@
 
 from fastapi import APIRouter
 
-from tiqora.api.portal import attachments, auth, kb, preferences, process, tickets
+from tiqora.api.portal import attachments, auth, auth_sso, kb, preferences, process, tickets
 
 portal_router = APIRouter()
 portal_router.include_router(auth.router)
+portal_router.include_router(auth_sso.router)
 portal_router.include_router(tickets.router)
 portal_router.include_router(attachments.router)
 portal_router.include_router(kb.router)
