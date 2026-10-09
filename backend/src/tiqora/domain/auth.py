@@ -339,6 +339,10 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        # DEL's reply is the atomic claim: of two parallel promotions only one
+        # sees the key (a fake returning None counts as "removed").
+        if await self._client.delete(self._key(token)) == 0:
+            return None
         await self.delete(token)
         return await self.create(user_id, login, avatar_url=avatar_url)
 

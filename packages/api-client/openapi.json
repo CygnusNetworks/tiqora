@@ -29785,7 +29785,7 @@
     },
     "/api/portal/auth/totp/enroll": {
       "post": {
-        "description": "Start (or replace) a TOTP enrollment; replacing a live factor needs its code.",
+        "description": "Start (or replace) a TOTP enrollment; replacing a live factor needs its code.\n\nAdding TOTP to a passkey-only account needs a recent sign-in (the passkey\ngate), or a stolen session could attach an authenticator it controls.",
         "operationId": "totp_enroll_api_portal_auth_totp_enroll_post",
         "parameters": [
           {
@@ -41403,6 +41403,74 @@
           }
         },
         "summary": "Update Customer User",
+        "tags": [
+          "admin:customers"
+        ]
+      }
+    },
+    "/api/v1/admin/customer-users/{customer_user_id}/reset-2fa": {
+      "post": {
+        "description": "Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.\n\nMirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,\nno code needed); the log line is the audit trail.",
+        "operationId": "reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_user_id",
+            "required": true,
+            "schema": {
+              "title": "Customer User Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Customer User 2Fa",
         "tags": [
           "admin:customers"
         ]

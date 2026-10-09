@@ -320,6 +320,9 @@ export interface paths {
         /**
          * Totp Enroll
          * @description Start (or replace) a TOTP enrollment; replacing a live factor needs its code.
+         *
+         *     Adding TOTP to a passkey-only account needs a recent sign-in (the passkey
+         *     gate), or a stolen session could attach an authenticator it controls.
          */
         post: operations["totp_enroll_api_portal_auth_totp_enroll_post"];
         delete?: never;
@@ -2261,6 +2264,29 @@ export interface paths {
         head?: never;
         /** Update Customer User */
         patch: operations["update_customer_user_api_v1_admin_customer_users__customer_user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/customer-users/{customer_user_id}/reset-2fa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Customer User 2Fa
+         * @description Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+         *
+         *     Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
+         *     no code needed); the log line is the audit trail.
+         */
+        post: operations["reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/customer-users/{customer_user_login}/companies": {
@@ -24210,6 +24236,39 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomerUserAdminOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_customer_user_2fa_api_v1_admin_customer_users__customer_user_id__reset_2fa_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_user_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

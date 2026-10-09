@@ -32,8 +32,13 @@ class _FakeRedis:
         self._store: dict[str, str] = {}
         self._sets: dict[str, set[str]] = {}
 
-    async def set(self, key: str, value: str, ex: int | None = None) -> None:
+    async def set(
+        self, key: str, value: str, ex: int | None = None, nx: bool = False
+    ) -> bool | None:
+        if nx and key in self._store:
+            return None
         self._store[key] = value
+        return True
 
     async def get(self, key: str) -> str | None:
         return self._store.get(key)

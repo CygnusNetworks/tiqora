@@ -226,8 +226,17 @@ class TOTPService:
         """
         if self._redis is None:
             return True
-        key = f"{_TOTP_KEY_ROOT}{self._subject.redis_ns}{_TOTP_USED_KEY}{user_id}"
-        raw = await self._redis.get(key)
+        prefix = f"{_TOTP_KEY_ROOT}{self._subject.redis_ns}{_TOTP_USED_KEY}{user_id}"
+        # Atomic single use: SET NX on the exact step. Of two parallel requests
+        # carrying the same code exactly one wins the claim (a GET-then-SET
+        # check alone lets both through).
+        claimed = await self._redis.set(
+            f"{prefix}:{step}", "1", ex=_TOTP_REPLAY_TTL_SECONDS, nx=True
+        )
+        if not claimed:
+            return False
+        # Monotonic guard: also refuse any step older than the last accepted one.
+        raw = await self._redis.get(prefix)
         if raw is not None:
             try:
                 last = int(raw if not isinstance(raw, bytes) else raw.decode("utf-8"))
@@ -235,7 +244,7 @@ class TOTPService:
                 last = None
             if last is not None and step <= last:
                 return False
-        await self._redis.set(key, str(step), ex=_TOTP_REPLAY_TTL_SECONDS)
+        await self._redis.set(prefix, str(step), ex=_TOTP_REPLAY_TTL_SECONDS)
         return True
 
     async def confirm(self, user_id: int, code: str) -> bool:

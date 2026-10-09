@@ -562,6 +562,7 @@ async def totp_verify(
 async def totp_enroll(
     user: EnrollableUser,
     totp: TOTPServiceDep,
+    webauthn: WebAuthnServiceDep,
     request: Request,
     settings: AppSettings,
     body: TOTPEnrollIn | None = None,
@@ -596,6 +597,10 @@ async def totp_enroll(
         await limiter.reset(login=rl_key, ip=ip)
         return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
 
+    # Adding TOTP to a passkey-only account is changing the account's factors:
+    # same recent-sign-in rule as registering a passkey (no-op for ENROLL sessions).
+    if await webauthn.has_passkey(user.id):
+        await _require_recent_auth(request, settings, user.id, totp, webauthn)
     secret, uri = await totp.enroll(user.id, user.login)
     return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
 

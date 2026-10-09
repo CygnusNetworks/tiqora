@@ -48,12 +48,17 @@ class _MemRedis:
             return False
         return key in self._kv or key in self._zsets
 
-    async def set(self, key: str, value: str, ex: int | None = None) -> None:
+    async def set(
+        self, key: str, value: str, ex: int | None = None, nx: bool = False
+    ) -> bool | None:
+        if nx and self._alive(key):
+            return None
         self._kv[key] = str(value)
         if ex is not None:
             self._exp[key] = time.time() + int(ex)
         else:
             self._exp.pop(key, None)
+        return True
 
     async def get(self, key: str) -> str | None:
         if not self._alive(key):

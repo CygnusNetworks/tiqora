@@ -119,6 +119,12 @@ class CustomerSessionStore:
         token = secrets.token_urlsafe(32)
         payload = f"{_PENDING_PAYLOAD_PREFIX}{customer_id}:{login}"
         await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        # Same per-customer index as full sessions, so revoke-all (password
+        # change, admin action) also removes a pending token.
+        with contextlib.suppress(Exception):
+            index_key = self._user_index_key(customer_id)
+            await self._client.sadd(index_key, token)
+            await self._client.expire(index_key, self._absolute_ttl)
         return token
 
     async def get_pending(self, token: str) -> tuple[int, str] | None:
@@ -141,7 +147,13 @@ class CustomerSessionStore:
         if data is None:
             return None
         customer_id, login = data
+        # DEL's reply is the atomic claim: of two parallel promotions only one
+        # sees the key (a fake returning None counts as "removed").
+        if await self._client.delete(self._key(token)) == 0:
+            return None
         await self.delete(token)
+        with contextlib.suppress(Exception):
+            await self._client.srem(self._user_index_key(customer_id), token)
         return await self.create(customer_id, login)
 
     async def revoke_customer_sessions(

@@ -8,7 +8,9 @@ provider slug ``idptest-2fa-*``. Erasure tests use autoincrement customers of th
 
 from __future__ import annotations
 
+import asyncio
 import base64
+import time
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -20,7 +22,7 @@ import pytest_asyncio
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from tests._identity_helpers import NOW, FakeRedis, make_provider
+from tests._identity_helpers import NOW, FakeRedis, make_provider, seed_agent
 from tests.test_auth_hardening import _MemPipe
 from tests.test_identity_oidc_flow import FakeIdp, _resolver
 from tests.test_identity_store import _to_async_url
@@ -28,6 +30,7 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_db
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.domain.auth import SessionStore
 from tiqora.domain.customer_auth import CustomerSessionStore
 from tiqora.domain.oidc import OidcClientConfig, OIDCService, clear_discovery_cache
 from tiqora.domain.passkey import WebAuthnService
@@ -35,6 +38,7 @@ from tiqora.domain.totp import TOTPService
 from tiqora.domain.two_factor_subject import AGENT_2FA, CUSTOMER_2FA
 from tiqora.identity import sso_routes
 from tiqora.identity.config_models import AttributeMap
+from tiqora.security.ratelimit import AuthRateLimiter
 from tiqora.znuny.password import hash_password
 
 pytestmark = pytest.mark.db
@@ -48,6 +52,28 @@ CUST_LO, CUST_HI = 47150, 47159
 AGENT_LO, AGENT_HI = 47160, 47169
 SLUG = "idptest-2fa-"
 _URLS: set[str] = set()
+
+
+class YieldingRedis(FakeRedis):
+    """Hands control to other tasks around every call, so GET-then-SET races become visible."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.zsets: dict[str, dict[str, float]] = {}
+
+    async def get(self, key: str) -> str | None:
+        await asyncio.sleep(0)
+        return await super().get(key)
+
+    async def set(
+        self, key: str, value: str, ex: int | None = None, nx: bool = False
+    ) -> bool | None:
+        await asyncio.sleep(0)
+        return await super().set(key, value, ex=ex, nx=nx)
+
+    async def delete(self, *keys: str) -> int:
+        await asyncio.sleep(0)
+        return await super().delete(*keys)
 
 
 class MemRedis(FakeRedis):
@@ -91,8 +117,18 @@ def _clean(url: str) -> None:
                     text(f"DELETE FROM {table} WHERE customer_user_id BETWEEN :lo AND :hi"),  # noqa: S608
                     band,
                 )
+            # Agent-side rows: the namespacing test reuses customer ids as agent ids.
+            for table in ("tiqora_user_totp", "tiqora_user_passkey"):
+                conn.execute(
+                    text(f"DELETE FROM {table} WHERE user_id BETWEEN :lo AND :hi"),  # noqa: S608
+                    {"lo": CUST_LO, "hi": AGENT_HI},
+                )
             conn.execute(
-                text("DELETE FROM tiqora_user_totp WHERE user_id BETWEEN :lo AND :hi"),
+                text("DELETE FROM user_preferences WHERE user_id BETWEEN :lo AND :hi"),
+                {"lo": AGENT_LO, "hi": AGENT_HI},
+            )
+            conn.execute(
+                text("DELETE FROM users WHERE id BETWEEN :lo AND :hi"),
                 {"lo": AGENT_LO, "hi": AGENT_HI},
             )
             conn.execute(
@@ -437,8 +473,10 @@ async def test_totp_verify_is_rate_limited(env: Env) -> None:
     )
     assert r.status_code == 429 and "retry-after" in r.headers
     assert (await env.client.get("/api/portal/auth/me")).status_code == 401
-    # The agent-side counter (`2fa:<login>`) is a different key.
-    assert not any(k.endswith(f"2fa:{login}") for k in env.redis.store if "lock" in k)
+    # The lock sits on the customer key; the agent counter (`2fa:<login>`) is untouched.
+    limiter = AuthRateLimiter(env.redis, env.settings)
+    assert (await limiter.check(login=f"2fa:customer:{login}", ip="203.0.113.7")).allowed is False
+    assert (await limiter.check(login=f"2fa:{login}", ip="203.0.113.7")).allowed is True
 
 
 async def test_totp_code_cannot_be_replayed(env: Env) -> None:
@@ -516,7 +554,7 @@ async def test_replacing_or_removing_a_live_totp_needs_its_code(env: Env) -> Non
     good = await c.request(
         "DELETE",
         "/api/portal/auth/totp",
-        json={"code": pyotp.TOTP(secret).at(__import__("time").time() + 30)},
+        json={"code": pyotp.TOTP(secret).at(time.time() + 30)},
         headers=SAME,
     )
     assert good.status_code == 200 and good.json() == {"enabled": False}
@@ -686,3 +724,118 @@ async def test_agent_delete_never_touches_a_customer_with_the_same_id(env: Env) 
             )
         ).scalar_one()
         assert int(count) == 1, table
+
+
+# ------------------------------------------------------------------ review round 1
+
+
+@pytest.mark.parametrize("subject", [CUSTOMER_2FA, AGENT_2FA], ids=["customer", "agent"])
+async def test_totp_code_single_use_under_concurrency(env: Env, subject: Any) -> None:
+    uid = 47153
+    redis = YieldingRedis()
+    svc = TOTPService(env.session, env.settings, redis, subject=subject)
+    secret, _ = await svc.enroll(uid, "idp.2fa.concurrent")
+    assert await svc.confirm(uid, pyotp.TOTP(secret).now())
+    code = pyotp.TOTP(secret).now()
+    # The claim itself, raced on pure Redis yields (deterministic interleaving) ...
+    step = svc._match_timestep(secret, code)  # noqa: SLF001
+    assert step is not None
+    claims = await asyncio.gather(*(svc._accept_timestep(uid, step) for _ in range(5)))  # noqa: SLF001
+    assert claims.count(True) == 1, claims
+    # ... and end to end through verify() with a fresh Redis.
+    svc = TOTPService(env.session, env.settings, YieldingRedis(), subject=subject)
+    results = await asyncio.gather(*(svc.verify(uid, code) for _ in range(5)))
+    assert results.count(True) == 1, results
+    await env.session.execute(text("DELETE FROM tiqora_user_totp WHERE user_id = :i"), {"i": uid})
+    await env.session.commit()
+
+
+async def test_pending_promotion_is_single_use_under_concurrency(env: Env) -> None:
+    store = CustomerSessionStore(YieldingRedis(), env.settings)  # type: ignore[arg-type]
+    pending = await store.create_pending(47154, "idp.2fa.47154@example.org", 300)
+    tokens = await asyncio.gather(*(store.promote_pending(pending) for _ in range(5)))
+    assert len([t for t in tokens if t]) == 1, tokens
+
+
+async def test_pending_tokens_are_in_the_session_index_and_revoked(env: Env) -> None:
+    cid = 47155
+    login = await env.customer(cid)
+    await env.enroll_totp(cid, login)
+    assert (await env.login(login=login)).json()["pending_2fa"] is True
+    pending = env.client.cookies.get(COOKIE)
+    assert pending and pending in env.redis.sets[f"tiqora:csession:user:{cid}"]
+    assert await env.store.revoke_customer_sessions(cid) == 1
+    assert await env.store.get_pending(pending) is None
+    r = await env.client.post("/api/portal/auth/totp/verify", json={"code": "123456"}, headers=SAME)
+    assert r.status_code == 401
+
+
+async def test_admin_reset_clears_customer_second_factors(env: Env) -> None:
+    from fastapi import HTTPException
+
+    from tiqora.api.v1.admin.customers import reset_customer_user_2fa
+    from tiqora.domain.auth import AuthenticatedUser
+
+    cid, other = 47156, 47157
+    login = await env.customer(cid)
+    other_login = await env.customer(other)
+    for uid, lg in ((cid, login), (other, other_login)):
+        await env.enroll_totp(uid, lg)
+        await env.add_passkey(uid, f"cred-{uid}")
+    admin = AuthenticatedUser(
+        id=1, login="root@localhost", first_name="A", last_name="B", auth_method="session"
+    )
+    await reset_customer_user_2fa(cid, admin, env.session, env.settings)
+    await reset_customer_user_2fa(cid, admin, env.session, env.settings)  # idempotent
+    assert await env.totp().is_enabled(cid) is False
+    assert await env.totp().is_enabled(other) is True  # neighbour untouched
+    counts = {
+        int(r[0]): int(r[1])
+        for r in await env.session.execute(
+            text(
+                "SELECT customer_user_id, COUNT(*) FROM tiqora_customer_passkey"
+                " WHERE customer_user_id IN (47156, 47157) GROUP BY customer_user_id"
+            )
+        )
+    }
+    assert counts == {other: 1}
+    # The customer can sign in with the password alone again.
+    assert (await env.login(login=login)).json()["customer"] is not None
+    with pytest.raises(HTTPException) as exc:
+        await reset_customer_user_2fa(47158, admin, env.session, env.settings)
+    assert exc.value.status_code == 404
+
+
+async def test_customer_adding_totp_to_passkey_only_account_needs_recent_auth(env: Env) -> None:
+    cid = 47158
+    await _full_session(env, cid, with_totp=False)
+    await env.add_passkey(cid)
+    token = env.client.cookies.get(COOKIE)
+    assert token
+    ok = await env.client.post("/api/portal/auth/totp/enroll", json={}, headers=SAME)
+    assert ok.status_code == 200, ok.text
+    env.redis.store[f"tiqora:csession:authat:{token}"] = "1"
+    stale = await env.client.post("/api/portal/auth/totp/enroll", json={}, headers=SAME)
+    assert stale.status_code == 403 and stale.json()["detail"] == "reauthentication_required"
+
+
+async def test_agent_adding_totp_to_passkey_only_account_needs_recent_auth(env: Env) -> None:
+    aid, login = 47160, "idp.2fa.agent47160"
+    await seed_agent(env.session, aid, login)
+    await env.session.execute(
+        text(
+            "INSERT INTO tiqora_user_passkey (user_id, credential_id, public_key, sign_count,"
+            " name) VALUES (:u, 'YWdlbnQ', :pk, 0, 'Key')"
+        ),
+        {"u": aid, "pk": b"k"},
+    )
+    await env.session.commit()
+    token = await SessionStore(env.redis, env.settings).create(aid, login)  # type: ignore[arg-type]
+    cookies = {"tiqora_session": token}
+    ok = await env.client.post("/api/v1/auth/totp/enroll", json={}, headers=SAME, cookies=cookies)
+    assert ok.status_code == 200, ok.text
+    env.redis.store[f"tiqora:session:authat:{token}"] = "1"
+    stale = await env.client.post(
+        "/api/v1/auth/totp/enroll", json={}, headers=SAME, cookies=cookies
+    )
+    assert stale.status_code == 403 and stale.json()["detail"] == "reauthentication_required"

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import re
 
+import structlog
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 
-from tiqora.api.deps import DbSession
+from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.common import (
     CUSTOMER_COMPANY_CACHE_TYPES,
     CUSTOMER_USER_CACHE_TYPES,
@@ -39,10 +40,14 @@ from tiqora.api.v1.admin.schemas import (
 from tiqora.api.v1.customer_sort import order_customer_users
 from tiqora.db.legacy.customer import CustomerCompany, CustomerUser, CustomerUserCustomer
 from tiqora.db.legacy.user import GroupCustomerUser, PermissionGroups
+from tiqora.db.tiqora.models import TiqoraCustomerPasskey
 from tiqora.domain import user_provisioning as provisioning
+from tiqora.domain.totp import TOTPService
+from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.znuny.password import hash_password
 
 router = APIRouter(tags=["admin:customers"])
+logger = structlog.get_logger(__name__)
 
 # Columns searched by both the plain substring search and the regex search.
 CUSTOMER_USER_SEARCH_COLUMNS = (
@@ -278,6 +283,26 @@ async def deactivate_customer_user(
     cu.change_by = admin.id
     await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()
+
+
+@router.post("/customer-users/{customer_user_id}/reset-2fa", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_customer_user_2fa(
+    customer_user_id: int, admin: AdminUser, session: DbSession, settings: AppSettings
+) -> None:
+    """Admin recovery for a lost authenticator: drop the customer's TOTP and all passkeys.
+
+    Mirrors the agent-side ``POST /auth-config/{user_id}/reset-2fa`` (idempotent,
+    no code needed); the log line is the audit trail.
+    """
+    cu = await session.get(CustomerUser, customer_user_id)
+    if cu is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer user not found")
+    await TOTPService(session, settings, subject=CUSTOMER_2FA).force_disable(customer_user_id)
+    await session.execute(
+        delete(TiqoraCustomerPasskey).where(TiqoraCustomerPasskey.user_id == customer_user_id)
+    )
+    await session.commit()
+    logger.info("customer_2fa_reset", customer_user_id=customer_user_id, admin_id=admin.id)
 
 
 @router.get("/customer-companies", response_model=Page[CustomerCompanyOut])

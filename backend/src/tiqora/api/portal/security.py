@@ -2,6 +2,10 @@
 
 Customer 2FA is opt-in; SSO logins skip it (the identity provider is the strong
 factor), password and LDAP logins with an enrolled factor get a pending session.
+WebAuthn switched off later: the login step still counts enrolled passkeys (as on
+the agent side), and ``/passkey/*`` answers 404 while it is off, so a passkey-only
+customer is stranded until WebAuthn is back on or an admin resets the factors
+(``POST /api/v1/admin/customer-users/{id}/reset-2fa``).
 A pending token is accepted ONLY by ``/totp/verify`` and
 ``/passkey/authenticate/*`` (via :class:`PendingCustomer`); every other route
 resolves sessions through ``get_current_customer``, which rejects it.
@@ -9,6 +13,7 @@ resolves sessions through ``get_current_customer``, which rejects it.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -40,19 +45,49 @@ from tiqora.domain.schemas import (
 )
 from tiqora.domain.totp import TOTPStepUpRequired
 from tiqora.domain.totp_qr import totp_qr_svg
-from tiqora.security.ratelimit import AuthRateLimiter, client_ip
+from tiqora.security.ratelimit import AuthRateLimiter, RateLimitDecision, client_ip
 
 router = APIRouter(prefix="/auth", tags=["portal-auth"])
 
 
-def _rate_limit_error(decision: object) -> HTTPException:
-    retry_after = int(getattr(decision, "retry_after", 0) or 0)
+def _rate_limit_error(decision: RateLimitDecision) -> HTTPException:
+    retry_after = int(decision.retry_after or 0)
     headers = {"Retry-After": str(max(1, retry_after))} if retry_after else None
     return HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail="Too many failed login attempts; try again later",
         headers=headers,
     )
+
+
+async def _throttled[T](
+    request: Request,
+    settings: AppSettings,
+    login: str,
+    attempt: Callable[[], Awaitable[T | None]],
+    *,
+    on_fail: HTTPException,
+) -> T:
+    """Run one second-factor guess under the customer 2FA throttle.
+
+    check -> attempt -> (falsy: record failure, 429 if that locks, else
+    *on_fail*) -> reset on success. The key is ``2fa:customer:<login>``,
+    separate from the agent counter of the same login.
+    """
+    limiter = AuthRateLimiter(await get_redis(request), settings)
+    ip = client_ip(request)
+    key = _rl_key(login)
+    pre = await limiter.check(login=key, ip=ip)
+    if not pre.allowed:
+        raise _rate_limit_error(pre)
+    result = await attempt()
+    if not result:
+        locked = await limiter.record_failure(login=key, ip=ip)
+        if locked is not None:
+            raise _rate_limit_error(locked)
+        raise on_fail
+    await limiter.reset(login=key, ip=ip)
+    return result
 
 
 def _rl_key(login: str) -> str:
@@ -114,19 +149,13 @@ async def totp_verify(
     settings: AppSettings,
 ) -> CustomerLoginResponse:
     """Promote a pending-2FA session to a full session after a valid TOTP code."""
-    redis_client = await get_redis(request)
-    limiter = AuthRateLimiter(redis_client, settings)
-    ip = client_ip(request)
-    key = _rl_key(pending.login)
-    pre = await limiter.check(login=key, ip=ip)
-    if not pre.allowed:
-        raise _rate_limit_error(pre)
-    if not await totp.verify(pending.customer_id, body.code):
-        locked = await limiter.record_failure(login=key, ip=ip)
-        if locked is not None:
-            raise _rate_limit_error(locked)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code")
-    await limiter.reset(login=key, ip=ip)
+    await _throttled(
+        request,
+        settings,
+        pending.login,
+        lambda: totp.verify(pending.customer_id, body.code),
+        on_fail=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code"),
+    )
     return await _promote(response, settings, auth, pending.token)
 
 
@@ -145,30 +174,39 @@ async def _promote(
 async def totp_enroll(
     customer: CurrentCustomer,
     totp: CustomerTOTPServiceDep,
+    webauthn: CustomerWebAuthnServiceDep,
+    sessions: Annotated[CustomerSessionStore, Depends(get_customer_session_store)],
     request: Request,
     settings: AppSettings,
     body: TOTPEnrollIn | None = None,
 ) -> TOTPEnrollOut:
-    """Start (or replace) a TOTP enrollment; replacing a live factor needs its code."""
+    """Start (or replace) a TOTP enrollment; replacing a live factor needs its code.
+
+    Adding TOTP to a passkey-only account needs a recent sign-in (the passkey
+    gate), or a stolen session could attach an authenticator it controls.
+    """
     if await totp.is_enabled(customer.id):
-        redis_client = await get_redis(request)
-        limiter = AuthRateLimiter(redis_client, settings)
-        ip = client_ip(request)
-        key = _rl_key(customer.login)
-        pre = await limiter.check(login=key, ip=ip)
-        if not pre.allowed:
-            raise _rate_limit_error(pre)
-        try:
-            secret, uri = await totp.enroll(
-                customer.id, customer.login, current_code=(body.current_code if body else None)
-            )
-        except TOTPStepUpRequired as exc:
-            locked = await limiter.record_failure(login=key, ip=ip)
-            if locked is not None:
-                raise _rate_limit_error(locked) from exc
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
-        await limiter.reset(login=key, ip=ip)
-        return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
+        current = body.current_code if body else None
+
+        async def replace() -> TOTPEnrollOut | None:
+            try:
+                secret, uri = await totp.enroll(customer.id, customer.login, current_code=current)
+            except TOTPStepUpRequired:
+                return None
+            return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
+
+        return await _throttled(
+            request,
+            settings,
+            customer.login,
+            replace,
+            on_fail=HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="A valid code from the current authenticator is required to re-enroll",
+            ),
+        )
+    if await webauthn.has_passkey(customer.id):
+        await _require_recent_auth(request, settings, sessions, customer.id, totp, webauthn)
     secret, uri = await totp.enroll(customer.id, customer.login)
     return TOTPEnrollOut(secret=secret, otpauth_uri=uri)
 
@@ -192,19 +230,13 @@ async def totp_confirm(
     settings: AppSettings,
 ) -> TOTPStatusOut:
     # A wrong code is a 2FA guess like any other: same throttle as verify.
-    redis_client = await get_redis(request)
-    limiter = AuthRateLimiter(redis_client, settings)
-    ip = client_ip(request)
-    key = _rl_key(customer.login)
-    pre = await limiter.check(login=key, ip=ip)
-    if not pre.allowed:
-        raise _rate_limit_error(pre)
-    if not await totp.confirm(customer.id, body.code):
-        locked = await limiter.record_failure(login=key, ip=ip)
-        if locked is not None:
-            raise _rate_limit_error(locked)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid TOTP code")
-    await limiter.reset(login=key, ip=ip)
+    await _throttled(
+        request,
+        settings,
+        customer.login,
+        lambda: totp.confirm(customer.id, body.code),
+        on_fail=HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid TOTP code"),
+    )
     return TOTPStatusOut(enabled=True)
 
 
@@ -216,19 +248,13 @@ async def totp_disable(
     totp: CustomerTOTPServiceDep,
     settings: AppSettings,
 ) -> TOTPStatusOut:
-    redis_client = await get_redis(request)
-    limiter = AuthRateLimiter(redis_client, settings)
-    ip = client_ip(request)
-    key = _rl_key(customer.login)
-    pre = await limiter.check(login=key, ip=ip)
-    if not pre.allowed:
-        raise _rate_limit_error(pre)
-    if not await totp.disable(customer.id, body.code):
-        locked = await limiter.record_failure(login=key, ip=ip)
-        if locked is not None:
-            raise _rate_limit_error(locked)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid TOTP code")
-    await limiter.reset(login=key, ip=ip)
+    await _throttled(
+        request,
+        settings,
+        customer.login,
+        lambda: totp.disable(customer.id, body.code),
+        on_fail=HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid TOTP code"),
+    )
     return TOTPStatusOut(enabled=False)
 
 
@@ -345,23 +371,16 @@ async def passkey_authenticate_finish(
     settings: AppSettings,
 ) -> CustomerLoginResponse:
     _require_webauthn(settings)
-    redis_client = await get_redis(request)
-    limiter = AuthRateLimiter(redis_client, settings)
-    ip = client_ip(request)
-    key = _rl_key(pending.login)
-    pre = await limiter.check(login=key, ip=ip)
-    if not pre.allowed:
-        raise _rate_limit_error(pre)
-    row = await webauthn.finish_authentication(
-        user_id=pending.customer_id, session_token=pending.token, credential=body.credential
-    )
-    if row is None:
-        locked = await limiter.record_failure(login=key, ip=ip)
-        if locked is not None:
-            raise _rate_limit_error(locked)
-        raise HTTPException(
+    await _throttled(
+        request,
+        settings,
+        pending.login,
+        lambda: webauthn.finish_authentication(
+            user_id=pending.customer_id, session_token=pending.token, credential=body.credential
+        ),
+        on_fail=HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired passkey assertion",
-        )
-    await limiter.reset(login=key, ip=ip)
+        ),
+    )
     return await _promote(response, settings, auth, pending.token)
