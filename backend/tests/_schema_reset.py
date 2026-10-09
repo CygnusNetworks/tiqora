@@ -52,3 +52,24 @@ def reset_tiqora_schema(sync_url: str) -> None:
                 conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
     finally:
         engine.dispose()
+
+
+#: rows Tiqora migrations insert themselves (migration 20261008_0062: the report state row)
+_MIGRATION_SEED_TABLES = ("tiqora_report_state",)
+
+
+def delete_migration_seed_rows(sync_url: str) -> None:
+    """Delete the rows migrations seed, so a module that ran ``upgrade`` leaks nothing.
+
+    Test databases are built with ``create_all`` (no seed rows); a migration test that
+    upgrades the shared container must leave it the same way.
+    """
+    engine = create_engine(sync_url)
+    try:
+        tables = set(inspect(engine).get_table_names())
+        with engine.begin() as conn:
+            for table in _MIGRATION_SEED_TABLES:
+                if table in tables:
+                    conn.execute(text(f"DELETE FROM {table}"))
+    finally:
+        engine.dispose()

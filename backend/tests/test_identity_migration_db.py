@@ -18,7 +18,7 @@ import pytest
 from alembic import command
 from sqlalchemy import create_engine, inspect, text
 
-from tests._schema_reset import reset_tiqora_schema
+from tests._schema_reset import delete_migration_seed_rows, reset_tiqora_schema
 from tiqora.cli.migrate import build_alembic_config
 from tiqora.config import get_settings
 
@@ -199,5 +199,6 @@ def test_identity_migrations_upgrade_downgrade_and_hold_large_metadata(alembic_e
     finally:
         _migrate("head")
         _delete_row(sync_url)
+        delete_migration_seed_rows(sync_url)
         if not had_version_row:
             _drop_version_row(sync_url)

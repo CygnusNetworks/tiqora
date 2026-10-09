@@ -9,11 +9,16 @@ mirror ``ticket.id`` and are never generated. ``gap_ids`` is ``MEDIUMTEXT`` on
 MariaDB (thousands of gaps exceed ``TEXT``'s 64 KiB).
 ``queued_at`` has microsecond precision on MariaDB.
 All timestamps the application writes are naive UTC.
+
+The single ``tiqora_report_state`` row (``name = 'facts'``) is created here, so the
+first concurrent requests never race to insert it (``load_state`` keeps its
+create-on-first-use fallback for databases built without this migration).
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 import sqlalchemy as sa
 from alembic import op
@@ -184,6 +189,13 @@ def upgrade() -> None:
         sa.Column("snapshot_time_zone", sa.String(64), nullable=True),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("name"),
+    )
+    # same values as reporting.state.load_state's first-use insert; naive UTC bind
+    op.execute(
+        sa.text(
+            "INSERT INTO tiqora_report_state (name, last_history_id, backfill_status, updated_at)"
+            " VALUES ('facts', 0, 'pending', :now)"
+        ).bindparams(now=datetime.now(UTC).replace(tzinfo=None))
     )
 
     op.create_table(

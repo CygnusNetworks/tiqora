@@ -22,7 +22,7 @@ from alembic import command
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from tests._schema_reset import reset_tiqora_schema
+from tests._schema_reset import delete_migration_seed_rows, reset_tiqora_schema
 from tiqora.ai.llm_routing import (
     TASK_AGENT,
     TASK_FINAL_ANSWER,
@@ -328,3 +328,4 @@ def test_upgrade_resolves_like_before_and_downgrade_restores(alembic_env: str) -
     finally:
         _migrate("head")
         _wipe_rows(sync_url)
+        delete_migration_seed_rows(sync_url)
