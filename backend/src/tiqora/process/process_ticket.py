@@ -45,6 +45,7 @@ from tiqora.process.engine import (
     _resolve_type_id,  # noqa: PLC2701
     _resolve_user_id,  # noqa: PLC2701
     apply_activity_dialog,
+    dialog_values_and_missing,
     run_transitions,
     start_process,
 )
@@ -54,7 +55,7 @@ from tiqora.process.exceptions import (
     RequiredFieldMissing,
     TicketAlreadyInProcess,
 )
-from tiqora.process.fields import effective_field_values, is_present, missing_required_fields
+from tiqora.process.fields import is_present
 from tiqora.process.graph import ActivityDialogNode, ProcessGraph, ProcessRepository
 from tiqora.process.smart_tags import render_ticketless
 from tiqora.process.ticket_state import get_ticket_process_state
@@ -106,15 +107,8 @@ def _assert_required(
 ) -> dict[str, Any]:
     """Effective values; raise for a missing ``Display: 2`` field (PendingTime depends on the
     target state and is checked by :func:`apply_activity_dialog`)."""
-    values = effective_field_values(dialog.config, field_values, actor.interface)
-    if actor.interface == "CustomerInterface":
-        values["CustomerUserID"] = actor.customer_user_login
-        values["CustomerID"] = actor.customer_id
-    missing = [
-        n
-        for n in missing_required_fields(dialog.config, values, actor.interface)
-        if n != "PendingTime"
-    ]
+    values, missing = dialog_values_and_missing(dialog.config, field_values, actor)
+    missing = [n for n in missing if n != "PendingTime"]
     if missing:
         raise RequiredFieldMissing(f"required activity dialog field missing: {', '.join(missing)}")
     return values
@@ -319,13 +313,13 @@ async def create_process_ticket(
         Priority=await _name(session, TicketPriority.name, TicketPriority.id, priority_id),
         Lock=await _name(session, TicketLockType.name, TicketLockType.id, lock_id),
     )
-    title = await render_ticketless(
-        await _default_title(sysconfig, graph.name, actor, values),
-        session=session,
-        user_id=actor.user_id,
-        sysconfig=sysconfig,
-        values=tag_values,
-    )
+    title = await _default_title(sysconfig, graph.name, actor, values)
+    if actor.interface == "AgentInterface":
+        # Only AgentTicketProcess renders the title (:5183-5195); CustomerTicketProcess takes
+        # the customer's text as it is (a customer must not expand <OTRS_CONFIG_*> and friends).
+        title = await render_ticketless(
+            title, session=session, user_id=actor.user_id, sysconfig=sysconfig, values=tag_values
+        )
 
     # Agents create as owner 1 and change the owner afterwards, so the owner events fire;
     # the customer interface creates as its panel user (CustomerTicketProcess.pm:3677-3685).
@@ -366,6 +360,7 @@ async def create_process_ticket(
         sysconfig=sysconfig,
         skip_fields=_CREATE_CONSUMED,
         apply_required_lock=False,
+        dynamic_fields_first=True,
     )
     if actor.interface == "AgentInterface" and owner_id is not None and owner_id != 1:
         await assign_owner(

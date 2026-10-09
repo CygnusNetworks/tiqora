@@ -55,7 +55,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -143,6 +143,7 @@ __all__ = [
     "ActivityDialogSubmitResult",
     "TransitionOutcome",
     "apply_activity_dialog",
+    "dialog_values_and_missing",
     "evaluate_transition",
     "execute_transition_action",
     "get_ticket_attrs",
@@ -308,6 +309,12 @@ async def _resolve_sla_id(session: AsyncSession, name: str | None, id_: int | No
     ).scalar_one_or_none()
 
 
+async def _state_unchanged(session: AsyncSession, ticket_id: int, state_id: int) -> bool:
+    """Same state: Znuny writes nothing (TicketStateSet.pm:163, Ticket.pm:4531-4539)."""
+    t = await _ticket_must_exist(session, ticket_id)
+    return int(t["ticket_state_id"]) == state_id
+
+
 async def _action_ticket_state_set(
     session: AsyncSession,
     config: dict[str, Any],
@@ -324,6 +331,8 @@ async def _action_ticket_state_set(
     diff = config.get("PendingTimeDiff")
     if diff is not None:
         pending_time = datetime.now(UTC) + timedelta(seconds=int(diff))
+    elif await _state_unchanged(session, ticket_id, int(state_id)):
+        return
     await change_state(
         session,
         ticket_id=ticket_id,
@@ -1179,6 +1188,7 @@ async def _apply_dialog_field_changes(
     user_id: int,
     sysconfig: SysConfig,
     sender_type: str = "agent",
+    dynamic_fields_first: bool = False,
 ) -> None:
     """Apply submitted field_values to the ticket, per the field names the
     dialog config declares. Only fields actually present (and non-blank) in
@@ -1210,7 +1220,7 @@ async def _apply_dialog_field_changes(
             raw=field_values["State"],
             resolver=_resolve_state_id,
         )
-        if state_id is not None:
+        if state_id is not None and not await _state_unchanged(session, ticket_id, state_id):
             await change_state(
                 session,
                 ticket_id=ticket_id,
@@ -1329,14 +1339,39 @@ async def _apply_dialog_field_changes(
             user_id=user_id,
         )
 
-    # Dynamic fields and the article are stored in FieldOrder (the Znuny save loop,
-    # AgentTicketProcess.pm:5463-5700); a dynamic field the order does not list comes last.
+    # Dynamic fields, the article and the owner are stored in FieldOrder (the Znuny save loop,
+    # AgentTicketProcess.pm:5463ff; Owner via $TicketFieldSetSub, :5800-5860); a dynamic field
+    # the order does not list comes last. A new ticket stores all dynamic fields first
+    # (:5262-5290), the article and the owner follow.
     order = dialog_field_order(dialog_config)
     dynamic = [k for k in field_values if k.startswith("DynamicField_")]
     dynamic.sort(key=lambda k: order.index(k) if k in order else len(order))
-    steps = [n for n in order if n == "Article" or n in dynamic]
+    steps = [n for n in order if n in ("Article", "Owner") or n in dynamic]
     steps += [k for k in dynamic if k not in steps]
+    if dynamic_fields_first:
+        steps = dynamic + [n for n in steps if n not in dynamic]
     for step in steps:
+        if step == "Owner":
+            owner_id = (
+                await _resolve_dialog_field_id(
+                    session,
+                    field="Owner",
+                    kind="user id",
+                    raw=field_values["Owner"],
+                    resolver=_resolve_user_id,
+                )
+                if "Owner" in field_values
+                else None
+            )
+            if owner_id is not None:
+                await assign_owner(
+                    session,
+                    ticket_id=ticket_id,
+                    new_owner_id=owner_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                )
+            continue
         if step == "Article":
             await _store_dialog_article(
                 session,
@@ -1506,6 +1541,22 @@ async def _resolve_dialog_pending_time(
     return True, parsed.astimezone(UTC).replace(second=0, microsecond=0)
 
 
+def dialog_values_and_missing(
+    dialog: ActivityDialogConfig, field_values: Mapping[str, Any], actor: ProcessActor
+) -> tuple[dict[str, Any], list[str]]:
+    """Effective dialog values and the ``Display: 2`` fields still missing (PendingTime included).
+
+    On the customer interface ``CustomerUserID``/``CustomerID`` are the acting customer
+    (CustomerTicketProcess.pm:3560-3569, 3675-3676): whatever was submitted is ignored and a
+    mandatory CustomerUserID counts as given, although the form never asks for it.
+    """
+    values = effective_field_values(dialog, field_values, actor.interface)
+    if actor.interface == "CustomerInterface":
+        values["CustomerUserID"] = actor.customer_user_login
+        values["CustomerID"] = actor.customer_id
+    return values, missing_required_fields(dialog, values, actor.interface)
+
+
 async def apply_activity_dialog(
     session: AsyncSession,
     *,
@@ -1516,21 +1567,17 @@ async def apply_activity_dialog(
     sysconfig: SysConfig,
     skip_fields: frozenset[str] = frozenset(),
     apply_required_lock: bool = True,
+    dynamic_fields_first: bool = False,
 ) -> None:
     """Validate and store one activity dialog submission with Znuny's field semantics.
 
     ``skip_fields`` (canonical names) are validated but not written again — used when a field
-    was already consumed by ``create_ticket``. ``apply_required_lock=False`` for new tickets
-    (Znuny never runs RequiredLock on create).
+    was already consumed by ``create_ticket``. ``apply_required_lock=False`` and
+    ``dynamic_fields_first=True`` for new tickets (Znuny never runs RequiredLock on create and
+    stores the dynamic fields right after creating the ticket).
     """
-    values = effective_field_values(dialog, field_values, actor.interface)
+    values, missing = dialog_values_and_missing(dialog, field_values, actor)
     customer_filled = actor.interface == "CustomerInterface"
-    if customer_filled:
-        # The customer interface never asks for the customer, it is the acting customer
-        # (CustomerTicketProcess.pm:3560-3569, 3675-3676); whatever was submitted is ignored.
-        values["CustomerUserID"] = actor.customer_user_login
-        values["CustomerID"] = actor.customer_id
-    missing = missing_required_fields(dialog, values, actor.interface)
     # PendingTime is only required (and only read) when the target state is a pending one.
     pending_required = "PendingTime" in missing
     missing = [name for name in missing if name != "PendingTime"]
@@ -1559,31 +1606,12 @@ async def apply_activity_dialog(
         user_id=actor.user_id,
         sysconfig=sysconfig,
         sender_type="customer" if actor.interface == "CustomerInterface" else "agent",
+        dynamic_fields_first=dynamic_fields_first,
     )
     if pending_time is not None:
         # AgentTicketProcess.pm:5554-5575: TicketPendingTimeSet after the other fields.
         await _set_ticket_pending_time(
             session, ticket_id=ticket_id, pending_time=pending_time, user_id=actor.user_id
-        )
-    # The owner is set last, after the whole save loop (AgentTicketProcess.pm:5967).
-    owner_id = (
-        await _resolve_dialog_field_id(
-            session,
-            field="Owner",
-            kind="user id",
-            raw=values["Owner"],
-            resolver=_resolve_user_id,
-        )
-        if "Owner" in values and "Owner" not in skip_fields
-        else None
-    )
-    if owner_id is not None:
-        await assign_owner(
-            session,
-            ticket_id=ticket_id,
-            new_owner_id=owner_id,
-            user_id=actor.user_id,
-            sysconfig=sysconfig,
         )
 
 

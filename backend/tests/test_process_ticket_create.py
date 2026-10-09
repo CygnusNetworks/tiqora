@@ -269,7 +269,7 @@ def _seed(conn: Any) -> None:
                 " responsible_user_id, ticket_priority_id, ticket_state_id, timeout, until_time,"
                 " escalation_time, escalation_update_time, escalation_response_time,"
                 " escalation_solution_time, archive_flag, create_time, create_by, change_time,"
-                " change_by) VALUES (:id, :tn, 'T888', :q, 1, 1, :u, :u, 3, 4, 0, 0, 0, 0, 0, 0,"
+                " change_by) VALUES (:id, :tn, 'T888', :q, 1, 1, :u, :u, 3, 1, 0, 0, 0, 0, 0, 0,"
                 " 0, :t, 1, :t, 1)"
             ),
             {"id": tid, "tn": f"2026030488{tid}", "q": QUEUE_RAW, "u": AGENT1, "t": T0},
@@ -505,7 +505,7 @@ async def test_create_process_ticket_uses_process_defaults_and_runs_transition(
         "TicketDynamicFieldUpdate",  # ProcessManagementActivityID (start activity)
         "TicketDynamicFieldUpdate",  # Region888
         "AddNote",
-        "Misc",  # "Reset of unlock time." -- part of TicketOwnerSet (golden-validated)
+        "Misc",  # "Reset of unlock time." -- written by the article (MIMEBase.pm:578-583)
         "OwnerUpdate",
         "TicketDynamicFieldUpdate",  # ProcessManagementActivityID (activity B)
         "StateUpdate",
@@ -678,7 +678,7 @@ async def test_enroll_applies_start_dialog_and_transitions(
     assert resp.json()["activity_entity_id"] == activity_eid(1, "B")
     assert resp.json()["process_entity_id"] == process_eid(1)
     _t, _q, state, _l, _p, owner, _r, _cid, _cuid = _ticket(sync_url, TICKET_1)
-    assert state == "open"  # the transition's TicketStateSet (the ticket was in state 4 = open)
+    assert state == "open"  # the transition's TicketStateSet (the ticket was "new")
     assert owner == AGENT2  # Owner field of the start dialog
     assert _df(sync_url, TICKET_1, "Region888") == ["eu"]
     assert _df(sync_url, TICKET_1, "ProcessManagementActivityID") == [activity_eid(1, "B")]
@@ -690,7 +690,7 @@ async def test_enroll_applies_start_dialog_and_transitions(
         "Misc",
         "OwnerUpdate",
         "TicketDynamicFieldUpdate",
-        "StateUpdate",
+        "StateUpdate",  # new -> open: a real change
         "SetPendingTime",
     ]
 
@@ -760,7 +760,7 @@ async def test_customer_submission_fills_customer_and_ignores_submitted_ones(
         engine,
         sync_url,
         actor,
-        {"Title": "From the portal", "CustomerUserID": "somebody-else"},
+        {"Title": "From the portal <OTRS_TICKET_Queue>", "CustomerUserID": "somebody-else"},
         2,
     )
     title, queue, _s, _l, _p, owner, _r, customer_id, customer_user_id = _ticket(
@@ -768,7 +768,8 @@ async def test_customer_submission_fills_customer_and_ignores_submitted_ones(
     )
     assert (customer_id, customer_user_id) == (CUSTOMER_COMPANY, CUSTOMER_LOGIN)
     assert owner == PORTAL_SYSTEM_USER_ID  # CustomerPanelUserID
-    assert (title, queue) == ("From the portal", Q_RAW)
+    # CustomerTicketProcess never renders the title: the tag stays literal.
+    assert (title, queue) == ("From the portal <OTRS_TICKET_Queue>", Q_RAW)
 
 
 @pytest.mark.db
@@ -809,3 +810,123 @@ async def test_agent_customer_user_brings_its_customer_id(
     _t, _q, _s, _l, _p, _o, _r, customer_id, customer_user_id = _ticket(sync_url, ticket_id)
     # TicketCustomerSet: a customer user without CustomerID takes the user's own company.
     assert (customer_id, customer_user_id) == (CUSTOMER_COMPANY, CUSTOMER_LOGIN)
+
+
+# --- review round: same-state guard, FieldOrder, rollback --------------------------------------
+
+
+def _types(url: str, ticket_id: int) -> list[str]:
+    return [h[0] for h in _history(url, ticket_id)]
+
+
+@pytest.mark.db
+async def test_transition_to_the_current_state_writes_no_state_history(
+    client: AsyncClient, sync_url: str
+) -> None:
+    # TicketStateSet.pm:163 + Ticket.pm:4531-4539: same state -> no StateUpdate, no pending reset.
+    _build(
+        sync_url,
+        lambda c: _add_process(c, 2, {"Title": "Display: '1'"}, action_state="new"),
+    )
+    resp = await client.post(
+        f"{PROCESSES}/ticket/{TICKET_2}/start", json={"process_entity_id": process_eid(2)}
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["activity_entity_id"] == activity_eid(2, "B")
+    assert _ticket(sync_url, TICKET_2)[2] == "new"
+    assert _types(sync_url, TICKET_2) == ["TicketDynamicFieldUpdate"] * 3
+
+
+@pytest.mark.db
+async def test_enroll_sets_owner_at_its_field_order_position(
+    client: AsyncClient, sync_url: str
+) -> None:
+    # Submit/enroll store Owner in the save loop (:5800-5860), here before the article.
+    _build(
+        sync_url,
+        lambda c: _add_process(
+            c,
+            2,
+            {
+                "Owner": "Display: '1'",
+                "Article": "{Display: '2', Config: {CommunicationChannel: Internal}}",
+            },
+            action_state=None,
+        ),
+    )
+    resp = await client.post(
+        f"{PROCESSES}/ticket/{TICKET_1}/start",
+        json={
+            "process_entity_id": process_eid(2),
+            "field_values": {"Owner": str(AGENT2), "Subject": "S", "Body": "B"},
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    assert _types(sync_url, TICKET_1) == [
+        "TicketDynamicFieldUpdate",
+        "TicketDynamicFieldUpdate",
+        "OwnerUpdate",
+        "AddNote",
+        "Misc",
+        "TicketDynamicFieldUpdate",  # activity B
+    ]
+    assert _ticket(sync_url, TICKET_1)[5] == AGENT2
+
+
+@pytest.mark.db
+async def test_create_stores_dynamic_fields_before_the_article(
+    client: AsyncClient, sync_url: str
+) -> None:
+    # AgentTicketProcess.pm:5262-5290: a new ticket gets every dynamic field first, whatever
+    # the FieldOrder says (the article is listed before the Region here).
+    _build(
+        sync_url,
+        lambda c: _add_process(
+            c,
+            2,
+            {
+                "Article": "{Display: '2', Config: {CommunicationChannel: Internal}}",
+                "DynamicField_Region888": "Display: '2'",
+            },
+            action_state=None,
+        ),
+    )
+    resp = await client.post(
+        f"{PROCESSES}/tickets",
+        json={
+            "process_entity_id": process_eid(2),
+            "field_values": {"DynamicField_Region888": "us", "Subject": "S", "Body": "B"},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    history = _history(sync_url, resp.json()["ticket_id"])
+    assert [h[0] for h in history] == [
+        "NewTicket",
+        "TicketDynamicFieldUpdate",  # process
+        "TicketDynamicFieldUpdate",  # start activity
+        "TicketDynamicFieldUpdate",  # Region888, before the article
+        "AddNote",
+        "Misc",
+        "TicketDynamicFieldUpdate",  # activity B
+    ]
+    assert "Region888" in history[3][1]
+
+
+@pytest.mark.db
+async def test_failure_after_create_ticket_rolls_the_ticket_back(
+    client: AsyncClient, sync_url: str
+) -> None:
+    # The transition action names an unknown state: the error surfaces after create_ticket,
+    # start_process and the dialog ran, and nothing of it may stay behind.
+    _build(
+        sync_url,
+        lambda c: _add_process(c, 2, {"Title": "Display: '1'"}, action_state="No such state"),
+    )
+    before = _ticket_count(sync_url)
+    resp = await client.post(
+        f"{PROCESSES}/tickets",
+        json={"process_entity_id": process_eid(2), "field_values": {"Title": "Doomed"}},
+    )
+    assert resp.status_code == 400, resp.text
+    assert _ticket_count(sync_url) == before
+    assert _rows(sync_url, "SELECT COUNT(*) FROM ticket WHERE title = 'Doomed'")[0][0] == 0
