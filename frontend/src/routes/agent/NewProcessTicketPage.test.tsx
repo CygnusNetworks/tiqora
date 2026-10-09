@@ -137,6 +137,33 @@ describe("NewProcessTicketPage", () => {
     );
   });
 
+  it("shows the plain conflict text for a 409, not the backend exception text", async () => {
+    searchParams.current = { process: "P" };
+    listStartable.mockResolvedValue(summaries);
+    startForm.mockResolvedValue(startFormData);
+    createTicket.mockRejectedValue(new ApiError(409, { detail: "ProcessNotStartable('P')" }, "/x"));
+    wrap(<NewProcessTicketPage />);
+
+    await fillTitleAndSubmit();
+
+    const msg = await screen.findByTestId("new-process-error");
+    expect(msg).toHaveTextContent("Dieser Prozess kann für dieses Ticket im Moment nicht gestartet werden.");
+    expect(msg).not.toHaveTextContent("ProcessNotStartable");
+  });
+
+  it("blocks submit on a missing required field without calling the API", async () => {
+    searchParams.current = { process: "P" };
+    listStartable.mockResolvedValue(summaries);
+    startForm.mockResolvedValue(startFormData);
+    wrap(<NewProcessTicketPage />);
+
+    fireEvent.click(await screen.findByTestId("new-process-submit"));
+
+    expect(await screen.findByTestId("new-process-field-Title-error")).toBeInTheDocument();
+    expect(createTicket).not.toHaveBeenCalled();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
   it("lets the agent pick a process when none is in the URL", async () => {
     listStartable.mockResolvedValue(summaries);
     startForm.mockResolvedValue(startFormData);

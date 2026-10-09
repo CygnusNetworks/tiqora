@@ -4070,8 +4070,7 @@
     "newTicket": {
       "title": "Neues Prozessticket",
       "chooseProcess": "Prozess wählen",
-      "empty": "Es gibt keinen Prozess, den Sie starten können.",
-      "created": "Ticket {{tn}} wurde angelegt."
+      "empty": "Es gibt keinen Prozess, den Sie starten können."
     }
   },
   "agentTemplates": {

@@ -192,7 +192,7 @@ describe("ProcessWidget", () => {
     await waitFor(() =>
       expect(enroll).toHaveBeenCalledWith(42, {
         process_entity_id: "Process-1",
-        field_values: expect.anything(),
+        field_values: { Title: "Neu" },
       }),
     );
   });

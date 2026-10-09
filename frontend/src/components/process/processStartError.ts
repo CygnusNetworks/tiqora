@@ -9,7 +9,8 @@ export function processStartErrorMessage(err: unknown, t: (key: string) => strin
   if (err instanceof ApiError && err.status === 403) return t("process.start.forbidden");
   if (err instanceof ApiError && err.status === 404) return t("process.start.notFound");
   if (err instanceof ApiError && err.status === 409) {
-    return apiErrorMessage(err, t("process.start.conflict"));
+    // the backend detail is an exception text, not UI copy
+    return t("process.start.conflict");
   }
   return apiErrorMessage(err, t(fallbackKey));
 }

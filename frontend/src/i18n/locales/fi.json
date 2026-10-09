@@ -4062,8 +4062,7 @@
     "newTicket": {
       "title": "New process ticket",
       "chooseProcess": "Choose a process",
-      "empty": "There is no process you can start.",
-      "created": "Ticket {{tn}} was created."
+      "empty": "There is no process you can start."
     }
   },
   "agentTemplates": {
