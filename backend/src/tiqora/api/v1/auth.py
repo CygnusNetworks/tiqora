@@ -24,6 +24,7 @@ from tiqora.api.deps import (
     get_auth_service,
     get_redis,
 )
+from tiqora.config import Settings
 from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import (
     AuthenticatedUser,
@@ -76,6 +77,8 @@ from tiqora.identity.sso_routes import (
 )
 from tiqora.identity.types import ENV_OIDC_SLUG
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.reporting.access import has_report_access
+from tiqora.reporting.settings import load_reporting_settings
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
 from tiqora.znuny.sessions import delete_agent_sessions
 from tiqora.znuny.sysconfig import SysConfig
@@ -107,6 +110,7 @@ async def _user_me(
     session: AsyncSession,
     user: AuthenticatedUser,
     *,
+    settings: Settings,
     extra: dict[str, Any] | None = None,
 ) -> UserMe:
     """Build ``UserMe`` including ``is_admin`` from ``PermissionEngine``."""
@@ -147,6 +151,16 @@ async def _user_me(
         )
     except Exception:  # noqa: BLE001 — same guard as above
         data["can_edit_customers"] = False
+        with contextlib.suppress(Exception):
+            await session.rollback()
+    try:
+        # Same rule as ``require_report_access`` (``reporting.access``): drives the
+        # agent "Berichte" nav item and the time-accounting reports link.
+        data["can_view_reports"] = await has_report_access(
+            session, user.id, await load_reporting_settings(session, settings)
+        )
+    except Exception:  # noqa: BLE001 — same guard as above
+        data["can_view_reports"] = False
         with contextlib.suppress(Exception):
             await session.rollback()
     return UserMe(**data)
@@ -437,7 +451,7 @@ async def login(
         return LoginResponse(user=None, must_enroll_2fa=True)
     token = await auth.create_session(user)
     _set_session_cookie(response, settings, token)
-    return LoginResponse(user=await _user_me(session, user))
+    return LoginResponse(user=await _user_me(session, user, settings=settings))
 
 
 async def _sso_logout_extra(
@@ -460,7 +474,9 @@ async def _sso_logout_extra(
 async def me(
     request: Request, user: CurrentUser, session: DbSession, settings: AppSettings
 ) -> UserMe:
-    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
+    return await _user_me(
+        session, user, settings=settings, extra=await _sso_logout_extra(request, session, settings)
+    )
 
 
 @router.put("/me/language", response_model=UserMe)
@@ -480,7 +496,9 @@ async def set_my_language(
             detail=f"Unsupported language code: {body.language!r}",
         )
     await auth.set_user_language(user.id, code)
-    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
+    return await _user_me(
+        session, user, settings=settings, extra=await _sso_logout_extra(request, session, settings)
+    )
 
 
 @router.put("/me/time-zone", response_model=UserMe)
@@ -502,7 +520,9 @@ async def set_my_time_zone(
                 detail=f"Unknown time zone: {body.time_zone!r}",
             )
     await auth.set_user_time_zone(user.id, zone)
-    return await _user_me(session, user, extra=await _sso_logout_extra(request, session, settings))
+    return await _user_me(
+        session, user, settings=settings, extra=await _sso_logout_extra(request, session, settings)
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -565,7 +585,7 @@ async def totp_verify(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     new_token, user = promoted
     _set_session_cookie(response, settings, new_token)
-    return LoginResponse(user=await _user_me(session, user))
+    return LoginResponse(user=await _user_me(session, user, settings=settings))
 
 
 @router.post("/totp/enroll", response_model=TOTPEnrollOut)
@@ -908,7 +928,7 @@ async def passkey_authenticate_finish(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     new_token, user = promoted
     _set_session_cookie(response, settings, new_token)
-    return LoginResponse(user=await _user_me(session, user))
+    return LoginResponse(user=await _user_me(session, user, settings=settings))
 
 
 # ---------------------------------------------------------------------------

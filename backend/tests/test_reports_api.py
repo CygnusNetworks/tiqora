@@ -836,3 +836,45 @@ async def test_access_setting_stats_group(env: Env) -> None:
     assert job["error"] == "Für Berichte fehlt die Berechtigung."
     await env.set_access("all_agents")
     assert (await env.client.get("/api/v1/reports")).status_code == 200
+
+
+async def test_me_can_view_reports_follows_access_setting(env: Env) -> None:
+    """``/auth/me`` ``can_view_reports`` uses the rule of ``require_report_access``."""
+
+    async def flag() -> bool:
+        resp = await env.client.get("/api/v1/auth/me")
+        assert resp.status_code == 200, resp.text
+        return resp.json()["can_view_reports"]  # type: ignore[no-any-return]
+
+    assert await flag() is True  # default all_agents
+    await env.set_access("stats_group")
+    assert await flag() is False  # agent without the stats group
+    assert (await env.client.get("/api/v1/reports")).status_code == 403
+    env.user = ADMIN
+    assert await flag() is True  # admins always may
+    env.user = USER
+    async with env.factory() as s:
+        # ``ro`` on Znuny's seeded "stats" group grants access (Znuny parity)
+        stats = (
+            await s.execute(text("SELECT id FROM permission_groups WHERE name = 'stats'"))
+        ).scalar_one()
+        await s.execute(
+            text(
+                "INSERT INTO group_user (user_id, group_id, permission_key,"
+                " create_time, create_by, change_time, change_by)"
+                " VALUES (:u, :g, 'ro', :t, 1, :t, 1)"
+            ),
+            {"u": AGENT, "g": stats, "t": BUILT},
+        )
+        await s.commit()
+    try:
+        assert await flag() is True
+        assert (await env.client.get("/api/v1/reports")).status_code == 200
+    finally:
+        async with env.factory() as s:
+            await s.execute(
+                text("DELETE FROM group_user WHERE user_id = :u AND group_id = :g"),
+                {"u": AGENT, "g": stats},
+            )
+            await s.commit()
+        await env.set_access("all_agents")

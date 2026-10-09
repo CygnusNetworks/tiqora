@@ -83,6 +83,9 @@ class UserMe(BaseModel):
     # True when the agent may create and edit customer users on that page
     # (admin, or a customer_edit grant).
     can_edit_customers: bool = False
+    # True when the agent may open reports — the rule of ``require_report_access``
+    # (``reporting.access``: every agent, or admins + ``ro`` on the ``stats`` group).
+    can_view_reports: bool = False
 
 
 class UserLanguageUpdate(BaseModel):

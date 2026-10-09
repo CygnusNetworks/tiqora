@@ -19189,6 +19189,11 @@ export interface components {
              */
             can_use_customer_directory: boolean;
             /**
+             * Can View Reports
+             * @default false
+             */
+            can_view_reports: boolean;
+            /**
              * Default Time Zone
              * @default UTC
              */

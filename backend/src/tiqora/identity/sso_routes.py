@@ -755,6 +755,7 @@ async def _complete_login(
             user=await _user_me(
                 session,
                 agent_user,
+                settings=settings,
                 extra={
                     "avatar_url": avatar_url,
                     "sso_logout": sso_logout_available(sso, record),

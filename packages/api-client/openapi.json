@@ -30124,6 +30124,11 @@
             "title": "Can Use Customer Directory",
             "type": "boolean"
           },
+          "can_view_reports": {
+            "default": false,
+            "title": "Can View Reports",
+            "type": "boolean"
+          },
           "default_time_zone": {
             "default": "UTC",
             "title": "Default Time Zone",
