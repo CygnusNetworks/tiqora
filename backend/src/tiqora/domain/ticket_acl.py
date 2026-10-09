@@ -9,7 +9,8 @@ Mirrors ``Kernel/System/Ticket/TicketACL.pm`` for the data-filtering path:
 * Apply ``Possible`` (replace whitelist), ``PossibleAdd`` (union), and
   ``PossibleNot`` (subtract) for ``ReturnType`` Action/Ticket (and Process /
   ActivityDialog specials treated like Action).
-* ``UserID == 1`` is never restricted (Znuny root).
+* ``UserID == 1`` is never restricted (Znuny root). A customer principal
+  (``CustomerUserID`` only, no ``UserID``) is never root (``TicketACL.pm:155-175``).
 * ``stop_after_match`` stops further ACL evaluation after a productive match.
 
 This filters selectable values / actions only. Group/role queue permissions
@@ -21,19 +22,21 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import yaml
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.config import Acl
+from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import Ticket, TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import (
+    GroupCustomerUser,
     GroupRole,
     GroupUser,
     PermissionGroups,
@@ -43,6 +46,7 @@ from tiqora.db.legacy.user import (
 )
 from tiqora.deployed.store import load_active_revision
 from tiqora.permissions.engine import PERMISSION_KEYS
+from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +58,32 @@ _ROOT_USER_ID = 1
 # Return types that store Possible* under ``{ReturnType}: [items]`` rather
 # than ``Ticket: {ReturnSubType: [items]}``.
 _SPECIAL_RETURN_TYPES = frozenset({"Action", "Process", "ActivityDialog"})
+
+# Framework.xml:3186-3196 (System::Customer::Permission) and :3495-3500 (CustomerGroupSupport).
+_DEFAULT_CUSTOMER_PERMISSIONS = ["ro", "rw"]
+
+ProcessAclKind = Literal["Process", "ActivityDialog", "Action"]
+
+
+@dataclass(frozen=True, slots=True)
+class AclPrincipal:
+    """Who the ACLs are evaluated for: an agent (``UserID``) or a customer user.
+
+    Znuny's ``TicketAcl`` takes ``UserID`` OR ``CustomerUserID`` (``TicketACL.pm:97-98,
+    155-160``); the customer interface passes only the latter.
+    """
+
+    user_id: int | None = None
+    customer_user_login: str | None = None
+
+    @classmethod
+    def agent(cls, user_id: int) -> AclPrincipal:
+        return cls(user_id=user_id)
+
+    @classmethod
+    def customer(cls, login: str) -> AclPrincipal:
+        return cls(customer_user_login=login)
+
 
 # ---------------------------------------------------------------------------
 # Match primitives (pure — unit-tested without DB)
@@ -421,6 +451,98 @@ async def load_user_checks(session: AsyncSession, user_id: int) -> dict[str, Any
     return checks
 
 
+async def load_customer_user_checks(
+    session: AsyncSession, login: str, *, sysconfig: SysConfig | None = None
+) -> dict[str, Any]:
+    """Build Znuny's ``CustomerUser`` check hash for *login*.
+
+    ``CustomerUserDataGet`` (``CustomerUser/DB.pm:1190-1296``, ``CustomerUser.pm:825-843``)
+    returns the mapped columns (``UserLogin``, ``UserFirstname``, ... ``UserCustomerID``),
+    ``UserID`` = login and ``UserFullname``; the login match is ``LOWER(login) = LOWER(?)``.
+    ``TicketACL.pm:1253-1266`` adds ``Group_<perm>`` for every type in
+    ``System::Customer::Permission`` from ``CustomerGroup::GroupMemberList``
+    (``CustomerGroup.pm:266-281``): with ``CustomerGroupSupport`` off (the default) that is
+    every valid group, with it on the valid groups of ``group_customer_user`` rows with
+    ``permission_value = 1`` and ``permission_key IN (perm, 'rw')``.
+
+    Known limitation (documented, not built): customer-company groups (``group_customer``) and
+    ``CustomerGroupAlwaysGroups`` that GroupMemberList adds on top when support is on.
+    An unknown login still gets the ``Group_*`` lists, like Znuny (empty user hash + groups).
+    """
+    cfg = sysconfig or SysConfig(session)
+    checks: dict[str, Any] = {}
+    row = (
+        (
+            await session.execute(
+                select(CustomerUser).where(func.lower(CustomerUser.login) == login.lower()).limit(1)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if row is not None:
+        checks.update(
+            {
+                "UserID": row.login,
+                "UserLogin": row.login,
+                "UserEmail": row.email,
+                "UserCustomerID": row.customer_id,
+                "UserTitle": row.title,
+                "UserFirstname": row.first_name,
+                "UserLastname": row.last_name,
+                "UserFullname": f"{row.first_name} {row.last_name}".strip(),
+                "UserPhone": row.phone,
+                "UserFax": row.fax,
+                "UserMobile": row.mobile,
+                "UserStreet": row.street,
+                "UserZip": row.zip,
+                "UserCity": row.city,
+                "UserCountry": row.country,
+                "UserComment": row.comments,
+                "ValidID": row.valid_id,
+            }
+        )
+
+    permissions = await cfg.get("System::Customer::Permission", _DEFAULT_CUSTOMER_PERMISSIONS)
+    if not isinstance(permissions, list):
+        permissions = _DEFAULT_CUSTOMER_PERMISSIONS
+    valid_groups = {
+        gid: name
+        for gid, name in (
+            await session.execute(
+                select(PermissionGroups.id, PermissionGroups.name).where(
+                    PermissionGroups.valid_id == _VALID
+                )
+            )
+        ).all()
+    }
+    group_support = await cfg.get("CustomerGroupSupport", 0)
+    if str(group_support) not in ("1", "True", "true"):
+        # CustomerGroup.pm:266-269: support off -> every valid group, for every type.
+        everything = sorted(valid_groups.values())
+        for perm in permissions:
+            checks[f"Group_{perm}"] = list(everything)
+        return checks
+
+    # CustomerGroup.pm:270-281: only permitted groups; ``rw`` stands in for every key.
+    keys_by_group: dict[int, set[str]] = {}
+    for group_id, key in (
+        await session.execute(
+            select(GroupCustomerUser.group_id, GroupCustomerUser.permission_key).where(
+                GroupCustomerUser.user_id == login, GroupCustomerUser.permission_value == 1
+            )
+        )
+    ).all():
+        keys_by_group.setdefault(group_id, set()).add(key)
+    for perm in permissions:
+        checks[f"Group_{perm}"] = sorted(
+            valid_groups[gid]
+            for gid, keys in keys_by_group.items()
+            if gid in valid_groups and (perm in keys or "rw" in keys)
+        )
+    return checks
+
+
 async def load_ticket_attribute_checks(
     session: AsyncSession,
     ticket_id: int,
@@ -532,27 +654,34 @@ async def load_ticket_attribute_checks(
 async def build_checks(
     session: AsyncSession,
     *,
-    user_id: int,
+    user_id: int | None,
     ticket_id: int | None = None,
     action: str | None = None,
     checks: dict[str, Any] | None = None,
     customer_user_id: str | None = None,
+    process: Mapping[str, str] | None = None,
+    sysconfig: SysConfig | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Assemble ``Checks`` (mutable/form) and ``ChecksDatabase`` (DB ticket).
 
-    *checks* may pre-fill/override form-side values (e.g. selected QueueID on
-    a create form). Database side is loaded from *ticket_id* when given.
+    Mirrors ``TicketACL.pm`` ``_GetChecks`` (1058ff). *checks* may pre-fill/override
+    form-side values (e.g. selected QueueID on a create form). Database side is loaded
+    from *ticket_id* when given. *customer_user_id* is Znuny's ``CustomerUserID`` param:
+    the customer principal (or the customer picked on an agent form).
     """
     checks_live: dict[str, Any] = {}
     checks_db: dict[str, Any] = {}
 
+    # TicketACL.pm:1070-1078
     if action:
         checks_live["Frontend"] = {"Action": action}
         checks_db["Frontend"] = {"Action": action}
 
-    user_block = await load_user_checks(session, user_id)
-    checks_live["User"] = user_block
-    checks_db["User"] = dict(user_block)
+    # TicketACL.pm:1216-1245: only with a UserID (a customer principal has no User block).
+    if user_id is not None:
+        user_block = await load_user_checks(session, user_id)
+        checks_live["User"] = user_block
+        checks_db["User"] = dict(user_block)
 
     if ticket_id is not None:
         db_attrs = await load_ticket_attribute_checks(session, ticket_id)
@@ -561,10 +690,39 @@ async def build_checks(
             checks_db[key] = dict(value) if isinstance(value, dict) else value
             checks_live[key] = dict(value) if isinstance(value, dict) else value
 
+    # TicketACL.pm:1118-1146: process entity ids passed as parameters go to the live side only
+    # (the ticket's own come from its dynamic fields on both sides, above).
+    param_process = {k: v for k, v in (process or {}).items() if v}
+    if param_process:
+        checks_live.setdefault("Process", {}).update(param_process)
+
+    ticket_customer = (checks_db.get("Ticket") or {}).get("CustomerUserID") or None
     if customer_user_id:
+        # TicketACL.pm:1253-1275: live CustomerUser from the param; it also overrides the
+        # ticket's CustomerUserID/CustomerID.
+        customer_block = await load_customer_user_checks(
+            session, customer_user_id, sysconfig=sysconfig
+        )
+        checks_live["CustomerUser"] = customer_block
         ticket_live = checks_live.setdefault("Ticket", {})
         if isinstance(ticket_live, dict):
-            ticket_live["CustomerUserID"] = customer_user_id
+            ticket_live["CustomerUserID"] = customer_block.get("UserLogin")
+            ticket_live["CustomerID"] = customer_block.get("UserCustomerID")
+    elif ticket_customer:
+        # TicketACL.pm:1276-1292: otherwise the ticket's customer.
+        checks_live["CustomerUser"] = await load_customer_user_checks(
+            session, ticket_customer, sysconfig=sysconfig
+        )
+    # TicketACL.pm:1296-1332: database side = the ticket's customer (reuse the live one when
+    # it is the same login).
+    if ticket_customer:
+        live_customer = checks_live.get("CustomerUser") or {}
+        if live_customer.get("UserLogin") == ticket_customer:
+            checks_db["CustomerUser"] = live_customer
+        else:
+            checks_db["CustomerUser"] = await load_customer_user_checks(
+                session, ticket_customer, sysconfig=sysconfig
+            )
 
     # Merge caller-supplied form overrides into Checks (not ChecksDatabase).
     if checks:
@@ -633,7 +791,7 @@ async def load_valid_acls(session: AsyncSession) -> list[AclRule]:
 async def apply_ticket_acl(
     session: AsyncSession,
     *,
-    user_id: int,
+    user_id: int | None = None,
     data: dict[Any, str],
     return_type: str,
     return_sub_type: str,
@@ -641,17 +799,28 @@ async def apply_ticket_acl(
     action: str | None = None,
     checks: dict[str, Any] | None = None,
     customer_user_id: str | None = None,
+    customer_user_login: str | None = None,
+    process: Mapping[str, str] | None = None,
+    sysconfig: SysConfig | None = None,
 ) -> dict[Any, str]:
     """Filter *data* (id→name map) through Ticket ACLs.
 
     If no ACL matches productively, returns a copy of the original *data*.
-    UserID 1 is never restricted.
+    Principal: *user_id* (agent) or *customer_user_login* (customer interface; Znuny's
+    ``CustomerUserID``, ``TicketACL.pm:97-98``). Only ``user_id == 1`` is never restricted
+    (``TicketACL.pm:175``); a customer principal is never root. With neither principal Znuny
+    logs "Need UserID or CustomerUserID" and returns nothing (``:155-160``) -> original data.
+    *process* carries ``ProcessEntityID`` / ``ActivityEntityID`` / ``ActivityDialogEntityID``
+    for the live ``Process`` checks (``:1118-1146``).
     """
     original = dict(data)
     if not original:
         return original
 
-    if user_id == _ROOT_USER_ID:
+    effective_customer = customer_user_login or customer_user_id
+    if user_id is None and not effective_customer:
+        return original
+    if user_id is not None and user_id == _ROOT_USER_ID:
         return original
 
     acls = await load_valid_acls(session)
@@ -664,7 +833,9 @@ async def apply_ticket_acl(
         ticket_id=ticket_id,
         action=action,
         checks=checks,
-        customer_user_id=customer_user_id,
+        customer_user_id=effective_customer,
+        process=process,
+        sysconfig=sysconfig,
     )
 
     new_data = dict(original)
@@ -735,3 +906,44 @@ async def filter_id_name_map(
         except (TypeError, ValueError):
             continue
     return out
+
+
+async def filter_process_options(
+    session: AsyncSession,
+    *,
+    principal: AclPrincipal,
+    kind: ProcessAclKind,
+    items: Sequence[str],
+    action: str,
+    ticket_id: int | None = None,
+    process_entity_id: str | None = None,
+    activity_dialog_entity_id: str | None = None,
+    activity_entity_id: str | None = None,
+    sysconfig: SysConfig | None = None,
+) -> list[str]:
+    """Filter process entity ids (``Process`` / ``ActivityDialog``) or action names through ACLs.
+
+    Znuny passes the entities themselves as ``Data`` (``{EntityID => EntityID}``) with
+    ``ReturnSubType '-'`` (``AgentTicketProcess.pm:156-177``, ``TicketACL.pm:37``). Returns the
+    kept items in input order. The ``Action`` kind is only meaningful with a ticket context
+    (rulings F36); callers decide, this function does not.
+    """
+    data: dict[Any, str] = {item: item for item in items}
+    process = {
+        "ProcessEntityID": process_entity_id or "",
+        "ActivityEntityID": activity_entity_id or "",
+        "ActivityDialogEntityID": activity_dialog_entity_id or "",
+    }
+    kept = await apply_ticket_acl(
+        session,
+        user_id=principal.user_id,
+        customer_user_login=principal.customer_user_login,
+        data=data,
+        return_type=kind,
+        return_sub_type="-",
+        ticket_id=ticket_id,
+        action=action,
+        process=process,
+        sysconfig=sysconfig,
+    )
+    return [item for item in items if item in kept]

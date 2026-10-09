@@ -4,11 +4,14 @@ attributed to (Znuny ``AgentTicketProcess`` vs ``CustomerTicketProcess``)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 # Znuny CustomerPanelUserID: the customer interface writes as this user
 # (CustomerTicketProcess.pm uses ``CustomerPanelUserID`` for every ticket write).
 from tiqora.domain.portal_ticket_service import PORTAL_SYSTEM_USER_ID
+
+if TYPE_CHECKING:
+    from tiqora.domain.ticket_acl import AclPrincipal
 
 Interface = Literal["AgentInterface", "CustomerInterface"]
 
@@ -40,3 +43,14 @@ class ProcessActor:
         return (
             "AgentTicketProcess" if self.interface == "AgentInterface" else "CustomerTicketProcess"
         )
+
+    @property
+    def acl_principal(self) -> AclPrincipal:
+        """The ACL principal: the agent, or the customer user (never the portal system user,
+        which would be treated as an unrestricted-looking agent id)."""
+        # Imported here: domain.ticket_acl -> deployed.store -> process.dump -> this package.
+        from tiqora.domain.ticket_acl import AclPrincipal
+
+        if self.interface == "CustomerInterface" and self.customer_user_login:
+            return AclPrincipal.customer(self.customer_user_login)
+        return AclPrincipal.agent(self.user_id)
