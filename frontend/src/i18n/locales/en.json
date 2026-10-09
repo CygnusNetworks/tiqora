@@ -4147,8 +4147,10 @@
         "updateProfile": "Update name and email on every sign-in",
         "previewHeading": "Preview",
         "previewEmpty": "Start a test sign-in and choose \"Use these values for the preview\". You then see here at once what a sign-in with these values would do, including unsaved changes.",
-        "previewHelp": "This is what a sign-in with the values of the last test sign-in would do, including your unsaved changes.",
-        "previewError": "The preview could not be calculated."
+        "previewHelp": "This is what a sign-in with the values of the last test sign-in would do, including your unsaved changes on the Mapping tab. Unsaved changes to the role rules are not included.",
+        "previewError": "The preview could not be calculated.",
+        "previewAudience": "Preview as",
+        "samlEmailWarning": "Note: the sign-in service decides which e-mail address a user has. Only match by e-mail if users cannot change their address there themselves; otherwise match by login name."
       },
       "roles": {
         "rulesHeading": "Rules",
@@ -4191,11 +4193,11 @@
         "managedGroup": "Group {{name}} ({{permission}})"
       },
       "links": {
-        "intro": "These accounts signed in through this sign-in service. When a link is removed, the account is matched again on its next sign-in.",
+        "intro": "These accounts signed in through this sign-in service. When a link is removed, the next sign-in is matched again if the account is found or automatic creation is on. Otherwise the sign-in is rejected.",
         "empty": "Nobody has signed in through this sign-in service yet.",
         "loadError": "The links could not be loaded.",
         "removeTitle": "Remove link?",
-        "removeBody": "The link between \"{{login}}\" and this sign-in service is removed. The user account stays and is matched again on the next sign-in.",
+        "removeBody": "The link between \"{{login}}\" and this sign-in service is removed. The user account stays. The next sign-in is matched again if the account is found or automatic creation is on; otherwise it is rejected.",
         "remove": "Remove link",
         "removeError": "The link could not be removed.",
         "account": "Account",

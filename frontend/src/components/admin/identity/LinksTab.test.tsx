@@ -3,6 +3,8 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
+import { formatDateTime } from "@/lib/format";
+import { toBcp47 } from "@/i18n";
 import { ApiError } from "@/lib/api";
 import { LinksTab } from "./LinksTab";
 import { makeProvider } from "./testFixtures";
@@ -50,6 +52,10 @@ describe("LinksTab", () => {
     expect(list[0]).toHaveTextContent("Agent");
     expect(list[0]).toHaveTextContent("subject-agent-1");
     expect(list[1]).toHaveTextContent("Kunde");
+    const cells = list[0].querySelectorAll("td");
+    expect(cells[3].textContent).toBe(formatDateTime("2026-09-20T07:15:00Z", toBcp47(i18n.language)));
+    expect(cells[4].textContent).toBe(formatDateTime("2026-10-08T06:45:00Z", toBcp47(i18n.language)));
+    expect(cells[3].textContent).not.toBe("—");
     expect(links).toHaveBeenCalledWith(1, expect.anything());
   });
 

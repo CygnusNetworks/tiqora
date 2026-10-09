@@ -7,6 +7,7 @@ import { SelectField } from "@/components/ui/SelectField";
 import { Spinner } from "@/components/ui/Spinner";
 import { Switch } from "@/components/ui/Switch";
 import { TagInput } from "@/components/ui/TagInput";
+import { cn } from "@/lib/cn";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import {
   identityApi,
@@ -92,9 +93,12 @@ export function MappingTab({
   );
 
   // Live preview of what a sign-in with the sample values would do, including unsaved edits.
+  const [previewAudience, setPreviewAudience] = useState<"agent" | "customer">(
+    provider.audience === "customer" ? "customer" : "agent",
+  );
   const requestKey = JSON.stringify({
     attributes: sampleAttributes,
-    audience: provider.audience === "customer" ? "customer" : "agent",
+    audience: previewAudience,
     draft: dirty && !locked ? values : null,
   });
   const [debounced, setDebounced] = useState(requestKey);
@@ -113,6 +117,8 @@ export function MappingTab({
   const domains = values.jit_defaults.allowed_email_domains ?? [];
   const config = provider.config as Record<string, unknown>;
   const emailUntrusted = values.match_by === "email" && provider.kind === "oidc" && config.email_must_be_verified === false;
+  const samlEmail = values.match_by === "email" && provider.kind === "saml";
+  const samlEmailRed = samlEmail && forAgents && values.jit_enabled;
   const entraEmail = values.match_by === "email" && provider.preset === "entra_id";
 
   return (
@@ -176,6 +182,19 @@ export function MappingTab({
             {t("admin.identity.mapping.emailUntrustedWarning")}
           </p>
         )}
+        {samlEmail && (
+          <p
+            data-testid="identity-saml-email-warning"
+            role={samlEmailRed ? "alert" : undefined}
+            className={
+              samlEmailRed
+                ? "rounded border border-danger/30 bg-danger/15 px-3 py-2 text-sm text-ink"
+                : "rounded border border-escalation/30 bg-escalation/15 px-3 py-2 text-sm text-ink"
+            }
+          >
+            {t("admin.identity.mapping.samlEmailWarning")}
+          </p>
+        )}
         {entraEmail && (
           <p data-testid="identity-entra-email-warning" className="rounded border border-escalation/30 bg-escalation/15 px-3 py-2 text-sm text-ink">
             {t("admin.identity.mapping.entraEmailWarning")}
@@ -200,13 +219,14 @@ export function MappingTab({
         {values.jit_enabled && (
           <div className="space-y-3" data-testid="identity-jit-details">
             <div>
-              <div id="identity-jit-domains-label" className="mb-1 text-xs font-medium text-muted">
+              <label htmlFor="identity-jit-domains-input" className="mb-1 block text-xs font-medium text-muted">
                 {t("admin.identity.mapping.allowedDomains")}
-              </div>
+              </label>
               {locked ? (
                 <p className="text-sm text-ink">{domains.join(", ") || "–"}</p>
               ) : (
                 <TagInput
+                  id="identity-jit-domains-input"
                   testId="identity-jit-domains"
                   value={domains}
                   onChange={(next) => setJit({ allowed_email_domains: next })}
@@ -317,6 +337,27 @@ export function MappingTab({
         ) : (
           <>
             <p className="text-xs text-muted">{t("admin.identity.mapping.previewHelp")}</p>
+            {provider.audience === "both" && (
+              <div role="group" aria-label={t("admin.identity.mapping.previewAudience")} className="flex items-center gap-1.5">
+                {(["agent", "customer"] as const).map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    data-testid={`identity-preview-audience-${a}`}
+                    aria-pressed={previewAudience === a}
+                    onClick={() => setPreviewAudience(a)}
+                    className={cn(
+                      "rounded-lg border px-3 py-1.5 text-[12.5px] font-medium",
+                      previewAudience === a
+                        ? "border-accent bg-accent text-accent-ink"
+                        : "border-hairline bg-surface text-muted hover:text-ink",
+                    )}
+                  >
+                    {t(`admin.identity.test.audiences.${a}`)}
+                  </button>
+                ))}
+              </div>
+            )}
             {previewQ.isError && (
               <p data-testid="identity-preview-error" role="alert" className="text-sm text-danger">
                 {apiErrorMessage(previewQ.error, t("admin.identity.mapping.previewError"))}

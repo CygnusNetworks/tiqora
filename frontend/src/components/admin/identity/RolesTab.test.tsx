@@ -116,5 +116,12 @@ describe("RolesTab", () => {
     expect(screen.queryByTestId("identity-roles-save")).toBeNull();
     expect(screen.queryByTestId("identity-rule-add")).toBeNull();
     expect(screen.getByTestId("identity-rule-0-attribute")).toBeDisabled();
+    expect(screen.getByTestId("identity-rule-0-value")).toBeDisabled();
+    expect(screen.getByTestId("identity-rule-0-groups-0-perm-ro")).toBeDisabled();
+    expect(screen.getByTestId("identity-sync-managed")).toBeDisabled();
+    expect(screen.getByTestId("identity-sync-authoritative")).toBeDisabled();
+    expect(screen.queryByTestId("identity-rule-0-remove")).toBeNull();
+    expect(screen.queryByTestId("identity-rule-0-groups-0-remove")).toBeNull();
+    expect(screen.queryByTestId("identity-rule-0-groups-add")).toBeNull();
   });
 });

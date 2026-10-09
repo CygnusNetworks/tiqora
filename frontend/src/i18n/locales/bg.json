@@ -4140,7 +4140,9 @@
         "previewHeading": "Preview",
         "previewEmpty": "Start a test sign-in and choose \"Use these values for the preview\". You then see here at once what a sign-in with these values would do, including unsaved changes.",
         "previewHelp": "This is what a sign-in with the values of the last test sign-in would do, including your unsaved changes.",
-        "previewError": "The preview could not be calculated."
+        "previewError": "The preview could not be calculated.",
+        "previewAudience": "Preview as",
+        "samlEmailWarning": "Note: the sign-in service decides which e-mail address a user has. Only match by e-mail if users cannot change their address there themselves; otherwise match by login name."
       },
       "roles": {
         "rulesHeading": "Rules",

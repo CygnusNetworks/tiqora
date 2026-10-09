@@ -4147,8 +4147,10 @@
         "updateProfile": "Namen und E-Mail bei jeder Anmeldung aktualisieren",
         "previewHeading": "Vorschau",
         "previewEmpty": "Starten Sie eine Testanmeldung und wählen Sie „Werte für die Vorschau übernehmen“. Dann sehen Sie hier sofort, was bei einer Anmeldung mit diesen Werten passieren würde, auch für ungespeicherte Änderungen.",
-        "previewHelp": "So würde eine Anmeldung mit den Werten der letzten Testanmeldung ablaufen, einschließlich Ihrer ungespeicherten Änderungen.",
-        "previewError": "Die Vorschau konnte nicht berechnet werden."
+        "previewHelp": "So würde eine Anmeldung mit den Werten der letzten Testanmeldung ablaufen, einschließlich Ihrer ungespeicherten Änderungen auf dem Reiter „Zuordnung“. Ungespeicherte Änderungen der Rollenregeln sind nicht enthalten.",
+        "previewError": "Die Vorschau konnte nicht berechnet werden.",
+        "previewAudience": "Vorschau als",
+        "samlEmailWarning": "Hinweis: Der Anmeldedienst entscheidet, welche E-Mail-Adresse ein Benutzer hat. Nutzen Sie die Zuordnung über E-Mail nur, wenn Benutzer ihre Adresse dort nicht selbst ändern können; sonst ordnen Sie über den Anmeldenamen zu."
       },
       "roles": {
         "rulesHeading": "Regeln",
@@ -4191,11 +4193,11 @@
         "managedGroup": "Gruppe {{name}} ({{permission}})"
       },
       "links": {
-        "intro": "Diese Konten haben sich über diesen Anmeldedienst angemeldet. Wird eine Verknüpfung gelöst, wird das Konto beim nächsten Anmelden neu zugeordnet.",
+        "intro": "Diese Konten haben sich über diesen Anmeldedienst angemeldet. Wird eine Verknüpfung gelöst, wird bei der nächsten Anmeldung neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist. Sonst wird die Anmeldung abgewiesen.",
         "empty": "Noch hat sich niemand über diesen Anmeldedienst angemeldet.",
         "loadError": "Die Verknüpfungen konnten nicht geladen werden.",
         "removeTitle": "Verknüpfung lösen?",
-        "removeBody": "Die Verknüpfung von „{{login}}“ mit diesem Anmeldedienst wird gelöst. Das Benutzerkonto bleibt erhalten und wird bei der nächsten Anmeldung neu zugeordnet.",
+        "removeBody": "Die Verknüpfung von „{{login}}“ mit diesem Anmeldedienst wird gelöst. Das Benutzerkonto bleibt erhalten. Bei der nächsten Anmeldung wird neu zugeordnet, sofern das Konto wieder gefunden wird oder automatisches Anlegen aktiv ist; sonst wird die Anmeldung abgewiesen.",
         "remove": "Verknüpfung lösen",
         "removeError": "Die Verknüpfung konnte nicht gelöst werden.",
         "account": "Konto",
