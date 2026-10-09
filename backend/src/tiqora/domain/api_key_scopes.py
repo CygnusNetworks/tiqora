@@ -66,6 +66,9 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/kb", "kb"),
     ("/api/v1/calendar", "calendar"),
     ("/api/v1/stats", "stats"),
+    # Reports replace /stats (same data); running one is a POST, so it needs stats:rw.
+    ("/api/v1/reports", "stats"),
+    ("/api/v1/reporting", "stats"),
     ("/api/v1/ai", "ai"),
     ("/api/v1/process", "process"),
     ("/api/v1/channels", "channels"),

@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
+from tiqora.db.legacy.user import Users
 from tiqora.db.tiqora.models import TiqoraJob, TiqoraJobFile
 from tiqora.extensions import Registry, get_registry
 from tiqora.jobs.registry import JOB_HANDLERS
@@ -82,6 +83,19 @@ async def enqueue_job(
     session.add(job)
     await session.flush()
     return job
+
+
+async def lock_user_job_quota(session: AsyncSession, user_id: int) -> None:
+    """Serialise per-user job caps: ``SELECT ... FOR UPDATE`` on the user's ``users`` row.
+
+    Call it as the FIRST statement of the transaction that counts the user's active
+    jobs (:func:`count_active_jobs`) and enqueues, then commit. A second request of the
+    same user waits here until the first one committed, so check-then-insert cannot
+    overshoot the cap. Only a row lock — nothing is written to the Znuny table. It must
+    come first because MariaDB's REPEATABLE READ snapshot starts at the first plain read:
+    a snapshot taken before the lock would not see the other request's committed job.
+    """
+    await session.execute(select(Users.id).where(Users.id == user_id).with_for_update())
 
 
 async def count_active_jobs(session: AsyncSession, *, kind: str, created_by: int) -> int:

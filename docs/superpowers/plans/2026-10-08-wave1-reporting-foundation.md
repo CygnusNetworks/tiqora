@@ -958,6 +958,10 @@ As built (Task 16):
 - `POST /reports/export` validates the request through `plan_report` (scope and compile only), so an invalid request gets 422 right away. No report query runs in the request.
 - Job results are private (controller ruling): `JobHandler.result_private`, set for `core.report_run` and `core.report_export`. `job_out(..., viewer_id=)` drops `result` for anyone except the creator, admins included, in both `GET /jobs` and `GET /jobs/{id}`. Files were already creator-only.
 - Per-user cap (controller ruling): at most `MAX_ACTIVE_REPORT_JOBS_PER_USER = 3` queued or running `core.report_run` + `core.report_export` jobs. Past that, an enqueue returns 429 with a German `detail.message`. Inline runs are not counted.
+- Cap race (review fix): the count and the enqueue run in a fresh transaction whose first statement is `jobs.service.lock_user_job_quota`, i.e. `SELECT users.id ... FOR UPDATE` on the caller's row. The same applies to the ticket export cap in `tickets.py`.
+- One plan per inline run (review fix): the route calls `plan_report`, then the cache lookup and the estimate, then `engine.execute_and_store(session, plan, ...)`. That is `run_report`'s tail without the lookup, and `run_report` itself is unchanged.
+- Request size limits: at most 10 parameters, with lists of up to `MAX_IN_VALUES` values and strings of up to `MAX_STRING_LENGTH`; at most 3 `dimension_choices`; label maps of at most 20 columns and 500 values per column, each label at most 200 characters; `info_lines` items of at most 300 characters.
+- API-key scopes: `/api/v1/reports` and `/api/v1/reporting` map to the `stats` area. A run is a POST, so it needs `stats:rw`.
 - `ReportSourceOut.filter_fields` maps a filter-only field as: `kind` = `filter_type`, `labels` "none", `i18n_values`/`options_source` None, `time_field` false.
 - The wave-0 filter models (`Filter`, `AllOf`, `AnyOf`, `Not`) set `json_schema_mode_override="validation"`. Without it, the recursive models get split into `-Input`/`-Output` OpenAPI schemas as soon as `BuiltinReportOut.definition` uses them in a response, and that renames `Filter` and `ReportDefinition` in `schema.d.ts`.
 

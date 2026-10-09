@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from tiqora.domain.schemas import UtcDateTime
+from tiqora.filters.catalog import MAX_IN_VALUES, MAX_STRING_LENGTH
 from tiqora.jobs.schemas import JobAccepted
-from tiqora.reporting.definition import ReportDefinition, TimeRange
+from tiqora.reporting.definition import MAX_KEY_LENGTH, ReportDefinition, TimeRange
 from tiqora.reporting.sql import Grain
 
 #: One result cell: dimension values (ids, strings, ISO dates) and measure values.
@@ -105,7 +106,27 @@ class ReportResultOut(BaseModel):
     facts: FactsStatusOut
 
 
-ParameterValue = list[str | int] | str | int | bool | None
+# Request size limits (422 beyond them): parameter and choice counts follow the
+# definition limits (10 parameters, 3 dimensions), parameter values the filter
+# language (MAX_IN_VALUES values of at most MAX_STRING_LENGTH characters); export
+# labels allow every column of a result (3 dimensions + 10 measures) with headroom.
+MAX_RUN_PARAMETERS: Final = 10
+MAX_DIMENSION_CHOICES: Final = 3
+MAX_LABEL_COLUMNS: Final = 20
+MAX_VALUE_LABELS_PER_COLUMN: Final = 500
+MAX_LABEL_LENGTH: Final = 200
+MAX_INFO_LINE_LENGTH: Final = 300
+
+_ParamString = Annotated[str, Field(max_length=MAX_STRING_LENGTH)]
+ParameterValue = (
+    Annotated[list[_ParamString | int], Field(max_length=MAX_IN_VALUES)]
+    | _ParamString
+    | int
+    | bool
+    | None
+)
+_ColumnKey = Annotated[str, Field(max_length=MAX_KEY_LENGTH)]
+_Label = Annotated[str, Field(max_length=MAX_LABEL_LENGTH)]
 
 
 class ReportRunIn(BaseModel):
@@ -123,9 +144,13 @@ class ReportRunIn(BaseModel):
     time_range: TimeRange | None = None
     grain: Grain | None = None
     time_zone: str | None = Field(None, max_length=64)
-    parameters: dict[str, ParameterValue] = Field(default_factory=dict)
+    parameters: dict[Annotated[str, Field(max_length=40)], ParameterValue] = Field(
+        default_factory=dict, max_length=MAX_RUN_PARAMETERS
+    )
     #: dimension index as a string ("0") -> dimension key
-    dimension_choices: dict[str, str] = Field(default_factory=dict)
+    dimension_choices: dict[Annotated[str, Field(max_length=3)], _ColumnKey] = Field(
+        default_factory=dict, max_length=MAX_DIMENSION_CHOICES
+    )
     compare_previous: bool = False
     no_cache: bool = False
     force_job: bool = False
@@ -142,12 +167,19 @@ class ReportExportIn(ReportRunIn):
     format: Literal["xlsx", "csv"] = "xlsx"
     title: str = Field("Bericht", min_length=1, max_length=120)
     #: frontend-translated column headers (column key -> header)
-    column_labels: dict[str, str] = Field(default_factory=dict)
+    column_labels: dict[_ColumnKey, _Label] = Field(
+        default_factory=dict, max_length=MAX_LABEL_COLUMNS
+    )
     #: frontend-translated enum values (column key -> value -> label)
-    value_labels: dict[str, dict[str, str]] = Field(default_factory=dict)
+    value_labels: dict[
+        _ColumnKey,
+        Annotated[dict[_Label, _Label], Field(max_length=MAX_VALUE_LABELS_PER_COLUMN)],
+    ] = Field(default_factory=dict, max_length=MAX_LABEL_COLUMNS)
     totals_label: str = Field("Summe", max_length=40)
     #: lines of the "Info" sheet ("Zeitraum: …" etc.)
-    info_lines: list[str] = Field(default_factory=list, max_length=20)
+    info_lines: list[Annotated[str, Field(max_length=MAX_INFO_LINE_LENGTH)]] = Field(
+        default_factory=list, max_length=20
+    )
 
 
 class BuiltinReportOut(BaseModel):

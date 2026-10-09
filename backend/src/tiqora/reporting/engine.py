@@ -829,6 +829,31 @@ async def run_report(
         hit = await cache.get(plan.cache_key)
         if hit is not None:
             return hit.model_copy(update={"report_key": report_key, "facts": plan.facts})
+    return await execute_and_store(
+        session,
+        plan,
+        report_key=report_key,
+        reporting=reporting,
+        cache=cache if use_cache else None,
+        budget=budget,
+    )
+
+
+async def execute_and_store(
+    session: AsyncSession,
+    plan: RunPlan,
+    *,
+    report_key: str | None,
+    reporting: ReportingSettings,
+    cache: ReportCache | None,
+    budget: QueryBudget | None = None,
+) -> ReportResultOut:
+    """Second half of :func:`run_report` for callers that planned (and looked up) already.
+
+    Runs ``plan`` and stores the result under ``plan.cache_key`` (when ``cache`` is
+    given and the data is ready). No cache lookup: the caller did it. ``budget`` as in
+    :func:`run_report`.
+    """
     result = await execute_plan(
         session,
         plan,
@@ -838,7 +863,7 @@ async def run_report(
     # never cache numbers computed while the report data is still being built: a
     # later hit would show them with the then-current "ready" status
     data_ready = plan.facts.ready or not plan.compiled.source.requires_facts
-    if use_cache and cache is not None and data_ready:
+    if cache is not None and data_ready:
         await cache.put(plan.cache_key, result)
     return result
 

@@ -10,6 +10,7 @@ writes is deleted again (incl. its jobs, the report state row and ``reporting.*`
 
 from __future__ import annotations
 
+import asyncio
 import io
 from collections.abc import AsyncIterator, Generator
 from datetime import datetime
@@ -263,6 +264,12 @@ class Env:
         assert resp.status_code == 200, resp.text
         return resp.json()  # type: ignore[no-any-return]
 
+    async def ensure_state(self) -> None:
+        """Commit the state row, as the worker's first tick does in production."""
+        async with self.factory() as s:
+            await load_state(s)
+            await s.commit()
+
     async def facts_ready(self) -> None:
         async with self.factory() as s:
             (await load_state(s)).backfill_status = "done"
@@ -489,7 +496,7 @@ async def test_inline_budget_is_shared_by_estimate_and_run(
     env: Env, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     seen: list[QueryBudget | None] = []
-    real_estimate, real_run = reports_api.estimate_rows, reports_api.run_report
+    real_estimate, real_run = reports_api.estimate_rows, reports_api.execute_and_store
 
     async def estimate(*args: Any, **kwargs: Any) -> int:
         seen.append(kwargs.get("budget"))
@@ -500,7 +507,7 @@ async def test_inline_budget_is_shared_by_estimate_and_run(
         return await real_run(*args, **kwargs)
 
     monkeypatch.setattr(reports_api, "estimate_rows", estimate)
-    monkeypatch.setattr(reports_api, "run_report", run)
+    monkeypatch.setattr(reports_api, "execute_and_store", run)
     resp = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE})
     assert resp.status_code == 200
     assert len(seen) == 2 and seen[0] is not None and seen[0] is seen[1]
@@ -513,7 +520,7 @@ async def test_timeout_is_504(env: Env, monkeypatch: pytest.MonkeyPatch) -> None
     async def slow(*args: Any, **kwargs: Any) -> Any:
         raise ReportQueryTimeout("budget used up")
 
-    monkeypatch.setattr(reports_api, "run_report", slow)
+    monkeypatch.setattr(reports_api, "execute_and_store", slow)
     resp = await _run(env, {"report_key": "builtin.channel_mix", "time_range": JUNE})
     assert resp.status_code == 504
     assert resp.json() == {"detail": {"message": TIMEOUT_TEXT}}
@@ -729,6 +736,77 @@ async def test_report_jobs_are_capped_per_user(env: Env) -> None:
     await env.run_jobs()
     await env.run_jobs()
     assert (await _run(env, body)).status_code == 202
+
+
+async def test_concurrent_report_jobs_cannot_overshoot_the_cap(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Five background runs at once: the user-row lock lets exactly 3 through."""
+    real_count = reports_api.count_active_jobs
+
+    async def slow_count(*args: Any, **kwargs: Any) -> int:
+        n = await real_count(*args, **kwargs)
+        await asyncio.sleep(0.2)  # widen the check-then-insert window
+        return n
+
+    monkeypatch.setattr(reports_api, "count_active_jobs", slow_count)
+    # five planners racing to CREATE the never-committed state row would deadlock in
+    # load_state (its documented first-start contract) before reaching the cap
+    await env.ensure_state()
+    body = {"report_key": "builtin.channel_mix", "time_range": JUNE, "force_job": True,
+            "no_cache": True}  # fmt: skip
+    responses = await asyncio.gather(*(_run(env, body) for _ in range(5)))
+    assert sorted(r.status_code for r in responses) == [202, 202, 202, 429, 429]
+    async with env.factory() as s:
+        active = (
+            await s.execute(
+                text(
+                    f"SELECT COUNT(*) FROM tiqora_job WHERE {_JOBS}"
+                    " AND created_by = :u AND status IN ('queued', 'running')"
+                ),
+                {"u": AGENT},
+            )
+        ).scalar_one()
+    assert active == 3
+
+
+async def test_request_size_limits(env: Env) -> None:
+    run = {"report_key": "builtin.channel_mix"}
+    too_big: list[tuple[str, dict[str, Any]]] = [
+        ("parameters", {"parameters": {f"p{i}": 1 for i in range(11)}}),
+        ("parameters", {"parameters": {"queues": list(range(1001))}}),
+        ("parameters", {"parameters": {"queues": ["x" * 1001]}}),
+        ("parameters", {"parameters": {"k" * 41: 1}}),
+        ("dimension_choices", {"dimension_choices": {str(i): "type" for i in range(4)}}),
+        ("dimension_choices", {"dimension_choices": {"0": "t" * 121}}),
+        ("report_key", {"report_key": "k" * 121}),
+    ]
+    for field, extra in too_big:
+        resp = await _run(env, {**run, **extra})
+        assert resp.status_code == 422, (field, resp.text)
+        assert any(field in err["loc"] for err in resp.json()["detail"]), field
+    export_too_big: list[tuple[str, dict[str, Any]]] = [
+        ("column_labels", {"column_labels": {f"c{i}": "x" for i in range(21)}}),
+        ("column_labels", {"column_labels": {"channel": "x" * 201}}),
+        ("value_labels", {"value_labels": {f"c{i}": {} for i in range(21)}}),
+        ("value_labels", {"value_labels": {"channel": {str(i): "x" for i in range(501)}}}),
+        ("value_labels", {"value_labels": {"channel": {"email": "x" * 201}}}),
+        ("info_lines", {"info_lines": ["x"] * 21}),
+        ("info_lines", {"info_lines": ["x" * 301]}),
+        ("totals_label", {"totals_label": "x" * 41}),
+    ]
+    for field, extra in export_too_big:
+        resp = await env.client.post("/api/v1/reports/export", json={**run, **extra})
+        assert resp.status_code == 422, (field, resp.text)
+        assert any(field in err["loc"] for err in resp.json()["detail"]), field
+    # at the limits everything is accepted
+    ok = await env.client.post(
+        "/api/v1/reports/export",
+        json={**run, "column_labels": {f"c{i}": "x" * 200 for i in range(20)},
+              "value_labels": {"channel": {str(i): "x" for i in range(500)}},
+              "info_lines": ["x" * 300] * 20},
+    )  # fmt: skip
+    assert ok.status_code == 202, ok.text
 
 
 # ---------------------------------------------------------------- access

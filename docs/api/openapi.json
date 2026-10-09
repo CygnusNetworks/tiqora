@@ -21149,7 +21149,12 @@
         "properties": {
           "column_labels": {
             "additionalProperties": {
+              "maxLength": 200,
               "type": "string"
+            },
+            "maxProperties": 20,
+            "propertyNames": {
+              "maxLength": 120
             },
             "title": "Column Labels",
             "type": "object"
@@ -21171,7 +21176,12 @@
           },
           "dimension_choices": {
             "additionalProperties": {
+              "maxLength": 120,
               "type": "string"
+            },
+            "maxProperties": 3,
+            "propertyNames": {
+              "maxLength": 3
             },
             "title": "Dimension Choices",
             "type": "object"
@@ -21210,6 +21220,7 @@
           },
           "info_lines": {
             "items": {
+              "maxLength": 300,
               "type": "string"
             },
             "maxItems": 20,
@@ -21228,6 +21239,7 @@
                   "items": {
                     "anyOf": [
                       {
+                        "maxLength": 1000,
                         "type": "string"
                       },
                       {
@@ -21235,9 +21247,11 @@
                       }
                     ]
                   },
+                  "maxItems": 1000,
                   "type": "array"
                 },
                 {
+                  "maxLength": 1000,
                   "type": "string"
                 },
                 {
@@ -21250,6 +21264,10 @@
                   "type": "null"
                 }
               ]
+            },
+            "maxProperties": 10,
+            "propertyNames": {
+              "maxLength": 40
             },
             "title": "Parameters",
             "type": "object"
@@ -21319,9 +21337,18 @@
           "value_labels": {
             "additionalProperties": {
               "additionalProperties": {
+                "maxLength": 200,
                 "type": "string"
               },
+              "maxProperties": 500,
+              "propertyNames": {
+                "maxLength": 200
+              },
               "type": "object"
+            },
+            "maxProperties": 20,
+            "propertyNames": {
+              "maxLength": 120
             },
             "title": "Value Labels",
             "type": "object"
@@ -21568,7 +21595,12 @@
           },
           "dimension_choices": {
             "additionalProperties": {
+              "maxLength": 120,
               "type": "string"
+            },
+            "maxProperties": 3,
+            "propertyNames": {
+              "maxLength": 3
             },
             "title": "Dimension Choices",
             "type": "object"
@@ -21608,6 +21640,7 @@
                   "items": {
                     "anyOf": [
                       {
+                        "maxLength": 1000,
                         "type": "string"
                       },
                       {
@@ -21615,9 +21648,11 @@
                       }
                     ]
                   },
+                  "maxItems": 1000,
                   "type": "array"
                 },
                 {
+                  "maxLength": 1000,
                   "type": "string"
                 },
                 {
@@ -21630,6 +21665,10 @@
                   "type": "null"
                 }
               ]
+            },
+            "maxProperties": 10,
+            "propertyNames": {
+              "maxLength": 40
             },
             "title": "Parameters",
             "type": "object"

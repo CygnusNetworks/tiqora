@@ -26,13 +26,13 @@ from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions.core import get_registry
 from tiqora.filters import FilterError
 from tiqora.jobs.schemas import JobAccepted
-from tiqora.jobs.service import count_active_jobs, enqueue_job
+from tiqora.jobs.service import count_active_jobs, enqueue_job, lock_user_job_quota
 from tiqora.reporting.access import require_report_access
 from tiqora.reporting.cache import CacheBackend, ReportCache
 from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition
-from tiqora.reporting.engine import QueryBudget, estimate_rows, plan_report, run_report
+from tiqora.reporting.engine import QueryBudget, estimate_rows, execute_and_store, plan_report
 from tiqora.reporting.jobs import (
     REPORT_EXPORT_JOB,
     REPORT_RUN_JOB,
@@ -146,7 +146,12 @@ def _source_out(src: ReportSource) -> ReportSourceOut:
 
 
 async def _check_job_limit(session: AsyncSession, user_id: int) -> None:
-    """429 when the user already has the maximum of report jobs queued or running."""
+    """429 when the user already has the maximum of report jobs queued or running.
+
+    Must start a fresh transaction (callers roll back first); the user row lock
+    serialises concurrent requests of one user until their enqueue is committed.
+    """
+    await lock_user_job_quota(session, user_id)
     active = 0
     for kind in (REPORT_RUN_JOB.kind, REPORT_EXPORT_JOB.kind):
         active += await count_active_jobs(session, kind=kind, created_by=user_id)
@@ -240,16 +245,13 @@ async def run_report_endpoint(
             return JSONResponse(
                 status_code=status.HTTP_202_ACCEPTED, content=out.model_dump(mode="json")
             )
-        result = await run_report(
+        # the plan above is reused: no second scope/state/compile, no second lookup
+        result = await execute_and_store(
             session,
-            defn=definition,
-            params=params,
-            user_id=user.id,
+            plan,
             report_key=report_key,
             reporting=reporting,
-            cache=cache,
-            use_cache=not body.no_cache,
-            compare_previous=body.compare_previous,
+            cache=None if body.no_cache else cache,
             budget=budget,
         )
     except (DefinitionError, FilterError) as exc:
