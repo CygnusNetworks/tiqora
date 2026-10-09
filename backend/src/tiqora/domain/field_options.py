@@ -17,7 +17,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, Sla
-from tiqora.db.legacy.ticket import Ticket, TicketPriority, TicketState, TicketType
+from tiqora.db.legacy.ticket import (
+    Ticket,
+    TicketPriority,
+    TicketState,
+    TicketStateType,
+    TicketType,
+)
 from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.ticket_acl import apply_ticket_acl
@@ -92,6 +98,7 @@ async def base_field_maps(
     picker_queue_id: int | None = None,
     honor_everyone: bool = True,
     sysconfig: SysConfig | None = None,
+    state_types: Sequence[str] | None = None,
 ) -> dict[str, dict[int, str]]:
     """Unfiltered valid id→name maps for the requested fields.
 
@@ -106,16 +113,20 @@ async def base_field_maps(
     ``Process::DefaultQueue``; used for the pickers only, never as ACL context). Without any
     queue the list is empty (AgentTicketBulk.pm:1969-1998). *honor_everyone* False ignores the
     setting (process dialog on an existing ticket, AgentTicketProcess.pm:6402-6413).
+
+    *state_types* restricts the states to those state type names, like
+    ``TicketStateList(Action => ...)`` with the frontend's ``StateType`` setting
+    (Ticket.pm:4656-4672 -> ``StateGetStatesByType``, State.pm:388-395); ``None`` lists every
+    valid state.
     """
     out: dict[str, dict[int, str]] = {}
     if "state" in fields:
-        rows = (
-            await session.execute(
-                select(TicketState.id, TicketState.name)
-                .where(TicketState.valid_id == VALID_ID)
-                .order_by(TicketState.id)
+        stmt = select(TicketState.id, TicketState.name).where(TicketState.valid_id == VALID_ID)
+        if state_types is not None:
+            stmt = stmt.join(TicketStateType, TicketStateType.id == TicketState.type_id).where(
+                TicketStateType.name.in_(list(state_types))
             )
-        ).all()
+        rows = (await session.execute(stmt.order_by(TicketState.id))).all()
         out["state"] = {int(r[0]): r[1] for r in rows}
     if "priority" in fields:
         rows = (
@@ -289,6 +300,7 @@ async def collect_ticket_field_options(
     priority_id: int | None = None,
     sla_id: int | None = None,
     process: Mapping[str, str] | None = None,
+    state_types: Sequence[str] | None = None,
 ) -> TicketFieldOptionsOut:
     """Load base maps, apply Ticket ACL, then Ticket Attribute Relations.
 
@@ -296,7 +308,7 @@ async def collect_ticket_field_options(
     process dialog the lists are built for (live ``Process`` ACL checks,
     ``TicketACL.pm:1118-1146``). *queue_ids* (bulk: the queues of the selected tickets) scope
     the owner/responsible pickers, as do *picker_queue_id* and *honor_everyone*, see
-    :func:`base_field_maps`.
+    :func:`base_field_maps`, which also explains *state_types*.
     """
     from tiqora.domain.ticket_acl import filter_id_name_map
     from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
@@ -312,6 +324,7 @@ async def collect_ticket_field_options(
         picker_queue_id=picker_queue_id,
         honor_everyone=honor_everyone,
         sysconfig=sysconfig,
+        state_types=state_types,
     )
     ticket_ctx = await ticket_acl_context(
         session,
@@ -432,6 +445,7 @@ async def collect_field_options(
     process: Mapping[str, str] | None = None,
     picker_queue_id: int | None = None,
     honor_everyone: bool = True,
+    state_types: Sequence[str] | None = None,
 ) -> FieldOptionsOut:
     """Options for attribute and dynamic fields, filtered by Ticket ACLs.
 
@@ -440,8 +454,8 @@ async def collect_field_options(
     :class:`~tiqora.domain.ticket_service.TicketAccessDenied` propagate); its
     attributes are the default ACL context, explicit ``context`` ids override. *process*
     (not part of the API request) carries the process ids of an activity dialog form
-    (``AgentTicketProcess.pm:1103-1105, 2638, 4319``). *picker_queue_id* / *honor_everyone*:
-    see :func:`base_field_maps`.
+    (``AgentTicketProcess.pm:1103-1105, 2638, 4319``). *picker_queue_id* / *honor_everyone* /
+    *state_types*: see :func:`base_field_maps`.
     """
     from tiqora.domain.dynamic_field_config import config_from_yaml
 
@@ -475,6 +489,7 @@ async def collect_field_options(
             queue_ids=queue_ids,
             picker_queue_id=picker_queue_id,
             honor_everyone=honor_everyone,
+            state_types=state_types,
             **ids,
         )
         attribute_maps = {f: getattr(collected, f) for f in attr_requested}

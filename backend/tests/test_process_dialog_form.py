@@ -685,6 +685,55 @@ async def test_customer_form_skips_owner_and_filters_as_customer(
     ]
 
 
+def _state_dialog(conn: Any) -> None:
+    _add_dialog(conn, 1, {"Title": "Display: '1'", "State": "Display: '2'"})
+    _add_process(conn, 1, start_dialog=1, dialogs=[1])
+
+
+@pytest.mark.db
+async def test_agent_state_options_follow_state_type(client: AsyncClient, sync_url: str) -> None:
+    """``_GetStates`` -> ``TicketStateList(Action => AgentTicketProcess)``: only the state types
+    of ``Ticket::Frontend::AgentTicketProcess###StateType`` (default new, open, pending auto,
+    pending reminder, closed; Ticket.pm:4656-4672, ProcessManagement.xml:584-596)."""
+    _build(sync_url, _state_dialog)
+    labels = _labels(_by_name((await _start_form(client, AGENT)).json())["State"])
+    assert {"new", "open", "closed successful", "pending reminder", "pending auto close+"} <= set(
+        labels
+    )
+    assert not {"merged", "removed"} & set(labels)
+
+    _build(
+        sync_url,
+        lambda conn: _set_sysconfig(
+            conn, {"Ticket::Frontend::AgentTicketProcess###StateType": ["open", "merged"]}
+        ),
+    )
+    labels = _labels(_by_name((await _start_form(client, AGENT)).json())["State"])
+    assert sorted(labels) == ["merged", "open"]
+
+
+@pytest.mark.db
+async def test_customer_state_options_follow_state_type(
+    portal_client: AsyncClient, sync_url: str
+) -> None:
+    """Customers get ``Ticket::Frontend::CustomerTicketProcess###StateType`` (default new and
+    open only, ProcessManagement.xml:607-616): no closed, pending, merged or removed state."""
+    _build(sync_url, _state_dialog)
+    resp = await _start_form(portal_client, PORTAL)
+    assert resp.status_code == 200, resp.text
+    assert sorted(_labels(_by_name(resp.json())["State"])) == ["new", "open"]
+
+    # A setting that is not a list offers nothing (Znuny: "Need config for ...->StateType!").
+    _build(
+        sync_url,
+        lambda conn: _set_sysconfig(
+            conn, {"Ticket::Frontend::CustomerTicketProcess###StateType": "closed"}
+        ),
+    )
+    resp = await _start_form(portal_client, PORTAL)
+    assert _by_name(resp.json())["State"]["options"] == []
+
+
 # --- ticket-bound dialogs ---
 
 

@@ -18,6 +18,8 @@ Agent option lists get the dialog's process context (``ProcessEntityID``/``Activ
 for live ``Process`` ACL checks. Owner/Responsible choices follow the queue group permissions like
 Znuny's ``_GetOwners``/``_GetResponsibles`` (ticket queue; for start forms the dialog's default
 Queue, else ``Process::DefaultQueue``; everyone with ``Ticket::ChangeOwnerToEveryone``).
+``State`` lists only offer the state types of ``Ticket::Frontend::<Action>###StateType``
+(:func:`process_state_types`).
 
 Known limitations: the customer SLA list is the union over the customer's services
 (the form has no selected service yet), and the customer Queue list keeps the system intake
@@ -26,6 +28,7 @@ queues (Postmaster/Raw/Junk) hidden on top of Znuny's create-group rule (Tiqora 
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from dataclasses import field as dc_field
@@ -73,6 +76,8 @@ from tiqora.process.schemas import (
 from tiqora.process.ticket_state import get_ticket_process_candidates
 from tiqora.znuny.sysconfig import SysConfig
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from tiqora.domain.auth import AuthenticatedUser
 
@@ -108,6 +113,28 @@ _DF_KINDS: dict[str, FieldKind] = {
 }
 _DF_OPTION_KINDS = frozenset({"select", "multiselect"})
 _CUSTOMER_FIELDS = ("CustomerUserID", "CustomerID")
+
+# ``Ticket::Frontend::<Action>###StateType`` defaults (ProcessManagement.xml:584-616).
+_DEFAULT_STATE_TYPES: dict[str, tuple[str, ...]] = {
+    "AgentTicketProcess": ("new", "open", "pending auto", "pending reminder", "closed"),
+    "CustomerTicketProcess": ("new", "open"),
+}
+
+
+async def process_state_types(sysconfig: SysConfig, action: str) -> list[str]:
+    """The state types a process dialog's ``State`` field offers (``_GetStates`` ->
+    ``TicketStateList(Action => ...)``, Ticket.pm:4656-4672).
+
+    A missing setting falls back to Znuny's default. A value that is not a list offers no
+    state at all: Znuny logs "Need config for Ticket::Frontend::<Action>->StateType!" and
+    returns an empty list; an empty list matches no state type either."""
+    raw = await sysconfig.get(f"Ticket::Frontend::{action}###StateType")
+    if raw is None:
+        return list(_DEFAULT_STATE_TYPES.get(action, ()))
+    if not isinstance(raw, list):
+        logger.error("Need config for Ticket::Frontend::%s->StateType!", action)
+        return []
+    return [str(v) for v in raw]
 
 
 async def _load_dynamic_fields(
@@ -263,7 +290,12 @@ async def collect_customer_field_options(
     out: dict[str, list[ProcessDialogOptionOut]] = {}
 
     attrs = {f for f in fields if f in ATTRIBUTE_OPTION_FIELDS and f not in AGENT_OPTION_FIELDS}
-    base = await base_field_maps(session, None, attrs - {"queue", "service", "sla"})
+    state_types = (
+        await process_state_types(sysconfig, actor.frontend_action) if "state" in attrs else None
+    )
+    base = await base_field_maps(
+        session, None, attrs - {"queue", "service", "sla"}, state_types=state_types
+    )
     if "queue" in attrs:
         base["queue"] = await _customer_queues(session, actor, sysconfig)
     if attrs & {"service", "sla"}:
@@ -371,6 +403,7 @@ async def _agent_options(
             requested[name] = name
     out: dict[str, list[ProcessDialogOptionOut]] = {}
     if requested:
+        sysconfig = SysConfig(session)
         queue_id = None
         picker_queue_id = None
         if ticket_id is None:
@@ -379,8 +412,13 @@ async def _agent_options(
             # AgentTicketProcess.pm:6420 -- no Queue yet: Process::DefaultQueue scopes the
             # Owner/Responsible pickers only, it is not part of the ACL context.
             picker_queue_id = await _default_queue_id(
-                session, await SysConfig(session).get("Process::DefaultQueue", "Raw")
+                session, await sysconfig.get("Process::DefaultQueue", "Raw")
             )
+        state_types = (
+            await process_state_types(sysconfig, "AgentTicketProcess")
+            if "state" in requested
+            else None
+        )
         collected = await collect_field_options(
             session,
             user,
@@ -394,6 +432,7 @@ async def _agent_options(
             picker_queue_id=picker_queue_id,
             # AgentTicketProcess.pm:6402-6413 -- an existing ticket ignores the setting.
             honor_everyone=ticket_id is None,
+            state_types=state_types,
         )
         for key, options in collected.options.items():
             out[requested[key]] = [
