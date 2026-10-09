@@ -56,8 +56,10 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/templates", "tickets"),
     ("/api/v1/search", "tickets"),
     ("/api/v1/integrations", "tickets"),
-    # Background jobs are started by ticket features (CSV export today); polling and
-    # downloading them must work with the same key that enqueued them.
+    # Background jobs are started by ticket features (CSV export) and by reports; polling,
+    # downloading and cancelling them must work with the same key that enqueued them, so
+    # ``tickets`` OR ``stats`` suffices (see ``_SHARED_AREAS``). Every job stays private
+    # to its creator (job endpoints check ``created_by``; report results creator-only).
     ("/api/v1/jobs", "tickets"),
     ("/api/v1/ticket-filters", "tickets"),
     ("/api/v1/avatars", "tickets"),
@@ -78,6 +80,10 @@ _PATH_PREFIX_TO_AREA: tuple[tuple[str, str], ...] = (
     ("/api/v1/sse", "events"),
     ("/znuny-compat", "compat"),
 )
+
+# Prefixes whose area is held by several features: any one of them grants access
+# (the level rule ``ro``/``rw`` is the same). The first is the one ``path_to_area`` names.
+_SHARED_AREAS: tuple[tuple[str, tuple[str, ...]], ...] = (("/api/v1/jobs", ("tickets", "stats")),)
 
 # Always allowed for any valid API key (identity / session plumbing).
 _ALWAYS_ALLOWED_PREFIXES: tuple[str, ...] = (
@@ -217,6 +223,20 @@ def path_to_area(path: str) -> str | None:
     return None
 
 
+def path_to_areas(path: str) -> tuple[str, ...]:
+    """Every area that grants ``path`` (one, except for :data:`_SHARED_AREAS`); () = open."""
+    area = path_to_area(path)
+    if area is None:
+        return ()
+    normalized = path.split("?", 1)[0]
+    if not normalized.startswith("/"):
+        normalized = "/" + normalized
+    for prefix, areas in _SHARED_AREAS:
+        if normalized == prefix or normalized.startswith(prefix + "/"):
+            return areas
+    return (area,)
+
+
 def method_needs_rw(method: str) -> bool:
     return method.upper() not in _SAFE_METHODS
 
@@ -240,17 +260,13 @@ def scopes_allow(
         normalized = "/" + normalized
     if _is_always_allowed(normalized):
         return not method_needs_rw(method)
-    area = path_to_area(path)
-    if area is None:
+    areas = path_to_areas(path)
+    if not areas:
         return True
-    if area == "_unknown":
+    if areas == ("_unknown",):
         return False
-    have = expanded.get(area)
-    if have is None:
-        return False
-    if method_needs_rw(method):
-        return have == "rw"
-    return have in ("ro", "rw")
+    wanted = ("rw",) if method_needs_rw(method) else ("ro", "rw")
+    return any(expanded.get(area) in wanted for area in areas)
 
 
 def assert_scope_allows(
@@ -300,6 +316,7 @@ __all__ = [
     "normalize_scopes",
     "parse_api_key_scopes",
     "path_to_area",
+    "path_to_areas",
     "scopes_allow",
     "validate_scope_tokens",
 ]

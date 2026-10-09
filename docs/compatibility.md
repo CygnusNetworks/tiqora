@@ -909,7 +909,10 @@ figures differ from Znuny's `Kernel::System::Stats`:
   answer 504 with a JSON `detail.message` when it is used up; large reports
   run as background jobs instead.
 - **API keys** need the `stats` scope: `GET` calls work read-only, running reports
-  (`POST /reports/run`, exports) needs read-write.
+  (`POST /reports/run`, exports) needs read-write. The same key polls the jobs it
+  started (`GET /api/v1/jobs/{id}`) and downloads their files: `/api/v1/jobs` accepts
+  a `tickets` **or** a `stats` scope (cancelling is a `POST` and needs `:rw`); a job
+  stays visible to its creator only.
 - **Cache.** Results are cached for up to `reporting.cache_seconds` (default 300,
   0 = off) per viewer scope. Results that depend on "now" (relative date filters,
   ages of open tickets) can therefore be that stale. Results computed while the

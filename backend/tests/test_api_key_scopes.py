@@ -16,6 +16,7 @@ from tiqora.domain.api_key_scopes import (
     normalize_scopes,
     parse_api_key_scopes,
     path_to_area,
+    path_to_areas,
     scopes_allow,
 )
 
@@ -185,6 +186,26 @@ def test_jobs_and_ticket_filters_map_to_tickets() -> None:
     assert path_to_area("/api/v1/ticket-filters/count") == "tickets"
     assert path_to_area("/api/v1/customer-directory/vcards") == "customers"
     assert scopes_allow(frozenset({"tickets:rw"}), method="GET", path="/api/v1/jobs/5/files/3")
+
+
+def test_jobs_accept_a_tickets_or_a_stats_key() -> None:
+    """I3: a stats-only key polls, downloads and cancels the report jobs it started."""
+    files = "/api/v1/jobs/5/files/3"
+    for scopes in ({"stats:ro"}, {"stats:rw"}, {"tickets:ro"}, {"tickets:rw"}):
+        assert scopes_allow(frozenset(scopes), method="GET", path="/api/v1/jobs/5"), scopes
+        assert scopes_allow(frozenset(scopes), method="GET", path=files), scopes
+    cancel = "/api/v1/jobs/5/cancel"
+    assert scopes_allow(frozenset({"stats:rw"}), method="POST", path=cancel)
+    assert not scopes_allow(frozenset({"stats:ro"}), method="POST", path=cancel)
+    assert not scopes_allow(frozenset({"stats:ro", "tickets:ro"}), method="POST", path=cancel)
+    assert scopes_allow(frozenset({"stats:ro", "tickets:rw"}), method="POST", path=cancel)
+    assert not scopes_allow(frozenset({"kb:rw"}), method="GET", path="/api/v1/jobs/5")
+    assert path_to_areas("/api/v1/jobs/5") == ("tickets", "stats")
+    assert path_to_areas("/api/v1/reports/run") == ("stats",)
+    assert path_to_areas("/api/v1/auth/me") == ()
+    with pytest.raises(HTTPException) as exc:
+        assert_scope_allows(frozenset({"kb:ro"}), method="GET", path="/api/v1/jobs/5")
+    assert exc.value.detail == "API key lacks tickets:ro scope"
 
 
 def test_reports_and_reporting_map_to_stats() -> None:
