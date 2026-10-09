@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from datetime import date
 
 from tiqora.config import get_settings
@@ -37,7 +38,22 @@ def add_report_subparser(sub: argparse._SubParsersAction) -> None:  # type: igno
 
 
 async def _cmd_backfill(args: argparse.Namespace) -> int:
-    from tiqora.reporting.backfill import ReportBackfillPayload, run_backfill
+    from tiqora.jobs.context import JobCancelled
+    from tiqora.jobs.service import find_active_job
+    from tiqora.reporting.backfill import REPORT_BACKFILL_JOB, ReportBackfillPayload, run_backfill
+
+    factory = get_session_factory()
+    async with factory() as session:
+        active = await find_active_job(
+            session, kind=REPORT_BACKFILL_JOB.kind, dedupe_key="report_backfill"
+        )
+    if active is not None:
+        print(  # noqa: T201 — CLI output
+            f"A backfill job (id {active.id}) is already {active.status}; "
+            "cancel it first or wait for it.",
+            file=sys.stderr,
+        )
+        return 1
 
     async def progress(done: int, total: int | None, message: str | None) -> None:
         print(f"{done}/{total} {message or ''}".rstrip())  # noqa: T201 — CLI output
@@ -48,13 +64,17 @@ async def _cmd_backfill(args: argparse.Namespace) -> int:
     payload = ReportBackfillPayload(
         since=args.since, restart=args.restart, snapshots=not args.no_snapshots
     )
-    result = await run_backfill(
-        get_session_factory(),
-        get_settings(),
-        payload,
-        progress=progress,
-        check_cancelled=check_cancelled,
-    )
+    try:
+        result = await run_backfill(
+            factory,
+            get_settings(),
+            payload,
+            progress=progress,
+            check_cancelled=check_cancelled,
+        )
+    except JobCancelled:
+        print("The backfill was taken over by another run.", file=sys.stderr)  # noqa: T201
+        return 1
     print(result)  # noqa: T201 — CLI output
     return 0
 

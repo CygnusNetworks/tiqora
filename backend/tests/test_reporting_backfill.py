@@ -4,7 +4,7 @@ Seed ids: 47620-47659 (names contain ``rep47``). Layout: group 47620, queue 4762
 agent 47623, tickets 47630-47634 created 2024-06-01..05 08:00 (47631 is closed on 06-03),
 ticket 47639 created 2099-01-02 (the only ticket a ``since`` in 2098 selects).
 Every row this module writes is deleted again; the backfill also builds facts for any
-other ticket above the first seeded id, so the cleanup of facts and events is unconditional.
+other ticket above the first seeded id, so the cleanup of facts and events also covers that ticket.
 The Znuny seed ticket is created "now", i.e. after every ``since`` used here: it counts as
 "created on/after since" and starts every range at its (lower) id.
 """
@@ -21,6 +21,7 @@ import pytest
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.exc import DBAPIError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
@@ -34,7 +35,9 @@ from tiqora.extensions.core import register_core
 from tiqora.extensions.registry import Registry
 from tiqora.jobs import JobCancelled, enqueue_job, get_job
 from tiqora.jobs.runner import JobRunner
+from tiqora.main import main
 from tiqora.reporting import backfill
+from tiqora.reporting import state as state_module
 from tiqora.reporting.backfill import (
     REPORT_BACKFILL_JOB,
     SNAPSHOTS_MESSAGE,
@@ -42,6 +45,7 @@ from tiqora.reporting.backfill import (
     ReportBackfillPayload,
     run_backfill,
 )
+from tiqora.reporting.dirty import mark_tickets_dirty
 from tiqora.reporting.state import (
     STATE_NAME,
     facts_status,
@@ -63,11 +67,13 @@ SETTINGS = Settings(environment="test")
 _URLS: set[str] = set()
 _BAND = {"lo": LO, "hi": HI}
 _CLEANUP = (
-    "DELETE FROM tiqora_report_daily_snapshot"
-    " WHERE snapshot_date BETWEEN '2024-05-01' AND '2024-06-30'",
-    "DELETE FROM tiqora_report_ticket_event",
-    "DELETE FROM tiqora_report_ticket_fact",
-    "DELETE FROM tiqora_report_dirty_ticket",
+    "DELETE FROM tiqora_report_daily_snapshot WHERE queue_id BETWEEN :lo AND :hi",
+    # the band tickets plus the Znuny seed ticket (created "now"), which every range includes
+    "DELETE FROM tiqora_report_ticket_event WHERE ticket_id >= :lo OR ticket_id IN"
+    " (SELECT id FROM ticket WHERE id < :lo AND create_time >= '2024-05-31')",
+    "DELETE FROM tiqora_report_ticket_fact WHERE ticket_id >= :lo OR ticket_id IN"
+    " (SELECT id FROM ticket WHERE id < :lo AND create_time >= '2024-05-31')",
+    "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id BETWEEN :lo AND :hi",
     "DELETE FROM tiqora_report_state",
     "DELETE FROM tiqora_job_file WHERE job_id IN"
     " (SELECT id FROM tiqora_job WHERE kind = 'core.report_backfill')",
@@ -348,8 +354,11 @@ async def test_backfill_builds_all_tickets_and_snapshots(
         assert state.backfill_since == SINCE
         ticket_calls = [c for c in rec.calls if c[2] == TICKETS_MESSAGE]
         snap_calls = [c for c in rec.calls if c[2] == SNAPSHOTS_MESSAGE]
-        assert ticket_calls and ticket_calls[-1][0] == ticket_calls[-1][1]
-        assert snap_calls[-1][:2] == (9, 9)
+        assert ticket_calls
+        total = state.backfill_target_ticket_id - state.backfill_start_ticket_id
+        # one bar over both phases: the snapshot days continue after the tickets
+        assert snap_calls[-1][:2] == (total + 9, total + 9)
+        assert ticket_calls[-1][:2] == (total, total)
         assert rec.checks == len(rec.calls)
     finally:
         await engine.dispose()
@@ -578,14 +587,21 @@ class _BarrierSession(AsyncSession):
         return result
 
 
-@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_load_state_for_update_first_creation_race(
-    url_fixture: str, request: pytest.FixtureRequest
-) -> None:
-    """Both sessions find no row under FOR UPDATE and insert it: on MariaDB the gap locks
-    deadlock (1213), on PostgreSQL the loser hits the unique key. Either way both end
-    up with the same single row and the loser's savepoint handling keeps the session usable."""
-    url = request.getfixturevalue(url_fixture)
+async def _race(url: str, monkeypatch: pytest.MonkeyPatch, *, retry: bool) -> tuple[list[Any], int]:
+    """Two sessions take FOR UPDATE on the missing row, then both insert it.
+
+    Returns each worker's outcome and how often ``load_state`` ran into a deadlock
+    (counted at its classification, so a pass cannot hide that the path never ran).
+    """
+    deadlocks = {"n": 0}
+    real = state_module._deadlock_behind
+
+    def counting(exc: DBAPIError) -> bool:
+        hit = real(exc)
+        deadlocks["n"] += int(hit)
+        return hit
+
+    monkeypatch.setattr(state_module, "_deadlock_behind", counting)
     _URLS.add(url)
     _clean(url)
     engine = create_async_engine(_to_async_url(url))
@@ -594,19 +610,48 @@ async def test_load_state_for_update_first_creation_race(
 
     async def worker() -> str:
         async with factory() as s:
-            st = await load_state(s, for_update=True)
+            st = await load_state(s, for_update=True, retry_on_deadlock=retry)
             st.last_history_id = 3
             await s.commit()
             return st.name
 
     try:
-        names = await asyncio.wait_for(asyncio.gather(worker(), worker()), 30)
-        assert names == [STATE_NAME, STATE_NAME]
+        outcomes = await asyncio.wait_for(
+            asyncio.gather(worker(), worker(), return_exceptions=True), 60
+        )
         async with factory() as s:
             count = (await s.execute(select(func.count()).select_from(TiqoraReportState))).scalar()
-            assert count == 1
+        assert count == 1
+        return list(outcomes), deadlocks["n"]
     finally:
         await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_load_state_first_creation_race_retries_when_opted_in(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MariaDB: the gap locks deadlock (1213, the victim also loses its savepoint, 1305)
+    and the opted-in loser retries. PostgreSQL: the loser hits the unique key instead."""
+    url = request.getfixturevalue(url_fixture)
+    outcomes, deadlocks = await _race(url, monkeypatch, retry=True)
+    assert outcomes == [STATE_NAME, STATE_NAME]
+    assert deadlocks == (1 if url_fixture == "mariadb_znuny_url" else 0)
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_load_state_first_creation_race_raises_without_opt_in(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    outcomes, deadlocks = await _race(url, monkeypatch, retry=False)
+    if url_fixture == "mariadb_znuny_url":
+        assert deadlocks == 1
+        failed = [o for o in outcomes if isinstance(o, BaseException)]
+        assert len(failed) == 1 and isinstance(failed[0], OperationalError)
+        assert [o for o in outcomes if not isinstance(o, BaseException)] == [STATE_NAME]
+    else:  # no deadlock on PostgreSQL: the unique-key path serves both
+        assert deadlocks == 0 and outcomes == [STATE_NAME, STATE_NAME]
 
 
 class _FakeOrig(Exception):
@@ -619,6 +664,14 @@ def _deadlock_error(orig: Exception) -> DBAPIError:
     return OperationalError("INSERT INTO tiqora_report_state", {}, orig)
 
 
+def _raise_lost_savepoint() -> Any:
+    """What MariaDB gives: the failed ROLLBACK TO SAVEPOINT (1305) after a deadlock (1213)."""
+    try:
+        raise _deadlock_error(_FakeOrig(1213, "Deadlock found when trying to get lock"))
+    except OperationalError:
+        raise _deadlock_error(_FakeOrig(1305, "SAVEPOINT sa_savepoint_1 does not exist")) from None
+
+
 def test_is_deadlock_recognises_both_dialects() -> None:
     assert is_deadlock(_deadlock_error(_FakeOrig(1213, "Deadlock found when trying to get lock")))
     assert is_deadlock(_deadlock_error(_FakeOrig("deadlock detected", sqlstate="40P01")))
@@ -627,7 +680,7 @@ def test_is_deadlock_recognises_both_dialects() -> None:
 
 
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
-async def test_load_state_retries_once_after_deadlock(
+async def test_load_state_retry_counts_and_non_deadlock_errors(
     url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     url = request.getfixturevalue(url_fixture)
@@ -647,12 +700,12 @@ async def test_load_state_retries_once_after_deadlock(
                 return real()
 
             monkeypatch.setattr(s, "begin_nested", flaky)
-            st = await load_state(s, for_update=True)
+            st = await load_state(s, for_update=True, retry_on_deadlock=True)
             assert st.name == STATE_NAME and attempts["n"] == 2
 
             # a second deadlock is raised, not retried forever
             await s.rollback()
-            attempts["n"] = -10
+            attempts["n"] = 0
 
             def always() -> Any:
                 attempts["n"] += 1
@@ -660,9 +713,14 @@ async def test_load_state_retries_once_after_deadlock(
 
             monkeypatch.setattr(s, "begin_nested", always)
             with pytest.raises(OperationalError):
+                await load_state(s, for_update=True, retry_on_deadlock=True)
+            assert attempts["n"] == 2  # exactly two attempts
+            # without the opt-in a deadlock is raised at once
+            attempts["n"] = 0
+            with pytest.raises(OperationalError):
                 await load_state(s, for_update=True)
-            assert attempts["n"] == -8  # exactly two attempts
-            # a non-deadlock error is not retried at all
+            assert attempts["n"] == 1
+            # a non-deadlock error is never retried
             attempts["n"] = 0
 
             def other() -> Any:
@@ -671,7 +729,215 @@ async def test_load_state_retries_once_after_deadlock(
 
             monkeypatch.setattr(s, "begin_nested", other)
             with pytest.raises(OperationalError):
-                await load_state(s, for_update=True)
+                await load_state(s, for_update=True, retry_on_deadlock=True)
             assert attempts["n"] == 1
     finally:
         await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_load_state_deadlock_never_loses_flushed_work_silently(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A lost savepoint (MariaDB aborted the whole transaction) after a flushed write:
+    without the opt-in ``load_state`` raises instead of returning a row with the write
+    gone; the session is rolled back and usable afterwards."""
+    url = request.getfixturevalue(url_fixture)
+    _URLS.add(url)
+    _clean(url)
+    engine = create_async_engine(_to_async_url(url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as s:
+            await mark_tickets_dirty(s, [47651])  # flushed, not committed
+            calls = {"n": 0}
+
+            def lost() -> Any:
+                calls["n"] += 1
+                _raise_lost_savepoint()
+
+            monkeypatch.setattr(s, "begin_nested", lost)
+            with pytest.raises(OperationalError):
+                await load_state(s, for_update=True)
+            assert calls["n"] == 1
+            monkeypatch.undo()
+            n = (
+                await s.execute(
+                    text("SELECT COUNT(*) FROM tiqora_report_dirty_ticket WHERE ticket_id = 47651")
+                )
+            ).scalar_one()
+            assert n == 0  # rolled back, and the caller was told by the exception
+            st = await load_state(s)  # the session works again
+            assert st.name == STATE_NAME
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_resumed_backfill_uses_the_stored_since_for_snapshots(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R-RESUME: the tick resumes with ``ReportBackfillPayload()`` (no ``since``). The
+    snapshot days must still start at the ``since`` of the run, not at the oldest fact."""
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    monkeypatch.setattr(backfill, "FACT_CHUNK_SIZE", 2)
+    engine, factory = _factory(url)
+    try:
+        first = Recorder(cancel_after=1)
+        with pytest.raises(JobCancelled):
+            await run_backfill(
+                factory,
+                SETTINGS,
+                ReportBackfillPayload(since=SINCE),
+                progress=first.progress,
+                check_cancelled=first.check_cancelled,
+                sleep_seconds=0,
+                now=NOW,
+            )
+        monkeypatch.setattr(backfill, "FACT_CHUNK_SIZE", 200)
+        second = Recorder()
+        result = await run_backfill(
+            factory,
+            SETTINGS,
+            ReportBackfillPayload(),  # what the tick enqueues
+            progress=second.progress,
+            check_cancelled=second.check_cancelled,
+            sleep_seconds=0,
+            now=NOW,
+        )
+        assert result["snapshot_days"] == 9  # 06-01 .. 06-09, not from the oldest fact
+        async with factory() as s:
+            dates = {
+                r
+                for r in (
+                    await s.execute(
+                        select(TiqoraReportDailySnapshot.snapshot_date).where(
+                            TiqoraReportDailySnapshot.queue_id == QUEUE
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            }
+            state = await load_state(s)
+        assert min(dates) == SINCE and max(dates) == date(2024, 6, 9)
+        assert state.backfill_since == SINCE and state.last_snapshot_date == date(2024, 6, 9)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_superseded_run_cannot_move_the_cursor(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    monkeypatch.setattr(backfill, "FACT_CHUNK_SIZE", 2)
+    engine, factory = _factory(url)
+    payload = ReportBackfillPayload(since=SINCE, snapshots=False)
+    try:
+        # same run: the cursor never moves backwards
+        run = await backfill._begin(factory, SETTINGS, payload)
+        await backfill._save_cursor(factory, run, run.start + 5)
+        await backfill._save_cursor(factory, run, run.start + 2)
+        async with factory() as s:
+            assert (await load_state(s)).backfill_cursor_ticket_id == run.start + 5
+
+        # another run takes over mid-way (a restart job, the CLI): the old one stops
+        async def take_over() -> None:
+            async with factory() as s:
+                st = await load_state(s, for_update=True)
+                st.backfill_started_at = datetime(2030, 1, 1)
+                st.backfill_cursor_ticket_id = 1
+                await s.commit()
+
+        calls = {"n": 0}
+
+        async def check() -> None:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                await take_over()
+
+        with pytest.raises(JobCancelled):
+            await run_backfill(
+                factory,
+                SETTINGS,
+                ReportBackfillPayload(since=SINCE, snapshots=False, restart=True),
+                progress=_noop_progress,
+                check_cancelled=check,
+                sleep_seconds=0,
+                now=NOW,
+            )
+        async with factory() as s:
+            st = await load_state(s)
+        assert st.backfill_cursor_ticket_id == 1 and st.backfill_status == "running"
+        assert st.backfill_started_at == datetime(2030, 1, 1)
+        # finishing is refused as well
+        with pytest.raises(JobCancelled):
+            await backfill._save_cursor(factory, run, 99, finish=(None, "UTC"))
+        async with factory() as s:
+            assert (await load_state(s)).backfill_status == "running"
+    finally:
+        await engine.dispose()
+
+
+def test_report_cli_through_main(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    url = mariadb_znuny_url
+    _URLS.add(url)
+    _clean(url)
+
+    def make_factory() -> async_sessionmaker[AsyncSession]:
+        engine = create_async_engine(_to_async_url(url), poolclass=NullPool)
+        return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    monkeypatch.setattr("tiqora.cli.report.get_session_factory", make_factory)
+    captured: list[ReportBackfillPayload] = []
+
+    async def fake_run(
+        factory: Any, settings: Any, payload: Any, *, progress: Any, check_cancelled: Any, **kw: Any
+    ) -> dict[str, int]:
+        captured.append(payload)
+        await progress(1, 2, "Tickets werden ausgewertet …")
+        return {"tickets": 1, "snapshot_days": 0}
+
+    monkeypatch.setattr(backfill, "run_backfill", fake_run)
+
+    with pytest.raises(SystemExit) as status_exit:
+        main(["report", "status"])
+    assert status_exit.value.code == 0
+    status_json = json.loads(capsys.readouterr().out)
+    assert status_json["ready"] is False and status_json["backfill_status"] == "pending"
+
+    with pytest.raises(SystemExit) as run_exit:
+        main(["report", "backfill", "--since", "2024-06-01", "--restart", "--no-snapshots"])
+    assert run_exit.value.code == 0
+    assert captured == [ReportBackfillPayload(since=SINCE, restart=True, snapshots=False)]
+    out = capsys.readouterr().out
+    assert "1/2 Tickets werden ausgewertet …" in out and "'tickets': 1" in out
+
+    with pytest.raises(SystemExit) as bare_exit:
+        main(["report"])
+    assert bare_exit.value.code == 2
+
+    # a queued backfill job blocks the CLI (two writers on one cursor)
+    async def enqueue() -> None:
+        factory = make_factory()
+        async with factory() as s:
+            await enqueue_job(
+                s,
+                kind=REPORT_BACKFILL_JOB.kind,
+                payload=ReportBackfillPayload(),
+                created_by=None,
+                dedupe_key="report_backfill",
+            )
+            await s.commit()
+
+    asyncio.run(enqueue())
+    with pytest.raises(SystemExit) as blocked:
+        main(["report", "backfill"])
+    assert blocked.value.code == 1
+    assert len(captured) == 1  # not run again
+    assert "already queued" in capsys.readouterr().err

@@ -52,18 +52,25 @@ def _deadlock_behind(exc: DBAPIError) -> bool:
     return _lost_savepoint(exc) and isinstance(cause, DBAPIError) and is_deadlock(cause)
 
 
-async def load_state(session: AsyncSession, *, for_update: bool = False) -> TiqoraReportState:
+async def load_state(
+    session: AsyncSession, *, for_update: bool = False, retry_on_deadlock: bool = False
+) -> TiqoraReportState:
     """Return the state row, creating it on first use.
 
     The insert runs in a SAVEPOINT so losing the first-start race rolls back only
-    the insert, never the caller's pending work. Two first starts that both take a
-    locking read of the missing row can deadlock on the insert (MariaDB gap locks,
-    error 1213; PostgreSQL 40P01): the loser rolls back to its savepoint and the whole
-    sequence runs once more, which then finds the winner's committed row. A second
-    deadlock is raised. InnoDB aborts the victim's whole transaction on a deadlock
-    (``ROLLBACK TO SAVEPOINT`` then fails with 1305), so on MariaDB the session is
-    rolled back and the caller's pending work is gone in that case; the first call of
-    a unit of work, which is how tick and backfill use it, loses nothing.
+    the insert, never the caller's pending work.
+
+    Two first starts that both take a locking read of the missing row can deadlock on
+    the insert (MariaDB gap locks, error 1213; PostgreSQL 40P01). InnoDB then aborts
+    the victim's WHOLE transaction (``ROLLBACK TO SAVEPOINT`` fails with 1305), so a
+    savepoint-only retry is impossible there and everything the caller did earlier in
+    the transaction is gone. Therefore a deadlock always rolls the session back, and:
+
+    * ``retry_on_deadlock=False`` (default): the deadlock is re-raised, so the caller's
+      unit of work fails visibly instead of silently losing flushed writes;
+    * ``retry_on_deadlock=True``: the whole select/insert runs once more, which then
+      finds the winner's committed row; a second deadlock is raised. Only pass this
+      when ``load_state`` is the FIRST statement of a fresh session (nothing to lose).
     """
     stmt = select(TiqoraReportState).where(TiqoraReportState.name == STATE_NAME)
     if for_update:
@@ -88,11 +95,13 @@ async def load_state(session: AsyncSession, *, for_update: bool = False) -> Tiqo
             # REPEATABLE READ snapshot, which a plain re-select would not.
             return (await session.execute(stmt.with_for_update())).scalar_one()
         except DBAPIError as exc:
-            if attempt >= 2 or not _deadlock_behind(exc):
+            if not _deadlock_behind(exc):
                 raise
-            if _lost_savepoint(exc):
-                # MariaDB aborted the whole transaction: the session must start a new one
+            giving_up = not retry_on_deadlock or attempt >= 2
+            if giving_up or _lost_savepoint(exc):
                 await session.rollback()
+            if giving_up:
+                raise
             attempt += 1
             continue
         return (await session.execute(stmt)).scalar_one()

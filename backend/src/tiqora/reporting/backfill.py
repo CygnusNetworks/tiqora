@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, Final
 from zoneinfo import ZoneInfo
@@ -21,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from tiqora.config import Settings
 from tiqora.db.legacy.ticket import Ticket, TicketHistory
 from tiqora.db.tiqora.models import TiqoraReportTicketFact
-from tiqora.jobs.context import JobContext
+from tiqora.jobs.context import JobCancelled, JobContext
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import utc_now
 from tiqora.reporting.facts_store import FACT_CHUNK_SIZE, rebuild_and_commit
@@ -55,14 +56,27 @@ def _local_date(moment: datetime, zone: str) -> date:
     return moment.replace(tzinfo=UTC).astimezone(ZoneInfo(zone)).date()
 
 
+@dataclass(frozen=True, slots=True)
+class _Run:
+    zone: str
+    start: int
+    cursor: int
+    target: int
+    #: ``since`` of the run being worked on: the stored one when resuming, never the
+    #: payload's (the ticket range and the snapshot days must belong together)
+    since: date | None
+    #: ``backfill_started_at`` of the run; a writer of a replaced run must not touch the state
+    token: datetime
+
+
 async def _begin(
     factory: async_sessionmaker[AsyncSession],
     settings: Settings,
     payload: ReportBackfillPayload,
-) -> tuple[str, int, int, int]:
-    """Prepare the state; returns ``(zone, start, cursor, target)`` of this run."""
+) -> _Run:
+    """Prepare the state (start a new run or pick up the stored one)."""
     async with factory() as session:
-        state = await load_state(session, for_update=True)
+        state = await load_state(session, for_update=True, retry_on_deadlock=True)
         values = await load_reporting_settings(session, settings)
         zone = await reporting_time_zone(session, values)
         if state.last_history_id == 0:
@@ -77,6 +91,7 @@ async def _begin(
             and state.backfill_cursor_ticket_id is not None
             and state.backfill_start_ticket_id is not None
             and state.backfill_target_ticket_id is not None
+            and state.backfill_started_at is not None
         )
         if not resume:
             if payload.since is not None:
@@ -92,7 +107,8 @@ async def _begin(
             target = int((await session.execute(select(func.max(Ticket.id)))).scalar_one() or 0)
             # no ticket on/after `since`: an empty range
             start = int(first) - 1 if first is not None else target
-            now = utc_now()
+            # whole seconds: MariaDB's DATETIME rounds, and the value is the run token
+            now = utc_now().replace(microsecond=0)
             state.backfill_status = "running"
             state.backfill_start_ticket_id = start
             state.backfill_cursor_ticket_id = start
@@ -104,23 +120,45 @@ async def _begin(
         assert state.backfill_start_ticket_id is not None
         assert state.backfill_cursor_ticket_id is not None
         assert state.backfill_target_ticket_id is not None
-        out = (
+        assert state.backfill_started_at is not None
+        run = _Run(
             zone,
             state.backfill_start_ticket_id,
             state.backfill_cursor_ticket_id,
             state.backfill_target_ticket_id,
+            state.backfill_since,
+            state.backfill_started_at,
         )
         await session.commit()
-    return out
+    return run
 
 
 async def _save_cursor(
-    factory: async_sessionmaker[AsyncSession], cursor: int, *, now: datetime | None = None
+    factory: async_sessionmaker[AsyncSession],
+    run: _Run,
+    cursor: int,
+    *,
+    finish: tuple[date | None, str] | None = None,
 ) -> None:
+    """Move the cursor forward (or finish the run) if this run still owns the state.
+
+    A run that was replaced (restart, another job or the CLI started a new one) or is
+    already finished writes nothing and stops with :class:`JobCancelled`; the cursor
+    never moves backwards.
+    """
     async with factory() as session:
-        state = await load_state(session, for_update=True)
-        state.backfill_cursor_ticket_id = cursor
-        state.updated_at = now or utc_now()
+        state = await load_state(session, for_update=True, retry_on_deadlock=True)
+        if state.backfill_started_at != run.token or state.backfill_status != "running":
+            raise JobCancelled
+        stamp = utc_now()
+        state.backfill_cursor_ticket_id = max(cursor, state.backfill_cursor_ticket_id or 0)
+        state.updated_at = stamp
+        if finish is not None:
+            state.backfill_status = "done"
+            state.backfill_finished_at = stamp
+            if finish[0] is not None:
+                state.last_snapshot_date = finish[0]
+                state.snapshot_time_zone = finish[1]
         await session.commit()
 
 
@@ -140,9 +178,13 @@ async def run_backfill(
     at the first ticket id (created on/after ``since`` when given) and ends at the
     highest ticket id of that moment; tickets created later belong to the incremental
     tick. A run that finds status "running" with a cursor continues after the cursor.
+    A run whose state was taken over meanwhile (restart, other job, CLI) raises
+    :class:`JobCancelled` at its next cursor write. The snapshot days start at the
+    ``since`` of the run being worked on (the stored one when resuming).
     Returns ``{"tickets": n, "snapshot_days": d}``.
     """
-    zone, start, cursor, target = await _begin(factory, settings, payload)
+    run = await _begin(factory, settings, payload)
+    zone, start, cursor, target = run.zone, run.start, run.cursor, run.target
     total = max(target - start, 0)
 
     while cursor < target:
@@ -163,12 +205,14 @@ async def run_backfill(
             break
         await rebuild_and_commit(factory, ids, now=now)
         cursor = ids[-1]
-        await _save_cursor(factory, cursor)
+        await _save_cursor(factory, run, cursor)
         await progress(cursor - start, total, TICKETS_MESSAGE)
         await check_cancelled()
         if sleep_seconds:
             await asyncio.sleep(sleep_seconds)
 
+    if cursor < target:  # the highest ids were deleted meanwhile: the phase is complete anyway
+        await progress(total, total, TICKETS_MESSAGE)
     async with factory() as session:
         tickets = int(
             (
@@ -184,7 +228,7 @@ async def run_backfill(
     yesterday: date | None = None
     if payload.snapshots:
         yesterday = _local_date(now or utc_now(), zone) - timedelta(days=1)
-        first_day = payload.since
+        first_day = run.since
         if first_day is None:
             async with factory() as session:
                 oldest = (
@@ -198,20 +242,13 @@ async def run_backfill(
             window = days[i : i + SNAPSHOT_WINDOW_DAYS]
             await snapshot_days(factory, window, zone=zone, now=now)
             days_done += len(window)
-            await progress(days_done, len(days), SNAPSHOTS_MESSAGE)
+            # one bar over both phases: the snapshot days continue after the tickets
+            await progress(total + days_done, total + len(days), SNAPSHOTS_MESSAGE)
             await check_cancelled()
 
-    async with factory() as session:
-        state = await load_state(session, for_update=True)
-        stamp = utc_now()
-        state.backfill_cursor_ticket_id = target
-        state.backfill_status = "done"
-        state.backfill_finished_at = stamp
-        state.updated_at = stamp
-        if yesterday is not None:
-            state.last_snapshot_date = yesterday
-            state.snapshot_time_zone = zone
-        await session.commit()
+    await _save_cursor(
+        factory, run, target, finish=(yesterday, zone) if yesterday is not None else (None, zone)
+    )
     return {"tickets": tickets, "snapshot_days": days_done}
 
 
