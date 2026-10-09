@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useChartFormat } from "./chartLocale";
 import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
 import { ChartFrame, EmptyChart, GridLines, YAxisLabels } from "./chartKit";
@@ -22,16 +22,20 @@ export type StackedBarChartProps = {
   formatValue?: (v: number) => string;
 };
 
-/** Stacked vertical bars with a 2 px surface gap between neighbouring segments. */
+/**
+ * Stacked vertical bars with a 2 px surface gap between neighbouring segments.
+ * Negative and null values draw no segment (clamped to 0); the tooltip shows the given numbers.
+ */
 export function StackedBarChart({
   categories,
   series,
   height = 200,
   emptyLabel,
   testId,
-  formatValue = String,
+  formatValue,
 }: StackedBarChartProps) {
-  const { t } = useTranslation();
+  const { t, number } = useChartFormat();
+  const fmt = formatValue ?? number;
   const [hover, setHover] = useState<number | null>(null);
   const totals = categories.map((_, i) => series.reduce((sum, s) => sum + Math.max(0, s.values[i] ?? 0), 0));
   if (categories.length === 0 || series.length === 0 || totals.every((v) => v === 0)) {
@@ -50,7 +54,7 @@ export function StackedBarChart({
     <ChartFrame
       testId={testId}
       onLeave={() => setHover(null)}
-      axis={<YAxisLabels ticks={ticks} yOf={yOf} format={formatValue} />}
+      axis={<YAxisLabels ticks={ticks} yOf={yOf} format={fmt} />}
       footer={
         <>
           <div className="ml-9 mt-2 flex text-[10px] text-muted">
@@ -74,8 +78,8 @@ export function StackedBarChart({
         preserveAspectRatio="none"
         className="w-full"
         style={{ height: chartHeight }}
-        role="img"
-        aria-label="stacked bar chart"
+        role="group"
+        aria-label={`${categories.map((c) => c.label).join(", ")}: ${series.map((s) => s.label).join(", ")}`}
       >
         <GridLines ticks={ticks} yOf={yOf} />
         {categories.map((c, ci) => {
@@ -108,6 +112,14 @@ export function StackedBarChart({
             width={band}
             height={chartHeight}
             fill="transparent"
+            tabIndex={0}
+            role="img"
+            aria-label={`${c.label}: ${series
+              .filter((s) => s.values[ci] != null)
+              .map((s) => `${s.label} ${fmt(s.values[ci] as number)}`)
+              .join(", ")}`}
+            onFocus={() => setHover(ci)}
+            onBlur={() => setHover(null)}
             onMouseEnter={() => setHover(ci)}
             onMouseMove={() => setHover(ci)}
             data-testid={testId ? `${testId}-hit-${ci}` : undefined}
@@ -123,8 +135,8 @@ export function StackedBarChart({
           rows={[
             ...series
               .filter((s) => s.values[hover] != null)
-              .map((s) => ({ label: s.label, value: formatValue(s.values[hover] as number), color: s.color })),
-            { label: "Σ", value: formatValue(totals[hover]) },
+              .map((s) => ({ label: s.label, value: fmt(s.values[hover] as number), color: s.color })),
+            { label: t("reports.chart.total"), value: fmt(totals[hover]) },
           ]}
         />
       )}

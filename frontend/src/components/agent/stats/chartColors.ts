@@ -1,3 +1,6 @@
+/** Server key of the folded-away tail ("Weitere"); always neutral, never a slot (same value as reportFormat). */
+export const OTHER_SERIES_KEY = "__other__";
+
 /** Number of categorical colour slots; everything beyond folds into "Weitere" (muted). */
 export const SERIES_SLOTS = 6;
 
@@ -28,6 +31,7 @@ export function assignSeriesSlots(
   const fixed = fixedOrder ?? [];
   const rest: string[] = [];
   for (const key of keys) {
+    if (key === OTHER_SERIES_KEY) continue;
     const at = fixed.indexOf(key);
     if (at >= 0) slots.set(key, at);
     else if (!rest.includes(key)) rest.push(key);
@@ -38,11 +42,21 @@ export function assignSeriesSlots(
   return slots;
 }
 
+/** Colour of a series key: `__other__` is always the neutral muted token, others follow their slot. */
+export function keyColor(key: string, slots: ReadonlyMap<string, number>): string {
+  if (key === OTHER_SERIES_KEY) return "var(--color-muted)";
+  return seriesColor(slots.get(key) ?? SERIES_SLOTS);
+}
+
+/** Ramp step 0..6 for a 0..1 value. */
+export function sequentialStep(t: number): number {
+  const clamped = Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : 0;
+  return Math.min(6, Math.floor(clamped * 7));
+}
+
 /** 0..1 -> `var(--color-seq-1..7)` (heatmap ramp). */
 export function sequentialColor(t: number): string {
-  const clamped = Number.isFinite(t) ? Math.min(1, Math.max(0, t)) : 0;
-  const step = Math.min(6, Math.floor(clamped * 7));
-  return `var(--color-seq-${step + 1})`;
+  return `var(--color-seq-${sequentialStep(t) + 1})`;
 }
 
 export const CHANNEL_ORDER = ["email", "phone", "telegram", "webchat", "sms", "whatsapp", "internal"] as const;
@@ -55,3 +69,8 @@ export const STATE_TYPE_ORDER = [
   "merged",
   "removed",
 ] as const;
+
+/** Fixed text colours per ramp step: the ramp is the same in light and dark mode, so the text must not flip with the theme. */
+export function valueTextColor(tone: number): string {
+  return sequentialStep(tone) <= 3 ? "#0d1b2e" : "#ffffff";
+}

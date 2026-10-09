@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useChartFormat } from "./chartLocale";
 import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
 import { ChartFrame, EmptyChart, GridLines, YAxisLabels } from "./chartKit";
@@ -28,7 +28,8 @@ export type LineChartProps = {
  *
  * Used for time-bucketed reports (ticket volume, backlog trend). One y axis
  * starting at zero, 2 px lines, a crosshair + tooltip per bucket and a legend
- * for two or more series.
+ * for two or more series. A single bucket gets a persistent marker per series.
+ * Negative values extend the axis below zero.
  */
 export function LineChart({
   labels,
@@ -37,9 +38,10 @@ export function LineChart({
   height = 160,
   emptyLabel,
   testId,
-  formatValue = String,
+  formatValue,
 }: LineChartProps) {
-  const { t } = useTranslation();
+  const { t, number } = useChartFormat();
+  const fmt = formatValue ?? number;
   const [hover, setHover] = useState<number | null>(null);
   const points = labels.length;
   if (points === 0 || series.every((s) => s.values.length === 0)) {
@@ -47,8 +49,11 @@ export function LineChart({
   }
 
   const allValues = series.flatMap((s) => s.values);
-  const dataMin = Math.min(0, ...allValues);
-  const ticks = niceTicks(Math.max(1, ...allValues));
+  const lowest = Math.min(0, ...allValues);
+  // Negative values get their own gridlines below zero.
+  const negTicks = lowest < 0 ? niceTicks(-lowest).slice(1).map((v) => -v).reverse() : [];
+  const ticks = [...negTicks, ...niceTicks(Math.max(1, ...allValues))];
+  const dataMin = ticks[0];
   const max = ticks[ticks.length - 1];
   const range = max - dataMin || 1;
   const chartHeight = height - 40;
@@ -64,7 +69,7 @@ export function LineChart({
     <ChartFrame
       testId={testId}
       onLeave={() => setHover(null)}
-      axis={<YAxisLabels ticks={ticks} yOf={yOf} format={formatValue} />}
+      axis={<YAxisLabels ticks={ticks} yOf={yOf} format={fmt} />}
       footer={
         <>
           <div className="ml-9 mt-2 flex items-center justify-between text-[10px] text-muted">
@@ -85,8 +90,8 @@ export function LineChart({
         preserveAspectRatio="none"
         className="w-full"
         style={{ height: chartHeight }}
-        role="img"
-        aria-label="line chart"
+        role="group"
+        aria-label={`${series.map((s) => s.name).join(", ")}: ${labels[0]}${points > 1 ? ` – ${labels[points - 1]}` : ""}`}
       >
         <GridLines ticks={ticks} yOf={yOf} />
         {area &&
@@ -139,6 +144,11 @@ export function LineChart({
               width={edge ? w / 2 : w}
               height={chartHeight}
               fill="transparent"
+              tabIndex={0}
+              role="img"
+              aria-label={`${label}: ${series.map((s) => `${s.name} ${s.values[i] === undefined ? "—" : fmt(s.values[i])}`).join(", ")}`}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(null)}
               onMouseEnter={() => setHover(i)}
               onMouseMove={() => setHover(i)}
               data-testid={testId ? `${testId}-hit-${i}` : undefined}
@@ -148,13 +158,14 @@ export function LineChart({
           );
         })}
       </svg>
-      {hover !== null &&
+      {(hover !== null || points === 1) &&
         series.map((s) =>
-          s.values[hover] === undefined ? null : (
+          s.values[hover ?? 0] === undefined ? null : (
             <span
               key={`m-${s.name}`}
+              data-testid={testId ? `${testId}-marker-${s.name}` : undefined}
               className="pointer-events-none absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface"
-              style={{ left: `${xOf(hover)}%`, top: yOf(s.values[hover]), backgroundColor: s.color }}
+              style={{ left: `${xOf(hover ?? 0)}%`, top: yOf(s.values[hover ?? 0]), backgroundColor: s.color }}
               aria-hidden
             />
           ),
@@ -167,7 +178,7 @@ export function LineChart({
           title={labels[hover]}
           rows={series.map((s) => ({
             label: s.name,
-            value: s.values[hover] === undefined ? "—" : formatValue(s.values[hover]),
+            value: s.values[hover] === undefined ? "—" : fmt(s.values[hover]),
             color: s.color,
           }))}
         />

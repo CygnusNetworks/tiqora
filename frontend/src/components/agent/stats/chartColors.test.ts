@@ -3,6 +3,8 @@ import {
   assignSeriesSlots,
   seriesColor,
   sequentialColor,
+  keyColor,
+  valueTextColor,
   CHANNEL_ORDER,
   SERIES_SLOTS,
 } from "./chartColors";
@@ -33,5 +35,27 @@ describe("chartColors", () => {
     expect(sequentialColor(1)).toBe("var(--color-seq-7)");
     expect(sequentialColor(7)).toBe("var(--color-seq-7)");
     expect(sequentialColor(Number.NaN)).toBe("var(--color-seq-1)");
+  });
+  it("__other__ never takes a slot and is always neutral", () => {
+    const a = assignSeriesSlots(["7", "__other__", "3"]);
+    expect(a.has("__other__")).toBe(false);
+    expect([a.get("3"), a.get("7")]).toEqual([0, 1]);
+    expect(keyColor("__other__", a)).toBe("var(--color-muted)");
+    expect(keyColor("3", a)).toBe("var(--color-series-1)");
+    // with a fixed order, __other__ still does not shift the slots
+    const b = assignSeriesSlots(["__other__", "phone"], ["email", "phone"]);
+    expect(b.get("phone")).toBe(1);
+    expect(keyColor("__other__", b)).toBe("var(--color-muted)");
+  });
+  it("slots are stable across repeated calls and input order", () => {
+    const one = assignSeriesSlots(["9", "2", "5"]);
+    const two = assignSeriesSlots(["5", "9", "2"]);
+    expect([...one.entries()].sort()).toEqual([...two.entries()].sort());
+  });
+  it("heatmap value text is dark on light steps and white on dark steps", () => {
+    expect(valueTextColor(0)).toBe("#0d1b2e");
+    expect(valueTextColor(0.5)).toBe("#0d1b2e");
+    expect(valueTextColor(0.6)).toBe("#ffffff");
+    expect(valueTextColor(1)).toBe("#ffffff");
   });
 });

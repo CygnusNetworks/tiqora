@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { createInstance } from "i18next";
+import { I18nextProvider } from "react-i18next";
+import de from "@/i18n/locales/de.json";
 import { LineChart } from "./LineChart";
 import { BarChart } from "./BarChart";
 import { StackedBarChart } from "./StackedBarChart";
@@ -160,5 +163,149 @@ describe("charts", () => {
     render(<DonutChart testId="e2" data={[]} emptyLabel="leer" />);
     render(<HeatmapChart testId="e3" rows={[]} columns={[]} values={[]} emptyLabel="leer" />);
     for (const id of ["e1", "e2", "e3"]) expect(screen.getByTestId(id)).toHaveTextContent("leer");
+  });
+
+  it("line chart hit areas are focusable, show the tooltip on focus and carry the values", () => {
+    render(<LineChart testId="lc" labels={["KW 1", "KW 2"]} series={twoSeries} />);
+    const hit = screen.getByTestId("lc-hit-1");
+    expect(hit).toHaveAttribute("tabindex", "0");
+    expect(hit).toHaveAttribute("aria-label", expect.stringContaining("Erstellt 5"));
+    fireEvent.focus(hit);
+    expect(screen.getByTestId("lc-tooltip")).toHaveTextContent("KW 2");
+    fireEvent.blur(hit);
+    expect(screen.queryByTestId("lc-tooltip")).toBeNull();
+  });
+
+  it("stacked bar, bar, donut and heatmap targets are focusable with value labels", () => {
+    render(
+      <>
+        <StackedBarChart
+          testId="sb"
+          categories={[{ key: "c1", label: "Mo" }]}
+          series={[{ key: "s1", label: "Eingang", color: seriesColor(0), values: [2] }]}
+        />
+        <BarChart testId="bc" data={[{ label: "A", value: 4 }]} />
+        <DonutChart testId="dn" data={[{ key: "a", label: "Offen", value: 3, color: seriesColor(0) }]} />
+        <HeatmapChart testId="hm" rows={[{ key: "r", label: "Mo" }]} columns={[{ key: "c", label: "9" }]} values={[[5]]} />
+      </>,
+    );
+    for (const id of ["sb-hit-0", "bc-hit-0", "dn-slice-a", "hm-cell-0-0"]) {
+      expect(screen.getByTestId(id)).toHaveAttribute("tabindex", "0");
+    }
+    expect(screen.getByTestId("sb-hit-0")).toHaveAttribute("aria-label", "Mo: Eingang 2");
+    expect(screen.getByTestId("bc-hit-0")).toHaveAttribute("aria-label", "A: 4");
+    fireEvent.focus(screen.getByTestId("bc-hit-0"));
+    expect(screen.getByTestId("bc-tooltip")).toBeInTheDocument();
+    fireEvent.focus(screen.getByTestId("hm-cell-0-0"));
+    expect(screen.getByTestId("hm-tooltip")).toHaveTextContent("Mo · 9");
+    expect(screen.getByRole("group", { name: "A: 4" })).toBeInTheDocument();
+  });
+
+  it("heatmap value text uses fixed colours per ramp step", () => {
+    render(
+      <HeatmapChart
+        testId="hm"
+        rows={[{ key: "r", label: "Mo" }]}
+        columns={[{ key: "a", label: "8" }, { key: "b", label: "9" }]}
+        values={[[1, 10]]}
+      />,
+    );
+    const fills = Array.from(document.querySelectorAll("text.font-mono")).map((n) => (n as SVGElement).style.fill);
+    expect(fills).toEqual(["#0d1b2e", "#ffffff"]);
+  });
+
+  it("a single bucket draws a persistent marker per series", () => {
+    render(<LineChart testId="lc" labels={["KW 1"]} series={twoSeries.map((s) => ({ ...s, values: [s.values[0]] }))} />);
+    expect(screen.getByTestId("lc-marker-Erstellt")).toBeInTheDocument();
+    expect(screen.getByTestId("lc-marker-Geschlossen")).toBeInTheDocument();
+  });
+
+  it("line chart with a negative value gets an axis label below zero", () => {
+    render(<LineChart testId="lc" labels={["a", "b"]} series={[{ name: "Saldo", color: seriesColor(0), values: [-4, 6] }]} formatValue={(v) => `v${v}`} />);
+    expect(screen.getByTestId("lc")).toHaveTextContent(/v-\d/);
+  });
+
+  it("bar and stacked bar clamp negatives and never draw an inverted rect", () => {
+    render(
+      <>
+        <BarChart testId="bc" data={[{ label: "A", value: -3 }, { label: "B", value: 2 }]} />
+        <StackedBarChart
+          testId="sb"
+          categories={[{ key: "c1", label: "Mo" }]}
+          series={[
+            { key: "s1", label: "A", color: seriesColor(0), values: [-2] },
+            { key: "s2", label: "B", color: seriesColor(1), values: [3] },
+          ]}
+        />
+      </>,
+    );
+    const heights = (id: string) => screen.getByTestId(id).getAttribute("d") ?? "";
+    expect(heights("bc-bar-0")).not.toMatch(/-\d/);
+    expect(heights("bc-bar-1")).not.toMatch(/-\d/);
+    expect(screen.queryByTestId("sb-seg-c1-s1")).toBeNull();
+    expect(heights("sb-seg-c1-s2")).not.toMatch(/-\d/);
+  });
+
+  it("kpi tile renders a negative delta as a decrease", () => {
+    render(<KpiTile label="T" value="1" delta={{ value: -0.08, direction: "down", goodWhen: "down" }} testId="k" />);
+    const d = screen.getByTestId("k-delta");
+    expect(d).toHaveTextContent("−8");
+    expect(d).toHaveTextContent("Decrease");
+    expect(d).toHaveClass("text-green");
+  });
+
+  it("all-zero data renders without NaN", () => {
+    render(
+      <>
+        <LineChart testId="lc" labels={["a", "b"]} series={[{ name: "Z", color: seriesColor(0), values: [0, 0] }]} />
+        <BarChart testId="bc" data={[{ label: "A", value: 0 }]} />
+      </>,
+    );
+    expect(screen.getByTestId("lc-series-Z").getAttribute("points")).not.toContain("NaN");
+    expect(screen.getByTestId("bc-bar-0").getAttribute("d")).not.toContain("NaN");
+  });
+
+  it("long labels are truncated with the full text in a title", () => {
+    const long = "Eine sehr lange Warteschlange mit vielen Worten";
+    render(
+      <>
+        <HeatmapChart testId="hm" rows={[{ key: "r", label: long }]} columns={[{ key: "c", label: "9" }]} values={[[1]]} />
+        <LineChart testId="lc" labels={["a", "b"]} series={[{ name: long, color: seriesColor(0), values: [1, 2] }, twoSeries[1]]} />
+      </>,
+    );
+    expect(screen.getByTestId("hm")).toHaveTextContent("…");
+    expect(Array.from(screen.getByTestId("hm").querySelectorAll("title")).map((n) => n.textContent)).toContain(long);
+    const item = screen.getByTestId("lc-legend").querySelector("li");
+    expect(item).toHaveAttribute("title", long);
+    expect(item?.querySelector(".truncate")).not.toBeNull();
+  });
+
+  it("uses the app locale for percentages (de) and keeps legend labels translated", async () => {
+    const i18n = createInstance();
+    await i18n.init({ lng: "de", resources: { de: { translation: de } }, interpolation: { escapeValue: false } });
+    render(
+      <I18nextProvider i18n={i18n}>
+        <DonutChart
+          testId="dn"
+          data={[
+            { key: "a", label: "Offen", value: 1, color: seriesColor(0) },
+            { key: "b", label: "Zu", value: 7, color: seriesColor(1) },
+          ]}
+        />
+        <KpiTile label="T" value="1" delta={{ value: 0.125, direction: "up", goodWhen: "up" }} testId="k" />
+      </I18nextProvider>,
+    );
+    expect(screen.getByTestId("dn-legend")).toHaveTextContent("12,5 %");
+    expect(screen.getByTestId("dn-legend")).toHaveAttribute("aria-label", "Legende");
+    expect(screen.getByTestId("k-delta")).toHaveTextContent("+12,5 %");
+    expect(screen.getByTestId("k-delta")).toHaveTextContent("Anstieg");
+  });
+
+  it("sparkline is decorative and safe without values", () => {
+    render(<Sparkline values={[]} testId="sp" />);
+    const svg = screen.getByTestId("sp");
+    expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(svg).not.toHaveAttribute("role");
+    expect(svg.querySelector("polyline")).toBeNull();
   });
 });

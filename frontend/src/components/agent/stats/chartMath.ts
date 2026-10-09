@@ -20,3 +20,8 @@ export function barPath(x: number, y: number, w: number, h: number, round: boole
     `A${rx},${ry} 0 0 1 ${x + w},${y + ry}V${y + h}H${x}Z`
   );
 }
+
+/** Shortens long labels with an ellipsis (callers keep the full text in a `title`). */
+export function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, Math.max(1, max - 1))}…` : text;
+}

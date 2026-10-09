@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useChartFormat } from "./chartLocale";
 import { ChartLegend } from "./ChartLegend";
 import { ChartTooltip } from "./ChartTooltip";
 import { EmptyChart } from "./chartKit";
@@ -32,9 +32,10 @@ export function DonutChart({
   size = 160,
   emptyLabel,
   testId,
-  formatValue = String,
+  formatValue,
 }: DonutChartProps) {
-  const { t } = useTranslation();
+  const { t, number, percent } = useChartFormat();
+  const fmt = formatValue ?? number;
   const [hover, setHover] = useState<string | null>(null);
   const slices = data.filter((d) => d.value > 0);
   const total = slices.reduce((s, d) => s + d.value, 0);
@@ -45,7 +46,7 @@ export function DonutChart({
   const c = size / 2;
   const rOut = c - 2;
   const rIn = rOut * 0.62;
-  const percentOf = (v: number) => `${((v / total) * 100).toLocaleString(undefined, { maximumFractionDigits: 1 })} %`;
+  const percentOf = (v: number) => percent(v / total);
   let angle = 0;
   const arcs = slices.map((d) => {
     const a0 = angle;
@@ -64,7 +65,9 @@ export function DonutChart({
       onMouseLeave={() => setHover(null)}
     >
       <div className="relative mx-auto" style={{ width: size, height: size }}>
-        <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="img" aria-label="donut chart">
+        <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} role="group"
+          aria-label={slices.map((d) => `${d.label}: ${fmt(d.value)}`).join(", ")}
+        >
           {arcs.map(({ d, a0, a1 }) => (
             <path
               key={d.key}
@@ -72,6 +75,11 @@ export function DonutChart({
               fill={d.color}
               stroke="var(--color-surface)"
               strokeWidth={2}
+              tabIndex={0}
+              role="img"
+              aria-label={`${d.label}: ${fmt(d.value)} (${percentOf(d.value)})`}
+              onFocus={() => setHover(d.key)}
+              onBlur={() => setHover(null)}
               onMouseEnter={() => setHover(d.key)}
               onMouseMove={() => setHover(d.key)}
               data-testid={testId ? `${testId}-slice-${d.key}` : undefined}
@@ -84,7 +92,7 @@ export function DonutChart({
             className="fill-ink font-mono text-base font-semibold"
             data-testid={testId ? `${testId}-center` : undefined}
           >
-            {formatValue(total)}
+            {fmt(total)}
           </text>
           {centerLabel && (
             <text x={c} y={c + 14} textAnchor="middle" className="fill-muted text-[10px]">
@@ -99,7 +107,7 @@ export function DonutChart({
             y={c - ((rOut + rIn) / 2) * Math.cos(mid)}
             title={active.d.label}
             rows={[
-              { label: t("reports.chart.ofTotal", { percent: percentOf(active.d.value) }), value: formatValue(active.d.value), color: active.d.color },
+              { label: t("reports.chart.ofTotal", { percent: percentOf(active.d.value) }), value: fmt(active.d.value), color: active.d.color },
             ]}
           />
         )}
@@ -110,7 +118,7 @@ export function DonutChart({
           key: d.key,
           label: d.label,
           color: d.color,
-          detail: `${formatValue(d.value)} · ${percentOf(d.value)}`,
+          detail: `${fmt(d.value)} · ${percentOf(d.value)}`,
         }))}
       />
     </div>

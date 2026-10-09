@@ -1,9 +1,9 @@
-import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { Sparkline } from "./Sparkline";
+import { useChartFormat } from "./chartLocale";
 
 export type KpiDelta = {
-  /** Relative change, 0.12 = 12 %. */
+  /** Relative change, 0.12 = 12 %; may be negative (-0.08 = down 8 %). */
   value: number;
   direction: "up" | "down" | "flat";
   /** Which direction is an improvement; decides green vs. red. */
@@ -35,16 +35,21 @@ function Arrow({ direction }: { direction: KpiDelta["direction"] }) {
 
 /** Stat tile with a headline value, a change indicator (icon + text, never colour alone) and an optional sparkline. */
 export function KpiTile({ label, value, delta, sparkline, hint, testId }: KpiTileProps) {
-  const { t } = useTranslation();
+  const { t, percent: formatPercent } = useChartFormat();
   const tone = !delta || delta.direction === "flat"
     ? "text-muted"
     : delta.direction === delta.goodWhen
       ? "text-green"
       : "text-danger";
-  const sign = delta?.direction === "up" ? "+" : delta?.direction === "down" ? "−" : "";
-  const percent = delta
-    ? `${sign}${(Math.abs(delta.value) * 100).toLocaleString(undefined, { maximumFractionDigits: 1 })} %`
-    : "";
+  // A negative number always reads as a decrease; otherwise the direction decides.
+  const sign = !delta
+    ? ""
+    : delta.value < 0 || (delta.value > 0 && delta.direction === "down")
+      ? "−"
+      : delta.value > 0 && delta.direction === "up"
+        ? "+"
+        : "";
+  const percent = delta ? `${sign}${formatPercent(Math.abs(delta.value))}` : "";
 
   return (
     <div className="rounded-lg border border-hairline bg-surface p-4" data-testid={testId}>

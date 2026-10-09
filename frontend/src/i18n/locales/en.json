@@ -4680,11 +4680,11 @@
     "chart": {
       "noData": "No data",
       "legend": "Legend",
-      "tooltipOther": "Others",
       "deltaUp": "Increase",
       "deltaDown": "Decrease",
       "deltaFlat": "Unchanged",
-      "ofTotal": "{{percent}} of total"
+      "ofTotal": "{{percent}} of total",
+      "total": "Total"
     }
   }
 }
