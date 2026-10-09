@@ -465,6 +465,9 @@ export interface paths {
         /**
          * Change Password
          * @description Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.
+         *
+         *     Afterwards every other session of the customer ends: Znuny/GI sessions and the
+         *     portal's Redis sessions, pending 2FA logins included. The calling session stays.
          */
         post: operations["change_password_api_portal_preferences_password_post"];
         delete?: never;

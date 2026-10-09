@@ -31821,7 +31821,7 @@
     },
     "/api/portal/preferences/password": {
       "post": {
-        "description": "Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.",
+        "description": "Znuny ``Preferences::Password`` (customer): verify the current one, store the new one.\n\nAfterwards every other session of the customer ends: Znuny/GI sessions and the\nportal's Redis sessions, pending 2FA logins included. The calling session stays.",
         "operationId": "change_password_api_portal_preferences_password_post",
         "parameters": [
           {
