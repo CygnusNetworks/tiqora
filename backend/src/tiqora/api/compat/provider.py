@@ -23,6 +23,16 @@ logger = structlog.get_logger(__name__)
 OperationRunner = Callable[[str, dict[str, Any], OperationConfig], Awaitable[dict[str, Any]]]
 
 
+class OperationFault(Exception):
+    """The operation answered ``Success => 0`` (Znuny ``Provider.pm`` ``_HandleError`` ->
+    ``_GenerateErrorResponse``): the transport sends a fault with this message (HTTP 500),
+    not an ``{"Error": ...}`` body."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderOutcome:
     status_code: int
@@ -87,7 +97,12 @@ async def run_provider(
             }
         }
     else:
-        result = await run_operation(op.handler, data_in if isinstance(data_in, dict) else {}, op)
+        try:
+            result = await run_operation(
+                op.handler, data_in if isinstance(data_in, dict) else {}, op
+            )
+        except OperationFault as exc:
+            return _fault(exc.message)
     status = error_status_code(result)
     headers: dict[str, str] = {}
     retry = result.get("Error", {}).get("RetryAfter") if status == 429 else None
@@ -124,6 +139,7 @@ def render_rest(outcome: ProviderOutcome) -> Response:
 
 
 __all__ = [
+    "OperationFault",
     "OperationRunner",
     "ProviderOutcome",
     "error_status_code",

@@ -45,6 +45,7 @@ from tiqora.api.compat.operations import (
     op_time_accounting_get,
 )
 from tiqora.api.compat.provider import (
+    OperationFault,
     ProviderOutcome,
     error_status_code,
     render_rest,
@@ -331,7 +332,10 @@ async def canonical_out_of_office(
     session_store: SessionStore = Depends(get_session_store),  # noqa: B008
 ) -> Response:
     data = await _merge_params(request)
-    result = await _dispatch_operation("OutOfOffice", data, session, session_store, request)
+    try:
+        result = await _dispatch_operation("OutOfOffice", data, session, session_store, request)
+    except OperationFault as exc:
+        return _fault_response(exc.message, status.HTTP_500_INTERNAL_SERVER_ERROR)
     return _json_or_501(result)
 
 
@@ -388,9 +392,14 @@ async def _handle_soap_request(
         )
         return _soap_response(fault, parsed.version, status.HTTP_501_NOT_IMPLEMENTED)
 
-    result = await _dispatch_operation(
-        parsed.operation, parsed.data, session, session_store, request
-    )
+    try:
+        result = await _dispatch_operation(
+            parsed.operation, parsed.data, session, session_store, request
+        )
+    except OperationFault as exc:
+        return _render_soap(
+            ProviderOutcome(500, {}, {}, exc.message), parsed.operation, parsed.version, namespace
+        )
     return _render_soap(
         ProviderOutcome(_error_status_code(result), result, {}, None),
         parsed.operation,

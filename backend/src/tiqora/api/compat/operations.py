@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.api.compat.article_input import (
@@ -30,7 +30,8 @@ from tiqora.api.compat.article_input import (
 from tiqora.api.compat.history_at import queues_at
 from tiqora.api.compat.mapping import MappingError
 from tiqora.api.compat.mapping.out_of_office import OutOfOfficeMapper
-from tiqora.api.compat.mapping.perl import perl_str, perl_truthy
+from tiqora.api.compat.mapping.perl import perl_is_string, perl_str, perl_truthy
+from tiqora.api.compat.provider import OperationFault
 from tiqora.api.compat.search_filters import (
     article_text_filters,
     create_time_settings,
@@ -102,6 +103,7 @@ from tiqora.domain.ticket_write_service import (
 from tiqora.domain.totp import TOTPService
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.security.ratelimit import AuthRateLimiter, client_ip
+from tiqora.znuny.cache_invalidation import invalidate_cache_type
 from tiqora.znuny.escalation import escalation_index_build
 from tiqora.znuny.history import (
     add_service_update,
@@ -2872,6 +2874,87 @@ async def op_time_accounting_get(
 # ---------------------------------------------------------------------------
 
 
+def _string_with_data(value: Any) -> bool:
+    """``IsStringWithData``: a defined, non-empty plain scalar."""
+    return perl_is_string(value) and perl_str(value) != ""
+
+
+def _like_escape(value: str) -> str:
+    """``Quote($Value, 'Like')``: ``_`` is literal (backslash = LIKE escape on both dialects)."""
+    return value.replace("\\", "\\\\").replace("_", "\\_")
+
+
+async def _out_of_office_user_ids(session: AsyncSession, entry: dict[str, Any]) -> list[int]:
+    """User IDs ``User::UserSearch`` finds for an OutOfOffice entry (``Valid`` users only).
+
+    Znuny checks ``Search`` (``UserSearch``), then ``PostMasterSearch`` (``UserEmail``), then
+    ``UserLogin`` - the first one given decides. The caller needs exactly one id.
+
+    * ``UserSearch``: whitespace -> ``+`` (OutOfOffice.pm:196), ``QueryCondition`` over
+      login / first_name / last_name: every word must match one of the columns, case
+      insensitively, as a whole value; ``*`` is the wildcard. Znuny's ``|``, ``AND``/``OR``,
+      ``!`` and parentheses are not supported (the words are AND-ed).
+    * ``UserEmail``: ``SearchPreferences(Key => 'UserEmail')`` - a LIKE on the preference,
+      ``LOWER()`` on both sides where the database is case sensitive (PostgreSQL); on
+      MariaDB the BLOB column compares byte-wise, exactly like Znuny there.
+    * ``UserLogin``: ``LOWER(login) LIKE lower(value)`` with ``*`` -> ``%``.
+    """
+    search = entry.get("UserSearch")
+    if _string_with_data(search):
+        words = [w for w in re.split(r"[\s+]+", perl_str(search)) if w]
+        if not words:
+            return []
+        conditions: list[str] = []
+        params: dict[str, Any] = {}
+        for i, word in enumerate(words):
+            params[f"w{i}"] = _like_escape(word.lower()).replace("*", "%")
+            conditions.append(
+                f"(LOWER(login) LIKE :w{i} OR LOWER(first_name) LIKE :w{i}"
+                f" OR LOWER(last_name) LIKE :w{i})"
+            )
+        rows = await session.execute(
+            text(f"SELECT id FROM users WHERE {' AND '.join(conditions)} AND valid_id = 1"),
+            params,
+        )
+        return [int(r[0]) for r in rows.all()]
+
+    email = entry.get("UserEmail")
+    if _string_with_data(email):
+        bind = session.get_bind()
+        postgres = bind is not None and bind.dialect.name == "postgresql"
+        cond = (
+            "LOWER(p.preferences_value) LIKE LOWER(:e)"
+            if postgres
+            else "p.preferences_value LIKE :e"
+        )
+        rows = await session.execute(
+            text(
+                "SELECT p.user_id FROM user_preferences p WHERE p.preferences_key = 'UserEmail'"
+                f" AND {cond}"
+            ),
+            {"e": _pref_param(session, perl_str(email))},
+        )
+        ids = sorted({int(r[0]) for r in rows.all()})
+        if not ids:
+            return []
+        # UserSearch returns every match as soon as one of them is a user GetUserData finds
+        # (OutOfOffice passes no Valid, so validity is not checked on this path)
+        known = await session.execute(
+            text("SELECT id FROM users WHERE id IN :ids").bindparams(
+                bindparam("ids", expanding=True)
+            ),
+            {"ids": ids},
+        )
+        return ids if known.first() is not None else []
+
+    login = perl_str(entry.get("UserLogin"))
+    rows = await session.execute(
+        text("SELECT id FROM users WHERE LOWER(login) LIKE :l AND valid_id = 1"),
+        {"l": _like_escape(login.lower()).replace("*", "%")},
+    )
+    return [int(r[0]) for r in rows.all()]
+
+
 async def op_out_of_office(
     data: dict[str, Any],
     session: AsyncSession,
@@ -2904,65 +2987,51 @@ async def op_out_of_office(
 
     entries = data.get("OutOfOfficeEntries")
     if not isinstance(entries, list) or not entries:
-        return _err(
-            f"{op}.WrongInputStructure",
-            f"{op}: OutOfOfficeEntries must be a non-empty list!",
+        # OutOfOffice.pm:149-170: Success => 0 -> the provider answers with a fault
+        raise OperationFault(
+            "Payload does not contain out-of-office entries or they could not be parsed."
         )
 
+    written = False
     for entry in entries:
-        if not isinstance(entry, dict):
-            continue  # OutOfOffice.pm:196-214 skips invalid entries
+        # OutOfOffice.pm:174-192: a hash with at least one of the three lookup keys
+        if (
+            not isinstance(entry, dict)
+            or not entry
+            or not any(
+                _string_with_data(entry.get(k)) for k in ("UserEmail", "UserSearch", "UserLogin")
+            )
+        ):
+            continue
+        user_ids = await _out_of_office_user_ids(session, entry)
+        if len(user_ids) != 1:
+            continue  # OutOfOffice.pm:207-218: "Error while looking up unique user ID."
+        target_id = user_ids[0]
 
-        # Resolve target agent
-        target_id: int | None = None
-        if entry.get("UserLogin"):
-            target_id = await _resolve_user_id(session, str(entry["UserLogin"]), None)
-        elif entry.get("UserEmail"):
-            row = (
-                await session.execute(
-                    text(
-                        "SELECT user_id FROM user_preferences"
-                        " WHERE preferences_key = 'UserEmail'"
-                        " AND preferences_value = :e LIMIT 1"
-                    ),
-                    {"e": _pref_param(session, str(entry["UserEmail"]))},
-                )
-            ).first()
-            if row:
-                target_id = int(row[0])
-        elif entry.get("UserSearch"):
-            search = str(entry["UserSearch"]).replace(" ", "%")
-            row = (
-                await session.execute(
-                    text(
-                        "SELECT id FROM users WHERE valid_id = 1"
-                        " AND (login LIKE :s OR first_name LIKE :s OR last_name LIKE :s)"
-                        " LIMIT 1"
-                    ),
-                    {"s": f"%{search}%"},
-                )
-            ).first()
-            if row:
-                target_id = int(row[0])
-
-        if target_id is None:
-            continue  # OutOfOffice.pm:236-249 skips entries without a unique user
-
-        # Parse StartDate / EndDate as YYYY-MM-DD
-        pref: dict[str, str] = {
-            "OutOfOffice": "1" if entry.get("OutOfOffice") else "0",
-        }
-        for part, key in (("Start", "StartDate"), ("End", "EndDate")):
-            date_s = entry.get(key) or entry.get(f"{part}Date")
-            if date_s and re.match(r"^\d{4}-\d{2}-\d{2}$", str(date_s)):
-                y, mo, d = str(date_s).split("-")
-                pref[f"OutOfOffice{part}Year"] = y
-                pref[f"OutOfOffice{part}Month"] = mo
-                pref[f"OutOfOffice{part}Day"] = d
+        pref: dict[str, str] = {}
+        # OutOfOffice.pm:228-236: unanchored match; the first missing / unparsable part ends
+        # the loop (`last DATEPART`), so an invalid StartDate also drops EndDate
+        for part in ("Start", "End"):
+            date_s = entry.get(f"{part}Date")
+            if not _string_with_data(date_s):
+                break
+            match = re.search(r"(\d{4})-(\d{2})-(\d{2})", str(date_s))
+            if match is None:
+                break
+            pref[f"OutOfOffice{part}Year"] = match.group(1)
+            pref[f"OutOfOffice{part}Month"] = match.group(2)
+            pref[f"OutOfOffice{part}Day"] = match.group(3)
+        # `$Entry->{OutOfOffice} ? 1 : 0` - Perl truthiness ("0" and "" are off)
+        pref["OutOfOffice"] = "1" if perl_truthy(entry.get("OutOfOffice")) else "0"
 
         for k, v in pref.items():
             await _set_user_preference(session, target_id, k, v)
+        written = True
 
+    if written:
+        # User.pm SetPreferences -> _UserCacheClear: Znuny must not keep serving the old
+        # out-of-office state from its User cache
+        await invalidate_cache_type(session, "User")
     await session.commit()
     # OutOfOffice.pm:260-264: the answer carries no per-entry detail
     return {"Success": 1}

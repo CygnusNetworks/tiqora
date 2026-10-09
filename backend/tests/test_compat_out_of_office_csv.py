@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+from tests._row_cleanup import delete_rows_above, snapshot_max_ids
 from tiqora.api.compat.operations import op_out_of_office
 from tiqora.domain.auth import SessionStore
 
@@ -21,6 +22,7 @@ pytestmark = pytest.mark.db
 
 SESSION = "GI8990ADMIN"
 _SEEDED: list[str] = []
+_SNAPSHOTS: dict[str, dict[str, int]] = {}
 
 _CLEANUP = (
     "DELETE FROM user_preferences WHERE user_id IN (8990, 8991, 8992)",
@@ -46,6 +48,7 @@ def _delete_seeded_rows() -> Generator[None, None, None]:
             for stmt in _CLEANUP:
                 conn.execute(text(stmt))
         engine.dispose()
+        delete_rows_above(sync_url, _SNAPSHOTS[sync_url])
     _SEEDED.clear()
 
 
@@ -56,8 +59,14 @@ def _async_url(sync_url: str) -> str:
 
 
 def _seed(sync_url: str) -> None:
+    from tiqora.db.tiqora.base import TiqoraBase
+
     _SEEDED.append(sync_url)
     engine = create_engine(sync_url)
+    with engine.begin() as conn:
+        TiqoraBase.metadata.create_all(conn)
+    if sync_url not in _SNAPSHOTS:  # the preference writes queue Znuny cache signals
+        _SNAPSHOTS[sync_url] = snapshot_max_ids(sync_url, ("tiqora_cache_invalidation",))
     now = datetime(2024, 6, 1, 12, 0, 0)
     stamp = str(int(time.time()))
     with engine.begin() as conn:
@@ -206,3 +215,94 @@ async def test_csv_row_resolved_by_email(sync_url: str) -> None:
     prefs = _prefs(sync_url, 8992)
     assert prefs["OutOfOffice"] == "1"
     assert (prefs["OutOfOfficeStartMonth"], prefs["OutOfOfficeEndDay"]) == ("05", "03")
+
+
+def _rows(sync_url: str, sql: str) -> list[Any]:
+    engine = create_engine(sync_url)
+    try:
+        with engine.begin() as conn:
+            return list(conn.execute(text(sql)).all())
+    finally:
+        engine.dispose()
+
+
+async def test_zero_is_perl_false_in_csv_and_json(sync_url: str) -> None:
+    # OutOfOffice.pm: `$Entry->{OutOfOffice} ? 1 : 0` - "0" and "" are false
+    csv = "UserLogin,OutOfOffice\ngi8991.agent,1\ngi8992.agent,0\n"
+    assert await _post(sync_url, {"OutOfOfficeEntriesCSVString": csv}) == {"Success": 1}
+    assert _prefs(sync_url, 8991)["OutOfOffice"] == "1"
+    assert _prefs(sync_url, 8992)["OutOfOffice"] == "0"
+    entries = [
+        {"UserLogin": "gi8991.agent", "OutOfOffice": "0"},
+        {"UserLogin": "gi8992.agent", "OutOfOffice": ""},
+    ]
+    assert await _post(sync_url, {"OutOfOfficeEntries": entries}) == {"Success": 1}
+    assert _prefs(sync_url, 8991)["OutOfOffice"] == "0"
+    assert _prefs(sync_url, 8992)["OutOfOffice"] == "0"
+
+
+async def test_ambiguous_user_search_skips_the_entry(sync_url: str) -> None:
+    # every seeded agent is "Gi Agent": more than one match -> Znuny skips (@UserIDs != 1)
+    entries = [{"UserSearch": "Agent", "OutOfOffice": 1}]
+    assert await _post(sync_url, {"OutOfOfficeEntries": entries}) == {"Success": 1}
+    for uid in (8990, 8991, 8992):
+        assert "OutOfOffice" not in _prefs(sync_url, uid)
+    # exactly one match is set; Search wins over UserLogin (UserSearch elsif chain)
+    entries = [{"UserSearch": "gi8992.agent", "UserLogin": "gi8991.agent", "OutOfOffice": 1}]
+    assert await _post(sync_url, {"OutOfOfficeEntries": entries}) == {"Success": 1}
+    assert _prefs(sync_url, 8992)["OutOfOffice"] == "1"
+    assert "OutOfOffice" not in _prefs(sync_url, 8991)
+    # words are AND-ed, each word must match a whole column (wildcards with *)
+    entries = [{"UserSearch": "gi8991*  Agent", "OutOfOffice": 1}]
+    assert await _post(sync_url, {"OutOfOfficeEntries": entries}) == {"Success": 1}
+    assert _prefs(sync_url, 8991)["OutOfOffice"] == "1"
+
+
+async def test_user_preferences_write_invalidates_the_znuny_user_cache(sync_url: str) -> None:
+    before = _rows(sync_url, "SELECT COALESCE(MAX(id), 0) FROM tiqora_cache_invalidation")[0][0]
+    entries = [{"UserLogin": "gi8991.agent", "OutOfOffice": 1}]
+    assert await _post(sync_url, {"OutOfOfficeEntries": entries}) == {"Success": 1}
+    types = [
+        str(r[0])
+        for r in _rows(
+            sync_url,
+            f"SELECT cache_type FROM tiqora_cache_invalidation WHERE id > {int(before)}"
+            " AND ticket_id IS NULL",
+        )
+    ]
+    assert "User" in types
+
+
+async def test_dates_unanchored_and_start_failure_stops_end(sync_url: str) -> None:
+    entries = [
+        {
+            "UserLogin": "gi8991.agent",
+            "OutOfOffice": 1,
+            "StartDate": "ab 2026-05-01 00:00",
+            "EndDate": "2026-05-09T23:59",
+        },
+        # an unparsable StartDate ends the date loop: EndDate is not stored either
+        {
+            "UserLogin": "gi8992.agent",
+            "OutOfOffice": 1,
+            "StartDate": "soon",
+            "EndDate": "2026-06-01",
+        },
+    ]
+    assert await _post(sync_url, {"OutOfOfficeEntries": entries}) == {"Success": 1}
+    one = _prefs(sync_url, 8991)
+    assert (one["OutOfOfficeStartDay"], one["OutOfOfficeEndDay"]) == ("01", "09")
+    two = _prefs(sync_url, 8992)
+    assert two["OutOfOffice"] == "1"
+    assert "OutOfOfficeStartDay" not in two and "OutOfOfficeEndDay" not in two
+
+
+async def test_empty_entries_is_a_provider_fault_like_znuny(sync_url: str) -> None:
+    from tiqora.api.compat.provider import OperationFault
+
+    for data in ({"OutOfOfficeEntries": []}, {"OutOfOfficeEntries": "x"}, {}):
+        with pytest.raises(OperationFault) as exc:
+            await _post(sync_url, data)
+        assert exc.value.message == (
+            "Payload does not contain out-of-office entries or they could not be parsed."
+        )

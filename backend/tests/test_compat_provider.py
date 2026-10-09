@@ -195,3 +195,23 @@ async def test_render_rest_sorted_compact_json_and_fault_shape() -> None:
     assert json.loads(fault.body) == rest_fault_body(
         "OperationType for operation 'Nope' is not registered"
     )
+
+
+async def test_operation_fault_becomes_a_server_fault() -> None:
+    """Operation Success => 0: Provider _HandleError -> _GenerateErrorResponse (HTTP 500)."""
+    from tiqora.api.compat.provider import OperationFault, run_provider
+    from tiqora.api.compat.webservices import parse_webservice
+
+    ws = parse_webservice(
+        8950,
+        "Gi8950Fault",
+        {"Provider": {"Operation": {"Away": {"Type": "User::OutOfOffice"}}}},
+        huge_xml=False,
+    )
+
+    async def _run(handler: str, data: dict[str, Any], op: Any) -> dict[str, Any]:
+        raise OperationFault("Payload does not contain out-of-office entries")
+
+    outcome = await run_provider(ws, "Away", {}, run_operation=_run)
+    assert outcome.status_code == 500
+    assert outcome.fault == "Payload does not contain out-of-office entries"
