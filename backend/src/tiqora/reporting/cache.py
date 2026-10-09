@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from datetime import date
 from typing import Any, Final, Protocol, cast
 
@@ -109,6 +109,52 @@ class ReportCache:
             await self._backend.set(key, result.model_dump_json(), ex=self._ttl)
         except Exception as exc:  # noqa: BLE001 - never fail a report over the cache
             logger.warning("report_cache_put_failed", error=str(exc))
+
+
+class PurgeableBackend(Protocol):
+    def scan_iter(
+        self, match: str | None = None, count: int | None = None
+    ) -> AsyncIterator[Any]: ...
+
+    async def delete(self, *names: Any) -> Any: ...
+
+
+async def purge_report_cache(backend: PurgeableBackend, *, batch: int = 500) -> int:
+    """Delete every cached report result (all scopes); returns the number of keys.
+
+    For data removals whose effect must not wait for the TTL, e.g. a GDPR
+    erasure (cached rows/labels may hold the erased customer ids/names).
+    Best effort: errors are logged, never raised.
+    """
+    deleted = 0
+    pending: list[Any] = []
+    try:
+        async for key in backend.scan_iter(match=CACHE_PREFIX + "*", count=batch):
+            pending.append(key)
+            if len(pending) >= batch:
+                await backend.delete(*pending)
+                deleted += len(pending)
+                pending = []
+        if pending:
+            await backend.delete(*pending)
+            deleted += len(pending)
+    except Exception as exc:  # noqa: BLE001 - entries still expire with their TTL
+        logger.warning("report_cache_purge_failed", error=str(exc), deleted=deleted)
+    return deleted
+
+
+async def purge_report_cache_at(redis_url: str) -> int:
+    """:func:`purge_report_cache` for code paths without a request (GDPR jobs)."""
+    import redis.asyncio as redis
+
+    client = redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+    try:
+        return await purge_report_cache(cast(PurgeableBackend, client))
+    finally:
+        try:
+            await client.aclose()
+        except Exception as exc:  # noqa: BLE001 - best effort
+            logger.warning("report_cache_purge_close_failed", error=str(exc))
 
 
 def cache_backend_from_settings(settings: Settings) -> CacheBackend:

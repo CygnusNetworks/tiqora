@@ -60,6 +60,7 @@ URLS = ["mariadb_znuny_url", "postgres_znuny_url"]
 
 LO, HI = 47740, 47789
 AGENT, AGENT2, NOBODY, ADMIN = 47740, 47743, 47744, 47745
+ROLE = 47746
 Q1, Q2 = 47741, 47742  # also the group ids
 T1, T2, T3, T4, T5, T6, T7, T8, T_ARCH = (
     47750,
@@ -94,6 +95,9 @@ _CLEANUP = (
     "DELETE FROM article WHERE ticket_id BETWEEN :lo AND :hi",
     "DELETE FROM ticket WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM group_user WHERE user_id BETWEEN :lo AND :hi",
+    "DELETE FROM group_role WHERE role_id BETWEEN :lo AND :hi",
+    "DELETE FROM role_user WHERE user_id BETWEEN :lo AND :hi",
+    "DELETE FROM roles WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM queue WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM permission_groups WHERE id BETWEEN :lo AND :hi",
     "DELETE FROM customer_user WHERE id BETWEEN :lo AND :hi",
@@ -396,6 +400,11 @@ class _Db:
 
     def _record(self, conn: Any, cursor: Any, statement: str, *args: Any) -> None:
         self.statements.append(statement)
+
+    async def set_status(self, value: str) -> None:
+        async with self.factory() as s:
+            (await load_state(s)).backfill_status = value
+            await s.commit()
 
     def fact_selects(self) -> int:
         return sum(
@@ -765,7 +774,7 @@ async def test_empty_scope_returns_empty_result_without_query(
                 reporting=ReportingSettings(),
                 now=NOW,
             )
-            assert await estimate_rows(s, plan.compiled) == 0
+            assert await estimate_rows(s, plan.compiled, reporting=ReportingSettings()) == 0
         assert db.fact_selects() == 0
     finally:
         await db.engine.dispose()
@@ -796,7 +805,7 @@ async def test_estimate_rows_uses_the_scoped_where(
                 now=NOW,
             )
             db.statements.clear()
-            assert await estimate_rows(s, plan.compiled) == 6
+            assert await estimate_rows(s, plan.compiled, reporting=ReportingSettings()) == 6
         (sql,) = [st for st in db.statements if "tiqora_report_ticket_fact" in st]
         assert "count(*)" in sql.lower() and "GROUP BY" not in sql.upper()
         assert "queue_id IN" in sql  # the scope comes with the WHERE
@@ -809,21 +818,15 @@ async def test_estimate_rows_uses_the_scoped_where(
 async def test_facts_status_is_attached(url_fixture: str, request: pytest.FixtureRequest) -> None:
     db = await _db(request, url_fixture)
     defn = {"source": "tickets", "measures": [{"key": "tickets"}], "time_range": JUNE}
-
-    async def set_status(value: str) -> None:
-        async with db.factory() as s:
-            (await load_state(s)).backfill_status = value
-            await s.commit()
-
     try:
-        await set_status("pending")
+        await db.set_status("pending")
         r = await db.run(defn)
         assert r.facts.ready is False and r.facts.backfill_status == "pending"
-        await set_status("done")
+        await db.set_status("done")
         r = await db.run(defn)
         assert r.facts.ready is True and r.facts.backfill_status == "done"
     finally:
-        await set_status("pending")
+        await db.set_status("pending")
         await db.engine.dispose()
 
 
@@ -961,6 +964,7 @@ async def test_engine_cache_is_per_scope(url_fixture: str, request: pytest.Fixtu
     cache = ReportCache(_FakeBackend(), ttl_seconds=300)
     defn = {"source": "tickets", "measures": [{"key": "tickets"}], "time_range": JUNE}
     try:
+        await db.set_status("done")
         first = await db.run(defn, cache=cache, report_key="builtin.a")
         assert first.rows == [[6]] and first.cached is False
         db.statements.clear()
@@ -996,6 +1000,35 @@ async def test_engine_cache_is_per_scope(url_fixture: str, request: pytest.Fixtu
         fresh = await db.run(defn, cache=cache, use_cache=False)
         assert fresh.cached is False and db.fact_selects() == 1
     finally:
+        await db.set_status("pending")
+        await db.engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_results_before_the_data_is_ready_are_not_cached(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    db = await _db(request, url_fixture)
+    backend = _FakeBackend()
+    cache = ReportCache(backend, ttl_seconds=300)
+    defn = {"source": "tickets", "measures": [{"key": "tickets"}], "time_range": JUNE}
+    try:
+        await db.set_status("pending")  # e.g. the first backfill is still running
+        assert (await db.run(defn, cache=cache)).cached is False
+        assert backend.store == {}
+        await db.set_status("done")
+        ready = await db.run(defn, cache=cache)
+        assert ready.cached is False and ready.facts.ready is True  # not the partial one
+        assert (await db.run(defn, cache=cache)).cached is True
+
+        # sources that never read the derived data are cached regardless
+        await db.set_status("pending")
+        live = {"source": "open_tickets", "measures": [{"key": "tickets"}]}
+        assert (await db.run(live, cache=cache)).cached is False
+        assert (await db.run(live, cache=cache)).cached is True
+    finally:
+        await db.set_status("pending")
         await db.engine.dispose()
 
 
@@ -1227,6 +1260,243 @@ async def test_require_report_access(url_fixture: str, request: pytest.FixtureRe
             await s.flush()
             await require_report_access(s, AGENT2, strict)  # ro on "stats"
             await require_report_access(s, NOBODY, strict)  # rw implies ro
-            await s.rollback()
+
+            # role-derived grant: role -> group_role(stats, ro)
+            t = datetime(2024, 5, 1)
+            await s.execute(
+                text(
+                    "INSERT INTO roles (id, name, valid_id, create_time, create_by,"
+                    " change_time, change_by) VALUES (:id, 'rep47-role', 1, :t, 1, :t, 1)"
+                ),
+                {"id": ROLE, "t": t},
+            )
+            await s.execute(
+                text(
+                    "INSERT INTO role_user (user_id, role_id, create_time, create_by,"
+                    " change_time, change_by) VALUES (:u, :r, :t, 1, :t, 1)"
+                ),
+                {"u": AGENT, "r": ROLE, "t": t},
+            )
+            await s.execute(
+                text(
+                    "INSERT INTO group_role (role_id, group_id, permission_key, permission_value,"
+                    " create_time, create_by, change_time, change_by)"
+                    " VALUES (:r, :g, 'ro', 1, :t, 1, :t, 1)"
+                ),
+                {"r": ROLE, "g": db.ids["stats_group"], "t": t},
+            )
+            await s.flush()
+            await require_report_access(s, AGENT, strict)
+
+            # an inactive user loses access although the grant is still there
+            await s.execute(text("UPDATE users SET valid_id = 2 WHERE id = :u"), {"u": AGENT2})
+            await s.flush()
+            with pytest.raises(HTTPException):
+                await require_report_access(s, AGENT2, strict)
+
+            # an invalid "stats" group grants nothing (admins keep access)
+            stats = {"g": db.ids["stats_group"]}
+            await s.execute(text("UPDATE permission_groups SET valid_id = 2 WHERE id = :g"), stats)
+            await s.flush()
+            for uid in (NOBODY, AGENT):
+                with pytest.raises(HTTPException):
+                    await require_report_access(s, uid, strict)
+            await require_report_access(s, ADMIN, strict)
+
+            # no group named "stats" at all
+            await s.execute(
+                text(
+                    "UPDATE permission_groups SET valid_id = 1, name = 'rep47-gone' WHERE id = :g"
+                ),
+                stats,
+            )
+            await s.flush()
+            with pytest.raises(HTTPException):
+                await require_report_access(s, NOBODY, strict)
+            await require_report_access(s, ADMIN, strict)
+            await s.rollback()  # every change above was only in this transaction
+    finally:
+        await db.engine.dispose()
+
+
+# ---------------------------------------------------------------- bounded output (fix round 1)
+
+BOOKINGS = {"kind": "absolute", "start": "2024-05-01", "end": "2024-06-30"}  # 61 days
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_time_series_fill_never_exceeds_the_row_cap(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    """days x series is only materialised when it fits the row cap."""
+    db = await _db(request, url_fixture)
+    per_ticket = {
+        "source": "accounted_time",
+        "dimensions": [{"key": "booked"}, {"key": "ticket"}],
+        "measures": [{"key": "time_units"}],
+        "time_range": BOOKINGS,
+        "visualization": {"type": "line", "series_dimension": 1},
+    }
+    try:
+        full = await db.run(per_ticket)
+        assert len(full.rows) == 61 * 2 and full.truncated is False  # T1, T2 x 61 days
+        assert sum(1 for row in full.rows if row[2]) == 4
+
+        capped = await db.run(per_ticket, row_cap=100)
+        assert capped.truncated is True and len(capped.rows) == 4  # grid refused, data kept
+        assert all(row[2] for row in capped.rows)
+
+        # one series over the longest allowed window: 3660 day buckets > row cap
+        long = {
+            "source": "tickets",
+            "dimensions": [{"key": "created"}],
+            "measures": [{"key": "tickets"}],
+            "time_range": {"kind": "absolute", "start": "2015-01-01", "end": "2025-01-07"},
+        }
+        r = await db.run(long, row_cap=100)
+        assert r.truncated is True and len(r.rows) <= 100
+        assert sum(row[1] for row in r.rows) == 6
+    finally:
+        await db.engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_row_and_column_totals_only_for_returned_rows(
+    url_fixture: str, request: pytest.FixtureRequest
+) -> None:
+    db = await _db(request, url_fixture)
+    defn = {
+        "source": "accounted_time",
+        "dimensions": [{"key": "ticket"}, {"key": "booked", "grain": "month"}],
+        "measures": [{"key": "time_units"}],
+        "time_range": BOOKINGS,
+        "totals": {"grand": True, "rows": True, "columns": True},
+        "sort": [{"key": "time_units", "direction": "desc"}],
+    }
+    try:
+        full = await db.run(defn, compare_previous=True)
+        assert full.totals is not None and set(full.totals.rows) == {str(T1), str(T2)}
+        assert set(full.totals.columns) == {"2024-05-01", "2024-06-01"}
+
+        r = await db.run(defn, row_cap=1, compare_previous=True)
+        assert r.rows == [[T1, "2024-06-01", 2.0]] and r.truncated is True
+        assert r.totals is not None and r.previous is not None
+        assert r.totals.grand == [None, None, 5.25]  # grand stays complete
+        assert r.totals.rows == {str(T1): [T1, None, 3.5]}
+        assert r.totals.columns == {"2024-06-01": [None, "2024-06-01", 2.5]}
+        assert set(r.previous.rows) <= {str(T1)} and set(r.previous.columns) <= {"2024-06-01"}
+        assert set(r.labels["ticket"]) == {str(T1)}  # no labels for rows not returned
+    finally:
+        await db.engine.dispose()
+
+
+# ---------------------------------------------------------------- cancellation, budgets
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_cancelled_query_invalidates_the_connection(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = await _db(request, url_fixture)
+    defn = D({"source": "tickets", "measures": [{"key": "tickets"}], "time_range": JUNE})
+    try:
+        async with db.factory() as s:
+            fairy = await (await s.connection()).get_raw_connection()
+            real = s.execute
+
+            async def cancelled(stmt: Any, *a: Any, **kw: Any) -> Any:
+                if "tiqora_report_ticket_fact" in str(stmt):
+                    raise asyncio.CancelledError  # client went away mid-query
+                return await real(stmt, *a, **kw)
+
+            monkeypatch.setattr(s, "execute", cancelled)
+            with pytest.raises(asyncio.CancelledError):
+                await run_report(
+                    s, defn=defn, params=UTC_PARAMS, user_id=AGENT, report_key=None,
+                    reporting=ReportingSettings(), now=NOW,
+                )  # fmt: skip
+            assert fairy.is_valid is False
+    finally:
+        await db.engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_label_lookup_cancel_and_timeout_invalidate(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """_bounded: cancellation and (job-mode) timeouts of label lookups drop the connection."""
+    db = await _db(request, url_fixture)
+    defn = D(
+        {
+            "source": "tickets",
+            "dimensions": [{"key": "queue"}],
+            "measures": [{"key": "tickets"}],
+            "time_range": JUNE,
+        }
+    )
+
+    async def cancelled(*a: Any, **kw: Any) -> dict[str, str]:
+        raise asyncio.CancelledError
+
+    async def hanging(*a: Any, **kw: Any) -> dict[str, str]:
+        await asyncio.sleep(30)
+        return {}
+
+    try:
+        monkeypatch.setattr(engine_mod, "resolve_labels", cancelled)
+        async with db.factory() as s:
+            fairy = await (await s.connection()).get_raw_connection()
+            with pytest.raises(asyncio.CancelledError):
+                await run_report(
+                    s, defn=defn, params=UTC_PARAMS, user_id=AGENT, report_key=None,
+                    reporting=ReportingSettings(), now=NOW,
+                )  # fmt: skip
+            assert fairy.is_valid is False
+
+        # job mode: label lookups are bounded by the per-query limit too
+        monkeypatch.setattr(engine_mod, "resolve_labels", hanging)
+        async with db.factory() as s:
+            fairy = await (await s.connection()).get_raw_connection()
+            with pytest.raises(ReportQueryTimeout):
+                await run_report(
+                    s, defn=defn, params=UTC_PARAMS, user_id=AGENT, report_key=None,
+                    reporting=ReportingSettings(), now=NOW, budget=QueryBudget(per_query_seconds=1),
+                )  # fmt: skip
+            assert fairy.is_valid is False
+    finally:
+        await db.engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
+async def test_budget_none_means_job_mode_everywhere(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = await _db(request, url_fixture)
+    seen: list[int] = []
+    real_timeout = engine_mod.statement_timeout
+
+    def recording(session: AsyncSession, seconds: int) -> Any:
+        seen.append(seconds)
+        return real_timeout(session, seconds)
+
+    monkeypatch.setattr(engine_mod, "statement_timeout", recording)
+    reporting = ReportingSettings(query_timeout_seconds=17)
+    defn = D({"source": "tickets", "measures": [{"key": "tickets"}], "time_range": JUNE})
+    try:
+        async with db.factory() as s:
+            plan = await plan_report(
+                s, defn=defn, params=UTC_PARAMS, user_id=AGENT, reporting=reporting, now=NOW
+            )
+            assert await estimate_rows(s, plan.compiled, reporting=reporting) == 6
+            await run_report(
+                s, defn=defn, params=UTC_PARAMS, user_id=AGENT, report_key=None,
+                reporting=reporting, now=NOW,
+            )  # fmt: skip
+        assert seen == [17, 17]  # estimate and main query: the same per-query job limit
     finally:
         await db.engine.dispose()

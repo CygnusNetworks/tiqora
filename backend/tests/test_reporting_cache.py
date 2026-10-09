@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 
 from tiqora.filters import Filter
-from tiqora.reporting.cache import CACHE_PREFIX, ReportCache
+from tiqora.reporting.cache import CACHE_PREFIX, ReportCache, purge_report_cache
 from tiqora.reporting.definition import TimeWindow
 from tiqora.reporting.schemas import (
     FactsStatusOut,
@@ -170,3 +170,36 @@ async def test_corrupt_entry_is_a_miss() -> None:
     backend = _FakeBackend()
     backend.store["k"] = '{"not": "a result"}'
     assert await ReportCache(backend, ttl_seconds=300).get("k") is None
+
+
+class _ScanBackend:
+    """scan_iter/delete like redis.asyncio, with a fnmatch filter."""
+
+    def __init__(self, keys: list[str], fail: bool = False) -> None:
+        self.store = dict.fromkeys(keys, "x")
+        self.fail = fail
+        self.deletes: list[int] = []
+
+    async def scan_iter(self, match: str | None = None, count: int | None = None) -> Any:
+        import fnmatch
+
+        if self.fail:
+            raise ConnectionError("redis down")
+        for key in list(self.store):
+            if match is None or fnmatch.fnmatch(key, match):
+                yield key
+
+    async def delete(self, *names: str) -> int:
+        self.deletes.append(len(names))
+        for name in names:
+            self.store.pop(name, None)
+        return len(names)
+
+
+async def test_purge_report_cache_drops_only_report_entries() -> None:
+    reports = [f"{CACHE_PREFIX}{i}" for i in range(5)]
+    backend = _ScanBackend([*reports, "tiqora:session:abc", "tiqora:avatar:x"])
+    assert await purge_report_cache(backend, batch=2) == 5
+    assert set(backend.store) == {"tiqora:session:abc", "tiqora:avatar:x"}
+    assert backend.deletes == [2, 2, 1]  # batched
+    assert await purge_report_cache(_ScanBackend(reports, fail=True)) == 0  # logged, not raised
