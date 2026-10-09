@@ -11,7 +11,7 @@ built frontend static assets. Process role is selected at start:
 | Command / env | Process |
 |---|---|
 | `api` (default) | FastAPI (uvicorn) |
-| `worker` | Background worker (Znuny-write poller, indexing, outbox/webhooks, daemon takeovers, background-job runner for exports etc.; poll interval `TIQORA_JOBS_POLL_INTERVAL_SECONDS`, default 2, range 1-60) |
+| `worker` | Background worker (Znuny-write poller, indexing, outbox/webhooks, daemon takeovers, background-job runner for exports and the GenericInterface mails (`ArticleSend`, auto responses) etc.; poll interval `TIQORA_JOBS_POLL_INTERVAL_SECONDS`, default 2, range 1-60) |
 | `ai-worker` | AI subsystem loop (triage, auto-reply, auto-summary), isolated from the main worker; inert unless `operation_mode=tiqora_primary` and `daemon.ai_worker.enabled` |
 | `mcp` | FastMCP server |
 

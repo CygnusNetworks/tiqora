@@ -537,9 +537,13 @@ sign key, encryption off). The composer always sends `email_security`
 ```
 
 - `ArticleSend: 1` (TicketCreate **and** TicketUpdate, agents): the article is
-  sent through the same path (`crypto.outbound.email_security_from_znuny`
-  maps the hash); `To` is required; key problems → `…InvalidParameter`, send
-  failures → `…OperationFailed`, nothing stored.
+  prepared and secured in the request through the same path
+  (`crypto.outbound.email_security_from_znuny` maps the hash); `To` is
+  required; key problems → `…InvalidParameter` and gpg/openssl failures →
+  `…OperationFailed`, nothing stored. The secured mail is stored with the
+  article and sent unchanged by the worker (job `gi_mail`, see
+  [compatibility.md](compatibility.md#ticketcreate--ticketupdate)); an SMTP
+  failure is recorded on the article and in the mail log, not in the response.
 - Without `ArticleSend` (Znuny ignores `EmailSecurity` then) Tiqora keeps
   rewriting the **stored** body with the same builder: PGP as inline PGP
   (clear-signed / armored), S/MIME as the signed/encrypted MIME entity.

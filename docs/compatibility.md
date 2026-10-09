@@ -57,16 +57,26 @@ webservice is loaded. A pattern that Python cannot compile (Perl-only syntax)
 makes that one webservice answer with a 500 fault naming the problem;
 other webservices keep working. A pattern that runs into the time limit
 fails the request with a mapping error. Small semantic differences from Perl
-regexes are possible. Every mapping runs in a worker thread, so a slow
-mapping never blocks other requests.
+regexes are possible: for example `\Z` in a pattern is the absolute end of the
+string in Tiqora, while Perl's `\Z` also matches before a trailing newline (Perl
+`\z` behaves like Tiqora's `\Z`). Every mapping runs in a worker thread, so a
+slow mapping never blocks other requests.
+
+XML request data is read like Znuny's `XML::Simple`, with two differences:
+internal entities declared in the request are dropped, not expanded (external
+entities are never resolved), and `xmlns` declarations are not reported as
+attributes when `KeepAttributes` is on. `DataInclude` entries are included when
+they are Perl-true (an empty hash counts, `"0"` does not), as in `XSLT.pm`.
 
 **XSLT security note.** Templates run in a sandbox: no file access and no
 network access, no `document()`, no `exsl:document`. The only external
 file a template can import is `OTRSFunctions.xsl`; any href ending in that
 name (`/opt/otrs/Kernel/...`, `/opt/znuny/Kernel/...`, relative `Kernel/...`)
 is served from the copy bundled with Tiqora, so templates written for Znuny
-keep working. Every other import or include fails with a readable error. The
-output is capped at 256 MB. libxslt cannot be interrupted, so a template has no
+keep working. Every other import or include fails with a readable error
+("External file '...' is not allowed in Tiqora"). The output is capped at
+256 MB; the cap is checked when the transform has finished, not while it runs.
+libxslt cannot be interrupted, so a template has no
 wall-clock timeout; templates are written by the administrator and are
 trusted. Documents above 10 MB per text node need the Znuny setting
 `LibXML::EnableHugeXMLDataSupport`, exactly as in Znuny.
@@ -81,7 +91,14 @@ alone is enough if that message is lost. A webservice that is renamed or
 disabled stops answering (404) after the next tick and the new name works;
 requests already running finish on the old snapshot. A database error during a
 refresh keeps the previous snapshot. A broken row (invalid YAML, unknown
-mapping type, bad regex) only affects its own webservice.
+mapping type, bad regex, or any unexpected error while it is built) only affects
+its own webservice.
+
+The fingerprint covers the `gi_webservice_config` rows only. A SysConfig change
+that a webservice uses through an `<OTRS_CONFIG_...>` placeholder, or a change of
+`LibXML::EnableHugeXMLDataSupport`, is picked up when a webservice row changes or
+after `POST /znuny-compat/admin/reload`. Placeholders are resolved from the
+SysConfig in the database; values set only in Znuny's `Config.pm` are not seen.
 
 ## Session handling
 
@@ -98,15 +115,30 @@ mapping type, bad regex) only affects its own webservice.
   (`UserPw`) is deliberately not copied into the row, and preference rows are
   copied from an allow-list only (no 2FA seeds, tokens or API keys).
   Calls made through the GI do not refresh `UserLastRequest`.
+- **Validity.** `SessionGet` checks the session first, like Znuny's
+  `SessionGet.pm` (`CheckSessionID`): an expired session (idle or absolute
+  limit), a disabled account or a failed remote-IP binding answers
+  `SessionGet.SessionInvalid` instead of returning data. This is the same check
+  every authenticated compat call makes.
 - **Purge.** Expired `sessions` rows are removed by the worker loop
   `znuny_session_purge` (every 300 s, always on, interval
   `TIQORA_ZNUNY_SESSION_PURGE_INTERVAL_SECONDS`). It is a port of Znuny's
   `GetExpiredSessionIDs` (session start + `SessionMaxTime` or last request +
   `SessionMaxIdleTime` is in the past), the same job as Znuny's
-  `Maint::Session::DeleteExpired`; running both is harmless.
-- **Revocation.** Disabling an account, a password reset or setup, a customer
-  password change in the portal and GDPR erasure delete the person's Znuny
-  session rows (database first, then Redis).
+  `Maint::Session::DeleteExpired`. Running both is harmless only while both use
+  the same limits: Tiqora reads `SessionMaxTime` / `SessionMaxIdleTime` from the
+  SysConfig in the database. If Znuny overrides them in `Config.pm`, Tiqora
+  purges with the database values and may end Znuny web sessions earlier. The
+  loop cannot be switched off; keep the limits in the SysConfig.
+- **Revocation.** These delete the person's Znuny session rows first (own
+  transaction), then the Redis sessions:
+  - agents: disabling the account (edit or delete), an admin password reset,
+    password setup;
+  - customer users: disabling the account (edit, delete or bulk edit) and an
+    admin password reset - Redis here means the portal sessions and the
+    GenericInterface customer tokens;
+  - a customer's own password change in the portal (Znuny rows only; the
+    customer's portal session stays) and GDPR erasure (Znuny rows).
 - **`SessionCheckRemoteIP` caveat.** Znuny's `SessionCheckRemoteIP` defaults
   to `1`. A session created by Tiqora stores the address Tiqora itself saw
   (the socket peer, or the trusted-proxy address), which can differ from what
@@ -177,11 +209,24 @@ of `0` becomes an empty string, JSON booleans become `1`/`0`, and numbers are
 normalised like Perl. Transport errors (no matching route, body too large,
 undecodable body) are answered as `text/plain`, like Znuny.
 
+Transport differences from Znuny's `HTTP::REST`:
+
+- A body sent with chunked transfer encoding and no `Content-Length` is not
+  read: the operation gets the URI and query data only.
+- `ParserBackend`, `PostParamName` and multipart form bodies are not supported;
+  the body is always parsed as JSON.
+- Raw (unescaped) UTF-8 bytes in the URL cannot reach Tiqora (the HTTP server
+  rejects them); clients must percent-encode them, which Znuny also accepts.
+- `HEAD` and `OPTIONS` requests answer 405 (Znuny: 500).
+- The webservice name in `/Webservice/{name}` is matched case-sensitively
+  (Znuny's lookup on MariaDB is case-insensitive). Use the exact name.
+
 ### Admin reload
 
 `POST /znuny-compat/admin/reload` (requires an admin) refreshes the webservice
 registry immediately and wakes the other API processes through Redis. See
-[Hot reload](#hot-reload); no restart is needed.
+[Hot reload](#hot-reload); no restart is needed. It answers
+`{"status": "ok", "webservices_loaded": <n>, "webservices": [<names>]}`.
 
 ## SOAP transport
 
@@ -241,8 +286,12 @@ Response (HTTP 200, same `text/xml`):
 
 Errors become a SOAP `<Fault>` (matching `ProviderGenerateResponse`'s
 `OperationResponse = 'Fault'` path) with the HTTP status set from the same
-`ErrorCode` → status mapping REST uses (401 AuthFail, 403 AccessDenied, 400
-Missing/InvalidParameter, 501 NotImplemented).
+`ErrorCode` → status mapping REST uses (see [Deviations kept on
+purpose](#deviations-kept-on-purpose)); operation errors are `Client` faults.
+An operation the webservice does not configure answers a `Server` fault
+"OperationType for operation '...' is not registered" with HTTP 500. A body
+longer than the webservice's `MaxLength` answers 413 "Request Entity Too Large"
+(`text/plain`) before it is parsed, like `SOAP.pm`.
 
 ### Namespace configuration
 
@@ -288,8 +337,6 @@ suite does.
 - `ResponseNameScheme`/`ResponseNameFreeText` (`Append`/`Plain`/`Replace`)
   are not configurable — Tiqora always uses Znuny's *default*
   (`Response` → `Append` + `Response`, i.e. `TicketGet` → `TicketGetResponse`).
-- `MaxLength` (request body size cap) is not enforced by the codec itself
-  (rely on the ASGI server / reverse proxy body-size limit instead).
 - SOAP 1.2 is accepted (mirrors the request's Content-Type/envelope
   namespace in the response) but Znuny's SOAP transport is primarily
   exercised with SOAP 1.1 (`SOAP::Lite` default) in practice.
@@ -303,7 +350,9 @@ Both forms are supported in Tiqora for convenience.
 ## Auth surface for integrators
 
 1. **Compat SessionCreate** — legacy tools, SessionID cookie/header style.
-2. **SessionID** — validated against Znuny `sessions` key-value table (not Redis).
+2. **SessionID** — validated against Znuny's `sessions` key-value table; a
+   SessionID that has no row there is looked up in Tiqora's Redis token store
+   (tokens issued while `TIQORA_COMPAT_SESSION_WRITE_ZNUNY=false`).
 3. **API keys** — preferred for MCP and modern automation (same permission engine).
 4. **OIDC / Kerberos** — UI and `/api/v1`; not required for basic
    GenericInterface parity.
@@ -325,13 +374,17 @@ framework. Items below are intentionally incomplete or out of scope.
 
 ### TicketCreate / TicketUpdate
 
-`ArticleSend: 1` (agents, TicketCreate and TicketUpdate) sends the article as e-mail through the same outbound path as agent replies (`deliver_agent_email_reply`), including `EmailSecurity` — see [crypto.md](crypto.md). Multiple `Article` entries, `TimeUnit`, `AutoResponseType`, `HistoryType`/`HistoryComment`, article dynamic fields and `NoAgentNotify` are implemented like Znuny.
+`ArticleSend: 1` (agents, TicketCreate and TicketUpdate) stores the article like an agent reply (signature, threading headers, `EmailSecurity` — see [crypto.md](crypto.md)) and sends it from the worker, like Znuny's `MailQueue`: each mail of the request (every `ArticleSend` article and every auto response) is one background job (kind `gi_mail`) committed together with the ticket and articles, and the request answers without waiting for SMTP. The worker rebuilds the mail from the stored article (a signed or encrypted mail is sent from its stored bytes, unchanged). A mail that cannot be sent is recorded like Znuny's `MailQueue` records a permanent failure: the article's transmission error (`article_data_mime_send_error`) and a `failed` row in the mail log; the job shows as failed. There is one attempt (Znuny retries temporary errors up to `MailQueue###ItemMaxAttempts`). The `worker` process must run for these mails. Multiple `Article` entries, `TimeUnit`, `AutoResponseType`, `HistoryType`/`HistoryComment`, article dynamic fields and `NoAgentNotify` are implemented like Znuny.
 
 | Gap | Behaviour |
 |-----|----------------|
 | `ForceNotificationToUserID`, `ExcludeNotificationToUserID`, `ExcludeMuteNotificationToUserID` | Validated with Znuny's messages but, as in Znuny's GI, not passed on to the article creation |
 | `SortOutbound` (operation config) | Not applied; response JSON keys are always sorted |
 | `TicketCreate` without `Article` | Accepted (Znuny rejects it); existing Tiqora clients rely on it |
+| Invalid `TimeUnit` (not a number) | Rejected before anything is written; Znuny's `TicketAccountTime` has already bumped the ticket's `change_time` when the insert fails |
+| Time accounting without an article | The domain function accepts `article_id=None` (used by Tiqora's own API); Znuny's `TicketAccountTime` requires an article. The GI always passes the article |
+| `ForceNotificationToUserID` agent without an e-mail address | Not added to the article's `To` line (Znuny writes `"First Last" <>`) |
+| Escalation columns on `TicketUpdate` | Not rebuilt inside the call (only `TicketCreate` sets them); the escalation sweep (`daemon.escalation.enabled`) updates them, as for every other Tiqora write. TicketGet reads the stored columns |
 
 ### TicketGet / Search / Session / TimeAccounting — partial fidelity
 
@@ -348,8 +401,12 @@ framework. Items below are intentionally incomplete or out of scope.
 | `TimeUnit` formatting | `"1.5"` (number normalised like Perl) | `"1.50"` |
 | TimeAccountingGet queue when the history has no `NewTicket` row | the ticket's current queue | n/a (Znuny's snapshot has none) |
 | Article text search (`MIMEBase_*`, `Fulltext`) | `LOWER(column) LIKE` on the article columns: no stop words, no tokenisation, no word index | search index (`article_search_index`) with tokenisation and stop words |
-| Non-integer element in a TicketSearch id filter | whole search returns empty (as Znuny) | empty |
-| Operation errors | keep Tiqora's `ErrorCode` to HTTP status mapping (401, 403, 400, 5xx), computed before the outbound mapping | HTTP 200 for operation errors |
+| Non-integer element in a TicketSearch id filter | whole search returns empty (as Znuny); an element of more than 16 digits counts as non-integer (`Quote(..., 'Integer')`) | empty |
+| `_` in `MIMEBase_*` / `Fulltext` values | a literal character (as Znuny, `Quote(..., 'Like')`) | same |
+| Operation errors | keep Tiqora's `ErrorCode` to HTTP status mapping, computed before the outbound mapping: `...AuthFail` 401, `...AccessDenied` 403, `...MissingParameter` / `...InvalidParameter` 400, `...RateLimited` 429 with `Retry-After`, `...NotImplemented` 501, every other error 200 | HTTP 200 for operation errors |
+| Operation answers `Success => 0` (OutOfOffice without entries) | HTTP 500 fault `{"faultcode": "Server", "faultstring": ...}` | same (`Provider.pm` `_GenerateErrorResponse`) |
+| OutOfOffice `UserSearch` | words AND-ed, each matching login / first name / last name as a whole value (`*` wildcard); Znuny's `|`, `AND`/`OR`, `!` and parentheses are not supported | `QueryCondition` |
+| GI mails (`ArticleSend`, auto responses) | sent by the worker, one attempt | `MailQueue`, retries temporary errors |
 | Unknown webservice | 404 JSON fault | bare 500 |
 | SessionCreate | does not copy `UserPw` into the `sessions` row | copies it |
 | OutOfOffice CSV with an unterminated quote | rejected with "Error while parsing" | silently truncated |
@@ -383,7 +440,14 @@ client against the list before updating.
   are `text/plain` instead of a JSON fault. Parse the status code rather than a body.
 - An unknown webservice answers 404 with a JSON fault.
 - `POST /znuny-compat/admin/reload` requires an admin (before: any
-  authenticated user), and it now refreshes the webservice registry.
+  authenticated user), and it now refreshes the webservice registry. Its answer is
+  `{"status", "webservices_loaded", "webservices"}`; `routes_loaded`,
+  `soap_webservices_loaded` and `message` are gone.
+- SOAP webservices: a body longer than the webservice's `MaxLength` answers 413
+  (`text/plain`); an operation the webservice does not configure answers a 500
+  `Server` fault ("OperationType for operation '...' is not registered").
+- An XSLT template that imports a file other than `OTRSFunctions.xsl` fails with
+  "External file '...' is not allowed in Tiqora" (the text was German).
 
 **TicketGet**
 
@@ -439,10 +503,13 @@ client against the list before updating.
 - The queue's auto reply or auto follow up is sent (when an outbound relay is
   configured), as Znuny does; never for `ArticleSend` articles. Clients that
   relied on silence must turn the queue's auto response off.
-- `ArticleSend`: the mail leaves after the commit. If it fails, the call
-  returns Znuny's error text while the ticket and articles stay. The signature
-  is converted to the article's content type and appended directly behind the
-  body. Remaining mails are still sent after a failure.
+- `ArticleSend` and auto responses are sent by the worker, not inside the call
+  (Znuny's `MailQueue` does the same): the call answers at once, the mails follow
+  within a few seconds. A mail that cannot be sent no longer turns the answer into
+  `<Operation>.OperationFailed`; the call succeeds, and the failure is recorded on
+  the article (transmission error, `article_data_mime_send_error`) and in the mail
+  log. Check the mail log instead of the response. The signature is converted to
+  the article's content type and appended directly behind the body.
 - `TicketCreate` without `Owner` makes the calling agent the owner, unlocked
   (before: `root@localhost`), with an `OwnerUpdate` history row. With an
   `Owner` and no `Lock`/`LockID` the ticket is created locked, history
@@ -460,21 +527,31 @@ client against the list before updating.
   create tickets in given Queue or QueueID!". `TicketUpdate` with an empty,
   non-numeric or `"0"` `TicketID` answers `TicketUpdate.AccessDenied` (was a 500).
 - Locking a ticket (and assigning an owner with lock) resets the unlock timeout
-  and writes the `Misc` history row "Reset of unlock time.".
+  and writes the `Misc` history row "Reset of unlock time.". An agent article
+  resets the unlock timeout too, as in Znuny. Every reset emits the
+  `TicketUnlockTimeoutUpdate` event (outbox, webhooks), like Znuny's event of the
+  same name.
 
 **TicketSearch**
 
 - No hit answers `{}` (no `TicketID` key) instead of `{"TicketID": []}`.
 - A non-integer element in any id filter makes the whole search return empty
-  (Znuny); an id outside its column range matches nothing instead of failing.
+  (Znuny); an element of more than 16 digits counts as non-integer. An id outside
+  its column range matches nothing instead of failing.
 - `MIMEBase_*` and `Fulltext` match substrings case-insensitively (Znuny GI wraps the
   value in `*`); a value made only of `*` is ignored. `MIMEBase_Bcc` and, when
   `Ticket::Article::Backend::MIMEBase::IndexAttachmentNames` is on,
-  `MIMEBase_AttachmentName` can be searched.
+  `MIMEBase_AttachmentName` can be searched. `_` is a literal character, not a
+  wildcard. A Perl-true `Fulltext` always joins the text filters with OR, even
+  when its own value is only `*`.
 - New `Created*` filters and the time-window filters (`TicketCreate*`,
   `TicketChange*`, `TicketLastChange*`, `TicketClose*`, `TicketPending*`,
   escalation times) and sort keys. `SortBy` `PendingTime` / `EscalationTime` sorts
   0 last. Pending filters apply to pending states only.
+- `TicketChangeTime*` and `TicketCloseTime*`: a Newer and an Older bound must both
+  hold for the same history row (Znuny's single history alias per family). "Changed
+  between 7 and 3 days ago" no longer matches a ticket whose only history rows are
+  10 days and 1 day old.
 
 **Sessions, time accounting, out of office**
 
@@ -484,9 +561,12 @@ client against the list before updating.
   [Session handling](#session-handling) for expiry, purge and the remote-IP caveat.
   GI calls do not refresh `UserLastRequest`, so the session ends at Znuny's idle limit.
 - `SessionGet` returns only an allow-list of non-secret keys (no password hash,
-  tokens or secrets).
-- Sessions of disabled accounts stop authenticating; password reset, setup and
-  change, and GDPR erasure delete the account's Znuny session rows.
+  tokens or secrets). It answers `SessionGet.SessionInvalid` for an expired
+  session or a disabled account (before: the data of the stale row).
+- Sessions of disabled accounts stop authenticating. Disabling an agent or a
+  customer user, an admin password reset (agents and customer users), password
+  setup, a customer's own password change and GDPR erasure delete the account's
+  Znuny session rows; see [Session handling](#session-handling) for the Redis side.
 - `TimeAccountingGet`: entries carry no `TicketID`; `Queue` is the queue at
   booking time (falling back to the current queue when the history has no
   `NewTicket` row); `TimeUnit` is a normalised string (`"1.5"`, Znuny shows
@@ -495,6 +575,14 @@ client against the list before updating.
 - `OutOfOffice` answers `{"Success": 1}`; the per-entry result of
   `OutOfOfficeEntries` is gone and unknown entries are skipped. It accepts
   `OutOfOfficeEntriesCSVString` on the canonical route.
+- `OutOfOffice` follows `OutOfOffice.pm`: `"0"` and `""` switch out-of-office off
+  (before: on); an entry whose `UserSearch` / `UserEmail` / `UserLogin` finds more
+  than one agent is skipped (before: the first match was set); `UserSearch` wins
+  over `UserEmail`, which wins over `UserLogin`; a date is found anywhere in the
+  value, and an unusable `StartDate` also drops `EndDate`. The Znuny user cache is
+  refreshed. A request without entries answers an HTTP 500 fault "Payload does not
+  contain out-of-office entries or they could not be parsed." (before: 200 with
+  `OutOfOffice.WrongInputStructure`).
 
 ## Migration guidance
 

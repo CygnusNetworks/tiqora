@@ -243,8 +243,16 @@ a SessionID created through Tiqora is also valid in Znuny and the other way
 round, with Znuny's `SessionMaxIdleTime` / `SessionMaxTime`. Tiqora's worker
 loop `znuny_session_purge` (every 300 s, always on) deletes expired rows with the
 same rule as Znuny's `GetExpiredSessionIDs`; running Znuny's
-`Maint::Session::DeleteExpired` as well is harmless. Disabling an account,
-resetting a password and GDPR erasure remove the person's rows on both sides.
+`Maint::Session::DeleteExpired` as well is harmless as long as both use the same
+`SessionMaxTime` / `SessionMaxIdleTime`. Tiqora reads them from the SysConfig in the
+database: if Znuny overrides them in `Config.pm`, Tiqora purges with the database
+values and can end Znuny web sessions earlier than Znuny would. The loop cannot be
+switched off, so keep these limits in the SysConfig during parallel operation.
+Disabling an agent or a customer user, an admin password reset, password setup, a
+customer's own password change and GDPR erasure remove the person's `sessions`
+rows (and, where the change is made by an admin, the person's Redis sessions).
+`SessionGet` answers `SessionInvalid` for an expired session or a disabled account,
+like Znuny.
 
 Znuny's `SessionCheckRemoteIP` defaults to `1`. Tiqora stores the client
 address it sees, which behind different proxies is not the address Znuny sees,
