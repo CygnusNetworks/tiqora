@@ -63,6 +63,7 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.channels.email.placeholder import PlaceholderContext
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
@@ -446,16 +447,41 @@ async def _action_ticket_customer_set(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
+    """Port of TransitionAction::TicketCustomerSet (TicketCustomerSet.pm:103-190): a falsy
+    ``CustomerID`` falls back to ``No``, ``CustomerUserID`` to ``User``; each key that differs
+    from the ticket is set by its own ``TicketCustomerSet`` call (own history row), an equal
+    one is skipped."""
     del sysconfig
-    customer_id = config.get("CustomerID", config.get("No"))
-    customer_user_id = config.get("CustomerUserID", config.get("User"))
-    await set_customer(
-        session,
-        ticket_id=ticket_id,
-        customer_id=customer_id,
-        customer_user_id=customer_user_id,
-        user_id=user_id,
-    )
+    keys = ("CustomerID", "No", "CustomerUserID", "User")
+    if not any(perl_truthy(config.get(k)) for k in keys):
+        raise RequiredFieldMissing(
+            "TicketCustomerSet: Config must set CustomerID/No or CustomerUserID/User"
+        )
+    customer_id = config.get("CustomerID")
+    if not perl_truthy(customer_id) and perl_truthy(config.get("No")):
+        customer_id = config.get("No")
+    customer_user_id = config.get("CustomerUserID")
+    if not perl_truthy(customer_user_id) and perl_truthy(config.get("User")):
+        customer_user_id = config.get("User")
+    t = await _ticket_must_exist(session, ticket_id)
+    if customer_id is not None and str(customer_id) != t.get("customer_id"):
+        await set_customer(
+            session,
+            ticket_id=ticket_id,
+            customer_id=str(customer_id),
+            customer_user_id=None,
+            user_id=user_id,
+            only_given=True,
+        )
+    if customer_user_id is not None and str(customer_user_id) != t.get("customer_user_id"):
+        await set_customer(
+            session,
+            ticket_id=ticket_id,
+            customer_id=None,
+            customer_user_id=str(customer_user_id),
+            user_id=user_id,
+            only_given=True,
+        )
 
 
 async def _action_ticket_responsible_set(
@@ -617,7 +643,7 @@ async def _action_article_send(
     t = await _ticket_must_exist(session, ticket_id)
     article = ArticleIn(
         sender_type="agent",
-        is_visible_for_customer=bool(config.get("IsVisibleForCustomer", 1)),
+        is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer", 1)),
         subject=subject,
         body=body,
         channel="email",
@@ -658,7 +684,7 @@ async def _action_ticket_article_create(
     channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
     article = ArticleIn(
         sender_type=str(sender_type),
-        is_visible_for_customer=bool(config.get("IsVisibleForCustomer", 0)),
+        is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer", 0)),
         subject=str(config.get("Subject", "")),
         body=str(config.get("Body", "")),
         channel=channel,
@@ -1002,7 +1028,7 @@ async def _action_ticket_create(
         channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
         article = ArticleIn(
             sender_type=str(config["SenderType"]),
-            is_visible_for_customer=bool(config.get("IsVisibleForCustomer")),
+            is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer")),
             subject=str(config.get("Subject") or title),
             body=str(config.get("Body") or ""),
             channel=channel,
@@ -1319,6 +1345,7 @@ async def _apply_dialog_field_changes(
             )
 
     if "Title" in field_values and field_values["Title"]:
+        # change_title is a no-op for an unchanged title (Ticket.pm:1883).
         await change_title(
             session, ticket_id=ticket_id, new_title=str(field_values["Title"]), user_id=user_id
         )
@@ -1354,13 +1381,19 @@ async def _apply_dialog_field_changes(
         t = await _ticket_must_exist(session, ticket_id)
         customer_id = field_values.get("CustomerID", t.get("customer_id"))
         customer_user_id = field_values.get("CustomerUserID", t.get("customer_user_id"))
-        await set_customer(
-            session,
-            ticket_id=ticket_id,
-            customer_id=customer_id,
-            customer_user_id=customer_user_id,
-            user_id=user_id,
-        )
+        # AgentTicketProcess.pm:5770-5783: no TicketCustomerSet when CustomerID and
+        # CustomerUser both equal the ticket's (Perl ``eq``: undef compares as "").
+        unchanged = str(customer_id or "") == str(t.get("customer_id") or "") and str(
+            customer_user_id or ""
+        ) == str(t.get("customer_user_id") or "")
+        if not unchanged:
+            await set_customer(
+                session,
+                ticket_id=ticket_id,
+                customer_id=customer_id,
+                customer_user_id=customer_user_id,
+                user_id=user_id,
+            )
 
     # Dynamic fields, the article and the owner are stored in FieldOrder (the Znuny save loop,
     # AgentTicketProcess.pm:5463ff; Owner via $TicketFieldSetSub, :5800-5860); a dynamic field
@@ -1458,7 +1491,7 @@ async def _store_dialog_article(
         history_comment = "%%"
     article = ArticleIn(
         sender_type=sender_type,
-        is_visible_for_customer=str(cfg.get("IsVisibleForCustomer", "0")) == "1",
+        is_visible_for_customer=perl_truthy(cfg.get("IsVisibleForCustomer", 0)),
         subject=str(field_values["Subject"]),
         body=str(field_values["Body"]),
         channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
@@ -1636,7 +1669,12 @@ async def apply_activity_dialog(
         # The ticket already carries this customer; do not rewrite it.
         values.pop("CustomerUserID")
         values.pop("CustomerID")
-    if apply_required_lock and dialog.required_lock == "1" and actor.interface == "AgentInterface":
+    # ``if ($ActivityDialogHashRef->{RequiredLock})`` (AgentTicketProcess.pm:183): Perl truthiness.
+    if (
+        apply_required_lock
+        and perl_truthy(dialog.required_lock)
+        and actor.interface == "AgentInterface"
+    ):
         await _ensure_required_lock(
             session, ticket_id=ticket_id, user_id=actor.user_id, sysconfig=sysconfig
         )

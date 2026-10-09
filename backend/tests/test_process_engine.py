@@ -37,6 +37,7 @@ from tiqora.process.config import (
 )
 from tiqora.process.engine import (
     _action_ticket_article_create,
+    _action_ticket_customer_set,
     _action_ticket_lock_set,
     _action_ticket_owner_set,
     _action_ticket_priority_set,
@@ -2195,3 +2196,185 @@ async def test_unchanged_queue_priority_responsible_write_nothing(mariadb_znuny_
             sysconfig=sysconfig,
         )
     assert await _history_types(factory, ticket_id) == before
+
+
+# ---------------------------------------------------------------------------
+# Same-value guards for Title and customer (final review I1)
+# ---------------------------------------------------------------------------
+
+_OLD_CHANGE_TIME = "2020-01-01 00:00:00"
+
+
+async def _age_ticket(
+    factory: async_sessionmaker[AsyncSession],
+    ticket_id: int,
+    *,
+    customer_id: str | None = None,
+    customer_user_id: str | None = None,
+) -> None:
+    """Pin change_time to a known old value (a bump is then visible) and set the customer."""
+    async with factory() as session, session.begin():
+        await session.execute(
+            text(
+                "UPDATE ticket SET change_time = :ct, customer_id = :c, customer_user_id = :u"
+                " WHERE id = :t"
+            ),
+            {"ct": _OLD_CHANGE_TIME, "c": customer_id, "u": customer_user_id, "t": ticket_id},
+        )
+
+
+async def _customer_and_change_time(
+    factory: async_sessionmaker[AsyncSession], ticket_id: int
+) -> tuple[Any, Any, str]:
+    async with factory() as session:
+        row = (
+            await session.execute(
+                text("SELECT customer_id, customer_user_id, change_time FROM ticket WHERE id = :t"),
+                {"t": ticket_id},
+            )
+        ).one()
+    return row[0], row[1], str(row[2])
+
+
+async def _history_names(
+    factory: async_sessionmaker[AsyncSession], ticket_id: int, history_type: str
+) -> list[str]:
+    async with factory() as session:
+        return list(
+            (
+                await session.execute(
+                    text(
+                        "SELECT th.name FROM ticket_history th"
+                        " JOIN ticket_history_type ht ON ht.id = th.history_type_id"
+                        " WHERE th.ticket_id = :t AND ht.name = :n ORDER BY th.id"
+                    ),
+                    {"t": ticket_id, "n": history_type},
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+
+_TITLE_CUSTOMER_DIALOG = (
+    "FieldOrder: [Title, CustomerUserID, CustomerID]\n"
+    "Fields:\n  Title: {Display: '1'}\n  CustomerUserID: {Display: '1'}\n"
+    "  CustomerID: {Display: '1'}\n"
+    "Interface: [AgentInterface]\n"
+)
+
+
+@pytest.mark.db
+async def test_unchanged_title_and_customer_write_nothing(mariadb_znuny_url: str) -> None:
+    """A dialog submitted with the prefilled Title and customer writes no TitleUpdate /
+    CustomerUpdate row and does not bump change_time (Ticket.pm:1883 TicketTitleUpdate,
+    AgentTicketProcess.pm:5770-5783)."""
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_dialog_refs(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    await _age_ticket(factory, ticket_id, customer_id="cust-a", customer_user_id="cu-a")
+    before = await _history_types(factory, ticket_id)
+    dialog = ActivityDialogConfig.from_yaml(_TITLE_CUSTOMER_DIALOG)
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={
+                "Title": "BPM test ticket",
+                "CustomerUserID": "cu-a",
+                "CustomerID": "cust-a",
+            },
+            actor=ProcessActor.agent(_DLG_USER_ID),
+            sysconfig=sysconfig,
+        )
+    assert await _history_types(factory, ticket_id) == before
+    assert await _customer_and_change_time(factory, ticket_id) == (
+        "cust-a",
+        "cu-a",
+        _OLD_CHANGE_TIME,
+    )
+
+    # A changed customer user still writes (both columns, one CustomerUpdate row).
+    async with factory() as session, session.begin():
+        await apply_activity_dialog(
+            session,
+            ticket_id=ticket_id,
+            dialog=dialog,
+            field_values={
+                "Title": "BPM test ticket",
+                "CustomerUserID": "cu-b",
+                "CustomerID": "cust-a",
+            },
+            actor=ProcessActor.agent(_DLG_USER_ID),
+            sysconfig=sysconfig,
+        )
+    assert await _history_names(factory, ticket_id, "CustomerUpdate") == [
+        "%%CustomerID=cust-a;CustomerUser=cu-b;"
+    ]
+    assert await _history_names(factory, ticket_id, "TitleUpdate") == []
+
+
+@pytest.mark.db
+async def test_title_set_action_same_title_is_noop(mariadb_znuny_url: str) -> None:
+    """TransitionAction TicketTitleSet with the current title: TicketTitleUpdate returns
+    early (no UPDATE, no history)."""
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    await _age_ticket(factory, ticket_id)
+    async with factory() as session, session.begin():
+        await _action_ticket_title_set(
+            session, {"Title": "BPM test ticket"}, ticket_id, 1, sysconfig
+        )
+    assert await _history_names(factory, ticket_id, "TitleUpdate") == []
+    assert (await _customer_and_change_time(factory, ticket_id))[2] == _OLD_CHANGE_TIME
+
+    async with factory() as session, session.begin():
+        await _action_ticket_title_set(session, {"Title": "Renamed"}, ticket_id, 1, sysconfig)
+    assert await _history_names(factory, ticket_id, "TitleUpdate") == ["%%BPM test ticket%%Renamed"]
+
+
+@pytest.mark.db
+async def test_customer_set_action_per_key_like_znuny(mariadb_znuny_url: str) -> None:
+    """TransitionAction TicketCustomerSet (TicketCustomerSet.pm:103-190): only ``User`` set
+    leaves customer_id alone; an equal value is skipped; each changed key is its own
+    TicketCustomerSet call with its own history row."""
+    factory, sysconfig = _make_sysconfig_and_factory(mariadb_znuny_url)
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+    ticket_id = await _make_ticket(factory, sysconfig)
+    await _age_ticket(factory, ticket_id, customer_id="cust-a", customer_user_id="cu-a")
+
+    async with factory() as session, session.begin():
+        await _action_ticket_customer_set(
+            session, {"CustomerID": "cust-a", "User": "cu-a"}, ticket_id, 1, sysconfig
+        )
+    assert await _history_names(factory, ticket_id, "CustomerUpdate") == []
+    assert await _customer_and_change_time(factory, ticket_id) == (
+        "cust-a",
+        "cu-a",
+        _OLD_CHANGE_TIME,
+    )
+
+    async with factory() as session, session.begin():
+        await _action_ticket_customer_set(session, {"User": "cu-b"}, ticket_id, 1, sysconfig)
+    customer_id, customer_user_id, _ = await _customer_and_change_time(factory, ticket_id)
+    assert (customer_id, customer_user_id) == ("cust-a", "cu-b")
+    assert await _history_names(factory, ticket_id, "CustomerUpdate") == ["%%CustomerUser=cu-b;"]
+
+    async with factory() as session, session.begin():
+        await _action_ticket_customer_set(
+            session, {"CustomerID": "cust-c", "CustomerUserID": "cu-c"}, ticket_id, 1, sysconfig
+        )
+    assert await _history_names(factory, ticket_id, "CustomerUpdate") == [
+        "%%CustomerUser=cu-b;",
+        "%%CustomerID=cust-c;",
+        "%%CustomerUser=cu-c;",
+    ]
+
+    async with factory() as session, session.begin():
+        with pytest.raises(RequiredFieldMissing):
+            await _action_ticket_customer_set(session, {"No": ""}, ticket_id, 1, sysconfig)
