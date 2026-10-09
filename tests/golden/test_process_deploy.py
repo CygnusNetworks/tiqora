@@ -350,7 +350,7 @@ async def test_watcher_snapshots_after_znuny_deploy(session: AsyncSession) -> No
     # First sighting: no revision -> "initial" at once; else the two-tick confirmation.
     outcomes = [await _tick(session, "process")]
     if before is not None:
-        assert outcomes[0].action == "unchanged"
+        assert outcomes[0].action == "confirming"
         outcomes.append(await _tick(session, "process"))
     assert outcomes[-1].action == "snapshot"
     first = await latest_revision_info(session, "process")
@@ -371,7 +371,7 @@ async def test_watcher_snapshots_after_znuny_deploy(session: AsyncSession) -> No
     # Znuny deploy: confirmed on the second tick, then recorded as a "znuny" revision.
     assert znuny_perl_eval(_DEPLOY_PROCESS_ONLY) == "ok"
     confirm = await _tick(session, "process")
-    assert (confirm.action, confirm.revision_id) == ("unchanged", first.id)
+    assert (confirm.action, confirm.revision_id) == ("confirming", first.id)
     snap = await _tick(session, "process")
     assert snap.action == "snapshot" and snap.revision_id is not None
     assert snap.revision_id > first.id
@@ -411,7 +411,7 @@ async def test_acl_deploy_cycle(session: AsyncSession) -> None:
     peer = json.loads(znuny_perl_eval(_ACL_DEPLOY))
     outcomes = [await _tick(session, "acl")]
     if before is not None:
-        assert outcomes[0].action == "unchanged"  # two-tick confirmation
+        assert outcomes[0].action == "confirming"  # two-tick confirmation
         outcomes.append(await _tick(session, "acl"))
     assert outcomes[-1].action == "snapshot"
     latest = await latest_revision_info(session, "acl")

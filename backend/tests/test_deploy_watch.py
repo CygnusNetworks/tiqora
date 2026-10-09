@@ -163,7 +163,7 @@ async def test_draft_edit_is_not_picked_up_until_sync_table_empties(session: Asy
     await _znuny_deploy(session)
     # First tick after the deploy only notes the new checksum (draft-edit race guard).
     pre = await check_deploy_state(session, "process", ownership_active=False)
-    assert pre.action == "unchanged" and pre.revision_id == out1.revision_id
+    assert pre.action == "confirming" and pre.revision_id == out1.revision_id
     out3 = await check_deploy_state(session, "process", ownership_active=False)
     assert out3.action == "snapshot" and out3.revision_id != out1.revision_id
     info = await latest_revision_info(session, "process")
@@ -275,7 +275,8 @@ async def test_changing_dump_between_ticks_is_not_snapshotted(session: AsyncSess
     )
     await session.commit()
     seen_v3 = await check_deploy_state(session, "process", ownership_active=False)
-    assert seen_v2.action == seen_v3.action == "unchanged"
+    # Each new checksum is only a candidate ("confirming"), never a revision yet.
+    assert seen_v2.action == seen_v3.action == "confirming"
     assert seen_v3.revision_id == first.revision_id
     stable = await check_deploy_state(session, "process", ownership_active=False)
     assert stable.action == "snapshot" and stable.revision_id != first.revision_id

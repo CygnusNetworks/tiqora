@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.db.legacy import CustomerUser, PermissionGroups, Queue
+from tiqora.db.legacy import CustomerUser, Queue
 from tiqora.domain.ticket_write_service import (
     _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse
 )
@@ -123,13 +123,7 @@ async def customer_create_queue_ids(
 
     if not actor.customer_user_login:
         return {}
-    login = (
-        await session.execute(
-            select(CustomerUser.login)
-            .where(func.lower(CustomerUser.login) == actor.customer_user_login.lower())
-            .limit(1)
-        )
-    ).scalar_one_or_none() or actor.customer_user_login
+    login = await _canonical_login(session, actor.customer_user_login)
     groups = await customer_group_ids(session, login, "create", sysconfig=sysconfig)
     if not groups:
         return {}
@@ -143,34 +137,40 @@ async def customer_create_queue_ids(
     return {int(r[0]): r[1] for r in rows}
 
 
+async def _canonical_login(session: AsyncSession, login: str) -> str:
+    """The stored ``customer_user.login`` for *login* (case-insensitive), else *login*."""
+    return (
+        await session.execute(
+            select(CustomerUser.login)
+            .where(func.lower(CustomerUser.login) == login.lower())
+            .limit(1)
+        )
+    ).scalar_one_or_none() or login
+
+
 async def _customer_has_permission(
     session: AsyncSession, actor: ProcessActor, *, queue_id: int, permission: str
 ) -> bool:
-    """``TicketCustomerPermission`` GroupCheck (``CustomerPermission/GroupCheck.pm``).
-
-    The customer needs *permission* in the queue's group via ``CustomerGroup::GroupMemberList``:
-    with ``CustomerGroupSupport`` off that is every group (no extra restriction), with it on the
-    ``Group_<perm>`` lists of :func:`load_customer_user_checks`. Company groups stay the
-    documented limitation of that function.
+    """``TicketCustomerPermission`` GroupCheck (``CustomerPermission/GroupCheck.pm``): the queue's
+    group must be in ``CustomerGroup::GroupMemberList(Type => permission)``
+    (:func:`~tiqora.domain.ticket_acl.customer_group_ids`). That list holds every valid group
+    with ``CustomerGroupSupport`` off, and with it on the groups granted *permission* or ``rw``
+    (``permission_key IN (?, 'rw')``, CustomerGroup.pm:266-281), so a dialog ``Permission`` such
+    as ``note`` passes for ``rw`` holders, and an invalid queue group is denied either way.
+    Company groups stay the documented limitation of that function.
     """
-    from tiqora.domain.ticket_acl import load_customer_user_checks  # noqa: PLC0415 -- cycle
+    from tiqora.domain.ticket_acl import customer_group_ids  # noqa: PLC0415 -- cycle
 
-    sysconfig = SysConfig(session)
-    if str(await sysconfig.get("CustomerGroupSupport", 0)) not in ("1", "True", "true"):
-        return True
-    group_name = (
-        await session.execute(
-            select(PermissionGroups.name)
-            .join(Queue, Queue.group_id == PermissionGroups.id)
-            .where(Queue.id == queue_id)
-        )
-    ).scalar_one_or_none()
-    if group_name is None or not actor.customer_user_login:
+    if not actor.customer_user_login:
         return False
-    checks = await load_customer_user_checks(
-        session, actor.customer_user_login, sysconfig=sysconfig
-    )
-    return group_name in checks.get(f"Group_{permission}", [])
+    group_id = (
+        await session.execute(select(Queue.group_id).where(Queue.id == queue_id))
+    ).scalar_one_or_none()
+    if group_id is None:
+        return False
+    login = await _canonical_login(session, actor.customer_user_login)
+    groups = await customer_group_ids(session, login, permission, sysconfig=SysConfig(session))
+    return int(group_id) in groups
 
 
 async def _has_ticket_permission(

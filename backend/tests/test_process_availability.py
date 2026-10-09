@@ -686,14 +686,14 @@ def _set_customer_group_support(url: str, value: int) -> None:
     )
 
 
-def _grant_customer(url: str) -> None:
+def _grant_customer(url: str, key: str = "rw") -> None:
     _exec(
         url,
         (
             "INSERT INTO group_customer_user (user_id, group_id, permission_key, permission_value,"
             " create_time, create_by, change_time, change_by)"
-            " VALUES (:u, :g, 'rw', 1, :t, 1, :t, 1)",
-            {"u": CUSTOMER_LOGIN, "g": GROUP, "t": T0},
+            " VALUES (:u, :g, :k, 1, :t, 1, :t, 1)",
+            {"u": CUSTOMER_LOGIN, "g": GROUP, "k": key, "t": T0},
         ),
     )
 
@@ -734,6 +734,50 @@ async def test_customer_dialog_permission_needs_group_when_support_is_on(
     ]
     assert ids == [dialog_eid(1), dialog_eid(2)]
     assert (await _submit(portal_client, TICKET_1, 2, prefix)).status_code == 200
+
+
+def _customer_note_perm(conn: Any) -> None:
+    _add_dialog(conn, 1, CUSTOMER_ONLY)
+    _add_dialog(conn, 3, CUSTOMER_ONLY, permission="note")
+    _add_process(conn, 1, start_dialog=1, dialogs=[1, 3])
+
+
+@pytest.mark.db
+async def test_customer_dialog_permission_beyond_ro_rw_follows_group_member_list(
+    portal_client: AsyncClient, sync_url: str
+) -> None:
+    """A dialog ``Permission: note``: GroupMemberList(Type => 'note') is
+    ``permission_key IN ('note', 'rw')`` (CustomerGroup.pm:266-281), so an rw holder passes and
+    an ro-only customer does not. With support off an invalid queue group is still denied
+    (GroupList(Valid => 1), GroupCheck.pm ``return 1 if $GroupIDs{$GroupID}``)."""
+    prefix = "/api/portal/process"
+    _build(sync_url, _customer_note_perm)
+    _set_customer_group_support(sync_url, 0)
+    assert (await _start(portal_client, TICKET_1, 1, prefix)).status_code == 200
+
+    _set_customer_group_support(sync_url, 1)
+    _grant_customer(sync_url, "ro")
+    ids = [
+        d["entity_id"] for d in (await _state(portal_client, TICKET_1, prefix))["available_dialogs"]
+    ]
+    assert ids == []  # default rw dialog and the note dialog: ro is neither
+    assert (await _submit(portal_client, TICKET_1, 3, prefix)).status_code == 403
+
+    _grant_customer(sync_url, "rw")
+    ids = [
+        d["entity_id"] for d in (await _state(portal_client, TICKET_1, prefix))["available_dialogs"]
+    ]
+    assert ids == [dialog_eid(1), dialog_eid(3)]
+
+    # Support off, but the queue's group is invalid: GroupList(Valid => 1) lacks it.
+    _set_customer_group_support(sync_url, 0)
+    _exec(sync_url, ("UPDATE permission_groups SET valid_id = 2 WHERE id = :g", {"g": GROUP}))
+    assert (await _state(portal_client, TICKET_1, prefix))["available_dialogs"] == []
+    assert (await _submit(portal_client, TICKET_1, 3, prefix)).status_code == 403
+
+    _set_customer_group_support(sync_url, 1)
+    _exec(sync_url, ("UPDATE permission_groups SET valid_id = 1 WHERE id = :g", {"g": GROUP}))
+    assert (await _submit(portal_client, TICKET_1, 3, prefix)).status_code == 200
 
 
 # --- ACL on the submitted dialog id (TicketACL.pm:1122-1133) -------------------------------------

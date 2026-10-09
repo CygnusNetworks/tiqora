@@ -115,7 +115,7 @@ class LiveProcessSource:
 
 
 class RevisionProcessSource:
-    """Reads one deployed revision. The dump is shared and must not be mutated."""
+    """Reads one deployed revision (its own parsed copy of the dump)."""
 
     def __init__(self, revision: LoadedRevision) -> None:
         self._dump = revision.dump

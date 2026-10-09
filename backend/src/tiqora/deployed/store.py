@@ -1,8 +1,9 @@
 """Store for deployed process/ACL revisions (``tiqora_*_revision``).
 
 The newest revision per kind is the active one. ``load_active_revision`` costs one
-small SELECT (newest id + checksum, no ``config``) and re-parses the JSON only when
-that pair changed.
+small SELECT (newest id + checksum, no ``config``) and reads ``config`` again only when
+that pair changed. Every call parses its own copy of the cached JSON, so a caller that
+mutates the dump cannot change what the next request runs.
 """
 
 from __future__ import annotations
@@ -43,10 +44,16 @@ class RevisionInfo:
 @dataclass(frozen=True, slots=True)
 class LoadedRevision:
     info: RevisionInfo
-    dump: Mapping[str, Any]  # parsed JSON; treat as read-only
+    dump: Mapping[str, Any]  # parsed JSON, a fresh copy per load_active_revision call
 
 
-_cache: dict[str, LoadedRevision] = {}
+@dataclass(frozen=True, slots=True)
+class _CachedRevision:
+    info: RevisionInfo
+    config: str  # the stored canonical JSON
+
+
+_cache: dict[str, _CachedRevision] = {}
 
 
 def clear_revision_cache() -> None:
@@ -94,13 +101,14 @@ async def load_active_revision(session: AsyncSession, kind: RevisionKind) -> Loa
         return None
     cached = _cache.get(kind)
     # Id and checksum: ids alone could repeat after a database was recreated.
-    if cached is not None and cached.info.id == info.id and cached.info.checksum == info.checksum:
-        return cached
-    model = _model(kind)
-    raw = (await session.execute(select(model.config).where(model.id == info.id))).scalar_one()
-    loaded = LoadedRevision(info=info, dump=json.loads(raw))
-    _cache[kind] = loaded
-    return loaded
+    if cached is None or cached.info.id != info.id or cached.info.checksum != info.checksum:
+        model = _model(kind)
+        raw = (await session.execute(select(model.config).where(model.id == info.id))).scalar_one()
+        cached = _CachedRevision(info=info, config=raw)
+        _cache[kind] = cached
+    # A copy per call: the dump's nested dicts end up in EntityRecord.data / ACL rules, and a
+    # shared object mutated by one caller would silently change the deployed revision.
+    return LoadedRevision(info=cached.info, dump=json.loads(cached.config))
 
 
 async def record_revision(

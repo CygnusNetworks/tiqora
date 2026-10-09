@@ -6,12 +6,11 @@ by id. Seed band 881500-881699 (rulings F8) is reserved for this module.
 
 from __future__ import annotations
 
-import json
-from collections.abc import AsyncIterator, Generator
+from collections.abc import AsyncIterator, Callable, Generator
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.db.tiqora.base import TiqoraBase
@@ -23,7 +22,7 @@ from tiqora.deployed.store import (
     load_active_revision,
     record_revision,
 )
-from tiqora.process.dump import dump_checksum, dump_entity_count
+from tiqora.process.dump import canonical_json, dump_checksum, dump_entity_count
 
 _CREATED: list[tuple[str, str, int]] = []  # (sync_url, table, id)
 
@@ -113,41 +112,100 @@ async def test_acl_kind_is_stored_in_its_own_table(ctx: _Ctx) -> None:
     assert loaded.dump == dump
 
 
-async def test_cache_is_keyed_by_revision_id(ctx: _Ctx, monkeypatch: pytest.MonkeyPatch) -> None:
+def _config_reads(session: AsyncSession) -> tuple[list[str], Callable[[], None]]:
+    """Statements that read a revision's ``config`` column (the expensive part the cache saves);
+    returns the list and a function that stops recording."""
+    seen: list[str] = []
+    sync_engine = session.bind.sync_engine  # type: ignore[union-attr]
+
+    def before(_c: Any, _cur: Any, statement: str, *_: Any) -> None:
+        if "_revision.config" in statement:
+            seen.append(statement)
+
+    event.listen(sync_engine, "before_cursor_execute", before)
+    return seen, lambda: event.remove(sync_engine, "before_cursor_execute", before)
+
+
+async def test_cache_is_keyed_by_revision_id(ctx: _Ctx) -> None:
     session = ctx.session
-    calls = 0
-    real_loads = json.loads
+    reads, stop = _config_reads(session)
+    try:
+        await ctx.record(
+            "process", dump={"Process": {"a": {"Name": "A"}}}, source="znuny", deployed_by=None
+        )
+        await session.commit()
 
-    def counting_loads(*args: Any, **kwargs: Any) -> Any:
-        nonlocal calls
-        calls += 1
-        return real_loads(*args, **kwargs)
+        first = await load_active_revision(session, "process")
+        second = await load_active_revision(session, "process")
+        assert len(reads) == 1  # config read once, the second call is served from the cache
+        assert first is not None and second is not None
+        assert first.dump == second.dump == {"Process": {"a": {"Name": "A"}}}
 
-    monkeypatch.setattr(store.json, "loads", counting_loads)
-    await ctx.record("process", dump={"Process": {"a": {}}}, source="znuny", deployed_by=None)
+        new = await ctx.record(
+            "process", dump={"Process": {"b": {}}}, source="tiqora", deployed_by=1
+        )
+        await session.commit()
+        third = await load_active_revision(session, "process")
+        assert len(reads) == 2
+        assert third is not None and third.info.id == new.id
+        assert third.dump == {"Process": {"b": {}}}
+    finally:
+        stop()
+
+
+async def test_loaded_dump_is_a_private_copy(ctx: _Ctx) -> None:
+    """A caller mutating its dump must not change what the next caller (request) runs."""
+    session = ctx.session
+    await ctx.record(
+        "process", dump={"Process": {"p": {"Name": "Orig"}}}, source="znuny", deployed_by=None
+    )
     await session.commit()
-
     first = await load_active_revision(session, "process")
+    assert first is not None
+    first.dump["Process"]["p"]["Name"] = "Mutated"  # type: ignore[index]
+    first.dump["Process"]["q"] = {}  # type: ignore[index]
     second = await load_active_revision(session, "process")
-    assert calls == 1
-    assert first is second
+    assert second is not None
+    assert second.dump == {"Process": {"p": {"Name": "Orig"}}}
 
-    new = await ctx.record("process", dump={"Process": {"b": {}}}, source="tiqora", deployed_by=1)
+
+async def test_cache_is_keyed_by_checksum_too(ctx: _Ctx) -> None:
+    """Same id, different checksum (a recreated database reuses ids): parse the new config."""
+    session = ctx.session
+    old = {"Process": {"same-id": {"Name": "old"}}}
+    info = await ctx.record("process", dump=old, source="znuny", deployed_by=None)
     await session.commit()
-    third = await load_active_revision(session, "process")
-    assert calls == 2
-    assert third is not None and third.info.id == new.id
-    assert third.dump == {"Process": {"b": {}}}
+    loaded = await load_active_revision(session, "process")
+    assert loaded is not None and loaded.dump == old
+
+    replacement = {"Process": {"same-id": {"Name": "new"}}}
+    await session.execute(
+        text(
+            f"UPDATE {TiqoraProcessRevision.__tablename__} SET checksum = :c, config = :j"
+            " WHERE id = :i"
+        ),
+        {"c": dump_checksum(replacement), "j": canonical_json(replacement), "i": info.id},
+    )
+    await session.commit()
+    reloaded = await load_active_revision(session, "process")
+    assert reloaded is not None and reloaded.info.id == info.id
+    assert reloaded.info.checksum == dump_checksum(replacement)
+    assert reloaded.dump == replacement
 
 
 async def test_record_does_not_commit(ctx: _Ctx) -> None:
     session = ctx.session
-    before = await latest_revision_info(session, "process")
+    kept = await ctx.record(
+        "process", dump={"Process": {"kept": {}}}, source="initial", deployed_by=None
+    )
+    await session.commit()
     info = await record_revision(
         session, "process", dump={"Process": {"gone": {}}}, source="initial", deployed_by=None
     )
-    assert info.id is not None
+    assert info.id is not None and info.id > kept.id
     assert (await latest_revision_info(session, "process")) == info  # visible in-transaction
     await session.rollback()
-    assert await latest_revision_info(session, "process") == before
-    assert await load_active_revision(session, "process") is not None or before is None
+    assert await latest_revision_info(session, "process") == kept
+    loaded = await load_active_revision(session, "process")
+    assert loaded is not None and loaded.info.id == kept.id
+    assert loaded.dump == {"Process": {"kept": {}}}

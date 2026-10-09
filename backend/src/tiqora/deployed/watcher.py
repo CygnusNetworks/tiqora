@@ -38,7 +38,9 @@ from tiqora.process.dump import build_process_dump, dump_checksum
 
 logger = logging.getLogger(__name__)
 
-WatchAction = Literal["unchanged", "snapshot", "waiting_for_deploy", "running_live"]
+# "confirming": a changed deployed dump was seen for the first time; it becomes a revision
+# when the next tick sees the same checksum (two-tick confirmation, ruling T5 fix).
+WatchAction = Literal["unchanged", "confirming", "snapshot", "waiting_for_deploy", "running_live"]
 
 _LOCK_TIMEOUT_SECONDS = 10
 _LOCK_POLL_SECONDS = 0.1
@@ -179,7 +181,7 @@ async def _check_deploy_state(
         if latest is not None and not ownership_active and _candidate.get(kind) != checksum:
             # First sighting of a changed dump after a deploy: confirm on the next tick.
             _candidate[kind] = checksum
-            return WatchOutcome(kind, "unchanged", latest.id, 0)
+            return WatchOutcome(kind, "confirming", latest.id, 0)
         _candidate.pop(kind, None)
         source: RevisionSource
         if ownership_active:
