@@ -76,8 +76,15 @@ from tiqora.process.graph import (
     TransitionActionNode,
     TransitionNode,
 )
+from tiqora.process.process_ticket import (
+    ProcessTicketResult,
+    create_process_ticket,
+    enroll_ticket,
+)
 from tiqora.process.schemas import (
     ActivityDialogSummaryOut,
+    NewProcessTicketIn,
+    NewProcessTicketOut,
     ProcessStateOut,
     ProcessSummaryOut,
     TransitionSummaryOut,
@@ -109,6 +116,8 @@ __all__ = [
     "ProcessActor",
     "apply_activity_dialog",
     "canonical_field_name",
+    "create_process_ticket",
+    "enroll_ticket",
     "dialog_field_order",
     "effective_field_values",
     "missing_required_fields",
@@ -130,7 +139,10 @@ __all__ = [
     "ProcessNotFound",
     "ProcessPermissionDenied",
     "ProcessRepository",
+    "NewProcessTicketIn",
+    "NewProcessTicketOut",
     "ProcessStateOut",
+    "ProcessTicketResult",
     "ProcessSummary",
     "ProcessSummaryOut",
     "RequiredFieldMissing",

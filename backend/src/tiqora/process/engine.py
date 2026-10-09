@@ -115,6 +115,7 @@ from tiqora.process.exceptions import (
 )
 from tiqora.process.fields import (
     canonical_field_name,
+    dialog_field_order,
     effective_field_values,
     is_present,
     missing_required_fields,
@@ -1291,23 +1292,6 @@ async def _apply_dialog_field_changes(
             session, ticket_id=ticket_id, new_title=str(field_values["Title"]), user_id=user_id
         )
 
-    if "Owner" in field_values:
-        owner_id = await _resolve_dialog_field_id(
-            session,
-            field="Owner",
-            kind="user id",
-            raw=field_values["Owner"],
-            resolver=_resolve_user_id,
-        )
-        if owner_id is not None:
-            await assign_owner(
-                session,
-                ticket_id=ticket_id,
-                new_owner_id=owner_id,
-                user_id=user_id,
-                sysconfig=sysconfig,
-            )
-
     if "Responsible" in field_values:
         responsible_id = await _resolve_dialog_field_id(
             session,
@@ -1345,40 +1329,69 @@ async def _apply_dialog_field_changes(
             user_id=user_id,
         )
 
-    # Article (AgentTicketProcess.pm:5576, 5686-5687): stored only when Subject AND Body are
-    # set; sender, visibility and channel come from the dialog config, never from the request.
+    # Dynamic fields and the article are stored in FieldOrder (the Znuny save loop,
+    # AgentTicketProcess.pm:5463-5700); a dynamic field the order does not list comes last.
+    order = dialog_field_order(dialog_config)
+    dynamic = [k for k in field_values if k.startswith("DynamicField_")]
+    dynamic.sort(key=lambda k: order.index(k) if k in order else len(order))
+    steps = [n for n in order if n == "Article" or n in dynamic]
+    steps += [k for k in dynamic if k not in steps]
+    for step in steps:
+        if step == "Article":
+            await _store_dialog_article(
+                session,
+                dialog_config=dialog_config,
+                field_values=field_values,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+                sender_type=sender_type,
+            )
+            continue
+        value = field_values[step]
+        values = value if isinstance(value, list) else [value]
+        await update_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            field_name=step.removeprefix("DynamicField_"),
+            values=[str(v) for v in values],
+            user_id=user_id,
+        )
+
+
+async def _store_dialog_article(
+    session: AsyncSession,
+    *,
+    dialog_config: ActivityDialogConfig,
+    field_values: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+    sender_type: str,
+) -> None:
+    """Article (AgentTicketProcess.pm:5576, 5686-5687): stored only when Subject AND Body are
+    set; sender, visibility and channel come from the dialog config, never from the request."""
     article_cfg = next(
         (c for n, c in dialog_config.fields.items() if canonical_field_name(n) == "Article"), None
     )
     if (
-        article_cfg is not None
-        and is_present(field_values.get("Subject"))
-        and is_present(field_values.get("Body"))
+        article_cfg is None
+        or not is_present(field_values.get("Subject"))
+        or not is_present(field_values.get("Body"))
     ):
-        cfg = article_cfg.config
-        channel_raw = str(
-            cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note"
-        ).lower()
-        article = ArticleIn(
-            sender_type=sender_type,
-            is_visible_for_customer=str(cfg.get("IsVisibleForCustomer", "0")) == "1",
-            subject=str(field_values["Subject"]),
-            body=str(field_values["Body"]),
-            channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
-        )
-        await add_article(
-            session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
-        )
-
-    for key, value in field_values.items():
-        if not key.startswith("DynamicField_"):
-            continue
-        field_name = key.removeprefix("DynamicField_")
-        values = value if isinstance(value, list) else [value]
-        str_values = [str(v) for v in values]
-        await update_dynamic_field(
-            session, ticket_id=ticket_id, field_name=field_name, values=str_values, user_id=user_id
-        )
+        return
+    cfg = article_cfg.config
+    channel_raw = str(cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note").lower()
+    article = ArticleIn(
+        sender_type=sender_type,
+        is_visible_for_customer=str(cfg.get("IsVisibleForCustomer", "0")) == "1",
+        subject=str(field_values["Subject"]),
+        body=str(field_values["Body"]),
+        channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
+    )
+    await add_article(
+        session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+    )
 
 
 async def _ensure_required_lock(
@@ -1511,6 +1524,12 @@ async def apply_activity_dialog(
     (Znuny never runs RequiredLock on create).
     """
     values = effective_field_values(dialog, field_values, actor.interface)
+    customer_filled = actor.interface == "CustomerInterface"
+    if customer_filled:
+        # The customer interface never asks for the customer, it is the acting customer
+        # (CustomerTicketProcess.pm:3560-3569, 3675-3676); whatever was submitted is ignored.
+        values["CustomerUserID"] = actor.customer_user_login
+        values["CustomerID"] = actor.customer_id
     missing = missing_required_fields(dialog, values, actor.interface)
     # PendingTime is only required (and only read) when the target state is a pending one.
     pending_required = "PendingTime" in missing
@@ -1524,6 +1543,10 @@ async def apply_activity_dialog(
             missing.append("PendingTime")
     if missing:
         raise RequiredFieldMissing(f"required activity dialog field missing: {', '.join(missing)}")
+    if customer_filled:
+        # The ticket already carries this customer; do not rewrite it.
+        values.pop("CustomerUserID")
+        values.pop("CustomerID")
     if apply_required_lock and dialog.required_lock == "1" and actor.interface == "AgentInterface":
         await _ensure_required_lock(
             session, ticket_id=ticket_id, user_id=actor.user_id, sysconfig=sysconfig
@@ -1541,6 +1564,26 @@ async def apply_activity_dialog(
         # AgentTicketProcess.pm:5554-5575: TicketPendingTimeSet after the other fields.
         await _set_ticket_pending_time(
             session, ticket_id=ticket_id, pending_time=pending_time, user_id=actor.user_id
+        )
+    # The owner is set last, after the whole save loop (AgentTicketProcess.pm:5967).
+    owner_id = (
+        await _resolve_dialog_field_id(
+            session,
+            field="Owner",
+            kind="user id",
+            raw=values["Owner"],
+            resolver=_resolve_user_id,
+        )
+        if "Owner" in values and "Owner" not in skip_fields
+        else None
+    )
+    if owner_id is not None:
+        await assign_owner(
+            session,
+            ticket_id=ticket_id,
+            new_owner_id=owner_id,
+            user_id=actor.user_id,
+            sysconfig=sysconfig,
         )
 
 

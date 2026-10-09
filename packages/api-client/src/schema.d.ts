@@ -6018,6 +6018,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/process/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create New Process Ticket
+         * @description Create a ticket from the start dialog of a process. Needs ``create`` on the resolved
+         *     queue (403), a startable process (409) and the start dialog's mandatory fields (400).
+         */
+        post: operations["create_new_process_ticket_api_v1_process_tickets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/process/{process_entity_id}": {
         parameters: {
             query?: never;
@@ -13606,6 +13627,33 @@ export interface components {
             open: number;
         };
         /**
+         * NewProcessTicketIn
+         * @description Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket.
+         */
+        NewProcessTicketIn: {
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
+            /** Process Entity Id */
+            process_entity_id: string;
+        };
+        /**
+         * NewProcessTicketOut
+         * @description The created process ticket and the outcome of its first transition pass.
+         */
+        NewProcessTicketOut: {
+            /** Activity Changed */
+            activity_changed: boolean;
+            state: components["schemas"]["TicketProcessStateOut"];
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket Number */
+            ticket_number: string;
+            /** Unsupported Actions */
+            unsupported_actions: string[];
+        };
+        /**
          * NewTicketPhoneCallIn
          * @description First article of a phone ticket (Znuny AgentTicketPhone).
          */
@@ -14785,9 +14833,14 @@ export interface components {
         };
         /**
          * ProcessStartIn
-         * @description Body of ``POST /api/v1/process/ticket/{ticket_id}/start``.
+         * @description Body of ``POST /api/v1/process/ticket/{ticket_id}/start`` (enroll through the start
+         *     dialog: ``field_values`` are the dialog's fields, like a dialog submit).
          */
         ProcessStartIn: {
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
             /** Process Entity Id */
             process_entity_id: string;
         };
@@ -33771,6 +33824,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityDialogSubmitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_new_process_ticket_api_v1_process_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProcessTicketIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewProcessTicketOut"];
                 };
             };
             /** @description Validation Error */

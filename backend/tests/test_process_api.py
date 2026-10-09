@@ -59,9 +59,10 @@ Permission: ''
 """
 
 # Znuny never fires a transition without a Condition (Transition.pm:322-327): require a
-# non-empty Title, which the dialog submission sets.
+# Title starting with "Updated", which only the dialog submission sets (enrolling through the
+# start dialog also runs the transitions, so it must not match the ticket's initial title).
 _TITLE_CONDITION = (
-    "Condition:\n  '1':\n    Fields:\n      Title:\n        Match: .\n        Type: Regexp\n"
+    "Condition:\n  '1':\n    Fields:\n      Title:\n        Match: ^Updated\n        Type: Regexp\n"
     "    Type: and\n  Type: and\nConditionLinking: and\n"
 )
 TRANSITION_CONFIG_YAML = _TITLE_CONDITION

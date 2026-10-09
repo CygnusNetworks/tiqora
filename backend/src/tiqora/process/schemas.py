@@ -147,9 +147,11 @@ class ActivityDialogDetailOut(BaseModel):
 
 
 class ProcessStartIn(BaseModel):
-    """Body of ``POST /api/v1/process/ticket/{ticket_id}/start``."""
+    """Body of ``POST /api/v1/process/ticket/{ticket_id}/start`` (enroll through the start
+    dialog: ``field_values`` are the dialog's fields, like a dialog submit)."""
 
     process_entity_id: str
+    field_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class ActivityDialogSubmitIn(BaseModel):
@@ -168,6 +170,23 @@ class ActivityDialogSubmitOut(BaseModel):
     activity_changed: bool
     new_activity_entity_id: str | None
     transition_entity_id: str | None
+    unsupported_actions: list[str]
+    state: TicketProcessStateOut
+
+
+class NewProcessTicketIn(BaseModel):
+    """Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket."""
+
+    process_entity_id: str
+    field_values: dict[str, Any] = Field(default_factory=dict)
+
+
+class NewProcessTicketOut(BaseModel):
+    """The created process ticket and the outcome of its first transition pass."""
+
+    ticket_id: int
+    ticket_number: str
+    activity_changed: bool
     unsupported_actions: list[str]
     state: TicketProcessStateOut
 

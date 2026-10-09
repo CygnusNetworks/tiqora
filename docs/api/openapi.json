@@ -16415,6 +16415,61 @@
         "title": "MyTicketCounts",
         "type": "object"
       },
+      "NewProcessTicketIn": {
+        "description": "Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket.",
+        "properties": {
+          "field_values": {
+            "additionalProperties": true,
+            "title": "Field Values",
+            "type": "object"
+          },
+          "process_entity_id": {
+            "title": "Process Entity Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "process_entity_id"
+        ],
+        "title": "NewProcessTicketIn",
+        "type": "object"
+      },
+      "NewProcessTicketOut": {
+        "description": "The created process ticket and the outcome of its first transition pass.",
+        "properties": {
+          "activity_changed": {
+            "title": "Activity Changed",
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TicketProcessStateOut"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "ticket_number": {
+            "title": "Ticket Number",
+            "type": "string"
+          },
+          "unsupported_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unsupported Actions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "ticket_number",
+          "activity_changed",
+          "unsupported_actions",
+          "state"
+        ],
+        "title": "NewProcessTicketOut",
+        "type": "object"
+      },
       "NewTicketPhoneCallIn": {
         "description": "First article of a phone ticket (Znuny AgentTicketPhone).",
         "properties": {
@@ -19610,8 +19665,13 @@
         "type": "object"
       },
       "ProcessStartIn": {
-        "description": "Body of ``POST /api/v1/process/ticket/{ticket_id}/start``.",
+        "description": "Body of ``POST /api/v1/process/ticket/{ticket_id}/start`` (enroll through the start\ndialog: ``field_values`` are the dialog's fields, like a dialog submit).",
         "properties": {
+          "field_values": {
+            "additionalProperties": true,
+            "title": "Field Values",
+            "type": "object"
+          },
           "process_entity_id": {
             "title": "Process Entity Id",
             "type": "string"
@@ -63605,6 +63665,82 @@
           }
         },
         "summary": "Submit Ticket Activity Dialog",
+        "tags": [
+          "process"
+        ]
+      }
+    },
+    "/api/v1/process/tickets": {
+      "post": {
+        "description": "Create a ticket from the start dialog of a process. Needs ``create`` on the resolved\nqueue (403), a startable process (409) and the start dialog's mandatory fields (400).",
+        "operationId": "create_new_process_ticket_api_v1_process_tickets_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProcessTicketIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewProcessTicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create New Process Ticket",
         "tags": [
           "process"
         ]

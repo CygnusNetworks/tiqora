@@ -875,6 +875,8 @@ export type ActivityDialogDetailOut = {
 
 export type ProcessStartIn = {
   process_entity_id: string;
+  // Start dialog fields when enrolling an existing ticket (like a dialog submit).
+  field_values?: Record<string, unknown>;
 };
 
 export type ActivityDialogSubmitIn = {
