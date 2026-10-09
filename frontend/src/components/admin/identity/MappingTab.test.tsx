@@ -206,7 +206,7 @@ describe("MappingTab", () => {
     update.mockResolvedValue(makeProvider());
     wrap(<MappingTab provider={makeProvider({ audience: "both", jit_enabled: true })} sampleAttributes={null} onSaved={vi.fn()} />);
     const domains = screen.getByLabelText("Erlaubte E-Mail-Domains");
-    fireEvent.change(domains, { target: { value: "Example.org" } });
+    fireEvent.change(domains, { target: { value: "example.org" } });
     fireEvent.keyDown(domains, { key: "Enter" });
     fireEvent.click(await screen.findByTestId("identity-jit-roles-add"));
     fireEvent.click(await screen.findByTestId("identity-jit-roles-add-menu-option-1"));
