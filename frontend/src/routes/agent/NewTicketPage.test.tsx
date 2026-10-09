@@ -255,6 +255,43 @@ describe("NewTicketPage", () => {
     );
   });
 
+  it("an email ticket sends attached files with its first article", async () => {
+    await renderReady();
+    await pickCustomer();
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), {
+      target: { value: "Formular" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Anbei das Formular." },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-attach-input"), {
+      target: { files: [new File(["hello"], "Formular.pdf", { type: "application/pdf" })] },
+    });
+    expect(screen.getByText("Formular.pdf")).toBeInTheDocument();
+    // Locked while the file is read, so it cannot go out without it.
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
+    expect(createArticle).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        channel: "email",
+        attachments: [
+          {
+            filename: "Formular.pdf",
+            content_type: "application/pdf",
+            content_base64: btoa("hello"),
+          },
+        ],
+      }),
+    );
+  });
+
   it("phone mode creates ticket + call in one request with direction, time and auto reply", async () => {
     await renderReady();
     fireEvent.click(screen.getByTestId("new-ticket-type-phone"));

@@ -39,7 +39,13 @@ import {
   type PhoneTicketFieldsValue,
 } from "@/components/agent/phone/phoneTicketValue";
 import { useCallTimer } from "@/components/agent/phone/useCallTimer";
-import { useChatAttachments } from "@/components/agent/telegram/useChatAttachments";
+import {
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  formatBytes,
+  useChatAttachments,
+} from "@/components/agent/telegram/useChatAttachments";
+import { AttachmentChips } from "@/components/agent/telegram/ComposerChips";
 import { phoneApi, type CallerCustomer, type CallerTicket } from "@/lib/phoneApi";
 import {
   missingRequired,
@@ -407,7 +413,6 @@ export function NewTicketPage() {
   const closedSelected = Boolean(selectedState?.type_name.startsWith("closed"));
   const phoneReady =
     missingRequired(phoneDfs, phoneFields.dfValues).length === 0 &&
-    !attachments.encoding &&
     (!pendingSelected || pendingIso(phoneFields.pendingAt) !== null);
 
   // PGP / S/MIME for the email (separate component; nothing shown when off).
@@ -430,6 +435,8 @@ export function NewTicketPage() {
     body.trim().length > 0 &&
     (ticketType === "phone" || to.length > 0) &&
     (ticketType === "email" || phoneReady) &&
+    // A file still being read would silently go missing from the request.
+    !attachments.encoding &&
     !submitting;
 
   const onSubmit = async (e: FormEvent) => {
@@ -509,13 +516,16 @@ export function NewTicketPage() {
           cc: joinRecipients(cc),
           bcc: joinRecipients(bcc),
           email_security: emailSecurity.payload,
+          ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
         });
       } catch (articleErr) {
         if (!(articleErr instanceof ApiError)) throw articleErr;
         setError(
           articleErr.status === 422
             ? `${t("newTicket.sendError")} ${articleErr.message}`
-            : t("newTicket.sendError"),
+            : articleErr.status === 413
+              ? `${t("newTicket.sendError")} ${t("ticket.telegram.composer.attachTooLargeServer")}`
+              : t("newTicket.sendError"),
         );
         return;
       }
@@ -952,8 +962,36 @@ export function NewTicketPage() {
                     />
                   </label>
                 )}
-                {refineControls}
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs">
+                  {refineControls}
+                  <label className="cursor-pointer rounded-md border border-hairline bg-surface px-2 py-[3px] text-muted hover:text-ink focus-within:outline focus-within:outline-2 focus-within:outline-accent">
+                    <span aria-hidden>📎</span> {t("newTicket.attachFile")}
+                    <input
+                      type="file"
+                      multiple
+                      className="sr-only"
+                      data-testid="new-ticket-attach-input"
+                      onChange={(e) => {
+                        if (e.target.files) attachments.add(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <AttachmentChips items={attachments.items} onRemove={attachments.remove} />
+                </div>
               </>
+            )}
+
+            {attachments.error && (
+              <p className="text-xs text-danger" data-testid="new-ticket-attach-error">
+                {attachments.error === "tooLarge"
+                  ? t("ticket.telegram.composer.attachTooLarge", {
+                      max: formatBytes(MAX_ATTACHMENT_BYTES),
+                    })
+                  : attachments.error === "tooMany"
+                    ? t("ticket.telegram.composer.attachTooMany", { max: MAX_ATTACHMENTS })
+                    : t("ticket.telegram.composer.attachReadFailed")}
+              </p>
             )}
 
             {ticketType === "email" &&
