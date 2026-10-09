@@ -153,7 +153,7 @@ class Keycloak:
             "/users",
             {
                 "username": LOGIN,
-                "email": "kc.anna@kc-corp.de",
+                "email": "kc.anna@keycloak.test",
                 "emailVerified": True,
                 "firstName": "Anna",
                 "lastName": "Keller",
