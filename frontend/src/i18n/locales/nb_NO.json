@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Kunne ikke fjerne passordet.",
     "passkeyReauthRequired": "Av sikkerhetshensyn, logg på igjen før du endrer passnøklene dine.",
     "passkeyDeleteLastError": "Kan ikke fjerne den siste 2FA-faktoren mens 2FA håndheves.",
-    "passkeyUnsupported": "Denne nettleseren støtter ikke passord (WebAuthn)."
+    "passkeyUnsupported": "Denne nettleseren støtter ikke passord (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

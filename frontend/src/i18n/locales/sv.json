@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Kunde inte ta bort passkey.",
     "passkeyReauthRequired": "Av säkerhetsskäl, logga in igen innan du ändrar dina lösennycklar.",
     "passkeyDeleteLastError": "Det går inte att ta bort den sista 2FA-faktorn medan 2FA tillämpas.",
-    "passkeyUnsupported": "Den här webbläsaren stöder inte passkeys (WebAuthn)."
+    "passkeyUnsupported": "Den här webbläsaren stöder inte passkeys (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

@@ -300,7 +300,10 @@
     "passkeyDeleteError": "تعذر إزالة مفتاح المرور.",
     "passkeyReauthRequired": "لدواعي الأمان، يُرجى تسجيل الدخول مرة أخرى قبل تغيير مفاتيح المرور.",
     "passkeyDeleteLastError": "لا يمكن إزالة عامل 2FA الأخير أثناء فرض 2FA.",
-    "passkeyUnsupported": "هذا المتصفح لا يدعم مفاتيح المرور (WebAuthn)."
+    "passkeyUnsupported": "هذا المتصفح لا يدعم مفاتيح المرور (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

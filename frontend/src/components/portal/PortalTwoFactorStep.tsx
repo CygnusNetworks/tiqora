@@ -18,16 +18,23 @@ function browserSupportsWebAuthn(): boolean {
 type StepFailure = "expired" | "rateLimited" | "invalid" | "other";
 
 /**
- * The backend answers a wrong code with 400/422 (or 401 "Invalid ..."), a
- * pending sign-in that no longer exists with 401 "No pending session" /
- * "Session expired", and a locked-out account with 429.
+ * Stable 401 detail of `/api/portal/auth/totp/verify` and
+ * `/passkey/authenticate/*` when the pending sign-in is gone (no pending
+ * session, or it could not be promoted any more). Pinned by the backend test
+ * `test_customer_two_factor.py`.
+ */
+export const PENDING_EXPIRED = "pending_expired";
+
+/**
+ * The backend answers a wrong code with 401 "invalid_code" (a rejected
+ * passkey with 401 "Invalid or expired passkey assertion"), a pending sign-in
+ * that no longer exists with 401 "pending_expired", and a locked-out account
+ * with 429.
  */
 function classify(err: unknown): StepFailure {
   if (!(err instanceof ApiError)) return "other";
   if (err.status === 429) return "rateLimited";
-  if (err.status === 401 && /no pending session|session expired/i.test(err.message)) {
-    return "expired";
-  }
+  if (err.status === 401 && err.message === PENDING_EXPIRED) return "expired";
   if (err.status === 400 || err.status === 401 || err.status === 422) return "invalid";
   return "other";
 }

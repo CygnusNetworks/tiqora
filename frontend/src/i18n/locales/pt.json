@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Não foi possível remover a chave de acesso.",
     "passkeyReauthRequired": "Por segurança, inicie sessão novamente antes de alterar as suas passkeys.",
     "passkeyDeleteLastError": "Não é possível remover o último fator 2FA enquanto o 2FA é aplicado.",
-    "passkeyUnsupported": "Este navegador não oferece suporte a senhas (WebAuthn)."
+    "passkeyUnsupported": "Este navegador não oferece suporte a senhas (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

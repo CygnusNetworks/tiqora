@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Δεν ήταν δυνατή η αφαίρεση του κωδικού πρόσβασης.",
     "passkeyReauthRequired": "Για την ασφάλειά σας, συνδεθείτε ξανά πριν αλλάξετε τα κλειδιά πρόσβασής σας.",
     "passkeyDeleteLastError": "Δεν είναι δυνατή η κατάργηση του τελευταίου παράγοντα 2FA ενώ επιβάλλεται το 2FA.",
-    "passkeyUnsupported": "Αυτό το πρόγραμμα περιήγησης δεν υποστηρίζει κωδικούς πρόσβασης (WebAuthn)."
+    "passkeyUnsupported": "Αυτό το πρόγραμμα περιήγησης δεν υποστηρίζει κωδικούς πρόσβασης (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

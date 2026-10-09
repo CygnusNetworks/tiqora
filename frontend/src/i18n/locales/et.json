@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Pääsuvõtit ei saanud eemaldada.",
     "passkeyReauthRequired": "Turvalisuse huvides logige enne pääsuvõtmete muutmist uuesti sisse.",
     "passkeyDeleteLastError": "Viimast 2FA-tegurit ei saa eemaldada, kui 2FA on jõustatud.",
-    "passkeyUnsupported": "See brauser ei toeta pääsukoode (WebAuthn)."
+    "passkeyUnsupported": "See brauser ei toeta pääsukoode (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

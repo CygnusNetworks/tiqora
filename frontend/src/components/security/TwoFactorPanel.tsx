@@ -55,6 +55,7 @@ export function TwoFactorPanel({
   const [disableCode, setDisableCode] = useState("");
   const [disableError, setDisableError] = useState<string | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
   const [addingPasskey, setAddingPasskey] = useState(false);
   const { confirm, dialog: confirmDialog } = useConfirm();
   const { prompt, dialog: promptDialog } = usePrompt();
@@ -90,6 +91,14 @@ export function TwoFactorPanel({
       setQrNonce((n) => n + 1);
       setEnrolling(true);
       setConfirmError(null);
+      setEnrollError(null);
+    },
+    // A passkey-only account with an old session gets 403 reauthentication_required
+    // (adding a factor needs a recent sign-in); anything else is a generic failure.
+    onError: (err: unknown) => {
+      setEnrollError(
+        isReauthRequired(err) ? t("security.totpReauthRequired") : t("security.enrollError"),
+      );
     },
   });
 
@@ -210,10 +219,18 @@ export function TwoFactorPanel({
             variant="primary"
             data-testid="totp-enroll-start"
             disabled={enrollMutation.isPending}
-            onClick={() => enrollMutation.mutate()}
+            onClick={() => {
+              setEnrollError(null);
+              enrollMutation.mutate();
+            }}
           >
             {enrollMutation.isPending ? <Spinner /> : t("security.enrollButton")}
           </Button>
+        )}
+        {!enabled && !enrolling && enrollError && (
+          <p className="mt-3 text-sm text-danger" role="alert" data-testid="totp-enroll-error">
+            {enrollError}
+          </p>
         )}
 
         {enrolling && secret && (
@@ -222,7 +239,7 @@ export function TwoFactorPanel({
             <img
               key={qrNonce}
               src={api.enrollQrUrl()}
-              alt="TOTP QR code"
+              alt={t("security.totpQrAlt")}
               width={200}
               height={200}
               data-testid="totp-qr-image"

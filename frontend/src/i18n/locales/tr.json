@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Şifre anahtarı kaldırılamadı.",
     "passkeyReauthRequired": "Güvenliğiniz için şifre anahtarlarınızı değiştirmeden önce lütfen yeniden giriş yapın.",
     "passkeyDeleteLastError": "2FA uygulanırken son 2FA faktörü kaldırılamaz.",
-    "passkeyUnsupported": "Bu tarayıcı şifre anahtarlarını (WebAuthn) desteklemiyor."
+    "passkeyUnsupported": "Bu tarayıcı şifre anahtarlarını (WebAuthn) desteklemiyor.",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

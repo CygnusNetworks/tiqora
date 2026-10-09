@@ -300,7 +300,10 @@
     "passkeyDeleteError": "رمز عبور حذف نشد.",
     "passkeyReauthRequired": "برای امنیت شما، پیش از تغییر کلیدهای عبور دوباره وارد شوید.",
     "passkeyDeleteLastError": "وقتی 2FA اجرا می شود، نمی توان آخرین فاکتور 2FA را حذف کرد.",
-    "passkeyUnsupported": "این مرورگر از کلیدهای عبور (WebAuthn) پشتیبانی نمی کند."
+    "passkeyUnsupported": "این مرورگر از کلیدهای عبور (WebAuthn) پشتیبانی نمی کند.",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

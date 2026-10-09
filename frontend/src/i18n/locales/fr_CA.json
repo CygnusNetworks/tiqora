@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Impossible de supprimer le mot de passe.",
     "passkeyReauthRequired": "Pour votre sécurité, veuillez ouvrir une session de nouveau avant de modifier vos clés d'accès.",
     "passkeyDeleteLastError": "Impossible de supprimer le dernier facteur 2FA pendant que 2FA est appliqué.",
-    "passkeyUnsupported": "Ce navigateur ne prend pas en charge les mots de passe (WebAuthn)."
+    "passkeyUnsupported": "Ce navigateur ne prend pas en charge les mots de passe (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

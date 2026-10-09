@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Nem sikerült eltávolítani a jelszót.",
     "passkeyReauthRequired": "A biztonsága érdekében a passkey-ek módosítása előtt jelentkezzen be újra.",
     "passkeyDeleteLastError": "Az utolsó 2FA-tényező nem távolítható el, miközben a 2FA kényszerítve van.",
-    "passkeyUnsupported": "Ez a böngésző nem támogatja a jelszót (WebAuthn)."
+    "passkeyUnsupported": "Ez a böngésző nem támogatja a jelszót (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

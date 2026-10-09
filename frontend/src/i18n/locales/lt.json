@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Nepavyko pašalinti slaptažodžio.",
     "passkeyReauthRequired": "Saugumo sumetimais prieš keisdami passkey prisijunkite dar kartą.",
     "passkeyDeleteLastError": "Negalima pašalinti paskutinio 2FA faktoriaus, kol 2FA yra vykdomas.",
-    "passkeyUnsupported": "Ši naršyklė nepalaiko slaptažodžių (WebAuthn)."
+    "passkeyUnsupported": "Ši naršyklė nepalaiko slaptažodžių (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

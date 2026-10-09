@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Не вдалося видалити ключ доступу.",
     "passkeyReauthRequired": "З міркувань безпеки увійдіть знову, перш ніж змінювати свої passkey.",
     "passkeyDeleteLastError": "Неможливо видалити останній фактор 2FA, поки 2FA застосовується примусово.",
-    "passkeyUnsupported": "Цей браузер не підтримує ключі доступу (WebAuthn)."
+    "passkeyUnsupported": "Цей браузер не підтримує ключі доступу (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

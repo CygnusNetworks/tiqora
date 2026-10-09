@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Haikuweza kuondoa nenosiri.",
     "passkeyReauthRequired": "Kwa usalama wako, tafadhali ingia tena kabla ya kubadilisha funguo zako za siri.",
     "passkeyDeleteLastError": "Haiwezi kuondoa kipengele cha mwisho cha 2FA huku 2FA inatekelezwa.",
-    "passkeyUnsupported": "Kivinjari hiki hakitumii vitufe vya siri (WebAuthn)."
+    "passkeyUnsupported": "Kivinjari hiki hakitumii vitufe vya siri (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

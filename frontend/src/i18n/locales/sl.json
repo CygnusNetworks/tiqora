@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Gesla ni bilo mogoče odstraniti.",
     "passkeyReauthRequired": "Zaradi varnosti se pred spreminjanjem ključnikov znova prijavite.",
     "passkeyDeleteLastError": "Zadnjega faktorja 2FA ni mogoče odstraniti, medtem ko je uveljavljen 2FA.",
-    "passkeyUnsupported": "Ta brskalnik ne podpira gesel (WebAuthn)."
+    "passkeyUnsupported": "Ta brskalnik ne podpira gesel (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

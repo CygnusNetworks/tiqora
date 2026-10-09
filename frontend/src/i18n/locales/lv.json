@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Nevarēja noņemt ieejas atslēgu.",
     "passkeyReauthRequired": "Drošības labad, lūdzu, pierakstieties vēlreiz, pirms maināt piekļuves atslēgas.",
     "passkeyDeleteLastError": "Nevar noņemt pēdējo 2FA faktoru, kamēr 2FA ir izpildīts.",
-    "passkeyUnsupported": "Šī pārlūkprogramma neatbalsta piekļuves atslēgas (WebAuthn)."
+    "passkeyUnsupported": "Šī pārlūkprogramma neatbalsta piekļuves atslēgas (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

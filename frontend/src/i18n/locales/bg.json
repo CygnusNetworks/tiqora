@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Ключът за достъп не можа да бъде премахнат.",
     "passkeyReauthRequired": "От съображения за сигурност, моля, влезте отново, преди да промените своите passkeys.",
     "passkeyDeleteLastError": "Не може да се премахне последният 2FA фактор, докато 2FA е наложен.",
-    "passkeyUnsupported": "Този браузър не поддържа пароли (WebAuthn)."
+    "passkeyUnsupported": "Този браузър не поддържа пароли (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

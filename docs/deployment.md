@@ -255,7 +255,8 @@ under `TIQORA_CUSTOMER_LDAP_*`:
 | `TIQORA_LDAP_GROUP_DN` | `cn=helpdesk,ou=groups,dc=example,dc=com` | Optional group-membership gate |
 | `TIQORA_LDAP_ACCESS_ATTR` | `memberUid` | Attribute checked under `GROUP_DN` |
 | `TIQORA_LDAP_USER_ATTR` | `DN` | `DN` compares the user's full DN; anything else compares the login |
-| `TIQORA_LDAP_TLS_VERIFY` | `true` | Verify the directory's certificate (system CAs, host name) for LDAPS/StartTLS. **Defaults to `false` only for compatibility with existing installs; a warning is logged at startup while it is off.** Set it to `true` (customer portal: `TIQORA_CUSTOMER_LDAP_TLS_VERIFY`). |
+| `TIQORA_LDAP_TLS_VERIFY` | `false` (default) | Verify the directory's certificate (system CAs, host name) for LDAPS/StartTLS. **Defaults to `false` only for compatibility with existing installs; a warning is logged at startup while it is off.** Set it to `true`. |
+| `TIQORA_CUSTOMER_LDAP_TLS_VERIFY` | `false` (default) | The same for the customer-portal directory (`TIQORA_CUSTOMER_LDAP_*`); same startup warning while it is off. |
 
 Simplifications vs. `Kernel::System::Auth::LDAP`: no `Die` (hard-crash on
 connect failure), `UserSuffix`, `UserLowerCase`, or per-directory charset

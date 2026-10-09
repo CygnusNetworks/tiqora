@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Не може да се отстрани лозинката.",
     "passkeyReauthRequired": "За ваша безбедност, најавете се повторно пред да ги менувате пас-клучевите.",
     "passkeyDeleteLastError": "Не може да се отстрани последниот фактор 2FA додека е наметнат 2FA.",
-    "passkeyUnsupported": "Овој прелистувач не поддржува клучеви за пристап (WebAuthn)."
+    "passkeyUnsupported": "Овој прелистувач не поддржува клучеви за пристап (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

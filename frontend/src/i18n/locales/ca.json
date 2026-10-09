@@ -300,7 +300,10 @@
     "passkeyDeleteError": "No s'ha pogut eliminar la contrasenya.",
     "passkeyReauthRequired": "Per la vostra seguretat, torneu a iniciar la sessió abans de canviar els passkeys.",
     "passkeyDeleteLastError": "No es pot eliminar l'últim factor 2FA mentre s'aplica.",
-    "passkeyUnsupported": "Aquest navegador no admet claus de pas (WebAuthn)."
+    "passkeyUnsupported": "Aquest navegador no admet claus de pas (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

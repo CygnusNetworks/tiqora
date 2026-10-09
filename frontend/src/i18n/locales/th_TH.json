@@ -300,7 +300,10 @@
     "passkeyDeleteError": "ไม่สามารถลบรหัสผ่านได้",
     "passkeyReauthRequired": "เพื่อความปลอดภัยของคุณ โปรดเข้าสู่ระบบอีกครั้งก่อนเปลี่ยนแปลงพาสคีย์",
     "passkeyDeleteLastError": "ไม่สามารถลบปัจจัย 2FA สุดท้ายในขณะที่บังคับใช้ 2FA ได้",
-    "passkeyUnsupported": "เบราว์เซอร์นี้ไม่รองรับรหัสผ่าน (WebAuthn)"
+    "passkeyUnsupported": "เบราว์เซอร์นี้ไม่รองรับรหัสผ่าน (WebAuthn)",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

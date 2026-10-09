@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Passkey konnte nicht entfernt werden.",
     "passkeyReauthRequired": "Aus Sicherheitsgründen bitte erneut anmelden, bevor Passkeys geändert werden.",
     "passkeyDeleteLastError": "Der letzte 2FA-Faktor kann nicht entfernt werden, solange 2FA erzwungen ist.",
-    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys (WebAuthn)."
+    "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys (WebAuthn).",
+    "totpReauthRequired": "Aus Sicherheitsgründen bitte erneut anmelden, bevor die Authenticator-App eingerichtet wird.",
+    "enrollError": "Die Authenticator-App konnte nicht eingerichtet werden. Bitte erneut versuchen.",
+    "totpQrAlt": "QR-Code für die Authenticator-App"
   },
   "dashboard": {
     "greeting": {

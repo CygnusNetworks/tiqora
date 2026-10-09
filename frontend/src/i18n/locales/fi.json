@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Salasanaa ei voitu poistaa.",
     "passkeyReauthRequired": "Turvallisuutesi vuoksi kirjaudu uudelleen, ennen kuin muutat pääsyavaimia.",
     "passkeyDeleteLastError": "Viimeistä 2FA-tekijää ei voi poistaa, kun 2FA on pakotettu.",
-    "passkeyUnsupported": "Tämä selain ei tue salasanoja (WebAuthn)."
+    "passkeyUnsupported": "Tämä selain ei tue salasanoja (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

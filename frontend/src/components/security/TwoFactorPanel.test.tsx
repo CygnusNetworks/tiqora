@@ -127,4 +127,45 @@ describe("TwoFactorPanel", () => {
       i18n.t("security.passkeyReauthRequired"),
     );
   });
+
+  // Adding TOTP to a passkey-only account needs a recent sign-in on both the agent
+  // (/agent/security) and the customer (/portal/security) side: the 403 must not be silent.
+  it.each(["security", "portal-security"])(
+    "explains a reauthentication_required answer when setting up TOTP (%s)",
+    async (prefix) => {
+      const api = fakeApi();
+      api.enroll.mockRejectedValue(new ApiError(403, "reauthentication_required", "/x"));
+      const qc = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      render(
+        <QueryClientProvider client={qc}>
+          <I18nextProvider i18n={i18n}>
+            <TwoFactorPanel api={api as unknown as TwoFactorApi} testIdPrefix={prefix} />
+          </I18nextProvider>
+        </QueryClientProvider>,
+      );
+      fireEvent.click(await screen.findByTestId("totp-enroll-start"));
+      expect(await screen.findByTestId("totp-enroll-error")).toHaveTextContent(
+        i18n.t("security.totpReauthRequired"),
+      );
+      expect(screen.queryByTestId("totp-qr-image")).toBeNull();
+    },
+  );
+
+  it("shows a generic error when TOTP setup fails otherwise and clears it on retry", async () => {
+    const api = fakeApi();
+    api.enroll.mockRejectedValueOnce(new ApiError(500, "boom", "/x"));
+    renderPanel(api);
+    fireEvent.click(await screen.findByTestId("totp-enroll-start"));
+    expect(await screen.findByTestId("totp-enroll-error")).toHaveTextContent(
+      i18n.t("security.enrollError"),
+    );
+    fireEvent.click(screen.getByTestId("totp-enroll-start"));
+    expect(await screen.findByTestId("totp-qr-image")).toHaveAttribute(
+      "alt",
+      i18n.t("security.totpQrAlt"),
+    );
+    expect(screen.queryByTestId("totp-enroll-error")).toBeNull();
+  });
 });

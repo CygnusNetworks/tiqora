@@ -157,7 +157,7 @@ describe("PortalLoginPage", () => {
 
   it("reports a wrong second-factor code and stays on the step", async () => {
     portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
-    totpVerify.mockRejectedValue(new ApiError(401, "Invalid TOTP code", "/x"));
+    totpVerify.mockRejectedValue(new ApiError(401, "invalid_code", "/x"));
     renderPage();
     await submitPassword();
     await screen.findByTestId("portal-2fa-step");
@@ -190,7 +190,7 @@ describe("PortalLoginPage", () => {
 
   it("an expired pending sign-in goes back to the password form with a message", async () => {
     portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
-    totpVerify.mockRejectedValue(new ApiError(401, "No pending session", "/x"));
+    totpVerify.mockRejectedValue(new ApiError(401, "pending_expired", "/x"));
     renderPage();
     await submitPassword();
     await screen.findByTestId("portal-2fa-step");
@@ -202,15 +202,38 @@ describe("PortalLoginPage", () => {
     expect(screen.getByTestId("portal-login-form")).toBeInTheDocument();
   });
 
-  it("a wrong code (400) keeps the step and says the code is invalid", async () => {
+  it("a wrong code (401 invalid_code) keeps the step and says the code is invalid", async () => {
     portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
-    totpVerify.mockRejectedValue(new ApiError(400, "Invalid TOTP code", "/x"));
+    totpVerify.mockRejectedValue(new ApiError(401, "invalid_code", "/x"));
     renderPage();
     await submitPassword();
     await screen.findByTestId("portal-2fa-step");
     fireEvent.change(screen.getByTestId("portal-2fa-code"), { target: { value: "000000" } });
     expect(await screen.findByText(i18n.t("portal.login.totpInvalid"))).toBeInTheDocument();
     expect(screen.getByTestId("portal-2fa-step")).toBeInTheDocument();
+    expect(screen.queryByTestId("portal-2fa-expired")).toBeNull();
+  });
+
+  it("a right code whose pending sign-in was lost (promotion race) goes back to the password form", async () => {
+    portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    totpVerify.mockRejectedValue(new ApiError(401, "pending_expired", "/x"));
+    renderPage();
+    await submitPassword();
+    await screen.findByTestId("portal-2fa-step");
+    fireEvent.change(screen.getByTestId("portal-2fa-code"), { target: { value: "123456" } });
+    expect(await screen.findByTestId("portal-2fa-expired")).toBeInTheDocument();
+    expect(screen.queryByTestId("portal-2fa-step")).toBeNull();
+  });
+
+  it("an unrelated 401 text is not mistaken for an expired sign-in", async () => {
+    portalLogin.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    totpVerify.mockRejectedValue(new ApiError(401, "Session expired soon", "/x"));
+    renderPage();
+    await submitPassword();
+    await screen.findByTestId("portal-2fa-step");
+    fireEvent.change(screen.getByTestId("portal-2fa-code"), { target: { value: "000000" } });
+    expect(await screen.findByText(i18n.t("portal.login.totpInvalid"))).toBeInTheDocument();
+    expect(screen.queryByTestId("portal-2fa-expired")).toBeNull();
   });
 
   it("a rate limit (429) has its own message and keeps the step", async () => {

@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Tidak dapat mengalih keluar kunci laluan.",
     "passkeyReauthRequired": "Untuk keselamatan anda, sila log masuk semula sebelum menukar kunci laluan anda.",
     "passkeyDeleteLastError": "Tidak boleh mengalih keluar faktor 2FA terakhir semasa 2FA dikuatkuasakan.",
-    "passkeyUnsupported": "Penyemak imbas ini tidak menyokong kekunci laluan (WebAuthn)."
+    "passkeyUnsupported": "Penyemak imbas ini tidak menyokong kekunci laluan (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

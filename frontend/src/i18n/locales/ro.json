@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Nu s-a putut elimina cheia de acces.",
     "passkeyReauthRequired": "Pentru securitatea dvs., autentificați-vă din nou înainte de a modifica passkey-urile.",
     "passkeyDeleteLastError": "Nu se poate elimina ultimul factor 2FA în timp ce 2FA este aplicat.",
-    "passkeyUnsupported": "Acest browser nu acceptă cheile de acces (WebAuthn)."
+    "passkeyUnsupported": "Acest browser nu acceptă cheile de acces (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

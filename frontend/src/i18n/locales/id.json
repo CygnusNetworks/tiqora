@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Tidak dapat menghapus kunci sandi.",
     "passkeyReauthRequired": "Demi keamanan Anda, silakan masuk lagi sebelum mengubah kunci sandi Anda.",
     "passkeyDeleteLastError": "Tidak dapat menghapus faktor 2FA terakhir saat 2FA diterapkan.",
-    "passkeyUnsupported": "Browser ini tidak mendukung kunci sandi (WebAuthn)."
+    "passkeyUnsupported": "Browser ini tidak mendukung kunci sandi (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

@@ -300,7 +300,10 @@
     "passkeyDeleteError": "암호키를 제거할 수 없습니다.",
     "passkeyReauthRequired": "보안을 위해 패스키를 변경하기 전에 다시 로그인해 주세요.",
     "passkeyDeleteLastError": "2FA가 시행되는 동안에는 마지막 2FA 요소를 제거할 수 없습니다.",
-    "passkeyUnsupported": "이 브라우저는 암호키(WebAuthn)를 지원하지 않습니다."
+    "passkeyUnsupported": "이 브라우저는 암호키(WebAuthn)를 지원하지 않습니다.",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

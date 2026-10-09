@@ -12,8 +12,14 @@ let demoPortalTotpEnabled = false;
 
 function respond(pathname: string, method: string): unknown {
   // Portal plane (checked before the shared resolver's generic /auth/me).
+  // One customer-audience provider (the admin demo's "microsoft", audience "both") so the
+  // portal SSO button is visible in demo mode.
   if (pathname.endsWith("/api/portal/auth/methods"))
-    return { password: true, providers: [], webauthn: false };
+    return {
+      password: true,
+      providers: [{ slug: "microsoft", kind: "oidc", label: "Mit Microsoft anmelden", icon: "microsoft" }],
+      webauthn: false,
+    };
   if (pathname.endsWith("/api/portal/auth/totp/status")) return { enabled: demoPortalTotpEnabled };
   if (pathname.endsWith("/api/portal/auth/totp/enroll"))
     return { secret: "JBSWY3DPEHPK3PXP", otpauth_uri: "otpauth://totp/Tiqora:demo?secret=JBSWY3DPEHPK3PXP" };

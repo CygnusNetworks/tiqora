@@ -300,7 +300,10 @@
     "passkeyDeleteError": "पासकी नहीं निकाली जा सकी.",
     "passkeyReauthRequired": "आपकी सुरक्षा के लिए, पासकी बदलने से पहले कृपया फिर से साइन इन करें।",
     "passkeyDeleteLastError": "2FA लागू होने पर अंतिम 2FA कारक को हटाया नहीं जा सकता।",
-    "passkeyUnsupported": "यह ब्राउज़र पासकीज़ (WebAuthn) का समर्थन नहीं करता है।"
+    "passkeyUnsupported": "यह ब्राउज़र पासकीज़ (WebAuthn) का समर्थन नहीं करता है।",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

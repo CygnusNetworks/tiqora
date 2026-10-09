@@ -300,7 +300,10 @@
     "passkeyDeleteError": "パスキーを削除できませんでした。",
     "passkeyReauthRequired": "セキュリティのため、パスキーを変更する前に再度サインインしてください。",
     "passkeyDeleteLastError": "2FAが強制されている間は、最後の2FA要素を削除できません。",
-    "passkeyUnsupported": "このブラウザはパスキー（WebAuthn）に対応していません。"
+    "passkeyUnsupported": "このブラウザはパスキー（WebAuthn）に対応していません。",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {

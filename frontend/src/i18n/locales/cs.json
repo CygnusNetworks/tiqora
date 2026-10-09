@@ -300,7 +300,10 @@
     "passkeyDeleteError": "Přístupový klíč se nepodařilo odebrat.",
     "passkeyReauthRequired": "Z bezpečnostních důvodů se před změnou přístupových klíčů znovu přihlaste.",
     "passkeyDeleteLastError": "Nelze odebrat poslední 2FA faktor, dokud je 2FA vynuceno.",
-    "passkeyUnsupported": "Tento prohlížeč nepodporuje přístupové klíče (WebAuthn)."
+    "passkeyUnsupported": "Tento prohlížeč nepodporuje přístupové klíče (WebAuthn).",
+    "totpReauthRequired": "For your security, please sign in again before setting up the authenticator app.",
+    "enrollError": "The authenticator app could not be set up. Please try again.",
+    "totpQrAlt": "QR code for the authenticator app"
   },
   "dashboard": {
     "greeting": {
