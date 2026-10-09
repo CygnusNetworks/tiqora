@@ -57,6 +57,7 @@ from tiqora.ai.context import (
     render_ticket_header,
     ticket_snapshot,
 )
+from tiqora.ai.customer_pause import active_pause_for_ticket
 from tiqora.ai.llm import LlmClient, LlmMessage
 from tiqora.ai.llm_routing import (
     TASK_VISION,
@@ -806,6 +807,8 @@ async def auto_summary_due(session: AsyncSession, ticket_id: int) -> bool:
     # and read-only (no get_or_create): a ticket without a state row is not paused.
     paused_state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
     if paused_state is not None and paused_state.ai_paused_at is not None:
+        return False
+    if await active_pause_for_ticket(session, ticket_id) is not None:
         return False
     try:
         ticket = await ticket_snapshot(session, ticket_id)

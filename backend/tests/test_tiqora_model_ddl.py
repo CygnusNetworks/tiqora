@@ -92,7 +92,7 @@ def test_report_fact_columns_ddl() -> None:
         token = _column_ddl(TiqoraReportState.__table__, "backfill_run_token", dialect)
         assert "VARCHAR(36)" in token and "NOT NULL" not in token
     migration = (
-        Path(__file__).parent.parent / "alembic/versions_tiqora/20261008_0062_reporting_facts.py"
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261009_0063_reporting_facts.py"
     ).read_text()
     assert 'sa.Column("backfill_run_token", sa.String(36), nullable=True)' in migration
     assert "MEDIUMTEXT" in _column_ddl(TiqoraReportState.__table__, "gap_ids", mysql.dialect())
@@ -133,7 +133,7 @@ def test_report_dirty_queued_at_has_microseconds_on_mariadb() -> None:
 
 def test_identity_metadata_xml_fits_large_documents_on_mariadb() -> None:
     """SAML IdP metadata can exceed 64 KiB: ``MEDIUMTEXT`` on MariaDB, plain
-    ``TEXT`` on PostgreSQL (same as migration ``20261009_0064``)."""
+    ``TEXT`` on PostgreSQL (same as migration ``20261009_0065``)."""
     from tiqora.db.tiqora.models import TiqoraIdentityProvider
 
     table = TiqoraIdentityProvider.__table__
@@ -143,6 +143,6 @@ def test_identity_metadata_xml_fits_large_documents_on_mariadb() -> None:
     assert "MEDIUMTEXT" in _column_ddl(table, "config", mysql.dialect())
     assert "MEDIUMTEXT" not in _column_ddl(table, "config", postgresql.dialect())
     migration = (
-        Path(__file__).parent.parent / "alembic/versions_tiqora/20261009_0064_identity_providers.py"
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261009_0065_identity_providers.py"
     ).read_text()
     assert migration.count('with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")') == 2

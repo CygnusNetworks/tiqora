@@ -247,6 +247,37 @@ def _addresses_of(value: str | None) -> set[str]:
     }
 
 
+def _reply_all_extras(
+    *,
+    outgoing: bool,
+    from_addr: str | None,
+    art_to: str | None,
+    art_cc: str | None,
+    system_addresses: set[str],
+) -> list[str]:
+    """The Cc entries a reply-all adds on top of the plain reply's To.
+
+    Everyone else on the original — minus whoever the plain reply already
+    addresses, minus the article's own sender on an outgoing article, and
+    minus our own system addresses so a reply never loops back into the
+    queue it came from. Empty means reply-all is the same as reply.
+    """
+    to_addr = art_to if outgoing else from_addr
+    skip = _addresses_of(to_addr)
+    if outgoing:
+        skip |= _addresses_of(from_addr)
+    skip |= system_addresses
+    extras: list[str] = []
+    for field in (art_cc,) if outgoing else (art_to, art_cc):
+        for entry in split_address_line(field or ""):
+            addr = get_email_address(entry).lower()
+            if not addr or addr in skip:
+                continue
+            skip.add(addr)
+            extras.append(entry)
+    return extras
+
+
 def _is_body_part_attachment(a: AttachmentMeta) -> bool:
     """Znuny stores the mail body's MIME alternatives as pseudo-attachments
     (``file-1`` text/plain, ``file-2`` / ``file-1.html`` text/html, plus rows
@@ -1607,11 +1638,23 @@ class TicketService:
         from tiqora.crypto.article_security import load_security
 
         security_by_aid = await load_security(self._session, article_ids)
+        system_addresses = await self._system_addresses()
 
         out: list[ArticleListItem] = []
         for a in articles:
             m = mime_by_aid.get(a.id)
             sec = security_by_aid.get(a.id)
+            reply_all_available = bool(
+                m
+                and _reply_all_extras(
+                    outgoing=(sender_types.get(a.article_sender_type_id) or "").strip().lower()
+                    in {"agent", "system"},
+                    from_addr=m.a_from or None,
+                    art_to=m.a_to or None,
+                    art_cc=m.a_cc or None,
+                    system_addresses=system_addresses,
+                )
+            )
             out.append(
                 ArticleListItem(
                     id=a.id,
@@ -1630,6 +1673,7 @@ class TicketService:
                     incoming_time=m.incoming_time if m else None,
                     ai_origin=a.id in origin_ids,
                     security=ArticleSecurity.from_result(sec) if sec else None,
+                    reply_all_available=reply_all_available,
                 )
             )
         return out
@@ -2011,22 +2055,13 @@ class TicketService:
         to_addr = (art_to if outgoing else from_addr) or None
         cc: str | None = None
         if reply_all:
-            # Reply-all: everyone else on the original as Cc — minus whoever is
-            # already in To, minus the article's own sender on an outgoing
-            # article, and minus our own system addresses so a reply never
-            # loops back into the queue it came from.
-            skip = _addresses_of(to_addr)
-            if outgoing:
-                skip |= _addresses_of(from_addr)
-            skip |= await self._system_addresses()
-            extras: list[str] = []
-            for field in (art_cc,) if outgoing else (art_to, art_cc):
-                for entry in split_address_line(field or ""):
-                    addr = get_email_address(entry).lower()
-                    if not addr or addr in skip:
-                        continue
-                    skip.add(addr)
-                    extras.append(entry)
+            extras = _reply_all_extras(
+                outgoing=outgoing,
+                from_addr=from_addr,
+                art_to=art_to,
+                art_cc=art_cc,
+                system_addresses=await self._system_addresses(),
+            )
             cc = ", ".join(extras) or None
 
         # Telegram reads as a chat, not an email — no "On <date>, X wrote:"

@@ -1,17 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { isAvatarImage, isVcardFile, useFileDrop } from "@/lib/useFileDrop";
+import { isAvatarImage, isVcardFile, useFileDrop, type DropRejection } from "@/lib/useFileDrop";
 
 function Zone({
   onFiles,
   onReject,
   disabled,
+  vcardText,
 }: {
   onFiles: (files: File[]) => void;
-  onReject?: (files: File[]) => void;
+  onReject?: (rejection: DropRejection) => void;
   disabled?: boolean;
+  vcardText?: boolean;
 }) {
-  const { active, dropProps } = useFileDrop({ accept: isVcardFile, onFiles, onReject, disabled });
+  const { active, dropProps } = useFileDrop({
+    accept: isVcardFile,
+    onFiles,
+    onReject,
+    disabled,
+    vcardText,
+  });
   return (
     <div data-testid="zone" data-active={active} {...dropProps}>
       <span data-testid="child">child</span>
@@ -51,7 +59,7 @@ describe("useFileDrop", () => {
     render(<Zone onFiles={onFiles} onReject={onReject} />);
     fireEvent.drop(screen.getByTestId("zone"), files(png));
     expect(onFiles).not.toHaveBeenCalled();
-    expect(onReject).toHaveBeenCalledWith([png]);
+    expect(onReject).toHaveBeenCalledWith({ files: [png], types: ["Files"] });
   });
 
   it("ignores drags of non-files (text, links)", () => {
@@ -59,6 +67,47 @@ describe("useFileDrop", () => {
     const zone = screen.getByTestId("zone");
     fireEvent.dragEnter(zone, { dataTransfer: { types: ["text/plain"], files: [] } });
     expect(zone).toHaveAttribute("data-active", "false");
+  });
+
+  it("takes a contact that arrives as text (Apple Contacts without a file)", () => {
+    const onFiles = vi.fn();
+    render(<Zone onFiles={onFiles} vcardText />);
+    const zone = screen.getByTestId("zone");
+    const card = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Ilka Brenner\r\nEND:VCARD\r\n";
+    const dataTransfer = {
+      types: ["text/plain"],
+      files: [],
+      getData: (type: string) => (type === "text/plain" ? card : ""),
+    };
+    fireEvent.dragEnter(zone, { dataTransfer });
+    expect(zone).toHaveAttribute("data-active", "true");
+    fireEvent.drop(zone, { dataTransfer });
+    expect(onFiles).toHaveBeenCalledOnce();
+    const [[file]] = onFiles.mock.calls[0] as [[File]];
+    expect(file.name).toBe("kontakt.vcf");
+    expect(file.type).toBe("text/vcard");
+    // jsdom's File has no text(); the card is ASCII, so bytes = characters.
+    expect(file.size).toBe(card.length);
+  });
+
+  it("reports what a text drag without a contact carried", () => {
+    const onReject = vi.fn();
+    render(<Zone onFiles={vi.fn()} onReject={onReject} vcardText />);
+    fireEvent.drop(screen.getByTestId("zone"), {
+      dataTransfer: { types: ["text/plain"], files: [], getData: () => "Ilka Brenner" },
+    });
+    expect(onReject).toHaveBeenCalledWith({ files: [], types: ["text/plain"] });
+  });
+
+  it("ignores drags that started on the page itself", () => {
+    render(<Zone onFiles={vi.fn()} vcardText />);
+    const zone = screen.getByTestId("zone");
+    fireEvent.dragStart(document.body);
+    fireEvent.dragEnter(zone, files());
+    expect(zone).toHaveAttribute("data-active", "false");
+    fireEvent.dragEnd(document.body);
+    fireEvent.dragEnter(zone, files());
+    expect(zone).toHaveAttribute("data-active", "true");
   });
 
   it("does nothing while disabled", () => {

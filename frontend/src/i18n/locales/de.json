@@ -579,6 +579,7 @@
     "senderSystem": "System",
     "reply": "Antworten",
     "replyAll": "Allen antworten",
+    "replyAllNoOthers": "Keine weiteren Empfänger – „Antworten“ erreicht bereits alle.",
     "forward": "Weiterleiten",
     "bounce": "Umleiten",
     "splitAction": "Ticket teilen",
@@ -1119,7 +1120,8 @@
       "sub": {
         "queueLimits": "nach Queue-Limits",
         "grant": "noch {{remaining}} von {{total}} Antworten",
-        "stoppedBy": "von {{name}}"
+        "stoppedBy": "von {{name}}",
+        "customerPaused": "Kunde pausiert"
       },
       "reason": {
         "max_clarifications": "Rückfragen-Limit erreicht",
@@ -1132,7 +1134,8 @@
       "explain": {
         "active": "Die KI beantwortet neue Kundennachrichten automatisch.",
         "stopped": "Die KI reagiert auf diesem Ticket nicht mehr automatisch, bis du sie wieder einschaltest.",
-        "handedOver": "Die KI hat das Ticket an das Team übergeben und antwortet nicht mehr automatisch."
+        "handedOver": "Die KI hat das Ticket an das Team übergeben und antwortet nicht mehr automatisch.",
+        "customerPaused": "Die KI-Automatik ist für diesen Kunden abgeschaltet (alle seine Tickets). Der manuelle Assistent bleibt verfügbar."
       },
       "remaining": "Verbleibend",
       "remainingOf": "{{remaining}} von {{total}}",
@@ -1147,7 +1150,20 @@
       "startHint": "Danach übergibt die KI wieder an das Team. Die Queue-Limits gelten in dieser Zeit nicht.",
       "error": "Der Autopilot konnte nicht geändert werden. Bitte erneut versuchen.",
       "listStopped": "KI gestoppt",
-      "escalatedInfo": "KI hat um {{dateTime}} an das Team übergeben: {{reason}}. Über den Schalter „KI-Autopilot“ oben lässt sie sich wieder einschalten."
+      "escalatedInfo": "KI hat um {{dateTime}} an das Team übergeben: {{reason}}. Über den Schalter „KI-Autopilot“ oben lässt sie sich wieder einschalten.",
+      "customerPausedHint": "Das gilt für alle Tickets des Kunden, nicht nur für dieses.",
+      "stopScope": {
+        "label": "Stoppen für",
+        "ticket": "Nur dieses Ticket",
+        "user": "Alle Tickets dieses Kunden",
+        "company": "Alle Tickets dieser Firma"
+      },
+      "pausedScope": {
+        "user": "Für diesen Kunden gestoppt",
+        "company": "Für diese Firma gestoppt"
+      },
+      "pausedUntil": "bis {{date}}",
+      "liftCustomer": "Für den Kunden wieder einschalten"
     }
   },
   "search": {
@@ -4795,7 +4811,17 @@
     "favorites": "Favoriten",
     "favorite": "Favorit",
     "favoriteAdd": "Zu Favoriten hinzufügen",
-    "favoriteRemove": "Aus Favoriten entfernen"
+    "favoriteRemove": "Aus Favoriten entfernen",
+    "vcardDrag": "Klicken zum Herunterladen – oder auf den Schreibtisch bzw. in Kontakte ziehen",
+    "filterOpen": "Offen {{n}}",
+    "filterAll": "Alle {{n}}",
+    "ticketFilter": "Tickets zeigen",
+    "noOpenTickets": "Keine offenen Tickets.",
+    "details": "Kundendetails",
+    "contactSection": "Kontakt",
+    "phone": "Telefon",
+    "mobile": "Mobil",
+    "vcardTileHint": "Ziehen oder klicken"
   },
   "customerPicker": {
     "title": "Kunde des Tickets",
@@ -4835,7 +4861,7 @@
     "import": "vCards importieren",
     "importHint": "Fotos und fehlende Kontaktdaten aus einer .vcf-Datei übernehmen – oder Kontakte aus Apple Kontakte auf diese Seite ziehen.",
     "importTitle": "vCards importieren",
-    "importDescription": "Jede Karte wird über ihre E-Mail-Adressen einem Kunden zugeordnet. Übernommen werden nur das Foto und leere Felder.",
+    "importDescription": "Jede Karte wird über ihre E-Mail-Adressen einem Kunden zugeordnet. Foto und leere Felder werden übernommen, abweichende Daten nur, wenn du sie auswählst.",
     "dropHere": "vCard-Datei zum Importieren ablegen",
     "wrongFile": "Das ist keine vCard-Datei (.vcf).",
     "applyTitle": "Aus vCard übernehmen",
@@ -4865,7 +4891,39 @@
       "email": "E-Mail",
       "phone": "Telefon",
       "mobile": "Mobil"
-    }
+    },
+    "noCardInDrag": "Der Browser hat keinen Kontakt mitgeliefert (angekommen: {{types}}). Zieh den Kontakt zuerst aus Kontakte auf den Schreibtisch und die .vcf-Datei dann hierher.",
+    "dropEmptyHint": "Kontakte aus Apple Kontakte oder .vcf-Dateien hierher ziehen, um Fotos und Kontaktdaten zu übernehmen.",
+    "conflictsTitle_one": "1 Feld weicht ab",
+    "conflictsTitle_other": "{{count}} Felder weichen ab",
+    "keepAll": "Alle behalten",
+    "takeAll": "Alle aus der vCard",
+    "keepCurrent": "Behalten",
+    "takeIncoming": "Aus der vCard",
+    "replaceList_one": "1 abweichendes Feld ersetzen",
+    "replaceList_other": "{{count}} abweichende Felder ersetzen"
+  },
+  "customerAiPause": {
+    "title": "KI-Automatik",
+    "off": "Für diesen Kunden eingeschaltet.",
+    "activeUntil": "Abgeschaltet bis {{date}}.",
+    "activeForever": "Abgeschaltet bis zur Aufhebung.",
+    "by": "von {{name}}",
+    "lift": "Wieder einschalten",
+    "pause": "Abschalten",
+    "duration": "Dauer",
+    "untilLifted": "Bis zur Aufhebung",
+    "days_one": "{{count}} Tag",
+    "days_other": "{{count}} Tage",
+    "reason": "Grund",
+    "reasonPlaceholder": "Grund (optional)",
+    "hint": "Stoppt Auto-Antwort, Triage und Auto-Zusammenfassung für alle Tickets dieses Kunden. Der manuelle Assistent bleibt verfügbar.",
+    "error": "Die Änderung konnte nicht gespeichert werden.",
+    "durationDays": "Dauer in Tagen",
+    "switchLabel": "KI-Automatik für diesen Kunden",
+    "pauseForDays_one": "{{count}} Tag abschalten",
+    "pauseForDays_other": "{{count}} Tage abschalten",
+    "pauseForever": "Bis zur Aufhebung abschalten"
   },
   "fields": {
     "none": "–",

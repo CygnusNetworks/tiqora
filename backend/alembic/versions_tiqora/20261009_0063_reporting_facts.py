@@ -1,7 +1,7 @@
 """Create the reporting fact, event, snapshot, state and dirty-ticket tables.
 
-Revision ID: 20261008_0062
-Revises: 20261008_0061
+Revision ID: 20261009_0063
+Revises: 20261009_0062
 Create Date: 2026-10-09
 
 ``tiqora_report_ticket_fact.ticket_id`` and ``tiqora_report_dirty_ticket.ticket_id``
@@ -24,8 +24,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
 
-revision: str = "20261008_0062"
-down_revision: str | None = "20261008_0061"
+revision: str = "20261009_0063"
+down_revision: str | None = "20261009_0062"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -1,7 +1,7 @@
 """Create tiqora_process_revision and tiqora_acl_revision (deployed snapshots).
 
-Revision ID: 20261009_0066
-Revises: 20261009_0065
+Revision ID: 20261009_0067
+Revises: 20261009_0066
 Create Date: 2026-10-09
 
 ``config`` is the canonical JSON dump of the deployed process/ACL configuration,
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
 
-revision: str = "20261009_0066"
-down_revision: str | None = "20261009_0065"
+revision: str = "20261009_0067"
+down_revision: str | None = "20261009_0066"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

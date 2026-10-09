@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, ApiError, type CustomerRef } from "@/lib/api";
 import { useAuth } from "@/auth/AuthContext";
@@ -22,7 +22,6 @@ import {
   type Recipient,
 } from "@/components/agent/RecipientsField";
 import { ComposerBody } from "@/components/agent/ComposerBody";
-import { ArticleBodyRenderer } from "@/components/agent/ArticleBodyRenderer";
 import { RefineControls } from "@/components/agent/RefineControls";
 import { toneLabelKey } from "@/lib/refineTone";
 import { RefineDiffView } from "@/components/agent/RefineDiffView";
@@ -40,7 +39,14 @@ import {
   type PhoneTicketFieldsValue,
 } from "@/components/agent/phone/phoneTicketValue";
 import { useCallTimer } from "@/components/agent/phone/useCallTimer";
-import { useChatAttachments } from "@/components/agent/telegram/useChatAttachments";
+import {
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENT_BYTES,
+  formatBytes,
+  useChatAttachments,
+} from "@/components/agent/telegram/useChatAttachments";
+import { ComposerEditorFrame } from "@/components/agent/ComposerEditorFrame";
+import { postComposerExtras } from "@/lib/composerExtras";
 import { phoneApi, type CallerCustomer, type CallerTicket } from "@/lib/phoneApi";
 import {
   missingRequired,
@@ -133,6 +139,7 @@ export type NewTicketSearch = {
 export function NewTicketPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const search = useSearch({
     from: "/agent/tickets/new",
@@ -243,8 +250,12 @@ export function NewTicketPage() {
   const [to, setTo] = useState<Recipient[]>([]);
   const [cc, setCc] = useState<Recipient[]>([]);
   const [bcc, setBcc] = useState<Recipient[]>([]);
+  const [replyTo, setReplyTo] = useState("");
   const [showCc, setShowCc] = useState(false);
   const [showBcc, setShowBcc] = useState(false);
+  const [showReplyTo, setShowReplyTo] = useState(false);
+  /** Time booked on the email's article (phone keeps its own in phoneFields). */
+  const [emailTimeUnits, setEmailTimeUnits] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
@@ -423,7 +434,6 @@ export function NewTicketPage() {
   const closedSelected = Boolean(selectedState?.type_name.startsWith("closed"));
   const phoneReady =
     missingRequired(phoneDfs, phoneFields.dfValues).length === 0 &&
-    !attachments.encoding &&
     (!pendingSelected || pendingIso(phoneFields.pendingAt) !== null);
 
   // PGP / S/MIME for the email (separate component; nothing shown when off).
@@ -446,6 +456,8 @@ export function NewTicketPage() {
     body.trim().length > 0 &&
     (ticketType === "phone" || to.length > 0) &&
     (ticketType === "email" || phoneReady) &&
+    // A file still being read would silently go missing from the request.
+    !attachments.encoding &&
     !submitting;
 
   const onSubmit = async (e: FormEvent) => {
@@ -511,8 +523,9 @@ export function NewTicketPage() {
       // email reply whose SMTP delivery fails, HTTP 502) — the ticket already
       // exists at that point, so surface an error with a link to it instead
       // of silently losing the agent's typed message.
+      let articleId: number;
       try {
-        await api.createArticle(ticket_id, {
+        ({ article_id: articleId } = await api.createArticle(ticket_id, {
           sender_type: "agent",
           channel: "email",
           is_visible_for_customer: true,
@@ -524,15 +537,34 @@ export function NewTicketPage() {
           to_address: joinRecipients(to),
           cc: joinRecipients(cc),
           bcc: joinRecipients(bcc),
+          reply_to: replyTo.trim() || null,
           email_security: emailSecurity.payload,
-        });
+          ...(attachments.payload.length > 0 ? { attachments: attachments.payload } : {}),
+        }));
       } catch (articleErr) {
         if (!(articleErr instanceof ApiError)) throw articleErr;
-        setError(
-          articleErr.status === 422
-            ? `${t("newTicket.sendError")} ${articleErr.message}`
-            : t("newTicket.sendError"),
-        );
+        // Same reason text as the reply dialog: the server's detail, unless
+        // it is just the bare status line.
+        const reason =
+          articleErr.status === 413
+            ? t("ticket.telegram.composer.attachTooLargeServer")
+            : articleErr.message && !articleErr.message.startsWith("HTTP ")
+              ? articleErr.message
+              : null;
+        setError(reason ? `${t("newTicket.sendError")} ${reason}` : t("newTicket.sendError"));
+        return;
+      }
+      // The mail is out; the booking follows and may fail on its own — the
+      // error then keeps the link to the new ticket to book there.
+      const extras = await postComposerExtras(ticket_id, {
+        articleId,
+        body: text,
+        mentions: [],
+        timeUnits: emailTimeUnits,
+        queryClient,
+      });
+      if (extras.failed.length > 0) {
+        setError(t("ticket.extrasFailedTime"));
         return;
       }
       await navigate({
@@ -574,6 +606,8 @@ export function NewTicketPage() {
       onShowChanges={refineReview.showChanges}
       reviewOpen={refineReview.review !== null}
       mode={ticketType === "phone" ? "call_note" : "message"}
+      // E-mail: in the editor frame's bottom bar, like the reply dialog.
+      variant={ticketType === "email" ? "toolbar" : undefined}
     />
   );
 
@@ -582,6 +616,8 @@ export function NewTicketPage() {
 
   const ccOn = showCc || cc.length > 0;
   const bccOn = showBcc || bcc.length > 0;
+  const replyToCount = replyTo.trim() ? 1 : 0;
+  const replyToOn = showReplyTo || replyToCount > 0;
 
   return (
     <div
@@ -799,6 +835,20 @@ export function NewTicketPage() {
                     testid="new-ticket-bcc"
                   />
                 )}
+                {showReplyTo && (
+                  <label className="block">
+                    <span className="mb-1 block text-[12px] font-medium text-muted">
+                      {t("ticket.replyReplyTo")}
+                    </span>
+                    <input
+                      className={FIELD_CLASS}
+                      value={replyTo}
+                      data-testid="new-ticket-replyto"
+                      placeholder={t("ticket.recipientAddHint")}
+                      onChange={(e) => setReplyTo(e.target.value)}
+                    />
+                  </label>
+                )}
                 <div className="flex flex-wrap items-center gap-1.5 text-xs">
                   <button
                     type="button"
@@ -824,6 +874,19 @@ export function NewTicketPage() {
                     {t("ticket.replyBcc")}
                     {!showBcc && bcc.length > 0 && (
                       <span className={countBadgeCls}>{bcc.length}</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(toggleCls, replyToOn && toggleActiveCls)}
+                    data-testid="new-ticket-toggle-replyto"
+                    data-active={replyToOn ? "true" : "false"}
+                    aria-expanded={showReplyTo}
+                    onClick={() => setShowReplyTo((v) => !v)}
+                  >
+                    {t("ticket.replyReplyTo")}
+                    {!showReplyTo && replyToCount > 0 && (
+                      <span className={countBadgeCls}>{replyToCount}</span>
                     )}
                   </button>
                 </div>
@@ -947,12 +1010,28 @@ export function NewTicketPage() {
                 </div>
               </div>
             ) : (
-              <>
-                {refineReview.review ? (
-                  <div className="block">
-                    <span className="mb-1 block text-[12px] font-medium text-muted">
-                      {t("newTicket.message")}
-                    </span>
+              <div className="block">
+                <span className="mb-1 block text-[12px] font-medium text-muted">
+                  {t("newTicket.message")}
+                </span>
+                {/* Same framed editor as the reply dialog: text, signature,
+                    files and the refine/file/time toolbar. */}
+                <ComposerEditorFrame
+                  testIdPrefix="new-ticket"
+                  attachments={attachments}
+                  timeUnits={emailTimeUnits}
+                  onTimeUnitsChange={setEmailTimeUnits}
+                  signature={
+                    composeContextQ.data
+                      ? {
+                          text: composeContextQ.data.signature,
+                          isHtml: composeContextQ.data.signature_is_html,
+                        }
+                      : null
+                  }
+                  refine={refineControls}
+                >
+                  {refineReview.review ? (
                     <RefineDiffView
                       key={refineReview.reviewKey}
                       before={refineReview.review.before}
@@ -961,48 +1040,33 @@ export function NewTicketPage() {
                       onAccept={refineReview.accept}
                       onDiscard={refineReview.discard}
                       onGroupsChange={refineReview.onGroupsChange}
-                      className="min-h-[15rem] rounded-md border border-hairline"
+                      className="min-h-[15rem]"
                     />
-                  </div>
-                ) : (
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-medium text-muted">
-                      {t("newTicket.message")}
-                    </span>
+                  ) : (
                     <ComposerBody
                       richText={richText}
                       value={body}
                       onChange={refineReview.onEdit}
                       testId="new-ticket-body"
+                      bare
                     />
-                  </label>
-                )}
-                {refineControls}
-              </>
+                  )}
+                </ComposerEditorFrame>
+              </div>
             )}
 
-            {ticketType === "email" &&
-              Boolean(composeContextQ.data?.signature?.trim()) && (
-                <div
-                  className="rounded border border-hairline bg-surface-subtle/60 p-2"
-                  data-testid="new-ticket-signature-preview"
-                >
-                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted">
-                    {t("ticket.signaturePreview")}
-                  </p>
-                  {composeContextQ.data?.signature_is_html ? (
-                    <ArticleBodyRenderer
-                      body={composeContextQ.data.signature}
-                      isHtml
-                      className="text-xs"
-                    />
-                  ) : (
-                    <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-ink">
-                      {composeContextQ.data?.signature}
-                    </pre>
-                  )}
-                </div>
-              )}
+            {/* The e-mail frame shows its own; the phone footer has no room. */}
+            {ticketType === "phone" && attachments.error && (
+              <p className="text-xs text-danger" data-testid="new-ticket-attach-error">
+                {attachments.error === "tooLarge"
+                  ? t("ticket.telegram.composer.attachTooLarge", {
+                      max: formatBytes(MAX_ATTACHMENT_BYTES),
+                    })
+                  : attachments.error === "tooMany"
+                    ? t("ticket.telegram.composer.attachTooMany", { max: MAX_ATTACHMENTS })
+                    : t("ticket.telegram.composer.attachReadFailed")}
+              </p>
+            )}
           </fieldset>
 
           {ticketType === "email" && (

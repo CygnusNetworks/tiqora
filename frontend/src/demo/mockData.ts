@@ -1953,6 +1953,8 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return {};
   }
   if (p.match(/\/customer-directory\/companies\/[^/]+$/)) return demoCompanyDetail(decodeURIComponent(p.split("/").pop() ?? ""));
+  if (p.endsWith("/ai-pause") && method === "GET")
+    return { active: false, paused_until: null, reason: null, by_name: null, since: null };
   if (p.match(/\/api\/v1\/customers\/[^/]+\/crypto-keys$/) && method === "GET")
     return demoCustomerCryptoKeys(decodeURIComponent(p.split("/").at(-2) ?? ""));
   if (p.match(/\/api\/v1\/customers\/[^/]+$/) && method === "GET") return demoCustomerDetail(decodeURIComponent(p.split("/").pop() ?? ""));
@@ -2043,7 +2045,22 @@ export function resolveData(path: string, method: string): unknown | undefined {
   }
   // Avatar sources (the demo cannot read the PUT body; saving echoes the defaults).
   if (p.endsWith("/admin/avatars")) return { gravatar_enabled: true, favicon_enabled: true };
-  if (p.endsWith("/customers/vcard-import/preview")) return { cards: [], truncated: false };
+  // Any dropped .vcf previews as Jane Doe's card, with two fields that differ.
+  if (p.endsWith("/customers/vcard-import/preview"))
+    return {
+      truncated: false,
+      cards: [{
+        index: 0, display_name: "Jane Doe", first_name: "Jane", last_name: "Doe-Martin",
+        emails: ["j.doe@acme.example"], phone: "+49 228 401 300", mobile: "+49 171 555 2210",
+        org: "Acme Corporation", title: "IT-Leitung", has_photo: false, photo_preview: null,
+        match_login: "j.doe@acme.example", match_name: "Jane Doe", fill_fields: [],
+        conflicts: [
+          { field: "last_name", current: "Doe", incoming: "Doe-Martin" },
+          { field: "phone", current: "+49 228 401 200", incoming: "+49 228 401 300" },
+        ],
+        has_existing_avatar: false,
+      }],
+    };
   if (p.endsWith("/customers/vcard-import/apply")) return { applied: [] };
   if (p.match(/\/customers\/(companies\/[^/]+\/logo|[^/]+\/avatar)$/))
     return method === "PUT" ? { version: String(Date.now()) } : {};

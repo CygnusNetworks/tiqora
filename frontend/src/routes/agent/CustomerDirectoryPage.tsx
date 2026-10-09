@@ -15,9 +15,11 @@ import { useCustomerShortlist } from "@/components/customers/favorites";
 import { VCARD_EXPORT_MAX } from "@/components/customers/vcardExport";
 import { DropOverlay } from "@/components/customers/AvatarEditor";
 import { VcardImportDialog } from "@/components/customers/VcardImport";
+import { dropRejectMessage } from "@/components/customers/dropMessage";
 import { Avatar } from "@/components/ui/Avatar";
 import { Spinner } from "@/components/ui/Spinner";
 import {
+  AddressBookIcon,
   BuildingIcon,
   DownloadIcon,
   PlusIcon,
@@ -91,16 +93,17 @@ export function CustomerDirectoryPage() {
   const [drawer, setDrawer] = useState<CustomerDrawerState | null>(null);
   // A .vcf (Apple Contacts drag, or picked) under review in the import dialog.
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importRejected, setImportRejected] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const drop = useFileDrop({
     accept: isVcardFile,
     onFiles: ([file]) => {
-      setImportRejected(false);
+      setImportError(null);
       setImportFile(file);
     },
-    onReject: () => setImportRejected(true),
+    onReject: (r) => setImportError(dropRejectMessage(t, r, "vcard.wrongFile")),
     disabled: !canEdit,
+    vcardText: true,
   });
 
   const setSearch = (patch: Partial<CustomerDirectorySearch>, replace = false) =>
@@ -354,7 +357,7 @@ export function CustomerDirectoryPage() {
                     const file = e.target.files?.[0];
                     e.target.value = "";
                     if (file) {
-                      setImportRejected(false);
+                      setImportError(null);
                       setImportFile(file);
                     }
                   }}
@@ -369,9 +372,9 @@ export function CustomerDirectoryPage() {
                   <UploadIcon className="text-[14px]" />
                   {t("vcard.import")}
                 </button>
-                {importRejected && (
+                {importError && (
                   <p className="px-1 text-xs text-danger" role="alert" data-testid="customer-import-rejected">
-                    {t("vcard.wrongFile")}
+                    {importError}
                   </p>
                 )}
               </>
@@ -409,9 +412,13 @@ export function CustomerDirectoryPage() {
                 customerId={search.company}
                 onSelectContact={selectPerson}
                 onAddContact={(company) => setDrawer({ mode: "create", company })}
+                onVcard={(file) => {
+                  setImportError(null);
+                  setImportFile(file);
+                }}
               />
             ) : (
-              <EmptyPane>{t("customerWorkbench.pickCompany")}</EmptyPane>
+              <EmptyPane canDrop={canEdit}>{t("customerWorkbench.pickCompany")}</EmptyPane>
             )
           ) : search.sel ? (
             <CustomerPanel
@@ -421,7 +428,7 @@ export function CustomerDirectoryPage() {
               onOpenCompany={selectCompany}
             />
           ) : (
-            <EmptyPane>{t("customerWorkbench.pickCustomer")}</EmptyPane>
+            <EmptyPane canDrop={canEdit}>{t("customerWorkbench.pickCustomer")}</EmptyPane>
           )}
         </section>
       </div>
@@ -549,10 +556,21 @@ function EmptyRail({ children }: { children: ReactNode }) {
   return <div className="px-2 py-4 text-sm text-muted">{children}</div>;
 }
 
-function EmptyPane({ children }: { children: ReactNode }) {
+/** The right pane with nothing selected; for editors also where contacts can be dropped. */
+function EmptyPane({ children, canDrop }: { children: ReactNode; canDrop: boolean }) {
+  const { t } = useTranslation();
   return (
-    <div className="grid min-h-[16rem] place-items-center rounded-lg border border-dashed border-hairline p-8 text-center text-sm text-muted">
-      {children}
+    <div
+      className="flex min-h-[16rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-hairline p-8 text-center text-sm text-muted"
+      data-testid="customer-empty-pane"
+    >
+      <p>{children}</p>
+      {canDrop && (
+        <p className="flex max-w-sm items-center gap-2 text-left text-xs">
+          <AddressBookIcon className="shrink-0 text-[18px] text-accent" />
+          {t("vcard.dropEmptyHint")}
+        </p>
+      )}
     </div>
   );
 }

@@ -70,11 +70,14 @@ export function CallAction({
   number,
   kind = "phone",
   compact,
+  inline,
 }: {
   customer: Customer;
   number: string;
   kind?: "phone" | "mobile";
   compact?: boolean;
+  /** A text link with the icon (a detail row), not a button. */
+  inline?: boolean;
 }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -105,7 +108,13 @@ export function CallAction({
           }
           openForm();
         }}
-        className={compact ? iconActionClass : cn(actionClass(), "tabular-nums")}
+        className={
+          compact
+            ? iconActionClass
+            : inline
+              ? "inline-flex items-center gap-1.5 tabular-nums text-ink hover:underline"
+              : cn(actionClass(), "tabular-nums")
+        }
         aria-label={compact ? label : undefined}
         title={compact ? label : t("customerWorkbench.callHint")}
         data-testid={`customer-call-${kind}-${customer.login}`}

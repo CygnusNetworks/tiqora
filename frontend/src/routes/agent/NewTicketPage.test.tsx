@@ -15,6 +15,7 @@ const {
   getComposeContext,
   createTicket,
   createArticle,
+  createTicketTimeAccounting,
   refine,
   refineAvailability,
   searchParams,
@@ -33,6 +34,7 @@ const {
   getComposeContext: vi.fn(),
   createTicket: vi.fn(),
   createArticle: vi.fn(),
+  createTicketTimeAccounting: vi.fn(),
   refine: vi.fn(),
   refineAvailability: vi.fn(),
   searchParams: { current: {} as Record<string, unknown> },
@@ -112,6 +114,7 @@ vi.mock("@/lib/api", async () => {
       getComposeContext,
       createTicket,
       createArticle,
+      createTicketTimeAccounting,
       getCustomer,
       listReferenceTypes: vi.fn().mockResolvedValue([]),
       listReferenceServices: vi.fn().mockResolvedValue([]),
@@ -268,6 +271,43 @@ describe("NewTicketPage", () => {
       expect(navigate).toHaveBeenCalledWith({
         to: "/agent/tickets/$ticketId",
         params: { ticketId: "42" },
+      }),
+    );
+  });
+
+  it("an email ticket sends attached files with its first article", async () => {
+    await renderReady();
+    await pickCustomer();
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), {
+      target: { value: "Formular" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Anbei das Formular." },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-attach-input"), {
+      target: { files: [new File(["hello"], "Formular.pdf", { type: "application/pdf" })] },
+    });
+    expect(screen.getByText("Formular.pdf")).toBeInTheDocument();
+    // Locked while the file is read, so it cannot go out without it.
+    expect(screen.getByTestId("new-ticket-submit")).toBeDisabled();
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalledTimes(1));
+    expect(createArticle).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        channel: "email",
+        attachments: [
+          {
+            filename: "Formular.pdf",
+            content_type: "application/pdf",
+            content_base64: btoa("hello"),
+          },
+        ],
       }),
     );
   });
@@ -451,6 +491,86 @@ describe("NewTicketPage", () => {
     );
     expect(screen.getByTestId("new-ticket-error")).toHaveTextContent(
       /could not be sent/,
+    );
+    // The server's reason, as in the reply dialog.
+    expect(screen.getByTestId("new-ticket-error")).toHaveTextContent(/SMTP refused/);
+    expect(screen.getByText("Go to ticket")).toBeInTheDocument();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  async function fillEmail() {
+    await renderReady();
+    await pickCustomer();
+    fireEvent.change(screen.getByTestId("new-ticket-subject"), {
+      target: { value: "Question" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-body"), {
+      target: { value: "Body text" },
+    });
+  }
+
+  it("uses the reply dialog's framed editor with the signature inside it", async () => {
+    getComposeContext.mockResolvedValue({ ...composeContext, signature: "-- \nIhr Support" });
+    await fillEmail();
+    const frame = screen.getByTestId("new-ticket-editor");
+    expect(within(frame).getByTestId("new-ticket-body")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(frame).getByTestId("new-ticket-signature-plain")).toHaveTextContent(
+        "Ihr Support",
+      ),
+    );
+    expect(within(frame).getByTestId("new-ticket-attach")).toBeInTheDocument();
+    expect(within(frame).getByTestId("new-ticket-time")).toBeInTheDocument();
+  });
+
+  it("sends Reply-To and books the time on the new email's article", async () => {
+    createArticle.mockResolvedValue({ article_id: 77 });
+    createTicketTimeAccounting.mockReset().mockResolvedValue({});
+    await fillEmail();
+    fireEvent.click(screen.getByTestId("new-ticket-toggle-replyto"));
+    fireEvent.change(screen.getByTestId("new-ticket-replyto"), {
+      target: { value: "team@example.com" },
+    });
+    fireEvent.change(screen.getByTestId("new-ticket-time"), { target: { value: "15" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    await waitFor(() =>
+      expect(createArticle).toHaveBeenCalledWith(
+        42,
+        expect.objectContaining({ reply_to: "team@example.com" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(createTicketTimeAccounting).toHaveBeenCalledWith(42, {
+        time_unit: 15,
+        article_id: 77,
+      }),
+    );
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({
+        to: "/agent/tickets/$ticketId",
+        params: { ticketId: "42" },
+      }),
+    );
+  });
+
+  it("stays on the page with a link when only the time booking fails", async () => {
+    createArticle.mockResolvedValue({ article_id: 77 });
+    createTicketTimeAccounting.mockReset().mockRejectedValue(new Error("down"));
+    await fillEmail();
+    fireEvent.change(screen.getByTestId("new-ticket-time"), { target: { value: "15" } });
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-submit")).not.toBeDisabled(),
+    );
+    fireEvent.click(screen.getByTestId("new-ticket-submit"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("new-ticket-error")).toHaveTextContent(
+        i18n.t("ticket.extrasFailedTime"),
+      ),
     );
     expect(screen.getByText("Go to ticket")).toBeInTheDocument();
     expect(navigate).not.toHaveBeenCalled();

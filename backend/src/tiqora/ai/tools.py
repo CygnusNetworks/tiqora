@@ -39,6 +39,7 @@ from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.models import DEFAULT_ALLOWED_STATE_TYPES
 from tiqora.ai.output_guards import (
     CustomerMessageGuardError,
+    strip_astral_symbols,
     strip_hallucinated_signoff,
     strip_markdown_bold,
     validate_customer_message,
@@ -544,6 +545,10 @@ class ToolExecutor:
         self._mcp_caller = mcp_caller or _default_mcp_call
         self._kb_search_fn = kb_search_fn
         self._kb_get_article_fn = kb_get_article_fn
+        # Articles whose full text already went to the model in this run: the
+        # search index returns one hit per chunk and models re-fetch the same
+        # article after every query, re-sending ~3-6k tokens each time.
+        self._kb_articles_read: set[int] = set()
         self._allowed_state_types = resolve_allowed_state_types(allowed_state_types_raw)
         # Mirrors the queue policy's pii_masking flag: with masking off, tool
         # results reach the model verbatim (before this flag, results were
@@ -593,7 +598,7 @@ class ToolExecutor:
             raise ToolArgumentError(
                 "propose_customer_message requires kind in {reply, clarify} and a non-empty body"
             )
-        body = strip_markdown_bold(strip_hallucinated_signoff(body))
+        body = strip_astral_symbols(strip_markdown_bold(strip_hallucinated_signoff(body)))
         if not body.strip():
             raise ToolArgumentError(
                 "propose_customer_message requires kind in {reply, clarify} and a non-empty body"
@@ -820,6 +825,17 @@ class ToolExecutor:
                 content_for_model=with_untrusted_tool_prefix("[]"),
             )
         results = await self._kb_search_fn(self._pii.unmask(query), limit=5)
+        seen: set[Any] = set()
+        unique: list[dict[str, Any]] = []
+        for hit in results:
+            key = hit.get("article_id") if isinstance(hit, dict) else None
+            if key is not None and key in seen:
+                continue
+            seen.add(key)
+            if isinstance(hit, dict) and key in self._kb_articles_read:
+                hit = {**hit, "already_read": True}
+            unique.append(hit)
+        results = unique
         content = json.dumps(results, default=str)
         if self._mask_results:
             content = self._pii.mask(content)
@@ -838,7 +854,23 @@ class ToolExecutor:
                 name=TOOL_KB_GET_ARTICLE,
                 content_for_model=with_untrusted_tool_prefix("null"),
             )
-        result = await self._kb_get_article_fn(int(article_id))
+        article_id = int(article_id)
+        if article_id in self._kb_articles_read:
+            return ToolOutcome(
+                name=TOOL_KB_GET_ARTICLE,
+                content_for_model=with_untrusted_tool_prefix(
+                    json.dumps(
+                        {
+                            "id": article_id,
+                            "already_read": True,
+                            "note": "Full text was already returned earlier in this run.",
+                        }
+                    )
+                ),
+            )
+        result = await self._kb_get_article_fn(article_id)
+        if result is not None:
+            self._kb_articles_read.add(article_id)
         content = json.dumps(result, default=str)
         if self._mask_results:
             content = self._pii.mask(content)

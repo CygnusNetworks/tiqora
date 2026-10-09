@@ -9,26 +9,17 @@ import type { CustomerUserOut } from "@/lib/api";
 import {
   apiErrorMessage,
   avatarApi,
+  type VCardConflict,
+  type VCardField,
   type VCardImportApplyOut,
   type VCardPreviewCard,
   type VCardSelection,
 } from "@/lib/avatarApi";
+import { cn } from "@/lib/cn";
 import { initialsOf } from "./customerFormat";
 
-/** Fields a vCard can fill — only blank ones, as `PATCH /customers/{login}`. */
-const FILL_FIELDS = ["first_name", "last_name", "email", "phone", "mobile"] as const;
-type FillField = (typeof FILL_FIELDS)[number];
-
-const cardValue = (card: VCardPreviewCard, field: FillField): string =>
+const cardValue = (card: VCardPreviewCard, field: VCardField): string =>
   ((field === "email" ? card.emails[0] : card[field]) ?? "").trim();
-
-/** Blank fields of `customer` the card has a value for. */
-function customerFillFields(
-  customer: Pick<CustomerUserOut, FillField>,
-  card: VCardPreviewCard,
-): FillField[] {
-  return FILL_FIELDS.filter((f) => !(customer[f] ?? "").trim() && cardValue(card, f) !== "");
-}
 
 /** The card meant for `login`: the one matched to it, else the only card. */
 function cardFor(cards: VCardPreviewCard[], login: string): VCardPreviewCard | null {
@@ -37,10 +28,11 @@ function cardFor(cards: VCardPreviewCard[], login: string): VCardPreviewCard | n
 
 const fileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`;
 
-function usePreview(file: File) {
+/** `login`: compare the cards with that customer (a card dropped on one customer). */
+function usePreview(file: File, login?: string) {
   return useQuery({
-    queryKey: ["vcard-import", "preview", fileKey(file)],
-    queryFn: () => avatarApi.previewVcards(file),
+    queryKey: ["vcard-import", "preview", fileKey(file), login ?? null],
+    queryFn: () => avatarApi.previewVcards(file, login),
     retry: false,
     staleTime: Infinity,
     gcTime: 0,
@@ -60,7 +52,7 @@ function FieldValues({ card, fields }: { card: VCardPreviewCard; fields: readonl
       {fields.map((f) => (
         <li key={f} className="flex gap-2">
           <span className="w-24 shrink-0 text-muted">{t(`vcard.fields.${f}`)}</span>
-          <span className="min-w-0 break-all text-ink">{cardValue(card, f as FillField)}</span>
+          <span className="min-w-0 break-all text-ink">{cardValue(card, f as VCardField)}</span>
         </li>
       ))}
     </ul>
@@ -77,11 +69,94 @@ function CardThumb({ card, size }: { card: VCardPreviewCard; size: number }) {
   );
 }
 
+const sideClass = (on: boolean) =>
+  cn(
+    "flex min-w-0 flex-col items-start gap-0.5 rounded-md border px-2.5 py-1.5 text-left transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+    on ? "border-accent bg-accent-dim" : "border-hairline bg-surface hover:bg-surface-subtle",
+  );
+
 /**
- * A .vcf dropped on one customer: take its photo and fill blank fields after
- * a short confirmation of what changes. The card matched to this customer
- * wins; a file with exactly one card applies to the open customer even
- * without a matching address.
+ * Field by field: keep what Tiqora has or take the card's value. Nothing is
+ * replaced unless picked here.
+ */
+function ConflictPicker({
+  conflicts,
+  replace,
+  onChange,
+}: {
+  conflicts: VCardConflict[];
+  replace: ReadonlySet<VCardField>;
+  onChange: (next: Set<VCardField>) => void;
+}) {
+  const { t } = useTranslation();
+  const set = (field: VCardField, take: boolean) => {
+    const next = new Set(replace);
+    if (take) next.add(field);
+    else next.delete(field);
+    onChange(next);
+  };
+  const allTaken = conflicts.every((c) => replace.has(c.field));
+  return (
+    <div className="space-y-2" data-testid="vcard-conflicts">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-medium text-ink">
+          {t("vcard.conflictsTitle", { count: conflicts.length })}
+        </p>
+        {conflicts.length > 1 && (
+          <button
+            type="button"
+            className="text-xs font-medium text-accent hover:underline"
+            onClick={() => onChange(allTaken ? new Set() : new Set(conflicts.map((c) => c.field)))}
+            data-testid="vcard-conflicts-all"
+          >
+            {allTaken ? t("vcard.keepAll") : t("vcard.takeAll")}
+          </button>
+        )}
+      </div>
+      <ul className="space-y-2.5">
+        {conflicts.map((c) => {
+          const take = replace.has(c.field);
+          return (
+            <li key={c.field} className="space-y-1" data-testid={`vcard-conflict-${c.field}`}>
+              <p className="text-xs text-muted">{t(`vcard.fields.${c.field}`)}</p>
+              <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label={t(`vcard.fields.${c.field}`)}>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={!take}
+                  className={sideClass(!take)}
+                  onClick={() => set(c.field, false)}
+                  data-testid={`vcard-conflict-${c.field}-keep`}
+                >
+                  <span className="text-[11px] text-muted">{t("vcard.keepCurrent")}</span>
+                  <span className="max-w-full break-all text-sm text-ink">{c.current}</span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={take}
+                  className={sideClass(take)}
+                  onClick={() => set(c.field, true)}
+                  data-testid={`vcard-conflict-${c.field}-take`}
+                >
+                  <span className="text-[11px] text-muted">{t("vcard.takeIncoming")}</span>
+                  <span className="max-w-full break-all text-sm text-ink">{c.incoming}</span>
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * A .vcf dropped on one customer: take its photo, fill blank fields and
+ * settle the fields where card and customer disagree, after a short
+ * confirmation of what changes. The card matched to this customer wins; a
+ * file with exactly one card applies to the open customer even without a
+ * matching address.
  */
 export function VcardApplyDialog({
   file,
@@ -97,12 +172,14 @@ export function VcardApplyDialog({
 }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
-  const previewQ = usePreview(file);
+  const previewQ = usePreview(file, customer.login);
   const cards = previewQ.data?.cards ?? [];
   const card = cardFor(cards, customer.login);
-  const fields = card ? customerFillFields(customer, card) : [];
+  const fields = card?.fill_fields ?? [];
+  const conflicts = card?.conflicts ?? [];
   const [photo, setPhoto] = useState(true);
   const [fill, setFill] = useState(true);
+  const [replace, setReplace] = useState<Set<VCardField>>(new Set());
 
   const applyM = useMutation({
     mutationFn: (selection: VCardSelection) => avatarApi.applyVcards(file, [selection]),
@@ -117,7 +194,7 @@ export function VcardApplyDialog({
 
   const takePhoto = Boolean(card?.has_photo) && photo;
   const takeFields = fields.length > 0 && fill;
-  const nothing = !card || (!card.has_photo && fields.length === 0);
+  const nothing = !card || (!card.has_photo && fields.length === 0 && conflicts.length === 0);
 
   let body;
   if (previewQ.isLoading) {
@@ -140,7 +217,7 @@ export function VcardApplyDialog({
     );
   } else {
     body = (
-      <div className="space-y-4" data-testid="vcard-apply">
+      <div className="space-y-5" data-testid="vcard-apply">
         <div className="flex items-center gap-3">
           <CardThumb card={card} size={44} />
           <div className="min-w-0">
@@ -158,16 +235,17 @@ export function VcardApplyDialog({
         {nothing ? (
           <p className="text-sm text-muted">{t("vcard.noChanges")}</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {card.has_photo && (
               <label className="flex items-center gap-2 text-sm text-ink">
                 <input
                   type="checkbox"
                   checked={photo}
                   onChange={(e) => setPhoto(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-accent"
                   data-testid="vcard-apply-photo"
                 />
-                {t("vcard.takePhoto")}
+                {card.has_existing_avatar ? t("vcard.replacePhoto") : t("vcard.takePhoto")}
               </label>
             )}
             {fields.length > 0 && (
@@ -177,6 +255,7 @@ export function VcardApplyDialog({
                     type="checkbox"
                     checked={fill}
                     onChange={(e) => setFill(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-accent"
                     data-testid="vcard-apply-fields"
                   />
                   {t("vcard.fillFields")}
@@ -185,6 +264,9 @@ export function VcardApplyDialog({
                   <FieldValues card={card} fields={fields} />
                 </div>
               </div>
+            )}
+            {conflicts.length > 0 && (
+              <ConflictPicker conflicts={conflicts} replace={replace} onChange={setReplace} />
             )}
           </div>
         )}
@@ -198,7 +280,7 @@ export function VcardApplyDialog({
       open
       onClose={onClose}
       title={t("vcard.applyTitle")}
-      size="sm"
+      size="md"
       footer={
         <div className="flex items-center justify-end gap-2">
           {applyM.isError && (
@@ -213,7 +295,7 @@ export function VcardApplyDialog({
             variant="primary"
             size="sm"
             data-testid="vcard-apply-confirm"
-            disabled={!card || (!takePhoto && !takeFields) || applyM.isPending}
+            disabled={!card || (!takePhoto && !takeFields && replace.size === 0) || applyM.isPending}
             onClick={() =>
               card &&
               applyM.mutate({
@@ -221,6 +303,7 @@ export function VcardApplyDialog({
                 login: customer.login,
                 photo: takePhoto,
                 fields: takeFields,
+                replace: [...replace],
               })
             }
           >
@@ -234,12 +317,14 @@ export function VcardApplyDialog({
   );
 }
 
-type Choice = { photo: boolean; fields: boolean };
+type Choice = { photo: boolean; fields: boolean; replace: boolean };
 
 /**
  * A .vcf with many contacts on the customer list: one row per card with what
- * it would change on the matched customer; checked rows are applied. Cards
- * without a match can be created through the regular create form.
+ * it would change on the matched customer; checked rows are applied. Fields
+ * where card and customer disagree are listed and replaced only when their
+ * row's box is ticked. Cards without a match can be created through the
+ * regular create form.
  */
 export function VcardImportDialog({
   file,
@@ -263,9 +348,14 @@ export function VcardImportDialog({
   const [choices, setChoices] = useState<Record<number, Choice>>({});
   const [result, setResult] = useState<VCardImportApplyOut | null>(null);
 
-  // Default: everything a matched card offers is checked.
+  // Default: everything a matched card offers is checked — except replacing
+  // what the customer already has, which is opt-in.
   const choiceOf = (card: VCardPreviewCard): Choice =>
-    choices[card.index] ?? { photo: card.has_photo, fields: card.fill_fields.length > 0 };
+    choices[card.index] ?? {
+      photo: card.has_photo,
+      fields: card.fill_fields.length > 0,
+      replace: false,
+    };
   const setChoice = (card: VCardPreviewCard, patch: Partial<Choice>) =>
     setChoices((prev) => ({ ...prev, [card.index]: { ...choiceOf(card), ...patch } }));
 
@@ -278,9 +368,10 @@ export function VcardImportDialog({
         login: c.match_login as string,
         photo: c.has_photo && ch.photo,
         fields: c.fill_fields.length > 0 && ch.fields,
+        replace: ch.replace ? c.conflicts.map((x) => x.field) : [],
       };
     })
-    .filter((s) => s.photo || s.fields);
+    .filter((s) => s.photo || s.fields || (s.replace?.length ?? 0) > 0);
 
   const applyM = useMutation({
     mutationFn: () => avatarApi.applyVcards(file, selections),
@@ -350,6 +441,7 @@ export function VcardImportDialog({
                               type="checkbox"
                               checked={ch.photo}
                               onChange={(e) => setChoice(card, { photo: e.target.checked })}
+                              className="h-3.5 w-3.5 accent-accent"
                               data-testid={`vcard-card-${card.index}-photo`}
                             />
                             {card.has_existing_avatar ? t("vcard.replacePhoto") : t("vcard.takePhoto")}
@@ -361,6 +453,7 @@ export function VcardImportDialog({
                               type="checkbox"
                               checked={ch.fields}
                               onChange={(e) => setChoice(card, { fields: e.target.checked })}
+                              className="h-3.5 w-3.5 accent-accent"
                               data-testid={`vcard-card-${card.index}-fields`}
                             />
                             {t("vcard.fillList", {
@@ -368,10 +461,34 @@ export function VcardImportDialog({
                             })}
                           </label>
                         )}
-                        {!card.has_photo && card.fill_fields.length === 0 && (
+                        {!card.has_photo && card.fill_fields.length === 0 && card.conflicts.length === 0 && (
                           <span className="text-muted">{t("vcard.noChanges")}</span>
                         )}
                       </div>
+                      {card.conflicts.length > 0 && (
+                        <div className="space-y-1 rounded-md bg-surface-subtle px-2.5 py-2 text-xs">
+                          <label className="inline-flex items-center gap-1.5 font-medium text-ink">
+                            <input
+                              type="checkbox"
+                              checked={ch.replace}
+                              onChange={(e) => setChoice(card, { replace: e.target.checked })}
+                              className="h-3.5 w-3.5 accent-accent"
+                              data-testid={`vcard-card-${card.index}-replace`}
+                            />
+                            {t("vcard.replaceList", { count: card.conflicts.length })}
+                          </label>
+                          <ul className="space-y-0.5 pl-5">
+                            {card.conflicts.map((c) => (
+                              <li key={c.field} className="flex flex-wrap gap-x-1.5 text-muted">
+                                <span>{t(`vcard.fields.${c.field}`)}:</span>
+                                <span className={cn("break-all", ch.replace && "line-through")}>{c.current}</span>
+                                <span aria-hidden>→</span>
+                                <span className="break-all text-ink">{c.incoming}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">

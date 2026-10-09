@@ -35,17 +35,22 @@ const TOOLBAR: ToolbarCommand[] = [
  * WYSIWYG (Bold/Italic/Underline/lists/remove-format via
  * ``document.execCommand``) when it's on. Emits plain text or HTML
  * respectively — the caller picks the matching ``content_type``.
+ *
+ * ``bare`` drops the own border/background for use inside
+ * ``ComposerEditorFrame``, which draws the frame itself.
  */
 export function ComposerBody({
   richText,
   value,
   onChange,
   testId,
+  bare = false,
 }: {
   richText: boolean;
   value: string;
   onChange: (v: string) => void;
   testId?: string;
+  bare?: boolean;
 }) {
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -73,16 +78,21 @@ export function ComposerBody({
     return (
       <textarea
         data-testid={testId}
-        rows={10}
+        rows={bare ? 12 : 10}
         value={value}
+        aria-label={t("newTicket.message")}
         onChange={(e) => onChange(e.target.value)}
-        className={`${FIELD_CLASS} font-mono resize-y`}
+        className={
+          bare
+            ? "block w-full resize-y border-0 bg-transparent px-3 py-2.5 font-mono text-[12.5px] leading-relaxed text-ink placeholder:text-muted focus:outline-none"
+            : `${FIELD_CLASS} font-mono resize-y`
+        }
       />
     );
   }
 
   return (
-    <div className="rounded-md border border-hairline bg-surface-subtle">
+    <div className={bare ? undefined : "rounded-md border border-hairline bg-surface-subtle"}>
       <div
         className="flex flex-wrap items-center gap-0.5 border-b border-hairline p-1"
         data-testid={testId ? `${testId}-toolbar` : undefined}

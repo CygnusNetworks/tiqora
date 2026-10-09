@@ -1,17 +1,19 @@
 """vCard import (Apple Contacts drag & drop, any .vcf): preview, then apply.
 
 The preview matches every card to a customer user through any of its e-mail
-addresses and reports what an import would change; it writes nothing. Apply
-re-reads the same file and, per selected card, fills blank fields (same
-fill-only rule as ``PATCH /customers/{login}``) and/or stores the card photo
-as the customer's avatar. Cards without a match are never created here — the
-frontend pre-fills the regular create dialog for them.
+addresses and reports what an import would change — blank fields it fills
+and fields where card and customer disagree (conflicts); it writes nothing.
+Apply re-reads the same file and, per selected card, fills blank fields (same
+fill-only rule as ``PATCH /customers/{login}``), replaces the conflicting
+fields the agent picked, and/or stores the card photo as the customer's
+avatar. Cards without a match are never created here — the frontend
+pre-fills the regular create dialog for them.
 """
 
 from __future__ import annotations
 
 import base64
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field, TypeAdapter, ValidationError
@@ -33,15 +35,28 @@ from tiqora.db.tiqora.models import TiqoraAvatar
 from tiqora.domain.customer_fill import (
     FILL_MAX_LENGTHS,
     CustomerEmailTakenError,
+    differing_fields,
     fill_blank_fields,
     fillable_fields,
     is_blank,
+    replace_fields,
 )
 from tiqora.domain.vcard import MAX_VCARD_IMPORT_BYTES, ParsedVCard, parse_vcards
 
 router = APIRouter(prefix="/customers/vcard-import", tags=["customers"])
 
 THUMBNAIL_PX = 64
+
+
+FillField = Literal["first_name", "last_name", "email", "phone", "mobile"]
+
+
+class VCardFieldConflict(BaseModel):
+    """A field the customer already has with a different value than the card."""
+
+    field: FillField
+    current: str
+    incoming: str
 
 
 class VCardImportCard(BaseModel):
@@ -60,8 +75,10 @@ class VCardImportCard(BaseModel):
     #: Customer user matched through any of the card's addresses.
     match_login: str | None
     match_name: str | None
-    #: Blank fields of the match the card would fill.
+    #: Blank fields of the target (the match, or ``login``) the card would fill.
     fill_fields: list[str]
+    #: Fields of the target set to something else than the card says.
+    conflicts: list[VCardFieldConflict]
     has_existing_avatar: bool
 
 
@@ -76,12 +93,15 @@ class VCardImportSelection(BaseModel):
     login: str = Field(..., min_length=1, max_length=200)
     photo: bool = False
     fields: bool = False
+    #: Conflicting fields to overwrite with the card's value.
+    replace: list[FillField] = Field(default_factory=list)
 
 
 class VCardImportApplied(BaseModel):
     login: str
     photo: bool
     filled: list[str]
+    replaced: list[str]
 
 
 class VCardImportApplyOut(BaseModel):
@@ -116,6 +136,30 @@ def _card_values(card: ParsedVCard) -> dict[str, str | None]:
         for name, value in values.items()
         if value is not None and len(value.strip()) <= FILL_MAX_LENGTHS[name]
     }
+
+
+def _values_against(cu: CustomerUser, card: ParsedVCard) -> dict[str, str | None]:
+    """The card's values for *cu*; an address the card lists anywhere is no conflict."""
+    values = _card_values(card)
+    if not is_blank(cu.email) and (cu.email or "").strip().lower() in {
+        e.lower() for e in card.emails
+    }:
+        values.pop("email", None)
+    return values
+
+
+def _conflicts(cu: CustomerUser, card: ParsedVCard) -> list[VCardFieldConflict]:
+    values = _values_against(cu, card)
+    return [
+        VCardFieldConflict.model_validate(
+            {
+                "field": name,
+                "current": (getattr(cu, name) or "").strip(),
+                "incoming": (values.get(name) or "").strip(),
+            }
+        )
+        for name in differing_fields(cu, values)
+    ]
 
 
 def _usable_photo(card: ParsedVCard) -> bytes | None:
@@ -177,12 +221,28 @@ async def preview_vcard_import(
     user: CustomerEditUser,
     session: DbSession,
     file: UploadFile = File(...),  # noqa: B008
+    login: Annotated[
+        str | None,
+        Form(
+            max_length=200,
+            description="Compare every card with this customer instead of its match "
+            "(a card dropped on one customer).",
+        ),
+    ] = None,
 ) -> VCardImportPreview:
     """What importing this .vcf would do, per card. Writes nothing."""
     _ = user
     cards, truncated = await _read_cards(file)
     matches = await _match_customers(session, cards)
-    keys = {email_key(cu.email) for cu in matches.values() if not is_blank(cu.email)}
+    target: CustomerUser | None = None
+    if login:
+        target = (
+            await session.execute(select(CustomerUser).where(CustomerUser.login == login))
+        ).scalar_one_or_none()
+        if target is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="unknown customer")
+    compared = [target] if target is not None else list(matches.values())
+    keys = {email_key(cu.email) for cu in compared if not is_blank(cu.email)}
     with_avatar: set[str] = set()
     if keys:
         with_avatar = set(
@@ -199,6 +259,7 @@ async def preview_vcard_import(
     out: list[VCardImportCard] = []
     for card in cards:
         cu = matches.get(card.index)
+        against = target if target is not None else cu
         preview = _thumbnail(_usable_photo(card))
         out.append(
             VCardImportCard(
@@ -215,9 +276,14 @@ async def preview_vcard_import(
                 photo_preview=preview,
                 match_login=cu.login if cu is not None else None,
                 match_name=_display(cu) if cu is not None else None,
-                fill_fields=fillable_fields(cu, _card_values(card)) if cu is not None else [],
+                fill_fields=(
+                    fillable_fields(against, _card_values(card)) if against is not None else []
+                ),
+                conflicts=_conflicts(against, card) if against is not None else [],
                 has_existing_avatar=(
-                    cu is not None and not is_blank(cu.email) and email_key(cu.email) in with_avatar
+                    against is not None
+                    and not is_blank(against.email)
+                    and email_key(against.email) in with_avatar
                 ),
             )
         )
@@ -229,10 +295,12 @@ async def apply_vcard_import(
     user: CustomerEditUser,
     session: DbSession,
     service: AvatarServiceDep,
-    selections: Annotated[str, Form(description='JSON: [{"index", "login", "photo", "fields"}]')],
+    selections: Annotated[
+        str, Form(description='JSON: [{"index", "login", "photo", "fields", "replace"}]')
+    ],
     file: UploadFile = File(...),  # noqa: B008
 ) -> VCardImportApplyOut:
-    """Fill blank fields and/or store photos for the selected cards."""
+    """Fill blank fields, replace chosen conflicts and/or store photos per selected card."""
     try:
         chosen = _SELECTIONS.validate_json(selections)
     except ValidationError as exc:
@@ -254,6 +322,7 @@ async def apply_vcard_import(
         if cu is None:
             continue
         filled: list[str] = []
+        replaced: list[str] = []
         if selection.fields:
             values = _card_values(card)
             try:
@@ -262,10 +331,17 @@ async def apply_vcard_import(
                 # Fill the rest; the address already belongs to someone else.
                 values.pop("email", None)
                 filled = await fill_blank_fields(session, cu, values)
-            if filled:
-                cu.change_time = now()
-                cu.change_by = user.id
-                any_filled = True
+        if selection.replace:
+            values = _values_against(cu, card)
+            try:
+                replaced = await replace_fields(session, cu, values, selection.replace)
+            except CustomerEmailTakenError:
+                values.pop("email", None)
+                replaced = await replace_fields(session, cu, values, selection.replace)
+        if filled or replaced:
+            cu.change_time = now()
+            cu.change_by = user.id
+            any_filled = True
         photo_stored = False
         photo = _usable_photo(card) if selection.photo else None
         if photo is not None and not is_blank(cu.email):
@@ -278,7 +354,9 @@ async def apply_vcard_import(
                 await service.stage_upload(EMAIL, key, png, owner_ref=cu.login, user_id=user.id)
                 photo_keys.append(key)
                 photo_stored = True
-        applied.append(VCardImportApplied(login=cu.login, photo=photo_stored, filled=filled))
+        applied.append(
+            VCardImportApplied(login=cu.login, photo=photo_stored, filled=filled, replaced=replaced)
+        )
     if any_filled:
         await invalidate_znuny_cache_types(session, CUSTOMER_USER_CACHE_TYPES)
     await session.commit()

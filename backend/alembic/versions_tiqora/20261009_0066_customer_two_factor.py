@@ -1,7 +1,7 @@
 """Create customer TOTP and passkey tables (portal second factor).
 
-Revision ID: 20261009_0065
-Revises: 20261009_0064
+Revision ID: 20261009_0066
+Revises: 20261009_0065
 Create Date: 2026-10-09
 
 Additive ``tiqora_*`` only. Keyed by ``customer_user.id`` (column
@@ -15,8 +15,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "20261009_0065"
-down_revision: str | None = "20261009_0064"
+revision: str = "20261009_0066"
+down_revision: str | None = "20261009_0065"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

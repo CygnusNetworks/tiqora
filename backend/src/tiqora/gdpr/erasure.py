@@ -1358,6 +1358,7 @@ async def run_erasure(
 
         # ---- related master tables (snapshot; delete mode removes) ----
         has_favorites = await _table_exists(session, "tiqora_customer_favorite")
+        has_ai_pause = await _table_exists(session, "tiqora_ai_customer_pause")
         for old_login in logins:
             # customer_preferences (composite PK user_id + preferences_key)
             prefs = (
@@ -1506,6 +1507,22 @@ async def run_erasure(
             elif has_favorites:
                 await session.execute(
                     text("DELETE FROM tiqora_customer_favorite WHERE customer_login = :u"),
+                    {"u": old_login},
+                )
+            if has_ai_pause and mode == "anonymize":
+                await session.execute(
+                    text(
+                        "UPDATE tiqora_ai_customer_pause SET customer_key = :new_u"
+                        " WHERE scope = 'user' AND customer_key = :old_u"
+                    ),
+                    {"new_u": login_to_new[old_login], "old_u": old_login},
+                )
+            elif has_ai_pause:
+                await session.execute(
+                    text(
+                        "DELETE FROM tiqora_ai_customer_pause"
+                        " WHERE scope = 'user' AND customer_key = :u"
+                    ),
                     {"u": old_login},
                 )
 
@@ -2276,6 +2293,14 @@ async def _rollback_login_renames(session: AsyncSession, job_id: int) -> None:
                 text(
                     "UPDATE tiqora_customer_favorite SET customer_login = :old"
                     " WHERE customer_login = :new"
+                ),
+                {"old": old_login, "new": new_login},
+            )
+        if await _table_exists(session, "tiqora_ai_customer_pause"):
+            await session.execute(
+                text(
+                    "UPDATE tiqora_ai_customer_pause SET customer_key = :old"
+                    " WHERE scope = 'user' AND customer_key = :new"
                 ),
                 {"old": old_login, "new": new_login},
             )

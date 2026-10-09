@@ -5964,6 +5964,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/companies/{customer_id}/ai-pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Company Ai Pause */
+        get: operations["get_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_get"];
+        /**
+         * Put Company Ai Pause
+         * @description Switch the AI automation off for every contact of the company.
+         */
+        put: operations["put_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_put"];
+        post?: never;
+        /** Delete Company Ai Pause */
+        delete: operations["delete_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/companies/{customer_id}/logo": {
         parameters: {
             query?: never;
@@ -6019,7 +6041,7 @@ export interface paths {
         put?: never;
         /**
          * Apply Vcard Import
-         * @description Fill blank fields and/or store photos for the selected cards.
+         * @description Fill blank fields, replace chosen conflicts and/or store photos per selected card.
          */
         post: operations["apply_vcard_import_api_v1_customers_vcard_import_apply_post"];
         delete?: never;
@@ -6068,6 +6090,28 @@ export interface paths {
         head?: never;
         /** Fill Customer */
         patch: operations["fill_customer_api_v1_customers__login__patch"];
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/ai-pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Ai Pause */
+        get: operations["get_customer_ai_pause_api_v1_customers__login__ai_pause_get"];
+        /**
+         * Put Customer Ai Pause
+         * @description Switch the AI automation off for this customer user (all their tickets).
+         */
+        put: operations["put_customer_ai_pause_api_v1_customers__login__ai_pause_put"];
+        post?: never;
+        /** Delete Customer Ai Pause */
+        delete: operations["delete_customer_ai_pause_api_v1_customers__login__ai_pause_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/customers/{login}/avatar": {
@@ -7928,6 +7972,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/customer-pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Customer Ai Route
+         * @description Stop the automation for this ticket's customer user or company (all
+         *     their tickets), for N days or until lifted. Same access rule as the
+         *     per-ticket pause; 409 when the ticket has no such customer.
+         */
+        post: operations["pause_customer_ai_route_api_v1_tickets__ticket_id__ai_customer_pause_post"];
+        /**
+         * Lift Customer Ai Pause Route
+         * @description Lift the customer pause that applies to this ticket. Idempotent.
+         */
+        delete: operations["lift_customer_ai_pause_route_api_v1_tickets__ticket_id__ai_customer_pause_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/draft": {
         parameters: {
             query?: never;
@@ -8160,7 +8230,8 @@ export interface paths {
          *
          *     Telegram replies may carry ``attachments``, ``telegram_buttons`` and
          *     ``telegram_reply_to_article_id`` (422 on any other channel); a failed
-         *     Telegram send returns 409 with nothing stored.
+         *     Telegram send returns 409 with nothing stored. Outgoing agent email may
+         *     carry ``attachments`` as well (413 over the upload limit).
          *
          *     With ``state_id`` the ticket's state is changed after the article, in the
          *     same transaction (PATCH semantics). The state change is validated before
@@ -9676,6 +9747,14 @@ export interface components {
         AiAutopilotOut: {
             /** By Name */
             by_name?: string | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Customer Pause Scope */
+            customer_pause_scope?: ("user" | "company") | null;
+            /** Customer Paused Until */
+            customer_paused_until?: string | null;
+            /** Customer User Id */
+            customer_user_id?: string | null;
             /** Grant Remaining */
             grant_remaining?: number | null;
             /** Grant Total */
@@ -9713,6 +9792,21 @@ export interface components {
             created_at: string;
             /** Summary Body */
             summary_body: string;
+        };
+        /**
+         * AiCustomerPauseIn
+         * @description Stop the automation for the ticket's customer user or company.
+         */
+        AiCustomerPauseIn: {
+            /** Days */
+            days?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "user" | "company";
         };
         /** AiDraftOut */
         AiDraftOut: {
@@ -10974,6 +11068,8 @@ export interface components {
             incoming_time?: number | null;
             /** Is Visible For Customer */
             is_visible_for_customer: boolean;
+            /** Reply All Available */
+            reply_all_available?: boolean | null;
             security?: components["schemas"]["ArticleSecurity"] | null;
             /** Sender Type */
             sender_type?: string | null;
@@ -11596,7 +11692,7 @@ export interface components {
             file: string;
             /**
              * Selections
-             * @description JSON: [{"index", "login", "photo", "fields"}]
+             * @description JSON: [{"index", "login", "photo", "fields", "replace"}]
              */
             selections: string;
         };
@@ -11604,6 +11700,11 @@ export interface components {
         Body_preview_vcard_import_api_v1_customers_vcard_import_preview_post: {
             /** File */
             file: string;
+            /**
+             * Login
+             * @description Compare every card with this customer instead of its match (a card dropped on one customer).
+             */
+            login?: string | null;
         };
         /** Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post */
         Body_upload_attachment_api_portal_tickets__ticket_id__attachments_post: {
@@ -12072,6 +12173,29 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        /** CustomerAiPauseIn */
+        CustomerAiPauseIn: {
+            /** Days */
+            days?: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * CustomerAiPauseOut
+         * @description Whether the AI automation is switched off for a customer user or company.
+         */
+        CustomerAiPauseOut: {
+            /** Active */
+            active: boolean;
+            /** By Name */
+            by_name?: string | null;
+            /** Paused Until */
+            paused_until?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Since */
+            since?: string | null;
         };
         /** CustomerCompanyCreate */
         CustomerCompanyCreate: {
@@ -19292,6 +19416,21 @@ export interface components {
             /** Valid Id */
             valid_id?: number | null;
         };
+        /**
+         * VCardFieldConflict
+         * @description A field the customer already has with a different value than the card.
+         */
+        VCardFieldConflict: {
+            /** Current */
+            current: string;
+            /**
+             * Field
+             * @enum {string}
+             */
+            field: "first_name" | "last_name" | "email" | "phone" | "mobile";
+            /** Incoming */
+            incoming: string;
+        };
         /** VCardImportApplied */
         VCardImportApplied: {
             /** Filled */
@@ -19300,6 +19439,8 @@ export interface components {
             login: string;
             /** Photo */
             photo: boolean;
+            /** Replaced */
+            replaced: string[];
         };
         /** VCardImportApplyOut */
         VCardImportApplyOut: {
@@ -19308,6 +19449,8 @@ export interface components {
         };
         /** VCardImportCard */
         VCardImportCard: {
+            /** Conflicts */
+            conflicts: components["schemas"]["VCardFieldConflict"][];
             /** Display Name */
             display_name: string;
             /** Emails */
@@ -35369,6 +35512,113 @@ export interface operations {
             };
         };
     };
+    get_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAiPauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_company_logo_api_v1_customers_companies__customer_id__logo_put: {
         parameters: {
             query?: never;
@@ -35651,6 +35901,113 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomerFillOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_ai_pause_api_v1_customers__login__ai_pause_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_customer_ai_pause_api_v1_customers__login__ai_pause_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAiPauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_ai_pause_api_v1_customers__login__ai_pause_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -39482,6 +39839,80 @@ export interface operations {
                 "application/json": components["schemas"]["AiAutopilotIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAutopilotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_customer_ai_route_api_v1_tickets__ticket_id__ai_customer_pause_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCustomerPauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAutopilotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lift_customer_ai_pause_route_api_v1_tickets__ticket_id__ai_customer_pause_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

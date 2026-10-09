@@ -361,6 +361,7 @@ def build_agent_email_message(
         loop_hint=False,  # not a ticket-system bounce/auto-response
         auto_submitted=auto_submitted,
         extra_headers=extra_headers,
+        attachments=article.attachments,
     )
 
 

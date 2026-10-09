@@ -880,6 +880,41 @@ class TiqoraAiTicketState(TiqoraBase):
     auto_skip_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+CUSTOMER_PAUSE_SCOPE_USER = "user"
+CUSTOMER_PAUSE_SCOPE_COMPANY = "company"
+
+
+class TiqoraAiCustomerPause(TiqoraBase):
+    """An agent switched all automatic AI actions off for one customer.
+
+    ``scope = "user"``: ``customer_key`` is the customer user's login (what a
+    ticket carries as ``customer_user_id``); ``scope = "company"``: the
+    customer company id (``ticket.customer_id``), covering every contact of
+    it. ``paused_until`` NULL = until an agent lifts it; otherwise the pause
+    ends by itself at that time (naive UTC like the other Tiqora columns).
+    Covers the same automatic actions as the per-ticket pause (auto-reply,
+    triage, auto-summary); Manual Assist stays available. Soft join to
+    ``customer_user.login`` / ``customer_company.customer_id`` and
+    ``users.id`` (no FK); GDPR erasure renames or drops the rows.
+    """
+
+    __tablename__ = "tiqora_ai_customer_pause"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    scope: Mapped[str] = mapped_column(String(16), nullable=False)
+    customer_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    paused_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_by: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("scope", "customer_key", name="uq_tiqora_ai_customer_pause_key"),
+    )
+
+
 class TiqoraAiAuditLog(TiqoraBase):
     """One LLM chat-completion call, in/out (full audit — separate from
     :class:`TiqoraAiUsage`, which is aggregate cost/budget reporting only).

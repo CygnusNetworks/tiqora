@@ -434,7 +434,10 @@ async def test_vcard_preview_writes_nothing(seeded: str) -> None:
     assert anna["photo_preview"].startswith("data:image/png;base64,")
     assert anna["has_existing_avatar"] is False
     assert anna["emails"] == ["anna.privat@elsewhere.example", ANNA_EMAIL.lower()]
+    # The card's other address is no conflict: Anna's own one is on it too.
+    assert anna["conflicts"] == [{"field": "last_name", "current": "Avatar", "incoming": "Neuname"}]
     assert unknown["match_login"] is None and unknown["fill_fields"] == []
+    assert unknown["conflicts"] == []
     assert before == after
     assert rows == []
     assert empty.status_code == 422
@@ -466,7 +469,14 @@ async def test_vcard_apply_fills_blanks_and_stores_photo(seeded: str) -> None:
         )
     assert resp.status_code == 200, resp.text
     assert resp.json() == {
-        "applied": [{"login": ANNA, "photo": True, "filled": ["first_name", "phone", "mobile"]}]
+        "applied": [
+            {
+                "login": ANNA,
+                "photo": True,
+                "filled": ["first_name", "phone", "mobile"],
+                "replaced": [],
+            }
+        ]
     }
     # Blank fields filled, the existing last name kept.
     assert fields == ("Anna", "Avatar", "+49 228 0000012", "+49 170 0000011")
@@ -474,7 +484,59 @@ async def test_vcard_apply_fills_blanks_and_stores_photo(seeded: str) -> None:
     assert photo.status_code == 200
     card = preview.json()["cards"][0]
     assert card["fill_fields"] == [] and card["has_existing_avatar"] is True
+    assert [c["field"] for c in card["conflicts"]] == ["last_name"]
     assert bad.status_code == 422
+
+
+async def test_vcard_conflicts_replace_only_what_was_picked(seeded: str) -> None:
+    vcf = _vcf(_jpeg())
+    async with _Harness(seeded, ROOT) as h:
+        # Bert's card dropped on Bert: compared with him although no address matches.
+        targeted = await h.client.post(
+            "/api/v1/customers/vcard-import/preview",
+            files={"file": ("kontakte.vcf", vcf, "text/vcard")},
+            data={"login": BERT},
+        )
+        unknown_target = await h.client.post(
+            "/api/v1/customers/vcard-import/preview",
+            files={"file": ("kontakte.vcf", vcf, "text/vcard")},
+            data={"login": PREFIX + "nobody"},
+        )
+        resp = await h.client.post(
+            "/api/v1/customers/vcard-import/apply",
+            files={"file": ("kontakte.vcf", vcf, "text/vcard")},
+            data={
+                "selections": json.dumps(
+                    [
+                        {
+                            "index": 0,
+                            "login": ANNA,
+                            "fields": False,
+                            # "email" agrees (the card lists Anna's address): nothing to replace.
+                            "replace": ["last_name", "email"],
+                        }
+                    ]
+                )
+            },
+        )
+        fields = await _anna_fields(h)
+        bad_field = await h.client.post(
+            "/api/v1/customers/vcard-import/apply",
+            files={"file": ("kontakte.vcf", vcf, "text/vcard")},
+            data={"selections": json.dumps([{"index": 0, "login": ANNA, "replace": ["login"]}])},
+        )
+    assert targeted.status_code == 200, targeted.text
+    bert_view = targeted.json()["cards"][0]
+    assert bert_view["match_login"] == ANNA  # the address match is still reported
+    assert {c["field"] for c in bert_view["conflicts"]} == {"first_name", "last_name", "email"}
+    assert unknown_target.status_code == 404
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["applied"] == [
+        {"login": ANNA, "photo": False, "filled": [], "replaced": ["last_name"]}
+    ]
+    # Only the picked conflict changed; blank fields stay blank without "fields".
+    assert fields == ("", "Neuname", None, None)
+    assert bad_field.status_code == 422
 
 
 async def test_gdpr_erasure_removes_upload_and_rollback_restores(seeded_any: str) -> None:

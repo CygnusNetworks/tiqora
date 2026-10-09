@@ -401,6 +401,10 @@ class ArticleListItem(BaseModel):
     incoming_time: int | None = None
     ai_origin: bool = False
     security: ArticleSecurity | None = None
+    #: Whether "reply all" would reach anyone the plain reply does not (other
+    #: To/Cc recipients besides our own system addresses). ``None`` when not
+    #: computed (portal).
+    reply_all_available: bool | None = None
 
 
 class ArticleBody(BaseModel):

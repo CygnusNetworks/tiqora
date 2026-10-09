@@ -1,7 +1,7 @@
 """Background jobs: attempts, due time and checkpoint (retries and safe requeue).
 
-Revision ID: 20261009_0063
-Revises: 20261008_0062
+Revision ID: 20261009_0064
+Revises: 20261009_0063
 Create Date: 2026-10-09
 
 ``attempts`` counts the claims of a job, ``due_at`` holds a retried job back until that
@@ -17,8 +17,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "20261009_0063"
-down_revision: str | None = "20261008_0062"
+revision: str = "20261009_0064"
+down_revision: str | None = "20261009_0063"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -340,15 +340,16 @@ def _reply(**extra: Any) -> dict[str, Any]:
     }
 
 
-async def test_attachments_on_email_reply_are_422(
+async def test_attachments_on_note_are_422(
     seeded: tuple[str, async_sessionmaker[AsyncSession], _FakeGateway],
 ) -> None:
+    # Files ride along on Telegram and outgoing agent email only.
     url, factory, gateway = seeded
     async with _client(factory) as client:
         resp = await client.post(
             f"/api/v1/tickets/{TICKET_ID}/articles",
             json=_reply(
-                channel="email",
+                channel="note",
                 subject="Re",
                 attachments=[{"filename": "a.txt", "content_base64": _b64(b"a")}],
             ),

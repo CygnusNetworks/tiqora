@@ -33,6 +33,9 @@ from tiqora.ai.context import (
     latest_customer_article_id,
     load_articles,
 )
+from tiqora.ai.customer_pause import MAX_PAUSE_DAYS, active_pause_for_ticket
+from tiqora.ai.customer_pause import clear_pause as clear_customer_pause
+from tiqora.ai.customer_pause import set_pause as set_customer_pause
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
@@ -212,6 +215,21 @@ class AiAutopilotOut(BaseModel):
     # The newest customer message has no customer-visible agent answer yet —
     # the switch then offers to answer it right away when starting.
     unanswered_customer_message: bool = False
+    # The ticket's customer, for the "stop for this customer" choice; and, when
+    # ``reason == "customer_paused"``, which pause applies and until when.
+    customer_user_id: str | None = None
+    customer_id: str | None = None
+    customer_pause_scope: Literal["user", "company"] | None = None
+    customer_paused_until: UtcDateTime | None = None
+
+
+class AiCustomerPauseIn(BaseModel):
+    """Stop the automation for the ticket's customer user or company."""
+
+    scope: Literal["user", "company"]
+    #: Days from now; ``None`` = until an agent lifts it.
+    days: int | None = Field(default=None, ge=1, le=MAX_PAUSE_DAYS)
+    reason: str | None = Field(default=None, max_length=255)
 
 
 class AiAutopilotIn(BaseModel):
@@ -590,9 +608,59 @@ async def _autopilot_out(
     policy: TiqoraAiQueuePolicy | None,
     state: TiqoraAiTicketState | None,
 ) -> AiAutopilotOut:
+    out = await _autopilot_mode_out(session, ticket_id=ticket_id, policy=policy, state=state)
+    if out.mode == "unavailable":
+        return out
+    user_id, company_id = await _ticket_customer_keys(session, ticket_id)
+    out.customer_user_id = user_id
+    out.customer_id = company_id
+    if out.reason == "customer_paused":
+        pause = await active_pause_for_ticket(session, ticket_id)
+        if pause is not None:
+            out.customer_pause_scope = "company" if pause.scope == "company" else "user"
+            out.customer_paused_until = pause.paused_until
+    return out
+
+
+async def _ticket_customer_keys(
+    session: AsyncSession, ticket_id: int
+) -> tuple[str | None, str | None]:
+    row = (
+        await session.execute(
+            sa_text("SELECT customer_user_id, customer_id FROM ticket WHERE id = :t"),
+            {"t": ticket_id},
+        )
+    ).first()
+    if row is None:
+        return None, None
+    return (str(row[0]) if row[0] else None, str(row[1]) if row[1] else None)
+
+
+async def _autopilot_mode_out(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    policy: TiqoraAiQueuePolicy | None,
+    state: TiqoraAiTicketState | None,
+) -> AiAutopilotOut:
     unanswered = await unanswered_customer_article(session, ticket_id) is not None
     if policy is None or not policy.enabled_auto_reply:
         return AiAutopilotOut(mode="unavailable", unanswered_customer_message=unanswered)
+    customer_pause = await active_pause_for_ticket(session, ticket_id)
+    if customer_pause is not None:
+        # Stopped for the whole customer: lifting it is done on the customer
+        # (the ticket's own switch would change nothing).
+        return AiAutopilotOut(
+            mode="stopped",
+            reason="customer_paused",
+            by_name=(
+                await _user_name(session, customer_pause.created_by)
+                if customer_pause.created_by is not None
+                else None
+            ),
+            since=customer_pause.created_at,
+            unanswered_customer_message=unanswered,
+        )
     if state is not None and state.ai_paused_at is not None:
         return AiAutopilotOut(
             mode="stopped",
@@ -1222,6 +1290,55 @@ async def autopilot_route(
     else:
         await _stop_ai_autopilot(session, ticket_id=ticket_id, user_id=user.id, sysconfig=sysconfig)
     await session.commit()
+    state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
+    return await _autopilot_out(session, ticket_id=ticket_id, policy=policy, state=state)
+
+
+@router.post("/customer-pause", response_model=AiAutopilotOut)
+async def pause_customer_ai_route(
+    ticket_id: int, body: AiCustomerPauseIn, user: CurrentUser, session: DbSession
+) -> AiAutopilotOut:
+    """Stop the automation for this ticket's customer user or company (all
+    their tickets), for N days or until lifted. Same access rule as the
+    per-ticket pause; 409 when the ticket has no such customer."""
+    await _require_note_access(session, user, ticket_id)
+    user_key, company_key = await _ticket_customer_keys(session, ticket_id)
+    key = user_key if body.scope == "user" else company_key
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The ticket has no customer of that kind.",
+        )
+    await set_customer_pause(
+        session,
+        scope=body.scope,
+        customer_key=key,
+        days=body.days,
+        reason=body.reason,
+        user_id=user.id,
+    )
+    await session.commit()
+    return await _ticket_autopilot_out(session, user.id, ticket_id)
+
+
+@router.delete("/customer-pause", response_model=AiAutopilotOut)
+async def lift_customer_ai_pause_route(
+    ticket_id: int, user: CurrentUser, session: DbSession
+) -> AiAutopilotOut:
+    """Lift the customer pause that applies to this ticket. Idempotent."""
+    await _require_note_access(session, user, ticket_id)
+    pause = await active_pause_for_ticket(session, ticket_id)
+    if pause is not None:
+        await clear_customer_pause(session, scope=pause.scope, customer_key=pause.customer_key)
+        await session.commit()
+    return await _ticket_autopilot_out(session, user.id, ticket_id)
+
+
+async def _ticket_autopilot_out(
+    session: AsyncSession, user_id: int, ticket_id: int
+) -> AiAutopilotOut:
+    ticket = await TicketService(session).get_ticket(user_id, ticket_id)
+    policy = await get_queue_policy_by_queue(session, ticket.queue_id)
     state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
     return await _autopilot_out(session, ticket_id=ticket_id, policy=policy, state=state)
 

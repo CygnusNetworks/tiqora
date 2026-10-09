@@ -1,4 +1,4 @@
-"""Reporting migration 20261008_0062 up and down on real databases (both dialects).
+"""Reporting migration 20261009_0063 up and down on real databases (both dialects).
 
 Upgrades from the previous revision, checks the five report tables and the single
 ``tiqora_report_state`` row the migration creates (so first concurrent requests never
@@ -24,8 +24,8 @@ from tiqora.jobs.service import utc_now
 
 pytestmark = pytest.mark.db
 
-_PREVIOUS = "20261008_0061"
-_REPORTING = "20261008_0062"
+_PREVIOUS = "20261009_0062"
+_REPORTING = "20261009_0063"
 _TABLES = {
     "tiqora_report_ticket_fact",
     "tiqora_report_ticket_event",

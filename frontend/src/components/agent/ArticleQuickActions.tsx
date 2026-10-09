@@ -40,9 +40,10 @@ export function ArticleQuickActions({
   const [dialog, setDialog] = useState<"reply" | "replyAll" | "forward" | "bounce" | "split" | null>(
     null,
   );
-  const hasMultipleRecipients =
-    (article.to_address ?? "").includes(",") || Boolean(article.to_address && article.from_address);
   const isTelegram = channelNameOf(article) === "Telegram";
+  // The backend knows our system addresses: false = reply-all would reach
+  // nobody beyond the plain reply, so it is offered greyed out.
+  const replyAllUseful = article.reply_all_available !== false;
   const noPerm = t("ticket.toolbar.noPermission");
   const showDelete = canDelete && isInternalNote(article);
   const del = useDeleteArticleNote(ticketId, article.id);
@@ -84,9 +85,18 @@ export function ArticleQuickActions({
           )}
         </Button>
       </span>
-      {hasMultipleRecipients && !compact && (
-        <span title={!canNote ? noPerm : undefined} className="inline-flex">
-          <Button size="sm" variant="secondary" disabled={!canNote} onClick={() => setDialog("replyAll")}>
+      {!isTelegram && !compact && (
+        <span
+          title={!canNote ? noPerm : !replyAllUseful ? t("ticket.replyAllNoOthers") : undefined}
+          className="inline-flex"
+        >
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={!canNote || !replyAllUseful}
+            data-testid={`article-reply-all-${article.id}`}
+            onClick={() => setDialog("replyAll")}
+          >
             ↪ {t("ticket.replyAll")}
           </Button>
         </span>

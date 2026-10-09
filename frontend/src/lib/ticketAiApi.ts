@@ -100,6 +100,19 @@ export type AiAutopilotOut = {
   reason?: string | null;
   /** The newest customer message has no answer yet. */
   unanswered_customer_message?: boolean;
+  /** The ticket's customer user / company, for "stop for this customer". */
+  customer_user_id?: string | null;
+  customer_id?: string | null;
+  /** With `reason: "customer_paused"`: which pause applies, and until when
+   * (`null` = until lifted). */
+  customer_pause_scope?: "user" | "company" | null;
+  customer_paused_until?: string | null;
+};
+
+export type AiCustomerPauseIn = {
+  scope: "user" | "company";
+  /** `null` = until lifted. */
+  days: number | null;
 };
 
 export type AiAutopilotIn =
@@ -200,6 +213,21 @@ export const ticketAiApi = {
       "POST",
       `/api/v1/tickets/${ticketId}/ai/autopilot`,
       { body, signal },
+    );
+  },
+  /** Stop the automation for the ticket's customer (all their tickets). */
+  customerPause(ticketId: number, body: AiCustomerPauseIn, signal?: AbortSignal) {
+    return api.request<AiAutopilotOut>(
+      "POST",
+      `/api/v1/tickets/${ticketId}/ai/customer-pause`,
+      { body, signal },
+    );
+  },
+  liftCustomerPause(ticketId: number, signal?: AbortSignal) {
+    return api.request<AiAutopilotOut>(
+      "DELETE",
+      `/api/v1/tickets/${ticketId}/ai/customer-pause`,
+      { signal },
     );
   },
   pause(ticketId: number, signal?: AbortSignal) {

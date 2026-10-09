@@ -9,11 +9,14 @@ import { BuildingIcon, DownloadIcon, PlusIcon } from "@/components/ui/icons";
 import { ApiError, api } from "@/lib/api";
 import { domainFromUrl } from "@/lib/avatar";
 import { avatarApi } from "@/lib/avatarApi";
-import { isAvatarImage, useFileDrop } from "@/lib/useFileDrop";
+import { isAvatarImage, isVcardFile, useFileDrop } from "@/lib/useFileDrop";
 import { DropOverlay, EditableAvatar } from "./AvatarEditor";
 import { useAvatarEditor } from "./useAvatarEditor";
 import { CallAction, EmailTicketLink } from "./CustomerActions";
+import { CustomerAiPause } from "./CustomerAiPause";
+import { dropRejectMessage } from "./dropMessage";
 import { customerName, initialsOf } from "./customerFormat";
+import { vcardDragProps } from "./vcardExport";
 
 const CONTACTS_SHOWN = 200;
 
@@ -27,11 +30,14 @@ export function CompanyPanel({
   customerId,
   onSelectContact,
   onAddContact,
+  onVcard,
 }: {
   customerId: string;
   onSelectContact: (login: string) => void;
   /** Shown only to agents who may edit customers. */
   onAddContact?: (company: { customer_id: string; name: string }) => void;
+  /** A .vcf dropped on the company: imported like one dropped on the list. */
+  onVcard?: (file: File) => void;
 }) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -67,10 +73,14 @@ export function CompanyPanel({
     remove: () => avatarApi.deleteCompanyLogo(customerId),
   });
   const drop = useFileDrop({
-    accept: isAvatarImage,
-    onFiles: ([file]) => void logo.uploadFile(file),
-    onReject: () => logo.setError(t("avatars.wrongType")),
+    accept: (f) => isAvatarImage(f) || (Boolean(onVcard) && isVcardFile(f)),
+    onFiles: ([file]) => {
+      if (onVcard && isVcardFile(file)) onVcard(file);
+      else void logo.uploadFile(file);
+    },
+    onReject: (r) => logo.setError(dropRejectMessage(t, r, "avatars.wrongType")),
     disabled: !canEdit || !companyQ.data,
+    vcardText: Boolean(onVcard),
   });
 
   if (companyQ.isLoading) {
@@ -160,6 +170,8 @@ export function CompanyPanel({
           <a
             href={api.companyVcardsUrl(customerId)}
             download
+            {...vcardDragProps(api.companyVcardsUrl(customerId), name)}
+            title={t("customerWorkbench.vcardDrag")}
             className="inline-flex items-center gap-1 text-accent hover:underline"
             data-testid="company-panel-vcards"
           >
@@ -168,6 +180,12 @@ export function CompanyPanel({
           </a>
         )}
       </div>
+
+      <CustomerAiPause
+        scope="company"
+        customerKey={customerId}
+        canEdit={Boolean(user?.can_edit_customers)}
+      />
 
       <section className="rounded-lg border border-hairline bg-surface" aria-labelledby="company-contacts-title">
         <h2 id="company-contacts-title" className="px-3.5 py-2.5 text-sm font-semibold text-ink">

@@ -8,7 +8,19 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy import text as sa_text
 
+from tiqora.ai.customer_pause import (
+    MAX_PAUSE_DAYS,
+    clear_pause,
+    get_pause,
+    set_pause,
+)
+from tiqora.ai.models import (
+    CUSTOMER_PAUSE_SCOPE_COMPANY,
+    CUSTOMER_PAUSE_SCOPE_USER,
+    TiqoraAiCustomerPause,
+)
 from tiqora.api.deps import CurrentUser, DbSession
 from tiqora.api.v1.admin.common import (
     CUSTOMER_COMPANY_CACHE_TYPES,
@@ -30,7 +42,7 @@ from tiqora.domain.new_ticket_queue import (
     QueueSuggestion,
     suggest_new_ticket_queue,
 )
-from tiqora.domain.schemas import CustomerUserOut
+from tiqora.domain.schemas import CustomerUserOut, UtcDateTime
 from tiqora.domain.vcard import build_vcard, vcard_filename
 
 router = APIRouter(prefix="/customers", tags=["customers"])
@@ -469,3 +481,134 @@ async def suggested_queue(
     null when the agent may create tickets nowhere.
     """
     return await suggest_new_ticket_queue(session, user.id, screen, login)
+
+
+class CustomerAiPauseOut(BaseModel):
+    """Whether the AI automation is switched off for a customer user or company."""
+
+    active: bool
+    #: ``None`` while ``active``: until an agent lifts it.
+    paused_until: UtcDateTime | None = None
+    reason: str | None = None
+    by_name: str | None = None
+    since: UtcDateTime | None = None
+
+
+class CustomerAiPauseIn(BaseModel):
+    #: Days from now; ``None`` = until an agent lifts it.
+    days: int | None = Field(default=None, ge=1, le=MAX_PAUSE_DAYS)
+    reason: str | None = Field(default=None, max_length=255)
+
+
+async def _pause_out(session: DbSession, row: TiqoraAiCustomerPause | None) -> CustomerAiPauseOut:
+    if row is None:
+        return CustomerAiPauseOut(active=False)
+    by_name: str | None = None
+    if row.created_by is not None:
+        who = (
+            (
+                await session.execute(
+                    sa_text("SELECT login, first_name, last_name FROM users WHERE id = :u"),
+                    {"u": row.created_by},
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if who is not None:
+            by_name = f"{who['first_name'] or ''} {who['last_name'] or ''}".strip() or who["login"]
+    return CustomerAiPauseOut(
+        active=True,
+        paused_until=row.paused_until,
+        reason=row.reason,
+        by_name=by_name,
+        since=row.created_at,
+    )
+
+
+async def _require_customer_user(session: DbSession, login: str) -> None:
+    found = (
+        await session.execute(select(CustomerUser.login).where(CustomerUser.login == login))
+    ).scalar_one_or_none()
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+
+async def _require_company(session: DbSession, customer_id: str) -> None:
+    found = (
+        await session.execute(
+            select(CustomerCompany.customer_id).where(CustomerCompany.customer_id == customer_id)
+        )
+    ).scalar_one_or_none()
+    if found is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+
+@router.get("/companies/{customer_id:path}/ai-pause", response_model=CustomerAiPauseOut)
+async def get_company_ai_pause(
+    customer_id: str, user: CurrentUser, session: DbSession
+) -> CustomerAiPauseOut:
+    _ = user
+    return await _pause_out(
+        session, await get_pause(session, CUSTOMER_PAUSE_SCOPE_COMPANY, customer_id)
+    )
+
+
+@router.put("/companies/{customer_id:path}/ai-pause", response_model=CustomerAiPauseOut)
+async def put_company_ai_pause(
+    customer_id: str, body: CustomerAiPauseIn, user: CustomerEditUser, session: DbSession
+) -> CustomerAiPauseOut:
+    """Switch the AI automation off for every contact of the company."""
+    await _require_company(session, customer_id)
+    row = await set_pause(
+        session,
+        scope=CUSTOMER_PAUSE_SCOPE_COMPANY,
+        customer_key=customer_id,
+        days=body.days,
+        reason=body.reason,
+        user_id=user.id,
+    )
+    await session.commit()
+    return await _pause_out(session, row)
+
+
+@router.delete("/companies/{customer_id:path}/ai-pause", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_company_ai_pause(
+    customer_id: str, user: CustomerEditUser, session: DbSession
+) -> None:
+    _ = user
+    await clear_pause(session, scope=CUSTOMER_PAUSE_SCOPE_COMPANY, customer_key=customer_id)
+    await session.commit()
+
+
+@router.get("/{login}/ai-pause", response_model=CustomerAiPauseOut)
+async def get_customer_ai_pause(
+    login: str, user: CurrentUser, session: DbSession
+) -> CustomerAiPauseOut:
+    _ = user
+    return await _pause_out(session, await get_pause(session, CUSTOMER_PAUSE_SCOPE_USER, login))
+
+
+@router.put("/{login}/ai-pause", response_model=CustomerAiPauseOut)
+async def put_customer_ai_pause(
+    login: str, body: CustomerAiPauseIn, user: CustomerEditUser, session: DbSession
+) -> CustomerAiPauseOut:
+    """Switch the AI automation off for this customer user (all their tickets)."""
+    await _require_customer_user(session, login)
+    row = await set_pause(
+        session,
+        scope=CUSTOMER_PAUSE_SCOPE_USER,
+        customer_key=login,
+        days=body.days,
+        reason=body.reason,
+        user_id=user.id,
+    )
+    await session.commit()
+    return await _pause_out(session, row)
+
+
+@router.delete("/{login}/ai-pause", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_customer_ai_pause(login: str, user: CustomerEditUser, session: DbSession) -> None:
+    _ = user
+    await clear_pause(session, scope=CUSTOMER_PAUSE_SCOPE_USER, customer_key=login)
+    await session.commit()

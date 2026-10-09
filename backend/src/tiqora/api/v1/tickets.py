@@ -188,8 +188,9 @@ class ArticleCreateRequest(BaseModel):
     # Required when ``state_id`` is a pending-type state (422 otherwise);
     # ignored for non-pending states. Same type/format as PATCH ``pending_time``.
     pending_time: datetime | None = None
-    # Telegram chat composer only (422 on any other channel): files sent
-    # before the text, a quoted article of this ticket, and inline buttons.
+    # Files: Telegram chat composer (sent before the text) and outgoing agent
+    # email (attached to the mail); 422 on any other channel. The quote and
+    # inline buttons are Telegram only.
     attachments: list[ArticleAttachmentIn] = Field(default_factory=list, max_length=10)
     telegram_reply_to_article_id: int | None = None
     telegram_buttons: list[TelegramButtonIn] = Field(default_factory=list, max_length=8)
@@ -310,6 +311,15 @@ def _telegram_extras(
     request uses none of them). 422 when they are used off Telegram, on bad
     base64, or when the decoded total exceeds Telegram's 50 MB upload limit.
     """
+    if body.attachments and body.channel.lower() == "email" and body.sender_type == "agent":
+        # Outgoing agent email carries files too (reply dialog); buttons and
+        # quotes stay Telegram-only.
+        if body.telegram_buttons or body.telegram_reply_to_article_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="buttons/quotes are only supported for Telegram replies",
+            )
+        return decode_attachments(body.attachments), None
     uses_extras = bool(
         body.attachments or body.telegram_buttons or body.telegram_reply_to_article_id is not None
     )
@@ -1625,7 +1635,8 @@ async def create_article(
 
     Telegram replies may carry ``attachments``, ``telegram_buttons`` and
     ``telegram_reply_to_article_id`` (422 on any other channel); a failed
-    Telegram send returns 409 with nothing stored.
+    Telegram send returns 409 with nothing stored. Outgoing agent email may
+    carry ``attachments`` as well (413 over the upload limit).
 
     With ``state_id`` the ticket's state is changed after the article, in the
     same transaction (PATCH semantics). The state change is validated before

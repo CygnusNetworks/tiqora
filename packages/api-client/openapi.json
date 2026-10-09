@@ -1244,6 +1244,55 @@
             ],
             "title": "By Name"
           },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Id"
+          },
+          "customer_pause_scope": {
+            "anyOf": [
+              {
+                "enum": [
+                  "user",
+                  "company"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Pause Scope"
+          },
+          "customer_paused_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Paused Until"
+          },
+          "customer_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer User Id"
+          },
           "grant_remaining": {
             "anyOf": [
               {
@@ -1344,6 +1393,49 @@
           "created_at"
         ],
         "title": "AiCustomSummaryOut",
+        "type": "object"
+      },
+      "AiCustomerPauseIn": {
+        "description": "Stop the automation for the ticket's customer user or company.",
+        "properties": {
+          "days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "scope": {
+            "enum": [
+              "user",
+              "company"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "AiCustomerPauseIn",
         "type": "object"
       },
       "AiDraftOut": {
@@ -5481,6 +5573,17 @@
             "title": "Is Visible For Customer",
             "type": "boolean"
           },
+          "reply_all_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply All Available"
+          },
           "security": {
             "anyOf": [
               {
@@ -7321,7 +7424,7 @@
             "type": "string"
           },
           "selections": {
-            "description": "JSON: [{\"index\", \"login\", \"photo\", \"fields\"}]",
+            "description": "JSON: [{\"index\", \"login\", \"photo\", \"fields\", \"replace\"}]",
             "title": "Selections",
             "type": "string"
           }
@@ -7339,6 +7442,19 @@
             "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
+          },
+          "login": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Compare every card with this customer instead of its match (a card dropped on one customer).",
+            "title": "Login"
           }
         },
         "required": [
@@ -8646,6 +8762,97 @@
           "values"
         ],
         "title": "CryptoSettingsUpdate",
+        "type": "object"
+      },
+      "CustomerAiPauseIn": {
+        "properties": {
+          "days": {
+            "anyOf": [
+              {
+                "maximum": 3650.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "title": "CustomerAiPauseIn",
+        "type": "object"
+      },
+      "CustomerAiPauseOut": {
+        "description": "Whether the AI automation is switched off for a customer user or company.",
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "by_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By Name"
+          },
+          "paused_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused Until"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          }
+        },
+        "required": [
+          "active"
+        ],
+        "title": "CustomerAiPauseOut",
         "type": "object"
       },
       "CustomerCompanyCreate": {
@@ -30502,6 +30709,37 @@
         "title": "UserUpdate",
         "type": "object"
       },
+      "VCardFieldConflict": {
+        "description": "A field the customer already has with a different value than the card.",
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "field": {
+            "enum": [
+              "first_name",
+              "last_name",
+              "email",
+              "phone",
+              "mobile"
+            ],
+            "title": "Field",
+            "type": "string"
+          },
+          "incoming": {
+            "title": "Incoming",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "current",
+          "incoming"
+        ],
+        "title": "VCardFieldConflict",
+        "type": "object"
+      },
       "VCardImportApplied": {
         "properties": {
           "filled": {
@@ -30518,12 +30756,20 @@
           "photo": {
             "title": "Photo",
             "type": "boolean"
+          },
+          "replaced": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Replaced",
+            "type": "array"
           }
         },
         "required": [
           "login",
           "photo",
-          "filled"
+          "filled",
+          "replaced"
         ],
         "title": "VCardImportApplied",
         "type": "object"
@@ -30546,6 +30792,13 @@
       },
       "VCardImportCard": {
         "properties": {
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/VCardFieldConflict"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
           "display_name": {
             "title": "Display Name",
             "type": "string"
@@ -30691,6 +30944,7 @@
           "match_login",
           "match_name",
           "fill_fields",
+          "conflicts",
           "has_existing_avatar"
         ],
         "title": "VCardImportCard",
@@ -65314,6 +65568,228 @@
         ]
       }
     },
+    "/api/v1/customers/companies/{customer_id}/ai-pause": {
+      "delete": {
+        "operationId": "delete_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "title": "Customer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Company Ai Pause",
+        "tags": [
+          "customers"
+        ]
+      },
+      "get": {
+        "operationId": "get_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "title": "Customer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAiPauseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Company Ai Pause",
+        "tags": [
+          "customers"
+        ]
+      },
+      "put": {
+        "description": "Switch the AI automation off for every contact of the company.",
+        "operationId": "put_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "customer_id",
+            "required": true,
+            "schema": {
+              "title": "Customer Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerAiPauseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAiPauseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Company Ai Pause",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
     "/api/v1/customers/companies/{customer_id}/logo": {
       "delete": {
         "operationId": "delete_company_logo_api_v1_customers_companies__customer_id__logo_delete",
@@ -65539,7 +66015,7 @@
     },
     "/api/v1/customers/vcard-import/apply": {
       "post": {
-        "description": "Fill blank fields and/or store photos for the selected cards.",
+        "description": "Fill blank fields, replace chosen conflicts and/or store photos per selected card.",
         "operationId": "apply_vcard_import_api_v1_customers_vcard_import_apply_post",
         "parameters": [
           {
@@ -65923,6 +66399,228 @@
           }
         },
         "summary": "Update Customer",
+        "tags": [
+          "customers"
+        ]
+      }
+    },
+    "/api/v1/customers/{login}/ai-pause": {
+      "delete": {
+        "operationId": "delete_customer_ai_pause_api_v1_customers__login__ai_pause_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Customer Ai Pause",
+        "tags": [
+          "customers"
+        ]
+      },
+      "get": {
+        "operationId": "get_customer_ai_pause_api_v1_customers__login__ai_pause_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAiPauseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Customer Ai Pause",
+        "tags": [
+          "customers"
+        ]
+      },
+      "put": {
+        "description": "Switch the AI automation off for this customer user (all their tickets).",
+        "operationId": "put_customer_ai_pause_api_v1_customers__login__ai_pause_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "login",
+            "required": true,
+            "schema": {
+              "title": "Login",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerAiPauseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerAiPauseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Customer Ai Pause",
         "tags": [
           "customers"
         ]
@@ -76474,6 +77172,164 @@
         ]
       }
     },
+    "/api/v1/tickets/{ticket_id}/ai/customer-pause": {
+      "delete": {
+        "description": "Lift the customer pause that applies to this ticket. Idempotent.",
+        "operationId": "lift_customer_ai_pause_route_api_v1_tickets__ticket_id__ai_customer_pause_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiAutopilotOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lift Customer Ai Pause Route",
+        "tags": [
+          "ai"
+        ]
+      },
+      "post": {
+        "description": "Stop the automation for this ticket's customer user or company (all\ntheir tickets), for N days or until lifted. Same access rule as the\nper-ticket pause; 409 when the ticket has no such customer.",
+        "operationId": "pause_customer_ai_route_api_v1_tickets__ticket_id__ai_customer_pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiCustomerPauseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiAutopilotOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Customer Ai Route",
+        "tags": [
+          "ai"
+        ]
+      }
+    },
     "/api/v1/tickets/{ticket_id}/ai/draft": {
       "post": {
         "description": "Manual Assist: kick off the agent run in the background and return\nimmediately.\n\nHetzner-hosted reasoning models can take 4-7 minutes per run \u2014 long past\nnginx's ``proxy_read_timeout 90s`` in front of this API \u2014 so the run\nitself happens in an ``asyncio.create_task`` (see\n:func:`_run_manual_draft_background`) started *after* the pre-flight\nchecks and the lock below, both still synchronous so a second POST while\na run is in flight gets a deterministic 423 rather than racing the\nbackground task. Always draft-path (plan \u00a73.4) \u2014 never sends a\ncustomer-visible article, regardless of the queue's autonomy setting.",
@@ -77272,7 +78128,7 @@
         ]
       },
       "post": {
-        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored.\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.",
+        "description": "Add an article to a ticket. Requires ``rw`` permission.\n\nAgent email replies (``channel=email``, ``sender_type=agent``) are SMTP-\ndelivered then stored (send-then-store). Delivery failure returns HTTP 502\nand does not leave a silent no-op 201.\n\nTelegram replies may carry ``attachments``, ``telegram_buttons`` and\n``telegram_reply_to_article_id`` (422 on any other channel); a failed\nTelegram send returns 409 with nothing stored. Outgoing agent email may\ncarry ``attachments`` as well (413 over the upload limit).\n\nWith ``state_id`` the ticket's state is changed after the article, in the\nsame transaction (PATCH semantics). The state change is validated before\nthe article is created, so an invalid one returns 403/404/422 without\nsending or storing anything.",
         "operationId": "create_article_api_v1_tickets__ticket_id__articles_post",
         "parameters": [
           {

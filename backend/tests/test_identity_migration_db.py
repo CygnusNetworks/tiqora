@@ -1,7 +1,7 @@
-"""Identity migrations 20261009_0064 (providers, links, managed assignments) and
-20261009_0065 (customer TOTP/passkeys) on real databases.
+"""Identity migrations 20261009_0065 (providers, links, managed assignments) and
+20261009_0066 (customer TOTP/passkeys) on real databases.
 
-Renumbered after the roadmap head 20261009_0063 at the wave-1 merge. Upgrades from
+Renumbered after the roadmap head 20261009_0064 at the wave-1 merge. Upgrades from
 the previous head, checks the tables (and that ``config`` / ``metadata_xml`` hold
 large SAML metadata on MariaDB), downgrades back and upgrades again. Sync test on
 purpose: Alembic's env.py runs its own event loop. Leaves the schema at head with
@@ -24,9 +24,9 @@ from tiqora.config import get_settings
 
 pytestmark = pytest.mark.db
 
-_PREVIOUS = "20261009_0063"
-_IDENTITY = "20261009_0064"
-_TWO_FACTOR = "20261009_0065"
+_PREVIOUS = "20261009_0064"
+_IDENTITY = "20261009_0065"
+_TWO_FACTOR = "20261009_0066"
 _TABLES = {
     "tiqora_identity_provider",
     "tiqora_identity_link",
@@ -138,7 +138,7 @@ def test_identity_migrations_upgrade_downgrade_and_hold_large_metadata(alembic_e
         _migrate(_PREVIOUS)
         assert _tables(sync_url) == set()
 
-        # Up to the identity head, not "head": later migrations (deployed revisions, 0066)
+        # Up to the identity head, not "head": later migrations (deployed revisions, 0067)
         # sit on top of it.
         _migrate(_TWO_FACTOR)
         assert _version(sync_url) == _TWO_FACTOR

@@ -54,7 +54,7 @@ def reset_tiqora_schema(sync_url: str) -> None:
         engine.dispose()
 
 
-#: rows Tiqora migrations insert themselves (migration 20261008_0062: the report state row)
+#: rows Tiqora migrations insert themselves (migration 20261009_0063: the report state row)
 _MIGRATION_SEED_TABLES = ("tiqora_report_state",)
 
 

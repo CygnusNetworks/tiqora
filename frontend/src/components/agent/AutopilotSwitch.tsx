@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { Popover } from "@/components/ui/Popover";
 import { usePopoverClose } from "@/components/ui/popoverContext";
 import { Spinner } from "@/components/ui/Spinner";
+import { DEFAULT_PAUSE_DAYS, PauseDurationPicker } from "@/components/customers/CustomerAiPause";
 import { cn } from "@/lib/cn";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -16,6 +17,9 @@ import {
 /** Release sizes offered when switching the autopilot back on. */
 const RUN_CHOICES = [1, 3, 5, 10] as const;
 const DEFAULT_RUNS = 3;
+
+/** What stopping the autopilot applies to. */
+type StopScope = "ticket" | "user" | "company";
 
 const KNOWN_REASONS = new Set([
   "max_clarifications",
@@ -46,6 +50,7 @@ export function AutopilotSwitch({ ticketId, canNote }: { ticketId: number; canNo
   const locale = i18n.language;
   const isActive = auto.mode === "active";
   const isStopped = auto.mode === "stopped";
+  const customerPaused = isStopped && auto.reason === "customer_paused";
   const granted = isActive && auto.grant_remaining != null && auto.grant_total != null;
 
   const label = isActive
@@ -60,7 +65,9 @@ export function AutopilotSwitch({ ticketId, canNote }: { ticketId: number; canNo
       })
     : isActive
       ? t("ticket.autopilot.sub.queueLimits")
-      : isStopped
+      : customerPaused
+        ? t("ticket.autopilot.sub.customerPaused")
+        : isStopped
         ? auto.by_name
           ? t("ticket.autopilot.sub.stoppedBy", { name: auto.by_name })
           : formatDateTime(auto.since, locale)
@@ -118,13 +125,21 @@ function reasonText(
 }
 
 function AutopilotPanel({ ticketId, auto }: { ticketId: number; auto: AiAutopilotOut }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const close = usePopoverClose();
   const [runs, setRuns] = useState<number>(DEFAULT_RUNS);
   const [answerNow, setAnswerNow] = useState(true);
+  // What "stop" applies to: this ticket, or every ticket of its customer.
+  const [stopScope, setStopScope] = useState<StopScope>("ticket");
+  const [stopDays, setStopDays] = useState<number | null>(DEFAULT_PAUSE_DAYS);
   const isActive = auto.mode === "active";
   const canAnswerNow = Boolean(auto.unanswered_customer_message);
+  const scopes: StopScope[] = [
+    "ticket",
+    ...(auto.customer_user_id ? (["user"] as const) : []),
+    ...(auto.customer_id ? (["company"] as const) : []),
+  ];
 
   // Starting or stopping writes an internal note, so refresh the whole
   // ticket (articles, history, AI state), not only the ai key.
@@ -136,9 +151,31 @@ function AutopilotPanel({ ticketId, auto }: { ticketId: number; auto: AiAutopilo
     },
   });
 
+  const customerMutation = useMutation({
+    mutationFn: () =>
+      stopScope === "ticket"
+        ? ticketAiApi.autopilot(ticketId, { action: "stop" })
+        : ticketAiApi.customerPause(ticketId, { scope: stopScope, days: stopDays }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
+      void queryClient.invalidateQueries({ queryKey: ["customers", "ai-pause"] });
+      close();
+    },
+  });
+  const liftMutation = useMutation({
+    mutationFn: () => ticketAiApi.liftCustomerPause(ticketId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["tickets", ticketId] });
+      void queryClient.invalidateQueries({ queryKey: ["customers", "ai-pause"] });
+      close();
+    },
+  });
+
   const explain = isActive
     ? t("ticket.autopilot.explain.active")
-    : auto.mode === "stopped"
+    : auto.reason === "customer_paused"
+      ? t("ticket.autopilot.explain.customerPaused")
+      : auto.mode === "stopped"
       ? t("ticket.autopilot.explain.stopped")
       : t("ticket.autopilot.explain.handedOver");
 
@@ -162,18 +199,81 @@ function AutopilotPanel({ ticketId, auto }: { ticketId: number; auto: AiAutopilo
                 : t("ticket.autopilot.remainingQueue")}
             </span>
           </div>
+          {scopes.length > 1 && (
+            <div className="space-y-1.5" data-testid="autopilot-stop-scope">
+              <p className="text-xs font-medium text-ink">{t("ticket.autopilot.stopScope.label")}</p>
+              {scopes.map((scope) => (
+                <label
+                  key={scope}
+                  className="flex cursor-pointer items-center gap-2 text-xs leading-snug text-ink"
+                >
+                  <input
+                    type="radio"
+                    name="autopilot-stop-scope"
+                    checked={stopScope === scope}
+                    onChange={() => setStopScope(scope)}
+                    data-testid={`autopilot-scope-${scope}`}
+                    className="h-3.5 w-3.5 accent-accent"
+                  />
+                  {t(`ticket.autopilot.stopScope.${scope}`)}
+                </label>
+              ))}
+              {stopScope !== "ticket" && (
+                <PauseDurationPicker
+                  value={stopDays}
+                  onChange={setStopDays}
+                  testId="autopilot-stop-days"
+                />
+              )}
+            </div>
+          )}
           {/* A plain button: the Button variants set their own border and text
               colour, which `cn` would not override. */}
           <button
             type="button"
             className="inline-flex h-8 w-full items-center justify-center rounded-md border border-danger/40 bg-danger/10 text-sm font-medium text-danger transition-colors duration-100 hover:bg-danger/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:opacity-60"
             data-testid="autopilot-stop"
-            disabled={mutation.isPending}
-            onClick={() => mutation.mutate({ action: "stop" })}
+            disabled={customerMutation.isPending}
+            onClick={() => customerMutation.mutate()}
           >
-            {mutation.isPending ? <Spinner className="h-3.5 w-3.5" /> : t("ticket.autopilot.stop")}
+            {customerMutation.isPending ? (
+              <Spinner className="h-3.5 w-3.5" />
+            ) : (
+              t("ticket.autopilot.stop")
+            )}
           </button>
           <p className="text-[11px] leading-relaxed text-muted">{t("ticket.autopilot.stopHint")}</p>
+        </div>
+      ) : auto.reason === "customer_paused" ? (
+        <div className="space-y-2.5" data-testid="autopilot-customer-paused">
+          <p className="text-xs text-ink">
+            {auto.customer_pause_scope === "company"
+              ? t("ticket.autopilot.pausedScope.company")
+              : t("ticket.autopilot.pausedScope.user")}
+            {" · "}
+            {auto.customer_paused_until
+              ? t("ticket.autopilot.pausedUntil", {
+                  date: formatDateTime(auto.customer_paused_until, i18n.language),
+                })
+              : t("customerAiPause.untilLifted")}
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full justify-center"
+            data-testid="autopilot-lift-customer"
+            disabled={liftMutation.isPending}
+            onClick={() => liftMutation.mutate()}
+          >
+            {liftMutation.isPending ? (
+              <Spinner className="h-3.5 w-3.5" />
+            ) : (
+              t("ticket.autopilot.liftCustomer")
+            )}
+          </Button>
+          <p className="text-[11px] leading-relaxed text-muted">
+            {t("ticket.autopilot.customerPausedHint")}
+          </p>
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -234,7 +334,7 @@ function AutopilotPanel({ ticketId, auto }: { ticketId: number; auto: AiAutopilo
         </div>
       )}
 
-      {mutation.isError && (
+      {(mutation.isError || customerMutation.isError || liftMutation.isError) && (
         <p className="text-xs text-danger" role="alert" data-testid="autopilot-error">
           {t("ticket.autopilot.error")}
         </p>

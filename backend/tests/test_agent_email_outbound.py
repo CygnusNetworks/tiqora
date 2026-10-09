@@ -307,6 +307,39 @@ def test_build_message_agent_headers() -> None:
     assert "X-OTRS-Loop" not in msg
 
 
+def test_build_message_with_attachments_is_multipart_mixed() -> None:
+    msg = build_message(
+        from_addr="Support <support@example.com>",
+        to_addrs="alice@example.com",
+        cc_addrs=None,
+        subject="Re: ticket",
+        body="Anbei das Formular.",
+        content_type="text/plain; charset=utf-8",
+        in_reply_to=None,
+        loop_hint=False,
+        attachments=[
+            ("Formular.pdf", "application/pdf", b"%PDF-1.4 data"),
+            ("notiz.txt", "text/plain; charset=utf-8", b"Gr\xc3\xbc\xc3\x9fe"),
+            ("raw.eml", "message/rfc822", b"From: x"),
+            ("blob", "", b"\x00\x01"),
+        ],
+    )
+    assert msg.get_content_type() == "multipart/mixed"
+    body = msg.get_body(("plain",))
+    assert body is not None and "Anbei das Formular." in body.get_content()
+    parts = [
+        (p.get_filename(), p.get_content_type(), p.get_payload(decode=True))
+        for p in msg.iter_attachments()
+    ]
+    assert parts == [
+        ("Formular.pdf", "application/pdf", b"%PDF-1.4 data"),
+        ("notiz.txt", "text/plain", b"Gr\xc3\xbc\xc3\x9fe"),
+        # Structured types cannot take raw bytes — sent as an opaque file.
+        ("raw.eml", "application/octet-stream", b"From: x"),
+        ("blob", "application/octet-stream", b"\x00\x01"),
+    ]
+
+
 # Real web.de/GMX "trinity-..." id: 107 chars, no legal fold point. On Python
 # 3.12 the unstructured-header folder turned this into RFC 2047 encoded-words
 # ("=?utf-8?q?=3Ctrinity-...") which no MUA matches against a Message-ID, so
@@ -381,6 +414,13 @@ async def test_agent_email_reply_sends_and_stores(
         factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         sysconfig = _make_sysconfig()
         sender = CapturingMailSender()
+        # Attachment bytes go into the TEXT column raw, which only MySQL/MariaDB
+        # takes (Znuny stores base64 on PostgreSQL; not ported here yet).
+        files = (
+            [("Formular.pdf", "application/pdf", b"%PDF-1.4 data")]
+            if url_fixture == "mariadb_znuny_url"
+            else []
+        )
 
         async with factory() as session, session.begin():
             svc = TicketWriteService(session, factory, sysconfig, mail_sender=sender)
@@ -397,6 +437,7 @@ async def test_agent_email_reply_sends_and_stores(
                     cc="cc91@example.com",
                     in_reply_to=ids["orig_mid"],
                     references=ids["orig_mid"],
+                    attachments=files,
                 ),
             )
             assert article_id > 0
@@ -405,11 +446,17 @@ async def test_agent_email_reply_sends_and_stores(
         msg = sender.sent[0]
         assert msg["To"] == ids["customer_email"]
         assert msg["Cc"] == "cc91@example.com"
+        sent_files = [
+            (p.get_filename(), p.get_payload(decode=True)) for p in msg.iter_attachments()
+        ]
+        assert sent_files == [(name, content) for name, _ct, content in files]
         # Default Ticket::Hook=Ticket#, SubjectFormat=Left → tag left of subject.
         expected_subject = f"[Ticket#{ids['tn']}] Re: Outbound ticket 911"
         assert msg["Subject"] == expected_subject
         assert f"[Ticket#{ids['tn']}]" in (msg["Subject"] or "")
-        body = msg.get_content()
+        body_part = msg.get_body(("plain",))
+        assert body_part is not None
+        body = body_part.get_content()
         assert "Thanks for your report" in body
         assert "Your Ticket-Team" in body
         assert "Ada" in body and "Lovelace" in body
@@ -440,6 +487,20 @@ async def test_agent_email_reply_sends_and_stores(
             assert ids["support_email"] in (row[4] or "")
             assert row[5] == ids["customer_email"]
             assert row[6] is not None, "a_message_id_md5 required for Znuny follow-up"
+            stored = (
+                (
+                    await session.execute(
+                        text(
+                            "SELECT filename FROM article_data_mime_attachment"
+                            " WHERE article_id = :aid"
+                        ),
+                        {"aid": article_id},
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert list(stored) == [name for name, _ct, _content in files]
 
         await engine.dispose()
     finally:

@@ -1,7 +1,7 @@
 """Create identity provider, link and managed-assignment tables.
 
-Revision ID: 20261009_0064
-Revises: 20261009_0063
+Revision ID: 20261009_0065
+Revises: 20261009_0064
 Create Date: 2026-10-09
 
 ``metadata_xml`` and ``config`` (holds pasted SAML IdP metadata) are
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
 
-revision: str = "20261009_0064"
-down_revision: str | None = "20261009_0063"
+revision: str = "20261009_0065"
+down_revision: str | None = "20261009_0064"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -1,7 +1,7 @@
 """Create tiqora_job and tiqora_job_file for background jobs.
 
-Revision ID: 20261008_0061
-Revises: 20261007_0060
+Revision ID: 20261009_0062
+Revises: 20261009_0061
 Create Date: 2026-10-08
 
 ``result`` is ``MEDIUMTEXT`` on MariaDB (handler results are JSON up to 1 MB),
@@ -17,8 +17,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import mysql
 
-revision: str = "20261008_0061"
-down_revision: str | None = "20261007_0060"
+revision: str = "20261009_0062"
+down_revision: str | None = "20261009_0061"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

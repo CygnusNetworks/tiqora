@@ -569,6 +569,63 @@ describe("ReplyDialog reset after send / persistence without send", () => {
     expect(reopenedSubject.value).not.toBe("Re: Changed subject");
   });
 
+  it("sends attached files with the reply and drops them afterwards", async () => {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
+
+    wrap(<ControlledReplyDialog ticketId={7} articleId={12} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
+
+    const file = new File(["hello"], "Formular.pdf", { type: "application/pdf" });
+    fireEvent.change(screen.getByTestId("reply-attach-input"), {
+      target: { files: [file] },
+    });
+    expect(screen.getByTestId("reply-attachments").textContent).toContain(
+      "Formular.pdf",
+    );
+    // Encoded asynchronously; send unlocks once the payload is ready.
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("reply-send") as HTMLButtonElement).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(screen.getByTestId("reply-send"));
+
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    const payload = createArticle.mock.calls[0][1] as {
+      attachments?: { filename: string; content_type: string; content_base64: string }[];
+    };
+    expect(payload.attachments).toEqual([
+      {
+        filename: "Formular.pdf",
+        content_type: "application/pdf",
+        content_base64: btoa("hello"),
+      },
+    ]);
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("reply-dialog")).toBeNull(),
+    );
+    fireEvent.click(screen.getByTestId("reopen"));
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
+    expect(screen.queryByTestId("reply-attachments")).toBeNull();
+  });
+
+  it("sends no attachments field without files", async () => {
+    getReplyDraft.mockResolvedValue({ ...baseDraft, to_address: "to@x.com" });
+
+    wrap(<ControlledReplyDialog ticketId={7} articleId={13} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("reply-dialog")).toBeTruthy(),
+    );
+    fireEvent.click(screen.getByTestId("reply-send"));
+    await waitFor(() => expect(createArticle).toHaveBeenCalled());
+    expect(createArticle.mock.calls[0][1]).not.toHaveProperty("attachments");
+  });
+
   it("clears the draft store after a successful send", async () => {
     getReplyDraft.mockResolvedValue({
       ...baseDraft,

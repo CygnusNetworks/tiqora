@@ -579,6 +579,7 @@
     "senderSystem": "Sistema",
     "reply": "Atsakyti",
     "replyAll": "Atsakyti visiems",
+    "replyAllNoOthers": "No other recipients – Reply already reaches everyone.",
     "forward": "Pirmyn",
     "bounce": "Atšokti",
     "splitAction": "Skaidyti",
@@ -1119,7 +1120,8 @@
       "sub": {
         "queueLimits": "within queue limits",
         "grant": "{{remaining}} of {{total}} replies left",
-        "stoppedBy": "by {{name}}"
+        "stoppedBy": "by {{name}}",
+        "customerPaused": "Customer paused"
       },
       "reason": {
         "max_clarifications": "Clarification limit reached",
@@ -1132,7 +1134,8 @@
       "explain": {
         "active": "The AI answers new customer messages automatically.",
         "stopped": "The AI no longer acts automatically on this ticket until you switch it back on.",
-        "handedOver": "The AI handed this ticket to the team and no longer answers automatically."
+        "handedOver": "The AI handed this ticket to the team and no longer answers automatically.",
+        "customerPaused": "The AI automation is switched off for this customer (all their tickets). Manual Assist stays available."
       },
       "remaining": "Remaining",
       "remainingOf": "{{remaining}} of {{total}}",
@@ -1147,7 +1150,20 @@
       "startHint": "Afterwards the AI hands the ticket back to the team. Queue limits don't apply meanwhile.",
       "error": "Could not change the autopilot. Please try again.",
       "listStopped": "AI stopped",
-      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top."
+      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top.",
+      "customerPausedHint": "This affects all tickets of the customer, not only this one.",
+      "stopScope": {
+        "label": "Stop for",
+        "ticket": "This ticket only",
+        "user": "All tickets of this customer",
+        "company": "All tickets of this company"
+      },
+      "pausedScope": {
+        "user": "Stopped for this customer",
+        "company": "Stopped for this company"
+      },
+      "pausedUntil": "until {{date}}",
+      "liftCustomer": "Switch back on for the customer"
     }
   },
   "search": {
@@ -4787,7 +4803,17 @@
     "favorites": "Favorites",
     "favorite": "Favorite",
     "favoriteAdd": "Add to favorites",
-    "favoriteRemove": "Remove from favorites"
+    "favoriteRemove": "Remove from favorites",
+    "vcardDrag": "Click to download — or drag it to the desktop or into Contacts",
+    "filterOpen": "Open {{n}}",
+    "filterAll": "All {{n}}",
+    "ticketFilter": "Show tickets",
+    "noOpenTickets": "No open tickets.",
+    "details": "Customer details",
+    "contactSection": "Contact",
+    "phone": "Phone",
+    "mobile": "Mobile",
+    "vcardTileHint": "Drag or click"
   },
   "customerPicker": {
     "title": "Ticket customer",
@@ -4827,7 +4853,7 @@
     "import": "Import vCards",
     "importHint": "Take photos and missing contact details from a .vcf file — or drag contacts from Apple Contacts onto this page.",
     "importTitle": "Import vCards",
-    "importDescription": "Each card is matched to a customer by its e-mail addresses. Only the photo and empty fields are taken over.",
+    "importDescription": "Each card is matched to a customer through its e-mail addresses. The photo and empty fields are taken over; differing data only when you tick it.",
     "dropHere": "Drop a vCard file to import it",
     "wrongFile": "That is not a vCard file (.vcf).",
     "applyTitle": "Update from vCard",
@@ -4857,7 +4883,39 @@
       "email": "E-mail",
       "phone": "Phone",
       "mobile": "Mobile"
-    }
+    },
+    "noCardInDrag": "The browser handed over no contact (received: {{types}}). Drag the contact from Contacts to the desktop first, then drop the .vcf file here.",
+    "dropEmptyHint": "Drag contacts from Apple Contacts or .vcf files here to take over photos and contact data.",
+    "conflictsTitle_one": "1 field differs",
+    "conflictsTitle_other": "{{count}} fields differ",
+    "keepAll": "Keep all",
+    "takeAll": "Take all from the card",
+    "keepCurrent": "Keep",
+    "takeIncoming": "From the card",
+    "replaceList_one": "Replace 1 differing field",
+    "replaceList_other": "Replace {{count}} differing fields"
+  },
+  "customerAiPause": {
+    "title": "AI automation",
+    "off": "Switched on for this customer.",
+    "activeUntil": "Switched off until {{date}}.",
+    "activeForever": "Switched off until lifted.",
+    "by": "by {{name}}",
+    "lift": "Switch back on",
+    "pause": "Switch off",
+    "duration": "Duration",
+    "untilLifted": "Until lifted",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "reason": "Reason",
+    "reasonPlaceholder": "Reason (optional)",
+    "hint": "Stops auto-reply, triage and auto-summary for all tickets of this customer. Manual Assist stays available.",
+    "error": "Could not save the change.",
+    "durationDays": "Duration in days",
+    "switchLabel": "AI automation for this customer",
+    "pauseForDays_one": "Switch off for {{count}} day",
+    "pauseForDays_other": "Switch off for {{count}} days",
+    "pauseForever": "Switch off until lifted"
   },
   "fields": {
     "none": "–",
