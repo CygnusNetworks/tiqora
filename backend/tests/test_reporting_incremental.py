@@ -214,11 +214,13 @@ def _registry() -> Registry:
     return registry
 
 
-async def _tick(factory: async_sessionmaker[AsyncSession], *, wall: float = WALL) -> dict[str, int]:
+async def _tick(
+    factory: async_sessionmaker[AsyncSession], *, wall: float = WALL, now: datetime = NOW
+) -> dict[str, int]:
     return await run_report_facts_tick(
         settings=SETTINGS,
         session_factory=factory,
-        now=NOW,
+        now=now,
         wall_clock=lambda: wall,
         registry=_registry(),
     )
@@ -674,11 +676,18 @@ async def test_cli_run_is_left_alone(url_fixture: str, request: pytest.FixtureRe
             backfill_cursor_ticket_id=47672,
             updated_at=NOW - timedelta(seconds=30),
         )
+        stamp = NOW - timedelta(seconds=30)
         await _tick(factory)
         assert await _jobs(factory) == []
-        await _set_state(factory, updated_at=NOW - timedelta(hours=1))  # silent for long
-        await _tick(factory)
-        assert len(await _jobs(factory)) == 1
+        assert (await _state(factory)).updated_at == stamp  # ticks never refresh a CLI run
+        # ticks keep running while the CLI is silent; they do not keep it "alive"
+        await _tick(factory, now=NOW + timedelta(minutes=5))
+        assert await _jobs(factory) == []
+        assert (await _state(factory)).updated_at == stamp
+        await _tick(factory, now=NOW + timedelta(minutes=11))  # 10 min without a write: dead
+        jobs = await _jobs(factory)
+        assert len(jobs) == 1 and (await _state(factory)).backfill_job_id == jobs[0].id
+        assert (await _state(factory)).updated_at == stamp
     finally:
         await engine.dispose()
 
@@ -779,6 +788,90 @@ async def test_failing_ticket_is_isolated_and_retried_with_backoff(
         await _tick(factory, wall=WALL + 3600)  # back-off over, ticket healthy again
         assert await _fact_ids(factory) == {47678, 47679}
         assert await dirty_count() == 0 and 47678 not in incremental._failing
+    finally:
+        incremental._failing.clear()
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_failing_dirty_ticket_moves_back_and_failing_upgrade_is_isolated(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tiqora.reporting.facts import FACT_VERSION
+
+    url = request.getfixturevalue(url_fixture)
+    _seed(url)
+    incremental._failing.clear()
+    real = incremental.rebuild_and_commit
+    broken = {"on": False}
+
+    async def flaky(factory: Any, ids: Any, **kwargs: Any) -> Any:
+        ids = list(ids)
+        if broken["on"] and 47678 in ids:
+            raise RuntimeError("poison")
+        return await real(factory, ids, **kwargs)
+
+    monkeypatch.setattr(incremental, "rebuild_and_commit", flaky)
+    engine, factory = _factory(url)
+
+    async def queued_at(tid: int) -> datetime | None:
+        async with factory() as s:
+            return (
+                await s.execute(
+                    text("SELECT queued_at FROM tiqora_report_dirty_ticket WHERE ticket_id = :t"),
+                    {"t": tid},
+                )
+            ).scalar_one_or_none()
+
+    async def version(tid: int) -> int:
+        async with factory() as s:
+            return int(
+                (
+                    await s.execute(
+                        text(
+                            "SELECT fact_version FROM tiqora_report_ticket_fact"
+                            " WHERE ticket_id = :t"
+                        ),
+                        {"t": tid},
+                    )
+                ).scalar_one()
+            )
+
+    try:
+        await _prime(url, factory)
+        old_mark = datetime(2024, 6, 1, 9, 0, 0)
+        async with factory() as s:
+            await mark_tickets_dirty(s, [47671, 47678], now=old_mark)
+            await s.commit()
+        await _tick(factory)  # healthy: both facts exist, queue empty
+        assert await _fact_ids(factory) == {47671, 47678} and await queued_at(47678) is None
+
+        # dirty path: the poison ticket fails again -> fresh queued_at, the other is done
+        broken["on"] = True
+        async with factory() as s:
+            await mark_tickets_dirty(s, [47671, 47678], now=old_mark)
+            await s.commit()
+        await _tick(factory)
+        moved = await queued_at(47678)
+        assert moved is not None and moved > old_mark + timedelta(days=1)  # re-marked just now
+        assert await queued_at(47671) is None
+
+        # upgrade path: an old fact whose rebuild fails does not stop the others
+        incremental._failing.clear()
+        await _set_state(factory, backfill_status="done")
+        async with factory() as s:
+            await s.execute(
+                text(
+                    "UPDATE tiqora_report_ticket_fact SET fact_version = 0"
+                    " WHERE ticket_id IN (47671, 47678)"
+                )
+            )
+            await s.execute(text("DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id = 47678"))
+            await s.commit()
+        result = await _tick(factory)
+        assert result["upgraded"] == 1
+        assert await version(47671) == FACT_VERSION and await version(47678) == 0
+        assert 47678 in incremental._failing
     finally:
         incremental._failing.clear()
         await engine.dispose()

@@ -171,7 +171,6 @@ async def _save_progress(
         state.last_history_id = max(state.last_history_id, watermark)
         state.gap_ids = _dump_gaps(gaps)
         state.last_tick_at = now
-        state.updated_at = now
         await session.commit()
 
 
@@ -432,11 +431,13 @@ async def _run_tick(
     due = [i for i in dirty_ids if not _backing_off(i, wall_clock)]
     if due:
         failed = set(await _rebuild_isolated(factory, due, now=stamp, wall_clock=wall_clock))
-        done_ids = [i for i in due if i not in failed]  # failed ones stay queued
-        if done_ids:
-            async with factory() as session:
+        done_ids = [i for i in due if i not in failed]
+        async with factory() as session:
+            if done_ids:
                 await clear_dirty(session, done_ids, taken_at)
-                await session.commit()
+            if failed:  # a fresh queued_at moves them behind newer marks
+                await mark_tickets_dirty(session, sorted(failed))
+            await session.commit()
         result["dirty"] = len(done_ids)
         result["tickets"] += len(done_ids)
 
@@ -454,7 +455,12 @@ async def _run_tick(
                 for i in (
                     await session.execute(
                         select(TiqoraReportTicketFact.ticket_id)
-                        .where(TiqoraReportTicketFact.fact_version < FACT_VERSION)
+                        .where(
+                            TiqoraReportTicketFact.fact_version < FACT_VERSION,
+                            TiqoraReportTicketFact.ticket_id.not_in(
+                                [i for i in _failing if _backing_off(i, wall_clock)] or [0]
+                            ),
+                        )
                         .order_by(TiqoraReportTicketFact.ticket_id)
                         .limit(VERSION_UPGRADE_BATCH)
                     )
@@ -463,8 +469,8 @@ async def _run_tick(
                 .all()
             ]
         if old:
-            await rebuild_and_commit(factory, old, now=stamp)
-            result["upgraded"] = len(old)
+            failed_up = await _rebuild_isolated(factory, old, now=stamp, wall_clock=wall_clock)
+            result["upgraded"] = len(old) - len(failed_up)
 
     # 6. orphan sweep
     if last_sweep is None or stamp - last_sweep >= timedelta(seconds=ORPHAN_SWEEP_EVERY_SECONDS):
