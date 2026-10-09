@@ -20,6 +20,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from tiqora.ai.quoted_text import strip_trailing_quote
+
 # Small, deliberately generic function-word profiles (articles, pronouns,
 # conjunctions, common verbs/prepositions) — not exhaustive, just enough to
 # separate the two languages reliably on short texts. Extend/add languages
@@ -220,7 +222,21 @@ def detect_reply_language_detailed(
     and whether ``default`` was used as a fallback, so a caller without a
     real default can decide for itself whether the detection is trustworthy
     enough to act on."""
-    tokens = _tokenize(f"{title or ''} {latest_customer_body or ''}")
+    # The quoted earlier mail is our own previous answer: it would vote for
+    # the language the customer just switched away from.
+    body = strip_trailing_quote(latest_customer_body)
+    # The newest message decides. The title (usually the first message's
+    # subject, plus "Re:" and the ticket tag) is only a tie-breaker for bodies
+    # too short to be conclusive on their own ("still no internet").
+    body_only = _best_language(_tokenize(body), candidates, default)
+    if not body_only.used_fallback:
+        return body_only
+    return _best_language(_tokenize(f"{title or ''} {body}"), candidates, default)
+
+
+def _best_language(
+    tokens: list[str], candidates: list[str], default: str
+) -> ReplyLanguageDetection:
     if not tokens or not candidates:
         return ReplyLanguageDetection(language=default, score=0, used_fallback=True)
     best_lang = default

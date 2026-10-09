@@ -100,6 +100,7 @@ from tiqora.ai.models import (
 )
 from tiqora.ai.output_guards import (
     CustomerMessageGuardError,
+    strip_astral_symbols,
     strip_hallucinated_signoff,
     strip_markdown_bold,
     validate_customer_message,
@@ -107,6 +108,7 @@ from tiqora.ai.output_guards import (
 from tiqora.ai.pii import PiiMapper
 from tiqora.ai.policies import get_queue_policy_by_queue, load_prompt_parts
 from tiqora.ai.prompt_safety import UNTRUSTED_CONTENT_SYSTEM_BLOCK
+from tiqora.ai.quoted_text import REMOVED_MARKER, strip_trailing_quote
 from tiqora.ai.reply_language import (
     LANGUAGE_PROFILES,
     detect_reply_language,
@@ -634,6 +636,12 @@ def _build_user_message(
         if a.is_ai_origin:
             label += " (AI, previous own action)"
         body = _strip_known_footer(a.body or "", disclosure_footer)
+        if a.sender_type == "customer":
+            # A reply carries our own earlier mail as a ">" quote: it is
+            # already in the thread above, so it only costs tokens.
+            unquoted = strip_trailing_quote(body)
+            if unquoted != body:
+                body = f"{unquoted}\n\n{REMOVED_MARKER}"
         subject_line = f"Subject: {a.subject}" if a.subject else None
         if mask:
             body = pii.mask(body)
@@ -1088,7 +1096,7 @@ async def _run_identity_exchange(
     kind = args.get("kind")
     body = args.get("body")
     if isinstance(body, str):
-        body = strip_markdown_bold(strip_hallucinated_signoff(body))
+        body = strip_astral_symbols(strip_markdown_bold(strip_hallucinated_signoff(body)))
     subject_raw = args.get("subject")
     subject = subject_raw if isinstance(subject_raw, str) else ""
     if kind not in ("reply", "clarify") or not isinstance(body, str) or not body.strip():

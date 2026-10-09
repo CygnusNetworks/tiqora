@@ -110,6 +110,19 @@ def strip_markdown_bold(body: str) -> str:
     return _MD_BOLD_RE.sub(r"\1", body)
 
 
+# Emoji and other astral-plane symbols: the article body column is utf8mb3 on
+# Znuny databases, so MariaDB silently turns them into "?" / U+FFFD — a mail
+# arrived with "mit einem Symbol wie �". Dropping them up front is cleaner.
+_ASTRAL_RE = re.compile("[\U00010000-\U0010ffff\ufe0f\u200d]")
+
+
+def strip_astral_symbols(body: str) -> str:
+    """Drop emoji (and their joiner/variation selectors) from a proposed
+    customer message; collapses the double space such a removal leaves."""
+    cleaned = _ASTRAL_RE.sub("", body)
+    return re.sub(r"(?<=\S)[ \t]{2,}(?=\S)", " ", cleaned) if cleaned != body else body
+
+
 def validate_customer_message(*, kind: str, subject: str, body: str) -> None:
     """Raise :class:`CustomerMessageGuardError` if the proposal is not safe
     enough to hand to the draft/send path."""
@@ -142,6 +155,7 @@ __all__ = [
     "MAX_CUSTOMER_BODY_LINKS",
     "MAX_CUSTOMER_SUBJECT_CHARS",
     "CustomerMessageGuardError",
+    "strip_astral_symbols",
     "strip_hallucinated_signoff",
     "strip_markdown_bold",
     "validate_customer_message",

@@ -4215,3 +4215,20 @@ def test_tool_round_budget_comes_from_the_first_agent_model() -> None:
 def _final_task_llm(client: Any) -> TaskLlm:
     """An injected final-answer chain without model rows (no provider)."""
     return TaskLlm(client=client, models=[], profile_id=0, profile_name="final")
+
+
+def test_user_message_drops_quoted_earlier_mail_from_customer_articles() -> None:
+    ticket = _snapshot()
+    article = ArticleSnapshot(
+        id=1,
+        sender_type="customer",
+        is_visible_for_customer=True,
+        subject="Re: Help",
+        body="Still broken.\n\nOn Fri, 9 Oct 2026 at 09:26 X <x@y.de> wrote:\n> Hallo,\n> alt\n> text\n",
+        from_address="customer@example.com",
+        is_ai_origin=False,
+    )
+    msg = _build_user_message(ticket, [article], pii=PiiMapper(), mask=False, kb_bundle=None)
+    assert "Still broken." in msg
+    assert "> alt" not in msg
+    assert "[quoted earlier message removed]" in msg

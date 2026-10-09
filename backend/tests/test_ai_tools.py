@@ -370,3 +370,39 @@ def test_collect_credential_values_walks_nested_results() -> None:
     assert _collect_credential_values(
         {"a": [{"PKZ": "900002"}, {"password": "hunter22"}], "pin": 12, "pkz": None}
     ) == {"900002", "hunter22"}
+
+
+async def test_kb_search_dedupes_chunks_and_marks_read_articles() -> None:
+    async def search(query: str, *, limit: int) -> list[dict[str, object]]:
+        return [
+            {"article_id": 16, "title": "Router", "snippet": "a"},
+            {"article_id": 16, "title": "Router", "snippet": "b"},
+            {"article_id": 17, "title": "Port", "snippet": "c"},
+        ]
+
+    async def get_article(article_id: int) -> dict[str, object]:
+        return {"id": article_id, "title": "Router", "body": "full text"}
+
+    executor = ToolExecutor(
+        session=None,  # type: ignore[arg-type]
+        sysconfig=None,  # type: ignore[arg-type]
+        registry=ToolRegistry(autonomy=AUTONOMY_OFF),
+        ticket_id=1,
+        acting_user_id=1,
+        pii=PiiMapper(),
+        escalation_rules=None,
+        kb_search_fn=search,
+        kb_get_article_fn=get_article,
+    )
+    first = await executor.execute("kb_search", {"query": "router"})
+    assert [h["article_id"] for h in first.raw_result] == [16, 17]
+
+    full = await executor.execute("kb_get_article", {"article_id": 16})
+    assert "full text" in full.content_for_model
+    again = await executor.execute("kb_get_article", {"article_id": 16})
+    assert "already_read" in again.content_for_model
+    assert "full text" not in again.content_for_model
+
+    second = await executor.execute("kb_search", {"query": "router again"})
+    flags = {h["article_id"]: h.get("already_read", False) for h in second.raw_result}
+    assert flags == {16: True, 17: False}

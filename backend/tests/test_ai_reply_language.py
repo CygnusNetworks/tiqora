@@ -93,3 +93,38 @@ def test_detailed_empty_text_reports_fallback() -> None:
     assert detection.used_fallback is True
     assert detection.language == "en"
     assert detection.score == 0
+
+
+_QUOTED_GERMAN_REPLY = (
+    "Hello,\r\nI have tried to connect my network with my router, it shows there no\r\n"
+    "internet connection and I cannot access to any website. Could you please\r\n"
+    "support me and figure out the problem?\r\n\r\n"
+    "On Fri, 9 Oct 2026 at 09:26 Support Team <support@example.org>\r\nwrote:\r\n\r\n"
+    "> Hallo,\r\n>\r\n"
+    "> dein Account ist aktiv und der Anschluss ist nicht gesperrt. Die Diagnose\r\n"
+    "> zeigt jedoch, dass aktuell kein Gerät an deiner Datendose erkannt wird.\r\n>\r\n"
+    "> Bevor wir weitermachen, prüfe bitte Folgendes: ist das Kabel in den Port\r\n"
+    "> deines Routers gesteckt und ist der Router eingeschaltet?\r\n"
+)
+
+
+def test_english_followup_under_quoted_german_reply_is_english() -> None:
+    """Prod ticket 2026000000000001: the quoted German AI answer and the German
+    subject outvoted the customer's new English text."""
+    lang = detect_reply_language(
+        "Re: [Cygnus#2026000000000001] Re: Keine Internetverbindung im Wohnheim - Bitte um Hilfe",
+        _QUOTED_GERMAN_REPLY,
+        candidates=list(LANGUAGE_PROFILES),
+        default="de",
+    )
+    assert lang == "en"
+
+
+def test_short_body_still_uses_title_as_tiebreaker() -> None:
+    lang = detect_reply_language(
+        "Keine Internetverbindung im Wohnheim, bitte um Hilfe",
+        "z90002",
+        candidates=list(LANGUAGE_PROFILES),
+        default="en",
+    )
+    assert lang == "de"
