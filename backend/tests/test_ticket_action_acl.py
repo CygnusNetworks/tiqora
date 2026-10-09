@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from tests._sysconfig_rows import set_sysconfig_rows
 from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.deployed.store import clear_revision_cache
 from tiqora.domain.ticket_action_acl import ZOOM_ACTIONS
@@ -86,33 +87,7 @@ def _insert_acl(conn: Any, acl_id: int, name: str, match: str, change: str) -> N
 
 
 def _set_sysconfig(conn: Any, settings: dict[str, Any]) -> None:
-    """Effective SysConfig values (Znuny's sysconfig_default + sysconfig_modified rows)."""
-    from tiqora.znuny.sysconfig import yaml_encode_effective
-
-    for i, (name, value) in enumerate(settings.items()):
-        enc = yaml_encode_effective(value)
-        conn.execute(
-            text(
-                "INSERT INTO sysconfig_default (id, name, description, navigation,"
-                " is_invisible, is_readonly, is_required, is_valid, has_configlevel,"
-                " user_modification_possible, user_modification_active, xml_content_raw,"
-                " xml_content_parsed, xml_filename, effective_value, is_dirty,"
-                " exclusive_lock_guid, create_time, create_by, change_time, change_by)"
-                " VALUES (:id, :n, 'x', 'x', 0, 0, 1, 1, 0, 0, 0, 'x', 'x', 'Ticket.xml',"
-                " :e, 0, '0', current_timestamp, 1, current_timestamp, 1)"
-            ),
-            {"id": SYSCONFIG_BASE + i, "n": name, "e": enc},
-        )
-        conn.execute(
-            text(
-                "INSERT INTO sysconfig_modified (id, sysconfig_default_id, name, user_id,"
-                " is_valid, user_modification_active, effective_value, is_dirty,"
-                " reset_to_default, create_time, create_by, change_time, change_by)"
-                " VALUES (:id, :did, :n, NULL, 1, 0, :e, 0, 0, current_timestamp, 1,"
-                " current_timestamp, 1)"
-            ),
-            {"id": SYSCONFIG_BASE + i, "did": SYSCONFIG_BASE + i, "n": name, "e": enc},
-        )
+    set_sysconfig_rows(conn, SYSCONFIG_BASE, settings)
 
 
 def _seed(
@@ -366,11 +341,11 @@ async def test_bulk_owner_options_filtered(
     async with _client(factory) as client:
         bulk = await client.get(
             "/api/v1/reference/ticket-field-options",
-            params={"fields": "owner", "action": "AgentTicketBulk"},
+            params={"fields": "owner", "action": "AgentTicketBulk", "queue_id": Q_BILLING},
         )
         zoom = await client.get(
             "/api/v1/reference/ticket-field-options",
-            params={"fields": "owner", "action": "AgentTicketZoom"},
+            params={"fields": "owner", "action": "AgentTicketZoom", "queue_id": Q_BILLING},
         )
     assert bulk.status_code == 200, bulk.text
     # ACL data is {id: login}, the labels are the full names.
@@ -482,7 +457,7 @@ async def test_change_owner_to_everyone_offers_all_valid_agents(
     db: tuple[str, async_sessionmaker[AsyncSession]],
 ) -> None:
     url, factory = db
-    _seed(url, sysconfig={"Ticket::ChangeOwnerToEveryone": 1})
+    _seed(url, sysconfig={"Ticket::ChangeOwnerToEveryone": "1"})
     async with _client(factory) as client:
         resp = await client.get(
             f"/api/v1/tickets/{T_BILLING}/field-options",
@@ -492,6 +467,24 @@ async def test_change_owner_to_everyone_offers_all_valid_agents(
     everyone = {AGENT, OTHER_AGENT, AGENT_RO, AGENT_ROLE, AGENT_SECOND, AGENT_RW2}
     for field in ("owner", "responsible"):
         assert {int(i) for i in resp.json()[field]} >= everyone
+
+
+@pytest.mark.asyncio
+async def test_change_owner_to_everyone_string_zero_is_off(
+    db: tuple[str, async_sessionmaker[AsyncSession]],
+) -> None:
+    url, factory = db
+    # Znuny stores a checkbox's "off" as the string '0' (truthy in Python, false in Perl).
+    _seed(url, sysconfig={"Ticket::ChangeOwnerToEveryone": "0"})
+    async with _client(factory) as client:
+        resp = await client.get(
+            f"/api/v1/tickets/{T_BILLING}/field-options",
+            params={"fields": "owner", "action": "AgentTicketOwner"},
+        )
+    assert resp.status_code == 200, resp.text
+    assert set(resp.json()["owner"]) == {
+        str(i) for i in (AGENT, OTHER_AGENT, AGENT_ROLE, AGENT_RW2)
+    }
 
 
 @pytest.mark.asyncio
@@ -515,41 +508,52 @@ async def test_new_ticket_form_scopes_pickers_by_selected_queue(
         str(OTHER_AGENT): "Bruno Support",
         str(AGENT_SECOND): "Emil Second",
     }
-    # no queue chosen yet: nothing to scope by
-    assert {AGENT_RO, AGENT_SECOND} <= {int(i) for i in unscoped.json()["owner"]}
+    # no queue chosen yet: Znuny's list is empty (AgentTicketPhone.pm:2226-2243)
+    assert unscoped.json()["owner"] == {}
 
 
 @pytest.mark.asyncio
-async def test_bulk_owner_choices_intersect_selected_ticket_queues(
+async def test_bulk_owner_choices_follow_znuny_bulk_screen(
     db: tuple[str, async_sessionmaker[AsyncSession]],
 ) -> None:
     url, factory = db
     _seed(url)
 
-    async def bulk(client: Any, tickets: list[int]) -> Any:
+    async def bulk(client: Any, tickets: list[int], **context: Any) -> Any:
         return await client.post(
             "/api/v1/reference/field-options",
             json={
                 "fields": ["owner", "responsible"],
-                "context": {"action": "AgentTicketBulk", "ticket_ids": tickets},
+                "context": {"action": "AgentTicketBulk", "ticket_ids": tickets, **context},
             },
         )
+
+    def labels(resp: Any, field: str) -> list[str]:
+        return [o["label"] for o in resp.json()["options"][field]]
 
     async with _client(factory) as client:
         both = await bulk(client, [T_BILLING, T_SECOND])
         single = await bulk(client, [T_SECOND])
+        move_target = await bulk(client, [T_BILLING, T_SECOND], queue_id=Q_SECOND)
+        no_queue = await bulk(client, [])
         foreign = await bulk(client, [T_BILLING, T_HIDDEN])
         missing = await bulk(client, [T_BILLING, 886539])
     assert both.status_code == 200, both.text
-    options = both.json()["options"]
-    # Billing group owners {Aaron, Alma, Bruno, Dora} / second group {Alma, Bruno, Emil}
-    assert [o["label"] for o in options["owner"]] == ["Alma Billing", "Bruno Support"]
-    assert [o["label"] for o in options["responsible"]] == ["Bruno Support"]
-    assert [o["label"] for o in single.json()["options"]["owner"]] == [
+    # AgentTicketBulk.pm:1969-1998 -- union over the selected tickets' queues: Billing owners
+    # {Aaron, Alma, Bruno, Dora} + second group {Alma, Bruno, Emil}.
+    assert labels(both, "owner") == [
+        "Aaron Rw",
         "Alma Billing",
         "Bruno Support",
+        "Dora Role",
         "Emil Second",
     ]
+    assert labels(both, "responsible") == ["Aaron Rw", "Bruno Support"]
+    assert labels(single, "owner") == ["Alma Billing", "Bruno Support", "Emil Second"]
+    # a selected move-target queue wins over the tickets' queues
+    assert labels(move_target, "owner") == ["Alma Billing", "Bruno Support", "Emil Second"]
+    # no queue known at all: empty list
+    assert labels(no_queue, "owner") == []
     assert foreign.status_code == 403  # no ro on the hidden ticket's queue
     assert missing.status_code == 404
 

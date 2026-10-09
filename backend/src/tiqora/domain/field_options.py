@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import Ticket, TicketPriority, TicketState, TicketType
@@ -88,16 +89,23 @@ async def base_field_maps(
     *,
     queue_id: int | None = None,
     queue_ids: Sequence[int] | None = None,
+    picker_queue_id: int | None = None,
+    honor_everyone: bool = True,
+    sysconfig: SysConfig | None = None,
 ) -> dict[str, dict[int, str]]:
     """Unfiltered valid id→name maps for the requested fields.
 
     Queues are still permission-gated (``ro``); ACL is additional filtering. *user* may be
     ``None`` (the customer interface) only when ``queue`` is not requested.
 
-    *queue_id* / *queue_ids* scope the owner and responsible pickers like Znuny's
-    ``_GetOwners``/``_GetResponsibles``: unless ``Ticket::ChangeOwnerToEveryone`` is on, only
-    agents with ``owner`` (``responsible``) or ``rw`` on the queue's group are offered; several
-    queues (bulk) keep the agents allowed on all of them. Without a queue the list is unscoped.
+    Owner and responsible pickers are scoped like Znuny's ``_GetOwners``/``_GetResponsibles``:
+    unless ``Ticket::ChangeOwnerToEveryone`` is on (Perl truthiness: a stored ``'0'`` is off),
+    only agents with ``owner`` (``responsible``) or ``rw`` on the queue's group are offered.
+    The queue is *queue_id* (bulk: the selected move-target queue wins), else the union over
+    *queue_ids* (bulk: the selected tickets' queues), else *picker_queue_id* (start forms:
+    ``Process::DefaultQueue``; used for the pickers only, never as ACL context). Without any
+    queue the list is empty (AgentTicketBulk.pm:1969-1998). *honor_everyone* False ignores the
+    setting (process dialog on an existing ticket, AgentTicketProcess.pm:6402-6413).
     """
     out: dict[str, dict[int, str]] = {}
     if "state" in fields:
@@ -154,13 +162,22 @@ async def base_field_maps(
             )
         ).all()
         agents = {int(r[0]): r[1] for r in rows}
-        scope = list(queue_ids) if queue_ids else ([queue_id] if queue_id else [])
-        everyone = bool(await SysConfig(session).get("Ticket::ChangeOwnerToEveryone", 0))
+        sysconfig = sysconfig or SysConfig(session)
+        if queue_id:
+            scope = [queue_id]
+        elif queue_ids:
+            scope = list(queue_ids)
+        else:
+            scope = [picker_queue_id] if picker_queue_id else []
+        everyone = honor_everyone and perl_truthy(
+            await sysconfig.get("Ticket::ChangeOwnerToEveryone", 0)
+        )
         for field in AGENT_OPTION_FIELDS & fields:
-            allowed = None
-            if scope and not everyone:
-                allowed = await _queue_agents(session, scope, field)
-            out[field] = {i: n for i, n in agents.items() if allowed is None or i in allowed}
+            if everyone:
+                out[field] = dict(agents)
+                continue
+            allowed = await _queue_agents(session, sysconfig, scope, field)
+            out[field] = {i: n for i, n in agents.items() if i in allowed}
     if "queue" in fields:
         if user is None:
             raise ValueError("queue options need an agent user")
@@ -180,21 +197,24 @@ async def base_field_maps(
     return out
 
 
-async def _queue_agents(session: AsyncSession, queue_ids: Sequence[int], field: str) -> set[int]:
-    """Agents with the field's permission on the group of every queue in *queue_ids*."""
-    configured = await SysConfig(session).get("System::Permission", None)
+async def _queue_agents(
+    session: AsyncSession, sysconfig: SysConfig, queue_ids: Sequence[int], field: str
+) -> set[int]:
+    """Agents with the field's permission on the group of any queue in *queue_ids* (union,
+    like AgentTicketBulk.pm's never-reset ``%AllGroupsMembersNew``)."""
+    configured = await sysconfig.get("System::Permission", None)
     permissions = configured if isinstance(configured, list) else DEFAULT_SYSTEM_PERMISSION
     # AgentTicketProcess.pm:6401 -- the key is used only when System::Permission lists it.
     key = field if field in permissions else "rw"
-    allowed: set[int] | None = None
+    allowed: set[int] = set()
     pe = PermissionEngine(session)
     for qid in dict.fromkeys(queue_ids):
         group_id = (
             await session.execute(select(Queue.group_id).where(Queue.id == qid))
         ).scalar_one_or_none()
-        members = set() if group_id is None else await pe.users_for_group_permission(group_id, key)
-        allowed = members if allowed is None else allowed & members
-    return allowed or set()
+        if group_id is not None:
+            allowed |= await pe.users_for_group_permission(group_id, key)
+    return allowed
 
 
 async def _agent_full_names(session: AsyncSession, user_ids: set[int]) -> dict[int, str]:
@@ -261,6 +281,8 @@ async def collect_ticket_field_options(
     action: str | None = None,
     queue_id: int | None = None,
     queue_ids: Sequence[int] | None = None,
+    picker_queue_id: int | None = None,
+    honor_everyone: bool = True,
     service_id: int | None = None,
     type_id: int | None = None,
     state_id: int | None = None,
@@ -273,12 +295,24 @@ async def collect_ticket_field_options(
     *process*: ``ProcessEntityID`` / ``ActivityDialogEntityID`` / ``ActivityEntityID`` of the
     process dialog the lists are built for (live ``Process`` ACL checks,
     ``TicketACL.pm:1118-1146``). *queue_ids* (bulk: the queues of the selected tickets) scope
-    the owner/responsible pickers, see :func:`base_field_maps`.
+    the owner/responsible pickers, as do *picker_queue_id* and *honor_everyone*, see
+    :func:`base_field_maps`.
     """
     from tiqora.domain.ticket_acl import filter_id_name_map
     from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
+    from tiqora.znuny.sysconfig import SysConfig
 
-    base = await base_field_maps(session, user, fields, queue_id=queue_id, queue_ids=queue_ids)
+    sysconfig = SysConfig(session)  # one reader for the pickers and every field's ACL pass
+    base = await base_field_maps(
+        session,
+        user,
+        fields,
+        queue_id=queue_id,
+        queue_ids=queue_ids,
+        picker_queue_id=picker_queue_id,
+        honor_everyone=honor_everyone,
+        sysconfig=sysconfig,
+    )
     ticket_ctx = await ticket_acl_context(
         session,
         queue_id=queue_id,
@@ -290,9 +324,6 @@ async def collect_ticket_field_options(
     )
     checks: dict[str, Any] | None = {"Ticket": dict(ticket_ctx)} if ticket_ctx else None
 
-    from tiqora.znuny.sysconfig import SysConfig
-
-    sysconfig = SysConfig(session)  # one reader for every field's ACL pass
     acl_maps: dict[str, dict[int, str]] = {}
     for field, mapping in base.items():
         subtype = FIELD_TO_SUBTYPE[field]
@@ -399,6 +430,8 @@ async def collect_field_options(
     req: FieldOptionsRequest,
     *,
     process: Mapping[str, str] | None = None,
+    picker_queue_id: int | None = None,
+    honor_everyone: bool = True,
 ) -> FieldOptionsOut:
     """Options for attribute and dynamic fields, filtered by Ticket ACLs.
 
@@ -407,7 +440,8 @@ async def collect_field_options(
     :class:`~tiqora.domain.ticket_service.TicketAccessDenied` propagate); its
     attributes are the default ACL context, explicit ``context`` ids override. *process*
     (not part of the API request) carries the process ids of an activity dialog form
-    (``AgentTicketProcess.pm:1103-1105, 2638, 4319``).
+    (``AgentTicketProcess.pm:1103-1105, 2638, 4319``). *picker_queue_id* / *honor_everyone*:
+    see :func:`base_field_maps`.
     """
     from tiqora.domain.dynamic_field_config import config_from_yaml
 
@@ -439,6 +473,8 @@ async def collect_field_options(
             action=ctx.action,
             process=process,
             queue_ids=queue_ids,
+            picker_queue_id=picker_queue_id,
+            honor_everyone=honor_everyone,
             **ids,
         )
         attribute_maps = {f: getattr(collected, f) for f in attr_requested}

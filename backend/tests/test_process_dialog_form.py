@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from tests._sysconfig_rows import set_sysconfig_rows
 from tiqora.api.app import create_app
 from tiqora.api.deps import get_current_user, get_db
 from tiqora.api.portal.deps import get_current_customer, require_portal_enabled
@@ -333,37 +334,7 @@ def sync_url(mariadb_znuny_url: str) -> str:
 
 
 def _set_sysconfig(conn: Any, settings: dict[str, Any]) -> None:
-    """Effective SysConfig values (Znuny's sysconfig_default + sysconfig_modified rows)."""
-    from tiqora.znuny.sysconfig import yaml_encode_effective
-
-    for table in ("sysconfig_modified", "sysconfig_default"):
-        conn.execute(
-            text(f"DELETE FROM {table} WHERE id BETWEEN {SYSCONFIG_BASE} AND {SYSCONFIG_BASE + 9}")
-        )
-    for i, (name, value) in enumerate(settings.items()):
-        enc = yaml_encode_effective(value)
-        conn.execute(
-            text(
-                "INSERT INTO sysconfig_default (id, name, description, navigation,"
-                " is_invisible, is_readonly, is_required, is_valid, has_configlevel,"
-                " user_modification_possible, user_modification_active, xml_content_raw,"
-                " xml_content_parsed, xml_filename, effective_value, is_dirty,"
-                " exclusive_lock_guid, create_time, create_by, change_time, change_by)"
-                " VALUES (:id, :n, 'x', 'x', 0, 0, 1, 1, 0, 0, 0, 'x', 'x', 'Ticket.xml',"
-                " :e, 0, '0', current_timestamp, 1, current_timestamp, 1)"
-            ),
-            {"id": SYSCONFIG_BASE + i, "n": name, "e": enc},
-        )
-        conn.execute(
-            text(
-                "INSERT INTO sysconfig_modified (id, sysconfig_default_id, name, user_id,"
-                " is_valid, user_modification_active, effective_value, is_dirty,"
-                " reset_to_default, create_time, create_by, change_time, change_by)"
-                " VALUES (:id, :did, :n, NULL, 1, 0, :e, 0, 0, current_timestamp, 1,"
-                " current_timestamp, 1)"
-            ),
-            {"id": SYSCONFIG_BASE + i, "did": SYSCONFIG_BASE + i, "n": name, "e": enc},
-        )
+    set_sysconfig_rows(conn, SYSCONFIG_BASE, settings)
     clear_revision_cache()
 
 
@@ -381,8 +352,11 @@ def _add_acl(
     change: str,
     action: str = "AgentTicketProcess",
     process_props: str = "",
+    ticket_props: str = "",
 ) -> None:
-    """*process_props*: ``Properties: Process`` lines, e.g. ``ProcessEntityID: [Process-1]``."""
+    """*process_props*: ``Properties: Process`` lines, e.g. ``ProcessEntityID: [Process-1]``;
+    *ticket_props*: ``Properties: Ticket`` lines, e.g. ``Queue: [Raw]``."""
+    tprops = "".join(f"    {line}\n" for line in ticket_props.splitlines())
     props = "".join(f"    {line}\n" for line in process_props.splitlines())
     engine = create_engine(url)
     with engine.begin() as conn:
@@ -396,7 +370,8 @@ def _add_acl(
                 "id": ACL_BASE + n,
                 "name": name,
                 "m": f"Properties:\n  Frontend:\n    Action: [{action}]\n"
-                + (f"  Process:\n{props}" if props else ""),
+                + (f"  Process:\n{props}" if props else "")
+                + (f"  Ticket:\n{tprops}" if tprops else ""),
                 "c": change,
                 "t": T0,
             },
@@ -1026,13 +1001,12 @@ async def test_agent_pickers_follow_default_queue_and_change_owner_to_everyone(
     client: AsyncClient, sync_url: str
 ) -> None:
     def setup(conn: Any) -> None:
-        _add_dialog(
-            conn,
-            1,
-            {"Owner": "Display: '1'", "Responsible": "Display: '1'"},
-        )
+        _add_dialog(conn, 1, {"Owner": "Display: '1'", "Responsible": "Display: '1'"})
         _add_process(conn, 1, start_dialog=1, dialogs=[1])
-        _set_sysconfig(conn, {"Process::DefaultQueue": Q_SUPPORT})
+        # Znuny stores checkbox settings as strings: "0" is off (Perl truthiness).
+        _set_sysconfig(
+            conn, {"Process::DefaultQueue": Q_SUPPORT, "Ticket::ChangeOwnerToEveryone": "0"}
+        )
 
     _build(sync_url, setup)
     fields = _by_name((await _start_form(client, AGENT, 1)).json())
@@ -1041,11 +1015,56 @@ async def test_agent_pickers_follow_default_queue_and_change_owner_to_everyone(
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         _set_sysconfig(
-            conn, {"Process::DefaultQueue": Q_SUPPORT, "Ticket::ChangeOwnerToEveryone": 1}
+            conn, {"Process::DefaultQueue": Q_SUPPORT, "Ticket::ChangeOwnerToEveryone": "1"}
         )
     engine.dispose()
     everyone = _by_name((await _start_form(client, AGENT, 1)).json())
     assert str(AGENT_C) in {o["value"] for o in everyone["Owner"]["options"]}
+
+
+@pytest.mark.db
+async def test_existing_ticket_dialog_ignores_change_owner_to_everyone(
+    client: AsyncClient, sync_url: str
+) -> None:
+    def setup(conn: Any) -> None:
+        _two_dialogs(conn)
+        _set_sysconfig(conn, {"Ticket::ChangeOwnerToEveryone": "1"})
+
+    _build(sync_url, setup)
+    await _enroll(client, AGENT, TICKET_1)  # TICKET_1 is in the Support queue
+    form = (await client.get(f"{AGENT}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")).json()
+    # AgentTicketProcess.pm:6402-6413 -- the TicketID branch never reads the setting.
+    owners = {o["value"] for o in _by_name(form)["Owner"]["options"]}
+    assert owners == {str(AGENT_A), str(AGENT_B)}
+
+
+@pytest.mark.db
+async def test_default_queue_scopes_pickers_but_not_the_acl_context(
+    client: AsyncClient, sync_url: str
+) -> None:
+    def setup(conn: Any) -> None:
+        _add_dialog(
+            conn,
+            1,
+            {"State": "Display: '1'", "Owner": "Display: '1'"},
+        )
+        _add_process(conn, 1, start_dialog=1, dialogs=[1])
+
+    _build(sync_url, setup)
+    # Process::DefaultQueue stays at its default (Raw). An ACL keyed on Ticket Queue Raw must
+    # not see it: Znuny uses the default queue only inside _GetOwners/_GetResponsibles.
+    _add_acl(
+        sync_url,
+        1,
+        "raw-hides-open",
+        "PossibleNot:\n  Ticket:\n    State: [open]\n",
+        ticket_props="Queue: [Raw]",
+    )
+    fields = _by_name((await _start_form(client, AGENT, 1)).json())
+    assert "open" in _labels(fields["State"])
+    # the pickers are scoped to Raw's group: none of the seeded agents holds owner/rw there
+    owners = {o["value"] for o in fields["Owner"]["options"]}
+    assert not owners & {str(AGENT_A), str(AGENT_B), str(AGENT_C)}
 
 
 def _query_login(url: str, user_id: int) -> str:

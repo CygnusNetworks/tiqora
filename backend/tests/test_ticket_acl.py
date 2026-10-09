@@ -415,7 +415,7 @@ async def test_owner_options_use_login_acl_and_full_name_labels(
         id=2, login="someone", first_name="Some", last_name="One", auth_method="session"
     )
     got = await collect_ticket_field_options(
-        acl_session, user, fields={"owner", "responsible"}, action="AgentTicketBulk"
+        acl_session, user, fields={"owner", "responsible"}, action="AgentTicketBulk", queue_id=1
     )
     assert "1" not in got.owner  # root@localhost removed by PossibleNot Owner
     assert "1" in got.responsible  # the ACL names Owner only

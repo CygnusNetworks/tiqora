@@ -369,15 +369,15 @@ async def _agent_options(
     out: dict[str, list[ProcessDialogOptionOut]] = {}
     if requested:
         queue_id = None
+        picker_queue_id = None
         if ticket_id is None:
             if "Queue" in dialog_fields:
                 queue_id = await _default_queue_id(session, dialog_fields["Queue"].default_value)
-            if queue_id is None:
-                # AgentTicketProcess.pm:6420 -- no Queue yet: scope the agent pickers to
-                # Process::DefaultQueue.
-                queue_id = await _default_queue_id(
-                    session, await SysConfig(session).get("Process::DefaultQueue", "Raw")
-                )
+            # AgentTicketProcess.pm:6420 -- no Queue yet: Process::DefaultQueue scopes the
+            # Owner/Responsible pickers only, it is not part of the ACL context.
+            picker_queue_id = await _default_queue_id(
+                session, await SysConfig(session).get("Process::DefaultQueue", "Raw")
+            )
         collected = await collect_field_options(
             session,
             user,
@@ -388,6 +388,9 @@ async def _agent_options(
                 ),
             ),
             process=process,
+            picker_queue_id=picker_queue_id,
+            # AgentTicketProcess.pm:6402-6413 -- an existing ticket ignores the setting.
+            honor_everyone=ticket_id is None,
         )
         for key, options in collected.options.items():
             out[requested[key]] = [
