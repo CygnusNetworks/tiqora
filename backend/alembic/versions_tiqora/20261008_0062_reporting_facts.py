@@ -7,7 +7,8 @@ Create Date: 2026-10-09
 ``tiqora_report_ticket_fact.ticket_id`` and ``tiqora_report_dirty_ticket.ticket_id``
 mirror ``ticket.id`` and are never generated. ``gap_ids`` is ``MEDIUMTEXT`` on
 MariaDB (thousands of gaps exceed ``TEXT``'s 64 KiB).
-``queued_at`` has microsecond precision on MariaDB. All timestamps the application writes are naive UTC.
+``queued_at`` has microsecond precision on MariaDB.
+All timestamps the application writes are naive UTC.
 """
 
 from __future__ import annotations
