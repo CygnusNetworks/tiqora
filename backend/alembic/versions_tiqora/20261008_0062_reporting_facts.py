@@ -178,6 +178,7 @@ def upgrade() -> None:
         sa.Column("backfill_target_ticket_id", sa.BigInteger(), nullable=True),
         sa.Column("backfill_since", sa.Date(), nullable=True),
         sa.Column("backfill_started_at", sa.DateTime(), nullable=True),
+        sa.Column("backfill_run_token", sa.String(36), nullable=True),
         sa.Column("backfill_finished_at", sa.DateTime(), nullable=True),
         sa.Column("last_snapshot_date", sa.Date(), nullable=True),
         sa.Column("snapshot_time_zone", sa.String(64), nullable=True),

@@ -220,6 +220,7 @@ tiqora_report_state                               -- single row name = "facts"
   backfill_target_ticket_id   BIGINT NULL
   backfill_since              DATE NULL
   backfill_started_at         DATETIME NULL
+  backfill_run_token          VARCHAR(36) NULL
   backfill_finished_at        DATETIME NULL
   last_snapshot_date          DATE NULL
   snapshot_time_zone          VARCHAR(64) NULL

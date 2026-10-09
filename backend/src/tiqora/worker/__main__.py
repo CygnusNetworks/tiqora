@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.config import get_settings
 from tiqora.db.engine import get_session_factory
-from tiqora.domain.settings_store import get_setting_int
+from tiqora.domain.settings_store import KEY_REPORT_FACTS_INTERVAL_SECONDS, get_setting_int
 from tiqora.jobs.runner import JobRunner
 from tiqora.logging_setup import configure_logging
 from tiqora.worker.ai_audit_cleanup import run_ai_audit_cleanup_tick
@@ -27,6 +27,7 @@ from tiqora.worker.outbox_drain import drain_outbox
 from tiqora.worker.pending_check import run_pending_check_tick
 from tiqora.worker.poller import poll_once
 from tiqora.worker.postmaster import run_postmaster_tick
+from tiqora.worker.report_facts import run_report_facts_worker_tick
 from tiqora.worker.smime_customer_renew import run_smime_customer_renew_tick
 from tiqora.worker.status import record_tick_status, seconds_until_daily
 from tiqora.worker.telegram_poller import run_telegram_poller_tick
@@ -165,6 +166,9 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
     async def telegram_poller_tick() -> dict[str, int]:
         return await run_telegram_poller_tick(settings=settings)
 
+    async def report_facts_tick() -> dict[str, int]:
+        return await run_report_facts_worker_tick(settings)
+
     from tiqora.extensions import get_registry
 
     job_runner = JobRunner(
@@ -228,6 +232,13 @@ async def _run_all_loops(stop: asyncio.Event) -> None:
             telegram_poller_tick,
             settings.telegram_poller_interval_seconds,
             "daemon.telegram_poller.interval_seconds",
+            stop,
+        ),
+        _interval_loop(
+            "report_facts",
+            report_facts_tick,
+            settings.report_facts_interval_seconds,
+            KEY_REPORT_FACTS_INTERVAL_SECONDS,
             stop,
         ),
         _interval_loop(

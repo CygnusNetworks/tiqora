@@ -3001,6 +3001,10 @@
           "name": "Obnova potrdil S/MIME strank",
           "description": "Enkrat na dan uvozi obnovljena potrdila strank iz zaledja strank (Znuny RenewCustomerSMIMECertificates; potrebuje SMIME::FetchFromCustomer)."
         },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date every minute."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."

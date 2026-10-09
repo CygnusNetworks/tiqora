@@ -3009,6 +3009,10 @@
           "name": "S/MIME-Kundenzertifikate erneuern",
           "description": "Übernimmt erneuerte Kundenzertifikate täglich aus dem Kunden-Backend (Znuny RenewCustomerSMIMECertificates; braucht SMIME::FetchFromCustomer)."
         },
+        "report_facts": {
+          "name": "Berichtsdaten aktuell halten",
+          "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
+        },
         "jobs": {
           "name": "Hintergrundaufgaben",
           "description": "Führt lange Aufgaben wie Exporte im Hintergrund aus, damit die Oberfläche nicht wartet."

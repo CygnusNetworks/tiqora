@@ -736,6 +736,51 @@ async def test_load_state_retry_counts_and_non_deadlock_errors(
 
 
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+async def test_load_state_retry_rolls_back_on_bare_deadlock(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A bare 1213 / 40P01 (not the 1305 form) also aborted the transaction: roll back first."""
+    url = request.getfixturevalue(url_fixture)
+    _URLS.add(url)
+    _clean(url)
+    engine = create_async_engine(_to_async_url(url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        for orig in (
+            _FakeOrig(1213, "Deadlock found"),
+            _FakeOrig("deadlock detected", sqlstate="40P01"),
+        ):
+            async with factory() as s:
+                real_nested, real_rollback = s.begin_nested, s.rollback
+                seen = {"nested": 0, "rollbacks": 0}
+
+                def flaky(
+                    real_nested: Any = real_nested,
+                    seen: dict[str, int] = seen,
+                    orig: Exception = orig,
+                ) -> Any:
+                    seen["nested"] += 1
+                    if seen["nested"] == 1:
+                        raise _deadlock_error(orig)
+                    return real_nested()
+
+                async def counting(
+                    real_rollback: Any = real_rollback, seen: dict[str, int] = seen
+                ) -> None:
+                    seen["rollbacks"] += 1
+                    await real_rollback()
+
+                monkeypatch.setattr(s, "begin_nested", flaky)
+                monkeypatch.setattr(s, "rollback", counting)
+                st = await load_state(s, for_update=True, retry_on_deadlock=True)
+                assert st.name == STATE_NAME
+                assert seen == {"nested": 2, "rollbacks": 1}
+            _clean(url)
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_load_state_deadlock_never_loses_flushed_work_silently(
     url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -848,7 +893,7 @@ async def test_superseded_run_cannot_move_the_cursor(
         async def take_over() -> None:
             async with factory() as s:
                 st = await load_state(s, for_update=True)
-                st.backfill_started_at = datetime(2030, 1, 1)
+                st.backfill_run_token = "other-run"
                 st.backfill_cursor_ticket_id = 1
                 await s.commit()
 
@@ -872,7 +917,7 @@ async def test_superseded_run_cannot_move_the_cursor(
         async with factory() as s:
             st = await load_state(s)
         assert st.backfill_cursor_ticket_id == 1 and st.backfill_status == "running"
-        assert st.backfill_started_at == datetime(2030, 1, 1)
+        assert st.backfill_run_token == "other-run"
         # finishing is refused as well
         with pytest.raises(JobCancelled):
             await backfill._save_cursor(factory, run, 99, finish=(None, "UTC"))

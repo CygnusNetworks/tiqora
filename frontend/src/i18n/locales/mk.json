@@ -3001,6 +3001,10 @@
           "name": "Обнова на клиентски S/MIME сертификати",
           "description": "Еднаш дневно ги презема обновените сертификати на клиенти од клиентскиот бекенд (Znuny RenewCustomerSMIMECertificates; потребно е SMIME::FetchFromCustomer)."
         },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date every minute."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."

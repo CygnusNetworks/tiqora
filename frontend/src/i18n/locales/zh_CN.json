@@ -3001,6 +3001,10 @@
           "name": "S/MIME 客户证书续期",
           "description": "每天从客户后端导入一次已续期的客户证书（Znuny RenewCustomerSMIMECertificates；需要 SMIME::FetchFromCustomer）。"
         },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date every minute."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."

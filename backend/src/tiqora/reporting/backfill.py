@@ -9,6 +9,7 @@ rows are replaced as a whole), so repeating a chunk is harmless.
 from __future__ import annotations
 
 import asyncio
+import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
@@ -65,8 +66,8 @@ class _Run:
     #: ``since`` of the run being worked on: the stored one when resuming, never the
     #: payload's (the ticket range and the snapshot days must belong together)
     since: date | None
-    #: ``backfill_started_at`` of the run; a writer of a replaced run must not touch the state
-    token: datetime
+    #: ``backfill_run_token`` of the run; a writer of a replaced run must not touch the state
+    token: str
 
 
 async def _begin(
@@ -91,7 +92,7 @@ async def _begin(
             and state.backfill_cursor_ticket_id is not None
             and state.backfill_start_ticket_id is not None
             and state.backfill_target_ticket_id is not None
-            and state.backfill_started_at is not None
+            and state.backfill_run_token is not None
         )
         if not resume:
             if payload.since is not None:
@@ -107,27 +108,27 @@ async def _begin(
             target = int((await session.execute(select(func.max(Ticket.id)))).scalar_one() or 0)
             # no ticket on/after `since`: an empty range
             start = int(first) - 1 if first is not None else target
-            # whole seconds: MariaDB's DATETIME rounds, and the value is the run token
-            now = utc_now().replace(microsecond=0)
+            now = utc_now()
             state.backfill_status = "running"
             state.backfill_start_ticket_id = start
             state.backfill_cursor_ticket_id = start
             state.backfill_target_ticket_id = target
             state.backfill_since = payload.since
             state.backfill_started_at = now
+            state.backfill_run_token = uuid.uuid4().hex
             state.backfill_finished_at = None
             state.updated_at = now
         assert state.backfill_start_ticket_id is not None
         assert state.backfill_cursor_ticket_id is not None
         assert state.backfill_target_ticket_id is not None
-        assert state.backfill_started_at is not None
+        assert state.backfill_run_token is not None
         run = _Run(
             zone,
             state.backfill_start_ticket_id,
             state.backfill_cursor_ticket_id,
             state.backfill_target_ticket_id,
             state.backfill_since,
-            state.backfill_started_at,
+            state.backfill_run_token,
         )
         await session.commit()
     return run
@@ -148,7 +149,7 @@ async def _save_cursor(
     """
     async with factory() as session:
         state = await load_state(session, for_update=True, retry_on_deadlock=True)
-        if state.backfill_started_at != run.token or state.backfill_status != "running":
+        if state.backfill_run_token != run.token or state.backfill_status != "running":
             raise JobCancelled
         stamp = utc_now()
         state.backfill_cursor_ticket_id = max(cursor, state.backfill_cursor_ticket_id or 0)

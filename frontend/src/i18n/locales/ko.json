@@ -3001,6 +3001,10 @@
           "name": "S/MIME 고객 인증서 갱신",
           "description": "갱신된 고객 인증서를 고객 백엔드에서 하루에 한 번 가져옵니다(Znuny RenewCustomerSMIMECertificates, SMIME::FetchFromCustomer 필요)."
         },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date every minute."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."

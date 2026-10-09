@@ -1082,6 +1082,18 @@ async def build_customer_record_preview(
 # ---------------------------------------------------------------------------
 
 
+async def _refresh_report_facts(session: AsyncSession, ticket_ids: set[int]) -> None:
+    """Drop report facts/events of the tickets now and queue them for a rebuild (same txn)."""
+    if not ticket_ids:
+        return
+    from tiqora.reporting.dirty import mark_tickets_dirty
+    from tiqora.reporting.facts_store import delete_ticket_facts
+
+    ids = sorted(ticket_ids)
+    await delete_ticket_facts(session, ids)
+    await mark_tickets_dirty(session, ids)
+
+
 async def run_erasure(
     session_factory: async_sessionmaker[AsyncSession],
     settings: Settings,
@@ -1497,6 +1509,9 @@ async def run_erasure(
                 )
 
         # ---- tickets: rewrite refs ----
+        # Report facts copy customer_id / customer_user: every ticket whose refs are
+        # rewritten (or that is hard-deleted) loses its facts now and is rebuilt later.
+        report_ticket_ids: set[int] = set(ticket_ids) if do_ticket_delete else set()
         # anonymize: customer_user_id follows the new login; customer_id stays
         # (company PK is kept). delete: both become stable tokens (masters gone).
         for trow in ticket_rows:
@@ -1539,6 +1554,7 @@ async def run_erasure(
                 )
                 await _update_row(session, "ticket", {"id": tid}, updates_t)
                 counts["tickets"] += 1
+                report_ticket_ids.add(tid)
 
         # ---- ticket_history + dynamic_field_value: scrub free-text PII ----
         # Only on anonymize (delete removes these rows outright, batch B). The
@@ -1957,6 +1973,8 @@ async def run_erasure(
                 )
             )
 
+        await _refresh_report_facts(session, report_ticket_ids)
+
         # ---- cache invalidation ----
         for ctype in _CUSTOMER_USER_CACHE_TYPES:
             await invalidate_cache_type(session, ctype)
@@ -2142,6 +2160,7 @@ async def rollback_job(
             await invalidate_cache_type(session, ctype)
         for ctype in _CUSTOMER_COMPANY_CACHE_TYPES:
             await invalidate_cache_type(session, ctype)
+        await _refresh_report_facts(session, set(ticket_ids))
         for tid in set(ticket_ids):
             await invalidate_ticket_cache(session, tid)
             await _emit_event(session, SEARCH_REINDEX_EVENT, tid)

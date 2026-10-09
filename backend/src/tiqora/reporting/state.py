@@ -97,10 +97,11 @@ async def load_state(
         except DBAPIError as exc:
             if not _deadlock_behind(exc):
                 raise
-            giving_up = not retry_on_deadlock or attempt >= 2
-            if giving_up or _lost_savepoint(exc):
-                await session.rollback()
-            if giving_up:
+            # InnoDB/PostgreSQL abort the whole transaction on a deadlock, whatever
+            # error form reaches us (bare 1213/40P01 or the 1305 that follows): the
+            # session must be rolled back before it is reused for a retry.
+            await session.rollback()
+            if not retry_on_deadlock or attempt >= 2:
                 raise
             attempt += 1
             continue

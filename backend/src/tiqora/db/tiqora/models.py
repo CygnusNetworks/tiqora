@@ -1069,6 +1069,8 @@ class TiqoraReportState(TiqoraBase):
     backfill_target_ticket_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     backfill_since: Mapped[date | None] = mapped_column(Date, nullable=True)
     backfill_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    #: uuid of the run that owns the cursor; a writer of a replaced run must not touch the state
+    backfill_run_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
     backfill_finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_snapshot_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     snapshot_time_zone: Mapped[str | None] = mapped_column(String(64), nullable=True)

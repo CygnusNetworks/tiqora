@@ -441,6 +441,12 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_OUTBOX_DRAIN_INTERVAL"
     )
 
+    # Report data upkeep (facts, events, daily snapshots). ``daemon.report_facts.enabled``
+    # (default ON) switches it off; this is only the poll interval.
+    report_facts_interval_seconds: int = Field(
+        default=60, validation_alias="TIQORA_REPORT_FACTS_INTERVAL"
+    )
+
     # AI worker (tiqora-ai-worker, separate process/compose service — see
     # ~/TIQORA_LLM_PLAN.md §3.0/§3.4). ``daemon.ai_worker.enabled``
     # (default OFF) is the takeover switch; this is only the tick cadence.

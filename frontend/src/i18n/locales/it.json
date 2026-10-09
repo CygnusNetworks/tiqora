@@ -3001,6 +3001,10 @@
           "name": "Rinnovo dei certificati S/MIME dei clienti",
           "description": "Importa ogni giorno dal backend clienti i certificati cliente rinnovati (Znuny RenewCustomerSMIMECertificates; richiede SMIME::FetchFromCustomer)."
         },
+        "report_facts": {
+          "name": "Report data upkeep",
+          "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date every minute."
+        },
         "jobs": {
           "name": "Background tasks",
           "description": "Runs long tasks such as exports in the background so the interface does not have to wait."

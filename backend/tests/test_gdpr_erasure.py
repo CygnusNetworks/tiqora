@@ -2186,3 +2186,100 @@ async def test_run_erasure_customer_favorites(mariadb_znuny_url: str, mode: str)
             await session.commit()
 
     await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
+@pytest.mark.parametrize("variant", ["anonymize", "delete", "delete_tickets"])
+async def test_erasure_removes_report_facts_and_marks_dirty(
+    url_fixture: str, variant: str, request: pytest.FixtureRequest
+) -> None:
+    """Facts copy customer_id/customer_user: every mode drops them and queues a rebuild."""
+    from tiqora.reporting.facts_store import rebuild_ticket_facts
+
+    url = request.getfixturevalue(url_fixture)
+    engine, factory = await _factory(url)
+    mysql = _is_mysql(url)
+    tag = f"{'my' if mysql else 'pg'}{variant.replace('_', '')}"
+    login = f"erase.rep47.{tag}@example.com"
+    company = f"ERASE-REP47-{tag.upper()}"
+    mode = "anonymize" if variant == "anonymize" else "delete"
+
+    async def report_rows(session: AsyncSession, tid: int) -> tuple[int, int, int]:
+        p = {"t": tid}
+        return (
+            await _count(
+                session, "SELECT COUNT(*) FROM tiqora_report_ticket_fact WHERE ticket_id = :t", p
+            ),
+            await _count(
+                session, "SELECT COUNT(*) FROM tiqora_report_ticket_event WHERE ticket_id = :t", p
+            ),
+            await _count(
+                session, "SELECT COUNT(*) FROM tiqora_report_dirty_ticket WHERE ticket_id = :t", p
+            ),
+        )
+
+    async with factory() as session:
+        await _seed_tiqora_tables(session, mysql=mysql)
+        await _insert_company(session, customer_id=company, name=f"Report Co {tag}")
+        cuid = await _insert_customer(session, login=login, customer_id=company)
+        tid = await _insert_ticket(
+            session, customer_user_id=login, customer_id=company, tn=f"2026REP{tag}{cuid}"
+        )
+        await _insert_article_bundle(session, ticket_id=tid, from_addr=login, body=f"body {login}")
+    async with factory() as session:
+        await session.execute(
+            text("DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id = :t"), {"t": tid}
+        )
+        await rebuild_ticket_facts(session, [tid])
+        await session.commit()
+    async with factory() as session:
+        fact, events, dirty = await report_rows(session, tid)
+        assert fact == 1 and events >= 1 and dirty == 0
+        copied = (
+            await session.execute(
+                text("SELECT customer_id FROM tiqora_report_ticket_fact WHERE ticket_id = :t"),
+                {"t": tid},
+            )
+        ).scalar_one()
+        assert copied == company
+
+    result = await run_erasure(
+        factory,
+        Settings(),
+        customer_user_ids=[cuid],
+        mode=mode,
+        seed=7,
+        force_parallel=True,
+        actor="test",
+        delete_tickets=variant == "delete_tickets",
+    )
+    async with factory() as session:
+        assert await report_rows(session, tid) == (0, 0, 1)
+        await session.execute(
+            text("DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id = :t"), {"t": tid}
+        )
+        await session.commit()
+
+    await rollback_job(factory, Settings(), result.job_id, force_parallel=True, actor="test")
+    async with factory() as session:
+        assert await report_rows(session, tid) == (0, 0, 1)
+        await session.rollback()
+        # cleanup of what this test created (rollback restored it)
+        tick = "(SELECT id FROM article WHERE ticket_id = :t)"
+        async with session.begin():
+            for stmt in (
+                "DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id = :t",
+                "DELETE FROM article_search_index WHERE ticket_id = :t",
+                f"DELETE FROM article_data_mime_attachment WHERE article_id IN {tick}",
+                f"DELETE FROM article_data_mime_plain WHERE article_id IN {tick}",
+                f"DELETE FROM article_data_mime WHERE article_id IN {tick}",
+                "DELETE FROM article WHERE ticket_id = :t",
+                "DELETE FROM ticket_history WHERE ticket_id = :t",
+                "DELETE FROM ticket WHERE id = :t",
+                "DELETE FROM customer_user WHERE id = :cu",
+                "DELETE FROM customer_company WHERE customer_id = :c",
+            ):
+                await session.execute(text(stmt), {"t": tid, "cu": cuid, "c": company})
+    await engine.dispose()

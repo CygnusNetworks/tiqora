@@ -41,6 +41,7 @@ async def _cmd_backfill(args: argparse.Namespace) -> int:
     from tiqora.jobs.context import JobCancelled
     from tiqora.jobs.service import find_active_job
     from tiqora.reporting.backfill import REPORT_BACKFILL_JOB, ReportBackfillPayload, run_backfill
+    from tiqora.reporting.state import load_state
 
     factory = get_session_factory()
     async with factory() as session:
@@ -54,6 +55,12 @@ async def _cmd_backfill(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 1
+
+    async with factory() as session:
+        # a CLI run has no job: the worker tick must not resume it through a stale job id
+        state = await load_state(session, for_update=True)
+        state.backfill_job_id = None
+        await session.commit()
 
     async def progress(done: int, total: int | None, message: str | None) -> None:
         print(f"{done}/{total} {message or ''}".rstrip())  # noqa: T201 — CLI output
