@@ -16,10 +16,13 @@ The ``Action`` ACL needs a ticket (``AgentTicketProcess.pm`` evaluates it only i
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.db.legacy import PermissionGroups, Queue
 from tiqora.domain.ticket_write_service import (
     _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse
 )
@@ -34,7 +37,11 @@ from tiqora.process.exceptions import (
     ProcessPermissionDenied,
 )
 from tiqora.process.graph import ActivityDialogNode, ProcessGraph, ProcessRepository, ProcessSummary
-from tiqora.process.ticket_state import TicketProcessCandidates
+from tiqora.process.ticket_state import TicketProcessCandidates, get_ticket_process_state
+from tiqora.znuny.sysconfig import SysConfig
+
+if TYPE_CHECKING:
+    from tiqora.domain.ticket_acl import AclPrincipal, ProcessAclKind
 
 # Process.pm ProcessList: new starts need Active; AgentTicketZoom keeps FadeAway tickets going.
 STARTABLE_STATES = frozenset({"S1"})
@@ -46,18 +53,40 @@ __all__ = [
     "assert_can_start",
     "assert_can_submit",
     "available_dialogs",
+    "can_start",
     "dialog_allows",
     "list_startable_processes",
     "process_action_allowed",
 ]
 
 
-async def filter_process_options(session: AsyncSession, **kwargs: Any) -> list[str]:
+async def filter_process_options(
+    session: AsyncSession,
+    *,
+    principal: AclPrincipal,
+    kind: ProcessAclKind,
+    items: Sequence[str],
+    action: str,
+    ticket_id: int | None = None,
+    process_entity_id: str | None = None,
+    activity_entity_id: str | None = None,
+    activity_dialog_entity_id: str | None = None,
+) -> list[str]:
     """:func:`tiqora.domain.ticket_acl.filter_process_options`, imported lazily:
     domain.ticket_acl -> deployed.store -> process.dump -> this package."""
     from tiqora.domain.ticket_acl import filter_process_options as _filter
 
-    return await _filter(session, **kwargs)
+    return await _filter(
+        session,
+        principal=principal,
+        kind=kind,
+        items=items,
+        action=action,
+        ticket_id=ticket_id,
+        process_entity_id=process_entity_id,
+        activity_entity_id=activity_entity_id,
+        activity_dialog_entity_id=activity_dialog_entity_id,
+    )
 
 
 def dialog_allows(dialog: ActivityDialogConfig, interface: Interface) -> bool:
@@ -83,6 +112,48 @@ async def process_action_allowed(
     return actor.frontend_action in kept
 
 
+async def _customer_has_permission(
+    session: AsyncSession, actor: ProcessActor, *, queue_id: int, permission: str
+) -> bool:
+    """``TicketCustomerPermission`` GroupCheck (``CustomerPermission/GroupCheck.pm``).
+
+    The customer needs *permission* in the queue's group via ``CustomerGroup::GroupMemberList``:
+    with ``CustomerGroupSupport`` off that is every group (no extra restriction), with it on the
+    ``Group_<perm>`` lists of :func:`load_customer_user_checks`. Company groups stay the
+    documented limitation of that function.
+    """
+    from tiqora.domain.ticket_acl import load_customer_user_checks  # noqa: PLC0415 -- cycle
+
+    sysconfig = SysConfig(session)
+    if str(await sysconfig.get("CustomerGroupSupport", 0)) not in ("1", "True", "true"):
+        return True
+    group_name = (
+        await session.execute(
+            select(PermissionGroups.name)
+            .join(Queue, Queue.group_id == PermissionGroups.id)
+            .where(Queue.id == queue_id)
+        )
+    ).scalar_one_or_none()
+    if group_name is None or not actor.customer_user_login:
+        return False
+    checks = await load_customer_user_checks(
+        session, actor.customer_user_login, sysconfig=sysconfig
+    )
+    return group_name in checks.get(f"Group_{permission}", [])
+
+
+async def _has_ticket_permission(
+    session: AsyncSession, actor: ProcessActor, *, ticket_id: int, permission: str
+) -> bool:
+    """The dialog / start permission on the ticket's queue: ``TicketPermission`` for agents
+    (AgentTicketProcess.pm:140-153), ``TicketCustomerPermission`` for customers
+    (CustomerTicketProcess.pm:84-121)."""
+    queue_id = int((await _ticket_must_exist(session, ticket_id))["queue_id"])
+    if actor.interface == "AgentInterface":
+        return await PermissionEngine(session).check(actor.user_id, queue_id, permission)
+    return await _customer_has_permission(session, actor, queue_id=queue_id, permission=permission)
+
+
 async def _start_dialog_offered(
     graph: ProcessGraph, actor: ProcessActor, repository: ProcessRepository
 ) -> bool:
@@ -102,7 +173,10 @@ async def list_startable_processes(
 ) -> list[ProcessSummary]:
     """Processes the actor may start: Active, start dialog on the interface, Process ACL."""
     repository = repository or ProcessRepository(session)
-    if not await process_action_allowed(session, actor, ticket_id=ticket_id):
+    if ticket_id is not None and not (
+        await _has_ticket_permission(session, actor, ticket_id=ticket_id, permission="rw")
+        and await process_action_allowed(session, actor, ticket_id=ticket_id)
+    ):
         return []
     candidates: list[ProcessSummary] = []
     for summary in await repository.list_processes():
@@ -145,6 +219,10 @@ async def assert_can_start(
         raise ProcessNotStartable(
             f"process {process_entity_id!r} has no start dialog for {actor.interface}"
         )
+    if ticket_id is not None and not await _has_ticket_permission(
+        session, actor, ticket_id=ticket_id, permission="rw"
+    ):
+        raise ProcessPermissionDenied(f"{actor.interface} lacks 'rw' on ticket {ticket_id}")
     if not await process_action_allowed(session, actor, ticket_id=ticket_id):
         raise ProcessNotStartable(f"{actor.frontend_action} is not allowed on this ticket")
     kept = await filter_process_options(
@@ -160,6 +238,24 @@ async def assert_can_start(
     return graph
 
 
+async def _dialog_permitted(
+    session: AsyncSession, actor: ProcessActor, *, ticket_id: int, dialog: ActivityDialogNode
+) -> bool:
+    """The dialog ``Permission`` on the ticket's queue.
+
+    Agents: only when the dialog sets one (the REST layer already demands ``rw``; Znuny's
+    default is ``rw`` too, AgentTicketProcess.pm:140-153). Customers: ``Permission`` or ``rw``
+    through GroupCheck (CustomerTicketProcess.pm:84-121). Known limitation: for agents ``rw``
+    is required on top of a weaker dialog Permission (stricter than Znuny).
+    """
+    permission = dialog.config.permission
+    if actor.interface == "AgentInterface" and not permission:
+        return True
+    return await _has_ticket_permission(
+        session, actor, ticket_id=ticket_id, permission=permission or "rw"
+    )
+
+
 async def _visible_dialogs(
     session: AsyncSession,
     actor: ProcessActor,
@@ -167,28 +263,14 @@ async def _visible_dialogs(
     ticket_id: int,
     candidates: TicketProcessCandidates,
 ) -> list[ActivityDialogNode]:
-    """Interface, (agents) dialog Permission and ``ActivityDialog`` ACL over the current
+    """Interface, dialog Permission and one ``ActivityDialog`` ACL call over the current
     activity's dialogs (``AgentTicketZoom.pm:1620-1650``)."""
-    dialogs = [d for d in candidates.activity_dialogs if dialog_allows(d.config, actor.interface)]
-    if actor.interface == "AgentInterface":
-        # Znuny keeps the dialog Permission for agents only (AgentTicketProcess.pm:140-153);
-        # CustomerTicketProcess has none, the portal writes as the panel user.
-        queue_id: int | None = None
-        rights: dict[str, bool] = {}
-        allowed: list[ActivityDialogNode] = []
-        for dialog in dialogs:
-            permission = dialog.config.permission
-            if permission:
-                if permission not in rights:
-                    if queue_id is None:
-                        queue_id = int((await _ticket_must_exist(session, ticket_id))["queue_id"])
-                    rights[permission] = await PermissionEngine(session).check(
-                        actor.user_id, queue_id, permission
-                    )
-                if not rights[permission]:
-                    continue
-            allowed.append(dialog)
-        dialogs = allowed
+    dialogs = [
+        d
+        for d in candidates.activity_dialogs
+        if dialog_allows(d.config, actor.interface)
+        and await _dialog_permitted(session, actor, ticket_id=ticket_id, dialog=d)
+    ]
     if not dialogs:
         return []
     kept = set(
@@ -222,6 +304,22 @@ async def available_dialogs(
     return await _visible_dialogs(session, actor, ticket_id=ticket_id, candidates=candidates)
 
 
+async def can_start(
+    session: AsyncSession,
+    actor: ProcessActor,
+    *,
+    ticket_id: int,
+    repository: ProcessRepository,
+) -> bool:
+    """The ticket is not in a process and the actor may start at least one (the start
+    permission, the Action ACL and the Process ACL are all evaluated by the list)."""
+    if await get_ticket_process_state(session, ticket_id) is not None:
+        return False
+    return bool(
+        await list_startable_processes(session, actor, ticket_id=ticket_id, repository=repository)
+    )
+
+
 async def assert_can_submit(
     session: AsyncSession,
     actor: ProcessActor,
@@ -233,7 +331,10 @@ async def assert_can_submit(
     """The dialog node to submit.
 
     Raises :class:`ProcessNotRunning` (409), :class:`ActivityDialogNotAvailable` (409, not on
-    the current activity) or :class:`ProcessPermissionDenied` (403).
+    the current activity) or :class:`ProcessPermissionDenied` (403). Like Znuny's submit
+    (AgentTicketProcess.pm:248-266, CustomerTicketProcess.pm:146-170) the ``ActivityDialog``
+    ACL is evaluated for this one dialog with its ``ActivityDialogEntityID`` known, so an ACL
+    keyed on that id applies even when it did not hide the dialog in the list.
     """
     if candidates.process.state_entity_id not in RUNNING_STATES:
         raise ProcessNotRunning(f"process {candidates.process.entity_id!r} is not running")
@@ -246,10 +347,24 @@ async def assert_can_submit(
         raise ProcessPermissionDenied(
             f"activity dialog {activity_dialog_entity_id!r} is not available on {actor.interface}"
         )
+    if not await _dialog_permitted(session, actor, ticket_id=ticket_id, dialog=node):
+        raise ProcessPermissionDenied(
+            f"missing permission for activity dialog {activity_dialog_entity_id!r}"
+        )
     if not await process_action_allowed(session, actor, ticket_id=ticket_id):
         raise ProcessPermissionDenied(f"{actor.frontend_action} is not allowed on this ticket")
-    visible = await _visible_dialogs(session, actor, ticket_id=ticket_id, candidates=candidates)
-    if node.entity_id not in {d.entity_id for d in visible}:
+    kept = await filter_process_options(
+        session,
+        principal=actor.acl_principal,
+        kind="ActivityDialog",
+        items=[node.entity_id],
+        action=actor.frontend_action,
+        ticket_id=ticket_id,
+        process_entity_id=candidates.process.entity_id,
+        activity_entity_id=candidates.activity_entity_id,
+        activity_dialog_entity_id=node.entity_id,
+    )
+    if node.entity_id not in kept:
         raise ProcessPermissionDenied(
             f"activity dialog {activity_dialog_entity_id!r} is not permitted for this user"
         )

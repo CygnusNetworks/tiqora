@@ -43,8 +43,11 @@ from tiqora.process.actor import ProcessActor
 from tiqora.process.availability import (
     assert_can_start,
     available_dialogs,
+    dialog_allows,
     list_startable_processes,
-    process_action_allowed,
+)
+from tiqora.process.availability import (
+    can_start as can_start_process,
 )
 from tiqora.process.config import ActivityDialogFieldConfig
 from tiqora.process.dump import PROCESS_STATE_NAMES
@@ -75,7 +78,7 @@ from tiqora.process.schemas import (
     ProcessSummaryOut,
     TicketProcessStateOut,
 )
-from tiqora.process.ticket_state import get_ticket_process_candidates, get_ticket_process_state
+from tiqora.process.ticket_state import get_ticket_process_candidates
 from tiqora.znuny.sysconfig import SysConfig
 
 router = APIRouter(prefix="/process", tags=["process"])
@@ -155,14 +158,8 @@ async def _ticket_process_state_out(
     """
     candidates = await get_ticket_process_candidates(session, ticket_id, repository=repository)
     if candidates is None:
-        can_start = (
-            await get_ticket_process_state(session, ticket_id) is None
-            and await process_action_allowed(session, actor, ticket_id=ticket_id)
-            and bool(
-                await list_startable_processes(
-                    session, actor, ticket_id=ticket_id, repository=repository
-                )
-            )
+        can_start = await can_start_process(
+            session, actor, ticket_id=ticket_id, repository=repository
         )
         return TicketProcessStateOut(can_start=can_start)
 
@@ -250,6 +247,12 @@ async def get_activity_dialog(
         raise _map_exc(ActivityDialogNotFound(activity_dialog_entity_id))
 
     config = node.config
+    # ActivityDialogGet with Interface => AgentInterface returns nothing for other dialogs.
+    if not dialog_allows(config, "AgentInterface"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Activity dialog is not available on the agent interface",
+        )
     return ActivityDialogDetailOut(
         entity_id=node.entity_id,
         name=node.name,

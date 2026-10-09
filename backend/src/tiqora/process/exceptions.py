@@ -45,8 +45,8 @@ class RequiredFieldMissing(Exception):
 
 
 class ProcessPermissionDenied(Exception):
-    """The acting user lacks the activity dialog's configured ``Permission``
-    on the ticket's queue."""
+    """The acting user may not use the dialog or start here: missing ``Permission`` on the
+    ticket's queue (agent or customer group check), wrong interface, or an ACL (HTTP 403)."""
 
 
 class UnresolvedFieldValue(Exception):

@@ -40,7 +40,9 @@ T0 = datetime(2026, 3, 4, 5, 6, 7)
 AGENT_A, AGENT_B = 886010, 886011  # A: rw on the queue's group, B: ro only
 GROUP = 886020
 QUEUE = 886030
-TICKET_1, TICKET_2 = 886040, 886041
+TICKET_1, TICKET_2, TICKET_OTHER = 886040, 886041, 886042
+AGENT_C = 886012  # no group at all
+SYSCONFIG_DEFAULT_ID, SYSCONFIG_MODIFIED_ID = 886480, 886481
 CUSTOMER_ID_ROW = 886001
 CUSTOMER_LOGIN = "cu-886001"
 CUSTOMER_COMPANY = "cust-886"
@@ -68,6 +70,9 @@ def _cleanup(conn: Any) -> None:
         "DELETE FROM ticket_history WHERE ticket_id BETWEEN 886040 AND 886049",
         "DELETE FROM ticket WHERE id BETWEEN 886040 AND 886049",
         "DELETE FROM queue WHERE id BETWEEN 886030 AND 886039",
+        "DELETE FROM group_customer_user WHERE group_id BETWEEN 886020 AND 886029",
+        f"DELETE FROM sysconfig_modified WHERE id = {SYSCONFIG_MODIFIED_ID}",
+        f"DELETE FROM sysconfig_default WHERE id = {SYSCONFIG_DEFAULT_ID}",
         "DELETE FROM group_user WHERE group_id BETWEEN 886020 AND 886029",
         "DELETE FROM permission_groups WHERE id BETWEEN 886020 AND 886029",
         "DELETE FROM customer_user WHERE id BETWEEN 886001 AND 886009",
@@ -174,7 +179,11 @@ def _add_process(
 
 
 def _seed(conn: Any) -> None:
-    for uid, login in ((AGENT_A, "agent-886a"), (AGENT_B, "agent-886b")):
+    for uid, login in (
+        (AGENT_A, "agent-886a"),
+        (AGENT_B, "agent-886b"),
+        (AGENT_C, "agent-886c"),
+    ):
         conn.execute(
             text(
                 "INSERT INTO users (id, login, pw, first_name, last_name, valid_id, create_time,"
@@ -214,7 +223,7 @@ def _seed(conn: Any) -> None:
         ),
         {"id": CUSTOMER_ID_ROW, "login": CUSTOMER_LOGIN, "cust": CUSTOMER_COMPANY, "t": T0},
     )
-    for tid in (TICKET_1, TICKET_2):
+    for tid in (TICKET_1, TICKET_2, TICKET_OTHER):
         conn.execute(
             text(
                 "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id, user_id,"
@@ -230,8 +239,8 @@ def _seed(conn: Any) -> None:
                 "tn": f"2026030488{tid}",
                 "q": QUEUE,
                 "u": AGENT_A,
-                "cust": CUSTOMER_COMPANY,
-                "cu": CUSTOMER_LOGIN,
+                "cust": CUSTOMER_COMPANY if tid != TICKET_OTHER else "other-co",
+                "cu": CUSTOMER_LOGIN if tid != TICKET_OTHER else "someone-else",
                 "t": T0,
             },
         )
@@ -386,6 +395,11 @@ async def _state(c: AsyncClient, ticket_id: int, prefix: str = "/api/v1/process"
     resp = await c.get(f"{prefix}/ticket/{ticket_id}/state")
     assert resp.status_code == 200, resp.text
     return resp.json()  # type: ignore[no-any-return]
+
+
+async def _dialog_ids(c: AsyncClient, ticket_id: int, prefix: str) -> list[str]:
+    state = await _state(c, ticket_id, prefix)
+    return [d["entity_id"] for d in state["available_dialogs"]]
 
 
 async def _start(c: AsyncClient, ticket_id: int, n: int, prefix: str = "/api/v1/process") -> Any:
@@ -592,12 +606,13 @@ async def test_dialog_permission_is_kept_for_agents(
     _build(sync_url, setup)
     assert (await _start(client, TICKET_1, 1)).status_code == 200
 
-    # Agent A (rw) sees and can submit it; agent B (ro) neither sees it ...
+    # Agent A (rw) sees it; agent B (ro) does not see it in the list ...
     a_ids = [d["entity_id"] for d in (await _state(client, TICKET_1))["available_dialogs"]]
     b_ids = [d["entity_id"] for d in (await _state(client_b, TICKET_1))["available_dialogs"]]
     assert a_ids == [dialog_eid(1), dialog_eid(2)]
     assert b_ids == [dialog_eid(1)]
-    # ... nor can submit it, on the REST surface and in the engine itself.
+    # ... and is refused on submit: the REST layer's rw gate already does that, so the engine
+    # call below is what proves the dialog Permission itself is enforced.
     assert (await _submit(client_b, TICKET_1, 2)).status_code == 403
     with pytest.raises(ProcessPermissionDenied):
         await submit_activity_dialog(
@@ -634,3 +649,169 @@ async def test_state_out_reports_process_state_and_can_start(
     assert (await _state(client, TICKET_1))["process_state"] == "Inactive"
     # Nothing startable is left for a ticket outside a process.
     assert (await _state(client, TICKET_2))["can_start"] is False
+
+
+# --- customer dialog Permission (CustomerTicketProcess.pm:84-121, GroupCheck.pm) ----------------
+
+
+def _set_customer_group_support(url: str, value: int) -> None:
+    from tiqora.znuny.sysconfig import yaml_encode_effective
+
+    _exec(
+        url,
+        ("DELETE FROM sysconfig_modified WHERE id = :id", {"id": SYSCONFIG_MODIFIED_ID}),
+        ("DELETE FROM sysconfig_default WHERE id = :id", {"id": SYSCONFIG_DEFAULT_ID}),
+        (
+            "INSERT INTO sysconfig_default (id, name, description, navigation, is_invisible,"
+            " is_readonly, is_required, is_valid, has_configlevel, user_modification_possible,"
+            " user_modification_active, xml_content_raw, xml_content_parsed, xml_filename,"
+            " effective_value, is_dirty, exclusive_lock_guid, create_time, create_by,"
+            " change_time, change_by) VALUES (:id, 'CustomerGroupSupport', 'x', 'x', 0, 0, 1, 1,"
+            " 0, 0, 0, 'x', 'x', 'Framework.xml', :e, 0, '0', current_timestamp, 1,"
+            " current_timestamp, 1)",
+            {"id": SYSCONFIG_DEFAULT_ID, "e": yaml_encode_effective(0)},
+        ),
+        (
+            "INSERT INTO sysconfig_modified (id, sysconfig_default_id, name, user_id, is_valid,"
+            " user_modification_active, effective_value, is_dirty, reset_to_default,"
+            " create_time, create_by, change_time, change_by)"
+            " VALUES (:id, :did, 'CustomerGroupSupport', NULL, 1, 0, :e, 0, 0,"
+            " current_timestamp, 1, current_timestamp, 1)",
+            {
+                "id": SYSCONFIG_MODIFIED_ID,
+                "did": SYSCONFIG_DEFAULT_ID,
+                "e": yaml_encode_effective(value),
+            },
+        ),
+    )
+
+
+def _grant_customer(url: str) -> None:
+    _exec(
+        url,
+        (
+            "INSERT INTO group_customer_user (user_id, group_id, permission_key, permission_value,"
+            " create_time, create_by, change_time, change_by)"
+            " VALUES (:u, :g, 'rw', 1, :t, 1, :t, 1)",
+            {"u": CUSTOMER_LOGIN, "g": GROUP, "t": T0},
+        ),
+    )
+
+
+def _customer_perm(conn: Any) -> None:
+    _add_dialog(conn, 1, CUSTOMER_ONLY)
+    _add_dialog(conn, 2, CUSTOMER_ONLY, permission="rw")
+    _add_process(conn, 1, start_dialog=1, dialogs=[1, 2])
+
+
+@pytest.mark.db
+async def test_customer_dialog_permission_needs_group_when_support_is_on(
+    portal_client: AsyncClient, sync_url: str
+) -> None:
+    prefix = "/api/portal/process"
+    _build(sync_url, _customer_perm)
+    _set_customer_group_support(sync_url, 0)
+    assert (await _start(portal_client, TICKET_1, 1, prefix)).status_code == 200
+
+    # Support off (the Znuny default): GroupMemberList is every group, no extra restriction.
+    ids = [
+        d["entity_id"] for d in (await _state(portal_client, TICKET_1, prefix))["available_dialogs"]
+    ]
+    assert ids == [dialog_eid(1), dialog_eid(2)]
+
+    # Support on, no group grant: both dialogs (default and explicit "rw") are hidden and refused.
+    _set_customer_group_support(sync_url, 1)
+    assert (await _state(portal_client, TICKET_1, prefix))["available_dialogs"] == []
+    assert (await _submit(portal_client, TICKET_1, 2, prefix)).status_code == 403
+    assert (await _submit(portal_client, TICKET_1, 1, prefix)).status_code == 403
+    assert (await _start(portal_client, TICKET_2, 1, prefix)).status_code == 403
+    assert await _listed(portal_client, prefix + "/", ticket_id=TICKET_2) == []
+
+    # Support on with the rw grant for the queue's group: allowed again.
+    _grant_customer(sync_url)
+    ids = [
+        d["entity_id"] for d in (await _state(portal_client, TICKET_1, prefix))["available_dialogs"]
+    ]
+    assert ids == [dialog_eid(1), dialog_eid(2)]
+    assert (await _submit(portal_client, TICKET_1, 2, prefix)).status_code == 200
+
+
+# --- ACL on the submitted dialog id (TicketACL.pm:1122-1133) -------------------------------------
+
+
+@pytest.mark.db
+async def test_submit_acl_keyed_only_on_dialog_id_applies(
+    client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _mixed)
+    assert (await _start(client, TICKET_1, 1)).status_code == 200
+    _add_acl(
+        sync_url,
+        1,
+        "by-dialog-id",
+        f"PossibleNot:\n  ActivityDialog: [{dialog_eid(2)}]\n",
+        match=(f"Properties:\n  Process:\n    ActivityDialogEntityID: [{dialog_eid(2)}]\n"),
+    )
+    # The list call knows no dialog id (AgentTicketZoom.pm:1636): the ACL does not match there ...
+    ids = [d["entity_id"] for d in (await _state(client, TICKET_1))["available_dialogs"]]
+    assert ids == [dialog_eid(1), dialog_eid(2)]
+    # ... but the submit call passes it, exactly like AgentTicketProcess.pm:248-266.
+    assert (await _submit(client, TICKET_1, 2)).status_code == 403
+    assert (await _submit(client, TICKET_1, 1)).status_code == 200
+
+
+# --- can_start, Action ACL on the portal, inaccessible tickets, dialog detail --------------------
+
+
+@pytest.mark.db
+async def test_can_start_needs_the_start_permission(
+    client: AsyncClient, client_b: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _basic)
+    assert (await _state(client, TICKET_2))["can_start"] is True
+    # Agent B only has ro: the start needs rw, so neither can_start nor the list offer it.
+    assert (await _state(client_b, TICKET_2))["can_start"] is False
+    assert await _listed(client_b, ticket_id=TICKET_2) == []
+    assert process_eid(1) in await _listed(client, ticket_id=TICKET_2)
+
+
+@pytest.mark.db
+async def test_portal_can_start_and_action_acl(portal_client: AsyncClient, sync_url: str) -> None:
+    prefix = "/api/portal/process"
+    _build(sync_url, _basic)
+    assert (await _state(portal_client, TICKET_2, prefix))["can_start"] is True
+    assert (await _start(portal_client, TICKET_1, 1, prefix)).status_code == 200
+    assert (await _state(portal_client, TICKET_1, prefix))["can_start"] is False
+
+    _add_acl(
+        sync_url, 1, "no-customer-process", "PossibleNot:\n  Action: [CustomerTicketProcess]\n"
+    )
+    assert (await _state(portal_client, TICKET_1, prefix))["available_dialogs"] == []
+    assert (await _state(portal_client, TICKET_2, prefix))["can_start"] is False
+    assert (await _start(portal_client, TICKET_2, 1, prefix)).status_code == 409
+    assert (await _submit(portal_client, TICKET_1, 1, prefix)).status_code == 403
+    assert await _listed(portal_client, prefix + "/", ticket_id=TICKET_2) == []
+    assert process_eid(1) in await _listed(portal_client, prefix + "/")  # no ticket: ignored (F36)
+
+
+@pytest.mark.db
+async def test_list_with_inaccessible_ticket_is_refused(
+    engine: AsyncEngine, portal_client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _basic)
+    async with _agent_client(engine, AGENT_C) as client_c:
+        assert (await client_c.get(_p(), params={"ticket_id": TICKET_1})).status_code == 403
+    async with _agent_client(engine, AGENT_A) as client_a:
+        assert (await client_a.get(_p(), params={"ticket_id": 999999999})).status_code == 404
+    resp = await portal_client.get(_pp(), params={"ticket_id": TICKET_OTHER})
+    assert resp.status_code == 403
+
+
+@pytest.mark.db
+async def test_agent_activity_dialog_detail_checks_the_interface(
+    client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _mixed)
+    assert (await client.get(_p(f"activity-dialog/{dialog_eid(2)}"))).status_code == 200
+    assert (await client.get(_p(f"activity-dialog/{dialog_eid(3)}"))).status_code == 403
+    assert (await client.get(_p(f"activity-dialog/{dialog_eid(4)}"))).status_code == 403
