@@ -6,6 +6,7 @@ from typing import Any, Final
 
 from sqlalchemy import ColumnElement, Table
 
+from tiqora.domain.queue_service import OPEN_STATE_TYPES
 from tiqora.filters import FieldType
 from tiqora.reporting.facts import CHANNEL_KEYS
 from tiqora.reporting.semantic import (
@@ -21,7 +22,7 @@ from tiqora.reporting.semantic import (
     MeasureUnit,
 )
 
-OPEN_TYPES: Final = ("new", "open", "pending reminder", "pending auto")
+OPEN_TYPES: Final = tuple(sorted(OPEN_STATE_TYPES))
 STATE_TYPES: Final = (*OPEN_TYPES, "closed", "removed", "merged")
 CHANNELS: Final = tuple(dict.fromkeys(CHANNEL_KEYS.values()))
 

@@ -506,8 +506,41 @@ def test_tickets_breach_and_near_miss_conditions(dialect: Any) -> None:
     assert "f.close_count > 0 AND f.reopen_count = 0 AND f.article_out_count <= 1" in sql
 
 
+_SAMPLE_VALUE: dict[str, tuple[str, Any]] = {
+    "id": ("eq", 3),
+    "string": ("contains", "a_b"),
+    "bool": ("is_true", None),
+    "datetime": ("within_last", {"amount": 7, "unit": "day"}),
+}
+
+
 @DIALECTS
-def test_filters_compile_on_every_filterable_source_field(dialect: Any) -> None:
+def test_filters_compile_on_every_filterable_field_of_every_source(dialect: Any) -> None:
+    ctx = _ctx()
+    checked = 0
+    for src in core_report_sources():
+        resolve = src.filter_resolver(ctx)
+        keys = [d.key for d in src.dimensions if d.filter_type] + [f.key for f in src.filter_fields]
+        for key in keys:
+            spec = src.filter_spec(key)
+            assert spec is not None
+            op, value = _SAMPLE_VALUE.get(
+                spec.type, ("eq", spec.enum_values[0] if spec.enum_values else None)
+            )
+            flt = Filter.model_validate(
+                {"version": 1, "where": {"field": key, "op": op, "value": value}}
+            )
+            expr = compile_conditions(flt, resolve, now=NOW)
+            assert expr is not None, (src.key, key)
+            stmt = select(1).select_from(src.from_clause(ctx)).where(expr)
+            assert len(stmt.get_final_froms()) == 1, (src.key, key)
+            assert "WHERE" in _compile(stmt, dialect), (src.key, key)
+            checked += 1
+    assert checked > 60
+
+
+@DIALECTS
+def test_filter_semantics_on_a_real_source(dialect: Any) -> None:
     ctx = _ctx()
     flt = Filter.model_validate(
         {
@@ -522,7 +555,6 @@ def test_filters_compile_on_every_filterable_source_field(dialect: Any) -> None:
                         "op": "within_last",
                         "value": {"amount": 7, "unit": "day"},
                     },
-                    {"not": {"field": "customer", "op": "contains", "value": "a_b"}},
                 ]
             },
         }
@@ -531,8 +563,9 @@ def test_filters_compile_on_every_filterable_source_field(dialect: Any) -> None:
     expr = compile_conditions(flt, src.filter_resolver(ctx), now=NOW)
     assert expr is not None
     sql = _compile(select(1).select_from(src.from_clause(ctx)).where(expr), dialect)
-    assert "f.reopen_count > 0 IS true" in sql or "(f.reopen_count > 0) IS true" in sql
+    assert "f.reopen_count > 0) IS true" in sql
     assert "f.queue_id IN (1, 2)" in sql
+    assert "f.state_type != 'closed'" in sql
     assert "f.created_at >= '2024-06-05 10:00:00'" in sql
 
 
@@ -543,3 +576,87 @@ def test_filter_resolver_rejects_unknown_and_unfilterable_fields() -> None:
     assert resolve("created_hour") is None
     hit = resolve("queue")
     assert hit is not None and hit[0].key == "queue"
+
+
+@pytest.mark.parametrize(
+    "tr",
+    [
+        RelativeTimeRange(unit="week", count=600),
+        RelativeTimeRange(unit="month", count=130),
+        RelativeTimeRange(unit="quarter", count=45),
+        RelativeTimeRange(unit="year", count=11),
+        RelativeTimeRange(unit="week", count=3660),
+        RelativeTimeRange(unit="month", count=3660, include_current=True),
+        RelativeTimeRange(unit="quarter", count=3660),
+        RelativeTimeRange(unit="year", count=3660),
+    ],
+)
+def test_relative_range_over_the_day_cap_is_a_definition_error(tr: Any) -> None:
+    with pytest.raises(DefinitionError) as exc:
+        resolve_time_window(tr, "Europe/Berlin", NOW)
+    assert exc.value.path == "time_range"
+
+
+@pytest.mark.parametrize(
+    "tr",
+    [
+        RelativeTimeRange(unit="day", count=3660, include_current=True),
+        RelativeTimeRange(unit="week", count=522),
+        RelativeTimeRange(unit="month", count=120),
+        RelativeTimeRange(unit="quarter", count=40),
+        RelativeTimeRange(unit="year", count=10),
+    ],
+)
+def test_relative_range_just_inside_the_cap_resolves(tr: Any) -> None:
+    w = resolve_time_window(tr, "Europe/Berlin", NOW)
+    assert 0 < (w.end_date - w.start_date).days + 1 <= 3660
+
+
+def test_sub_models_and_identifiers_are_strict() -> None:
+    base = {"source": "tickets", "measures": [{"key": "tickets"}]}
+    for extra in (
+        {"visualization": {"typ": "line"}},
+        {"totals": {"grand": True, "row": True}},
+        {"sort": [{"key": "tickets", "dir": "asc"}]},
+        {"source": "x" * 121},
+        {"time_field": "x" * 121},
+        {"measures": [{"key": "x" * 121}]},
+        {"dimensions": [{"key": "queue", "choices": ["x" * 121]}]},
+        {"parameters": [{"key": "q", "field": "x" * 121}]},
+        {"parameters": [{"key": "q", "field": "queue", "allowed_values": list(range(1001))}]},
+        {"parameters": [{"key": "q", "field": "queue", "default": ["x" * 1001]}]},
+    ):
+        with pytest.raises(ValidationError):
+            ReportDefinition.model_validate({**base, **extra})
+
+
+def test_open_types_come_from_the_domain_constant() -> None:
+    from tiqora.domain.queue_service import OPEN_STATE_TYPES
+    from tiqora.reporting.sources._common import OPEN_TYPES
+
+    assert set(OPEN_TYPES) == set(OPEN_STATE_TYPES)
+
+
+@DIALECTS
+def test_event_from_to_columns_are_gated_by_kind(dialect: Any) -> None:
+    ctx = _ctx()
+    src = {s.key: s for s in core_report_sources()}["ticket_events"]
+
+    def sql(key: str) -> str:
+        d = src.dimension(key)
+        assert d is not None
+        return _compile(select(d.expr(ctx)), dialect)
+
+    for key, col_, kinds in [
+        ("from_state_type", "from_value", "'create', 'state', 'close', 'reopen'"),
+        ("to_state_type", "to_value", "'create', 'state', 'close', 'reopen'"),
+        ("from_state", "from_id", "'state', 'close', 'reopen'"),
+        ("to_state", "to_id", "'state', 'close', 'reopen'"),
+        ("from_queue", "from_id", "'create', 'queue'"),
+        ("to_queue", "to_id", "'create', 'queue'"),
+    ]:
+        out = sql(key)
+        assert f"CASE WHEN (e.kind IN ({kinds})) THEN e.{col_} ELSE NULL END" in out, out
+    # process_activity / merge values never reach a state-type grouping
+    assert "'process_activity'" not in sql("from_state_type")
+    assert "'merge'" not in sql("to_state_type")

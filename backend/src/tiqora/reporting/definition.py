@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from tiqora.domain.timezones import valid_time_zone
 from tiqora.extensions.registry import Registry
 from tiqora.filters import Filter, FilterError, validate_filter
+from tiqora.filters.catalog import MAX_IN_VALUES, MAX_STRING_LENGTH
 from tiqora.reporting.semantic import REPORT_SOURCES
 from tiqora.reporting.sql import Grain
 
@@ -22,6 +23,9 @@ if TYPE_CHECKING:
 
 SCHEMA_VERSION: Final = 1
 MAX_RANGE_DAYS: Final = 3660
+MAX_KEY_LENGTH: Final = 120
+_Key = Annotated[str, Field(max_length=MAX_KEY_LENGTH)]
+_ParamValue = Annotated[str, Field(max_length=MAX_STRING_LENGTH)] | int
 VisualizationType = Literal[
     "table", "pivot", "bar", "stacked_bar", "line", "area", "donut", "heatmap", "kpi"
 ]
@@ -61,16 +65,16 @@ TimeRange = Annotated[RelativeTimeRange | AbsoluteTimeRange, Field(discriminator
 class DimensionRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    key: str
+    key: _Key
     grain: Grain | None = None  # date dimensions only; default "day"
-    choices: list[str] = Field(default_factory=list, max_length=10)  # runtime alternatives
+    choices: list[_Key] = Field(default_factory=list, max_length=10)  # runtime alternatives
     top_n: int | None = Field(None, ge=1, le=100)  # rest folded into "__other__"
 
 
 class MeasureRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    key: str
+    key: _Key
 
 
 class ReportParameter(BaseModel):
@@ -79,26 +83,34 @@ class ReportParameter(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     key: str = Field(pattern=r"^[a-z][a-z0-9_]{0,39}$")
-    field: str  # dimension key or filter-only field key of the source
+    field: _Key  # dimension key or filter-only field key of the source
     op: Literal["in", "eq", "is_true", "is_false"] = "in"
-    label_key: str | None = None
-    allowed_values: list[str | int] | None = None  # None = anything the viewer may see
-    default: list[str | int] | None = None
+    label_key: Annotated[str, Field(max_length=MAX_KEY_LENGTH)] | None = None
+    allowed_values: list[_ParamValue] | None = Field(
+        None, max_length=MAX_IN_VALUES
+    )  # None = anything the viewer may see
+    default: list[_ParamValue] | None = Field(None, max_length=MAX_IN_VALUES)
     required: bool = False
 
 
 class SortSpec(BaseModel):
-    key: str  # dimension or measure key
+    model_config = ConfigDict(extra="forbid")
+
+    key: _Key  # dimension or measure key
     direction: Literal["asc", "desc"] = "desc"
 
 
 class Totals(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     grand: bool = False  # one total row
     rows: bool = False  # pivot: total per first-dimension value
     columns: bool = False  # pivot: total per second-dimension value
 
 
 class Visualization(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     type: VisualizationType = "table"
     series_dimension: int | None = None  # index of the dimension that forms the series
     chart_measures: list[int] | None = None  # measure indices plotted; None = all
@@ -108,12 +120,12 @@ class ReportDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: Literal[1] = 1
-    source: str
+    source: _Key
     dimensions: list[DimensionRef] = Field(default_factory=list, max_length=3)
     measures: list[MeasureRef] = Field(min_length=1, max_length=10)
     filter: Filter | None = None  # wave-0 filter language; keys = source dimension/filter fields
     parameters: list[ReportParameter] = Field(default_factory=list, max_length=10)
-    time_field: str | None = None  # None -> source.default_time_field
+    time_field: _Key | None = None  # None -> source.default_time_field
     time_range: TimeRange | None = None  # None -> no window (no time field) or last 30 days
     time_zone: str | None = None  # None -> the viewer's zone
     visualization: Visualization = Field(default_factory=Visualization)
@@ -196,6 +208,10 @@ def resolve_time_window(tr: TimeRange, zone: str, now_utc: datetime) -> TimeWind
             raise DefinitionError(
                 "Der Zeitraum liegt außerhalb des darstellbaren Bereichs.", path="time_range"
             ) from None
+        if (last - first).days + 1 > MAX_RANGE_DAYS:
+            raise DefinitionError(
+                f"Der Zeitraum darf höchstens {MAX_RANGE_DAYS} Tage umfassen.", path="time_range"
+            )
     return TimeWindow(
         start_utc=_local_midnight_utc(first, tz),
         end_utc=_local_midnight_utc(last + timedelta(days=1), tz),

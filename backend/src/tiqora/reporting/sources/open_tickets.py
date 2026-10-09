@@ -7,7 +7,6 @@ from datetime import UTC, timedelta
 from sqlalchemy import ColumnElement, FromClause, and_
 
 from tiqora.db.legacy.ticket import Ticket, TicketState, TicketStateType
-from tiqora.domain.queue_service import OPEN_STATE_TYPES
 from tiqora.domain.ticket_service import UNASSIGNED_OWNER_ID
 from tiqora.reporting.semantic import BoolFn, CompileContext, Measure, ReportSource
 from tiqora.reporting.sources._common import (
@@ -38,7 +37,7 @@ def _from(ctx: CompileContext) -> FromClause:
 
 
 def _base_where(ctx: CompileContext) -> list[ColumnElement[bool]]:
-    return [STT.c.name.in_(sorted(OPEN_STATE_TYPES)), T.c.archive_flag == 0]
+    return [STT.c.name.in_(OPEN_TYPES), T.c.archive_flag == 0]
 
 
 def _age(lower: int | None, upper: int | None) -> BoolFn:
