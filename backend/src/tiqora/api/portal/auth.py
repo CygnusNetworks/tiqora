@@ -7,7 +7,13 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from tiqora.api.deps import DbSession, get_redis
-from tiqora.api.portal.deps import AppSettings, CurrentCustomer, get_customer_auth_service
+from tiqora.api.portal.deps import (
+    AppSettings,
+    CurrentCustomer,
+    CustomerTOTPServiceDep,
+    CustomerWebAuthnServiceDep,
+    get_customer_auth_service,
+)
 from tiqora.domain.customer_auth import CustomerAuthService, customer_to_dict
 from tiqora.domain.schemas import CustomerLoginResponse, CustomerMe, LoginRequest
 from tiqora.identity.ldap_login import LdapSignInUnavailable, ldap_sign_in
@@ -28,6 +34,20 @@ def _clear_customer_session_cookie(response: Response, settings: AppSettings) ->
     )
 
 
+def set_customer_session_cookie(
+    response: Response, settings: AppSettings, token: str, *, max_age: int | None = None
+) -> None:
+    response.set_cookie(
+        key=settings.customer_session_cookie_name,
+        value=token,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
+        max_age=max_age if max_age is not None else settings.session_ttl_seconds,
+        path="/",
+    )
+
+
 def _too_many(retry_after: int | None) -> HTTPException:
     headers = {"Retry-After": str(max(1, retry_after))} if retry_after else None
     return HTTPException(
@@ -43,6 +63,8 @@ async def login(
     request: Request,
     response: Response,
     auth: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
+    totp: CustomerTOTPServiceDep,
+    webauthn: CustomerWebAuthnServiceDep,
     settings: AppSettings,
     session: DbSession,
 ) -> CustomerLoginResponse:
@@ -84,16 +106,24 @@ async def login(
             detail="Invalid credentials",
         )
     await limiter.reset(login=body.login, ip=ip)
+    # Customer 2FA is opt-in: only an enrolled factor changes the flow. The
+    # lookup runs after the password check, so the response never reveals
+    # whether an unknown login "has" a second factor.
+    totp_enrolled = await totp.is_enabled(customer.id)
+    passkey_enrolled = await webauthn.has_passkey(customer.id)
+    if totp_enrolled or passkey_enrolled:
+        pending_token = await auth.create_pending_session(customer)
+        set_customer_session_cookie(
+            response, settings, pending_token, max_age=settings.totp_pending_ttl_seconds
+        )
+        return CustomerLoginResponse(
+            customer=None,
+            pending_2fa=True,
+            totp_enrolled=totp_enrolled,
+            passkey_enrolled=passkey_enrolled,
+        )
     token = await auth.create_session(customer)
-    response.set_cookie(
-        key=settings.customer_session_cookie_name,
-        value=token,
-        httponly=True,
-        secure=settings.session_cookie_secure,
-        samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
-        max_age=settings.session_ttl_seconds,
-        path="/",
-    )
+    set_customer_session_cookie(response, settings, token)
     return CustomerLoginResponse(customer=CustomerMe(**customer_to_dict(customer)))
 
 

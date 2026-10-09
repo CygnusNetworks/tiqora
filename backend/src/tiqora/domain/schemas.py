@@ -643,7 +643,11 @@ class PortalAuthMethodsOut(BaseModel):
 
 
 class CustomerLoginResponse(BaseModel):
-    customer: CustomerMe
+    # ``customer`` is null while a second factor is still owed (``pending_2fa``).
+    customer: CustomerMe | None = None
+    pending_2fa: bool = False
+    totp_enrolled: bool = False
+    passkey_enrolled: bool = False
 
 
 class PortalTicketCreateRequest(BaseModel):

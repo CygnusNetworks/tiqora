@@ -1004,3 +1004,51 @@ class TiqoraIdentityManagedAssignment(TiqoraBase):
         ),
         Index("ix_tiqora_identity_managed_user", "user_id"),
     )
+
+
+class TiqoraCustomerTotp(TiqoraBase):
+    """Per-customer TOTP 2FA enrollment (customer portal).
+
+    Same shape as :class:`TiqoraUserTotp`; the database column is
+    ``customer_user_id`` (``customer_user.id`` -- a different id space than
+    ``users.id``) while the Python attribute stays ``user_id`` so
+    ``TOTPService`` works on both models unchanged.
+    """
+
+    __tablename__ = "tiqora_customer_totp"
+
+    user_id: Mapped[int] = mapped_column(
+        "customer_user_id", Integer, primary_key=True, autoincrement=False, nullable=False
+    )
+    secret: Mapped[str] = mapped_column(String(255), nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+
+
+class TiqoraCustomerPasskey(TiqoraBase):
+    """Per-customer WebAuthn passkey credential (portal second factor)."""
+
+    __tablename__ = "tiqora_customer_passkey"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=True, nullable=False
+    )
+    user_id: Mapped[int] = mapped_column("customer_user_id", Integer, nullable=False)
+    credential_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    public_key: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    sign_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    transports: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aaguid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, default="Passkey")
+    created: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    __table_args__ = (Index("ix_tiqora_customer_passkey_user", "customer_user_id"),)

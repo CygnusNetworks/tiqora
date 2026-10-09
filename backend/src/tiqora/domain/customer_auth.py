@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import secrets
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +24,8 @@ from tiqora.identity.sso_sessions import SsoSessionInfo, drop_sso, load_sso, sto
 from tiqora.znuny.password import hash_password, is_weak_scheme, needs_rehash, verify_password
 
 CUSTOMER_SESSION_KEY_PREFIX = "tiqora:csession:"
+CUSTOMER_SESSION_AUTH_AT_KEY_PREFIX = "tiqora:csession:authat:"
+_PENDING_PAYLOAD_PREFIX = "PENDING:"
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +67,9 @@ class CustomerSessionStore:
     def _born_key(self, token: str) -> str:
         return f"{self._born_prefix}{token}"
 
+    def _auth_at_key(self, token: str) -> str:
+        return f"{CUSTOMER_SESSION_AUTH_AT_KEY_PREFIX}{token}"
+
     def _user_index_key(self, customer_id: int) -> str:
         return f"{self._prefix}user:{customer_id}"
 
@@ -75,6 +81,10 @@ class CustomerSessionStore:
         await self._client.set(self._key(token), payload, ex=self._ttl)
         # Absolute-lifetime marker, never renewed by touch() (security review L-2).
         await self._client.set(self._born_key(token), "1", ex=self._absolute_ttl)
+        # Authentication timestamp for step-up checks, same fixed TTL.
+        await self._client.set(
+            self._auth_at_key(token), str(int(time.time())), ex=self._absolute_ttl
+        )
         # Per-customer reverse index for revoke_customer_sessions().
         with contextlib.suppress(Exception):
             index_key = self._user_index_key(customer_id)
@@ -86,6 +96,53 @@ class CustomerSessionStore:
 
     async def get_sso(self, token: str) -> SsoSessionInfo | None:
         return await load_sso(self._client, "c", token)
+
+    async def seconds_since_auth(self, token: str) -> int | None:
+        """Age of the authentication event behind *token*; ``None`` if unknown."""
+        raw = await self._client.get(self._auth_at_key(token))
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        try:
+            return max(0, int(time.time()) - int(str(raw).strip()))
+        except (TypeError, ValueError):
+            return None
+
+    async def create_pending(self, customer_id: int, login: str, ttl_seconds: int) -> str:
+        """Short-lived 'pending 2FA' session, invisible to :meth:`get`.
+
+        No born marker is written and the payload carries ``PENDING:``, so
+        :meth:`get` (and with it every portal route) rejects the token; only
+        :meth:`get_pending` and :meth:`promote_pending` read it.
+        """
+        token = secrets.token_urlsafe(32)
+        payload = f"{_PENDING_PAYLOAD_PREFIX}{customer_id}:{login}"
+        await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        return token
+
+    async def get_pending(self, token: str) -> tuple[int, str] | None:
+        raw = await self._client.get(self._key(token))
+        if raw is None:
+            return None
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        if not raw.startswith(_PENDING_PAYLOAD_PREFIX):
+            return None
+        try:
+            _, customer_id_s, login = raw.split(":", 2)
+            return int(customer_id_s), login
+        except (ValueError, TypeError):
+            return None
+
+    async def promote_pending(self, token: str) -> str | None:
+        """Consume a pending session and issue a full session token."""
+        data = await self.get_pending(token)
+        if data is None:
+            return None
+        customer_id, login = data
+        await self.delete(token)
+        return await self.create(customer_id, login)
 
     async def revoke_customer_sessions(
         self, customer_id: int, *, keep_token: str | None = None
@@ -129,7 +186,7 @@ class CustomerSessionStore:
         await self._client.expire(self._key(token), self._ttl)
 
     async def delete(self, token: str) -> None:
-        await self._client.delete(self._key(token), self._born_key(token))
+        await self._client.delete(self._key(token), self._born_key(token), self._auth_at_key(token))
         await drop_sso(self._client, "c", token)
 
 
@@ -178,6 +235,35 @@ class CustomerAuthService:
         self, customer: AuthenticatedCustomer, *, sso: SsoSessionInfo | None = None
     ) -> str:
         return await self._sessions.create(customer.id, customer.login, sso=sso)
+
+    async def create_pending_session(self, customer: AuthenticatedCustomer) -> str:
+        return await self._sessions.create_pending(
+            customer.id, customer.login, self._settings.totp_pending_ttl_seconds
+        )
+
+    async def get_pending_session(self, token: str) -> tuple[int, str] | None:
+        return await self._sessions.get_pending(token)
+
+    async def promote_pending_session(self, token: str) -> tuple[str, AuthenticatedCustomer] | None:
+        """Issue a full session for a still-valid pending one (customer must be valid)."""
+        pending = await self._sessions.get_pending(token)
+        if pending is None:
+            return None
+        customer_id, login = pending
+        result = await self._session.execute(
+            select(CustomerUser).where(
+                CustomerUser.id == customer_id,
+                CustomerUser.login == login,
+                CustomerUser.valid_id == 1,
+            )
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        new_token = await self._sessions.promote_pending(token)
+        if new_token is None:
+            return None
+        return new_token, _to_authenticated(user)
 
     async def resolve_session(self, token: str) -> AuthenticatedCustomer | None:
         data = await self._sessions.get(token)

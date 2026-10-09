@@ -1505,6 +1505,18 @@ async def run_erasure(
                 {"ids": [int(c.id) for c in ordered]},
             )
 
+        # Portal second factors (TOTP secret, passkeys) belong to the person: purge
+        # in both modes (tiqora-owned, no backup; an anonymized account must not
+        # keep a working authenticator). Keyed by customer_user.id, not by login.
+        for table in ("tiqora_customer_totp", "tiqora_customer_passkey"):
+            if await _table_exists(session, table):
+                await session.execute(
+                    text(f"DELETE FROM {table} WHERE customer_user_id IN :ids").bindparams(  # noqa: S608
+                        bindparam("ids", expanding=True)
+                    ),
+                    {"ids": [int(c.id) for c in ordered]},
+                )
+
         # ---- tickets: rewrite refs ----
         # anonymize: customer_user_id follows the new login; customer_id stays
         # (company PK is kept). delete: both become stable tokens (masters gone).

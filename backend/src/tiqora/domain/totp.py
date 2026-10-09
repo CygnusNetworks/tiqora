@@ -29,18 +29,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.config import Settings
-from tiqora.db.tiqora.models import TiqoraUserTotp
+from tiqora.db.tiqora.models import TiqoraCustomerTotp, TiqoraUserTotp
+from tiqora.domain.two_factor_subject import AGENT_2FA, TwoFactorSubject
 
 _TOTP_VALID_WINDOW = 1
 _TOTP_STEP_SECONDS = 30
 # Keep used-timestep keys a bit longer than the ±1 window (~90s).
 _TOTP_REPLAY_TTL_SECONDS = 90
-_TOTP_USED_KEY_PREFIX = "tiqora:totp:used:"
+_TOTP_KEY_ROOT = "tiqora:totp:"
+_TOTP_USED_KEY = "used:"
 
 # Pending (unconfirmed) enrollment secrets. Held in Redis rather than on the
 # tiqora_user_totp row so an abandoned re-enrollment cannot damage the factor
 # that is currently live. Long enough to scan a QR code and type one code.
-_TOTP_PENDING_KEY_PREFIX = "tiqora:totp:pending:"
+_TOTP_PENDING_KEY = "pending:"
 _TOTP_PENDING_TTL_SECONDS = 600
 
 
@@ -63,7 +65,10 @@ class TOTPService:
         session: AsyncSession,
         settings: Settings,
         redis_client: Any | None = None,
+        *,
+        subject: TwoFactorSubject = AGENT_2FA,
     ) -> None:
+        self._subject = subject
         self._session = session
         self._settings = settings
         self._redis = redis_client
@@ -78,10 +83,9 @@ class TOTPService:
         except InvalidToken:
             return None
 
-    async def _get_row(self, user_id: int) -> TiqoraUserTotp | None:
-        result = await self._session.execute(
-            select(TiqoraUserTotp).where(TiqoraUserTotp.user_id == user_id)
-        )
+    async def _get_row(self, user_id: int) -> TiqoraUserTotp | TiqoraCustomerTotp | None:
+        model = self._subject.totp_model
+        result = await self._session.execute(select(model).where(model.user_id == user_id))
         return result.scalar_one_or_none()
 
     async def is_enabled(self, user_id: int) -> bool:
@@ -89,9 +93,11 @@ class TOTPService:
         return bool(row is not None and row.enabled)
 
     def _pending_key(self, user_id: int) -> str:
-        return f"{_TOTP_PENDING_KEY_PREFIX}{user_id}"
+        return f"{_TOTP_KEY_ROOT}{self._subject.redis_ns}{_TOTP_PENDING_KEY}{user_id}"
 
-    async def _store_pending(self, user_id: int, secret: str, row: TiqoraUserTotp | None) -> None:
+    async def _store_pending(
+        self, user_id: int, secret: str, row: TiqoraUserTotp | TiqoraCustomerTotp | None
+    ) -> None:
         """Park an unconfirmed secret until :meth:`confirm` accepts it.
 
         Redis is the right home: the value is short-lived and must not touch the
@@ -108,7 +114,9 @@ class TOTPService:
             return
         if row is None:
             self._session.add(
-                TiqoraUserTotp(user_id=user_id, secret=self._encrypt(secret), enabled=False)
+                self._subject.totp_model(
+                    user_id=user_id, secret=self._encrypt(secret), enabled=False
+                )
             )
         else:
             row.secret = self._encrypt(secret)
@@ -132,7 +140,7 @@ class TOTPService:
             await self._redis.delete(self._pending_key(user_id))
 
     async def _step_up_ok(
-        self, row: TiqoraUserTotp, user_id: int, current_code: str | None
+        self, row: TiqoraUserTotp | TiqoraCustomerTotp, user_id: int, current_code: str | None
     ) -> bool:
         """Whether *current_code* proves possession of the live factor."""
         if not current_code:
@@ -194,7 +202,7 @@ class TOTPService:
 
     async def _verify_code(
         self,
-        row: TiqoraUserTotp,
+        row: TiqoraUserTotp | TiqoraCustomerTotp,
         code: str,
         *,
         consume_replay: bool = False,
@@ -218,7 +226,7 @@ class TOTPService:
         """
         if self._redis is None:
             return True
-        key = f"{_TOTP_USED_KEY_PREFIX}{user_id}"
+        key = f"{_TOTP_KEY_ROOT}{self._subject.redis_ns}{_TOTP_USED_KEY}{user_id}"
         raw = await self._redis.get(key)
         if raw is not None:
             try:
@@ -242,7 +250,9 @@ class TOTPService:
             return False
         row = await self._get_row(user_id)
         if row is None:
-            row = TiqoraUserTotp(user_id=user_id, secret=self._encrypt(secret), enabled=True)
+            row = self._subject.totp_model(
+                user_id=user_id, secret=self._encrypt(secret), enabled=True
+            )
             self._session.add(row)
         else:
             row.secret = self._encrypt(secret)

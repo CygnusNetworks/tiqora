@@ -9452,12 +9452,31 @@
       "CustomerLoginResponse": {
         "properties": {
           "customer": {
-            "$ref": "#/components/schemas/CustomerMe"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CustomerMe"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passkey_enrolled": {
+            "default": false,
+            "title": "Passkey Enrolled",
+            "type": "boolean"
+          },
+          "pending_2fa": {
+            "default": false,
+            "title": "Pending 2Fa",
+            "type": "boolean"
+          },
+          "totp_enrolled": {
+            "default": false,
+            "title": "Totp Enrolled",
+            "type": "boolean"
           }
         },
-        "required": [
-          "customer"
-        ],
         "title": "CustomerLoginResponse",
         "type": "object"
       },
@@ -29234,6 +29253,285 @@
         ]
       }
     },
+    "/api/portal/auth/passkey": {
+      "get": {
+        "operationId": "passkey_list_api_portal_auth_passkey_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PasskeyOut"
+                  },
+                  "title": "Response Passkey List Api Portal Auth Passkey Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey List",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/authenticate/begin": {
+      "post": {
+        "description": "Start a passkey assertion; the challenge is bound to the pending token.",
+        "operationId": "passkey_authenticate_begin_api_portal_auth_passkey_authenticate_begin_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Passkey Authenticate Begin Api Portal Auth Passkey Authenticate Begin Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Passkey Authenticate Begin",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/authenticate/finish": {
+      "post": {
+        "operationId": "passkey_authenticate_finish_api_portal_auth_passkey_authenticate_finish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyAuthenticateFinishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerLoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Authenticate Finish",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/register/begin": {
+      "post": {
+        "operationId": "passkey_register_begin_api_portal_auth_passkey_register_begin_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Passkey Register Begin Api Portal Auth Passkey Register Begin Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Register Begin",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/register/finish": {
+      "post": {
+        "operationId": "passkey_register_finish_api_portal_auth_passkey_register_finish_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasskeyRegisterFinishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Register Finish",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/passkey/{passkey_id}": {
+      "delete": {
+        "operationId": "passkey_delete_api_portal_auth_passkey__passkey_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "passkey_id",
+            "required": true,
+            "schema": {
+              "title": "Passkey Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Passkey Delete",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
     "/api/portal/auth/saml/{slug}/acs": {
       "post": {
         "description": "The IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/portal/login``.",
@@ -29362,6 +29660,329 @@
           }
         },
         "summary": "Start a portal SSO login",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp": {
+      "delete": {
+        "operationId": "totp_disable_api_portal_auth_totp_delete",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Disable",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/confirm": {
+      "post": {
+        "operationId": "totp_confirm_api_portal_auth_totp_confirm_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Confirm",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/enroll": {
+      "post": {
+        "description": "Start (or replace) a TOTP enrollment; replacing a live factor needs its code.",
+        "operationId": "totp_enroll_api_portal_auth_totp_enroll_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TOTPEnrollIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPEnrollOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Enroll",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/enroll/qr": {
+      "get": {
+        "operationId": "totp_enroll_qr_api_portal_auth_totp_enroll_qr_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Enroll Qr",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/status": {
+      "get": {
+        "operationId": "totp_status_api_portal_auth_totp_status_get",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TOTPStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Status",
+        "tags": [
+          "portal-auth"
+        ]
+      }
+    },
+    "/api/portal/auth/totp/verify": {
+      "post": {
+        "description": "Promote a pending-2FA session to a full session after a valid TOTP code.",
+        "operationId": "totp_verify_api_portal_auth_totp_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TOTPCodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerLoginResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Totp Verify",
         "tags": [
           "portal-auth"
         ]

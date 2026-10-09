@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Annotated
 
 import redis.asyncio as redis
@@ -16,8 +17,11 @@ from tiqora.domain.customer_auth import (
     CustomerAuthService,
     CustomerSessionStore,
 )
+from tiqora.domain.passkey import WebAuthnService
 from tiqora.domain.portal_gate import portal_enabled
 from tiqora.domain.portal_ticket_service import PortalTicketService
+from tiqora.domain.totp import TOTPService
+from tiqora.domain.two_factor_subject import CUSTOMER_2FA
 from tiqora.znuny.sysconfig import SysConfig
 
 
@@ -61,6 +65,51 @@ async def get_current_customer(
     )
 
 
+async def get_customer_totp_service(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> TOTPService:
+    redis_client = await get_redis(request)
+    return TOTPService(session, settings, redis_client, subject=CUSTOMER_2FA)
+
+
+async def get_customer_webauthn_service(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> WebAuthnService:
+    redis_client = await get_redis(request)
+    return WebAuthnService(session, redis_client, settings, subject=CUSTOMER_2FA)
+
+
+@dataclass(frozen=True, slots=True)
+class PendingCustomerToken:
+    """A password-verified customer who still owes a second factor."""
+
+    token: str
+    customer_id: int
+    login: str
+
+
+async def get_pending_customer_token(
+    request: Request,
+    auth: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
+    settings: Annotated[Settings, Depends(get_app_settings)],
+) -> PendingCustomerToken:
+    """Resolve the pending (pre-2FA) token from the portal cookie, else 401.
+
+    Used ONLY by the second-factor verify / passkey-authenticate routes; every
+    other portal route resolves sessions through :func:`get_current_customer`,
+    which never accepts a pending token.
+    """
+    token = request.cookies.get(settings.customer_session_cookie_name)
+    pending = await auth.get_pending_session(token) if token else None
+    if token is None or pending is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
+    return PendingCustomerToken(token=token, customer_id=pending[0], login=pending[1])
+
+
 async def get_portal_ticket_service(
     session: DbSession,
 ) -> PortalTicketService:
@@ -70,6 +119,9 @@ async def get_portal_ticket_service(
 
 
 CurrentCustomer = Annotated[AuthenticatedCustomer, Depends(get_current_customer)]
+CustomerTOTPServiceDep = Annotated[TOTPService, Depends(get_customer_totp_service)]
+CustomerWebAuthnServiceDep = Annotated[WebAuthnService, Depends(get_customer_webauthn_service)]
+PendingCustomer = Annotated[PendingCustomerToken, Depends(get_pending_customer_token)]
 PortalService = Annotated[PortalTicketService, Depends(get_portal_ticket_service)]
 
 
@@ -85,8 +137,15 @@ async def require_portal_enabled(session: DbSession, settings: AppSettings) -> N
 __all__ = [
     "AppSettings",
     "CurrentCustomer",
+    "CustomerTOTPServiceDep",
+    "CustomerWebAuthnServiceDep",
     "DbSession",
+    "PendingCustomer",
+    "PendingCustomerToken",
     "PortalService",
+    "get_customer_totp_service",
+    "get_customer_webauthn_service",
+    "get_pending_customer_token",
     "get_current_customer",
     "get_customer_auth_service",
     "get_customer_session_store",
