@@ -883,8 +883,6 @@ While Znuny is still in use:
   the "Dienste" page warns; one "Bereitstellen" in Znuny ends that state.
 - Znuny's process import writes no sync rows and is picked up by Tiqora
   without a deploy.
-- On the first tick after an upgrade Tiqora records one new revision per kind
-  (process, ACL); this is expected (corrected dump checksums).
 
 After the schema cutover (see below) Tiqora is the only system and deploys
 automatically: each tick records a revision when something changed and clears

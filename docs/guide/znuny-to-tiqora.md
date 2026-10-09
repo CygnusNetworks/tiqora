@@ -294,8 +294,7 @@ Tiqora) must press **"Bereitstellen"** in Znuny; Tiqora picks the new state up
 within about 30 seconds. The admin pages for processes and ACLs show a card
 "Bereitstellung" with the time of the last deployed state and the number of
 changes that are not yet deployed. After Stage 4 (schema ownership) Tiqora
-deploys by itself. When you upgrade Tiqora, the first watcher tick records one
-new state per kind; that is expected. Details:
+deploys by itself. Details:
 [`../process-management.md`](../process-management.md#deployed-revisions-tiqora-runs-what-was-deployed).
 
 ## Boundaries, restated

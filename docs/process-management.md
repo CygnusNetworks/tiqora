@@ -77,12 +77,6 @@ admin presses **"Bereitstellen"** (Znuny writes the deployed file and empties
   ("Bereitgestellt am ..."), the number of undeployed changes and a warning
   when Tiqora still runs the draft state. `GET /api/v1/admin/deploy-status`
   and `GET /api/v1/admin/processes` back them.
-- **Upgrade note:** the first watcher tick after upgrading to this version
-  records one new revision per kind (process, ACL), even if nobody deployed.
-  The dump checksums were corrected to match Znuny (Perl `||` defaults such as
-  `''`/`{}`/`[]` for missing values, and ACL `CreateBy`/`ChangeBy` as user
-  logins), so the new checksum differs from any earlier one. The content is
-  the same; it is harmless.
 
 ## Ticket <-> process linkage
 

@@ -469,10 +469,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 
 - **Process and ACL revisions.** New tables `tiqora_process_revision` and
   `tiqora_acl_revision` come with the regular Tiqora migration. Processes and
-  ACLs now run from the deployed state. The first watcher tick after the
-  upgrade records one new revision per kind; that is expected (the dump
-  checksums follow Znuny: Perl `||` defaults and ACL CreateBy/ChangeBy as
-  logins). Process admins must press "Bereitstellen" in Znuny for edits to
+  ACLs now run from the deployed state. Process admins must press "Bereitstellen" in Znuny for edits to
   take effect ([process-management.md](process-management.md)).
 - Dialog fields with `Display: 1` are now optional and `2` mandatory (Znuny
   semantics; it was the other way round).
