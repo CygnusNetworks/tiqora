@@ -55,7 +55,7 @@ from tiqora.process.exceptions import (
     RequiredFieldMissing,
     TicketAlreadyInProcess,
 )
-from tiqora.process.fields import is_present
+from tiqora.process.fields import canonical_field_name, is_present, visible_fields
 from tiqora.process.graph import ActivityDialogNode, ProcessGraph, ProcessRepository
 from tiqora.process.smart_tags import render_ticketless
 from tiqora.process.ticket_state import get_ticket_process_state
@@ -288,11 +288,16 @@ async def create_process_ticket(
 
     if (
         actor.interface == "CustomerInterface"
-        and (values.get("Queue") or values.get("QueueID"))
-        and queue_id not in await customer_create_queue_ids(session, actor)
+        and any(
+            canonical_field_name(n) == "Queue"
+            for n in visible_fields(dialog.config, actor.interface)
+        )
+        and queue_id not in await customer_create_queue_ids(session, actor, sysconfig)
     ):
-        # CustomerTicketProcess.pm:4626-4690 _GetQueues: only queues of the customer's create
-        # groups are offered; a queue chosen explicitly must come from that list.
+        # Tiqora hardening (Znuny only offers, never validates, the list): a Queue the customer
+        # could choose (a visible dialog field) must be one of the queues _GetQueues offers
+        # (CustomerTicketProcess.pm:4626-4690). A hidden default queue is the process
+        # designer's routing and is not checked (Znuny: Display 0 only runs _LookupValue).
         raise ProcessPermissionDenied(
             f"customer {actor.customer_user_login!r} may not create tickets in queue {queue_id}"
         )

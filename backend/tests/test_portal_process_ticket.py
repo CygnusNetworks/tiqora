@@ -34,7 +34,7 @@ from tiqora.deployed import clear_revision_cache
 from tiqora.domain.customer_auth import AuthenticatedCustomer
 from tiqora.domain.portal_ticket_service import PORTAL_SYSTEM_USER_ID
 from tiqora.process.dialog_form import customer_service_map
-from tiqora.znuny.sysconfig import yaml_encode_effective
+from tiqora.znuny.sysconfig import SysConfig, yaml_encode_effective
 
 T0 = datetime(2026, 3, 4, 5, 6, 7)
 
@@ -337,7 +337,7 @@ def _seed(conn: Any) -> None:
         )
 
 
-def _set_sysconfig(url: str, settings: dict[str, str]) -> None:
+def _set_sysconfig(url: str, settings: dict[str, Any]) -> None:
     engine = create_engine(url)
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM sysconfig_modified WHERE id BETWEEN 888900 AND 888919"))
@@ -612,7 +612,7 @@ async def test_customer_queue_list_and_create_follow_the_customer_create_groups(
         {
             "Process::DefaultQueue": Q_OK,
             "CustomerGroupSupport": "1",
-            "CustomerGroupAlwaysGroups": "[]",
+            "CustomerGroupAlwaysGroups": [],
         },
     )
     form = (await portal.get(f"{PORTAL}/{process_eid(1)}/start-form")).json()
@@ -651,7 +651,7 @@ async def test_customer_without_create_group_gets_no_queue_options(
         {
             "Process::DefaultQueue": Q_OK,
             "CustomerGroupSupport": "1",
-            "CustomerGroupAlwaysGroups": "[]",
+            "CustomerGroupAlwaysGroups": [],
         },
     )
     form = (await portal_other.get(f"{PORTAL}/{process_eid(1)}/start-form")).json()
@@ -685,10 +685,12 @@ async def test_customer_service_and_sla_lists_are_the_customers_own(
 async def test_customer_service_map_keep_children(engine: AsyncEngine, sync_url: str) -> None:
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with factory() as session:
-        assert await customer_service_map(session, CUSTOMER_LOGIN) == {SVC_MINE: "Svc888-Mine"}
+        assert await customer_service_map(session, CUSTOMER_LOGIN, SysConfig(session)) == {
+            SVC_MINE: "Svc888-Mine"
+        }
     _set_sysconfig(sync_url, {"Process::DefaultQueue": Q_OK, "Ticket::Service::KeepChildren": "1"})
     async with factory() as session:
-        assert await customer_service_map(session, CUSTOMER_LOGIN) == {
+        assert await customer_service_map(session, CUSTOMER_LOGIN, SysConfig(session)) == {
             SVC_MINE: "Svc888-Mine",
             SVC_KID: "Svc888-Par::Kid",
         }
@@ -790,3 +792,120 @@ async def test_customer_enroll_missing_required_field_starts_nothing(
         )[0][0]
         == 0
     )
+
+
+# --- review fixes -----------------------------------------------------------------------------
+
+
+def _support_on(url: str, **extra: Any) -> None:
+    _set_sysconfig(
+        url,
+        {"Process::DefaultQueue": Q_OK, "CustomerGroupSupport": "1"} | extra,
+    )
+
+
+@pytest.mark.db
+async def test_hidden_default_queue_outside_the_create_groups_is_not_checked(
+    portal: AsyncClient, sync_url: str
+) -> None:
+    # The process designer routes to Queue-NO with a hidden Queue field (Display 0): Znuny only
+    # looks the value up (CustomerTicketProcess.pm:4333-4344), so the customer still creates.
+    fields = {"Title": "Display: '1'", "Queue": f"{{Display: '0', DefaultValue: {Q_NO}}}"}
+    _build(sync_url, lambda c: _add_process(c, 1, fields))
+    _support_on(sync_url, CustomerGroupAlwaysGroups=[])
+    resp = await portal.post(
+        f"{PORTAL}/tickets",
+        json={"process_entity_id": process_eid(1), "field_values": {"Title": "Routed"}},
+    )
+    assert resp.status_code == 201, resp.text
+    assert _ticket(sync_url, resp.json()["ticket_id"])[1] == Q_NO
+
+
+@pytest.mark.db
+async def test_visible_queue_with_a_forged_value_is_still_checked(
+    portal: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, lambda c: _add_process(c, 1, QUEUE_FIELDS))
+    _support_on(sync_url, CustomerGroupAlwaysGroups=[])
+    resp = await portal.post(
+        f"{PORTAL}/tickets",
+        json={"process_entity_id": process_eid(1), "field_values": VALUES | {"Queue": Q_NO}},
+    )
+    assert resp.status_code == 403, resp.text
+
+
+@pytest.mark.db
+async def test_always_groups_default_users_group_is_added(
+    portal_other: AsyncClient, sync_url: str
+) -> None:
+    # Default CustomerGroupAlwaysGroups = ['users']: the stock "users" group counts for everyone.
+    def setup(conn: Any) -> None:
+        _add_process(conn, 1, QUEUE_FIELDS)
+        conn.execute(
+            text(
+                "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+                " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
+                " change_time, change_by) VALUES (888633, 'Queue-Users-888',"
+                " (SELECT id FROM permission_groups WHERE name = 'users'), 1, 1, 1, 1, 0, 1,"
+                " :t, 1, :t, 1)"
+            ),
+            {"t": T0},
+        )
+
+    _build(sync_url, setup)
+    _set_sysconfig(sync_url, {"Process::DefaultQueue": Q_OK, "CustomerGroupSupport": "1"})
+    form = (await portal_other.get(f"{PORTAL}/{process_eid(1)}/start-form")).json()
+    offered = _labels(_by_name(form)["Queue"])
+    assert "Queue-Users-888" in offered
+    assert not {Q_OK, Q_B, Q_NO} & set(offered)  # the customer holds no create group
+
+
+@pytest.mark.db
+async def test_default_services_when_all_assigned_services_are_invalid(
+    engine: AsyncEngine, sync_url: str
+) -> None:
+    _build(
+        sync_url,
+        lambda c: c.execute(
+            text("UPDATE service SET valid_id = 2 WHERE id IN (:a, :b)"),
+            {"a": SVC_MINE, "b": SVC_KID},
+        ),
+    )
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with factory() as session:
+        # Both assigned services are invalid: no valid assignment is left, so the
+        # '<DEFAULT>' services apply (Service.pm:1198 filters valid_id before the fallback).
+        assert await customer_service_map(session, CUSTOMER_LOGIN, SysConfig(session)) == {
+            SVC_DEFAULT: "Svc888-Default"
+        }
+
+
+@pytest.mark.db
+async def test_customer_enroll_with_group_support_needs_rw_in_the_queue_group(
+    portal: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, lambda c: _add_process(c, 1, {"Title": "Display: '1'"}))
+    _support_on(sync_url, CustomerGroupAlwaysGroups=[])
+    body = {"process_entity_id": process_eid(1), "field_values": {}}
+    # The customer only holds "create" in the ticket queue's group, the dialog needs "rw".
+    denied = await portal.post(f"{PORTAL}/ticket/{TICKET_OWN}/start", json=body)
+    assert denied.status_code in (403, 409), denied.text
+    assert (
+        _rows(
+            sync_url, "SELECT COUNT(*) FROM dynamic_field_value WHERE object_id = :t", t=TICKET_OWN
+        )[0][0]
+        == 0
+    )
+    _build(
+        sync_url,
+        lambda c: c.execute(
+            text(
+                "UPDATE group_customer_user SET permission_key = 'rw' WHERE user_id = :u"
+                " AND group_id = :g"
+            ),
+            {"u": CUSTOMER_LOGIN, "g": GROUP_OK},
+        ),
+    )
+    allowed = await portal.post(f"{PORTAL}/ticket/{TICKET_OWN}/start", json=body)
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["process_entity_id"] == process_eid(1)

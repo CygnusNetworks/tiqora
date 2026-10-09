@@ -510,8 +510,18 @@ async def load_customer_user_checks(
     permissions = await cfg.get("System::Customer::Permission", _DEFAULT_CUSTOMER_PERMISSIONS)
     if not isinstance(permissions, list):
         permissions = _DEFAULT_CUSTOMER_PERMISSIONS
-    valid_groups = {
-        gid: name
+    valid_groups = await _valid_group_names(session)
+    # The group query uses the canonical login (the lookup above is case-insensitive).
+    canonical = row.login if row is not None else login
+    for perm in permissions:
+        ids = await customer_group_ids(session, canonical, str(perm), sysconfig=cfg)
+        checks[f"Group_{perm}"] = sorted(valid_groups[gid] for gid in ids if gid in valid_groups)
+    return checks
+
+
+async def _valid_group_names(session: AsyncSession) -> dict[int, str]:
+    return {
+        int(gid): name
         for gid, name in (
             await session.execute(
                 select(PermissionGroups.id, PermissionGroups.name).where(
@@ -520,40 +530,37 @@ async def load_customer_user_checks(
             )
         ).all()
     }
-    group_support = await cfg.get("CustomerGroupSupport", 0)
-    if str(group_support) not in ("1", "True", "true"):
-        # CustomerGroup.pm:266-269: support off -> every valid group, for every type.
-        everything = sorted(valid_groups.values())
-        for perm in permissions:
-            checks[f"Group_{perm}"] = list(everything)
-        return checks
 
-    # CustomerGroup.pm:270-281: only permitted groups; ``rw`` stands in for every key.
-    # The group query uses the canonical login (the lookup above is case-insensitive).
-    canonical = row.login if row is not None else login
-    keys_by_group: dict[int, set[str]] = {}
-    for group_id, key in (
-        await session.execute(
-            select(GroupCustomerUser.group_id, GroupCustomerUser.permission_key).where(
-                GroupCustomerUser.user_id == canonical,
-                GroupCustomerUser.permission_value == 1,
+
+async def customer_group_ids(
+    session: AsyncSession, login: str, permission: str, *, sysconfig: SysConfig
+) -> set[int]:
+    """``CustomerGroup::GroupMemberList(UserID => login, Type => permission, Result => 'ID')``
+    (``CustomerGroup.pm:266-281``): with ``CustomerGroupSupport`` off every valid group, with it
+    on the valid groups of ``group_customer_user`` rows with ``permission_value = 1`` and
+    ``permission_key IN (permission, 'rw')``, plus ``CustomerGroupAlwaysGroups``
+    (``CustomerGroup.pm:358-372``, Framework.xml:3502-3510, default ``['users']``). *login* must
+    be the canonical login. Customer-company groups (``group_customer``) are not built."""
+    valid_groups = await _valid_group_names(session)
+    group_support = await sysconfig.get("CustomerGroupSupport", 0)
+    if str(group_support) not in ("1", "True", "true"):
+        return set(valid_groups)
+    keys_by_group: set[int] = {
+        int(g)
+        for g in (
+            await session.execute(
+                select(GroupCustomerUser.group_id).where(
+                    GroupCustomerUser.user_id == login,
+                    GroupCustomerUser.permission_value == 1,
+                    GroupCustomerUser.permission_key.in_([permission, "rw"]),
+                )
             )
-        )
-    ).all():
-        keys_by_group.setdefault(group_id, set()).add(key)
-    # CustomerGroup.pm:358-372: CustomerGroupAlwaysGroups (Framework.xml:3502-3510, default
-    # ['users']) are added to every permission type when they name a valid group.
-    always = await cfg.get("CustomerGroupAlwaysGroups", ["users"])
+        ).scalars()
+    }
+    always = await sysconfig.get("CustomerGroupAlwaysGroups", ["users"])
     always_names = {str(n) for n in always} if isinstance(always, list) else set()
     always_ids = {gid for gid, name in valid_groups.items() if name in always_names}
-    for perm in permissions:
-        member_ids = {
-            gid
-            for gid, keys in keys_by_group.items()
-            if gid in valid_groups and (perm in keys or "rw" in keys)
-        }
-        checks[f"Group_{perm}"] = sorted(valid_groups[gid] for gid in member_ids | always_ids)
-    return checks
+    return {gid for gid in keys_by_group if gid in valid_groups} | always_ids
 
 
 async def load_ticket_attribute_checks(

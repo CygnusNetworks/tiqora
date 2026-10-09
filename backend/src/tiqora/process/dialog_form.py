@@ -18,7 +18,7 @@ Known limitations: agent option ACLs see the ticket's own process (its dynamic f
 the ``ProcessEntityID``/``ActivityDialogEntityID`` of the dialog being opened (the wave-0 option
 source has no such parameter); the customer SLA list is the union over the customer's services
 (the form has no selected service yet), and the customer Queue list keeps the system intake
-queues hidden on top of Znuny's create-group rule.
+queues (Postmaster/Raw/Junk) hidden on top of Znuny's create-group rule (Tiqora hardening).
 """
 
 from __future__ import annotations
@@ -144,19 +144,26 @@ def _field_kind(name: str, dynamic_fields: Mapping[str, DynamicField]) -> FieldK
     return "unsupported"  # Attachments (phase 2, rulings F34), unknown names, unknown DFs
 
 
-async def _customer_queues(session: AsyncSession, actor: ProcessActor) -> dict[int, str]:
+async def _customer_queues(
+    session: AsyncSession, actor: ProcessActor, sysconfig: SysConfig
+) -> dict[int, str]:
     """The customer's create queues (:func:`customer_create_queue_ids`, Znuny ``_GetQueues``),
-    minus the system intake queues (a deliberate Tiqora extra: Znuny's own hiding relies on the
-    ``users`` group, which ``CustomerGroupAlwaysGroups`` hands to every customer)."""
-    queues = await customer_create_queue_ids(session, actor)
+    minus Postmaster/Raw/Junk. Tiqora hardening, not Znuny behaviour: Znuny offers these queues
+    when their group (``users``) is in ``CustomerGroupAlwaysGroups``; the portal never lists
+    the intake queues. The server-side create check does not apply this exclusion."""
+    queues = await customer_create_queue_ids(session, actor, sysconfig)
     return {i: n for i, n in queues.items() if n not in _CUSTOMER_HIDDEN_QUEUES}
 
 
-async def customer_service_map(session: AsyncSession, login: str) -> dict[int, str]:
+async def customer_service_map(
+    session: AsyncSession, login: str, sysconfig: SysConfig
+) -> dict[int, str]:
     """``TicketServiceList`` for a customer user (``Ticket.pm:2503-2560``): the valid services of
-    ``CustomerUserServiceMemberList`` (``Service.pm:1190-1235``; no assignment at all -> the
-    ``<DEFAULT>`` services), without children of invalid services unless
+    ``CustomerUserServiceMemberList`` (``Service.pm:1190-1235``; no VALID assigned service ->
+    the ``<DEFAULT>`` services), without children of invalid services unless
     ``Ticket::Service::KeepChildren`` (``Service.pm:188-205``)."""
+    all_rows = (await session.execute(select(Service.id, Service.name, Service.valid_id))).all()
+    valid_ids = {int(r[0]) for r in all_rows if r[2] == _VALID}
 
     async def member_ids(who: str) -> set[int]:
         rows = await session.execute(
@@ -164,23 +171,22 @@ async def customer_service_map(session: AsyncSession, login: str) -> dict[int, s
                 ServiceCustomerUser.customer_user_login == who
             )
         )
-        return {int(r) for r in rows.scalars()}
+        return {int(r) for r in rows.scalars()} & valid_ids
 
     ids = await member_ids(login)
     if not ids:
         ids = await member_ids("<DEFAULT>")
     if not ids:
         return {}
-    all_rows = (await session.execute(select(Service.id, Service.name, Service.valid_id))).all()
     invalid_names = [r[1] for r in all_rows if r[2] != _VALID]
-    keep_children = str(await SysConfig(session).get("Ticket::Service::KeepChildren", 0)) in (
+    keep_children = str(await sysconfig.get("Ticket::Service::KeepChildren", 0)) in (
         "1",
         "True",
         "true",
     )
     out: dict[int, str] = {}
-    for sid, name, valid in all_rows:
-        if int(sid) not in ids or valid != _VALID:
+    for sid, name, _valid in all_rows:
+        if int(sid) not in ids:
             continue
         if not keep_children and any(name.startswith(f"{bad}::") for bad in invalid_names):
             continue
@@ -252,10 +258,10 @@ async def collect_customer_field_options(
     attrs = {f for f in fields if f in ATTRIBUTE_OPTION_FIELDS}
     base = await _base_field_maps(session, None, attrs - {"queue", "service", "sla"})
     if "queue" in attrs:
-        base["queue"] = await _customer_queues(session, actor)
+        base["queue"] = await _customer_queues(session, actor, sysconfig)
     if attrs & {"service", "sla"}:
         # CustomerTicketProcess.pm:4569-4602 / 4548-4566: only the customer user's services.
-        services = await customer_service_map(session, login)
+        services = await customer_service_map(session, login, sysconfig)
         if "service" in attrs:
             base["service"] = services
         if "sla" in attrs:

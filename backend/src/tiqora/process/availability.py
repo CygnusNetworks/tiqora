@@ -19,10 +19,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.db.legacy import GroupCustomerUser, PermissionGroups, Queue
+from tiqora.db.legacy import CustomerUser, PermissionGroups, Queue
 from tiqora.domain.ticket_write_service import (
     _ticket_must_exist,  # noqa: PLC2701 -- deliberate reuse
 )
@@ -55,7 +55,6 @@ __all__ = [
     "available_dialogs",
     "can_start",
     "customer_create_queue_ids",
-    "customer_group_ids",
     "dialog_allows",
     "list_startable_processes",
     "process_action_allowed",
@@ -114,49 +113,24 @@ async def process_action_allowed(
     return actor.frontend_action in kept
 
 
-async def customer_group_ids(
-    session: AsyncSession, actor: ProcessActor, permission: str
-) -> set[int]:
-    """``CustomerGroup::GroupMemberList(Type => permission, Result => 'ID')``
-    (``CustomerGroup.pm:266-281``): with ``CustomerGroupSupport`` off every valid group, with it
-    on the valid groups of the customer user's ``group_customer_user`` rows (``permission_key``
-    *permission* or ``rw``) plus ``CustomerGroupAlwaysGroups``. Company groups stay the
-    documented limitation of ``load_customer_user_checks``."""
-    sysconfig = SysConfig(session)
-    valid = {
-        int(gid): name
-        for gid, name in (
-            await session.execute(
-                select(PermissionGroups.id, PermissionGroups.name).where(
-                    PermissionGroups.valid_id == 1
-                )
-            )
-        ).all()
-    }
-    if str(await sysconfig.get("CustomerGroupSupport", 0)) not in ("1", "True", "true"):
-        return set(valid)
-    if not actor.customer_user_login:
-        return set()
-    rows = (
-        await session.execute(
-            select(GroupCustomerUser.group_id).where(
-                GroupCustomerUser.user_id == actor.customer_user_login,
-                GroupCustomerUser.permission_value == 1,
-                GroupCustomerUser.permission_key.in_([permission, "rw"]),
-            )
-        )
-    ).scalars()
-    ids = {int(g) for g in rows if int(g) in valid}
-    always = await sysconfig.get("CustomerGroupAlwaysGroups", ["users"])
-    always_names = {str(n) for n in always} if isinstance(always, list) else set()
-    return ids | {gid for gid, name in valid.items() if name in always_names}
-
-
-async def customer_create_queue_ids(session: AsyncSession, actor: ProcessActor) -> dict[int, str]:
+async def customer_create_queue_ids(
+    session: AsyncSession, actor: ProcessActor, sysconfig: SysConfig
+) -> dict[int, str]:
     """Valid queues (id -> name) whose group the customer holds ``create`` in
     (``CustomerTicketProcess.pm:4626-4690`` ``_GetQueues``: ``MoveList Type => create`` plus the
     ``GroupMemberList Type => create`` check on ``QueueData{GroupID}``)."""
-    groups = await customer_group_ids(session, actor, "create")
+    from tiqora.domain.ticket_acl import customer_group_ids  # noqa: PLC0415 -- cycle
+
+    if not actor.customer_user_login:
+        return {}
+    login = (
+        await session.execute(
+            select(CustomerUser.login)
+            .where(func.lower(CustomerUser.login) == actor.customer_user_login.lower())
+            .limit(1)
+        )
+    ).scalar_one_or_none() or actor.customer_user_login
+    groups = await customer_group_ids(session, login, "create", sysconfig=sysconfig)
     if not groups:
         return {}
     rows = (
