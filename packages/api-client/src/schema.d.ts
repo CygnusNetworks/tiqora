@@ -3759,7 +3759,8 @@ export interface paths {
         post?: never;
         /**
          * Deactivate User
-         * @description Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users.
+         * @description Soft-invalidate (``valid_id = 2``) — Znuny never hard-deletes users. The
+         *     account's sessions (Znuny rows and Redis) end with it.
          */
         delete: operations["deactivate_user_api_v1_admin_users__user_id__delete"];
         options?: never;

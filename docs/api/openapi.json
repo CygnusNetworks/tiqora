@@ -52755,7 +52755,7 @@
     },
     "/api/v1/admin/users/{user_id}": {
       "delete": {
-        "description": "Soft-invalidate (``valid_id = 2``) \u2014 Znuny never hard-deletes users.",
+        "description": "Soft-invalidate (``valid_id = 2``) \u2014 Znuny never hard-deletes users. The\naccount's sessions (Znuny rows and Redis) end with it.",
         "operationId": "deactivate_user_api_v1_admin_users__user_id__delete",
         "parameters": [
           {
