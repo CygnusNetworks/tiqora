@@ -152,7 +152,10 @@ async def fetch_idp_metadata(
         )
     except OutboundURLError as exc:
         raise SamlMetadataError(f"Die Metadaten-URL ist nicht erlaubt: {exc}") from exc
-    headers = pinned.request_headers({"Accept": "application/samlmetadata+xml, application/xml"})
+    # identity: the 5 MB cap counts what arrives, not a decompressed bomb.
+    headers = pinned.request_headers(
+        {"Accept": "application/samlmetadata+xml, application/xml", "Accept-Encoding": "identity"}
+    )
     try:
         async with (
             asyncio.timeout(TOTAL_FETCH_TIMEOUT),

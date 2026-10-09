@@ -126,3 +126,10 @@ def test_identity_metadata_xml_fits_large_documents_on_mariadb() -> None:
     table = TiqoraIdentityProvider.__table__
     assert "MEDIUMTEXT" in _column_ddl(table, "metadata_xml", mysql.dialect())
     assert "MEDIUMTEXT" not in _column_ddl(table, "metadata_xml", postgresql.dialect())
+    # ``config`` carries pasted ``idp_metadata_xml`` (parser accepts up to 5 MB).
+    assert "MEDIUMTEXT" in _column_ddl(table, "config", mysql.dialect())
+    assert "MEDIUMTEXT" not in _column_ddl(table, "config", postgresql.dialect())
+    migration = (
+        Path(__file__).parent.parent / "alembic/versions_tiqora/20261009_0064_identity_providers.py"
+    ).read_text()
+    assert migration.count('with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb")') == 2

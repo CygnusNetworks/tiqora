@@ -1,6 +1,6 @@
 """Admin API for identity providers incl. test login and preview (wave 1, Task 13).
 
-ASGI + DB. Seed band 47200-47299, provider slugs use the ``idpadm-`` prefix. Agents log in
+ASGI + DB. Seed band 47200-47209, provider slugs use the ``idpadm-`` prefix. Agents log in
 with real sessions (FakeRedis) so the test-login path sees the admin's agent cookie.
 """
 
@@ -41,7 +41,7 @@ from tiqora.identity.store import get_provider_by_slug
 pytestmark = pytest.mark.db
 
 KEY = "unit-test-secret-key-for-identity-admin-api"
-BAND = (47200, 47299)
+BAND = (47200, 47209)
 SLUG = "idpadm-"
 BASE = "/api/v1/admin/identity-providers"
 ADMIN1, ADMIN2, PLAIN, LINKED = 47201, 47202, 47203, 47204
@@ -868,6 +868,30 @@ async def test_refresh_with_pasted_xml_only_is_422_without_stored_error(
     assert resp.status_code == 422
     assert "Metadaten-URL" in resp.json()["detail"]["message"]
     assert (await env.client.get(f"{BASE}/{created['id']}")).json()["metadata_error"] is None
+
+
+async def test_large_pasted_metadata_is_stored_intact(
+    env: Env, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Pasted IdP metadata lives in the ``config`` JSON: ~200 KB (a full ADFS
+    FederationMetadata.xml) must fit on MariaDB too (MEDIUMTEXT, not 64 KiB TEXT)."""
+    base = _metadata_xml(tmp_path_factory)
+    padding = "".join(
+        f'<md:ContactPerson contactType="other"><md:EmailAddress>mailto:c{i}@example.org'
+        "</md:EmailAddress></md:ContactPerson>\n"
+        for i in range(2500)
+    )
+    xml = base.replace("</md:EntityDescriptor>", f"{padding}</md:EntityDescriptor>")
+    assert len(xml.encode()) > 200_000
+    created = await env.create("md-big", preset="generic_saml")
+    saved = await env.patch(created["id"], {"config": {"idp_metadata_xml": xml}})
+    assert saved.status_code == 200, saved.text[:500]
+    env.session.expire_all()
+    stored = await get_provider_by_slug(env.session, f"{SLUG}md-big", secret_key=KEY)
+    assert stored is not None
+    assert stored.config.idp_metadata_xml == xml  # type: ignore[union-attr]
+    reloaded = (await env.client.get(f"{BASE}/{created['id']}")).json()
+    assert reloaded["config"]["idp_metadata_xml"] == xml
 
 
 async def test_preview_checks_audience(env: Env) -> None:

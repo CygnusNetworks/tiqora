@@ -117,6 +117,8 @@ async def test_fetch_ok_uses_pinned_ip(monkeypatch: pytest.MonkeyPatch, idp_xml:
     )
     assert got == idp_xml
     assert seen[0].url.host == PUBLIC and seen[0].headers["host"] == "idp.example.org"
+    # The 5 MB cap counts bytes on the wire: no compressed body is inflated.
+    assert seen[0].headers["accept-encoding"] == "identity"
 
 
 async def test_fetch_too_large_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

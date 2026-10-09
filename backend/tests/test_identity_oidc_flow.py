@@ -1,6 +1,7 @@
 """Several OIDC providers, generic SSO routes and env aliases (wave 1, Task 8).
 
-ASGI + DB. Seed band 47900-47999, provider slugs use the ``idptest-`` prefix.
+ASGI + DB. Seed band 47250-47259 (47500-47999 belongs to reporting), provider slugs use
+the ``idptest-`` prefix.
 A fake IdP (``httpx.MockTransport``) serves discovery, token and userinfo; the
 authorization code doubles as the access token so each test picks its claims.
 """
@@ -41,7 +42,7 @@ from tiqora.identity.store import ProviderChanges, update_provider
 pytestmark = pytest.mark.db
 
 KEY = "unit-test-secret-key-for-identity-oidc-flow"
-BAND = (47900, 47999)
+BAND = (47250, 47259)
 SLUG = "idptest-"
 _URLS: set[str] = set()
 ENV_ISSUER_HOST = "idp.example.org"
@@ -236,8 +237,8 @@ async def _kc(env: Env, slug: str = "kc", *, host: str = "kc.example.org", **kw:
 
 
 async def test_env_oidc_unchanged_login_via_alias(env: Env) -> None:
-    await _agent(env, 47901, "idp.env.47901")
-    env.idp.claims["c"] = {"sub": "sub-47901", "preferred_username": "idp.env.47901"}
+    await _agent(env, 47250, "idp.env.47250")
+    env.idp.claims["c"] = {"sub": "sub-47250", "preferred_username": "idp.env.47250"}
     q = await env.start("/api/v1/auth/oidc/login")
     assert q["redirect_uri"] == [ENV_REDIRECT]
     assert q["code_challenge_method"] == ["S256"]
@@ -247,7 +248,7 @@ async def test_env_oidc_unchanged_login_via_alias(env: Env) -> None:
         "/api/v1/auth/oidc/callback", params={"code": "c", "state": state}, headers=JSON
     )
     assert ok.status_code == 200, ok.text
-    assert ok.json()["user"]["login"] == "idp.env.47901"
+    assert ok.json()["user"]["login"] == "idp.env.47250"
     assert env.client.cookies.get("tiqora_session")
     # PKCE verifier from the state reached the token endpoint
     assert env.idp.token_forms[-1]["code_verifier"][0]
@@ -263,9 +264,9 @@ async def test_env_oidc_unchanged_login_via_alias(env: Env) -> None:
 
 
 async def test_env_oidc_unchanged_rejections(env: Env) -> None:
-    await _agent(env, 47902, "idp.env.47902", sso=False)
-    env.idp.claims["nomatch"] = {"sub": "x1", "preferred_username": "nobody.47999"}
-    env.idp.claims["noopt"] = {"sub": "x2", "preferred_username": "idp.env.47902"}
+    await _agent(env, 47251, "idp.env.47251", sso=False)
+    env.idp.claims["nomatch"] = {"sub": "x1", "preferred_username": "nobody.oidcflow"}
+    env.idp.claims["noopt"] = {"sub": "x2", "preferred_username": "idp.env.47251"}
 
     async def callback(code: str, headers: dict[str, str]) -> httpx.Response:
         q = await env.start("/api/v1/auth/oidc/login")
@@ -292,8 +293,8 @@ async def test_env_oidc_unchanged_rejections(env: Env) -> None:
 
 @pytest.mark.parametrize("stored", ["1", "legacy-verifier-value"])
 async def test_callback_accepts_legacy_state_value(env: Env, stored: str) -> None:
-    await _agent(env, 47903, "idp.env.47903")
-    env.idp.claims["c"] = {"sub": "s47903", "preferred_username": "idp.env.47903"}
+    await _agent(env, 47252, "idp.env.47252")
+    env.idp.claims["c"] = {"sub": "s47903", "preferred_username": "idp.env.47252"}
     # env-oidc row is created by the first request to any SSO route
     await env.client.get("/api/v1/auth/methods")
     await env.redis.set(f"tiqora:oidc:state:legacy{stored[:1]}", stored, ex=300)
@@ -304,7 +305,7 @@ async def test_callback_accepts_legacy_state_value(env: Env, stored: str) -> Non
         headers=JSON,
     )
     assert r.status_code == 200, r.text
-    assert r.json()["user"]["login"] == "idp.env.47903"
+    assert r.json()["user"]["login"] == "idp.env.47252"
     form = env.idp.token_forms[-1]
     if stored == "1":
         assert "code_verifier" not in form
@@ -313,9 +314,9 @@ async def test_callback_accepts_legacy_state_value(env: Env, stored: str) -> Non
 
 
 async def test_db_oidc_provider_login_redirects_to_next(env: Env) -> None:
-    await _agent(env, 47904, "idp.kc.47904")
+    await _agent(env, 47253, "idp.kc.47253")
     await _kc(env)
-    env.idp.claims["c"] = {"sub": "kc-sub-1", "preferred_username": "idp.kc.47904"}
+    env.idp.claims["c"] = {"sub": "kc-sub-1", "preferred_username": "idp.kc.47253"}
     q = await env.start("/api/v1/auth/sso/idptest-kc/login?next=/tickets/5")
     assert q["redirect_uri"] == [
         "https://helpdesk.example.org/api/v1/auth/oidc/idptest-kc/callback"
@@ -333,10 +334,10 @@ async def test_db_oidc_provider_login_redirects_to_next(env: Env) -> None:
 
 
 async def test_state_bound_to_provider(env: Env) -> None:
-    await _agent(env, 47905, "idp.kc.47905")
+    await _agent(env, 47254, "idp.kc.47254")
     await _kc(env, "a")
     await _kc(env, "b")
-    env.idp.claims["c"] = {"sub": "s", "preferred_username": "idp.kc.47905"}
+    env.idp.claims["c"] = {"sub": "s", "preferred_username": "idp.kc.47254"}
     q = await env.start("/api/v1/auth/sso/idptest-a/login")
     resp = await env.client.get(
         "/api/v1/auth/oidc/idptest-b/callback", params={"code": "c", "state": q["state"][0]}
@@ -348,9 +349,9 @@ async def test_state_bound_to_provider(env: Env) -> None:
 
 
 async def test_next_is_sanitised(env: Env) -> None:
-    await _agent(env, 47906, "idp.kc.47906")
+    await _agent(env, 47255, "idp.kc.47255")
     await _kc(env)
-    env.idp.claims["c"] = {"sub": "s", "preferred_username": "idp.kc.47906"}
+    env.idp.claims["c"] = {"sub": "s", "preferred_username": "idp.kc.47255"}
     q = await env.start("/api/v1/auth/sso/idptest-kc/login?next=//evil.example.com")
     resp = await env.client.get(
         "/api/v1/auth/oidc/idptest-kc/callback", params={"code": "c", "state": q["state"][0]}
@@ -421,11 +422,11 @@ async def test_private_network_issuer_blocked_unless_allowed(env: Env) -> None:
 
 
 async def test_avatar_picture_kept(env: Env) -> None:
-    await _agent(env, 47907, "idp.kc.47907")
+    await _agent(env, 47256, "idp.kc.47256")
     await _kc(env)
     env.idp.claims["c"] = {
         "sub": "s",
-        "preferred_username": "idp.kc.47907",
+        "preferred_username": "idp.kc.47256",
         "picture": "https://cdn.example.org/a.png",
     }
     q = await env.start("/api/v1/auth/sso/idptest-kc/login")
@@ -446,8 +447,8 @@ def _env_id_token(env: Env, q: dict[str, list[str]], sub: str) -> str:
 
 
 async def test_userinfo_sub_must_match_id_token_sub(env: Env) -> None:
-    await _agent(env, 47908, "idp.env.47908")
-    env.idp.claims["c"] = {"sub": "real-sub", "preferred_username": "idp.env.47908"}
+    await _agent(env, 47257, "idp.env.47257")
+    env.idp.claims["c"] = {"sub": "real-sub", "preferred_username": "idp.env.47257"}
     q = await env.start("/api/v1/auth/oidc/login")
     env.idp.id_tokens["c"] = _env_id_token(env, q, "other-sub")
     resp = await env.client.get(
@@ -476,8 +477,8 @@ async def _env_login(env: Env, headers: dict[str, str] = JSON) -> httpx.Response
 
 
 async def test_env_oidc_survives_missing_row_without_methods(env: Env) -> None:
-    await _agent(env, 47909, "idp.env.47909")
-    env.idp.claims["c"] = {"sub": "s47909", "preferred_username": "idp.env.47909"}
+    await _agent(env, 47258, "idp.env.47258")
+    env.idp.claims["c"] = {"sub": "s47909", "preferred_username": "idp.env.47258"}
     # warm the once-per-process sync flag, then lose the row behind its back
     await env.client.get("/api/v1/auth/methods")
     for stmt, params in _stmts()[:2]:
@@ -485,12 +486,12 @@ async def test_env_oidc_survives_missing_row_without_methods(env: Env) -> None:
     await env.session.commit()
     resp = await _env_login(env)
     assert resp.status_code == 200, resp.text
-    assert resp.json()["user"]["login"] == "idp.env.47909"
+    assert resp.json()["user"]["login"] == "idp.env.47258"
 
 
 async def test_env_oidc_survives_stale_disabled_row(env: Env) -> None:
-    await _agent(env, 47910, "idp.env.47910")
-    env.idp.claims["c"] = {"sub": "s47910", "preferred_username": "idp.env.47910"}
+    await _agent(env, 47259, "idp.env.47259")
+    env.idp.claims["c"] = {"sub": "s47910", "preferred_username": "idp.env.47259"}
     await env.client.get("/api/v1/auth/methods")
     await env.session.execute(
         text("UPDATE tiqora_identity_provider SET enabled = :f WHERE slug = 'env-oidc'"),

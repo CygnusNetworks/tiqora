@@ -137,3 +137,63 @@ async def test_discovery_is_cached() -> None:
 def test_claims_serialize_roundtrip() -> None:
     # sanity check the mock transport payloads are valid JSON (guards typos above)
     assert json.loads(json.dumps({"preferred_username": "jdoe"}))["preferred_username"] == "jdoe"
+
+
+async def test_idp_calls_ask_for_uncompressed_bodies() -> None:
+    """The streamed size cap counts decoded bytes; ``identity`` keeps a small compressed
+    body from inflating to tens of MB before the check runs."""
+    from tiqora.domain.oidc import _json_request
+
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"ok": True})
+
+    got = await _json_request(
+        httpx.MockTransport(handler),
+        "GET",
+        "https://idp.example.org/x",
+        headers={"Accept": "application/json"},
+    )
+    assert got == {"ok": True}
+    assert seen[0].headers["accept-encoding"] == "identity"
+    assert seen[0].headers["accept"] == "application/json"
+
+
+async def test_idp_call_has_an_overall_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """httpx's timeout is per phase; a slow IdP must not hold a callback for minutes."""
+    import asyncio
+
+    import tiqora.domain.oidc as oidc_mod
+
+    monkeypatch.setattr(oidc_mod, "_TOTAL_REQUEST_TIMEOUT", 0.05)
+
+    async def slow(_request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(2)
+        return httpx.Response(200, json={})
+
+    with pytest.raises(httpx.TimeoutException):
+        await oidc_mod._json_request(httpx.MockTransport(slow), "GET", "https://idp.example.org/x")
+
+
+def test_token_bearing_fields_are_not_in_repr() -> None:
+    from tiqora.domain.oidc import OidcLoginResult
+    from tiqora.identity.flow_state import LoginState
+    from tiqora.identity.login import SsoSessionDraft
+    from tiqora.identity.sso_sessions import SsoSessionInfo
+
+    secret = "tok-SECRET-value"
+    objects = (
+        LoginState(
+            provider_id=1, next_path="/", user_kind="agent", code_verifier=secret, nonce=secret
+        ),
+        SsoSessionInfo(
+            provider_id=1, slug="s", kind="oidc", subject_hash="h", id_token_hint=secret
+        ),
+        SsoSessionDraft(id_token_hint=secret),
+        OidcLoginResult(claims={}, id_token=secret),
+    )
+    for obj in objects:
+        assert secret not in repr(obj), type(obj).__name__
+    assert objects[3].id_token == secret  # still readable, only hidden from repr

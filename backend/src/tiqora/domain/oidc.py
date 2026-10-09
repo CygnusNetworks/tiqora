@@ -23,6 +23,7 @@ unknown key id. The same verifier serves back-channel logout tokens
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import json
@@ -55,6 +56,8 @@ _DISCOVERY_TTL = 3600.0
 # Every IdP call is bounded in time and size (a slow or hostile IdP must not pin a worker
 # or exhaust memory): connect/read/write/pool 10 s, bodies read streamed up to the cap.
 _HTTP_TIMEOUT = httpx.Timeout(10.0)
+# Wall clock for one IdP call (connect + streamed body), on top of the per-phase timeout.
+_TOTAL_REQUEST_TIMEOUT = 15.0
 _MAX_DOCUMENT_BYTES = 256 * 1024
 # Microsoft's multi-tenant discovery ("common"/"organizations") publishes this placeholder.
 TENANT_PLACEHOLDER = "{tenantid}"
@@ -124,7 +127,7 @@ class OidcClientConfig:
 @dataclass(frozen=True, slots=True)
 class OidcLoginResult:
     claims: dict[str, Any]  # userinfo (or token "userinfo" fallback)
-    id_token: str | None  # raw, kept only as id_token_hint for logout
+    id_token: str | None = field(repr=False)  # raw, kept only as id_token_hint for logout
     id_token_claims: dict[str, Any] | None = None  # verified via JWKS; sid comes from here
 
 
@@ -272,17 +275,27 @@ async def _json_request(
     """One bounded IdP call (no redirects, timeout, streamed size cap); the decoded JSON.
 
     Raises :class:`OIDCError` for an error status, an oversized body or invalid JSON, and
-    lets ``httpx.HTTPError`` (connect/timeout) through.
+    lets ``httpx.HTTPError`` (connect/timeout) through. The whole call (connect + body)
+    has a wall-clock deadline of ``_TOTAL_REQUEST_TIMEOUT``: httpx's timeout is per phase,
+    so a slow-drip body could otherwise hold the request for minutes. ``Accept-Encoding:
+    identity`` keeps the size cap honest (no decompression of a small compressed body).
     """
-    async with (
-        httpx.AsyncClient(
-            transport=transport, follow_redirects=False, timeout=http_timeout
-        ) as client,
-        client.stream(method, url, **kwargs) as resp,
-    ):
-        if resp.status_code >= 400:
-            raise OIDCError(f"HTTP {resp.status_code} from {method} {url}")
-        body = await _read_capped(resp, max_bytes)
+    headers = {**dict(kwargs.pop("headers", None) or {}), "Accept-Encoding": "identity"}
+    try:
+        async with (
+            asyncio.timeout(_TOTAL_REQUEST_TIMEOUT),
+            httpx.AsyncClient(
+                transport=transport, follow_redirects=False, timeout=http_timeout
+            ) as client,
+            client.stream(method, url, headers=headers, **kwargs) as resp,
+        ):
+            if resp.status_code >= 400:
+                raise OIDCError(f"HTTP {resp.status_code} from {method} {url}")
+            body = await _read_capped(resp, max_bytes)
+    except TimeoutError as exc:
+        raise httpx.TimeoutException(
+            f"no complete answer within {_TOTAL_REQUEST_TIMEOUT:.0f} s"
+        ) from exc
     try:
         return json.loads(body)
     except ValueError as exc:

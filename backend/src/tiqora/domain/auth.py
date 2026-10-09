@@ -389,6 +389,12 @@ class SessionStore:
         token = secrets.token_urlsafe(32)
         payload = f"ENROLL:{user_id}:{login}"
         await self._client.set(self._key(token), payload, ex=ttl_seconds)
+        # Indexed like pending tokens: a password change or an admin 2FA reset
+        # (revoke_user_sessions) must not leave a token that can still enroll a factor.
+        with contextlib.suppress(Exception):
+            index_key = self._user_index_key(user_id)
+            await self._client.sadd(index_key, token)
+            await self._client.expire(index_key, self._absolute_ttl)
         return token
 
     async def get_enroll(self, token: str) -> tuple[int, str] | None:
@@ -411,7 +417,12 @@ class SessionStore:
         if data is None:
             return None
         user_id, login = data
+        # Atomic claim, as in promote_pending: only one of two parallel promotions wins.
+        if await self._client.delete(self._key(token)) == 0:
+            return None
         await self.delete(token)
+        with contextlib.suppress(Exception):
+            await self._client.srem(self._user_index_key(user_id), token)
         return await self.create(user_id, login, avatar_url=avatar_url)
 
 

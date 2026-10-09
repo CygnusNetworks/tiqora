@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Final, Literal
 
 from sqlalchemy import func, select
@@ -55,7 +55,7 @@ class SsoSessionDraft:
     name_qualifier: str | None = None
     sp_name_qualifier: str | None = None
     sid: str | None = None  # OIDC
-    id_token_hint: str | None = None  # OIDC, for end_session
+    id_token_hint: str | None = field(default=None, repr=False)  # OIDC, for end_session
 
 
 @dataclass(frozen=True, slots=True)

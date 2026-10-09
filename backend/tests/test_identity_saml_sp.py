@@ -837,3 +837,14 @@ async def test_logout_response_signature_checked_before_parsing(
     assert parse_spy == []
     assert await sp.parse_logout_response(**_response_call(url)) == "id-logout-9"
     assert parse_spy == ["parse_logout_request_response"]
+
+
+def test_saml_replay_ttl_never_truncates() -> None:
+    """The replay key must live at least until NotOnOrAfter + skew (rounded up)."""
+    from datetime import UTC, datetime, timedelta
+
+    from tiqora.identity.sso_routes import _assertion_ttl
+
+    not_after = datetime.now(UTC) + timedelta(seconds=300.4)
+    assert _assertion_ttl(not_after, 120) >= 300.4 + 120
+    assert _assertion_ttl(None, 120) == 86400 + 120

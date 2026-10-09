@@ -92,6 +92,12 @@ class PendingCustomerToken:
     login: str
 
 
+#: 401 detail when the pending (pre-2FA) sign-in is gone; the portal UI matches it exactly.
+PENDING_EXPIRED = "pending_expired"
+#: 401 detail for a wrong second-factor code (the pending sign-in stays usable).
+INVALID_CODE = "invalid_code"
+
+
 async def get_pending_customer_token(
     request: Request,
     auth: Annotated[CustomerAuthService, Depends(get_customer_auth_service)],
@@ -106,7 +112,8 @@ async def get_pending_customer_token(
     token = request.cookies.get(settings.customer_session_cookie_name)
     pending = await auth.get_pending_session(token) if token else None
     if token is None or pending is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No pending session")
+        # Stable machine code: the portal sends the user back to the password step on it.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=PENDING_EXPIRED)
     return PendingCustomerToken(token=token, customer_id=pending[0], login=pending[1])
 
 

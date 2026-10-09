@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
@@ -41,8 +41,8 @@ class LoginState:
     next_path: str
     user_kind: UserKind
     test_id: str | None = None
-    code_verifier: str | None = None
-    nonce: str | None = None
+    code_verifier: str | None = field(default=None, repr=False)
+    nonce: str | None = field(default=None, repr=False)
     legacy: bool = False  # pre-upgrade env-oidc value
 
 

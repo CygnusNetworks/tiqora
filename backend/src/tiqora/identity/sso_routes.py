@@ -9,6 +9,7 @@ login and issues the session. SAML adds ``finish_saml_acs`` (the POSTed response
 from __future__ import annotations
 
 import contextlib
+import math
 import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -804,7 +805,8 @@ def _assertion_ttl(not_on_or_after: datetime | None, skew: int) -> int:
     if not_on_or_after is None:
         return 86400 + skew
     remaining = (not_on_or_after - datetime.now(UTC)).total_seconds()
-    return max(60, int(remaining) + skew)
+    # ceil + 1: a truncated TTL could free the replay key a fraction of a second early.
+    return max(60, math.ceil(remaining) + skew + 1)
 
 
 def _form_text(value: object) -> str | None:

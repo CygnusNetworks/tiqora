@@ -21,6 +21,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from tiqora.api.deps import get_redis
 from tiqora.api.portal.auth import set_customer_session_cookie
 from tiqora.api.portal.deps import (
+    INVALID_CODE,
+    PENDING_EXPIRED,
     AppSettings,
     CurrentCustomer,
     CustomerTOTPServiceDep,
@@ -154,7 +156,7 @@ async def totp_verify(
         settings,
         pending.login,
         lambda: totp.verify(pending.customer_id, body.code),
-        on_fail=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid TOTP code"),
+        on_fail=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=INVALID_CODE),
     )
     return await _promote(response, settings, auth, pending.token)
 
@@ -164,7 +166,7 @@ async def _promote(
 ) -> CustomerLoginResponse:
     promoted = await auth.promote_pending_session(token)
     if promoted is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=PENDING_EXPIRED)
     new_token, customer = promoted
     set_customer_session_cookie(response, settings, new_token)
     return CustomerLoginResponse(customer=CustomerMe(**customer_to_dict(customer)))

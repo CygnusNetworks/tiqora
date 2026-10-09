@@ -1,6 +1,7 @@
 """SAML login for agents: start, ACS, SP metadata and replay protection (wave 1, Task 10).
 
-ASGI + DB with an in-process pysaml2 IdP. Seed band 47100-47199, provider slugs ``idptest-saml-*``.
+ASGI + DB with an in-process pysaml2 IdP. Seed band 47100-47119 (agents
+47101-47111), provider slugs ``idptest-saml-*``.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ require_saml()
 assert shutil.which("xmlsec1")
 
 KEY = "unit-test-secret-key-for-identity-saml-flow"
-BAND = (47100, 47199)
+BAND = (47100, 47119)
 SLUG = "idptest-saml-"
 PROVIDER = "idptest-saml-a"
 BASE = "https://helpdesk.example.org"

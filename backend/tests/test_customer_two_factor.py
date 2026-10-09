@@ -370,6 +370,8 @@ async def test_portal_login_pending_when_totp_enrolled(env: Env) -> None:
         "/api/portal/auth/totp/verify", json={"code": "000000"}, headers=SAME
     )
     assert bad.status_code == 401
+    # Stable machine code the portal UI matches exactly (stays on the code step).
+    assert bad.json()["detail"] == "invalid_code"
     assert (await env.client.get("/api/portal/auth/me")).status_code == 401  # still pending
 
     ok = await env.client.post(
@@ -436,6 +438,7 @@ async def test_full_session_cannot_use_verify_endpoints(env: Env) -> None:
     assert (await env.login(login=login)).json()["customer"] is not None
     r = await env.client.post("/api/portal/auth/totp/verify", json={"code": "123456"}, headers=SAME)
     assert r.status_code == 401
+    assert r.json()["detail"] == "pending_expired"  # no pending sign-in behind the cookie
     r = await env.client.post("/api/portal/auth/passkey/authenticate/begin", headers=SAME)
     assert r.status_code == 401
 
@@ -477,6 +480,24 @@ async def test_totp_verify_is_rate_limited(env: Env) -> None:
     limiter = AuthRateLimiter(env.redis, env.settings)
     assert (await limiter.check(login=f"2fa:customer:{login}", ip="203.0.113.7")).allowed is False
     assert (await limiter.check(login=f"2fa:{login}", ip="203.0.113.7")).allowed is True
+
+
+async def test_pending_lost_before_promotion_is_pending_expired(env: Env) -> None:
+    """A right code whose pending sign-in cannot be promoted any more (account disabled,
+    a parallel tab won) answers the same stable code as a missing pending session."""
+    cid = 47158
+    login = await env.customer(cid)
+    secret = await env.enroll_totp(cid, login)
+    assert (await env.login(login=login)).json()["pending_2fa"] is True
+    await env.session.execute(
+        text("UPDATE customer_user SET valid_id = 2 WHERE id = :id"), {"id": cid}
+    )
+    await env.session.commit()
+    r = await env.client.post(
+        "/api/portal/auth/totp/verify", json={"code": pyotp.TOTP(secret).now()}, headers=SAME
+    )
+    assert r.status_code == 401
+    assert r.json()["detail"] == "pending_expired"
 
 
 async def test_totp_code_cannot_be_replayed(env: Env) -> None:

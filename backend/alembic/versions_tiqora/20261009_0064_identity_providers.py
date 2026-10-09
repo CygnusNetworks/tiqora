@@ -4,9 +4,9 @@ Revision ID: 20261009_0064
 Revises: 20261009_0063
 Create Date: 2026-10-09
 
-``metadata_xml`` is ``MEDIUMTEXT`` on MariaDB (SAML IdP metadata can exceed
-64 KiB). Booleans and timestamps are written by the application (naive UTC);
-no server defaults, in particular none on TEXT columns (MariaDB).
+``metadata_xml`` and ``config`` (holds pasted SAML IdP metadata) are
+``MEDIUMTEXT`` on MariaDB (SAML IdP metadata can exceed 64 KiB). Booleans
+and timestamps are written by the application (naive UTC); no server defaults, in particular none on TEXT columns (MariaDB).
 """
 
 from __future__ import annotations
@@ -37,7 +37,11 @@ def upgrade() -> None:
         sa.Column("button_label", sa.String(200), nullable=True),
         sa.Column("button_icon", sa.String(32), nullable=True),
         sa.Column("preset", sa.String(40), nullable=True),
-        sa.Column("config", sa.Text(), nullable=False),
+        sa.Column(
+            "config",
+            sa.Text().with_variant(mysql.MEDIUMTEXT(), "mysql", "mariadb"),
+            nullable=False,
+        ),
         sa.Column("secrets_enc", sa.Text(), nullable=True),
         sa.Column("match_by", sa.String(16), nullable=False),
         sa.Column("require_sso_opt_in", sa.Boolean(), nullable=False),

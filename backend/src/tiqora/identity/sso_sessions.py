@@ -11,7 +11,7 @@ import contextlib
 import hashlib
 import json
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, get_args
 
 from tiqora.identity.types import ProviderKind
@@ -45,7 +45,7 @@ class SsoSessionInfo:
     name_qualifier: str | None = None
     sp_name_qualifier: str | None = None
     sid: str | None = None
-    id_token_hint: str | None = None
+    id_token_hint: str | None = field(default=None, repr=False)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), separators=(",", ":"))

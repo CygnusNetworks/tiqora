@@ -216,7 +216,11 @@ class CustomerSessionStore:
             value = await self._client.get(key)
             if isinstance(value, bytes):
                 value = value.decode("utf-8")
-            if value is not None and str(value).split(":", 1)[-1] in wanted:
+            if value is None:
+                continue
+            # "<id>:<login>" for full sessions, "PENDING:<id>:<login>" for pending 2FA.
+            payload = str(value).removeprefix(_PENDING_PAYLOAD_PREFIX)
+            if payload.split(":", 1)[-1] in wanted:
                 await self.delete(token)
                 removed += 1
         return removed

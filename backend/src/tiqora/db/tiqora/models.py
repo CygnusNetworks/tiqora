@@ -924,7 +924,8 @@ class TiqoraIdentityProvider(TiqoraBase):
     button_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
     button_icon: Mapped[str | None] = mapped_column(String(32), nullable=True)
     preset: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    config: Mapped[str] = mapped_column(Text, nullable=False)
+    #: JSON; may carry pasted SAML IdP metadata (MEDIUMTEXT on MariaDB).
+    config: Mapped[str] = mapped_column(IDENTITY_METADATA_TEXT, nullable=False)
     secrets_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     match_by: Mapped[str] = mapped_column(String(16), nullable=False)
     require_sso_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False)
