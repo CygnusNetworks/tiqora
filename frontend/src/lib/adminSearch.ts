@@ -557,6 +557,22 @@ export const ADMIN_PAGES: AdminPageEntry[] = [
     keywords: ["hintergrundaufgaben", "export", "aufgaben", "jobs", "background", "retention", "aufbewahrung"],
   },
   {
+    slug: "reporting",
+    route: "/admin/reporting",
+    group: "system",
+    nameKey: "admin.nav.reporting",
+    descriptionKey: "admin.pageDescriptions.reporting",
+    keywords: ["berichte", "statistik", "auswertung", "reports", "reporting", "neu aufbauen", "rebuild", "backfill"],
+  },
+  {
+    slug: "settings-reporting",
+    route: "/admin/settings/reporting",
+    group: "system",
+    nameKey: "admin.settings.reporting.title",
+    descriptionKey: "admin.pageDescriptions.settingsReporting",
+    keywords: ["berichte", "zeitzone", "cache", "export", "zugriff", "statistik", "reports", "sla"],
+  },
+  {
     slug: "gdpr",
     route: "/admin/gdpr",
     group: "system",

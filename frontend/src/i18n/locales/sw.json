@@ -2151,7 +2151,8 @@
       "pgp": "PGP",
       "smime": "S/MIME",
       "aiModels": "Modeli",
-      "identityProviders": "Identity providers"
+      "identityProviders": "Identity providers",
+      "reporting": "Report data"
     },
     "table": {
       "id": "ID",
@@ -3441,7 +3442,9 @@
       "smime": "Washa na zima S/MIME, dhibiti vyeti, funguo za faragha na uhusiano wa watia saini, weka maeneo ya kuhifadhi.",
       "aiModels": "Modeli kwa watoa huduma, wasifu wenye modeli mbadala, na wasifu upi unashughulikia kazi ipi.",
       "settingsJobs": "Background tasks such as exports: how many run at once and how long results are kept.",
-      "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP."
+      "identityProviders": "Set up sign-in through Microsoft, Google, SAML or LDAP.",
+      "reporting": "Check the state of the report data and have everything recalculated.",
+      "settingsReporting": "Reports: time zone, access, cache and limits for results and exports."
     },
     "types": {
       "title_plural": "Aina za tiketi",
@@ -3831,6 +3834,47 @@
           "favicon_enabled": {
             "label": "Website icons",
             "help": "Icon of the website of the mail domain or company URL. Never for freemail domains such as gmail.com."
+          }
+        }
+      },
+      "reporting": {
+        "title": "Reports",
+        "fields": {
+          "time_zone": {
+            "label": "Report time zone",
+            "help": "Days, weeks and months are cut by this time zone. Leave empty for the Znuny default time zone, e.g. Europe/Berlin."
+          },
+          "access": {
+            "label": "Who may see reports",
+            "help": "All agents, or only members of the \"stats\" group as in Znuny.",
+            "options": {
+              "all_agents": "All agents",
+              "stats_group": "Only group \"stats\""
+            }
+          },
+          "near_miss_percent": {
+            "label": "Near miss in percent",
+            "help": "A ticket counts as a near miss if it overran the target time by at most this many percent."
+          },
+          "cache_seconds": {
+            "label": "Cache in seconds",
+            "help": "How long a report result is reused before it is recalculated. 0 turns the cache off."
+          },
+          "inline_row_threshold": {
+            "label": "Limit for instant calculation",
+            "help": "Reports over more ticket rows than this run in the background so the page does not freeze."
+          },
+          "max_result_rows": {
+            "label": "Maximum result rows",
+            "help": "A report shows no more rows on screen; the rest is summed up as \"Other\"."
+          },
+          "export_row_limit": {
+            "label": "Maximum rows when exporting",
+            "help": "Larger exports to Excel or CSV are cut off at this number of rows."
+          },
+          "query_timeout_seconds": {
+            "label": "Time limit per report in seconds",
+            "help": "If the calculation takes longer it is stopped and a message is shown."
           }
         }
       }
@@ -4239,6 +4283,32 @@
           "customer": "Customer"
         }
       }
+    },
+    "reporting": {
+      "title": "Report data",
+      "subtitle": "State of the data that feeds the reports. Recalculate everything here when needed.",
+      "settings": "Report settings",
+      "ready": "Ready: the report data is up to date",
+      "building": "Being built",
+      "buildingPercent": "Being built ({{percent}}%)",
+      "pending": "Not built yet",
+      "asOf": "As of",
+      "lag": "Backlog",
+      "lagHint": "Ticket changes not evaluated yet",
+      "gaps": "Gaps",
+      "gapsHint": "Skipped changes that will be caught up",
+      "dirty": "Queued for recalculation",
+      "dirtyHint": "Tickets whose values are being recalculated",
+      "lastSnapshot": "Last daily snapshot",
+      "factRows": "Ticket rows",
+      "eventRows": "Event rows",
+      "rebuild": "Rebuild report data",
+      "rebuildSince": "From date (optional)",
+      "rebuildHelp": "Recalculates all report data from the tickets and their history. Without a date the whole history is used.",
+      "rebuildConfirm": "All report data will be recalculated. With many tickets this can take hours; the reports stay usable meanwhile.",
+      "rebuildStart": "Rebuild",
+      "rebuildError": "The rebuild could not be started.",
+      "loadError": "The state of the report data could not be loaded."
     }
   },
   "kb": {

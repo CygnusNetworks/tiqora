@@ -1895,7 +1895,30 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return [
       { key: "avatars", title_key: "admin.settings.avatars.title", owner: "core" },
       { key: "jobs", title_key: "admin.settings.jobs.title", owner: "core" },
+      { key: "reporting", title_key: "admin.settings.reporting.title", owner: "core" },
     ];
+  if (p.endsWith("/admin/settings-sections/reporting"))
+    return {
+      key: "reporting",
+      title_key: "admin.settings.reporting.title",
+      i18n_prefix: "admin.settings.reporting",
+      json_schema: {
+        properties: {
+          time_zone: { default: "", maxLength: 64, title: "Time Zone", type: "string" },
+          access: { default: "all_agents", enum: ["all_agents", "stats_group"], title: "Access", type: "string" },
+          near_miss_percent: { default: 10, maximum: 50, minimum: 1, title: "Near Miss Percent", type: "integer" },
+          cache_seconds: { default: 300, maximum: 3600, minimum: 0, title: "Cache Seconds", type: "integer" },
+          inline_row_threshold: { default: 200000, maximum: 10000000, minimum: 1000, title: "Inline Row Threshold", type: "integer" },
+          max_result_rows: { default: 5000, maximum: 10000, minimum: 100, title: "Max Result Rows", type: "integer" },
+          export_row_limit: { default: 100000, maximum: 1000000, minimum: 1000, title: "Export Row Limit", type: "integer" },
+          query_timeout_seconds: { default: 60, maximum: 600, minimum: 5, title: "Query Timeout Seconds", type: "integer" },
+        },
+        title: "ReportingSettings",
+        type: "object",
+      },
+      values: { time_zone: "", access: "all_agents", near_miss_percent: 10, cache_seconds: 300, inline_row_threshold: 200000, max_result_rows: 5000, export_row_limit: 100000, query_timeout_seconds: 60 },
+      secrets_set: [],
+    };
   if (p.endsWith("/admin/settings-sections/jobs"))
     return {
       key: "jobs",

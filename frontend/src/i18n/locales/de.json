@@ -2151,7 +2151,8 @@
       "pgp": "PGP",
       "smime": "S/MIME",
       "aiModels": "Modelle",
-      "identityProviders": "Identitätsanbieter"
+      "identityProviders": "Identitätsanbieter",
+      "reporting": "Berichtsdaten"
     },
     "table": {
       "id": "ID",
@@ -3449,7 +3450,9 @@
       "smime": "S/MIME ein- und ausschalten, Zertifikate, private Schlüssel und Signer-Beziehungen verwalten, Speicherorte einstellen.",
       "aiModels": "Modelle bei den Providern, Profile mit Ausweichmodellen und welches Profil welche Aufgabe übernimmt.",
       "settingsJobs": "Hintergrundaufgaben wie Exporte: wie viele gleichzeitig laufen und wie lange Ergebnisse bleiben.",
-      "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten."
+      "identityProviders": "Anmeldung über Microsoft, Google, SAML oder LDAP einrichten.",
+      "reporting": "Zustand der Berichtsdaten ansehen und alles neu berechnen lassen.",
+      "settingsReporting": "Berichte: Zeitzone, Zugriff, Zwischenspeicher sowie Grenzen für Ergebnisse und Exporte."
     },
     "types": {
       "title_plural": "Ticket-Typen",
@@ -3839,6 +3842,47 @@
           "favicon_enabled": {
             "label": "Website-Icons",
             "help": "Icon der Website zur Mail-Domain bzw. Firmen-URL. Nie für Freemail-Domains wie gmail.com."
+          }
+        }
+      },
+      "reporting": {
+        "title": "Berichte",
+        "fields": {
+          "time_zone": {
+            "label": "Zeitzone der Berichte",
+            "help": "Nach dieser Zeitzone werden Tage, Wochen und Monate abgegrenzt. Leer lassen für die Standard-Zeitzone von Znuny, z. B. Europe/Berlin."
+          },
+          "access": {
+            "label": "Wer darf Berichte sehen",
+            "help": "Alle Agenten oder nur Mitglieder der Gruppe „stats“, wie in Znuny.",
+            "options": {
+              "all_agents": "Alle Agenten",
+              "stats_group": "Nur Gruppe „stats“"
+            }
+          },
+          "near_miss_percent": {
+            "label": "Knapp verfehlt in Prozent",
+            "help": "Ein Ticket gilt als knapp verfehlt, wenn es höchstens so viel Prozent der Zielzeit überschritten hat."
+          },
+          "cache_seconds": {
+            "label": "Zwischenspeicher in Sekunden",
+            "help": "So lange wird ein Berichtsergebnis wiederverwendet, bevor neu gerechnet wird. 0 schaltet den Zwischenspeicher aus."
+          },
+          "inline_row_threshold": {
+            "label": "Grenze für Sofortberechnung",
+            "help": "Berichte über mehr Ticketzeilen als hier werden im Hintergrund gerechnet, damit die Seite nicht hängt."
+          },
+          "max_result_rows": {
+            "label": "Höchstzahl Ergebniszeilen",
+            "help": "Mehr Zeilen zeigt ein Bericht am Bildschirm nicht an; der Rest wird als „Sonstige“ zusammengefasst."
+          },
+          "export_row_limit": {
+            "label": "Höchstzahl Zeilen beim Export",
+            "help": "Größere Exporte nach Excel oder CSV werden bei dieser Zeilenzahl abgeschnitten."
+          },
+          "query_timeout_seconds": {
+            "label": "Zeitlimit pro Bericht in Sekunden",
+            "help": "Dauert die Berechnung länger, wird sie abgebrochen und eine Meldung angezeigt."
           }
         }
       }
@@ -4247,6 +4291,32 @@
           "customer": "Kunde"
         }
       }
+    },
+    "reporting": {
+      "title": "Berichtsdaten",
+      "subtitle": "Zustand der Auswertungsdaten, aus denen die Berichte gespeist werden. Hier lässt sich alles bei Bedarf neu berechnen.",
+      "settings": "Einstellungen für Berichte",
+      "ready": "Bereit: die Berichtsdaten sind aktuell",
+      "building": "Wird aufgebaut",
+      "buildingPercent": "Wird aufgebaut ({{percent}} %)",
+      "pending": "Noch nicht aufgebaut",
+      "asOf": "Stand",
+      "lag": "Rückstand",
+      "lagHint": "Ticketänderungen, die noch nicht ausgewertet sind",
+      "gaps": "Lücken",
+      "gapsHint": "Übersprungene Änderungen, die nachgeholt werden",
+      "dirty": "Zur Neuberechnung vorgemerkt",
+      "dirtyHint": "Tickets, deren Werte neu berechnet werden",
+      "lastSnapshot": "Letzter Tagesstand",
+      "factRows": "Ticketzeilen",
+      "eventRows": "Ereigniszeilen",
+      "rebuild": "Berichtsdaten neu aufbauen",
+      "rebuildSince": "Ab Datum (optional)",
+      "rebuildHelp": "Rechnet alle Berichtsdaten aus den Tickets und ihrem Verlauf neu. Ohne Datum wird die gesamte Historie verwendet.",
+      "rebuildConfirm": "Alle Berichtsdaten werden neu berechnet. Das kann bei vielen Tickets Stunden dauern; die Berichte bleiben währenddessen nutzbar.",
+      "rebuildStart": "Neu aufbauen",
+      "rebuildError": "Der Neuaufbau konnte nicht gestartet werden.",
+      "loadError": "Der Zustand der Berichtsdaten konnte nicht geladen werden."
     }
   },
   "kb": {
