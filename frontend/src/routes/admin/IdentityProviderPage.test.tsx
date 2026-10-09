@@ -43,6 +43,9 @@ vi.mock("@/lib/identityApi", async (importOriginal) => {
       refreshMetadata: (...a: unknown[]) => refreshMetadata(...a),
       startTest: (...a: unknown[]) => startTest(...a),
       testResult: (...a: unknown[]) => testResult(...a),
+      managedAssignments: () => Promise.resolve([]),
+      links: () => Promise.resolve([]),
+      preview: vi.fn(),
     },
   };
 });
@@ -81,10 +84,14 @@ describe("IdentityProviderPage", () => {
     await waitFor(() => expect(testResult).toHaveBeenCalledWith(1, "t-123", expect.anything()));
   });
 
-  it("shows placeholders for the later tabs", async () => {
-    search = { tab: "mapping" };
+  it.each([
+    ["mapping", "identity-mapping"],
+    ["roles", "identity-roles"],
+    ["links", "identity-links"],
+  ])("renders the %s tab", async (tab, testId) => {
+    search = { tab };
     wrap(<IdentityProviderPage />);
-    expect(await screen.findByTestId("identity-tab-placeholder")).toBeInTheDocument();
+    expect(await screen.findByTestId(testId)).toBeVisible();
   });
 
   it("switches tabs through the URL search", async () => {

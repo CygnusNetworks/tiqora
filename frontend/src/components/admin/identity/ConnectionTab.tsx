@@ -191,6 +191,9 @@ export function ConnectionTab({
   const samlUnavailable = provider.kind === "saml" && !capabilities.saml_available;
   const certificate = provider.kind === "saml" ? String((latest.config as Record<string, unknown>).sp_certificate ?? "") : "";
   const iconValue = String(common.button_icon ?? "");
+  // Environment-configured LDAP shows its TIQORA_LDAP_TLS_VERIFY value here (off unless set).
+  const ldapTlsUnchecked =
+    provider.kind === "ldap" && shownConfig.tls_verify === false && (!!shownConfig.use_ssl || !!shownConfig.use_starttls);
 
   return (
     <div className="space-y-4" data-testid="identity-connection">
@@ -268,6 +271,15 @@ export function ConnectionTab({
             <span className="font-medium">{schema.properties?.[key]?.title ?? key}</span>: {t("fields.unsupported")}
           </p>
         ))}
+        {ldapTlsUnchecked && (
+          <p
+            data-testid="identity-ldap-tls-warning"
+            role="alert"
+            className="rounded border border-danger/30 bg-danger/15 px-3 py-2 text-sm text-ink"
+          >
+            {t(locked ? "admin.identity.ldap.tlsWarningEnv" : "admin.identity.ldap.tlsWarning")}
+          </p>
+        )}
         {provider.kind === "saml" && (
           <p
             data-testid="identity-sha1-warning"

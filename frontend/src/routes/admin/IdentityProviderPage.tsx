@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { ConnectionTab } from "@/components/admin/identity/ConnectionTab";
+import { LinksTab } from "@/components/admin/identity/LinksTab";
+import { MappingTab } from "@/components/admin/identity/MappingTab";
+import { RolesTab } from "@/components/admin/identity/RolesTab";
 import { TestTab } from "@/components/admin/identity/TestTab";
 import { ProviderIcon } from "@/components/auth/ProviderIcon";
 import { Badge } from "@/components/ui/Badge";
@@ -26,6 +29,10 @@ export function IdentityProviderPage() {
   const search = useSearch({ from: ROUTE });
   const id = Number(providerId);
   const [draft, setDraft] = useState<ProviderChanges | undefined>(undefined);
+  // Values of the last test sign-in; they drive the live preview on the mapping tab.
+  const [sample, setSample] = useState<Record<string, string[]> | null>(null);
+  // Mapping and roles stay mounted once visited so unsaved edits survive tab switches.
+  const [visited, setVisited] = useState<ReadonlySet<IdentityProviderTab>>(new Set());
 
   const providerKey = ["admin", "identity", id] as const;
   const providerQ = useQuery({ queryKey: providerKey, queryFn: ({ signal }) => identityApi.get(id, signal) });
@@ -41,6 +48,9 @@ export function IdentityProviderPage() {
 
   const tab: IdentityProviderTab = search.test ? "test" : (search.tab ?? "connection");
   const provider = providerQ.data;
+  useEffect(() => {
+    setVisited((cur) => (cur.has(tab) ? cur : new Set(cur).add(tab)));
+  }, [tab]);
 
   const onSaved = (p: IdentityProvider) => {
     qc.setQueryData(providerKey, p);
@@ -64,15 +74,6 @@ export function IdentityProviderPage() {
       </div>
     );
   }
-
-  const placeholder = (
-    <p
-      data-testid="identity-tab-placeholder"
-      className="rounded-lg border border-hairline bg-surface p-4 text-sm text-muted"
-    >
-      {t("admin.identity.placeholder")}
-    </p>
-  );
 
   return (
     <div className="space-y-4 p-4" data-testid="admin-identity-provider-page">
@@ -113,8 +114,28 @@ export function IdentityProviderPage() {
           onDraftChange={setDraft}
         />
       </div>
-      {tab === "test" && <TestTab provider={provider} testId={search.test} draft={draft} />}
-      {(tab === "mapping" || tab === "roles" || tab === "links") && placeholder}
+      {(tab === "mapping" || visited.has("mapping")) && (
+        <div hidden={tab !== "mapping"}>
+          <MappingTab key={provider.id} provider={provider} sampleAttributes={sample} onSaved={onSaved} />
+        </div>
+      )}
+      {(tab === "roles" || visited.has("roles")) && (
+        <div hidden={tab !== "roles"}>
+          <RolesTab key={provider.id} provider={provider} sampleAttributes={sample} onSaved={onSaved} />
+        </div>
+      )}
+      {tab === "test" && (
+        <TestTab
+          provider={provider}
+          testId={search.test}
+          draft={draft}
+          onUseAttributes={(attributes) => {
+            setSample(attributes);
+            navigate({ to: ROUTE, params: { providerId: String(provider.id) }, search: { tab: "mapping" } });
+          }}
+        />
+      )}
+      {tab === "links" && <LinksTab provider={provider} />}
     </div>
   );
 }

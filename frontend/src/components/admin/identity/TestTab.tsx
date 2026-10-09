@@ -28,10 +28,13 @@ export function TestTab({
   provider,
   testId,
   draft,
+  onUseAttributes,
 }: {
   provider: IdentityProvider;
   testId?: string;
   draft?: ProviderChanges;
+  /** Hands the values of this test to the mapping tab's live preview. */
+  onUseAttributes?: (attributes: Record<string, string[]>) => void;
 }) {
   const { t } = useTranslation();
   const [audience, setAudience] = useState<TestAudience>(provider.audience === "customer" ? "customer" : "agent");
@@ -170,6 +173,15 @@ export function TestTab({
                   </tbody>
                 </table>
               </div>
+              {onUseAttributes && (
+                <Button
+                  type="button"
+                  data-testid="identity-test-use-sample"
+                  onClick={() => onUseAttributes(result.attributes)}
+                >
+                  {t("admin.identity.test.useForPreview")}
+                </Button>
+              )}
               {result.plan && <LoginPlanView plan={result.plan} />}
             </>
           )}

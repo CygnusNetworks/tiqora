@@ -35,15 +35,14 @@ describe("ssoErrorKey", () => {
     );
     const block = /RejectCode = Literal\[([\s\S]*?)\]/.exec(src)?.[1] ?? "";
     const reject = [...block.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
-    const extra = [
-      "unknown_provider",
-      "config",
-      "saml_unavailable",
-      "state",
-      "saml_invalid",
-      "oidc_failed",
-      "idp_error",
-    ];
+    // The codes the backend adds on top of RejectCode, read from the SSO_ERROR_CODES tuple itself.
+    const http = readFileSync(
+      resolve(__dirname, "../../../backend/src/tiqora/identity/http.py"),
+      "utf8",
+    );
+    const tuple = /SSO_ERROR_CODES[^=]*=\s*\(([\s\S]*?)\n\)/.exec(http)?.[1] ?? "";
+    const extra = [...tuple.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+    expect(extra.length).toBeGreaterThan(0);
     expect([...SSO_ERROR_CODES].sort()).toEqual([...reject, ...extra].sort());
   });
 });

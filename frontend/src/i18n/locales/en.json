@@ -3934,7 +3934,8 @@
         "waiting": "Waiting for the sign-in …",
         "timeout": "No result arrived within two minutes. Please start the test sign-in again.",
         "subject": "Identifier",
-        "attributesHeading": "Values sent by the sign-in service"
+        "attributesHeading": "Values sent by the sign-in service",
+        "useForPreview": "Use these values for the preview"
       },
       "plan": {
         "rejected": "The sign-in would be rejected:",
@@ -3995,7 +3996,7 @@
             },
             "allowed_tenant_ids": {
               "label": "Allowed Microsoft tenant IDs",
-              "help": "Only for Microsoft Entra with the multi-tenant address (common/organizations): sign-ins from these tenants only. Empty = every tenant."
+              "help": "Only for Microsoft Entra with the multi-tenant address (common/organizations): only sign-ins from these tenants. Empty = any organisation (tenant). When matching by login name, enter your own tenant ID."
             }
           }
         },
@@ -4108,6 +4109,103 @@
               "help": "Only needed when the directory's certificate comes from your own certification authority."
             }
           }
+        }
+      },
+      "ldap": {
+        "tlsWarning": "Warning: the directory server's certificate is not checked. An attacker on the network could read sign-in data or pose as the directory. Only turn the check off for a test directory.",
+        "tlsWarningEnv": "Warning: the directory server's certificate is not checked. An attacker on the network could read sign-in data or pose as the directory. The setting comes from the environment: set TIQORA_LDAP_TLS_VERIFY=true (customer directory: TIQORA_CUSTOMER_LDAP_TLS_VERIFY=true)."
+      },
+      "mapping": {
+        "fieldsHeading": "Which values fill which field?",
+        "fieldsHelp": "Enter which details from the sign-in service fill the field. The first value with content wins. Prefix with an underscore (_example) to set a fixed text.",
+        "sourcePlaceholder": "Detail from the sign-in service",
+        "field": {
+          "login": "Login name",
+          "email": "Email",
+          "first_name": "First name",
+          "last_name": "Last name",
+          "customer_id": "Customer number",
+          "mobile": "Mobile number"
+        },
+        "matchBy": "Match sign-in by",
+        "matchByOption": {
+          "login": "Login name",
+          "email": "Email"
+        },
+        "matchByHelp": "Used to find the matching user account when no link exists yet.",
+        "emailUntrustedWarning": "Warning: the email address does not have to be confirmed at the sign-in service. Anyone who can enter other people's addresses there could sign in to their accounts. Turn on \"Email address must be confirmed\" on the Connection tab, or match by login name.",
+        "entraEmailWarning": "Note: with Microsoft Entra the email address of an account can be changed and is not a safe identifier. Better match by login name and enter the allowed tenant IDs.",
+        "jit": "Create accounts automatically on first sign-in",
+        "jitHelp": "If a user is not known yet, an account is created on first sign-in. Otherwise unknown users are turned away.",
+        "allowedDomains": "Allowed email domains",
+        "allowedDomainsHelp": "Only users with an email address from these domains (e.g. example.org) automatically get an account.",
+        "noDomainWarning": "Warning: without a domain restriction anyone who can sign in at this sign-in service can have an account created, whatever their email domain. Enter your organisation's domains.",
+        "initialRoles": "Roles for new accounts (agents)",
+        "initialGroups": "Group permissions for new accounts (agents)",
+        "fixedCustomerId": "Fixed customer number for new customers",
+        "fixedCustomerIdHelp": "Used when the sign-in service does not send a customer number.",
+        "updateProfile": "Update name and email on every sign-in",
+        "previewHeading": "Preview",
+        "previewEmpty": "Start a test sign-in and choose \"Use these values for the preview\". You then see here at once what a sign-in with these values would do, including unsaved changes.",
+        "previewHelp": "This is what a sign-in with the values of the last test sign-in would do, including your unsaved changes.",
+        "previewError": "The preview could not be calculated."
+      },
+      "roles": {
+        "rulesHeading": "Rules",
+        "rulesHelp": "When a value from the sign-in service matches, the user gets the chosen roles and group permissions.",
+        "rulesEmpty": "No rule yet.",
+        "attribute": "Detail from the sign-in service",
+        "value": "Value",
+        "roles": "Roles",
+        "groups": "Groups",
+        "addGroup": "Add group",
+        "removeGroup": "Remove {{name}}",
+        "removeRule": "Remove rule",
+        "addRule": "Add rule",
+        "perm": {
+          "ro": "Read (ro)",
+          "move_into": "Move into (move_into)",
+          "create": "Create (create)",
+          "note": "Note (note)",
+          "owner": "Owner (owner)",
+          "priority": "Priority (priority)",
+          "rw": "All permissions (rw)"
+        },
+        "rwHint": "rw includes all permissions.",
+        "ldapGroupDn": "Member of LDAP group (DN)",
+        "syncHeading": "How are roles and groups reconciled?",
+        "sync": {
+          "managed": "Only maintain assignments made by these rules (recommended)",
+          "managedHelp": "Only assignments that a rule here created are removed. Roles and groups assigned by hand stay.",
+          "authoritative": "Like Znuny: replace all roles and groups",
+          "authoritativeHelp": "On every sign-in exactly the roles and groups from the rules apply. Everything else, including what was assigned by hand, is removed."
+        },
+        "managedHeading": "Managed assignments",
+        "managedHelp": "Roles and group permissions that were assigned by a rule.",
+        "managedEmpty": "No assignment made by a rule yet.",
+        "managedError": "The managed assignments could not be loaded.",
+        "managedAccount": "Account",
+        "managedAssignment": "Assignment",
+        "managedSince": "Since",
+        "managedRole": "Role {{name}}",
+        "managedGroup": "Group {{name}} ({{permission}})"
+      },
+      "links": {
+        "intro": "These accounts signed in through this sign-in service. When a link is removed, the account is matched again on its next sign-in.",
+        "empty": "Nobody has signed in through this sign-in service yet.",
+        "loadError": "The links could not be loaded.",
+        "removeTitle": "Remove link?",
+        "removeBody": "The link between \"{{login}}\" and this sign-in service is removed. The user account stays and is matched again on the next sign-in.",
+        "remove": "Remove link",
+        "removeError": "The link could not be removed.",
+        "account": "Account",
+        "kind": "Type",
+        "subject": "ID at the sign-in service",
+        "firstSeen": "First seen",
+        "lastSeen": "Last seen",
+        "kinds": {
+          "agent": "Agent",
+          "customer": "Customer"
         }
       }
     }

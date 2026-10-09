@@ -31,6 +31,14 @@ export type IdentityTestStart = Schemas["IdentityTestStartOut"];
 export type IdentityTestResult = Schemas["IdentityTestResultOut"];
 export type LoginPlan = Schemas["LoginPlanOut"];
 export type ProviderEndpoints = Schemas["ProviderEndpointsOut"];
+export type AttributeMap = Schemas["AttributeMap"];
+export type JitDefaults = Schemas["JitDefaults"];
+export type RoleRule = Schemas["RoleRule"];
+export type GroupGrant = Schemas["GroupGrant"];
+export type GroupPermission = NonNullable<GroupGrant["permissions"]>[number];
+export type ManagedAssignment = Schemas["ManagedAssignmentOut"];
+export type IdentityLink = Schemas["IdentityLinkOut"];
+export type MappingPreviewBody = Schemas["MappingPreviewIn"];
 export type ProviderAudience = "agent" | "customer" | "both";
 export type TestAudience = "agent" | "customer";
 
@@ -66,6 +74,18 @@ export const identityApi = {
   },
   startTest(id: number, body: { audience: TestAudience; draft?: ProviderChanges | null }) {
     return api.request<IdentityTestStart>("POST", `${BASE}/${id}/tests`, { body });
+  },
+  preview(id: number, body: MappingPreviewBody, signal?: AbortSignal) {
+    return api.request<LoginPlan>("POST", `${BASE}/${id}/preview`, { body, signal });
+  },
+  managedAssignments(id: number, signal?: AbortSignal) {
+    return api.request<ManagedAssignment[]>("GET", `${BASE}/${id}/managed-assignments`, { signal });
+  },
+  links(id: number, signal?: AbortSignal) {
+    return api.request<IdentityLink[]>("GET", `${BASE}/${id}/links`, { signal });
+  },
+  removeLink(id: number, linkId: number) {
+    return api.request<void>("DELETE", `${BASE}/${id}/links/${linkId}`);
   },
   testResult(id: number, testId: string, signal?: AbortSignal) {
     return api.request<IdentityTestResult>("GET", `${BASE}/${id}/tests/${encodeURIComponent(testId)}`, {

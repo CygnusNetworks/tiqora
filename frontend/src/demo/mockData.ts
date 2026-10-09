@@ -1639,8 +1639,8 @@ function identityDetail(id: number) {
     match_by: "login",
     require_sso_opt_in: true,
     attribute_map: { login: ["preferred_username"], email: ["email"], first_name: ["given_name"], last_name: ["family_name"], customer_id: [], mobile: [] },
-    jit_defaults: { customer_id: "", initial_groups: [], initial_role_ids: [], update_profile_on_login: true },
-    role_rules: [],
+    jit_defaults: { customer_id: "", initial_groups: [], initial_role_ids: [], update_profile_on_login: true, allowed_email_domains: [] },
+    role_rules: [{ attribute: "groups", value: "support", role_ids: [1], groups: [{ group_id: 3, permissions: ["ro", "create"] }] }],
     sync_mode: "managed",
     metadata_fetched_at: row.kind === "saml" ? t0 : null,
     endpoints: {
@@ -1678,6 +1678,15 @@ const identityTestResult = {
     groups_remove: [],
   },
 };
+
+const identityManaged = [
+  { user_id: 2, login: "anna.example", kind: "role", target_id: 1, target_name: "Agent", permission_key: "", created: "2026-10-01T08:30:00Z" },
+  { user_id: 2, login: "anna.example", kind: "group", target_id: 3, target_name: "support", permission_key: "ro", created: "2026-10-01T08:30:00Z" },
+];
+const identityLinks = [
+  { id: 1, user_kind: "agent", subject: "7f3b9c1e-0d52-4c1a-9a6e-3f1d2b8a4c10", user_id: 2, user_login: "anna.example", first_seen: "2026-09-20T07:15:00Z", last_seen: "2026-10-08T06:45:00Z" },
+  { id: 2, user_kind: "customer", subject: "a1c2e3f4-5b6d-4e7f-8a9b-0c1d2e3f4a5b", user_id: 14, user_login: "kunde@example.org", first_seen: "2026-10-02T12:00:00Z", last_seen: "2026-10-07T16:20:00Z" },
+];
 
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
@@ -1878,6 +1887,10 @@ export function resolveData(path: string, method: string): unknown | undefined {
     return { saml_available: true, saml_missing: null, public_base_url_set: true, webauthn: true };
   if (p.endsWith("/admin/identity-providers") && method === "GET") return identitySummaries;
   if (p.endsWith("/admin/identity-providers") && method === "POST") return identityDetail(1);
+  if (p.match(/\/admin\/identity-providers\/\d+\/preview$/)) return identityTestResult.plan;
+  if (p.match(/\/admin\/identity-providers\/\d+\/managed-assignments$/)) return identityManaged;
+  if (p.match(/\/admin\/identity-providers\/\d+\/links$/)) return identityLinks;
+  if (p.match(/\/admin\/identity-providers\/\d+\/links\/\d+$/)) return {};
   if (p.match(/\/admin\/identity-providers\/\d+\/tests$/) && method === "POST")
     return { test_id: "demo-test", login_url: "/admin/identity-providers/1?test=demo-test" };
   if (p.match(/\/admin\/identity-providers\/\d+\/tests\/[^/]+$/)) return identityTestResult;

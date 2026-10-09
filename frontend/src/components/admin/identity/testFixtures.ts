@@ -17,6 +17,7 @@ export const oidcSchema = {
       title: "Client Secret",
     },
     allow_private_network: { type: "boolean", default: false, title: "Allow Private Network" },
+    allowed_tenant_ids: { type: "array", items: { type: "string" }, default: [], title: "Allowed Tenant Ids" },
   },
 };
 
@@ -36,7 +37,12 @@ export const samlSchema = {
 
 export const ldapSchema = {
   type: "object",
-  properties: { host: { type: "string", default: "", title: "Host" } },
+  properties: {
+    host: { type: "string", default: "", title: "Host" },
+    use_ssl: { type: "boolean", default: false, title: "Use Ssl" },
+    use_starttls: { type: "boolean", default: false, title: "Use Starttls" },
+    tls_verify: { type: "boolean", default: true, title: "Tls Verify" },
+  },
 };
 
 export const kinds: IdentityKind[] = [
@@ -108,7 +114,9 @@ export function makeProvider(over: Partial<IdentityProvider> = {}): IdentityProv
     secrets_set: ["client_secret"],
     match_by: "login", require_sso_opt_in: true,
     attribute_map: { login: [], email: [], first_name: [], last_name: [], customer_id: [], mobile: [] },
-    jit_defaults: { customer_id: "", initial_groups: [], initial_role_ids: [], update_profile_on_login: true },
+    jit_defaults: {
+      customer_id: "", initial_groups: [], initial_role_ids: [], update_profile_on_login: true, allowed_email_domains: [],
+    },
     role_rules: [], sync_mode: "managed", metadata_fetched_at: null,
     endpoints: { ...endpoints },
     ...over,

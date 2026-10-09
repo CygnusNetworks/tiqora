@@ -60,6 +60,18 @@ describe("TestTab", () => {
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/api/v1/auth/sso/entra/login?test=t1"));
   });
 
+  it("hands the attributes of a finished test to the preview", async () => {
+    testResult.mockResolvedValue({
+      status: "done", error: null, subject: "s-1", attributes: { upn: ["anna@example.org"] },
+      plan: { ...basePlan },
+    });
+    const onUse = vi.fn();
+    wrap(<TestTab provider={makeProvider()} testId="t1" onUseAttributes={onUse} />);
+    fireEvent.click(await screen.findByTestId("identity-test-use-sample"));
+    expect(screen.getByRole("button", { name: "Werte für die Vorschau übernehmen" })).toBeInTheDocument();
+    expect(onUse).toHaveBeenCalledWith({ upn: ["anna@example.org"] });
+  });
+
   it("lets the admin choose the audience for providers serving both", async () => {
     startTest.mockResolvedValue({ test_id: "t1", login_url: "/l" });
     wrap(<TestTab provider={makeProvider({ audience: "both" })} />);

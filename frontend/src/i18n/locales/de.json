@@ -3934,7 +3934,8 @@
         "waiting": "Warte auf die Anmeldung …",
         "timeout": "Das Ergebnis ist nach zwei Minuten nicht eingetroffen. Bitte die Testanmeldung erneut starten.",
         "subject": "Kennung",
-        "attributesHeading": "Vom Anmeldedienst übermittelte Werte"
+        "attributesHeading": "Vom Anmeldedienst übermittelte Werte",
+        "useForPreview": "Werte für die Vorschau übernehmen"
       },
       "plan": {
         "rejected": "Die Anmeldung würde abgelehnt:",
@@ -3995,7 +3996,7 @@
             },
             "allowed_tenant_ids": {
               "label": "Erlaubte Microsoft-Mandanten-IDs",
-              "help": "Nur für Microsoft Entra mit der mandantenübergreifenden Adresse (common/organizations): nur Anmeldungen aus diesen Mandanten. Leer = jeder Mandant."
+              "help": "Nur für Microsoft Entra mit der mandantenübergreifenden Adresse (common/organizations): nur Anmeldungen aus diesen Mandanten. Leer = jede Organisation (Mandant). Bei Zuordnung über den Anmeldenamen die eigene Mandanten-ID eintragen."
             }
           }
         },
@@ -4108,6 +4109,103 @@
               "help": "Nur nötig, wenn das Zertifikat des Verzeichnisses von Ihrer eigenen Zertifizierungsstelle stammt."
             }
           }
+        }
+      },
+      "ldap": {
+        "tlsWarning": "Achtung: Das Zertifikat des Verzeichnisservers wird nicht geprüft. Ein Angreifer im Netz könnte Anmeldedaten mitlesen oder sich als Verzeichnis ausgeben. Schalten Sie die Prüfung nur für ein Testverzeichnis aus.",
+        "tlsWarningEnv": "Achtung: Das Zertifikat des Verzeichnisservers wird nicht geprüft. Ein Angreifer im Netz könnte Anmeldedaten mitlesen oder sich als Verzeichnis ausgeben. Die Einstellung kommt aus der Umgebung: TIQORA_LDAP_TLS_VERIFY=true setzen (beim Kundenverzeichnis TIQORA_CUSTOMER_LDAP_TLS_VERIFY=true)."
+      },
+      "mapping": {
+        "fieldsHeading": "Welche Werte füllen welches Feld?",
+        "fieldsHelp": "Tragen Sie ein, aus welchen Angaben des Anmeldedienstes das Feld gefüllt wird. Der erste Wert mit Inhalt gilt. Mit einem Unterstrich davor (_Beispiel) setzen Sie einen festen Text.",
+        "sourcePlaceholder": "Angabe des Anmeldedienstes",
+        "field": {
+          "login": "Anmeldename",
+          "email": "E-Mail",
+          "first_name": "Vorname",
+          "last_name": "Nachname",
+          "customer_id": "Kundennummer",
+          "mobile": "Mobilnummer"
+        },
+        "matchBy": "Anmeldung zuordnen über",
+        "matchByOption": {
+          "login": "Anmeldename",
+          "email": "E-Mail"
+        },
+        "matchByHelp": "Damit wird das passende Benutzerkonto gefunden, wenn noch keine Verknüpfung besteht.",
+        "emailUntrustedWarning": "Achtung: Die E-Mail-Adresse muss beim Anmeldedienst nicht bestätigt sein. Wer dort fremde Adressen eintragen kann, könnte sich in fremde Konten anmelden. Schalten Sie auf dem Reiter „Verbindung“ „E-Mail-Adresse muss bestätigt sein“ ein oder ordnen Sie über den Anmeldenamen zu.",
+        "entraEmailWarning": "Hinweis: Bei Microsoft Entra kann die E-Mail-Adresse eines Kontos geändert werden und gilt nicht als sichere Kennung. Besser über den Anmeldenamen zuordnen und die erlaubten Mandanten-IDs eintragen.",
+        "jit": "Beim ersten Anmelden automatisch anlegen",
+        "jitHelp": "Ist ein Benutzer noch nicht bekannt, wird beim ersten Anmelden ein Konto angelegt. Sonst werden unbekannte Benutzer abgewiesen.",
+        "allowedDomains": "Erlaubte E-Mail-Domains",
+        "allowedDomainsHelp": "Nur Benutzer mit einer E-Mail-Adresse aus diesen Domains (z. B. example.org) erhalten automatisch ein Konto.",
+        "noDomainWarning": "Achtung: Ohne Domain-Einschränkung kann sich jeder, der sich bei diesem Anmeldedienst anmelden kann, ein Konto anlegen lassen, egal mit welcher E-Mail-Domain. Tragen Sie die Domains Ihrer Organisation ein.",
+        "initialRoles": "Rollen für neue Konten (Agenten)",
+        "initialGroups": "Gruppenrechte für neue Konten (Agenten)",
+        "fixedCustomerId": "Feste Kundennummer für neue Kunden",
+        "fixedCustomerIdHelp": "Wird verwendet, wenn der Anmeldedienst keine Kundennummer übermittelt.",
+        "updateProfile": "Namen und E-Mail bei jeder Anmeldung aktualisieren",
+        "previewHeading": "Vorschau",
+        "previewEmpty": "Starten Sie eine Testanmeldung und wählen Sie „Werte für die Vorschau übernehmen“. Dann sehen Sie hier sofort, was bei einer Anmeldung mit diesen Werten passieren würde, auch für ungespeicherte Änderungen.",
+        "previewHelp": "So würde eine Anmeldung mit den Werten der letzten Testanmeldung ablaufen, einschließlich Ihrer ungespeicherten Änderungen.",
+        "previewError": "Die Vorschau konnte nicht berechnet werden."
+      },
+      "roles": {
+        "rulesHeading": "Regeln",
+        "rulesHelp": "Wenn ein Wert des Anmeldedienstes passt, erhält der Benutzer die gewählten Rollen und Gruppenrechte.",
+        "rulesEmpty": "Noch keine Regel angelegt.",
+        "attribute": "Angabe des Anmeldedienstes",
+        "value": "Wert",
+        "roles": "Rollen",
+        "groups": "Gruppen",
+        "addGroup": "Gruppe hinzufügen",
+        "removeGroup": "{{name}} entfernen",
+        "removeRule": "Regel entfernen",
+        "addRule": "Regel hinzufügen",
+        "perm": {
+          "ro": "Lesen (ro)",
+          "move_into": "Verschieben in (move_into)",
+          "create": "Anlegen (create)",
+          "note": "Notiz (note)",
+          "owner": "Besitzer (owner)",
+          "priority": "Priorität (priority)",
+          "rw": "Alle Rechte (rw)"
+        },
+        "rwHint": "rw enthält alle Rechte.",
+        "ldapGroupDn": "Mitglied der LDAP-Gruppe (DN)",
+        "syncHeading": "Wie werden Rollen und Gruppen abgeglichen?",
+        "sync": {
+          "managed": "Nur selbst vergebene Zuordnungen pflegen (empfohlen)",
+          "managedHelp": "Es werden nur Zuordnungen entfernt, die eine Regel hier selbst vergeben hat. Von Hand vergebene Rollen und Gruppen bleiben.",
+          "authoritative": "Wie Znuny: alle Rollen und Gruppen ersetzen",
+          "authoritativeHelp": "Bei jeder Anmeldung gelten genau die Rollen und Gruppen aus den Regeln. Alles andere, auch von Hand Vergebenes, wird entfernt."
+        },
+        "managedHeading": "Verwaltete Zuordnungen",
+        "managedHelp": "Rollen und Gruppenrechte, die durch eine Regel vergeben wurden.",
+        "managedEmpty": "Noch keine Zuordnung durch eine Regel vergeben.",
+        "managedError": "Die verwalteten Zuordnungen konnten nicht geladen werden.",
+        "managedAccount": "Konto",
+        "managedAssignment": "Zuordnung",
+        "managedSince": "Seit",
+        "managedRole": "Rolle {{name}}",
+        "managedGroup": "Gruppe {{name}} ({{permission}})"
+      },
+      "links": {
+        "intro": "Diese Konten haben sich über diesen Anmeldedienst angemeldet. Wird eine Verknüpfung gelöst, wird das Konto beim nächsten Anmelden neu zugeordnet.",
+        "empty": "Noch hat sich niemand über diesen Anmeldedienst angemeldet.",
+        "loadError": "Die Verknüpfungen konnten nicht geladen werden.",
+        "removeTitle": "Verknüpfung lösen?",
+        "removeBody": "Die Verknüpfung von „{{login}}“ mit diesem Anmeldedienst wird gelöst. Das Benutzerkonto bleibt erhalten und wird bei der nächsten Anmeldung neu zugeordnet.",
+        "remove": "Verknüpfung lösen",
+        "removeError": "Die Verknüpfung konnte nicht gelöst werden.",
+        "account": "Konto",
+        "kind": "Art",
+        "subject": "Kennung beim Anmeldedienst",
+        "firstSeen": "Zuerst gesehen",
+        "lastSeen": "Zuletzt gesehen",
+        "kinds": {
+          "agent": "Agent",
+          "customer": "Kunde"
         }
       }
     }
