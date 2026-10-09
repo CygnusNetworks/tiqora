@@ -165,39 +165,3 @@ def test_actor_agent_and_customer() -> None:
     assert cust.customer_user_login == "c@example.org"
     assert cust.customer_id == "ACME"
     assert cust.frontend_action == "CustomerTicketProcess"
-
-
-def test_customer_on_existing_ticket_also_skips_service_sla_queue() -> None:
-    dialog = ActivityDialogConfig.from_yaml("""
-FieldOrder: [Title, Queue, Service, SLA, Owner, State]
-Fields:
-  Title: {Display: '1'}
-  Queue: {Display: '2'}
-  Service: {Display: '1'}
-  SLA: {Display: '1'}
-  Owner: {Display: '1'}
-  State: {Display: '1'}
-Interface: [AgentInterface, CustomerInterface]
-""")
-    # CustomerTicketProcess.pm:75-82
-    assert visible_fields(dialog, "CustomerInterface") == [
-        "Title",
-        "Queue",
-        "Service",
-        "SLA",
-        "State",
-    ]
-    assert visible_fields(dialog, "CustomerInterface", has_ticket=True) == ["Title", "State"]
-    assert visible_fields(dialog, "AgentInterface", has_ticket=True) == [
-        "Title",
-        "Queue",
-        "Service",
-        "SLA",
-        "Owner",
-        "State",
-    ]
-    assert missing_required_fields(dialog, {}, "CustomerInterface") == ["Queue"]
-    assert missing_required_fields(dialog, {}, "CustomerInterface", has_ticket=True) == []
-    assert effective_field_values(
-        dialog, {"Queue": "3", "Title": "x"}, "CustomerInterface", has_ticket=True
-    ) == {"Title": "x"}

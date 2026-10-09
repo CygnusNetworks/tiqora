@@ -36,8 +36,6 @@ FIELD_ALIASES: dict[str, str] = {
 TICKET_REQUIRED_FIELDS = ("Queue", "State", "Lock", "Priority")
 # CustomerTicketProcess.pm:75
 CUSTOMER_SKIP_FIELDS = frozenset({"Owner", "Responsible", "Lock", "PendingTime", "CustomerID"})
-# CustomerTicketProcess.pm:78-82: on an EXISTING ticket these are skipped as well.
-CUSTOMER_TICKET_SKIP_FIELDS = frozenset({"Service", "SLA", "Queue"})
 
 # Sub-fields of the pseudo-field "Article" that a user may submit; everything else about the
 # article (sender, visibility, channel) comes from the dialog config (:5686-5687).
@@ -45,7 +43,6 @@ _ARTICLE_INPUT_KEYS = ("Subject", "Body")
 
 __all__ = [
     "CUSTOMER_SKIP_FIELDS",
-    "CUSTOMER_TICKET_SKIP_FIELDS",
     "DISPLAY_HIDDEN",
     "DISPLAY_OPTIONAL",
     "DISPLAY_REQUIRED",
@@ -83,20 +80,15 @@ def field_config(dialog: ActivityDialogConfig, canonical_name: str) -> ActivityD
     return ActivityDialogFieldConfig()
 
 
-def _skipped(name: str, interface: Interface, has_ticket: bool = False) -> bool:
-    if interface != "CustomerInterface":
-        return False
-    return name in CUSTOMER_SKIP_FIELDS or (has_ticket and name in CUSTOMER_TICKET_SKIP_FIELDS)
+def _skipped(name: str, interface: Interface) -> bool:
+    return interface == "CustomerInterface" and name in CUSTOMER_SKIP_FIELDS
 
 
-def visible_fields(
-    dialog: ActivityDialogConfig, interface: Interface, *, has_ticket: bool = False
-) -> list[str]:
-    """Fields shown to *interface*; ``has_ticket`` = the dialog runs on an existing ticket."""
+def visible_fields(dialog: ActivityDialogConfig, interface: Interface) -> list[str]:
     return [
         name
         for name in dialog_field_order(dialog)
-        if not field_config(dialog, name).hidden and not _skipped(name, interface, has_ticket)
+        if not field_config(dialog, name).hidden and not _skipped(name, interface)
     ]
 
 
@@ -118,11 +110,7 @@ def _has_default(value: Any) -> bool:
 
 
 def effective_field_values(
-    dialog: ActivityDialogConfig,
-    submitted: Mapping[str, Any],
-    interface: Interface,
-    *,
-    has_ticket: bool = False,
+    dialog: ActivityDialogConfig, submitted: Mapping[str, Any], interface: Interface
 ) -> dict[str, Any]:
     """What is actually applied: submitted values of visible fields, overridden by hidden defaults.
 
@@ -130,7 +118,7 @@ def effective_field_values(
     default is cleared) — ``AgentTicketProcess.pm:4916-4927``.
     """
     normalized = normalize_field_values(submitted)
-    visible = visible_fields(dialog, interface, has_ticket=has_ticket)
+    visible = visible_fields(dialog, interface)
     values: dict[str, Any] = {name: normalized[name] for name in visible if name in normalized}
     if "Article" in visible:
         for sub in _ARTICLE_INPUT_KEYS:
@@ -138,7 +126,7 @@ def effective_field_values(
                 values[sub] = normalized[sub]
     for name in dialog_field_order(dialog):
         cfg = field_config(dialog, name)
-        if not cfg.hidden or _skipped(name, interface, has_ticket) or name == "Article":
+        if not cfg.hidden or _skipped(name, interface) or name == "Article":
             continue
         if _has_default(cfg.default_value):
             values[name] = cfg.default_value
@@ -158,11 +146,7 @@ def is_present(value: Any) -> bool:
 
 
 def missing_required_fields(
-    dialog: ActivityDialogConfig,
-    values: Mapping[str, Any],
-    interface: Interface,
-    *,
-    has_ticket: bool = False,
+    dialog: ActivityDialogConfig, values: Mapping[str, Any], interface: Interface
 ) -> list[str]:
     """Visible fields with ``Display: '2'`` that have no value.
 
@@ -170,7 +154,7 @@ def missing_required_fields(
     ``AgentTicketProcess.pm:5576``).
     """
     missing: list[str] = []
-    for name in visible_fields(dialog, interface, has_ticket=has_ticket):
+    for name in visible_fields(dialog, interface):
         if not field_config(dialog, name).required:
             continue
         if name == "Article":

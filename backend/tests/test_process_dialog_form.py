@@ -38,6 +38,8 @@ GROUP = 889020
 QUEUE_SUPPORT, QUEUE_JUNK = 889030, 889031
 Q_SUPPORT, Q_JUNK = "Support-889", "Junk-889"
 TICKET_1, TICKET_2 = 889040, 889041
+TICKET_FOREIGN_QUEUE, TICKET_FOREIGN_CUSTOMER = 889042, 889043
+GROUP_FOREIGN, QUEUE_FOREIGN = 889021, 889032
 DF_REGION, DF_REGISTRY, DF_NOTE, DF_MULTI, DF_FLAG, DF_DATE, DF_DATETIME = range(889050, 889057)
 CUSTOMER_ID_ROW = 889001
 CUSTOMER_LOGIN = "cu-889001"
@@ -241,13 +243,29 @@ def _seed(conn: Any) -> None:
         )
     conn.execute(
         text(
+            "INSERT INTO permission_groups (id, name, valid_id, create_time, create_by,"
+            " change_time, change_by) VALUES (:id, 'dialogform-889-foreign', 1, :t, 1, :t, 1)"
+        ),
+        {"id": GROUP_FOREIGN, "t": T0},
+    )
+    conn.execute(
+        text(
+            "INSERT INTO queue (id, name, group_id, system_address_id, salutation_id,"
+            " signature_id, follow_up_id, follow_up_lock, valid_id, create_time, create_by,"
+            " change_time, change_by)"
+            " VALUES (:id, 'Foreign-889', :g, 1, 1, 1, 1, 0, 1, :t, 1, :t, 1)"
+        ),
+        {"id": QUEUE_FOREIGN, "g": GROUP_FOREIGN, "t": T0},
+    )
+    conn.execute(
+        text(
             "INSERT INTO customer_user (id, login, email, customer_id, first_name, last_name,"
             " valid_id, create_time, create_by, change_time, change_by)"
             " VALUES (:id, :login, 'cu889@example.org', :cust, 'Cora', 'Cust', 1, :t, 1, :t, 1)"
         ),
         {"id": CUSTOMER_ID_ROW, "login": CUSTOMER_LOGIN, "cust": CUSTOMER_COMPANY, "t": T0},
     )
-    for tid in (TICKET_1, TICKET_2):
+    for tid in (TICKET_1, TICKET_2, TICKET_FOREIGN_QUEUE, TICKET_FOREIGN_CUSTOMER):
         conn.execute(
             text(
                 "INSERT INTO ticket (id, tn, title, queue_id, ticket_lock_id, type_id, user_id,"
@@ -261,10 +279,10 @@ def _seed(conn: Any) -> None:
             {
                 "id": tid,
                 "tn": f"2026030488{tid}",
-                "q": QUEUE_SUPPORT,
+                "q": QUEUE_FOREIGN if tid == TICKET_FOREIGN_QUEUE else QUEUE_SUPPORT,
                 "u": AGENT_A,
-                "cust": CUSTOMER_COMPANY,
-                "cu": CUSTOMER_LOGIN,
+                "cust": "other-co" if tid == TICKET_FOREIGN_CUSTOMER else CUSTOMER_COMPANY,
+                "cu": "someone-else" if tid == TICKET_FOREIGN_CUSTOMER else CUSTOMER_LOGIN,
                 "t": T0,
             },
         )
@@ -306,7 +324,16 @@ def _build(url: str, setup: Callable[[Any], None]) -> None:
     engine.dispose()
 
 
-def _add_acl(url: str, n: int, name: str, change: str, action: str = "AgentTicketProcess") -> None:
+def _add_acl(
+    url: str,
+    n: int,
+    name: str,
+    change: str,
+    action: str = "AgentTicketProcess",
+    process_props: str = "",
+) -> None:
+    """*process_props*: ``Properties: Process`` lines, e.g. ``ProcessEntityID: [Process-1]``."""
+    props = "".join(f"    {line}\n" for line in process_props.splitlines())
     engine = create_engine(url)
     with engine.begin() as conn:
         conn.execute(
@@ -318,7 +345,8 @@ def _add_acl(url: str, n: int, name: str, change: str, action: str = "AgentTicke
             {
                 "id": ACL_BASE + n,
                 "name": name,
-                "m": f"Properties:\n  Frontend:\n    Action: [{action}]\n",
+                "m": f"Properties:\n  Frontend:\n    Action: [{action}]\n"
+                + (f"  Process:\n{props}" if props else ""),
                 "c": change,
                 "t": T0,
             },
@@ -622,7 +650,7 @@ async def test_customer_form_skips_owner_and_filters_as_customer(
     ]
     fields = _by_name(form)
     queue_labels = _labels(fields["Queue"])
-    assert [q for q in queue_labels if q.endswith("-889")] == [Q_SUPPORT]
+    assert [q for q in queue_labels if q in (Q_JUNK, Q_SUPPORT)] == [Q_SUPPORT]
     # Znuny's system queues are not offered to customers.
     assert not {"Postmaster", "Raw", "Junk"} & set(queue_labels)
     assert [(o["value"], o["label"]) for o in fields["DynamicField_Region889"]["options"]] == [
@@ -677,10 +705,14 @@ async def test_ticket_dialog_form_agent_and_customer_skips(
     ]
     assert agent["process_entity_id"] == process_eid(1)
     assert agent["activity_dialog_entity_id"] == dialog_eid(2)
-    # CustomerTicketProcess.pm:75-82: on an existing ticket no Owner/Queue/Service/SLA.
+    # CustomerTicketProcess.pm:464/950/1506/3448: Owner is skipped, Queue/Service/SLA are not
+    # (the Run-scope $SkipFields with them is dead code), also on an existing ticket.
     customer = (await portal_client.get(PORTAL + url)).json()
     assert [(f["name"], f["kind"]) for f in customer["fields"]] == [
         ("Title", "text"),
+        ("Queue", "select"),
+        ("Service", "select"),
+        ("SLA", "select"),
         ("State", "select"),
     ]
     assert "open" in _labels(_by_name(customer)["State"])
@@ -758,3 +790,144 @@ async def test_start_form_uses_the_start_gates(
     # A Process ACL hides the form like the list.
     _add_acl(sync_url, 2, "hide-p3", f"PossibleNot:\n  Process: [{process_eid(3)}]\n")
     assert (await _start_form(client, AGENT, 3)).status_code == 409
+
+
+# --- process context of the option ACLs (AgentTicketProcess.pm:1103-1105, 2638, 4319) -----------
+
+
+def _queue_values(form: dict[str, Any]) -> list[str]:
+    return [
+        o["label"] for o in _by_name(form)["Queue"]["options"] if o["label"] in (Q_JUNK, Q_SUPPORT)
+    ]
+
+
+_HIDE_JUNK = f"PossibleNot:\n  Ticket:\n    Queue: [{Q_JUNK}]\n"
+
+
+@pytest.mark.db
+async def test_agent_option_acl_keyed_on_activity_dialog_id(
+    client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _two_dialogs)
+    await _enroll(client, AGENT, TICKET_1)
+    _add_acl(
+        sync_url,
+        1,
+        "dialog-2-no-junk",
+        _HIDE_JUNK,
+        process_props=f"ActivityDialogEntityID: [{dialog_eid(2)}]",
+    )
+    form = (await client.get(f"{AGENT}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")).json()
+    assert _queue_values(form) == [Q_SUPPORT]
+    # Another dialog's form is not affected (that one has no Queue field: use the start form of
+    # a process whose start dialog differs).
+    other = (await _start_form(client, AGENT, 1)).json()
+    assert [f["name"] for f in other["fields"]] == ["Title"]
+
+
+@pytest.mark.db
+async def test_agent_start_form_option_acl_keyed_on_process_and_activity(
+    client: AsyncClient, sync_url: str
+) -> None:
+    def setup(conn: Any) -> None:
+        _add_dialog(conn, 1, {"Queue": "Display: '1'"})
+        _add_process(conn, 1, start_dialog=1, dialogs=[1])
+        _add_dialog(conn, 2, {"Queue": "Display: '1'"})
+        _add_process(conn, 2, start_dialog=2, dialogs=[2])
+
+    _build(sync_url, setup)
+    assert _queue_values((await _start_form(client, AGENT, 1)).json()) == [Q_JUNK, Q_SUPPORT]
+    _add_acl(
+        sync_url,
+        1,
+        "p1-no-junk",
+        _HIDE_JUNK,
+        process_props=f"ProcessEntityID: [{process_eid(1)}]",
+    )
+    assert _queue_values((await _start_form(client, AGENT, 1)).json()) == [Q_SUPPORT]
+    assert _queue_values((await _start_form(client, AGENT, 2)).json()) == [Q_JUNK, Q_SUPPORT]
+    # The start activity is part of the context as well.
+    _add_acl(
+        sync_url,
+        2,
+        "p2-activity-no-support",
+        "PossibleNot:\n  Ticket:\n    Queue: [Support-889]\n",
+        process_props=f"ActivityEntityID: [Activity-{889300 + 4}]",
+    )
+    assert _queue_values((await _start_form(client, AGENT, 2)).json()) == [Q_JUNK]
+    assert _queue_values((await _start_form(client, AGENT, 1)).json()) == [Q_SUPPORT]
+
+
+@pytest.mark.db
+async def test_customer_option_acl_keyed_on_process_context(
+    portal_client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _two_dialogs)
+    _add_acl(
+        sync_url,
+        1,
+        "customer-p1-no-junk",
+        _HIDE_JUNK,
+        action="CustomerTicketProcess",
+        process_props=f"ProcessEntityID: [{process_eid(1)}]\nActivityDialogEntityID: "
+        f"[{dialog_eid(1)}]\nActivityEntityID: [Activity-{889302}]",
+    )
+    start = (await _start_form(portal_client, PORTAL)).json()
+    assert [f["name"] for f in start["fields"]] == ["Title"]  # dialog 1 has no Queue: see below
+    await _enroll(portal_client, PORTAL, TICKET_1)
+    queue = (
+        await portal_client.get(f"{PORTAL}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")
+    ).json()
+    # Dialog 2 differs from the ACL's ActivityDialogEntityID: the ACL must NOT match ...
+    assert _queue_values(queue) == [Q_JUNK, Q_SUPPORT]
+
+
+@pytest.mark.db
+async def test_customer_option_acl_matches_on_dialog_id(
+    portal_client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _two_dialogs)
+    await _enroll(portal_client, PORTAL, TICKET_1)
+    _add_acl(
+        sync_url,
+        1,
+        "customer-d2-no-junk",
+        _HIDE_JUNK,
+        action="CustomerTicketProcess",
+        process_props=f"ProcessEntityID: [{process_eid(1)}]\n"
+        f"ActivityDialogEntityID: [{dialog_eid(2)}]",
+    )
+    queue = (
+        await portal_client.get(f"{PORTAL}/ticket/{TICKET_1}/dialog/{dialog_eid(2)}/form")
+    ).json()
+    assert _queue_values(queue) == [Q_SUPPORT]
+
+
+# --- foreign / inaccessible tickets -----------------------------------------------------------
+
+
+@pytest.mark.db
+async def test_dialog_form_on_foreign_tickets_is_refused(
+    client: AsyncClient, portal_client: AsyncClient, sync_url: str
+) -> None:
+    _build(sync_url, _two_dialogs)
+    d = dialog_eid(1)
+    # Agent A has no group on the foreign queue; the 404 is for a missing ticket.
+    assert (
+        await client.get(f"{AGENT}/ticket/{TICKET_FOREIGN_QUEUE}/dialog/{d}/form")
+    ).status_code == 403
+    assert (
+        await client.get(
+            f"{AGENT}/{process_eid(1)}/start-form", params={"ticket_id": TICKET_FOREIGN_QUEUE}
+        )
+    ).status_code == 403
+    # Customer: a ticket of another customer.
+    assert (
+        await portal_client.get(f"{PORTAL}/ticket/{TICKET_FOREIGN_CUSTOMER}/dialog/{d}/form")
+    ).status_code == 403
+    assert (
+        await portal_client.get(
+            f"{PORTAL}/{process_eid(1)}/start-form", params={"ticket_id": TICKET_FOREIGN_CUSTOMER}
+        )
+    ).status_code == 403
+    assert (await portal_client.get(f"{PORTAL}/ticket/889999/dialog/{d}/form")).status_code == 404

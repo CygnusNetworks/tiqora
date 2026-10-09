@@ -896,6 +896,7 @@ async def filter_id_name_map(
     checks: dict[str, Any] | None = None,
     customer_user_id: str | None = None,
     return_type: str = "Ticket",
+    process: Mapping[str, str] | None = None,
     sysconfig: SysConfig | None = None,
 ) -> dict[int, str]:
     """Convenience wrapper: filter an id→name map for a Ticket return subtype."""
@@ -913,6 +914,7 @@ async def filter_id_name_map(
         action=action,
         checks=checks,
         customer_user_id=customer_user_id,
+        process=process,
         sysconfig=sysconfig,
     )
     out: dict[int, str] = {}

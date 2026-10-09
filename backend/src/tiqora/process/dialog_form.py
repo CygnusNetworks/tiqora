@@ -259,8 +259,10 @@ async def _agent_options(
     ticket_id: int | None,
     dialog_fields: Mapping[str, ActivityDialogFieldConfig],
     dynamic_fields: Mapping[str, DynamicField],
+    process: Mapping[str, str],
 ) -> dict[str, list[ProcessDialogOptionOut]]:
-    """Options by *dialog field name*, from the wave-0 ACL-filtered source."""
+    """Options by *dialog field name*, from the wave-0 ACL-filtered source (with the process
+    context, like AgentTicketProcess.pm:4319 passing ``%{$Param{GetParam}}``)."""
     requested: dict[str, str] = {}  # option-source key -> dialog field name
     for name in names:
         if name in _ATTRIBUTE_KEY:
@@ -281,6 +283,7 @@ async def _agent_options(
                     action="AgentTicketProcess", ticket_id=ticket_id, queue_id=queue_id
                 ),
             ),
+            process=process,
         )
         for key, options in collected.options.items():
             out[requested[key]] = [
@@ -326,18 +329,27 @@ async def build_dialog_form(
     graph: ProcessGraph,
     dialog: ActivityDialogNode,
     ticket_id: int | None,
+    activity_entity_id: str | None = None,
 ) -> ProcessDialogFormOut:
-    """The form for *dialog*. *user* is the agent for agent routes and ``None`` for customers;
-    availability (state, interface, permission, ACLs) is the caller's job
-    (:func:`build_start_form` / :func:`build_ticket_dialog_form`)."""
+    """The form for *dialog*.
+
+    *activity_entity_id* is the ticket's current activity, or the start activity of a start form
+    (the ``ActivityEntityID`` of the ACL process context). *user* is the agent for agent routes
+    and ``None`` for customers. Availability (state, interface, permission, ACLs) is the
+    caller's job (:func:`build_start_form` / :func:`build_ticket_dialog_form`)."""
     agent = actor.interface == "AgentInterface"
     if agent and user is None:
         raise ValueError("agent forms need the AuthenticatedUser")
     config = dialog.config
-    visible = visible_fields(config, actor.interface, has_ticket=ticket_id is not None)
+    visible = visible_fields(config, actor.interface)
     names = _customer_field_names(visible, agent)
     dynamic_fields = await _load_dynamic_fields(session, names)
     dialog_fields = {name: field_config(config, name) for name in names}
+    process_context = {
+        "ProcessEntityID": graph.entity_id,
+        "ActivityEntityID": activity_entity_id or "",
+        "ActivityDialogEntityID": dialog.entity_id,
+    }
 
     if agent:
         assert user is not None
@@ -348,6 +360,7 @@ async def build_dialog_form(
             ticket_id=ticket_id,
             dialog_fields=dialog_fields,
             dynamic_fields=dynamic_fields,
+            process=process_context,
         )
     else:
         wanted = [_ATTRIBUTE_KEY[n] for n in names if n in _ATTRIBUTE_KEY]
@@ -357,10 +370,7 @@ async def build_dialog_form(
             actor,
             wanted,
             ticket_id,
-            process={
-                "ProcessEntityID": graph.entity_id,
-                "ActivityDialogEntityID": dialog.entity_id,
-            },
+            process=process_context,
             dynamic_fields=dynamic_fields,
         )
         options = {
@@ -433,7 +443,13 @@ async def build_start_form(
     if dialog is None:  # assert_can_start already demanded it; a race with a redeploy
         raise ProcessNotFound(process_entity_id)
     return await build_dialog_form(
-        session, actor=actor, user=user, graph=graph, dialog=dialog, ticket_id=ticket_id
+        session,
+        actor=actor,
+        user=user,
+        graph=graph,
+        dialog=dialog,
+        ticket_id=ticket_id,
+        activity_entity_id=graph.config.start_activity,
     )
 
 
@@ -465,4 +481,5 @@ async def build_ticket_dialog_form(
         graph=candidates.process,
         dialog=dialog,
         ticket_id=ticket_id,
+        activity_entity_id=candidates.activity_entity_id,
     )

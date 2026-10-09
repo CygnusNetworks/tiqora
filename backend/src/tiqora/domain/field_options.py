@@ -7,6 +7,7 @@ reuse them without an import cycle (``reference.py`` re-imports them).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -186,8 +187,14 @@ async def collect_ticket_field_options(
     state_id: int | None = None,
     priority_id: int | None = None,
     sla_id: int | None = None,
+    process: Mapping[str, str] | None = None,
 ) -> TicketFieldOptionsOut:
-    """Load base maps, apply Ticket ACL, then Ticket Attribute Relations."""
+    """Load base maps, apply Ticket ACL, then Ticket Attribute Relations.
+
+    *process*: ``ProcessEntityID`` / ``ActivityDialogEntityID`` / ``ActivityEntityID`` of the
+    process dialog the lists are built for (live ``Process`` ACL checks,
+    ``TicketACL.pm:1118-1146``).
+    """
     from tiqora.domain.ticket_acl import filter_id_name_map
     from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
 
@@ -217,6 +224,7 @@ async def collect_ticket_field_options(
             ticket_id=ticket_id,
             action=action,
             checks=checks,
+            process=process,
             sysconfig=sysconfig,
         )
         acl_maps[field] = filtered
@@ -272,14 +280,20 @@ def _sorted_options(items: dict[str, str]) -> list[FieldOptionOut]:
 
 
 async def collect_field_options(
-    session: AsyncSession, user: AuthenticatedUser, req: FieldOptionsRequest
+    session: AsyncSession,
+    user: AuthenticatedUser,
+    req: FieldOptionsRequest,
+    *,
+    process: Mapping[str, str] | None = None,
 ) -> FieldOptionsOut:
     """Options for attribute and dynamic fields, filtered by Ticket ACLs.
 
     With ``context.ticket_id`` the ticket must be readable
     (:class:`~tiqora.domain.ticket_service.TicketNotFound` /
     :class:`~tiqora.domain.ticket_service.TicketAccessDenied` propagate); its
-    attributes are the default ACL context, explicit ``context`` ids override.
+    attributes are the default ACL context, explicit ``context`` ids override. *process*
+    (not part of the API request) carries the process ids of an activity dialog form
+    (``AgentTicketProcess.pm:1103-1105, 2638, 4319``).
     """
     from tiqora.domain.dynamic_field_config import config_from_yaml
 
@@ -308,6 +322,7 @@ async def collect_field_options(
             fields=attr_requested,
             ticket_id=ctx.ticket_id,
             action=ctx.action,
+            process=process,
             **ids,
         )
         attribute_maps = {f: getattr(collected, f) for f in attr_requested}
@@ -372,6 +387,7 @@ async def collect_field_options(
             action=ctx.action,
             checks=checks,
             customer_user_id=ctx.customer_user_id,
+            process=process,
         )
         options[requested] = _sorted_options({k: labels[k] for k in filtered if k in labels})
     return FieldOptionsOut(options=options)
