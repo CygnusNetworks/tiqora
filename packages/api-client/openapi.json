@@ -24711,6 +24711,23 @@
         "title": "TemplateOut",
         "type": "object"
       },
+      "TicketAclActionsOut": {
+        "description": "Zoom menu entries the ticket's ACLs leave available (in ``ZOOM_ACTIONS`` order).",
+        "properties": {
+          "allowed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "allowed"
+        ],
+        "title": "TicketAclActionsOut",
+        "type": "object"
+      },
       "TicketAttributeRelationCreate": {
         "properties": {
           "acl_data": {
@@ -25602,6 +25619,14 @@
       "TicketFieldOptionsOut": {
         "description": "ACL-filtered id\u2192name maps (string keys for JSON).\n\nOnly requested fields are populated; others are omitted (empty dict).",
         "properties": {
+          "owner": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Owner",
+            "type": "object"
+          },
           "priority": {
             "additionalProperties": {
               "type": "string"
@@ -25616,6 +25641,14 @@
             },
             "default": {},
             "title": "Queue",
+            "type": "object"
+          },
+          "responsible": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Responsible",
             "type": "object"
           },
           "service": {
@@ -69983,6 +70016,81 @@
           }
         },
         "summary": "Patch Ticket",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/acl-actions": {
+      "get": {
+        "description": "Zoom menu actions left after ``Action`` ACLs (Znuny ``AgentTicketZoom`` menu).\n\nSame access rule as ``GET /tickets/{id}`` (``ro`` on the ticket's queue).",
+        "operationId": "ticket_acl_actions_api_v1_tickets__ticket_id__acl_actions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketAclActionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ticket Acl Actions",
         "tags": [
           "tickets"
         ]

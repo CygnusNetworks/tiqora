@@ -185,6 +185,8 @@ describe("TicketHeaderActions", () => {
       service: {},
       sla: {},
       queue: {},
+      owner: {},
+      responsible: {},
     });
     listArticles.mockReset().mockResolvedValue([
       {

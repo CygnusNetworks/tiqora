@@ -3299,6 +3299,8 @@ export class ApiClient {
       type: Record<string, string>;
       service: Record<string, string>;
       sla: Record<string, string>;
+      owner: Record<string, string>;
+      responsible: Record<string, string>;
     }>("GET", "/api/v1/reference/ticket-field-options", {
       query: {
         fields: params?.fields,

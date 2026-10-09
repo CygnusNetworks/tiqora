@@ -9,8 +9,8 @@ what :func:`build_dialog_form` returns (plan D9). Znuny references: ``AgentTicke
 Option sources:
 
 * agents -- wave-0 :func:`tiqora.domain.field_options.collect_field_options`, so the dialog
-  filters exactly like the zoom pickers (``Owner``/``Responsible`` are all valid agents until
-  Task 15 moves them into the ACL-filtered option source),
+  filters exactly like the zoom pickers (``Owner``/``Responsible`` are ``{id: login}`` lists
+  with ``ReturnSubType`` ``Owner``/``Responsible``, labels are the full names),
 * customers -- :func:`collect_customer_field_options` (same tables, customer principal,
   ``Action => CustomerTicketProcess``).
 
@@ -32,18 +32,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, ServiceCustomerUser, ServiceSla, Sla
 from tiqora.db.legacy.ticket import Ticket
-from tiqora.db.legacy.user import Users
 from tiqora.domain.dynamic_field_config import config_from_yaml
 from tiqora.domain.field_options import (
-    _FIELD_TO_SUBTYPE,  # noqa: PLC2701 -- deliberate reuse
-    _VALID,  # noqa: PLC2701 -- deliberate reuse
+    AGENT_OPTION_FIELDS,
     ATTRIBUTE_OPTION_FIELDS,
     DF_OPTION_PREFIX,
+    FIELD_TO_SUBTYPE,
+    VALID_ID,
     FieldOptionsContext,
     FieldOptionsRequest,
-    _base_field_maps,  # noqa: PLC2701 -- deliberate reuse
-    _sorted_options,  # noqa: PLC2701 -- deliberate reuse
+    base_field_maps,
     collect_field_options,
+    sorted_options,
     ticket_acl_context,
 )
 from tiqora.domain.ticket_acl import apply_ticket_acl
@@ -88,6 +88,8 @@ _ATTRIBUTE_KEY = {
     "Type": "type",
     "Service": "service",
     "SLA": "sla",
+    "Owner": "owner",
+    "Responsible": "responsible",
 }
 _AGENT_PICKERS = frozenset({"Owner", "Responsible"})
 _DF_KINDS: dict[str, FieldKind] = {
@@ -115,7 +117,7 @@ async def _load_dynamic_fields(
             await session.execute(
                 select(DynamicField).where(
                     DynamicField.name.in_(names),
-                    DynamicField.valid_id == _VALID,
+                    DynamicField.valid_id == VALID_ID,
                     DynamicField.object_type == "Ticket",
                 )
             )
@@ -163,7 +165,7 @@ async def customer_service_map(
     the ``<DEFAULT>`` services), without children of invalid services unless
     ``Ticket::Service::KeepChildren`` (``Service.pm:188-205``)."""
     all_rows = (await session.execute(select(Service.id, Service.name, Service.valid_id))).all()
-    valid_ids = {int(r[0]) for r in all_rows if r[2] == _VALID}
+    valid_ids = {int(r[0]) for r in all_rows if r[2] == VALID_ID}
 
     async def member_ids(who: str) -> set[int]:
         rows = await session.execute(
@@ -178,7 +180,7 @@ async def customer_service_map(
         ids = await member_ids("<DEFAULT>")
     if not ids:
         return {}
-    invalid_names = [r[1] for r in all_rows if r[2] != _VALID]
+    invalid_names = [r[1] for r in all_rows if r[2] != VALID_ID]
     keep_children = str(await sysconfig.get("Ticket::Service::KeepChildren", 0)) in (
         "1",
         "True",
@@ -203,7 +205,7 @@ async def _customer_slas(session: AsyncSession, services: Mapping[int, str]) -> 
         await session.execute(
             select(Sla.id, Sla.name)
             .join(ServiceSla, ServiceSla.sla_id == Sla.id)
-            .where(ServiceSla.service_id.in_(sorted(services)), Sla.valid_id == _VALID)
+            .where(ServiceSla.service_id.in_(sorted(services)), Sla.valid_id == VALID_ID)
             .order_by(Sla.name)
         )
     ).all()
@@ -255,8 +257,8 @@ async def collect_customer_field_options(
     sysconfig = SysConfig(session)
     out: dict[str, list[ProcessDialogOptionOut]] = {}
 
-    attrs = {f for f in fields if f in ATTRIBUTE_OPTION_FIELDS}
-    base = await _base_field_maps(session, None, attrs - {"queue", "service", "sla"})
+    attrs = {f for f in fields if f in ATTRIBUTE_OPTION_FIELDS and f not in AGENT_OPTION_FIELDS}
+    base = await base_field_maps(session, None, attrs - {"queue", "service", "sla"})
     if "queue" in attrs:
         base["queue"] = await _customer_queues(session, actor, sysconfig)
     if attrs & {"service", "sla"}:
@@ -275,7 +277,7 @@ async def collect_customer_field_options(
             customer_user_login=login,
             data=dict(mapping),
             return_type="Ticket",
-            return_sub_type=_FIELD_TO_SUBTYPE[field],
+            return_sub_type=FIELD_TO_SUBTYPE[field],
             ticket_id=ticket_id,
             action=actor.frontend_action,
             process=process,
@@ -324,21 +326,9 @@ async def collect_customer_field_options(
         )
         out[name] = [
             ProcessDialogOptionOut(value=o.value, label=o.label)
-            for o in _sorted_options({k: labels[k] for k in kept if k in labels})
+            for o in sorted_options({k: labels[k] for k in kept if k in labels})
         ]
     return out
-
-
-async def _agent_picker_options(session: AsyncSession) -> list[ProcessDialogOptionOut]:
-    """``{id: full name}`` of the valid agents, unfiltered until Task 15 (owner/responsible
-    join the ACL-filtered option source)."""
-    rows = (
-        await session.execute(select(Users).where(Users.valid_id == _VALID).order_by(Users.login))
-    ).scalars()
-    return [
-        ProcessDialogOptionOut(value=str(u.id), label=f"{u.first_name} {u.last_name}".strip())
-        for u in rows
-    ]
 
 
 async def _default_queue_id(session: AsyncSession, default: Any) -> int | None:
@@ -349,7 +339,9 @@ async def _default_queue_id(session: AsyncSession, default: Any) -> int | None:
     if text.isdecimal():
         return int(text)
     row = (
-        await session.execute(select(Queue.id).where(Queue.name == text, Queue.valid_id == _VALID))
+        await session.execute(
+            select(Queue.id).where(Queue.name == text, Queue.valid_id == VALID_ID)
+        )
     ).scalar_one_or_none()
     return int(row) if row is not None else None
 
@@ -392,11 +384,6 @@ async def _agent_options(
             out[requested[key]] = [
                 ProcessDialogOptionOut(value=o.value, label=o.label) for o in options
             ]
-    if any(n in _AGENT_PICKERS for n in names):
-        agents = await _agent_picker_options(session)
-        for name in names:
-            if name in _AGENT_PICKERS:
-                out[name] = list(agents)
     return out
 
 

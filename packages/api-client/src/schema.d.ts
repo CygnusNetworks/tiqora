@@ -6979,6 +6979,28 @@ export interface paths {
         patch: operations["patch_ticket_api_v1_tickets__ticket_id__patch"];
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/acl-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ticket Acl Actions
+         * @description Zoom menu actions left after ``Action`` ACLs (Znuny ``AgentTicketZoom`` menu).
+         *
+         *     Same access rule as ``GET /tickets/{id}`` (``ro`` on the ticket's queue).
+         */
+        get: operations["ticket_acl_actions_api_v1_tickets__ticket_id__acl_actions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/acquire-lock": {
         parameters: {
             query?: never;
@@ -16416,6 +16438,14 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * TicketAclActionsOut
+         * @description Zoom menu entries the ticket's ACLs leave available (in ``ZOOM_ACTIONS`` order).
+         */
+        TicketAclActionsOut: {
+            /** Allowed */
+            allowed: string[];
+        };
         /** TicketAttributeRelationCreate */
         TicketAttributeRelationCreate: {
             /**
@@ -16746,6 +16776,13 @@ export interface components {
          */
         TicketFieldOptionsOut: {
             /**
+             * Owner
+             * @default {}
+             */
+            owner: {
+                [key: string]: string;
+            };
+            /**
              * Priority
              * @default {}
              */
@@ -16757,6 +16794,13 @@ export interface components {
              * @default {}
              */
             queue: {
+                [key: string]: string;
+            };
+            /**
+             * Responsible
+             * @default {}
+             */
+            responsible: {
                 [key: string]: string;
             };
             /**
@@ -35762,6 +35806,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_acl_actions_api_v1_tickets__ticket_id__acl_actions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketAclActionsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

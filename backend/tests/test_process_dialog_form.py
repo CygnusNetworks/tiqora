@@ -931,3 +931,52 @@ async def test_dialog_form_on_foreign_tickets_is_refused(
         )
     ).status_code == 403
     assert (await portal_client.get(f"{PORTAL}/ticket/889999/dialog/{d}/form")).status_code == 404
+
+
+@pytest.mark.db
+async def test_owner_responsible_options_acl_filtered_with_process_context(
+    client: AsyncClient, sync_url: str
+) -> None:
+    def setup(conn: Any) -> None:
+        _add_dialog(conn, 1, {"Owner": "Display: '1'", "Responsible": "Display: '1'"})
+        _add_process(conn, 1, start_dialog=1, dialogs=[1])
+        _add_process(conn, 2, start_dialog=1, dialogs=[1])
+
+    _build(sync_url, setup)
+    login_a = _query_login(sync_url, AGENT_A)
+    # ReturnSubType Owner/Responsible, ACL data {id: login}; keyed on this process only.
+    _add_acl(
+        sync_url,
+        1,
+        "p1-owner-only-a",
+        f"Possible:\n  Ticket:\n    Owner: [{login_a}]\n",
+        process_props=f"ProcessEntityID: [{process_eid(1)}]",
+    )
+    _add_acl(
+        sync_url,
+        2,
+        "p1-responsible-not-a",
+        f"PossibleNot:\n  Ticket:\n    Responsible: [{login_a}]\n",
+        process_props=f"ProcessEntityID: [{process_eid(1)}]",
+    )
+    fields = _by_name((await _start_form(client, AGENT, 1)).json())
+    owners = {o["value"]: o["label"] for o in fields["Owner"]["options"]}
+    responsibles = {o["value"]: o["label"] for o in fields["Responsible"]["options"]}
+    assert owners == {str(AGENT_A): "Ada Agent889"}
+    assert str(AGENT_A) not in responsibles
+    assert responsibles[str(AGENT_B)] == "Bo Agent889"
+    other = _by_name((await _start_form(client, AGENT, 2)).json())
+    assert {o["value"] for o in other["Owner"]["options"]} >= {str(AGENT_A), str(AGENT_B)}
+
+
+def _query_login(url: str, user_id: int) -> str:
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            return str(
+                conn.execute(
+                    text("SELECT login FROM users WHERE id = :i"), {"i": user_id}
+                ).scalar_one()
+            )
+    finally:
+        engine.dispose()

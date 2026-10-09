@@ -56,6 +56,7 @@ from tiqora.domain.schemas import (
     as_naive_utc,
 )
 from tiqora.domain.search import SearchIndexService
+from tiqora.domain.ticket_action_acl import TicketAclActionsOut, allowed_ticket_actions
 from tiqora.domain.ticket_csv import CSV_HEADER, EchoWriter, ticket_csv_row
 from tiqora.domain.ticket_service import (
     TicketAccessDenied,
@@ -969,6 +970,25 @@ async def ticket_field_options(
         sla_id=getattr(detail, "sla_id", None),
     )
     return result.model_dump()
+
+
+@router.get("/{ticket_id}/acl-actions", response_model=TicketAclActionsOut)
+async def ticket_acl_actions(
+    ticket_id: int,
+    user: CurrentUser,
+    session: DbSession,
+) -> TicketAclActionsOut:
+    """Zoom menu actions left after ``Action`` ACLs (Znuny ``AgentTicketZoom`` menu).
+
+    Same access rule as ``GET /tickets/{id}`` (``ro`` on the ticket's queue).
+    """
+    try:
+        await TicketService(session).get_ticket(user.id, ticket_id)
+    except (TicketNotFound, TicketAccessDenied) as exc:
+        raise _map_exc(exc) from exc
+    return TicketAclActionsOut(
+        allowed=await allowed_ticket_actions(session, user_id=user.id, ticket_id=ticket_id)
+    )
 
 
 @router.get("/{ticket_id}/print", response_class=HTMLResponse)

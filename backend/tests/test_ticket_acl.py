@@ -377,3 +377,46 @@ async def test_revision_rule_carries_dump_sections_and_stop_flag(
         "PossibleAdd": {},
         "PossibleNot": {"Ticket": {"State": ["open"]}},
     }
+
+
+def test_possible_owner_and_responsible_subtypes_filter_login_maps() -> None:
+    # Znuny hands _GetOwners/_GetResponsibles to the ACL as {UserID => UserLogin}.
+    agents = {2: "agent-a", 3: "agent-b", 4: "agent-c"}
+    change = {
+        "Possible": {"Ticket": {"Owner": ["agent-a", "agent-b"]}},
+        "PossibleNot": {"Ticket": {"Responsible": ["agent-c"]}},
+    }
+    owners, owner_used = apply_possible_filters(
+        agents, dict(agents), change, return_type="Ticket", return_sub_type="Owner"
+    )
+    responsibles, resp_used = apply_possible_filters(
+        agents, dict(agents), change, return_type="Ticket", return_sub_type="Responsible"
+    )
+    assert owner_used and resp_used
+    assert owners == {2: "agent-a", 3: "agent-b"}
+    assert responsibles == {2: "agent-a", 3: "agent-b"}
+
+
+@pytest.mark.db
+async def test_owner_options_use_login_acl_and_full_name_labels(
+    acl_session: AsyncSession, mariadb_znuny_url: str
+) -> None:
+    from tiqora.domain.auth import AuthenticatedUser
+    from tiqora.domain.field_options import collect_ticket_field_options
+
+    engine = create_engine(mariadb_znuny_url)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE acl SET config_change = :c WHERE id = 881751"),
+            {"c": "PossibleNot:\n  Ticket:\n    Owner: [root@localhost]\n"},
+        )
+    engine.dispose()
+    user = AuthenticatedUser(
+        id=2, login="someone", first_name="Some", last_name="One", auth_method="session"
+    )
+    got = await collect_ticket_field_options(
+        acl_session, user, fields={"owner", "responsible"}, action="AgentTicketBulk"
+    )
+    assert "1" not in got.owner  # root@localhost removed by PossibleNot Owner
+    assert "1" in got.responsible  # the ACL names Owner only
+    assert got.responsible["1"].strip() != "root@localhost"

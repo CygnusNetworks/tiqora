@@ -17,25 +17,39 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
+from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.ticket_acl import apply_ticket_acl
 from tiqora.domain.ticket_service import TicketService
 from tiqora.permissions.engine import PermissionEngine
 
 # Znuny's "valid" list id -- 1 == valid, everything else is invalid/temporary.
-_VALID = 1
+VALID_ID = 1
 
-ATTRIBUTE_OPTION_FIELDS: tuple[str, ...] = ("state", "queue", "priority", "type", "service", "sla")
+ATTRIBUTE_OPTION_FIELDS: tuple[str, ...] = (
+    "state",
+    "queue",
+    "priority",
+    "type",
+    "service",
+    "sla",
+    "owner",
+    "responsible",
+)
+#: Agent pickers: ACL data is ``{user_id: login}``, the output labels are the full names.
+AGENT_OPTION_FIELDS: frozenset[str] = frozenset({"owner", "responsible"})
 DF_OPTION_PREFIX = "DynamicField_"
 _OPTION_DF_TYPES = frozenset({"Dropdown", "Multiselect"})
 
-_FIELD_TO_SUBTYPE: dict[str, str] = {
+FIELD_TO_SUBTYPE: dict[str, str] = {
     "state": "State",
     "queue": "Queue",
     "priority": "Priority",
     "type": "Type",
     "service": "Service",
     "sla": "SLA",
+    "owner": "Owner",
+    "responsible": "Responsible",
 }
 
 
@@ -51,9 +65,11 @@ class TicketFieldOptionsOut(BaseModel):
     type: dict[str, str] = {}
     service: dict[str, str] = {}
     sla: dict[str, str] = {}
+    owner: dict[str, str] = {}
+    responsible: dict[str, str] = {}
 
 
-async def _base_field_maps(
+async def base_field_maps(
     session: AsyncSession,
     user: AuthenticatedUser | None,
     fields: set[str],
@@ -70,7 +86,7 @@ async def _base_field_maps(
         rows = (
             await session.execute(
                 select(TicketState.id, TicketState.name)
-                .where(TicketState.valid_id == _VALID)
+                .where(TicketState.valid_id == VALID_ID)
                 .order_by(TicketState.id)
             )
         ).all()
@@ -79,7 +95,7 @@ async def _base_field_maps(
         rows = (
             await session.execute(
                 select(TicketPriority.id, TicketPriority.name)
-                .where(TicketPriority.valid_id == _VALID)
+                .where(TicketPriority.valid_id == VALID_ID)
                 .order_by(TicketPriority.id)
             )
         ).all()
@@ -88,7 +104,7 @@ async def _base_field_maps(
         rows = (
             await session.execute(
                 select(TicketType.id, TicketType.name)
-                .where(TicketType.valid_id == _VALID)
+                .where(TicketType.valid_id == VALID_ID)
                 .order_by(TicketType.name)
             )
         ).all()
@@ -97,7 +113,7 @@ async def _base_field_maps(
         rows = (
             await session.execute(
                 select(Service.id, Service.name)
-                .where(Service.valid_id == _VALID)
+                .where(Service.valid_id == VALID_ID)
                 .order_by(Service.name)
             )
         ).all()
@@ -105,10 +121,23 @@ async def _base_field_maps(
     if "sla" in fields:
         rows = (
             await session.execute(
-                select(Sla.id, Sla.name).where(Sla.valid_id == _VALID).order_by(Sla.name)
+                select(Sla.id, Sla.name).where(Sla.valid_id == VALID_ID).order_by(Sla.name)
             )
         ).all()
         out["sla"] = {int(r[0]): r[1] for r in rows}
+    if fields & AGENT_OPTION_FIELDS:
+        # Znuny _GetOwners/_GetResponsibles hand the ACL {UserID => UserLogin}
+        # (AgentTicketBulk.pm / AgentTicketOwner.pm); labels become full names later.
+        rows = (
+            await session.execute(
+                select(Users.id, Users.login)
+                .where(Users.valid_id == VALID_ID)
+                .order_by(Users.login)
+            )
+        ).all()
+        agents = {int(r[0]): r[1] for r in rows}
+        for field in AGENT_OPTION_FIELDS & fields:
+            out[field] = dict(agents)
     if "queue" in fields:
         if user is None:
             raise ValueError("queue options need an agent user")
@@ -120,13 +149,23 @@ async def _base_field_maps(
             rows = (
                 await session.execute(
                     select(Queue.id, Queue.name)
-                    .where(Queue.group_id.in_(group_ids), Queue.valid_id == _VALID)
+                    .where(Queue.group_id.in_(group_ids), Queue.valid_id == VALID_ID)
                     .order_by(Queue.name)
                 )
             ).all()
             out["queue"] = {int(r[0]): r[1] for r in rows}
     _ = queue_id  # reserved for form-side Queue checks when callers pass it
     return out
+
+
+async def _agent_full_names(session: AsyncSession, user_ids: set[int]) -> dict[int, str]:
+    """``{user_id: "First Last"}`` (the picker labels) for the surviving agents."""
+    rows = (
+        await session.execute(
+            select(Users.id, Users.first_name, Users.last_name).where(Users.id.in_(user_ids))
+        )
+    ).all()
+    return {int(r[0]): f"{r[1]} {r[2]}".strip() for r in rows}
 
 
 async def ticket_acl_context(
@@ -198,7 +237,7 @@ async def collect_ticket_field_options(
     from tiqora.domain.ticket_acl import filter_id_name_map
     from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
 
-    base = await _base_field_maps(session, user, fields, queue_id=queue_id)
+    base = await base_field_maps(session, user, fields, queue_id=queue_id)
     ticket_ctx = await ticket_acl_context(
         session,
         queue_id=queue_id,
@@ -215,7 +254,7 @@ async def collect_ticket_field_options(
     sysconfig = SysConfig(session)  # one reader for every field's ACL pass
     acl_maps: dict[str, dict[int, str]] = {}
     for field, mapping in base.items():
-        subtype = _FIELD_TO_SUBTYPE[field]
+        subtype = FIELD_TO_SUBTYPE[field]
         filtered = await filter_id_name_map(
             session,
             user_id=user.id,
@@ -233,6 +272,12 @@ async def collect_ticket_field_options(
         acl_maps = await apply_attribute_relations_to_field_maps(
             session, acl_maps, ticket_context=ticket_ctx
         )
+
+    agent_ids = {i for f in AGENT_OPTION_FIELDS for i in acl_maps.get(f, {})}
+    if agent_ids:
+        names = await _agent_full_names(session, agent_ids)
+        for field in AGENT_OPTION_FIELDS & acl_maps.keys():
+            acl_maps[field] = {i: names.get(i, login) for i, login in acl_maps[field].items()}
 
     result = TicketFieldOptionsOut()
     for field, mapping in acl_maps.items():
@@ -270,7 +315,7 @@ class FieldOptionsOut(BaseModel):
     options: dict[str, list[FieldOptionOut]]
 
 
-def _sorted_options(items: dict[str, str]) -> list[FieldOptionOut]:
+def sorted_options(items: dict[str, str]) -> list[FieldOptionOut]:
     # Znuny LayoutObject->BuildSelection default (no Sort option): values sorted
     # case-insensitively, `sort { lc $a cmp lc $b } values %List`
     # (Kernel/Output/HTML/Layout.pm, _BuildSelectionDataRefCreate, ~l. 5538).
@@ -340,7 +385,7 @@ async def collect_field_options(
                 await session.execute(
                     select(DynamicField).where(
                         DynamicField.name.in_(df_names),
-                        DynamicField.valid_id == _VALID,
+                        DynamicField.valid_id == VALID_ID,
                         DynamicField.object_type == "Ticket",
                         DynamicField.field_type.in_(sorted(_OPTION_DF_TYPES)),
                     )
@@ -389,5 +434,5 @@ async def collect_field_options(
             customer_user_id=ctx.customer_user_id,
             process=process,
         )
-        options[requested] = _sorted_options({k: labels[k] for k in filtered if k in labels})
+        options[requested] = sorted_options({k: labels[k] for k in filtered if k in labels})
     return FieldOptionsOut(options=options)
