@@ -214,11 +214,7 @@ async def customer_service_map(
     if not ids:
         return {}
     invalid_names = [r[1] for r in all_rows if r[2] != VALID_ID]
-    keep_children = str(await sysconfig.get("Ticket::Service::KeepChildren", 0)) in (
-        "1",
-        "True",
-        "true",
-    )
+    keep_children = await sysconfig.get_bool("Ticket::Service::KeepChildren")
     out: dict[int, str] = {}
     for sid, name, _valid in all_rows:
         if int(sid) not in ids:

@@ -542,8 +542,7 @@ async def customer_group_ids(
     (``CustomerGroup.pm:358-372``, Framework.xml:3502-3510, default ``['users']``). *login* must
     be the canonical login. Customer-company groups (``group_customer``) are not built."""
     valid_groups = await _valid_group_names(session)
-    group_support = await sysconfig.get("CustomerGroupSupport", 0)
-    if str(group_support) not in ("1", "True", "true"):
+    if not await sysconfig.get_bool("CustomerGroupSupport"):
         return set(valid_groups)
     keys_by_group: set[int] = {
         int(g)

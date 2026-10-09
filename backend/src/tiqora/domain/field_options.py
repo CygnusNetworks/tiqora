@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import (
@@ -180,9 +179,7 @@ async def base_field_maps(
             scope = list(queue_ids)
         else:
             scope = [picker_queue_id] if picker_queue_id else []
-        everyone = honor_everyone and perl_truthy(
-            await sysconfig.get("Ticket::ChangeOwnerToEveryone", 0)
-        )
+        everyone = honor_everyone and await sysconfig.get_bool("Ticket::ChangeOwnerToEveryone")
         for field in AGENT_OPTION_FIELDS & fields:
             if everyone:
                 out[field] = dict(agents)
