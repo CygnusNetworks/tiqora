@@ -5,15 +5,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
 import { AutopilotSwitch } from "./AutopilotSwitch";
 
-const { getState, autopilot } = vi.hoisted(() => ({
+const { getState, autopilot, customerPause, liftCustomerPause } = vi.hoisted(() => ({
   getState: vi.fn(),
   autopilot: vi.fn(),
+  customerPause: vi.fn(),
+  liftCustomerPause: vi.fn(),
 }));
 
 vi.mock("@/lib/ticketAiApi", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/ticketAiApi")>("@/lib/ticketAiApi");
-  return { ...actual, ticketAiApi: { getState, autopilot } };
+  return {
+    ...actual,
+    ticketAiApi: { getState, autopilot, customerPause, liftCustomerPause },
+  };
 });
 
 function wrap(ui: React.ReactElement) {
@@ -41,6 +46,8 @@ const baseState = {
 describe("AutopilotSwitch", () => {
   beforeEach(() => {
     getState.mockReset();
+    customerPause.mockReset();
+    liftCustomerPause.mockReset();
     autopilot.mockReset();
   });
 
@@ -135,6 +142,50 @@ describe("AutopilotSwitch", () => {
     fireEvent.click(await screen.findByTestId("autopilot-switch"));
     fireEvent.click(await screen.findByTestId("autopilot-stop"));
     expect(await screen.findByTestId("autopilot-error")).toBeInTheDocument();
+  });
+
+  it("stops the automation for the customer instead of the ticket", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      autopilot: { mode: "active", customer_user_id: "anna", customer_id: "ACME" },
+    });
+    customerPause.mockResolvedValue({ mode: "stopped", reason: "customer_paused" });
+    wrap(<AutopilotSwitch ticketId={7} canNote />);
+
+    fireEvent.click(await screen.findByTestId("autopilot-switch"));
+    fireEvent.click(await screen.findByTestId("autopilot-scope-user"));
+    fireEvent.change(screen.getByTestId("autopilot-stop-days"), { target: { value: "30" } });
+    fireEvent.click(screen.getByTestId("autopilot-stop"));
+    await waitFor(() =>
+      expect(customerPause).toHaveBeenCalledWith(7, { scope: "user", days: 30 }),
+    );
+    expect(autopilot).not.toHaveBeenCalled();
+  });
+
+  it("keeps the plain ticket stop when no customer is set", async () => {
+    getState.mockResolvedValue({ ...baseState, autopilot: { mode: "active" } });
+    wrap(<AutopilotSwitch ticketId={7} canNote />);
+
+    fireEvent.click(await screen.findByTestId("autopilot-switch"));
+    expect(screen.queryByTestId("autopilot-stop-scope")).toBeNull();
+  });
+
+  it("lifts a customer pause from the ticket", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      autopilot: {
+        mode: "stopped",
+        reason: "customer_paused",
+        customer_pause_scope: "company",
+        customer_paused_until: null,
+      },
+    });
+    liftCustomerPause.mockResolvedValue({ mode: "active" });
+    wrap(<AutopilotSwitch ticketId={7} canNote />);
+
+    fireEvent.click(await screen.findByTestId("autopilot-switch"));
+    fireEvent.click(await screen.findByTestId("autopilot-lift-customer"));
+    await waitFor(() => expect(liftCustomerPause).toHaveBeenCalledWith(7));
   });
 
   it("shows a customer pause instead of the start controls", async () => {

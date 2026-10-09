@@ -1110,7 +1110,19 @@
       "error": "Der Autopilot konnte nicht geändert werden. Bitte erneut versuchen.",
       "listStopped": "KI gestoppt",
       "escalatedInfo": "KI hat um {{dateTime}} an das Team übergeben: {{reason}}. Über den Schalter „KI-Autopilot“ oben lässt sie sich wieder einschalten.",
-      "customerPausedHint": "Zum Wiedereinschalten die Pause beim Kunden aufheben."
+      "customerPausedHint": "Das gilt für alle Tickets des Kunden, nicht nur für dieses.",
+      "stopScope": {
+        "label": "Stoppen für",
+        "ticket": "Nur dieses Ticket",
+        "user": "Alle Tickets dieses Kunden",
+        "company": "Alle Tickets dieser Firma"
+      },
+      "pausedScope": {
+        "user": "Für diesen Kunden gestoppt",
+        "company": "Für diese Firma gestoppt"
+      },
+      "pausedUntil": "bis {{date}}",
+      "liftCustomer": "Für den Kunden wieder einschalten"
     }
   },
   "search": {

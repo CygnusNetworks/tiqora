@@ -1110,7 +1110,19 @@
       "error": "Could not change the autopilot. Please try again.",
       "listStopped": "AI stopped",
       "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top.",
-      "customerPausedHint": "To switch it back on, lift the pause on the customer."
+      "customerPausedHint": "This affects all tickets of the customer, not only this one.",
+      "stopScope": {
+        "label": "Stop for",
+        "ticket": "This ticket only",
+        "user": "All tickets of this customer",
+        "company": "All tickets of this company"
+      },
+      "pausedScope": {
+        "user": "Stopped for this customer",
+        "company": "Stopped for this company"
+      },
+      "pausedUntil": "until {{date}}",
+      "liftCustomer": "Switch back on for the customer"
     }
   },
   "search": {

@@ -6703,6 +6703,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tickets/{ticket_id}/ai/customer-pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Customer Ai Route
+         * @description Stop the automation for this ticket's customer user or company (all
+         *     their tickets), for N days or until lifted. Same access rule as the
+         *     per-ticket pause; 409 when the ticket has no such customer.
+         */
+        post: operations["pause_customer_ai_route_api_v1_tickets__ticket_id__ai_customer_pause_post"];
+        /**
+         * Lift Customer Ai Pause Route
+         * @description Lift the customer pause that applies to this ticket. Idempotent.
+         */
+        delete: operations["lift_customer_ai_pause_route_api_v1_tickets__ticket_id__ai_customer_pause_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tickets/{ticket_id}/ai/draft": {
         parameters: {
             query?: never;
@@ -8423,6 +8449,14 @@ export interface components {
         AiAutopilotOut: {
             /** By Name */
             by_name?: string | null;
+            /** Customer Id */
+            customer_id?: string | null;
+            /** Customer Pause Scope */
+            customer_pause_scope?: ("user" | "company") | null;
+            /** Customer Paused Until */
+            customer_paused_until?: string | null;
+            /** Customer User Id */
+            customer_user_id?: string | null;
             /** Grant Remaining */
             grant_remaining?: number | null;
             /** Grant Total */
@@ -8460,6 +8494,21 @@ export interface components {
             created_at: string;
             /** Summary Body */
             summary_body: string;
+        };
+        /**
+         * AiCustomerPauseIn
+         * @description Stop the automation for the ticket's customer user or company.
+         */
+        AiCustomerPauseIn: {
+            /** Days */
+            days?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "user" | "company";
         };
         /** AiDraftOut */
         AiDraftOut: {
@@ -34544,6 +34593,80 @@ export interface operations {
                 "application/json": components["schemas"]["AiAutopilotIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAutopilotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_customer_ai_route_api_v1_tickets__ticket_id__ai_customer_pause_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiCustomerPauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiAutopilotOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lift_customer_ai_pause_route_api_v1_tickets__ticket_id__ai_customer_pause_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

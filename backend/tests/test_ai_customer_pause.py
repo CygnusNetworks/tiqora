@@ -234,3 +234,26 @@ async def test_auto_worker_skips_paused_customer(seeded: str) -> None:
         )
         assert reason == "customer_ai_paused"
     await engine.dispose()
+
+
+async def test_ticket_route_sets_and_lifts_customer_pause(seeded: str) -> None:
+    client, engine = await _client(seeded)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with client:
+        base = f"/api/v1/tickets/{TICKET}/ai/customer-pause"
+        resp = await client.post(base, json={"scope": "user", "days": 3})
+        assert resp.status_code == 200, resp.text
+        async with factory() as session:
+            pause = await active_pause_for_ticket(session, TICKET)
+            assert pause is not None and pause.customer_key == LOGIN
+            assert await active_pause_for_ticket(session, OTHER_TICKET) is None
+        assert (await client.delete(base)).status_code == 200
+        async with factory() as session:
+            assert await active_pause_for_ticket(session, TICKET) is None
+
+        resp = await client.post(base, json={"scope": "company"})
+        assert resp.status_code == 200, resp.text
+        async with factory() as session:
+            other = await active_pause_for_ticket(session, OTHER_TICKET)
+            assert other is not None and other.scope == CUSTOMER_PAUSE_SCOPE_COMPANY
+    await engine.dispose()
