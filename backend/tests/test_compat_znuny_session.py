@@ -413,3 +413,47 @@ async def test_revocation_deletes_only_that_agents_znuny_sessions(sync_url: str)
         assert (await db.rows(theirs))["UserID"][0] == "8971"
     finally:
         await db.engine.dispose()
+
+
+@pytest.mark.usefixtures("_no_2fa")
+async def test_session_get_checks_validity_first_like_znuny(sync_url: str) -> None:
+    """SessionGet.pm: CheckSessionID first, else SessionGet.SessionInvalid (no data)."""
+    invalid = {
+        "Error": {
+            "ErrorCode": "SessionGet.SessionInvalid",
+            "ErrorMessage": "SessionGet: SessionID is Invalid!",
+        }
+    }
+    db = _Db(sync_url)
+    engine = create_engine(sync_url)
+    try:
+        sid = (await db.create({"UserLogin": LOGIN, "Password": PASSWORD}))["SessionID"]
+        async with db.factory() as s:
+            assert "SessionData" in await op_session_get({"SessionID": sid}, s, _store())
+
+        # idle for longer than SessionMaxIdleTime: the row is still there, but invalid
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "UPDATE sessions SET data_value = :v WHERE session_id = :s"
+                    " AND data_key = 'UserLastRequest'"
+                ),
+                {"v": str(int(time.time()) - 7 * 24 * 3600), "s": sid},
+            )
+        assert (await db.rows(sid))["UserLogin"][0] == LOGIN
+        async with db.factory() as s:
+            assert await op_session_get({"SessionID": sid}, s, _store()) == invalid
+
+        # a disabled account's live session is invalid as well
+        sid2 = (await db.create({"UserLogin": LOGIN, "Password": PASSWORD}))["SessionID"]
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE users SET valid_id = 2 WHERE id = 8970"))
+        try:
+            async with db.factory() as s:
+                assert await op_session_get({"SessionID": sid2}, s, _store()) == invalid
+        finally:
+            with engine.begin() as conn:
+                conn.execute(text("UPDATE users SET valid_id = 1 WHERE id = 8970"))
+    finally:
+        engine.dispose()
+        await db.engine.dispose()

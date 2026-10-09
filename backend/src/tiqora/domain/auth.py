@@ -6,6 +6,7 @@ import contextlib
 import hashlib
 import secrets
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -252,6 +253,31 @@ class SessionStore:
         else:
             with contextlib.suppress(Exception):
                 await self._client.delete(index_key)
+        return removed
+
+    async def revoke_customer_sessions(self, logins: Iterable[str]) -> int:
+        """Delete every GenericInterface customer token of *logins*; return how many.
+
+        Compat SessionCreate stores customer tokens here under the sentinel user id 0, so
+        the per-user index cannot single out one customer (``revoke_user_sessions(0)`` would
+        end every customer's session). There is no per-login index: scan the token keys.
+        Only used on rare admin actions (password reset, account disabled).
+        """
+        wanted = {f"0:{login}" for login in logins}
+        if not wanted:
+            return 0
+        removed = 0
+        async for raw_key in self._client.scan_iter(match=f"{self._prefix}*", count=500):
+            key = raw_key.decode("utf-8") if isinstance(raw_key, bytes) else str(raw_key)
+            token = key[len(self._prefix) :]
+            if not token or ":" in token:  # avatar:/born:/authat:/user: side keys
+                continue
+            value = await self._client.get(key)
+            if isinstance(value, bytes):
+                value = value.decode("utf-8")
+            if value in wanted:
+                await self.delete(token)
+                removed += 1
         return removed
 
     async def get(self, token: str) -> tuple[int, str] | None:

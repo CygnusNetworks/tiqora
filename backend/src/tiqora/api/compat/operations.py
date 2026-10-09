@@ -1008,10 +1008,14 @@ async def op_session_get(
 ) -> dict[str, Any]:
     """SessionGet — return SessionData key/value list for a SessionID.
 
-    Matches Znuny SessionGet: no auth params beyond SessionID; returns all
-    session key/value pairs (UserPw / UserChallengeToken filtered).
+    Matches Znuny SessionGet: no auth params beyond SessionID; the session is checked
+    first (``CheckSessionID``: idle / absolute expiry, here also a still valid account and
+    the optional remote-IP binding - the same check as every authenticated call) and an
+    invalid one answers ``SessionGet.SessionInvalid``. Returns the allow-listed session
+    key/value pairs.
     """
     op = "SessionGet"
+    invalid = _err(f"{op}.SessionInvalid", f"{op}: SessionID is Invalid!")
     session_id = (data.get("SessionID") or "").strip()
     if not session_id:
         return _err(f"{op}.MissingParameter", f"{op}: SessionID is missing!")
@@ -1024,6 +1028,11 @@ async def op_session_get(
         )
     ).fetchall()
     if rows:
+        valid = await _lookup_session(
+            session, session_id, remote_addr=_peer_addr(request), settings=settings
+        )
+        if valid is None:
+            return invalid
         session_data: list[dict[str, Any]] = []
         for key, val, serialized in rows:
             k = str(key)
@@ -1039,7 +1048,7 @@ async def op_session_get(
     # Fall back to Tiqora Redis session store.
     payload = await session_store.get(session_id)
     if payload is None:
-        return _err(f"{op}.SessionInvalid", f"{op}: SessionID is Invalid!")
+        return invalid
     user_id, login = payload
     if user_id == _CUSTOMER_SENTINEL_USER_ID:
         user_type = _CUSTOMER_USER_TYPE
