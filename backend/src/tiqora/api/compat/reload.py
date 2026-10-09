@@ -78,6 +78,11 @@ async def _subscribe(app: Any) -> Any:
         if candidate is not None:
             await _close_pubsub(candidate)
         return None
+    except BaseException:
+        # cancelled (shutdown) halfway through: close the candidate, then let it propagate
+        if candidate is not None:
+            await asyncio.shield(_close_pubsub(candidate))
+        raise
     return candidate
 
 

@@ -364,7 +364,19 @@ async def _handle_soap_request(
     its name with no mapping. With a webservice the operation name selects the configured
     operation (type + mapping) through the provider pipeline.
     """
+    # SOAP.pm:160-165: a body longer than the transport's MaxLength is refused with 413
+    # (text/plain, like every Znuny transport error) before it is parsed or mapped
+    max_length = webservice.max_length if webservice is not None else None
+    if max_length is not None:
+        try:
+            declared = int(request.headers.get("content-length") or 0)
+        except ValueError:
+            declared = 0
+        if declared > max_length:
+            return _text_error(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large")
     body_bytes = await request.body()
+    if max_length is not None and len(body_bytes) > max_length:
+        return _text_error(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Request Entity Too Large")
     soap_action = request.headers.get("SOAPAction") or request.headers.get("soapaction")
 
     try:

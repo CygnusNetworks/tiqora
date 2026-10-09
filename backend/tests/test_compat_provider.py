@@ -215,3 +215,34 @@ async def test_operation_fault_becomes_a_server_fault() -> None:
     outcome = await run_provider(ws, "Away", {}, run_operation=_run)
     assert outcome.status_code == 500
     assert outcome.fault == "Payload does not contain out-of-office entries"
+
+
+async def test_rate_limited_operation_keeps_retry_after_through_a_webservice() -> None:
+    from tiqora.api.compat.webservices import parse_webservice
+
+    ws = parse_webservice(
+        8951,
+        "Gi8951Rate",
+        {
+            "Provider": {
+                "Transport": {"Type": "HTTP::REST", "Config": {}},
+                "Operation": {"Login": {"Type": "Session::SessionCreate"}},
+            }
+        },
+        huge_xml=False,
+    )
+
+    async def _run(handler: str, data: dict[str, Any], op: Any) -> dict[str, Any]:
+        return {
+            "Error": {
+                "ErrorCode": "SessionCreate.RateLimited",
+                "ErrorMessage": "Too many attempts",
+                "RetryAfter": 42,
+            }
+        }
+
+    outcome = await run_provider(ws, "Login", {}, run_operation=_run)
+    assert outcome.status_code == 429
+    response = render_rest(outcome)
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "42"

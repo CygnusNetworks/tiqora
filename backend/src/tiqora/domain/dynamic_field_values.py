@@ -388,7 +388,17 @@ async def set_article_dynamic_field(
     clears the ticket cache and fires ``ArticleDynamicFieldUpdate`` -- but, unlike
     ticket fields, writes no history row.
     """
-    from tiqora.domain.ticket_write_service import _emit_event
+    from tiqora.domain.ticket_write_service import InvalidInput, _emit_event
+
+    # The ticket whose change_time / cache / event this write touches must be the article's
+    # own (same guard as add_time_accounting).
+    owner = (
+        await session.execute(
+            text("SELECT ticket_id FROM article WHERE id = :aid"), {"aid": article_id}
+        )
+    ).scalar_one_or_none()
+    if owner is None or int(owner) != ticket_id:
+        raise InvalidInput("article_id does not belong to this ticket")
 
     new = normalize_df_values(field.field_type, values)
     old, legacy = await _read_df_values(session, field, article_id)

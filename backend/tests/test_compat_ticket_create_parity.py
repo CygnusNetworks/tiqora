@@ -3,7 +3,8 @@ parity fixes of Task 15b (the golden peer found these; here they run without a p
 
 DB tests on MariaDB and PostgreSQL. Seed ids live in the GI band 8900-8929: agents 8900 (acting)
 and 8902 (owner to be), groups 8900 (queue 8901, agent 8900 is rw) and 8901 (queue 8902, nobody
-is a member), customer users gi8900.cust / gi8900.noco. Every row (including the tickets the
+is a member), customer users gi8900.cust / gi8900.noco (no ``gi_webservice_config`` rows: ids
+8900-8919 there belong to ``test_compat_webservice_registry``). Every row (including the tickets the
 operations create in queue 8901) is deleted afterwards.
 """
 

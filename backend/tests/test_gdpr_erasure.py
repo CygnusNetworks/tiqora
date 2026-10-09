@@ -41,6 +41,34 @@ from tiqora.gdpr.erasure import (
 )
 from tiqora.gdpr.gate import GdprRefusedError
 
+_TABLES_CREATED: set[str] = set()
+
+
+@pytest.fixture(autouse=True)
+def _tiqora_tables(request: pytest.FixtureRequest) -> None:
+    """Create the ``tiqora_*`` tables (``tiqora_event_outbox`` ...) for every database a test
+    uses, so the module also passes on its own and not only after another module created them.
+    """
+    names = [n for n in ("mariadb_znuny_url", "postgres_znuny_url") if n in request.fixturenames]
+    callspec = getattr(request.node, "callspec", None)
+    if callspec is not None and "url_fixture" in callspec.params:
+        names.append(str(callspec.params["url_fixture"]))
+    from sqlalchemy import create_engine
+
+    from tiqora.db.tiqora.base import TiqoraBase
+
+    for name in names:
+        url = str(request.getfixturevalue(name))
+        if url in _TABLES_CREATED:
+            continue
+        engine = create_engine(url)
+        try:
+            with engine.begin() as conn:
+                TiqoraBase.metadata.create_all(conn)
+        finally:
+            engine.dispose()
+        _TABLES_CREATED.add(url)
+
 
 def _root_user() -> AuthenticatedUser:
     return AuthenticatedUser(

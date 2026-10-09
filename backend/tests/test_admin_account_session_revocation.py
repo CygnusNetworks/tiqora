@@ -5,8 +5,8 @@ reset, disable via PATCH and via DELETE): the Znuny ``sessions`` rows are delete
 the Redis sessions (agent tokens; portal sessions and GenericInterface customer tokens).
 
 DB tests on MariaDB, direct router calls. Seed ids: agents 8930-8931, customer logins
-``gi8930.*@example.org``, ``sessions`` ids ``GI8930*`` (sub-band of the GI band 8900-8999,
-see the band list in ``test_compat_webservice_registry``). Every row is deleted afterwards.
+``gi8930.*@example.org``, ``sessions`` ids ``GI8930*`` (GI sub-band 8930-8939; 8920-8929 is
+``test_compat_webservice_api``). Every row is deleted afterwards.
 """
 
 from __future__ import annotations

@@ -907,7 +907,10 @@ async def add_article(
         self_notify = str(await sysconfig.get("AgentSelfNotifyOnAction")) in {"1", "True"}
         # MIMEBase.pm: SkipRecipients = Exclude + ExcludeMute; Recipients = the
         # forced agents (the worker still applies skip/valid/permission checks).
-        skip_ids: list[int] = [] if self_notify else [user_id]
+        # NotificationEvent.pm:1078-1085: the acting agent is skipped unless it is one of
+        # the pre-calculated (forced) recipients.
+        forced = {int(uid) for uid in article.force_notification_user_ids}
+        skip_ids: list[int] = [] if self_notify or int(user_id) in forced else [user_id]
         for uid in (
             *article.exclude_notification_user_ids,
             *article.exclude_mute_notification_user_ids,

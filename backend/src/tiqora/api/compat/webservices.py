@@ -338,6 +338,11 @@ def _build_snapshot(
                 error=str(exc),
             )
             continue
+        except Exception:  # noqa: BLE001 - one odd row must never block every other one
+            logger.exception(
+                "compat_webservice_unexpected_error", webservice_id=ws_id, webservice_name=ws_name
+            )
+            continue
         by_name[ws.name] = ws
         by_id[ws.id] = ws
     return by_name, by_id

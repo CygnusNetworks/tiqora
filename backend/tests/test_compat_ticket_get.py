@@ -1,7 +1,10 @@
 """Znuny-shaped TicketGet / TicketHistoryGet (GenericInterface compat).
 
 Pure ``attachment_index`` / ``znuny_ts`` tests plus DB tests on MariaDB and PostgreSQL.
-Seed ids live in the GI band 8950-8969; every row is deleted again after the module.
+Seed ids live in the GI band 8950-8969; every row is deleted again after the module. The
+``sessions`` id prefixes GI8960* / GI8961* are not part of it: GI8960* belongs to
+``test_gdpr_erasure`` and ``test_admin_users_contact_permissions``, GI8961* to
+``test_znuny_sessions``.
 """
 
 from __future__ import annotations

@@ -1,8 +1,8 @@
 """Request-time webservice routes end-to-end (MariaDB and PostgreSQL).
 
 Hits ``/znuny-compat/Webservice(ID)/...`` through the ASGI app: registry lookup, REST route
-matching, inbound/outbound mapping and the shared ``op_*`` handlers. Seed ids use 8920-8939
-(GI band: agent 8920, group 8921, queue 8922, webservices 8923-8926); everything is deleted
+matching, inbound/outbound mapping and the shared ``op_*`` handlers. Seed ids use 8920-8929
+(GI band: agent 8920, group 8921, queue 8922, webservices 8923-8929); everything is deleted
 again after the module.
 """
 
@@ -29,6 +29,7 @@ PASSWORD = "wsmap-secret"
 LOGIN = "wsmap.agent"
 AGENT_ID, GROUP_ID, QUEUE_ID = 8920, 8921, 8922
 MAP_ID, BROKEN_ID, SOAP_ID, PLAIN_ID, NOPROV_ID = 8923, 8924, 8925, 8926, 8927
+SMALL_SOAP_ID, ECHO_ID = 8928, 8929
 
 _OUT_XSLT = (
     '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
@@ -118,12 +119,52 @@ SOAP_CFG: dict[str, Any] = {
     }
 }
 
+SMALL_SOAP_CFG: dict[str, Any] = {
+    "Provider": {
+        "Transport": {
+            "Type": "HTTP::SOAP",
+            "Config": {"NameSpace": "http://example.org/Small/", "MaxLength": 100},
+        },
+        "Operation": {"Login": {"Type": "Session::SessionCreate"}},
+    }
+}
+
+# Echoes the route variable the operation received (outbound XSLT over DataInclude).
+_ECHO_XSLT = (
+    '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">'
+    '<xsl:output method="xml" encoding="utf-8"/>'
+    '<xsl:template match="/RootElement"><R><Id>'
+    '<xsl:value-of select="/RootElement/DataInclude/ProviderRequestInput/Id"/>'
+    "</Id></R></xsl:template></xsl:stylesheet>"
+)
+ECHO_CFG: dict[str, Any] = {
+    "Provider": {
+        "Transport": {
+            "Type": "HTTP::REST",
+            "Config": {
+                "RouteOperationMapping": {"Echo": {"Route": "/Echo/:Id", "RequestMethod": ["GET"]}}
+            },
+        },
+        "Operation": {
+            "Echo": {
+                "Type": "Session::SessionGet",
+                "MappingOutbound": {
+                    "Type": "XSLT",
+                    "Config": {"Template": _ECHO_XSLT, "DataInclude": ["ProviderRequestInput"]},
+                },
+            }
+        },
+    }
+}
+
 _WEBSERVICES = {
     MAP_ID: ("MapREST", MAP_CFG),
     BROKEN_ID: ("BrokenREST", BROKEN_CFG),
     SOAP_ID: ("MapSOAP", SOAP_CFG),
     PLAIN_ID: ("PlainREST", PLAIN_CFG),
     NOPROV_ID: ("NoProviderSvc", {"Description": "requester only", "Requester": {}}),
+    SMALL_SOAP_ID: ("SmallSOAP", SMALL_SOAP_CFG),
+    ECHO_ID: ("EchoREST", ECHO_CFG),
 }
 
 _TICKET_SCOPE = f"(SELECT id FROM ticket WHERE queue_id = {QUEUE_ID})"
@@ -144,7 +185,7 @@ def _seed_statements() -> tuple[tuple[str, dict[str, Any]], ...]:
         (f"DELETE FROM article WHERE ticket_id IN {_TICKET_SCOPE}", {}),
         (f"DELETE FROM ticket_history WHERE ticket_id IN {_TICKET_SCOPE}", {}),
         (f"DELETE FROM ticket WHERE queue_id = {QUEUE_ID}", {}),
-        ("DELETE FROM gi_webservice_config WHERE id BETWEEN 8923 AND 8927", {}),
+        ("DELETE FROM gi_webservice_config WHERE id BETWEEN 8923 AND 8929", {}),
         (f"DELETE FROM queue WHERE id = {QUEUE_ID}", {}),
         (f"DELETE FROM group_user WHERE group_id = {GROUP_ID}", {}),
         (f"DELETE FROM permission_groups WHERE id = {GROUP_ID}", {}),
@@ -368,6 +409,53 @@ async def test_percent_escaped_slash_stays_in_route_variable(sync_url: str) -> N
         )
         # Matches Fetch with Id "a/b" (not a route miss); TicketGet then rejects the bad id.
         assert not resp.text.startswith("HTTP::REST Error")
+        # the operation receives the value unescaped exactly once (REST.pm URI::Escape)
+        echo = await client.get("/znuny-compat/Webservice/EchoREST/Echo/a%2Fb")
+        assert echo.json() == {"Id": "a/b"}, echo.text
+        twice = await client.get("/znuny-compat/Webservice/EchoREST/Echo/a%2520b")
+        assert twice.json() == {"Id": "a%20b"}, twice.text
+    await engine.dispose()
+
+
+async def test_soap_max_length_answers_413_before_reading(sync_url: str) -> None:
+    client, engine = await _client_for(sync_url)
+    envelope = (
+        '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
+        "<soapenv:Body><Login>"
+        f"<UserLogin>{LOGIN}</UserLogin><Password>{PASSWORD}</Password>"
+        "</Login></soapenv:Body></soapenv:Envelope>"
+    ).encode()
+    assert len(envelope) > 100
+    async with client:
+        resp = await client.post(
+            "/znuny-compat/Webservice/SmallSOAP",
+            content=envelope,
+            headers={"Content-Type": "text/xml"},
+        )
+        # SOAP.pm:160-165 (MaxLength) -> _Error HTTPError 413, text/plain
+        assert resp.status_code == 413
+        assert resp.headers["content-type"].startswith("text/plain")
+        assert resp.text == "Request Entity Too Large"
+    await engine.dispose()
+
+
+async def test_soap_operation_error_is_a_client_fault(sync_url: str) -> None:
+    client, engine = await _client_for(sync_url)
+    envelope = (
+        '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">'
+        "<soapenv:Body><Login>"
+        f"<UserLogin>{LOGIN}</UserLogin><Password>wrong-password</Password>"
+        "</Login></soapenv:Body></soapenv:Envelope>"
+    ).encode()
+    async with client:
+        resp = await client.post(
+            "/znuny-compat/Webservice/MapSOAP",
+            content=envelope,
+            headers={"Content-Type": "text/xml"},
+        )
+        assert resp.status_code == 401
+        assert "<faultcode>Client</faultcode>" in resp.text
+        assert "SessionCreate.AuthFail" in resp.text
     await engine.dispose()
 
 
@@ -466,6 +554,17 @@ async def test_admin_reload_requires_admin_and_refreshes(sync_url: str) -> None:
     async with client:
         denied = await client.post("/znuny-compat/admin/reload")
         assert denied.status_code in (401, 403)
+
+        # an authenticated agent who is not in the admin group
+        from tiqora.api.deps import get_current_user
+        from tiqora.domain.auth import AuthenticatedUser
+
+        overrides = client._transport.app.dependency_overrides  # type: ignore[attr-defined]
+        overrides[get_current_user] = lambda: AuthenticatedUser(
+            id=AGENT_ID, login=LOGIN, first_name="Ws", last_name="Agent", auth_method="session"
+        )
+        forbidden = await client.post("/znuny-compat/admin/reload")
+        assert forbidden.status_code == 403
 
         class _Admin:
             login = "root@localhost"

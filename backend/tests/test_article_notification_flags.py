@@ -52,9 +52,38 @@ def _to_async_url(sync_url: str) -> str:
 _NOTIF_IDS = f"(SELECT id FROM notification_event WHERE name = '{NOTIFY_NAME}')"
 
 
+_SENDER_KEY = "notification.sender_email"
+# the global setting as it was before the module ran, per database (restored afterwards)
+_SAVED_SENDER: dict[str, list[Any]] = {}
+
+
+def _key_col(conn: Any) -> str:
+    return "`key`" if conn.dialect.name == "mysql" else '"key"'
+
+
+def _clear_sender_setting(conn: Any, sync_url: str) -> None:
+    """Remove ``notification.sender_email`` for the tests, remembering the original row."""
+    key_col = _key_col(conn)
+    if sync_url not in _SAVED_SENDER:
+        _SAVED_SENDER[sync_url] = list(
+            conn.execute(
+                text(f"SELECT value FROM tiqora_settings WHERE {key_col} = :k"), {"k": _SENDER_KEY}
+            ).all()
+        )
+    conn.execute(text(f"DELETE FROM tiqora_settings WHERE {key_col} = :k"), {"k": _SENDER_KEY})
+
+
+def _restore_sender_setting(conn: Any, sync_url: str) -> None:
+    key_col = _key_col(conn)
+    conn.execute(text(f"DELETE FROM tiqora_settings WHERE {key_col} = :k"), {"k": _SENDER_KEY})
+    for (value,) in _SAVED_SENDER.get(sync_url, []):
+        conn.execute(
+            text(f"INSERT INTO tiqora_settings ({key_col}, value) VALUES (:k, :v)"),
+            {"k": _SENDER_KEY, "v": value},
+        )
+
+
 def _cleanup(conn: Any) -> None:
-    key_col = "`key`" if conn.dialect.name == "mysql" else '"key"'
-    conn.execute(text(f"DELETE FROM tiqora_settings WHERE {key_col} = 'notification.sender_email'"))
     ids = ", ".join(map(str, USER_IDS))
     for sql in (
         f"DELETE FROM ticket_history WHERE ticket_id = {TICKET_ID}",
@@ -80,6 +109,7 @@ def _seed(sync_url: str) -> None:
     engine = create_engine(sync_url)
     with engine.begin() as conn:
         TiqoraBase.metadata.create_all(conn)
+        _clear_sender_setting(conn, sync_url)
         _cleanup(conn)
         users = (
             (ACTOR, "w1f.actor", "Act", "Or", 1, "actor@example.org"),
@@ -159,6 +189,7 @@ async def env(
         e = create_engine(sync_url)
         with e.begin() as conn:
             _cleanup(conn)
+            _restore_sender_setting(conn, sync_url)
         e.dispose()
 
 
@@ -205,8 +236,9 @@ async def test_no_agent_notify_suppresses_legacy_event(env: Any) -> None:
     ]
     _query(url, "DELETE FROM tiqora_event_outbox WHERE ticket_id = :t", t=TICKET_ID)
     await _add(factory, no_agent_notify=True)
-    # the timeout is already reset, so the second call only creates the article
-    assert _event_types(url) == ["ArticleCreate"]
+    # no legacy notification event; the unlock-timeout event repeats only when the second
+    # article lands in a later second (Znuny skips an unchanged timeout), so it is ignored
+    assert [e for e in _event_types(url) if e != "TicketUnlockTimeoutUpdate"] == ["ArticleCreate"]
 
 
 async def test_exclude_lists_extend_skip_user_ids(env: Any) -> None:
@@ -219,6 +251,16 @@ async def test_exclude_lists_extend_skip_user_ids(env: Any) -> None:
     [payload] = [p for e, p in _events(url) if e == "NotificationAddNote"]
     assert set(payload["skip_user_ids"]) == {ACTOR, EXCLUDED, MUTED}
     assert "recipient_user_ids" not in payload
+
+
+async def test_forced_author_is_not_skipped_as_self(env: Any) -> None:
+    # NotificationEvent.pm:1083: the acting agent is skipped unless it is a pre-calculated
+    # (forced) recipient
+    url, factory = env
+    await _add(factory, force_notification_user_ids=(ACTOR,))
+    [payload] = [p for e, p in _events(url) if e == "NotificationAddNote"]
+    assert payload["recipient_user_ids"] == [ACTOR]
+    assert ACTOR not in payload.get("skip_user_ids", [])
 
 
 async def test_force_ids_become_recipients_and_to_line(env: Any) -> None:

@@ -27,6 +27,9 @@ from tiqora.api.compat.article_input import (
     parse_gi_articles,
     parse_gi_dynamic_fields,
 )
+from tiqora.api.compat.article_input import (
+    gi_error as _err,
+)
 from tiqora.api.compat.history_at import queues_at
 from tiqora.api.compat.mapping import MappingError
 from tiqora.api.compat.mapping.out_of_office import OutOfOfficeMapper
@@ -124,11 +127,6 @@ logger = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Error helpers (Znuny wire format)
 # ---------------------------------------------------------------------------
-
-
-def _err(code: str, message: str) -> dict[str, Any]:
-    """Return a Znuny-style GenericInterface error envelope."""
-    return {"Error": {"ErrorCode": code, "ErrorMessage": message}}
 
 
 # ---------------------------------------------------------------------------
