@@ -6,13 +6,13 @@ reporting time zone. The stock is replayed from the ``create``/``queue``/``state
 always replaced as a whole (idempotent). Days without open tickets write no rows.
 
 Boundary: the state "at" a day end is the segment containing that instant with
-half-open ``[start, end)`` semantics, i.e. an event stamped exactly at local
-midnight already belongs to the next day's start state.
+``(start, end]`` semantics, i.e. an event stamped exactly at local midnight
+belongs to the next day (and a ticket created at that instant is not yet counted).
 """
 
 from __future__ import annotations
 
-from bisect import bisect_left
+from bisect import bisect_right
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
@@ -136,12 +136,11 @@ def compute_snapshot_counts(
         for seg in ticket_timeline(created_at, events, default_priority=default_priority):
             if seg.state_type not in OPEN_STATE_TYPES:
                 continue
-            lo = bisect_left(instants, seg.start)
-            hi = len(instants) if seg.end is None else bisect_left(instants, seg.end)
+            # day end e belongs to the segment with start < e <= end
+            lo = bisect_right(instants, seg.start)
+            hi = len(instants) if seg.end is None else bisect_right(instants, seg.end)
             for idx in range(lo, hi):
                 day, end = ordered[idx]
-                if created_at >= end:
-                    continue
                 row = out.setdefault(
                     (day, seg.queue_id, seg.state_type, seg.priority_id),
                     [0] * (1 + len(AGE_BUCKETS)),
@@ -161,6 +160,7 @@ async def write_snapshots(
     """Replace the rows of *days* with *counts*; flush only. Returns rows written."""
     if not days:
         return 0
+    wanted = set(days)
     await session.execute(
         delete(TiqoraReportDailySnapshot).where(TiqoraReportDailySnapshot.snapshot_date.in_(days))
     )
@@ -175,7 +175,7 @@ async def write_snapshots(
             "built_at": now,
         }
         for (day, queue_id, state_type, priority_id), vals in sorted(counts.items())
-        if day in set(days)
+        if day in wanted
     ]
     if rows:
         await session.execute(insert(TiqoraReportDailySnapshot), rows)

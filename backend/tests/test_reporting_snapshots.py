@@ -211,6 +211,35 @@ def test_ticket_created_after_day_end_not_counted() -> None:
     assert set(counts) == {(date(2024, 6, 2), 1, "new", 3)}
 
 
+def test_event_exactly_at_day_end_belongs_to_next_day() -> None:
+    created = datetime(2024, 6, 1, 8, 0)
+    ev = [
+        _ev("create", created, to_id=1, to_value="new"),
+        _ev("state", datetime(2024, 6, 2, 0, 0), to_value="closed", hid=1),
+    ]
+    days = [date(2024, 6, 1), date(2024, 6, 2)]
+    counts = compute_snapshot_counts([(created, ev)], day_end_instants(days, UTC_ZONE))
+    # closed at exactly 06-02 00:00 -> still open at the end of 06-01, closed on 06-02
+    assert set(counts) == {(date(2024, 6, 1), 1, "new", 3)}
+    # created exactly at the day end -> not counted for that day, counted for the next
+    at = datetime(2024, 6, 2, 0, 0)
+    counts = compute_snapshot_counts(
+        [(at, [_ev("create", at, to_id=1, to_value="new")])], day_end_instants(days, UTC_ZONE)
+    )
+    assert set(counts) == {(date(2024, 6, 2), 1, "new", 3)}
+
+
+def test_merged_state_is_not_open() -> None:
+    created = datetime(2024, 6, 1, 8, 0)
+    ev = [
+        _ev("create", created, to_id=1, to_value="new"),
+        _ev("state", datetime(2024, 6, 2, 10, 0), to_value="merged", hid=1),
+    ]
+    days = [date(2024, 6, 1), date(2024, 6, 2), date(2024, 6, 3)]
+    counts = compute_snapshot_counts([(created, ev)], day_end_instants(days, UTC_ZONE))
+    assert set(counts) == {(date(2024, 6, 1), 1, "new", 3)}
+
+
 # ---------------------------------------------------------------- DB
 
 
