@@ -9,6 +9,10 @@
  * auto-authenticated).
  */
 
+import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, DEMO_REPORTING_STATUS, demoReport } from "./reportsMock";
+
+export { resolveReportRun } from "./reportsMock";
+
 function page<T>(items: T[]) {
   return { items, total: items.length, page: 1, page_size: 500 };
 }
@@ -1558,6 +1562,33 @@ const demoExportJob = {
   finished_at: "2026-10-08T09:00:02Z",
 };
 
+const demoReportExportJob = {
+  id: 9201,
+  kind: "core.report_export",
+  status: "succeeded",
+  title_key: "jobs.kinds.core.report_export",
+  progress_done: 1,
+  progress_total: 1,
+  progress_message: null,
+  cancel_requested: false,
+  error: null,
+  result: { rows: 12 },
+  files: [{ id: 1, name: "bericht.xlsx", content_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", size_bytes: 24 }],
+  created_by: 1,
+  created_at: "2026-10-08T09:00:00Z",
+  started_at: "2026-10-08T09:00:01Z",
+  finished_at: "2026-10-08T09:00:02Z",
+};
+
+const demoBackfillJob = {
+  ...demoReportExportJob,
+  id: 9202,
+  kind: "core.report_backfill",
+  title_key: "jobs.kinds.core.report_backfill",
+  result: null,
+  files: [],
+};
+
 export function resolveData(path: string, method: string): unknown | undefined {
   const p = path;
   // Auth
@@ -1597,6 +1628,16 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/tickets/export-jobs") && method === "POST") return { job_id: 9101, status: "queued" };
   if (p.endsWith("/api/v1/jobs/9101/cancel") && method === "POST") return { ...demoExportJob, status: "cancelled" };
   if (p.endsWith("/api/v1/jobs/9101")) return demoExportJob;
+  // Reports: `POST /reports/run` needs the body, so the MSW handler answers it (resolveReportRun).
+  if (p.endsWith("/api/v1/reports/export") && method === "POST") return { job_id: 9201, status: "queued" };
+  if (p.endsWith("/api/v1/reports") && method === "GET") return DEMO_REPORT_CATALOGUE;
+  if (p.match(/\/api\/v1\/reports\/builtin\.[a-z_]+$/) && method === "GET")
+    return demoReport(decodeURIComponent(p.split("/").pop() as string));
+  if (p.endsWith("/api/v1/reporting/status")) return DEMO_FACTS;
+  if (p.endsWith("/api/v1/admin/reporting/status")) return DEMO_REPORTING_STATUS;
+  if (p.endsWith("/api/v1/admin/reporting/backfill") && method === "POST") return { job_id: 9202, status: "queued" };
+  if (p.endsWith("/api/v1/jobs/9201")) return demoReportExportJob;
+  if (p.endsWith("/api/v1/jobs/9202")) return demoBackfillJob;
   if (p.endsWith("/api/v1/jobs")) return [];
   // Agent
   if (p.endsWith("/api/v1/queues")) return agentQueues;

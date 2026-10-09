@@ -1,5 +1,12 @@
 import { http, HttpResponse } from "msw";
-import { resolveData, demoPortalUser, demoPortalTickets, demoRefine } from "./mockData";
+import {
+  resolveData,
+  resolveReportRun,
+  demoPortalUser,
+  demoPortalTickets,
+  demoRefine,
+} from "./mockData";
+import type { ReportRunIn } from "@/lib/reportsApi";
 
 /**
  * MSW request handlers for the public demo build. Delegates to the shared pure
@@ -23,6 +30,21 @@ export const handlers = [
   // AI refine needs the request body (the segments to rewrite).
   http.post("*/api/v1/ai/refine", async ({ request }) =>
     HttpResponse.json(demoRefine((await request.json()) as Parameters<typeof demoRefine>[0])),
+  ),
+  // Report runs need the request body (report_key / definition), which resolveData never sees.
+  http.post("*/api/v1/reports/run", async ({ request }) =>
+    HttpResponse.json(resolveReportRun((await request.json()) as ReportRunIn)),
+  ),
+  // Report export download: a tiny XLSX-typed body (declared before the CSV catch-all below).
+  http.get(
+    "*/api/v1/jobs/9201/files/*",
+    () =>
+      new HttpResponse("PK demo", {
+        headers: {
+          "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "content-disposition": 'attachment; filename="bericht.xlsx"',
+        },
+      }),
   ),
   // No pictures in the demo: the avatar proxy "has nothing", so every
   // avatar shows its initials (the catch-all's JSON would be a broken image).
