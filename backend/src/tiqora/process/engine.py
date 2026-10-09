@@ -117,6 +117,7 @@ from tiqora.process.ticket_state import (
     PROCESS_ID_DF_NAME,
     get_ticket_process_state,
 )
+from tiqora.util.perl import perl_truthy
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
 from tiqora.znuny.history import add_pending_time
 from tiqora.znuny.sysconfig import SysConfig
@@ -799,7 +800,7 @@ async def _action_article_send(
     t = await _ticket_must_exist(session, ticket_id)
     article = ArticleIn(
         sender_type="agent",
-        is_visible_for_customer=bool(config.get("IsVisibleForCustomer", 1)),
+        is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer", 1)),
         subject=subject,
         body=body,
         channel="email",
@@ -840,7 +841,7 @@ async def _action_ticket_article_create(
     channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
     article = ArticleIn(
         sender_type=str(sender_type),
-        is_visible_for_customer=bool(config.get("IsVisibleForCustomer", 0)),
+        is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer", 0)),
         subject=str(config.get("Subject", "")),
         body=str(config.get("Body", "")),
         channel=channel,
@@ -1184,7 +1185,7 @@ async def _action_ticket_create(
         channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
         article = ArticleIn(
             sender_type=str(config["SenderType"]),
-            is_visible_for_customer=bool(config.get("IsVisibleForCustomer")),
+            is_visible_for_customer=perl_truthy(config.get("IsVisibleForCustomer")),
             subject=str(config.get("Subject") or title),
             body=str(config.get("Body") or ""),
             channel=channel,
@@ -1513,7 +1514,7 @@ async def _apply_dialog_field_changes(
         channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
         article = ArticleIn(
             sender_type=str(field_values.get("SenderType") or "agent"),
-            is_visible_for_customer=bool(field_values.get("IsVisibleForCustomer", False)),
+            is_visible_for_customer=perl_truthy(article_field_cfg.get("IsVisibleForCustomer", 0)),
             subject=str(field_values.get("Subject", "")),
             body=str(field_values.get("Body", "")),
             channel=channel,
