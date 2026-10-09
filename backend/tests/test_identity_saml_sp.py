@@ -15,7 +15,7 @@ import pytest
 
 from tests._saml_idp import IDP_ENTITY_ID, IDP_SLO_URL, SamlTestIdp, require_saml, saml_record
 from tiqora.config import Settings
-from tiqora.identity.saml_sp import SamlResponseInvalid, SamlServiceProvider
+from tiqora.identity.saml_sp import MAX_MESSAGE_CHARS, SamlResponseInvalid, SamlServiceProvider
 from tiqora.identity.sso_sessions import SsoSessionInfo
 
 pytestmark = [pytest.mark.saml]
@@ -750,3 +750,90 @@ async def test_sha1_inside_encrypted_assertion_rejected_unless_opted_in(
         b64, outstanding={req_id: AGENT_ACS}, expected_acs=AGENT_ACS
     )
     assert res.name_id == "u-1001"
+
+
+# --------------------------------------------------------------------------- T21 fix round 1
+
+
+def _signed_logout_xml(idp: SamlTestIdp, mutate: Any) -> str:
+    """A LogoutRequest whose XML is rewritten by *mutate* and THEN validly signed by the IdP."""
+    from saml2.saml import NameID  # noqa: PLC0415
+
+    _rid, req = idp._server.create_logout_request(
+        SP_SLO,
+        idp.entity_id,
+        name_id=NameID(
+            text="u-1001", format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
+        ),
+        session_indexes=["s1"],
+        sign=False,
+    )
+    return idp._redirect(mutate(str(req)), SP_SLO, response=False)
+
+
+@pytest.fixture
+def parse_spy(sp: SamlServiceProvider, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    calls: list[str] = []
+    client = sp._ensure()
+
+    def spy(name: str) -> Any:
+        real = getattr(client, name)
+
+        def wrapped(*a: Any, **k: Any) -> Any:
+            calls.append(name)
+            return real(*a, **k)
+
+        return wrapped
+
+    for name in ("parse_logout_request", "parse_logout_request_response"):
+        monkeypatch.setattr(client, name, spy(name))
+    return calls
+
+
+async def test_logout_request_signature_checked_before_parsing(
+    sp: SamlServiceProvider, idp: SamlTestIdp, tmp_path: Path, parse_spy: list[str]
+) -> None:
+    url = idp.logout_request_redirect(sp_slo_url=SP_SLO, name_id="u-1001", session_index="s1")
+    forged = _logout_call(url, signature=base64.b64encode(b"x" * 256).decode(), raw_query=None)
+    assert await _logout_reject(sp, forged) == "logout_signature"
+    foreign = SamlTestIdp(tmp_path).logout_request_redirect(
+        sp_slo_url=SP_SLO, name_id="u-1001", session_index="s1"
+    )
+    assert await _logout_reject(sp, _logout_call(foreign)) == "logout_signature"
+    unsigned = _logout_call(url, sigalg=None, signature=None)
+    assert await _logout_reject(sp, unsigned) == "logout_unsigned"
+    oversized = _logout_call(url, saml_request="A" * (MAX_MESSAGE_CHARS + 1), raw_query=None)
+    assert await _logout_reject(sp, oversized) == "too_large"
+    assert parse_spy == []  # nothing unverified reached pysaml2
+
+    args = _logout_call(url)
+    await sp.handle_logout_request(str(args.pop("saml_request")), **args)  # type: ignore[arg-type]
+    assert parse_spy == ["parse_logout_request"]
+
+
+async def test_signed_inflate_bomb_and_dtd_refused_before_pysaml2(
+    sp: SamlServiceProvider, idp: SamlTestIdp, parse_spy: list[str]
+) -> None:
+    bomb = _signed_logout_xml(idp, lambda xml: xml + "<!--" + "A" * (3 * 1024 * 1024) + "-->")
+    args = _logout_call(bomb)
+    assert len(str(args["saml_request"])) < 64 * 1024  # small on the wire
+    assert await _logout_reject(sp, args) == "too_large"
+
+    def with_dtd(xml: str) -> str:
+        decl, sep, rest = xml.partition("?>")
+        doctype = '<!DOCTYPE x [<!ENTITY e "boom">]>'
+        return f"{decl}{sep}{doctype}{rest}" if sep else doctype + xml
+
+    assert await _logout_reject(sp, _logout_call(_signed_logout_xml(idp, with_dtd))) == "dtd"
+    assert parse_spy == []
+
+
+async def test_logout_response_signature_checked_before_parsing(
+    sp: SamlServiceProvider, idp: SamlTestIdp, parse_spy: list[str]
+) -> None:
+    url = idp.logout_response_redirect(sp_slo_url=SP_SLO, in_response_to="id-logout-9")
+    forged = _response_call(url, signature=base64.b64encode(b"x" * 256).decode(), raw_query=None)
+    assert await _response_reject(sp, forged) == "logout_signature"
+    assert parse_spy == []
+    assert await sp.parse_logout_response(**_response_call(url)) == "id-logout-9"
+    assert parse_spy == ["parse_logout_request_response"]

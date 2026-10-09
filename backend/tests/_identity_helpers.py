@@ -247,6 +247,7 @@ class OidcSigner:
         key: Any = None,
         kid: str | None = None,
         alg: str = "RS256",
+        typ: str | None = None,
     ) -> str:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
@@ -257,6 +258,8 @@ class OidcSigner:
             "alg": alg,
             "kid": kid if kid is not None else use.as_dict()["kid"],
         }
+        if typ is not None:
+            header["typ"] = typ
         return jwt.encode(header, claims, use).decode("ascii")
 
     def id_token(self, *, iss: str, aud: str, sub: str, nonce: str | None, **extra: Any) -> str:

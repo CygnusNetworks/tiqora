@@ -26,13 +26,16 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import re
 import secrets
 import time
 import warnings
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
 import httpx
+import structlog
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 with warnings.catch_warnings():
@@ -46,7 +49,16 @@ from tiqora.security.outbound import OutboundURLError, pin_outbound_url
 if TYPE_CHECKING:
     from tiqora.identity.config_models import OidcProviderConfig
 
+logger = structlog.get_logger(__name__)
+
 _DISCOVERY_TTL = 3600.0
+# Every IdP call is bounded in time and size (a slow or hostile IdP must not pin a worker
+# or exhaust memory): connect/read/write/pool 10 s, bodies read streamed up to the cap.
+_HTTP_TIMEOUT = httpx.Timeout(10.0)
+_MAX_DOCUMENT_BYTES = 256 * 1024
+# Microsoft's multi-tenant discovery ("common"/"organizations") publishes this placeholder.
+TENANT_PLACEHOLDER = "{tenantid}"
+_GUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 # issuer (+ private-network flag) -> (fetched monotonic, document); shared per process.
 _DISCOVERY_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
 
@@ -106,6 +118,7 @@ class OidcClientConfig:
     redirect_uri: str
     pkce: Literal["auto", "always", "never"] = "auto"
     allow_private_network: bool = False
+    allowed_tenant_ids: tuple[str, ...] = ()  # Entra multi-tenant issuer: empty = any tenant
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +147,7 @@ def oidc_client_config(cfg: OidcProviderConfig, *, redirect_uri: str) -> OidcCli
         redirect_uri=redirect_uri,
         pkce=cfg.pkce,
         allow_private_network=cfg.allow_private_network,
+        allowed_tenant_ids=tuple(cfg.allowed_tenant_ids),
     )
 
 
@@ -178,7 +192,12 @@ def _num(claims: dict[str, Any], name: str) -> float | None:
     return float(value)
 
 
-def check_audience(claims: dict[str, Any], client_id: str) -> None:
+def _shown(value: Any) -> str:
+    """A claim value for a diagnostic log line (never a whole token), shortened."""
+    return repr(value)[:200]
+
+
+def check_audience(claims: Mapping[str, Any], client_id: str) -> None:
     """``aud`` holds *client_id*; with several audiences ``azp`` must name it (Core 3.1.3.7)."""
     aud = claims.get("aud")
     audiences = [aud] if isinstance(aud, str) else aud
@@ -187,12 +206,87 @@ def check_audience(claims: dict[str, Any], client_id: str) -> None:
         or not all(isinstance(a, str) for a in audiences)
         or client_id not in audiences
     ):
+        logger.warning("oidc_token_aud_mismatch", expected=client_id, received=_shown(aud))
         raise OIDCTokenInvalid("aud")
     azp = claims.get("azp")
-    if azp is not None and azp != client_id:
+    if (azp is not None and azp != client_id) or (len(audiences) > 1 and azp is None):
+        logger.warning("oidc_token_azp_mismatch", expected=client_id, received=_shown(azp))
         raise OIDCTokenInvalid("azp")
-    if len(audiences) > 1 and azp is None:
-        raise OIDCTokenInvalid("azp")
+
+
+def resolve_issuer(
+    template: str, claims: Mapping[str, Any], allowed_tenant_ids: Sequence[str] = ()
+) -> str:
+    """The issuer a token must carry.
+
+    Microsoft's multi-tenant discovery issuer contains ``{tenantid}``: the token's ``tid``
+    (required, GUID form) is substituted before the exact comparison, and a non-empty
+    *allowed_tenant_ids* limits which tenants are accepted. Any other issuer is returned as is.
+    """
+    if TENANT_PLACEHOLDER not in template:
+        return template
+    tid = claims.get("tid")
+    if not isinstance(tid, str) or not _GUID_RE.fullmatch(tid.lower()):
+        logger.warning("oidc_token_tid_invalid", received=_shown(tid))
+        raise OIDCTokenInvalid("tid")
+    tid = tid.lower()
+    if allowed_tenant_ids and tid not in {t.lower() for t in allowed_tenant_ids}:
+        logger.warning("oidc_token_tenant_not_allowed", received=tid)
+        raise OIDCTokenInvalid("tenant")
+    return template.replace(TENANT_PLACEHOLDER, tid)
+
+
+def check_issuer(
+    claims: Mapping[str, Any], template: str, allowed_tenant_ids: Sequence[str] = ()
+) -> None:
+    expected = resolve_issuer(template, claims, allowed_tenant_ids)
+    if claims.get("iss") != expected:
+        logger.warning(
+            "oidc_token_iss_mismatch", expected=expected, received=_shown(claims.get("iss"))
+        )
+        raise OIDCTokenInvalid("iss")
+
+
+async def _read_capped(resp: httpx.Response, max_bytes: int) -> bytes:
+    """Body of a streamed response, refusing anything over *max_bytes*."""
+    declared = resp.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > max_bytes:
+        raise OIDCError("response too large")
+    body = bytearray()
+    async for chunk in resp.aiter_bytes():
+        body += chunk
+        if len(body) > max_bytes:
+            raise OIDCError("response too large")
+    return bytes(body)
+
+
+async def _json_request(
+    transport: httpx.AsyncBaseTransport | None,
+    method: str,
+    url: str,
+    *,
+    http_timeout: httpx.Timeout = _HTTP_TIMEOUT,
+    max_bytes: int = _MAX_DOCUMENT_BYTES,
+    **kwargs: Any,
+) -> Any:
+    """One bounded IdP call (no redirects, timeout, streamed size cap); the decoded JSON.
+
+    Raises :class:`OIDCError` for an error status, an oversized body or invalid JSON, and
+    lets ``httpx.HTTPError`` (connect/timeout) through.
+    """
+    async with (
+        httpx.AsyncClient(
+            transport=transport, follow_redirects=False, timeout=http_timeout
+        ) as client,
+        client.stream(method, url, **kwargs) as resp,
+    ):
+        if resp.status_code >= 400:
+            raise OIDCError(f"HTTP {resp.status_code} from {method} {url}")
+        body = await _read_capped(resp, max_bytes)
+    try:
+        return json.loads(body)
+    except ValueError as exc:
+        raise OIDCError("response is not JSON") from exc
 
 
 class OIDCService:
@@ -219,10 +313,9 @@ class OIDCService:
             return hit[1]
         url = self._config.issuer.rstrip("/") + "/.well-known/openid-configuration"
         request_url, headers, extensions = self._safe_get_url(url)
-        async with httpx.AsyncClient(transport=self._transport, follow_redirects=False) as client:
-            resp = await client.get(request_url, headers=headers, extensions=extensions)
-            resp.raise_for_status()
-            doc = resp.json()
+        doc = await _json_request(
+            self._transport, "GET", request_url, headers=headers, extensions=extensions
+        )
         if not isinstance(doc, dict):
             raise OIDCError("provider discovery returned no JSON object")
         _DISCOVERY_CACHE[key] = (time.monotonic(), doc)
@@ -279,14 +372,15 @@ class OIDCService:
             raise OIDCError("provider discovery is missing jwks_uri")
         request_url, headers, extensions = self._safe_get_url(uri)
         try:
-            async with httpx.AsyncClient(
-                transport=self._transport, follow_redirects=False, timeout=_JWKS_TIMEOUT
-            ) as client:
-                resp = await client.get(request_url, headers=headers, extensions=extensions)
-                resp.raise_for_status()
-                if len(resp.content) > _MAX_JWKS_BYTES:
-                    raise OIDCError("JWKS document too large")
-                doc = resp.json()
+            doc = await _json_request(
+                self._transport,
+                "GET",
+                request_url,
+                http_timeout=_JWKS_TIMEOUT,
+                max_bytes=_MAX_JWKS_BYTES,
+                headers=headers,
+                extensions=extensions,
+            )
         except (httpx.HTTPError, ValueError) as exc:
             raise OIDCError(f"JWKS fetch failed: {exc}") from exc
         if not isinstance(doc, dict) or not isinstance(doc.get("keys"), list):
@@ -294,8 +388,16 @@ class OIDCService:
         _JWKS_CACHE[key] = (time.monotonic(), doc)
         return doc
 
+    @property
+    def allowed_tenant_ids(self) -> tuple[str, ...]:
+        return self._config.allowed_tenant_ids
+
     async def verify_jwt(self, token: str) -> dict[str, Any]:
-        """Signature check of a compact JWS against the JWKS; returns the (unchecked) claims.
+        """Signature check of a compact JWS against the JWKS; returns the (unchecked) claims."""
+        return (await self.decode_jwt(token))[1]
+
+    async def decode_jwt(self, token: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Signature check of a compact JWS against the JWKS; ``(header, claims)`` unchecked.
 
         Only :data:`JWT_ALGORITHMS`; the key is chosen by ``kid`` (and key type), an unknown
         ``kid`` triggers one rate-limited JWKS refetch. Claim checks are the caller's job.
@@ -305,6 +407,9 @@ class OIDCService:
         header = _jwt_header(token)
         alg = header.get("alg")
         if not isinstance(alg, str) or alg not in JWT_ALGORITHMS:
+            logger.warning(
+                "oidc_token_alg_rejected", expected=list(JWT_ALGORITHMS), received=_shown(alg)
+            )
             raise OIDCTokenInvalid("alg")
         kid = header.get("kid")
         if kid is not None and not isinstance(kid, str):
@@ -313,20 +418,20 @@ class OIDCService:
         if jwk is None:
             jwk = _select_jwk(await self.jwks(refresh=True), kid, alg)
         if jwk is None:
+            logger.warning("oidc_token_unknown_kid", received=_shown(kid), alg=alg)
             raise OIDCTokenInvalid("unknown_kid")
         try:
             public = {k: v for k, v in jwk.items() if k not in ("d", "p", "q", "dp", "dq", "qi")}
             claims = JsonWebToken(list(JWT_ALGORITHMS)).decode(token, JsonWebKey.import_key(public))
         except Exception as exc:  # noqa: BLE001 - bad signature, malformed key or payload
             raise OIDCTokenInvalid(f"signature:{type(exc).__name__}") from exc
-        return dict(claims)
+        return header, dict(claims)
 
     async def verify_id_token(self, id_token: str, *, nonce: str | None) -> dict[str, Any]:
         """Verified id_token claims (OIDC Core 3.1.3.7): signature, iss, aud/azp, exp, iat,
         ``sub`` and ``nonce`` (when the flow stored one; pre-upgrade env states have none)."""
         claims = await self.verify_jwt(id_token)
-        if claims.get("iss") != await self.expected_issuer():
-            raise OIDCTokenInvalid("iss")
+        check_issuer(claims, await self.expected_issuer(), self._config.allowed_tenant_ids)
         check_audience(claims, self._config.client_id)
         now = time.time()
         exp, iat, nbf = _num(claims, "exp"), _num(claims, "iat"), _num(claims, "nbf")
@@ -415,18 +520,15 @@ class OIDCService:
                 form["code_verifier"] = code_verifier
             post_headers = dict(token_headers)
             post_headers["Content-Type"] = "application/x-www-form-urlencoded"
-            async with httpx.AsyncClient(
-                transport=self._transport, follow_redirects=False
-            ) as token_client:
-                token_resp = await token_client.post(
-                    token_url,
-                    data=form,
-                    headers=post_headers,
-                    extensions=token_ext,
-                    auth=(self._config.client_id, self._config.client_secret),
-                )
-                token_resp.raise_for_status()
-                token = token_resp.json()
+            token = await _json_request(
+                self._transport,
+                "POST",
+                token_url,
+                data=form,
+                headers=post_headers,
+                extensions=token_ext,
+                auth=(self._config.client_id, self._config.client_secret),
+            )
         except (httpx.HTTPError, ValueError) as exc:  # normalize provider errors
             raise OIDCError(f"token exchange failed: {exc}") from exc
         if not isinstance(token, dict):
@@ -439,9 +541,10 @@ class OIDCService:
         )
         claims = await self._userinfo(disc, token)
         if id_claims is not None:
+            # Core 5.3.2: userinfo MUST carry sub and it must be the id_token's.
             user_sub = claims.get("sub")
-            if user_sub is not None and str(user_sub) != id_claims["sub"]:
-                raise OIDCError("userinfo subject does not match the id_token subject")
+            if user_sub is None or str(user_sub) != id_claims["sub"]:
+                raise OIDCError("userinfo subject missing or not the id_token subject")
         return OidcLoginResult(claims=claims, id_token=id_token, id_token_claims=id_claims)
 
     async def _userinfo(self, disc: dict[str, Any], token: dict[str, Any]) -> dict[str, Any]:
@@ -450,17 +553,18 @@ class OIDCService:
             if not isinstance(userinfo_endpoint, str):
                 raise OIDCError("provider discovery has invalid userinfo_endpoint")
             request_url, headers, extensions = self._safe_get_url(userinfo_endpoint)
+            auth_headers = dict(headers)
+            access = token.get("access_token")
+            if access:
+                auth_headers["Authorization"] = f"Bearer {access}"
             try:
-                async with httpx.AsyncClient(
-                    transport=self._transport, follow_redirects=False
-                ) as raw:
-                    auth_headers = dict(headers)
-                    access = token.get("access_token")
-                    if access:
-                        auth_headers["Authorization"] = f"Bearer {access}"
-                    resp = await raw.get(request_url, headers=auth_headers, extensions=extensions)
-                    resp.raise_for_status()
-                    claims = resp.json()
+                claims = await _json_request(
+                    self._transport,
+                    "GET",
+                    request_url,
+                    headers=auth_headers,
+                    extensions=extensions,
+                )
             except (httpx.HTTPError, ValueError) as exc:
                 raise OIDCError(f"userinfo request failed: {exc}") from exc
             if not isinstance(claims, dict):

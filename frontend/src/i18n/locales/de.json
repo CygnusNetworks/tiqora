@@ -3992,6 +3992,10 @@
             },
             "backchannel_logout": {
               "label": "Abmeldung durch den Anmeldedienst annehmen"
+            },
+            "allowed_tenant_ids": {
+              "label": "Erlaubte Microsoft-Mandanten-IDs",
+              "help": "Nur für Microsoft Entra mit der mandantenübergreifenden Adresse (common/organizations): nur Anmeldungen aus diesen Mandanten. Leer = jeder Mandant."
             }
           }
         },

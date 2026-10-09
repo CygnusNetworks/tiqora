@@ -115,6 +115,7 @@ policies, ACL/limits and the operation-mode gate are all managed in admin
 | `TIQORA_OIDC_SCOPES` | `openid profile email` | |
 | `TIQORA_OIDC_CLAIM` | `preferred_username` | Claim mapped to `users.login`. No auto-provisioning — the claim value must match an existing, valid user. |
 | `TIQORA_OIDC_REDIRECT_URI` | *(empty)* | e.g. `https://tickets.example.com/api/v1/auth/oidc/callback` |
+| `TIQORA_OIDC_BACKCHANNEL_LOGOUT` | `false` | `true` enables back-channel logout at `/api/v1/auth/oidc/env-oidc/backchannel-logout` |
 
 ### Kerberos / SPNEGO
 

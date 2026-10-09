@@ -213,6 +213,11 @@ class Settings(BaseSettings):
     oidc_scopes: str = Field(default="openid profile email", validation_alias="TIQORA_OIDC_SCOPES")
     oidc_claim: str = Field(default="preferred_username", validation_alias="TIQORA_OIDC_CLAIM")
     oidc_redirect_uri: str = Field(default="", validation_alias="TIQORA_OIDC_REDIRECT_URI")
+    # Back-channel logout of the env OIDC provider: off unless explicitly enabled, so an
+    # upgrade adds no new unauthenticated endpoint for existing installs.
+    oidc_backchannel_logout: bool = Field(
+        default=False, validation_alias="TIQORA_OIDC_BACKCHANNEL_LOGOUT"
+    )
 
     # Kerberos / SPNEGO (Phase 3c). Off by default; requires the optional
     # `kerberos` extra (gssapi) and a keytab reachable via KRB5_KTNAME.

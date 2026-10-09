@@ -7,6 +7,7 @@ Secrets are ``SecretStr | None``.
 
 from __future__ import annotations
 
+import re
 import ssl
 from collections.abc import Mapping
 from typing import Annotated, Any, Final, Literal
@@ -15,6 +16,8 @@ from pydantic import BaseModel, Field, SecretStr, field_validator
 
 from tiqora.identity.types import GroupPermission, ProviderKind
 from tiqora.settings_sections.section import SECRET_MASK, field_kind
+
+_GUID_RE: Final = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 # Row ids must fit a 32-bit INT column (otherwise PostgreSQL fails the bind with a 500).
 DbId = Annotated[int, Field(ge=1, le=2_147_483_647)]
@@ -30,6 +33,24 @@ class OidcProviderConfig(BaseModel):
     email_must_be_verified: bool = True
     allow_private_network: bool = False  # self-hosted Keycloak in RFC1918
     backchannel_logout: bool = True
+    # Microsoft Entra "common"/"organizations": only these tenant ids (GUID); empty = any.
+    allowed_tenant_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("allowed_tenant_ids")
+    @classmethod
+    def _normalize_tenants(cls, value: list[str]) -> list[str]:
+        out: list[str] = []
+        for raw in value:
+            tid = raw.strip().lower()
+            if not tid:
+                continue
+            if not _GUID_RE.fullmatch(tid):
+                raise ValueError(
+                    f"Mandanten-ID {raw.strip()!r} ungültig: erwartet wird eine GUID "
+                    "wie 9188040d-6c67-4c5b-b112-36a304b66dad."
+                )
+            out.append(tid)
+        return list(dict.fromkeys(out))
 
 
 NameIdFormat = Literal["unspecified", "emailAddress", "persistent", "transient"]

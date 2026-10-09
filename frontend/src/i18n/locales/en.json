@@ -3992,6 +3992,10 @@
             },
             "backchannel_logout": {
               "label": "Accept sign-out by the sign-in service"
+            },
+            "allowed_tenant_ids": {
+              "label": "Allowed Microsoft tenant IDs",
+              "help": "Only for Microsoft Entra with the multi-tenant address (common/organizations): sign-ins from these tenants only. Empty = every tenant."
             }
           }
         },

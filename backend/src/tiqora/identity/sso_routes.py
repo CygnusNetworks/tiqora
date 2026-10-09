@@ -13,7 +13,7 @@ import secrets
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, Final
-from urllib.parse import quote, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 import defusedxml.ElementTree as safe_et
 import httpx
@@ -68,6 +68,7 @@ from tiqora.identity.saml_metadata import (
 from tiqora.identity.saml_runtime import SamlUnavailable, saml_availability
 from tiqora.identity.saml_sp import (
     LOGOUT_REQUEST_MAX_AGE,
+    MAX_MESSAGE_CHARS,
     MAX_RESPONSE_BYTES,
     SamlResponseInvalid,
     SamlServiceProvider,
@@ -585,7 +586,9 @@ async def _finish_oidc_callback(
         )
 
     claims = result.claims
-    sub_raw = claims.get("sub")
+    # The verified id_token's sub is the subject when there is one (userinfo must agree,
+    # enforced by fetch_tokens_and_claims); otherwise the userinfo sub as before.
+    sub_raw = (result.id_token_claims or {}).get("sub") or claims.get("sub")
     subject = (
         str(sub_raw)
         if isinstance(sub_raw, (str, int)) and not isinstance(sub_raw, bool) and str(sub_raw)
@@ -1240,6 +1243,16 @@ async def handle_sls(
     relay_state = _text_field(fields.get("RelayState"))
     sigalg = _text_field(fields.get("SigAlg"))
     signature = _text_field(fields.get("Signature"))
+    # Same size limit as the ACS, before any lookup or decoding.
+    if saml_request and len(saml_request) > MAX_MESSAGE_CHARS:
+        logger.warning("saml_logout_request_rejected", slug=slug[:64], reason="too_large")
+        return _logout_request_rejected()
+    if saml_response and len(saml_response) > MAX_MESSAGE_CHARS:
+        # ignored like any other unverifiable response
+        return RedirectResponse(
+            logged_out_path(await _sls_fallback_kind(session, settings, slug)),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
     if saml_response:
         state = await _consume_logout_response(
             request,
@@ -1403,6 +1416,22 @@ def _backchannel_error(http_status: int = status.HTTP_400_BAD_REQUEST) -> Respon
     return JSONResponse({"error": "invalid_request"}, status_code=http_status, headers=_NO_STORE)
 
 
+async def _read_form_capped(request: Request, max_bytes: int) -> dict[str, list[str]] | None:
+    """The urlencoded body read streamed with a hard cap; None when oversized or malformed."""
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > max_bytes:
+        return None
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > max_bytes:
+            return None
+    try:
+        return parse_qs(body.decode("ascii"), keep_blank_values=True, strict_parsing=bool(body))
+    except (UnicodeDecodeError, ValueError):
+        return None
+
+
 async def handle_backchannel_logout(
     request: Request,
     *,
@@ -1412,14 +1441,39 @@ async def handle_backchannel_logout(
 ) -> Response:
     """OIDC Back-Channel Logout 1.0 receiver (server to server, cookie-less, CSRF-exempt).
 
-    404 when the slug is no OIDC provider or back-channel logout is switched off; 429 over the
-    per-IP limit; 400 for every invalid token, a replayed ``jti`` or a failed revocation; 200
-    with ``Cache-Control: no-store`` after the matching sessions of both audiences are gone.
+    Order: per-IP rate limit (429, before anything else is looked at), then the form body
+    (urlencoded, streamed, 64 KB cap), then the provider (404 when the slug is no OIDC provider
+    or back-channel logout is off; env-oidc only with TIQORA_OIDC_BACKCHANNEL_LOGOUT=true).
+    400 for every invalid token, a replayed ``jti`` or a failed revocation; 200 with
+    ``Cache-Control: no-store`` after the matching sessions of both audiences are gone.
     """
+    redis = await get_redis(request)
+    retry_after = await oidc_backchannel.rate_limited(
+        redis, client_ip(request, settings.trusted_proxies)
+    )
+    if retry_after:
+        logger.warning("oidc_backchannel_rate_limited", slug=slug[:64])
+        return JSONResponse(
+            {"error": "rate_limited"},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={**_NO_STORE, "Retry-After": str(retry_after)},
+        )
+
+    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if content_type != "application/x-www-form-urlencoded":
+        logger.warning("oidc_backchannel_rejected", slug=slug[:64], reason="content_type")
+        return _backchannel_error()
+    form = await _read_form_capped(request, _BACKCHANNEL_MAX_BODY)
+    tokens = form.get("logout_token") if form is not None else None
+    if not tokens or len(tokens) != 1 or not tokens[0]:
+        logger.warning("oidc_backchannel_rejected", slug=slug[:64], reason="request_format")
+        return _backchannel_error()
+    token = tokens[0]
+
     try:
         record = await _load_provider(session, settings, slug)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("sso_provider_lookup_failed", slug=slug, error=type(exc).__name__)
+        logger.warning("sso_provider_lookup_failed", slug=slug[:64], error=type(exc).__name__)
         return _backchannel_error()
     cfg = runtime_config(record, settings) if record is not None else None
     if (
@@ -1431,34 +1485,6 @@ async def handle_backchannel_logout(
         return JSONResponse(
             {"detail": "Not Found"}, status_code=status.HTTP_404_NOT_FOUND, headers=_NO_STORE
         )
-    redis = await get_redis(request)
-    retry_after = await oidc_backchannel.rate_limited(
-        redis, record.id, client_ip(request, settings.trusted_proxies)
-    )
-    if retry_after:
-        logger.warning("oidc_backchannel_rate_limited", slug=slug)
-        return JSONResponse(
-            {"error": "rate_limited"},
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            headers={**_NO_STORE, "Retry-After": str(retry_after)},
-        )
-
-    content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
-    declared = request.headers.get("content-length", "")
-    if content_type != "application/x-www-form-urlencoded" or (
-        declared.isdigit() and int(declared) > _BACKCHANNEL_MAX_BODY
-    ):
-        logger.warning("oidc_backchannel_rejected", slug=slug, reason="request_format")
-        return _backchannel_error()
-    try:
-        form = await request.form()
-    except Exception:  # noqa: BLE001 - malformed body
-        logger.warning("oidc_backchannel_rejected", slug=slug, reason="form")
-        return _backchannel_error()
-    token = form.get("logout_token")
-    if not isinstance(token, str) or not token:
-        logger.warning("oidc_backchannel_rejected", slug=slug, reason="no_token")
-        return _backchannel_error()
 
     try:
         service = new_oidc_service(oidc_client_config(cfg, redirect_uri=""))
@@ -1472,6 +1498,9 @@ async def handle_backchannel_logout(
     except (OIDCError, httpx.HTTPError, ValueError) as exc:  # discovery unreachable
         logger.warning("oidc_backchannel_rejected", slug=slug, reason=type(exc).__name__)
         return _backchannel_error()
+    # The jti is marked BEFORE the revocation: if the revocation fails the IdP's retry of the
+    # same token is refused as a replay (400 either way, the IdP sees a failed logout). This
+    # trade-off keeps a token from ever acting twice; the user can still log out locally.
     if not await flow_state.mark_jti_seen(redis, record.id, verified.jti):
         logger.warning("oidc_backchannel_rejected", slug=slug, reason="replay")
         return _backchannel_error()

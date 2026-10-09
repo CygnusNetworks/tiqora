@@ -64,9 +64,11 @@ from tiqora.domain.oidc import (
 )
 from tiqora.identity import oidc_backchannel, sso_routes
 from tiqora.identity.config_models import AttributeMap
-from tiqora.identity.oidc_backchannel import BACKCHANNEL_EVENT
+from tiqora.identity.oidc_backchannel import BACKCHANNEL_EVENT, LogoutTokenInvalid
+from tiqora.identity.saml_sp import MAX_MESSAGE_CHARS
 from tiqora.identity.sso_sessions import SsoSessionInfo, store_sso, tokens_for
 from tiqora.identity.store import ProviderChanges, get_provider_by_slug, update_provider
+from tiqora.identity.types import subject_hash
 
 pytestmark = pytest.mark.db
 
@@ -171,25 +173,30 @@ class Env:
         sid: str | None,
         customer: bool = False,
         id_token: Any = None,
+        userinfo: dict[str, Any] | None = None,
+        slug: str = OIDC_SLUG,
+        issuer: str = ISSUER,
     ) -> httpx.Response:
         """One OIDC login through the real routes. ``id_token``: None = a valid signed token
         (with *sid*), a callable ``(nonce) -> str | None`` = custom token / no token."""
         prefix = "/api/portal/auth" if customer else "/api/v1/auth"
-        q = await self.start(f"{prefix}/sso/{OIDC_SLUG}/login")
+        q = await self.start(f"{prefix}/sso/{slug}/login")
         code = self.code()
-        self.oidc.claims[code] = {"sub": sub, "preferred_username": login}
+        self.oidc.claims[code] = (
+            userinfo if userinfo is not None else {"sub": sub, "preferred_username": login}
+        )
         nonce = q["nonce"][0]
         if id_token is None:
             extra = {"sid": sid} if sid is not None else {}
             token: str | None = self.oidc.signer.id_token(
-                iss=ISSUER, aud="tiqora", sub=sub, nonce=nonce, **extra
+                iss=issuer, aud="tiqora", sub=sub, nonce=nonce, **extra
             )
         else:
             token = id_token(nonce)
         if token is not None:
             self.oidc.id_tokens[code] = token
         resp = await self.client.get(
-            f"{prefix}/oidc/{OIDC_SLUG}/callback", params={"code": code, "state": q["state"][0]}
+            f"{prefix}/oidc/{slug}/callback", params={"code": code, "state": q["state"][0]}
         )
         return resp
 
@@ -372,6 +379,7 @@ async def test_backchannel_rejects(env: Env) -> None:
         "unknown_kid": env.oidc.signer.sign(good_claims, key=OidcSigner("k-x").key),
         "alg_none": _unsigned({"alg": "none", "kid": "k1"}, good_claims),
         "alg_hs256_with_public_key": _hs256(good_claims, jwk_n),
+        "typ_access_token": env.oidc.signer.sign(good_claims, typ="at+jwt"),
         "garbage": "not-a-jwt",
         "empty": "",
     }
@@ -526,7 +534,8 @@ async def test_provider_without_id_token_keeps_working(env: Env) -> None:
 
 
 class _JwksIdp:
-    def __init__(self) -> None:
+    def __init__(self, issuer: str = "https://jwks.example.org") -> None:
+        self.issuer = issuer
         self.signer = OidcSigner()
         self.jwks_hits = 0
         self.timeouts: list[dict[str, Any]] = []
@@ -536,10 +545,7 @@ class _JwksIdp:
         if request.url.path.endswith("/.well-known/openid-configuration"):
             return httpx.Response(
                 200,
-                json={
-                    "issuer": "https://jwks.example.org",
-                    "jwks_uri": "https://jwks.example.org/jwks",
-                },
+                json={"issuer": self.issuer, "jwks_uri": "https://jwks.example.org/jwks"},
             )
         if request.url.path == "/jwks":
             self.jwks_hits += 1
@@ -550,13 +556,14 @@ class _JwksIdp:
         return httpx.Response(404)
 
 
-def _jwks_service(fake: _JwksIdp) -> OIDCService:
+def _jwks_service(fake: _JwksIdp, allowed_tenant_ids: tuple[str, ...] = ()) -> OIDCService:
     cfg = OidcClientConfig(
         issuer="https://jwks.example.org",
         client_id="tiqora",
         client_secret="x",
         scopes="openid",
         redirect_uri="",
+        allowed_tenant_ids=allowed_tenant_ids,
     )
     return OIDCService(cfg, transport=httpx.MockTransport(fake.handler))
 
@@ -695,6 +702,13 @@ async def _saml_login(env: Env, idp: SamlTestIdp, user_id: int) -> str:
     return token
 
 
+def _with_relay_state(query: str, value: str) -> str:
+    """The signed query with its RelayState swapped (or added) — the signature stays as is."""
+    parts = [p for p in query.split("&") if not p.startswith("RelayState=")]
+    parts.insert(1, f"RelayState={value}")
+    return "&".join(parts)
+
+
 def _request_id(url: str) -> str:
     raw = parse_qs(urlparse(url).query)["SAMLRequest"][0]
     xml = zlib.decompress(base64.b64decode(raw), -15).decode()
@@ -760,12 +774,21 @@ async def test_idp_logout_request_rejects(env: Env, idp: SamlTestIdp, tmp_path: 
         "stale": f"{SLS_PATH}?{urlparse(req(issue_instant='2026-01-01T00:00:00Z')).query}",
         "tampered_signature": f"{SLS_PATH}?{q[:-6]}AAAAAA",
         "unknown_provider": f"/api/v1/auth/saml/idptest-bcl-none/sls?{q}",
+        "relay_state_appended": f"{SLS_PATH}?{q}&RelayState=%2Fevil",
+        "relay_state_replaced": f"{SLS_PATH}?{_with_relay_state(q, 'evil')}",
     }
     for name, path in cases.items():
         resp = await env.client.get(path)
         assert resp.status_code == 400, (name, resp.status_code, resp.text)
         assert resp.json() == {"detail": "Invalid logout request"}, name
         assert await _alive(env, victim), name
+
+    # oversized POST body: Starlette's form parser refuses a >1 MB field -> nothing processed
+    huge = await env.client.post(
+        SLS_PATH, content=urlencode({"SAMLRequest": "A" * (MAX_MESSAGE_CHARS + 1)}), headers=FORM
+    )
+    assert huge.status_code == 303
+    assert await _alive(env, victim)
 
     # POST binding is not offered for LogoutRequests
     form = {k: v[0] for k, v in parse_qs(q).items()}
@@ -782,6 +805,28 @@ async def test_idp_logout_request_rejects(env: Env, idp: SamlTestIdp, tmp_path: 
     replay = await env.client.get(f"{SLS_PATH}?{q}")
     assert replay.status_code == 400
     assert await _alive(env, later)
+
+
+@pytest.mark.saml
+async def test_sls_caps_message_size_before_any_processing(
+    env: Env, idp: SamlTestIdp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _saml_provider(env, idp)
+    seen: list[str] = []
+
+    async def spy(*_a: Any, **_k: Any) -> Any:
+        seen.append("sp")
+        raise AssertionError("must not be reached")
+
+    monkeypatch.setattr(sso_routes.SamlServiceProvider, "handle_logout_request", spy)
+    monkeypatch.setattr(sso_routes.SamlServiceProvider, "parse_logout_response", spy)
+    monkeypatch.setattr(sso_routes, "MAX_MESSAGE_CHARS", 1000)
+    big = "A" * 1001
+    req = await env.client.get(f"{SLS_PATH}?SAMLRequest={big}&SigAlg=x&Signature=y")
+    assert req.status_code == 400 and req.json() == {"detail": "Invalid logout request"}
+    resp = await env.client.get(f"{SLS_PATH}?SAMLResponse={big}&SigAlg=x&Signature=y")
+    assert (resp.status_code, resp.headers["location"]) == (303, "/login?logged_out=1")
+    assert seen == []
 
 
 @pytest.mark.saml
@@ -864,3 +909,386 @@ async def test_idp_initiated_login_off_by_default(env: Env, idp: SamlTestIdp) ->
     assert replay.status_code == 302
     assert parse_qs(urlparse(replay.headers["location"]).query)["sso_error"] == ["saml_invalid"]
     assert _session_cookie(replay) is None
+
+
+# ------------------------------------------------------------------ fix round 1 (T21 fix rulings)
+
+ENTRA_TEMPLATE = "https://login.microsoftonline.com/{tenantid}/v2.0"
+TENANT_A = "9188040d-6c67-4c5b-b112-36a304b66dad"
+TENANT_B = "72f988bf-86f1-41af-91ab-2d7cd011db47"
+
+
+def _entra_claims(
+    tid: str | None, *, iss_tenant: str | None = None, **extra: Any
+) -> dict[str, Any]:
+    now = int(time.time())
+    body: dict[str, Any] = {
+        "iss": ENTRA_TEMPLATE.replace("{tenantid}", iss_tenant or tid or "x"),
+        "aud": "tiqora",
+        "sub": "entra-sub",
+        "iat": now,
+        "exp": now + 300,
+        "nonce": "n-1",
+    }
+    if tid is not None:
+        body["tid"] = tid
+    body.update(extra)
+    return body
+
+
+@pytest.mark.usefixtures("_pure")
+async def test_entra_multi_tenant_issuer_template() -> None:
+    fake = _JwksIdp(issuer=ENTRA_TEMPLATE)
+    service = _jwks_service(fake)
+    ok = await service.verify_id_token(fake.signer.sign(_entra_claims(TENANT_A)), nonce="n-1")
+    assert ok["tid"] == TENANT_A
+    upper = _entra_claims(TENANT_A.upper(), iss_tenant=TENANT_A)
+    assert (await service.verify_id_token(fake.signer.sign(upper), nonce="n-1"))["sub"]
+
+    bad = {
+        "tid_missing": (_entra_claims(None, iss_tenant=TENANT_A), "tid"),
+        "tid_not_guid": (_entra_claims("contoso", iss_tenant="contoso"), "tid"),
+        "iss_other_tenant": (_entra_claims(TENANT_A, iss_tenant=TENANT_B), "iss"),
+        "iss_literal_template": (
+            {**_entra_claims(TENANT_A), "iss": ENTRA_TEMPLATE},
+            "iss",
+        ),
+    }
+    for name, (claims, reason) in bad.items():
+        with pytest.raises(OIDCTokenInvalid) as err:
+            await service.verify_id_token(fake.signer.sign(claims), nonce="n-1")
+        assert err.value.reason == reason, name
+
+    # allow-list (normalised to lower case by the config model, compared case-insensitively)
+    limited = _jwks_service(fake, allowed_tenant_ids=(TENANT_A,))
+    await limited.verify_id_token(fake.signer.sign(_entra_claims(TENANT_A)), nonce="n-1")
+    with pytest.raises(OIDCTokenInvalid) as err:
+        await limited.verify_id_token(fake.signer.sign(_entra_claims(TENANT_B)), nonce="n-1")
+    assert err.value.reason == "tenant"
+
+    # a fixed (single-tenant) issuer is compared exactly; tid plays no role
+    clear_discovery_cache()  # the next fake IdP has its own key under the same config issuer
+    fixed = _JwksIdp(issuer=f"https://login.microsoftonline.com/{TENANT_A}/v2.0")
+    claims = _entra_claims(TENANT_B, iss_tenant=TENANT_A)
+    await _jwks_service(fixed).verify_id_token(fixed.signer.sign(claims), nonce="n-1")
+
+
+@pytest.mark.usefixtures("_pure")
+async def test_entra_logout_token_tenant_template() -> None:
+    fake = _JwksIdp(issuer=ENTRA_TEMPLATE)
+    now = int(time.time())
+
+    def token(tid: str | None, iss_tenant: str) -> str:
+        body: dict[str, Any] = {
+            "iss": ENTRA_TEMPLATE.replace("{tenantid}", iss_tenant),
+            "aud": "tiqora",
+            "iat": now,
+            "jti": uuid.uuid4().hex,
+            "sid": "sid-e",
+            "events": {BACKCHANNEL_EVENT: {}},
+        }
+        if tid is not None:
+            body["tid"] = tid
+        return fake.signer.sign(body)
+
+    async def verify(tok: str, allowed: tuple[str, ...] = ()) -> Any:
+        return await oidc_backchannel.verify_logout_token(
+            tok,
+            service=_jwks_service(fake, allowed),
+            client_id="tiqora",
+            issuer=ENTRA_TEMPLATE,
+        )
+
+    assert (await verify(token(TENANT_A, TENANT_A))).sid == "sid-e"
+    for tok, allowed, reason in (
+        (token(None, TENANT_A), (), "tid"),
+        (token(TENANT_A, TENANT_B), (), "iss"),
+        (token(TENANT_B, TENANT_B), (TENANT_A,), "tenant"),
+    ):
+        with pytest.raises(LogoutTokenInvalid) as err:
+            await verify(tok, allowed)
+        assert err.value.reason == reason
+
+
+def test_allowed_tenant_ids_normalised_and_validated() -> None:
+    from pydantic import ValidationError  # noqa: PLC0415
+
+    from tiqora.identity.config_models import OidcProviderConfig  # noqa: PLC0415
+
+    cfg = OidcProviderConfig(allowed_tenant_ids=[f" {TENANT_A.upper()} ", "", TENANT_A])
+    assert cfg.allowed_tenant_ids == [TENANT_A]
+    with pytest.raises(ValidationError, match="Mandanten-ID"):
+        OidcProviderConfig(allowed_tenant_ids=["contoso.onmicrosoft.com"])
+    assert OidcProviderConfig().allowed_tenant_ids == []
+
+
+@pytest.mark.usefixtures("_pure")
+async def test_logout_token_typ_variants_and_optional_exp() -> None:
+    fake = _JwksIdp()
+    now = int(time.time())
+    base = {
+        "iss": "https://jwks.example.org",
+        "aud": "tiqora",
+        "iat": now,
+        "sub": "s-typ",
+        "events": {BACKCHANNEL_EVENT: {}},
+    }
+
+    async def verify(typ: str | None) -> Any:
+        tok = fake.signer.sign({**base, "jti": uuid.uuid4().hex}, typ=typ)
+        return await oidc_backchannel.verify_logout_token(
+            tok, service=_jwks_service(fake), client_id="tiqora", issuer="https://jwks.example.org"
+        )
+
+    for typ in (None, "logout+jwt", "application/logout+jwt", "JWT", "Logout+JWT"):
+        assert (await verify(typ)).sub == "s-typ", typ  # no exp claim at all: accepted
+    for typ in ("at+jwt", "secevent+jwt", "Logout"):
+        with pytest.raises(LogoutTokenInvalid) as err:
+            await verify(typ)
+        assert err.value.reason == "typ", typ
+
+
+@pytest.mark.usefixtures("_pure")
+async def test_mismatches_are_logged_with_expected_and_received() -> None:
+    from structlog.testing import capture_logs  # noqa: PLC0415
+
+    fake = _JwksIdp()
+    service = _jwks_service(fake)
+    now = int(time.time())
+    claims = {"iss": "https://evil.example.org", "aud": "tiqora", "sub": "a", "iat": now}
+    with capture_logs() as logs:
+        with pytest.raises(OIDCTokenInvalid):
+            await service.verify_id_token(fake.signer.sign({**claims, "exp": now + 60}), nonce=None)
+        with pytest.raises(OIDCTokenInvalid):
+            await service.verify_id_token(
+                fake.signer.sign(
+                    {**claims, "iss": "https://jwks.example.org", "aud": "x", "exp": now + 60}
+                ),
+                nonce=None,
+            )
+        with pytest.raises(OIDCTokenInvalid):
+            await service.verify_jwt(_unsigned({"alg": "HS256"}, claims))
+    by_event = {e["event"]: e for e in logs}
+    iss = by_event["oidc_token_iss_mismatch"]
+    assert iss["expected"] == "https://jwks.example.org"
+    assert "evil.example.org" in iss["received"]
+    aud = by_event["oidc_token_aud_mismatch"]
+    assert aud["expected"] == "tiqora" and "'x'" in aud["received"]
+    assert "HS256" in by_event["oidc_token_alg_rejected"]["received"]
+    assert not any("eyJ" in str(e) for e in logs)  # never a whole token
+
+
+class _BigIdp:
+    """Discovery/token/userinfo/JWKS with switchable oversized or slow bodies."""
+
+    def __init__(self) -> None:
+        self.signer = OidcSigner()
+        self.big: str | None = None  # which endpoint answers with an oversized body
+        self.chunked = False  # oversized body without Content-Length
+        self.timeouts: dict[str, dict[str, Any]] = {}
+
+    def _body(self, name: str, doc: Any) -> httpx.Response:
+        if self.big != name:
+            return httpx.Response(200, json=doc)
+        payload = json.dumps({"pad": "x" * (300 * 1024)}).encode()
+        if not self.chunked:
+            return httpx.Response(200, content=payload)
+
+        async def gen() -> AsyncIterator[bytes]:
+            for i in range(0, len(payload), 16 * 1024):
+                yield payload[i : i + 16 * 1024]
+
+        return httpx.Response(200, content=gen())
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        name = path.rsplit("/", 1)[-1]
+        self.timeouts[name] = dict(request.extensions.get("timeout", {}))
+        base = "https://big.example.org"
+        if path.endswith("/.well-known/openid-configuration"):
+            return self._body(
+                "openid-configuration",
+                {
+                    "issuer": base,
+                    "authorization_endpoint": f"{base}/authorize",
+                    "token_endpoint": f"{base}/token",
+                    "userinfo_endpoint": f"{base}/userinfo",
+                    "jwks_uri": f"{base}/jwks",
+                },
+            )
+        if name == "token":
+            now = int(time.time())
+            idt = self.signer.sign(
+                {"iss": base, "aud": "tiqora", "sub": "u", "iat": now, "exp": now + 60}
+            )
+            return self._body("token", {"access_token": "a", "id_token": idt})
+        if name == "userinfo":
+            return self._body("userinfo", {"sub": "u"})
+        if name == "jwks":
+            return self._body("jwks", self.signer.jwks())
+        return httpx.Response(404)
+
+
+def _big_service(fake: _BigIdp) -> OIDCService:
+    cfg = OidcClientConfig(
+        issuer="https://big.example.org",
+        client_id="tiqora",
+        client_secret="x",
+        scopes="openid",
+        redirect_uri="https://helpdesk.example.org/cb",
+    )
+    return OIDCService(cfg, transport=httpx.MockTransport(fake.handler))
+
+
+@pytest.mark.usefixtures("_pure")
+@pytest.mark.parametrize("chunked", [False, True])
+@pytest.mark.parametrize("endpoint", ["openid-configuration", "token", "userinfo", "jwks"])
+async def test_idp_responses_are_size_capped(endpoint: str, chunked: bool) -> None:
+    fake = _BigIdp()
+    ok = await _big_service(fake).fetch_tokens_and_claims("c", nonce=None)
+    assert ok.claims["sub"] == "u" and ok.id_token_claims is not None
+    for name in ("openid-configuration", "token", "userinfo"):
+        assert fake.timeouts[name]["read"] == 10.0, name  # explicit, not the library default
+    assert fake.timeouts["jwks"]["read"] == 5.0
+
+    clear_discovery_cache()
+    fake.big, fake.chunked = endpoint, chunked
+    with pytest.raises(OIDCError):
+        await _big_service(fake).fetch_tokens_and_claims("c", nonce=None)
+
+
+async def test_oidc_userinfo_without_sub_rejected_when_id_token_present(env: Env) -> None:
+    await _oidc_provider(env)
+    await env.agent(47132, "idp.bc.47132")
+    resp = await env.oidc_login(
+        login="idp.bc.47132",
+        sub="s-47132",
+        sid=None,
+        userinfo={"preferred_username": "idp.bc.47132"},  # no sub (Core 5.3.2)
+    )
+    assert parse_qs(urlparse(resp.headers["location"]).query)["sso_error"] == ["oidc_failed"]
+    # the subject of a good login is the verified id_token's sub
+    token = await env.session_token(login="idp.bc.47132", sub="s-47132", sid=None)
+    info = await env.agents.get_sso(token)
+    assert info is not None and info.subject_hash == subject_hash("s-47132")
+
+
+async def test_backchannel_body_is_capped_while_streaming(env: Env) -> None:
+    await _oidc_provider(env)
+    await env.agent(47133, "idp.bc.47133")
+    victim = await env.session_token(login="idp.bc.47133", sub="s-47133", sid="sid-big")
+    good = _logout_token(env, sid="sid-big")
+
+    async def chunks() -> AsyncIterator[bytes]:
+        yield f"logout_token={good}&pad=".encode()
+        for _ in range(9):
+            yield b"x" * 8192  # > 64 KB in total, no Content-Length
+
+    streamed = await env.client.post(BCL_PATH, content=chunks(), headers=FORM)
+    assert "content-length" not in streamed.request.headers
+    assert streamed.status_code == 400 and streamed.json() == REJECTED
+    declared = await env.client.post(
+        BCL_PATH, content=f"logout_token={good}&pad={'x' * 70000}", headers=FORM
+    )
+    assert declared.status_code == 400
+    twice = await env.client.post(
+        BCL_PATH, content=urlencode([("logout_token", good), ("logout_token", good)]), headers=FORM
+    )
+    assert twice.status_code == 400  # ambiguous: two tokens
+    assert await _alive(env, victim)
+    assert (await env.bcl(good)).status_code == 200
+    assert not await _alive(env, victim)
+
+
+async def test_backchannel_rate_limit_runs_before_provider_lookup(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(oidc_backchannel, "RATE_LIMIT_MAX", 2)
+    calls: list[str] = []
+    real = sso_routes._load_provider
+
+    async def spy(session: Any, settings: Any, slug: str) -> Any:
+        calls.append(slug)
+        return await real(session, settings, slug)
+
+    monkeypatch.setattr(sso_routes, "_load_provider", spy)
+    for i in range(2):
+        resp = await env.bcl("x", path=f"/api/v1/auth/oidc/idptest-bcl-n{i}/backchannel-logout")
+        assert resp.status_code == 404
+    key = "tiqora:rl:oidc-bcl:127.0.0.1"
+    # the window key carries its TTL from creation on (SET NX EX before INCR)
+    assert env.redis.ttls[key] == oidc_backchannel.RATE_LIMIT_WINDOW_SECONDS
+    limited = await env.bcl("x", path="/api/v1/auth/oidc/idptest-bcl-n9/backchannel-logout")
+    assert limited.status_code == 429
+    assert calls == ["idptest-bcl-n0", "idptest-bcl-n1"]  # the limited one never looked up
+
+
+async def test_rate_limit_key_without_ttl_cannot_lock_forever() -> None:
+    redis = FakeRedis()
+    await oidc_backchannel.rate_limited(redis, "198.51.100.7")
+    key = "tiqora:rl:oidc-bcl:198.51.100.7"
+    assert redis.ttls[key] == oidc_backchannel.RATE_LIMIT_WINDOW_SECONDS
+    assert redis.store[key] == "1"
+    # the key expired between SET NX and INCR, so INCR re-created it without a TTL: repaired
+    redis.store[key] = "250"
+    del redis.ttls[key]
+    await oidc_backchannel.rate_limited(redis, "198.51.100.7")
+    assert redis.store[key] == "251"
+    assert redis.ttls[key] == oidc_backchannel.RATE_LIMIT_WINDOW_SECONDS
+
+
+def test_env_oidc_backchannel_logout_is_off_unless_enabled() -> None:
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from tiqora.identity.config_models import OidcProviderConfig  # noqa: PLC0415
+    from tiqora.identity.env_providers import env_runtime_config  # noqa: PLC0415
+    from tiqora.identity.types import ENV_OIDC_SLUG  # noqa: PLC0415
+
+    row: Any = SimpleNamespace(slug=ENV_OIDC_SLUG)
+    off = env_runtime_config(row, Settings(environment="test", secret_key=KEY))
+    assert isinstance(off, OidcProviderConfig) and off.backchannel_logout is False
+    on = env_runtime_config(
+        row, Settings(environment="test", secret_key=KEY, oidc_backchannel_logout=True)
+    )
+    assert isinstance(on, OidcProviderConfig) and on.backchannel_logout is True
+    # DB providers keep their own default (on)
+    assert OidcProviderConfig().backchannel_logout is True
+
+
+async def test_provider_a_token_on_provider_b_route(env: Env) -> None:
+    await _oidc_provider(env)  # A: ISSUER
+    b_slug, b_issuer = f"{SLUG}kc-b", f"https://{SLUG}kc-b.example.org/realms/y"
+    await make_provider(
+        env.session,
+        slug=b_slug,
+        audience="both",
+        attribute_map=AttributeMap(login=["preferred_username"]),
+        config={"issuer": b_issuer, "client_id": "tiqora", "client_secret": "kc-secret"},
+        settings=env.settings,
+    )
+    await env.session.commit()
+    await env.agent(47134, "idp.bc.47134")
+    resp = await env.oidc_login(
+        login="idp.bc.47134", sub="s-47134", sid="sid-ab", slug=b_slug, issuer=b_issuer
+    )
+    assert resp.status_code == 302 and "sso_error" not in resp.headers["location"], resp.text
+    token = next(
+        c.split(";")[0].split("=", 1)[1]
+        for c in resp.headers.get_list("set-cookie")
+        if c.startswith(f"{AGENT_COOKIE}=")
+    )
+    env.client.cookies.clear()
+
+    # Same signing key at both IdPs (worst case): A's token still fails B's issuer check.
+    a_token = _logout_token(env, sid="sid-ab")
+    on_b = await env.bcl(a_token, path=f"/api/v1/auth/oidc/{b_slug}/backchannel-logout")
+    assert on_b.status_code == 400 and on_b.json() == REJECTED
+    assert await _alive(env, token)
+    # On A's own route it is valid, but sids are per provider: B's session is untouched.
+    assert (await env.bcl(a_token)).status_code == 200
+    assert await _alive(env, token)
+    b_token = _logout_token(env, sid="sid-ab", iss=b_issuer)
+    assert (
+        await env.bcl(b_token, path=f"/api/v1/auth/oidc/{b_slug}/backchannel-logout")
+    ).status_code == 200
+    assert not await _alive(env, token)

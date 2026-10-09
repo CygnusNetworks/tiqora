@@ -26,6 +26,7 @@ import base64
 import binascii
 import functools
 import threading
+import zlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -62,6 +63,8 @@ logger = structlog.get_logger(__name__)
 T = TypeVar("T")
 
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+# Longest base64 text that can decode to MAX_RESPONSE_BYTES (shared by ACS and SLS).
+MAX_MESSAGE_CHARS = MAX_RESPONSE_BYTES * 4 // 3 + 16
 NS_ASSERTION = "urn:oasis:names:tc:SAML:2.0:assertion"
 BINDING_REDIRECT = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
 BINDING_POST = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
@@ -213,9 +216,38 @@ def _expect_xml_safe(raw: bytes, *, allow_sha1: bool) -> None:
         raise SamlResponseInvalid("sha1_signature")
 
 
-def decode_saml_b64(b64: str) -> bytes:
-    if len(b64) > MAX_RESPONSE_BYTES * 4 // 3 + 16:
+def check_message_size(value: str) -> None:
+    """Size cap for any POSTed or redirect-bound SAML message, before it is decoded."""
+    if len(value) > MAX_MESSAGE_CHARS:
         raise SamlResponseInvalid("too_large")
+
+
+def inflate_redirect_message(b64: str) -> bytes:
+    """Decode + DEFLATE-inflate a redirect-binding message with hard caps (no inflate bomb),
+    then refuse DTDs/entities. Call only AFTER the redirect signature verified."""
+    check_message_size(b64)
+    try:
+        raw = base64.b64decode(b64.encode("ascii", "ignore"), validate=False)
+    except (binascii.Error, ValueError) as exc:
+        raise SamlResponseInvalid("base64") from exc
+    inflater = zlib.decompressobj(-15)
+    try:
+        xml = inflater.decompress(raw, MAX_RESPONSE_BYTES)
+    except zlib.error as exc:
+        raise SamlResponseInvalid("inflate") from exc
+    if inflater.unconsumed_tail or len(xml) >= MAX_RESPONSE_BYTES:
+        raise SamlResponseInvalid("too_large")
+    try:
+        safe_et.fromstring(xml, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+    except defusedxml.DefusedXmlException as exc:
+        raise SamlResponseInvalid("dtd") from exc
+    except Exception as exc:
+        raise SamlResponseInvalid("xml") from exc
+    return xml
+
+
+def decode_saml_b64(b64: str) -> bytes:
+    check_message_size(b64)
     try:
         raw = base64.b64decode(b64.encode("ascii", "ignore"))
     except (binascii.Error, ValueError) as exc:
@@ -529,10 +561,13 @@ class SamlServiceProvider:
         client = self._ensure()
         if binding != BINDING_HTTP_REDIRECT:
             raise SamlResponseInvalid("logout_binding")
-        # Signature first: nothing of an unverified message is trusted.
+        # Size cap, then the signature over the raw query: nothing of an unverified message is
+        # decoded, inflated or parsed. Then a bounded inflate + DTD check before pysaml2.
+        check_message_size(saml_response)
         self._verify_redirect_signature(
             client, "SAMLResponse", saml_response, relay_state, sigalg, signature, raw_query
         )
+        inflate_redirect_message(saml_response)
         resp = client.parse_logout_request_response(saml_response, binding)
         if resp is None:
             raise SamlResponseInvalid("no_response")
@@ -593,11 +628,13 @@ class SamlServiceProvider:
         if binding != BINDING_HTTP_REDIRECT:
             raise SamlResponseInvalid("logout_binding")
         # pysaml2 only checks a redirect signature when ITS idp-scoped "want signed" flag is
-        # set, which an SP config never has: verify it here and refuse unsigned requests.
-        if not sigalg or not signature:
-            raise SamlResponseInvalid("logout_unsigned")
-        if sigalg not in REDIRECT_SIGALGS:
-            raise SamlResponseInvalid("logout_sigalg")
+        # set, which an SP config never has. Order: size cap, signature over the raw query
+        # octets (the IdP's metadata keys), and only then decode/inflate (bounded) and parse.
+        check_message_size(saml_request)
+        self._verify_redirect_signature(
+            client, "SAMLRequest", saml_request, relay_state, sigalg, signature, raw_query
+        )
+        inflate_redirect_message(saml_request)
         req = client.parse_logout_request(
             saml_request,
             binding,
@@ -613,9 +650,6 @@ class SamlServiceProvider:
         destination = _text_attr(req.message, "destination")
         if destination != self._urls.slo_url:
             raise SamlResponseInvalid("destination_mismatch")
-        self._verify_redirect_signature(
-            client, "SAMLRequest", saml_request, relay_state, sigalg, signature, raw_query
-        )
         _expect_fresh(req.message, self._cfg.clock_skew_seconds)
         request_id = _text_attr(req.message, "id")
         if not request_id:

@@ -122,6 +122,7 @@ def env_runtime_config(record: ProviderRecord, settings: Settings) -> BaseModel:
             client_secret=_secret(settings.oidc_client_secret),
             scopes=settings.oidc_scopes,
             redirect_uri=settings.oidc_redirect_uri,
+            backchannel_logout=settings.oidc_backchannel_logout,
         )
     if record.slug == ENV_LDAP_SLUG:
         return _ldap_config(settings, "ldap_")

@@ -22,6 +22,7 @@ from tiqora.domain.oidc import (
     OIDCService,
     OIDCTokenInvalid,
     check_audience,
+    check_issuer,
 )
 
 logger = structlog.get_logger(__name__)
@@ -30,8 +31,12 @@ BACKCHANNEL_EVENT: Final = "http://schemas.openid.net/event/backchannel-logout"
 MAX_JTI_LENGTH: Final = 256
 MAX_SELECTOR_LENGTH: Final = 1024
 
-# Fixed window per (provider, client IP): an IdP ending many sessions at once stays far below
-# this; a client spraying invented tokens (each may cost a JWKS lookup) is cut off.
+# Accepted JOSE "typ" values (case-insensitive, optional "application/" prefix, RFC 7515
+# 4.1.9); a missing typ is accepted (spec: explicit typing RECOMMENDED, not required).
+ACCEPTED_TYP: Final = frozenset({"logout+jwt", "jwt"})
+
+# Fixed window per client IP, counted BEFORE any provider lookup: an IdP ending many sessions
+# at once stays far below this; a client spraying tokens or slugs is cut off.
 RATE_LIMIT_MAX: int = 300
 RATE_LIMIT_WINDOW_SECONDS: int = 60
 _RATE_PREFIX: Final = "tiqora:rl:oidc-bcl:"
@@ -69,16 +74,26 @@ async def verify_logout_token(
     issuer: str,
     max_age_seconds: int = 300,
 ) -> LogoutToken:
-    """Verify a back-channel logout token (section 2.6); :class:`LogoutTokenInvalid` otherwise."""
+    """Verify a back-channel logout token (section 2.6); :class:`LogoutTokenInvalid` otherwise.
+
+    *issuer* may be Microsoft's multi-tenant template (``{tenantid}``): the token's ``tid``
+    is substituted, limited to the service's ``allowed_tenant_ids`` when set. ``exp`` is
+    optional (the ``iat`` window bounds the token's life).
+    """
     try:
-        claims = await service.verify_jwt(token)
+        header, claims = await service.decode_jwt(token)
     except OIDCTokenInvalid as exc:
         raise LogoutTokenInvalid(exc.reason) from exc
     except OIDCError as exc:  # JWKS/discovery unreachable: the token cannot be validated
         raise LogoutTokenInvalid("jwks_unavailable") from exc
-    if claims.get("iss") != issuer:
-        raise LogoutTokenInvalid("iss")
+    typ = header.get("typ")
+    if typ is not None and (
+        not isinstance(typ, str) or typ.lower().removeprefix("application/") not in ACCEPTED_TYP
+    ):
+        logger.warning("oidc_logout_token_typ_rejected", received=repr(typ)[:100])
+        raise LogoutTokenInvalid("typ")
     try:
+        check_issuer(claims, issuer, service.allowed_tenant_ids)
         check_audience(claims, client_id)
     except OIDCTokenInvalid as exc:
         raise LogoutTokenInvalid(exc.reason) from exc
@@ -108,15 +123,20 @@ async def verify_logout_token(
     return LogoutToken(sub=sub, sid=sid, jti=jti)
 
 
-async def rate_limited(redis: Any, provider_id: int, ip: str) -> int:
-    """Count this request; return Retry-After seconds when over the limit, else 0.
+async def rate_limited(redis: Any, ip: str) -> int:
+    """Count this request of client *ip*; return Retry-After seconds when over the limit, else 0.
 
-    Fails open on Redis trouble (a Redis outage must not stop logouts).
+    The window key is created with its TTL atomically (SET NX EX) before INCR, so a crash
+    between the two can never leave a counter without expiry (a permanent lockout); a key
+    that expired between the two calls is given its TTL back. Fails open on Redis trouble
+    (a Redis outage must not stop logouts).
     """
-    key = f"{_RATE_PREFIX}{provider_id}:{ip or 'unknown'}"
+    key = f"{_RATE_PREFIX}{ip or 'unknown'}"
     try:
+        await redis.set(key, "0", ex=RATE_LIMIT_WINDOW_SECONDS, nx=True)
         count = int(await redis.incr(key))
-        if count == 1:
+        # The key can expire between SET NX and INCR; INCR then re-creates it without a TTL.
+        if int(await redis.ttl(key)) < 0:
             await redis.expire(key, RATE_LIMIT_WINDOW_SECONDS)
         if count > RATE_LIMIT_MAX:
             ttl = int(await redis.ttl(key) or RATE_LIMIT_WINDOW_SECONDS)
