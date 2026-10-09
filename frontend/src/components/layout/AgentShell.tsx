@@ -584,7 +584,7 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
             onNavigate={onNavigate}
           />
           <NavItem
-            to="/agent/stats"
+            to="/agent/reports"
             label={t("sidebar.stats")}
             icon={<ChartIcon />}
             testId="agent-nav-stats"

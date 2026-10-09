@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { DEMO_REPORTS } from "./reportsCatalogue";
 import { resolveData, resolveReportRun } from "./mockData";
+import { setDemoFactsBuilding } from "./reportsMock";
 import de from "@/i18n/locales/de.json";
 import en from "@/i18n/locales/en.json";
 import type { ReportRunIn } from "@/lib/reportsApi";
@@ -48,6 +49,88 @@ describe("report demo mocks", () => {
       status: "succeeded",
       files: [{ name: "bericht.xlsx" }],
     });
+  });
+});
+
+describe("report demo runs follow the request", () => {
+  const run = (body: Partial<ReportRunIn>) => resolveReportRun(body as ReportRunIn);
+  const col = (out: ReturnType<typeof run>, key: string) => out.result!.columns.findIndex((c) => c.key === key);
+
+  it("rebuckets the date dimension by the chosen grain", () => {
+    const weeks = run({ report_key: "builtin.volume" }).result!;
+    const months = run({ report_key: "builtin.volume", grain: "month" }).result!;
+    expect(weeks.columns[0]).toMatchObject({ key: "occurred", grain: "week" });
+    expect(months.columns[0]).toMatchObject({ key: "occurred", grain: "month" });
+    const distinct = (r: typeof weeks) => new Set(r.rows.map((row) => row[0])).size;
+    expect(distinct(months)).toBeLessThan(distinct(weeks));
+    expect(months.rows.every((row) => String(row[0]).endsWith("-01"))).toBe(true);
+  });
+
+  it("swaps the dimension for the chosen split", () => {
+    const out = run({ report_key: "builtin.open_now", dimension_choices: { "0": "owner" } });
+    expect(out.result!.columns[0].key).toBe("owner");
+    expect(out.result!.labels.owner).toMatchObject({ "2": "Anna Beispiel" });
+    expect(run({ report_key: "builtin.open_now" }).result!.columns[0].key).toBe("queue");
+  });
+
+  it("covers an absolute range day by day and reports it as the window", () => {
+    const out = run({
+      report_key: "builtin.backlog_trend",
+      time_range: { kind: "absolute", start: "2026-09-01", end: "2026-09-07" },
+      time_zone: "Europe/Vienna",
+    }).result!;
+    expect(out.rows.map((r) => r[0])).toEqual([
+      "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07",
+    ]);
+    expect(out.time_window).toMatchObject({ start_date: "2026-09-01", end_date: "2026-09-07", time_zone: "Europe/Vienna" });
+  });
+
+  it("restricts queue splits to the chosen queues and shrinks other counts", () => {
+    const byQueue = run({ report_key: "builtin.open_now", parameters: { queues: [2] } }).result!;
+    expect(byQueue.rows.map((r) => r[0])).toEqual(["2"]);
+    const all = run({ report_key: "builtin.ticket_kpis" }).result!;
+    const one = run({ report_key: "builtin.ticket_kpis", parameters: { queues: [1] } }).result!;
+    const t = col({ result: all, job: null }, "tickets");
+    expect(one.rows[0][t] as number).toBeLessThan(all.rows[0][t] as number);
+  });
+
+  it("adds the previous period when asked", () => {
+    expect(run({ report_key: "builtin.ticket_kpis" }).result!.previous).toBeNull();
+    const out = run({ report_key: "builtin.ticket_kpis", compare_previous: true }).result!;
+    expect(out.previous?.grand).toHaveLength(out.columns.length);
+    expect(out.previous!.grand!.every((v) => typeof v === "number")).toBe(true);
+  });
+
+  it("runs a long range as a background job that succeeds on the second poll", () => {
+    const out = run({
+      report_key: "builtin.volume",
+      time_range: { kind: "absolute", start: "2025-01-01", end: "2025-12-31" },
+    });
+    expect(out.result).toBeNull();
+    const id = out.job!.job_id;
+    expect(resolveData(`/api/v1/jobs/${id}`, "GET")).toMatchObject({ status: "running", kind: "core.report_run" });
+    const done = resolveData(`/api/v1/jobs/${id}`, "GET") as { status: string; result: { report_key: string; rows: unknown[] } };
+    expect(done.status).toBe("succeeded");
+    expect(done.result.report_key).toBe("builtin.volume");
+    expect(done.result.rows.length).toBeGreaterThan(0);
+  });
+
+  it("switches the catalogue, status and results to 'still building'", () => {
+    setDemoFactsBuilding(true);
+    try {
+      const cat = resolveData("/api/v1/reports", "GET") as { facts: { ready: boolean; backfill_job_id: number } };
+      expect(cat.facts.ready).toBe(false);
+      expect(resolveData("/api/v1/reporting/status", "GET")).toMatchObject({ ready: false, backfill_progress: 0.42 });
+      expect(run({ report_key: "builtin.volume" }).result!.facts.ready).toBe(false);
+      // the admin's progress follows a running rebuild job
+      expect(resolveData(`/api/v1/jobs/${cat.facts.backfill_job_id}`, "GET")).toMatchObject({
+        status: "running",
+        kind: "core.report_backfill",
+      });
+    } finally {
+      setDemoFactsBuilding(false);
+    }
+    expect((resolveData("/api/v1/reports", "GET") as { facts: { ready: boolean } }).facts.ready).toBe(true);
   });
 });
 

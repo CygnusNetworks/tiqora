@@ -1,6 +1,8 @@
 import type { Page, Route } from "@playwright/test";
+import type { ReportRunIn } from "../../src/lib/reportsApi";
 import {
   resolveData,
+  resolveReportRun,
   demoRefine,
   demoUser as user,
   demoPortalUser as portalUser,
@@ -48,6 +50,12 @@ export async function mockRich(page: Page) {
     if (p.startsWith("/api/v1/") && !authed) { await json(r, 401, { detail: "Not authenticated" }); return; }
     if (p.endsWith("/api/v1/ai/refine") && method === "POST") {
       await json(r, 200, demoRefine(r.request().postDataJSON() ?? {}));
+      return;
+    }
+    // Report runs need the request body (report_key, range, choices), which resolveData never sees.
+    if (p.endsWith("/api/v1/reports/run") && method === "POST") {
+      const out = resolveReportRun(r.request().postDataJSON() as ReportRunIn);
+      await json(r, out.job ? 202 : 200, out);
       return;
     }
     const body = resolveData(p, method);

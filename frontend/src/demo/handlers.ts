@@ -6,7 +6,24 @@ import {
   demoPortalTickets,
   demoRefine,
 } from "./mockData";
+import { setDemoFactsBuilding } from "./reportsMock";
 import type { ReportRunIn } from "@/lib/reportsApi";
+
+/**
+ * Demo switch for the "report data is still being built" state: open any page
+ * with `?demo_facts=building` (and `?demo_facts=ready` to end it). Kept for the
+ * tab in sessionStorage because the app drops unknown search params.
+ */
+function syncDemoFacts(): void {
+  try {
+    const flag = new URLSearchParams(window.location.search).get("demo_facts");
+    if (flag === "building") sessionStorage.setItem("tiqora-demo-facts", "building");
+    if (flag === "ready") sessionStorage.removeItem("tiqora-demo-facts");
+    setDemoFactsBuilding(sessionStorage.getItem("tiqora-demo-facts") === "building");
+  } catch {
+    // no storage (private mode): keep the current state
+  }
+}
 
 /**
  * MSW request handlers for the public demo build. Delegates to the shared pure
@@ -42,6 +59,7 @@ function respond(pathname: string, method: string): unknown {
   if (pathname.endsWith("/api/portal/tickets")) return demoPortalTickets;
   if (pathname.startsWith("/api/portal/")) return method === "GET" ? [] : {};
 
+  if (pathname.includes("/api/v1/report")) syncDemoFacts();
   const data = resolveData(pathname, method);
   if (data !== undefined) return data;
   return method === "GET" ? [] : {};
@@ -61,9 +79,12 @@ export const handlers = [
     HttpResponse.json(demoRefine((await request.json()) as Parameters<typeof demoRefine>[0])),
   ),
   // Report runs need the request body (report_key / definition), which resolveData never sees.
-  http.post("*/api/v1/reports/run", async ({ request }) =>
-    HttpResponse.json(resolveReportRun((await request.json()) as ReportRunIn)),
-  ),
+  http.post("*/api/v1/reports/run", async ({ request }) => {
+    syncDemoFacts();
+    const out = resolveReportRun((await request.json()) as ReportRunIn);
+    // A long range runs in the background, like on a real server.
+    return HttpResponse.json(out, { status: out.job ? 202 : 200 });
+  }),
   // Report export download: a tiny XLSX-typed body (declared before the CSV catch-all below).
   http.get(
     "*/api/v1/jobs/9201/files/*",

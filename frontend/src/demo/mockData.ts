@@ -9,7 +9,7 @@
  * auto-authenticated).
  */
 
-import { DEMO_FACTS, DEMO_REPORT_CATALOGUE, DEMO_REPORTING_STATUS, demoReport } from "./reportsMock";
+import { demoCatalogue, demoFacts, demoReport, demoReportingStatus, demoReportJob } from "./reportsMock";
 
 export { resolveReportRun } from "./reportsMock";
 
@@ -1768,14 +1768,20 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/jobs/9101")) return demoExportJob;
   // Reports: `POST /reports/run` needs the body, so the MSW handler answers it (resolveReportRun).
   if (p.endsWith("/api/v1/reports/export") && method === "POST") return { job_id: 9201, status: "queued" };
-  if (p.endsWith("/api/v1/reports") && method === "GET") return DEMO_REPORT_CATALOGUE;
+  if (p.endsWith("/api/v1/reports") && method === "GET") return demoCatalogue();
   if (p.match(/\/api\/v1\/reports\/builtin\.[a-z_]+$/) && method === "GET")
     return demoReport(decodeURIComponent(p.split("/").pop() as string));
-  if (p.endsWith("/api/v1/reporting/status")) return DEMO_FACTS;
-  if (p.endsWith("/api/v1/admin/reporting/status")) return DEMO_REPORTING_STATUS;
+  if (p.endsWith("/api/v1/reporting/status")) return demoFacts();
+  if (p.endsWith("/api/v1/admin/reporting/status")) return demoReportingStatus();
   if (p.endsWith("/api/v1/admin/reporting/backfill") && method === "POST") return { job_id: 9202, status: "queued" };
   if (p.endsWith("/api/v1/jobs/9201")) return demoReportExportJob;
   if (p.endsWith("/api/v1/jobs/9202")) return demoBackfillJob;
+  // Background report runs and the running first build (?demo_facts=building).
+  const reportJob = /\/api\/v1\/jobs\/(\d+)$/.exec(p);
+  if (reportJob && method === "GET") {
+    const job = demoReportJob(Number(reportJob[1]));
+    if (job) return job;
+  }
   if (p.endsWith("/api/v1/jobs")) return [];
   // Agent
   if (p.endsWith("/api/v1/queues")) return agentQueues;

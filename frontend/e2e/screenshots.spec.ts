@@ -62,7 +62,8 @@ test("agent screenshots", async ({ page }) => {
     ["/agent", "agent-dashboard"],
     ["/agent/queues", "agent-queues"],
     ["/agent/tickets/100", "agent-ticket-zoom"],
-    ["/agent/stats", "agent-stats"],
+    // README embeds docs/images/agent-stats.png: the name stays, the page is the reports overview.
+    ["/agent/reports", "agent-stats"],
     ["/agent/calendar", "agent-calendar"],
     ["/agent/kb", "agent-kb"],
     ["/agent/search?q=server", "agent-search"],

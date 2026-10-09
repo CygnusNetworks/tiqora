@@ -67,7 +67,7 @@
     "toggle": "Navigation umschalten",
     "insights": "Insights",
     "reports": "Reports",
-    "stats": "Reports",
+    "stats": "Berichte",
     "calendar": "Kalender",
     "showAllQueues": "Alle anzeigen",
     "showActiveQueues": "Aktive anzeigen",
@@ -183,7 +183,8 @@
     "clearFilters": "Filter zurücksetzen",
     "pageRange": "{{from}}–{{to}}",
     "pageScope": "auf dieser Seite",
-    "chartPeak": "Spitze {{units}}"
+    "chartPeak": "Spitze {{units}}",
+    "reportsLink": "Auswertungen nach Kunde, Queue, Agent, Typ"
   },
   "common": {
     "prev": "Zurück",
@@ -5151,6 +5152,23 @@
       "deltaFlat": "Unverändert",
       "ofTotal": "{{percent}} vom Gesamtwert",
       "total": "Gesamt"
+    },
+    "openReport": "Bericht öffnen",
+    "retry": "Erneut versuchen",
+    "exportFailed": "Der Export konnte nicht gestartet werden.",
+    "runningInBackground": "Der Bericht wird im Hintergrund erstellt. Das kann einen Moment dauern …",
+    "previousPeriodValue": "Vorheriger Zeitraum: {{value}}",
+    "info": {
+      "timeRange": "Zeitraum: {{range}}",
+      "timeZone": "Zeitzone: {{zone}}",
+      "queues": "Queues: {{queues}}"
+    },
+    "agentTable": {
+      "agent": "Mitarbeiter",
+      "open": "Offen",
+      "replies": "Antworten",
+      "notes": "Notizen",
+      "closed": "Geschlossen"
     }
   }
 }

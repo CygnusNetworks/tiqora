@@ -25,6 +25,9 @@ export type FactsStatus = Schemas["FactsStatusOut"];
 export type ReportingStatus = Schemas["ReportingStatusOut"];
 export type ReportBackfillIn = Schemas["ReportBackfillIn"];
 export type ReportCell = string | number | null;
+/** Time buckets of a date dimension (`Grain` in backend/src/tiqora/reporting/definition.py). */
+export type Grain = "day" | "week" | "month" | "quarter" | "year";
+export const GRAINS: readonly Grain[] = ["day", "week", "month", "quarter", "year"];
 
 export const reportsApi = {
   catalogue(signal?: AbortSignal) {

@@ -183,7 +183,8 @@
     "clearFilters": "Futa vichujio",
     "pageRange": "{{from}}–{{to}}",
     "pageScope": "kwenye ukurasa huu",
-    "chartPeak": "kilele {{units}}"
+    "chartPeak": "kilele {{units}}",
+    "reportsLink": "Reports by customer, queue, agent, type"
   },
   "common": {
     "prev": "Iliyotangulia",
@@ -5143,6 +5144,23 @@
       "deltaFlat": "Unchanged",
       "ofTotal": "{{percent}} of total",
       "total": "Total"
+    },
+    "openReport": "Open report",
+    "retry": "Try again",
+    "exportFailed": "The export could not be started.",
+    "runningInBackground": "The report is being created in the background. This can take a moment …",
+    "previousPeriodValue": "Previous period: {{value}}",
+    "info": {
+      "timeRange": "Period: {{range}}",
+      "timeZone": "Time zone: {{zone}}",
+      "queues": "Queues: {{queues}}"
+    },
+    "agentTable": {
+      "agent": "Agent",
+      "open": "Open",
+      "replies": "Replies",
+      "notes": "Notes",
+      "closed": "Closed"
     }
   }
 }

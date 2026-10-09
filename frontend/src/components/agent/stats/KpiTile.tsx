@@ -53,7 +53,9 @@ export function KpiTile({ label, value, delta, sparkline, hint, testId }: KpiTil
 
   return (
     <div className="rounded-lg border border-hairline bg-surface p-4" data-testid={testId}>
-      <p className="truncate text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="line-clamp-2 text-xs uppercase tracking-wide text-muted" title={label}>
+        {label}
+      </p>
       <div className="mt-2 flex items-end justify-between gap-2">
         <p className="font-mono text-2xl font-semibold tabular-nums text-ink">{value}</p>
         {sparkline && sparkline.length > 0 && (

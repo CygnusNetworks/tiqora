@@ -8,7 +8,9 @@ import {
 import { SetPasswordPage } from "@/routes/SetPasswordPage";
 import { LoginPage } from "@/routes/LoginPage";
 import { DashboardPage } from "@/routes/agent/DashboardPage";
-import { StatsPage } from "@/routes/agent/StatsPage";
+import { ReportsPage, type ReportsSearch } from "@/routes/agent/ReportsPage";
+import { ReportViewPage } from "@/routes/agent/ReportViewPage";
+import { validateReportViewSearch } from "@/routes/agent/reportViewSearch";
 import { QueuesPage, type QueuesSearch } from "@/routes/agent/QueuesPage";
 import { TicketZoomPage } from "@/routes/agent/TicketZoomPage";
 import { SearchPage, type SearchSearch } from "@/routes/agent/SearchPage";
@@ -447,10 +449,29 @@ const agentSettingsRoute = createRoute({
   },
 });
 
+// The old statistics page lives on as the reports overview; keep bookmarks working.
 const agentStatsRoute = createRoute({
   getParentRoute: () => agentLayoutRoute,
   path: "/stats",
-  component: StatsPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/agent/reports" });
+  },
+});
+
+const agentReportsRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports",
+  validateSearch: (s: Record<string, unknown>): ReportsSearch => ({
+    category: typeof s.category === "string" && /^[a-z_]{1,32}$/.test(s.category) ? s.category : undefined,
+  }),
+  component: ReportsPage,
+});
+
+const agentReportViewRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/reports/$reportKey",
+  validateSearch: validateReportViewSearch,
+  component: ReportViewPage,
 });
 
 const agentCalendarRoute = createRoute({
@@ -1094,6 +1115,8 @@ const routeTree = rootRoute.addChildren([
     agentSecurityRoute,
     agentSettingsRoute,
     agentStatsRoute,
+    agentReportsRoute,
+    agentReportViewRoute,
     agentCalendarRoute,
     agentTemplatesRoute,
     agentServicesRoute,
