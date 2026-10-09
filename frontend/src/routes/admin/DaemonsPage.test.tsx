@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { DaemonsPage } from "./DaemonsPage";
+import { humanizeResult } from "@/lib/daemonResult";
 import type { DaemonServiceOut } from "@/lib/api";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -200,6 +201,29 @@ describe("DaemonsPage", () => {
     renderPage();
     const banner = await screen.findByTestId("daemons-deploy-live");
     expect(banner).toHaveTextContent(i18n.t("admin.daemons.deployLive"));
+  });
+
+  it("summarizes deploy_watch's nested process/acl outcomes instead of [object Object]", async () => {
+    const lastResult = {
+      mode: "deployed",
+      process: { kind: "process", action: "snapshot", revision_id: 12, pending: 0 },
+      acl: { kind: "acl", action: "waiting_for_deploy", revision_id: 3, pending: 2 },
+    };
+    getDaemons.mockResolvedValue({
+      services: [poller({ slug: "deploy_watch", last_result: lastResult as DaemonServiceOut["last_result"] })],
+    });
+    renderPage();
+    const row = await screen.findByTestId("daemon-row-deploy_watch");
+    expect(row).toHaveTextContent("mode: deployed · process: snapshot · acl: waiting_for_deploy (pending 2)");
+    expect(row).not.toHaveTextContent("[object Object]");
+  });
+
+  it("humanizes flat, nested and non-object results", () => {
+    expect(humanizeResult(null)).toBe("");
+    expect(humanizeResult({ processed: 12 })).toBe("processed: 12");
+    expect(humanizeResult({ counts: { a: 1, b: [1, 2] } })).toBe("counts: a=1, b=[1,2]");
+    expect(humanizeResult({ ids: [1, 2] })).toBe("ids: 1, 2");
+    expect(humanizeResult([1])).toBe("[1]");
   });
 
   it("hides the deploy-live banner once a deployed revision is in use", async () => {

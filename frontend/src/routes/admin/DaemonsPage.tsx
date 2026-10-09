@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { formatAgeSeconds, formatDateTime } from "@/lib/format";
 import { statusColor, type StatusColor } from "@/lib/daemonStatus";
+import { humanizeResult } from "@/lib/daemonResult";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { cn } from "@/lib/cn";
 
@@ -42,19 +43,6 @@ const DOT_HALO_CLASS: Record<StatusColor, string> = {
   red: "shadow-[0_0_0_3px] shadow-danger/15",
   grey: "",
 };
-
-/** Compact humanized form of the raw last_result JSON — "processed: 12" reads
- * better in a pill than {"processed":12}. Non-objects fall back to String(). */
-function humanizeResult(result: unknown): string {
-  if (result == null) return "";
-  if (typeof result === "object" && !Array.isArray(result)) {
-    const entries = Object.entries(result as Record<string, unknown>);
-    if (entries.length > 0) {
-      return entries.map(([k, v]) => `${k}: ${String(v)}`).join(" · ");
-    }
-  }
-  return JSON.stringify(result);
-}
 
 /** Styled on/off switch backed by a real (screen-reader-only) checkbox so
  * existing tests and a11y semantics (checked/disabled) keep working. */
