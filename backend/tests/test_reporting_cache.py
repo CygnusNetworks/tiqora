@@ -8,7 +8,12 @@ from typing import Any
 import pytest
 
 from tiqora.filters import Filter
-from tiqora.reporting.cache import CACHE_PREFIX, ReportCache, purge_report_cache
+from tiqora.reporting.cache import (
+    CACHE_PREFIX,
+    ReportCache,
+    purge_report_cache,
+    purge_report_cache_at,
+)
 from tiqora.reporting.definition import TimeWindow
 from tiqora.reporting.schemas import (
     FactsStatusOut,
@@ -203,3 +208,9 @@ async def test_purge_report_cache_drops_only_report_entries() -> None:
     assert set(backend.store) == {"tiqora:session:abc", "tiqora:avatar:x"}
     assert backend.deletes == [2, 2, 1]  # batched
     assert await purge_report_cache(_ScanBackend(reports, fail=True)) == 0  # logged, not raised
+
+
+async def test_purge_report_cache_at_never_raises() -> None:
+    """A GDPR erasure must not fail because Redis is down or misconfigured."""
+    assert await purge_report_cache_at("redis://127.0.0.1:1/0") == 0  # connection refused
+    assert await purge_report_cache_at("not-a-redis-url") == 0  # rejected by from_url

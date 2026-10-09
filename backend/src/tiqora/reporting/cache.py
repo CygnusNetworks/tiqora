@@ -147,7 +147,11 @@ async def purge_report_cache_at(redis_url: str) -> int:
     """:func:`purge_report_cache` for code paths without a request (GDPR jobs)."""
     import redis.asyncio as redis
 
-    client = redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+    try:
+        client = redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+    except Exception as exc:  # noqa: BLE001 - e.g. a malformed URL; never fail the caller
+        logger.warning("report_cache_purge_failed", error=str(exc), deleted=0)
+        return 0
     try:
         return await purge_report_cache(cast(PurgeableBackend, client))
     finally:

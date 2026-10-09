@@ -44,6 +44,7 @@ from tiqora.domain.settings_store import get_setting
 from tiqora.domain.ticket_write_service import SEARCH_REINDEX_EVENT, _emit_event
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
+from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.znuny.cache_invalidation import invalidate_cache_type, invalidate_ticket_cache
 from tiqora.znuny.sessions import delete_customer_sessions
 
@@ -1996,6 +1997,9 @@ async def run_erasure(
     # Cached Gravatar pictures of the erased addresses (best-effort, no Redis
     # in the transaction above).
     await forget_cached(settings.redis_url, [cache_key(EMAIL, key) for key in avatar_keys])
+    # Cached report results can hold the erased customer ids/names (rows, labels):
+    # drop them all now instead of waiting for their TTL (best-effort, never raises).
+    await purge_report_cache_at(settings.redis_url)
 
     # Audit outside the big txn (record_audit commits itself).
     async with session_factory() as session:
