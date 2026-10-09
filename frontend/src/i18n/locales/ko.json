@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· 접수 확인 없음(고객 없음)",
       "answeredAt": "{{time}}에 응답",
       "endedAt": "{{time}}에 종료"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "라이브로 연결됨",
@@ -4003,7 +4004,10 @@
       "cancel": "취소",
       "loadError": "프로세스를 로드할 수 없습니다.",
       "startError": "프로세스를 시작할 수 없습니다.",
-      "empty": "사용 가능한 프로세스가 없습니다."
+      "empty": "사용 가능한 프로세스가 없습니다.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

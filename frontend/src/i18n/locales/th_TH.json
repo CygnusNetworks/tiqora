@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· ไม่มีข้อความตอบรับ (ไม่มีลูกค้า)",
       "answeredAt": "รับสายเมื่อ {{time}}",
       "endedAt": "สิ้นสุดเมื่อ {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "เชื่อมต่อสดแล้ว",
@@ -4003,7 +4004,10 @@
       "cancel": "ยกเลิก",
       "loadError": "ไม่สามารถโหลดกระบวนการได้",
       "startError": "ไม่สามารถเริ่มกระบวนการได้",
-      "empty": "ไม่มีกระบวนการที่พร้อมใช้งาน"
+      "empty": "ไม่มีกระบวนการที่พร้อมใช้งาน",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

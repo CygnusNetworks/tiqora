@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· 不發送確認信（無客戶）",
       "answeredAt": "{{time}} 接聽",
       "endedAt": "{{time}} 結束"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "已連線直播",
@@ -4003,7 +4004,10 @@
       "cancel": "取消",
       "loadError": "無法載入進程。",
       "startError": "無法啟動進程。",
-      "empty": "沒有可用的流程。"
+      "empty": "沒有可用的流程。",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

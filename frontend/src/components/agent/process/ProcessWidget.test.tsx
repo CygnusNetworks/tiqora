@@ -3,27 +3,22 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
+import { ApiError } from "@tiqora/api-client";
 import { ProcessWidget } from "./ProcessWidget";
-import type { ProcessSummaryOut } from "@/lib/api";
-import type { ProcessDialogFormData, TicketProcessState } from "@/lib/processApi";
+import type { ProcessDialogFormData, ProcessSummary, TicketProcessState } from "@/lib/processApi";
 
-const { listProcesses, startTicketProcess, ticketState, dialogForm, submit } = vi.hoisted(() => ({
-  listProcesses: vi.fn(),
-  startTicketProcess: vi.fn(),
+const { listStartable, startForm, enroll, ticketState, dialogForm, submit } = vi.hoisted(() => ({
+  listStartable: vi.fn(),
+  startForm: vi.fn(),
+  enroll: vi.fn(),
   ticketState: vi.fn(),
   dialogForm: vi.fn(),
   submit: vi.fn(),
 }));
 
-vi.mock("@/lib/api", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return {
-    ...actual,
-    api: { listProcesses, startTicketProcess },
-  };
-});
-
-vi.mock("@/lib/processApi", () => ({ processApi: { ticketState, dialogForm, submit } }));
+vi.mock("@/lib/processApi", () => ({
+  processApi: { listStartable, startForm, enroll, ticketState, dialogForm, submit },
+}));
 
 function wrap(ui: React.ReactElement) {
   const queryClient = new QueryClient({
@@ -73,7 +68,7 @@ const dialogDetail: ProcessDialogFormData = {
   ],
 };
 
-const processSummaries: ProcessSummaryOut[] = [
+const processSummaries: ProcessSummary[] = [
   { id: 1, entity_id: "Process-1", name: "Onboarding", state_entity_id: "S1", state_name: "Active" },
 ];
 
@@ -173,22 +168,49 @@ describe("ProcessWidget", () => {
     expect(screen.queryByTestId("process-dialog-button-ActivityDialog-1")).not.toBeInTheDocument();
   });
 
-  it("starts a process from the start-process dialog", async () => {
+  it("starts a process in two steps: pick, then the start form, then enroll with the ticket", async () => {
     ticketState.mockResolvedValue(notInProcessState);
-    listProcesses.mockResolvedValue(processSummaries);
-    startTicketProcess.mockResolvedValue(activeState);
+    listStartable.mockResolvedValue(processSummaries);
+    startForm.mockResolvedValue(dialogDetail);
+    enroll.mockResolvedValue(activeState);
     wrap(<ProcessWidget ticketId={42} />);
 
     fireEvent.click(await screen.findByTestId("process-widget-start-button"));
     await screen.findByTestId("process-start-select");
+    expect(listStartable).toHaveBeenCalledWith({ ticketId: 42 }, expect.anything());
 
     // SelectField: open the menu and click the option in its portal panel.
     fireEvent.click(screen.getByTestId("process-start-select"));
     fireEvent.click(screen.getByTestId("process-start-select-menu-option-Process-1"));
+    fireEvent.click(screen.getByTestId("process-start-next"));
+
+    await screen.findByTestId("process-start-form");
+    expect(startForm).toHaveBeenCalledWith("Process-1", { ticketId: 42 }, expect.anything());
+    fireEvent.change(await screen.findByLabelText(/Title/), { target: { value: "Neu" } });
     fireEvent.click(screen.getByTestId("process-start-submit"));
 
     await waitFor(() =>
-      expect(startTicketProcess).toHaveBeenCalledWith(42, { process_entity_id: "Process-1" }),
+      expect(enroll).toHaveBeenCalledWith(42, {
+        process_entity_id: "Process-1",
+        field_values: expect.anything(),
+      }),
+    );
+  });
+
+  it("shows a plain message when the server refuses the start (403)", async () => {
+    ticketState.mockResolvedValue(notInProcessState);
+    listStartable.mockResolvedValue(processSummaries);
+    startForm.mockRejectedValue(new ApiError(403, { detail: "Forbidden" }, "/x"));
+    wrap(<ProcessWidget ticketId={42} />);
+
+    fireEvent.click(await screen.findByTestId("process-widget-start-button"));
+    await screen.findByTestId("process-start-select");
+    fireEvent.click(screen.getByTestId("process-start-select"));
+    fireEvent.click(screen.getByTestId("process-start-select-menu-option-Process-1"));
+    fireEvent.click(screen.getByTestId("process-start-next"));
+
+    expect(await screen.findByTestId("process-start-load-error")).toHaveTextContent(
+      i18n.t("process.start.forbidden"),
     );
   });
 });

@@ -1663,6 +1663,9 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/state$/)) return processTicketState;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) || p.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) return processDialogForm;
   if (p.match(/\/api\/v1\/process\/ticket\/\d+\/submit$/) && method === "POST") return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: processTicketState };
+  if (p.endsWith("/api/v1/process/tickets") && method === "POST") return { ticket_id: 1, ticket_number: "2026100001", activity_changed: true, unsupported_actions: [], state: processTicketState };
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/start$/) && method === "POST") return processTicketState;
+  if (p.match(/\/api\/v1\/process\/?$/) && method === "GET") return [{ id: 1, entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active" }];
   if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};
   // Admin — assignment editors (before the generic list handler)
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }

@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· без потвърждение за получаване (няма клиент)",
       "answeredAt": "прието {{time}}",
       "endedAt": "приключило {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "Свързан на живо",
@@ -4003,7 +4004,10 @@
       "cancel": "Отказ",
       "loadError": "Процесите не можаха да се заредят.",
       "startError": "Процесът не можа да започне.",
-      "empty": "Няма налични процеси."
+      "empty": "Няма налични процеси.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

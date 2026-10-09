@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· بلا إشعار استلام (لا يوجد عميل)",
       "answeredAt": "تم الرد {{time}}",
       "endedAt": "انتهت {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "متصلة مباشرة",
@@ -4003,7 +4004,10 @@
       "cancel": "إلغاء",
       "loadError": "لا يمكن تحميل العمليات.",
       "startError": "لا يمكن بدء العملية.",
-      "empty": "لا توجد عمليات متاحة."
+      "empty": "لا توجد عمليات متاحة.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

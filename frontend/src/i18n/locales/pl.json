@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· bez potwierdzenia (brak klienta)",
       "answeredAt": "odebrane {{time}}",
       "endedAt": "zakończone {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "Połączono na żywo",
@@ -4003,7 +4004,10 @@
       "cancel": "Anuluj",
       "loadError": "Nie udało się wczytać procesów.",
       "startError": "Nie udało się uruchomić procesu.",
-      "empty": "Brak dostępnych procesów."
+      "empty": "Brak dostępnych procesów.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

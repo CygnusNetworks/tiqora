@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· brez potrdila o prejemu (ni stranke)",
       "answeredAt": "sprejeto {{time}}",
       "endedAt": "končano {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "Povezan v živo",
@@ -4003,7 +4004,10 @@
       "cancel": "Prekliči",
       "loadError": "Procesov ni bilo mogoče naložiti.",
       "startError": "Procesa ni bilo mogoče začeti.",
-      "empty": "Na voljo ni noben proces."
+      "empty": "Na voljo ni noben proces.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

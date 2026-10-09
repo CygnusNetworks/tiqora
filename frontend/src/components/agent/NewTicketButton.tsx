@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
+import { processApi } from "@/lib/processApi";
 import { flattenQueues } from "@/components/agent/QueueTree";
 import { isSystemQueue } from "@/lib/systemQueues";
 import { Menu, MenuItem, MenuLabel } from "@/components/ui/Menu";
@@ -35,6 +36,13 @@ export function NewTicketButton() {
     (q) => q.valid && !isSystemQueue(q),
   );
 
+  // Processes this agent may start (permission/ACL filtered server-side). A failed lookup just hides the section.
+  const processesQ = useQuery({
+    queryKey: ["process", "startable"],
+    queryFn: ({ signal }) => processApi.listStartable(undefined, signal),
+  });
+  const processes = processesQ.data ?? [];
+
   const goToForm = (queueId?: number) => {
     void navigate({
       to: "/agent/tickets/new",
@@ -44,7 +52,7 @@ export function NewTicketButton() {
 
   // Zero or one queue: no picker — go straight to the form (pre-selected when
   // there's exactly one). The button is a plain action in that case.
-  if (queues.length <= 1) {
+  if (queues.length <= 1 && processes.length === 0) {
     return (
       <button
         type="button"
@@ -88,7 +96,28 @@ export function NewTicketButton() {
             </MenuItem>
           );
         })}
+        {queues.length === 0 && (
+          <MenuItem testId="new-ticket-plain" onSelect={() => goToForm()}>
+            {t("newTicket.title")}
+          </MenuItem>
+        )}
       </div>
+      {processes.length > 0 && (
+        <>
+          <MenuLabel>{t("newTicket.processLabel")}</MenuLabel>
+          <div className="max-h-72 overflow-y-auto">
+            {processes.map((p) => (
+              <MenuItem
+                key={p.entity_id}
+                testId={`new-ticket-process-${p.entity_id}`}
+                onSelect={() => void navigate({ to: "/agent/process/new", search: { process: p.entity_id } })}
+              >
+                {p.name}
+              </MenuItem>
+            ))}
+          </div>
+        </>
+      )}
     </Menu>
   );
 }

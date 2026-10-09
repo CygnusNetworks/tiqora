@@ -5,10 +5,13 @@ import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { NewTicketButton } from "./NewTicketButton";
 
-const { navigate, listQueues } = vi.hoisted(() => ({
+const { navigate, listQueues, listStartable } = vi.hoisted(() => ({
   navigate: vi.fn(),
   listQueues: vi.fn(),
+  listStartable: vi.fn(),
 }));
+
+vi.mock("@/lib/processApi", () => ({ processApi: { listStartable } }));
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigate,
@@ -31,6 +34,7 @@ async function renderButton() {
     </QueryClientProvider>,
   );
   await waitFor(() => expect(client.getQueryData(["queues"])).toBeDefined());
+  await waitFor(() => expect(client.getQueryData(["process", "startable"])).toBeDefined());
   return result;
 }
 
@@ -38,6 +42,8 @@ describe("NewTicketButton", () => {
   beforeEach(() => {
     navigate.mockClear();
     listQueues.mockReset();
+    listStartable.mockReset();
+    listStartable.mockResolvedValue([]);
     void i18n.changeLanguage("en");
   });
 
@@ -138,5 +144,32 @@ describe("NewTicketButton", () => {
     await renderButton();
     fireEvent.click(screen.getByTestId("new-ticket-button"));
     expect(screen.getByTestId("new-ticket-queue-3")).toHaveTextContent("Escalated");
+  });
+
+  it("adds the startable processes below the queues and opens the process page", async () => {
+    listQueues.mockResolvedValue([{ id: 1, name: "Support", group_id: 1, valid: true }]);
+    listStartable.mockResolvedValue([
+      { id: 1, entity_id: "P", name: "Bestellung", state_entity_id: "S1", state_name: "Active" },
+    ]);
+    await renderButton();
+    fireEvent.click(screen.getByTestId("new-ticket-button"));
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByTestId("new-ticket-queue-1")).toHaveTextContent("Support");
+    expect(screen.getByTestId("new-ticket-process-P")).toHaveTextContent("Bestellung");
+
+    fireEvent.click(screen.getByTestId("new-ticket-process-P"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/agent/process/new", search: { process: "P" } });
+  });
+
+  it("offers the plain form next to the processes when there is no queue", async () => {
+    listQueues.mockResolvedValue([]);
+    listStartable.mockResolvedValue([
+      { id: 1, entity_id: "P", name: "Bestellung", state_entity_id: "S1", state_name: "Active" },
+    ]);
+    await renderButton();
+    fireEvent.click(screen.getByTestId("new-ticket-button"));
+    fireEvent.click(screen.getByTestId("new-ticket-plain"));
+    expect(navigate).toHaveBeenCalledWith({ to: "/agent/tickets/new", search: {} });
   });
 });

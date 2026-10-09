@@ -21,6 +21,7 @@ import {
   NewTicketPage as AgentNewTicketPage,
   type NewTicketSearch,
 } from "@/routes/agent/NewTicketPage";
+import { NewProcessTicketPage, type NewProcessTicketSearch } from "@/routes/agent/NewProcessTicketPage";
 import {
   KbArticleNewPage,
   KbArticleEditPage,
@@ -291,6 +292,16 @@ const agentNewTicketRoute = createRoute({
     from_call: s.from_call === true || s.from_call === 1 || s.from_call === "1" || s.from_call === "true" ? true : undefined,
   }),
   component: AgentNewTicketPage,
+});
+
+// Literal path; no `$param` sibling can capture "process/new".
+const agentNewProcessTicketRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/process/new",
+  validateSearch: (s: Record<string, unknown>): NewProcessTicketSearch => ({
+    process: typeof s.process === "string" && s.process !== "" ? s.process : undefined,
+  }),
+  component: NewProcessTicketPage,
 });
 
 const agentTicketRoute = createRoute({
@@ -1034,6 +1045,7 @@ const routeTree = rootRoute.addChildren([
     agentIndexRoute,
     agentQueuesRoute,
     agentNewTicketRoute,
+    agentNewProcessTicketRoute,
     agentTicketRoute,
     agentSearchRoute,
     agentKbRoute,

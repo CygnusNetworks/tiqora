@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· không có xác nhận (không có khách hàng)",
       "answeredAt": "đã trả lời lúc {{time}}",
       "endedAt": "đã kết thúc lúc {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "Đã kết nối trực tiếp",
@@ -4003,7 +4004,10 @@
       "cancel": "Hủy bỏ",
       "loadError": "Không thể tải các tiến trình.",
       "startError": "Không thể bắt đầu quá trình.",
-      "empty": "Không có quy trình nào có sẵn."
+      "empty": "Không có quy trình nào có sẵn.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

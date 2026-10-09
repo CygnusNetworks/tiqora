@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· ei vastaanottokuittausta (ei asiakasta)",
       "answeredAt": "vastattu {{time}}",
       "endedAt": "päättyi {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "Yhdistetty livenä",
@@ -4003,7 +4004,10 @@
       "cancel": "Peruuta",
       "loadError": "Prosesseja ei voitu ladata.",
       "startError": "Prosessia ei voitu käynnistää.",
-      "empty": "Ei prosesseja käytettävissä."
+      "empty": "Ei prosesseja käytettävissä.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {

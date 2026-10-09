@@ -1271,7 +1271,8 @@
       "autoReplyNoCustomer": "· بدون تأیید دریافت (بدون مشتری)",
       "answeredAt": "پذیرفته‌شده {{time}}",
       "endedAt": "پایان {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "به صورت زنده متصل شد",
@@ -4003,7 +4004,10 @@
       "cancel": "لغو کنید",
       "loadError": "فرآیندها بارگیری نشد.",
       "startError": "فرآیند شروع نشد.",
-      "empty": "هیچ فرآیندی در دسترس نیست."
+      "empty": "هیچ فرآیندی در دسترس نیست.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4045,6 +4049,12 @@
     "lock": {
       "lock": "locked",
       "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start.",
+      "created": "Ticket {{tn}} was created."
     }
   },
   "agentTemplates": {
