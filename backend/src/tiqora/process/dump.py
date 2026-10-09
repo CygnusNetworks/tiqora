@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.api.compat.mapping.perl import perl_truthy
 from tiqora.db.legacy.process_management import (
     PmActivity,
     PmActivityDialog,
@@ -72,6 +73,12 @@ def format_time(value: datetime | None) -> str:
     return value.strftime(_TIME_FORMAT) if value is not None else ""
 
 
+def _or(value: Any, default: Any) -> Any:
+    """Perl ``$value || $default``: ``undef``, ``''``, ``'0'`` and ``0`` fall back, while any
+    reference is kept, even an empty hash or list (``ActivityDialog: {}`` stays ``{}``)."""
+    return value if perl_truthy(value) else default
+
+
 def _config(raw: str | bytes | None) -> dict[str, Any]:
     return _jsonable(_load_yaml_mapping(raw))  # type: ignore[no-any-return]
 
@@ -106,7 +113,9 @@ async def _load_preferences(session: AsyncSession) -> dict[str, dict[str, Any]]:
 async def build_process_dump(session: AsyncSession) -> dict[str, Any]:
     """Znuny ``ProcessDump`` (DB/Process.pm:1225-1377) for the live ``pm_*`` rows.
 
-    Empty values use Znuny's ``|| ''`` / ``|| {}`` / ``|| []`` defaults.
+    Empty values use Znuny's ``|| ''`` / ``|| {}`` / ``|| []`` defaults, with Perl
+    truthiness (:func:`_or`): ``RequiredLock: '0'`` dumps as ``''``, ``ActivityDialog: {}``
+    stays ``{}``.
     """
     processes: dict[str, Any] = {}
     # DB/Process.pm:1265-1274; ID and Description are Tiqora additions.
@@ -116,17 +125,20 @@ async def build_process_dump(session: AsyncSession) -> dict[str, Any]:
             **_common(p),
             "StateEntityID": p.state_entity_id,
             "State": PROCESS_STATE_NAMES.get(p.state_entity_id, ""),
-            "StartActivity": cfg.get("StartActivity") or "",
-            "StartActivityDialog": cfg.get("StartActivityDialog") or "",
-            "Path": cfg.get("Path") or {},
-            "Description": cfg.get("Description") or "",
+            "StartActivity": _or(cfg.get("StartActivity"), ""),
+            "StartActivityDialog": _or(cfg.get("StartActivityDialog"), ""),
+            "Path": _or(cfg.get("Path"), {}),
+            "Description": _or(cfg.get("Description"), ""),
         }
 
     activities: dict[str, Any] = {}
     # DB/Process.pm:1287-1293
     for a in (await session.execute(select(PmActivity).order_by(PmActivity.id))).scalars():
         cfg = _config(a.config)
-        activities[a.entity_id] = {**_common(a), "ActivityDialog": cfg.get("ActivityDialog") or ""}
+        activities[a.entity_id] = {
+            **_common(a),
+            "ActivityDialog": _or(cfg.get("ActivityDialog"), ""),
+        }
 
     dialogs: dict[str, Any] = {}
     # DB/Process.pm:1306-1319
@@ -136,15 +148,15 @@ async def build_process_dump(session: AsyncSession) -> dict[str, Any]:
         cfg = _config(d.config)
         dialogs[d.entity_id] = {
             **_common(d),
-            "Interface": cfg.get("Interface") or "",
-            "DescriptionShort": cfg.get("DescriptionShort") or "",
-            "DescriptionLong": cfg.get("DescriptionLong") or "",
-            "Fields": cfg.get("Fields") or {},
-            "FieldOrder": cfg.get("FieldOrder") or [],
-            "Permission": cfg.get("Permission") or "",
-            "RequiredLock": cfg.get("RequiredLock") or "",
-            "SubmitAdviceText": cfg.get("SubmitAdviceText") or "",
-            "SubmitButtonText": cfg.get("SubmitButtonText") or "",
+            "Interface": _or(cfg.get("Interface"), ""),
+            "DescriptionShort": _or(cfg.get("DescriptionShort"), ""),
+            "DescriptionLong": _or(cfg.get("DescriptionLong"), ""),
+            "Fields": _or(cfg.get("Fields"), {}),
+            "FieldOrder": _or(cfg.get("FieldOrder"), []),
+            "Permission": _or(cfg.get("Permission"), ""),
+            "RequiredLock": _or(cfg.get("RequiredLock"), ""),
+            "SubmitAdviceText": _or(cfg.get("SubmitAdviceText"), ""),
+            "SubmitButtonText": _or(cfg.get("SubmitButtonText"), ""),
         }
 
     transitions: dict[str, Any] = {}
@@ -153,8 +165,8 @@ async def build_process_dump(session: AsyncSession) -> dict[str, Any]:
         cfg = _config(t.config)
         transitions[t.entity_id] = {
             **_common(t),
-            "Condition": cfg.get("Condition") or {},
-            "ConditionLinking": cfg.get("ConditionLinking") or "",
+            "Condition": _or(cfg.get("Condition"), {}),
+            "ConditionLinking": _or(cfg.get("ConditionLinking"), ""),
         }
 
     actions: dict[str, Any] = {}
@@ -165,8 +177,8 @@ async def build_process_dump(session: AsyncSession) -> dict[str, Any]:
         cfg = _config(x.config)
         actions[x.entity_id] = {
             **_common(x),
-            "Module": cfg.get("Module") or "",
-            "Config": cfg.get("Config") or {},
+            "Module": _or(cfg.get("Module"), ""),
+            "Config": _or(cfg.get("Config"), {}),
         }
 
     return {

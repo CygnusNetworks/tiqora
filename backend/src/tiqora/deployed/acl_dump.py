@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.config import Acl
+from tiqora.db.legacy.user import Users
 from tiqora.process.config import _load_yaml_mapping
 from tiqora.process.dump import _jsonable, format_time
 
@@ -26,7 +27,9 @@ def _section(cfg: dict[str, Any], key: str) -> dict[str, Any]:
 async def build_acl_dump(session: AsyncSession) -> dict[str, Any]:
     """Valid ACLs keyed by sanitised name, sorted by name.
 
-    ``CreateBy``/``ChangeBy`` are the raw user ids (ruling F7; ACL.pm:897-900).
+    ``CreateBy``/``ChangeBy`` are user logins: ACLGet maps both ids through ``UserLookup``
+    (ACL.pm:393-398), which does not filter on ``valid_id`` and gives ``undef`` for an
+    unknown id (User.pm UserLookup). Ruling F7 said raw ids; the golden peer shows logins.
     Two ACLs whose names collapse to the same key keep the one with the higher
     id, as Znuny's hash assignment does.
     """
@@ -34,6 +37,16 @@ async def build_acl_dump(session: AsyncSession) -> dict[str, Any]:
         (await session.execute(select(Acl).where(Acl.valid_id == 1).order_by(Acl.id)))
         .scalars()
         .all()
+    )
+    user_ids = {u for acl in rows for u in (acl.create_by, acl.change_by)}
+    logins: dict[int, str] = (
+        dict(
+            (await session.execute(select(Users.id, Users.login).where(Users.id.in_(user_ids))))
+            .tuples()
+            .all()
+        )
+        if user_ids
+        else {}
     )
     acls: dict[str, Any] = {}
     for acl in rows:
@@ -46,8 +59,8 @@ async def build_acl_dump(session: AsyncSession) -> dict[str, Any]:
             "ID": acl.id,
             "CreateTime": format_time(acl.create_time),
             "ChangeTime": format_time(acl.change_time),
-            "CreateBy": acl.create_by,
-            "ChangeBy": acl.change_by,
+            "CreateBy": logins.get(acl.create_by),
+            "ChangeBy": logins.get(acl.change_by),
             "Comment": comment,
             "Values": {
                 "StopAfterMatch": acl.stop_after_match or 0,

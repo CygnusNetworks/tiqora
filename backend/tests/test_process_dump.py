@@ -112,6 +112,16 @@ def _seed(sync_url: str) -> None:
         )
         _entity(conn, "pm_activity", 2, "Activity", "A2", "{}\n")
         _entity(conn, "pm_activity_dialog", 1, "ActivityDialog", "D1", "DescriptionShort: Short\n")
+        # Znuny sample AgentTicketProcess.yml shapes: an empty dialog hash, RequiredLock '0'.
+        _entity(conn, "pm_activity", 3, "Activity", "A3", "ActivityDialog: {}\n")
+        _entity(
+            conn,
+            "pm_activity_dialog",
+            2,
+            "ActivityDialog",
+            "D2",
+            "DescriptionShort: '0'\nRequiredLock: '0'\nPermission: '0'\nInterface: []\n",
+        )
         _entity(conn, "pm_transition", 1, "Transition", "T1", _TRANSITION_CFG)
         _entity(
             conn,
@@ -293,8 +303,9 @@ async def test_acl_dump_valid_only_sorted_and_sanitised(session: AsyncSession) -
     b = dump["ACL"]["b-acl"]
     assert b["Values"]["StopAfterMatch"] == 1
     assert b["Comment"] == "line1line2"  # ACL.pm:891-894 strips line breaks
-    # Raw user ids, not logins (ruling F7, ACL.pm:897-900).
-    assert (b["CreateBy"], b["ChangeBy"]) == (1, 881001)
+    # Logins: ACLGet maps both ids through UserLookup (ACL.pm:393-398); the golden peer run
+    # showed ruling F7's "raw ids" premise wrong (tests/golden/test_process_deploy.py).
+    assert (b["CreateBy"], b["ChangeBy"]) == ("root@localhost", "dump.agent.881001")
     assert b["ID"] == 881001
     assert b["CreateTime"] == "2026-03-04 05:06:07"
     assert b["Values"]["Properties"] == {"Ticket": {"Queue": ["Raw"]}}
@@ -304,6 +315,22 @@ async def test_acl_dump_valid_only_sorted_and_sanitised(session: AsyncSession) -
     a = dump["ACL"]["aacl"]
     assert a["Values"]["StopAfterMatch"] == 0  # NULL -> `|| 0`
     assert a["Comment"] is None
+
+
+async def test_process_dump_defaults_follow_perl_truthiness(
+    session: AsyncSession, no_profile: None
+) -> None:
+    """``$X || ''`` in DB/Process.pm:1291/1310-1317 is Perl truthiness: the strings ``''`` and
+    ``'0'`` fall back to the default, but any reference (even an empty hash or list) is kept.
+    Found by the golden peer run (tests/golden/test_process_deploy.py)."""
+    dump = await build_process_dump(session)
+
+    assert dump["Activity"]["Activity-881003"]["ActivityDialog"] == {}
+    dialog = dump["ActivityDialog"]["ActivityDialog-881002"]
+    assert dialog["RequiredLock"] == ""
+    assert dialog["Permission"] == ""
+    assert dialog["DescriptionShort"] == ""
+    assert dialog["Interface"] == []
 
 
 def test_config_from_dict_accepts_znuny_dump_defaults() -> None:

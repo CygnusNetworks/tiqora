@@ -1433,12 +1433,18 @@ async def _store_dialog_article(
         return
     cfg = article_cfg.config
     channel_raw = str(cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note").lower()
+    # AgentTicketProcess.pm:5650-5654: the agent dialog article's history text is "%%Note"
+    # ("%%" for the Phone channel), not the usual "%% <subject>".
+    history_comment = (
+        ("%%" if channel_raw == "phone" else "%%Note") if sender_type == "agent" else None
+    )
     article = ArticleIn(
         sender_type=sender_type,
         is_visible_for_customer=str(cfg.get("IsVisibleForCustomer", "0")) == "1",
         subject=str(field_values["Subject"]),
         body=str(field_values["Body"]),
         channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
+        history_comment_override=history_comment,
     )
     await add_article(
         session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig

@@ -515,6 +515,9 @@ async def test_create_process_ticket_uses_process_defaults_and_runs_transition(
     assert activity_eid(1, "A") in history[2][1]
     assert "Region888" in history[3][1]
     assert activity_eid(1, "B") in history[7][1]
+    # AgentTicketProcess.pm:5650-5654: an Internal dialog article is AddNote "%%Note", not the
+    # usual "%% <subject>" (found by tests/golden/test_process_deploy.py on Znuny 6.5).
+    assert history[4] == ("AddNote", "%%Note")
     # The article carries the submitted subject/body.
     article = _rows(
         sync_url,
