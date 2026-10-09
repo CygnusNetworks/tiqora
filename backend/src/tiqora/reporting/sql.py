@@ -234,7 +234,12 @@ def is_timeout_error(exc: BaseException) -> bool:
     return False
 
 
-async def _invalidate_quietly(session: AsyncSession) -> None:
+async def invalidate_quietly(session: AsyncSession) -> None:
+    """Invalidate the session's connection so the pool never reuses it (best effort).
+
+    For a connection left mid-protocol by a cancelled driver call; the session
+    must be rolled back or closed afterwards.
+    """
     try:
         conn = await session.connection()
         await conn.invalidate()
@@ -287,10 +292,10 @@ async def statement_timeout(session: AsyncSession, seconds: int) -> AsyncIterato
             try:
                 await session.execute(sa_text(reset_sql))
             except asyncio.CancelledError:
-                await _invalidate_quietly(session)
+                await invalidate_quietly(session)
                 raise
             except Exception as reset_exc:  # noqa: BLE001 - best effort, never mask
                 logger.warning("report_statement_timeout_reset_failed", error=str(reset_exc))
-                await _invalidate_quietly(session)
+                await invalidate_quietly(session)
     if timed_out is not None:
         raise ReportQueryTimeout(f"statement exceeded {seconds}s") from timed_out

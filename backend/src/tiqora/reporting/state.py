@@ -130,9 +130,14 @@ def _status_fields(state: TiqoraReportState) -> dict[str, Any]:
     }
 
 
+def facts_status_of(state: TiqoraReportState) -> FactsStatusOut:
+    """Readiness of the report data from an already loaded state row."""
+    return FactsStatusOut.model_validate(_status_fields(state))
+
+
 async def facts_status(session: AsyncSession) -> FactsStatusOut:
     """Readiness of the report data (creates the state row when missing)."""
-    return FactsStatusOut.model_validate(_status_fields(await load_state(session)))
+    return facts_status_of(await load_state(session))
 
 
 async def reporting_status(session: AsyncSession) -> ReportingStatusOut:

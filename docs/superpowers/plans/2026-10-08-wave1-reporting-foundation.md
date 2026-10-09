@@ -755,35 +755,57 @@ def compile_conditions(flt: Filter, resolve: Callable[[str], tuple[FilterFieldSp
 # backend/src/tiqora/reporting/engine.py
 OTHER_KEY: Final = "__other__"
 PERCENTILE_SAMPLE_CAP: Final = 200_000
-async def estimate_rows(session: AsyncSession, compiled: CompiledReport) -> int
+INLINE_BUDGET_SECONDS: Final = 75          # R-INLINEBUDGET: one deadline for all queries of a request
+@dataclass
+class QueryBudget:                         # seconds per statement
+    per_query_seconds: int = 60; deadline: float | None = None; clock: Callable[[], float] = time.monotonic
+    @classmethod
+    def inline(cls, reporting, seconds=INLINE_BUDGET_SECONDS, *, clock=time.monotonic) -> QueryBudget
+    @classmethod
+    def job(cls, reporting) -> QueryBudget  # query_timeout_seconds per statement, no shared deadline
+    def statement_seconds(self) -> int      # inline: min(per_query, remaining); remaining < 1 -> ReportQueryTimeout
+async def estimate_rows(session: AsyncSession, compiled: CompiledReport, *,
+                        budget: QueryBudget | None = None) -> int
     # SELECT COUNT(*) FROM <same FROM/WHERE as stmt>; 0 when stmt is None
 async def run_report(session: AsyncSession, *, defn: ReportDefinition, params: RunParams, user_id: int,
                      report_key: str | None, reporting: ReportingSettings,
                      cache: ReportCache | None = None, now: datetime | None = None,
                      row_cap: int | None = None, compare_previous: bool = False,
-                     registry: Registry | None = None, use_cache: bool = True) -> ReportResultOut
-    # scope = ticket_query_scope(session, user_id); compile; cache lookup (key from R8b); execute stmt inside
-    # statement_timeout(reporting.query_timeout_seconds) and asyncio.wait_for(timeout + 5) -> ReportQueryTimeout;
+                     registry: Registry | None = None, use_cache: bool = True,
+                     include_archived: bool = False, budget: QueryBudget | None = None) -> ReportResultOut
+    # scope = ticket_query_scope(session, user_id, include_archived=include_archived and is_admin); compile; cache
+    # lookup (key from R8b; a hit gets the caller's report_key and the current facts status); execute every
+    # statement inside statement_timeout(budget.statement_seconds()) and asyncio.wait_for(seconds + 5) ->
+    # ReportQueryTimeout (budget None = QueryBudget.job; inline callers pass ONE QueryBudget.inline per request,
+    # shared with estimate_rows; label lookups count against it too); a client-side timeout/cancellation
+    # invalidates the connection before the timeout reset runs (R-STMTRESET T10 amendment);
     # percentiles from raw_stmt (linear interpolation like PERCENTILE_CONT; > PERCENTILE_SAMPLE_CAP rows -> sampled
     # first rows, result.truncated = True); rates num/den (den 0 -> None); top_n folding (additive measures summed
     # into "__other__", others None); time-series bucket fill (zero rows for empty buckets of the FIRST date
     # dimension when it is the only dimension or the series dimension is another one); sort (definition.sort, else
     # first date dimension asc, else first measure desc); limit; row_cap (default reporting.max_result_rows) ->
     # truncated; totals via extra compiled queries with group_by [] / [0] / [1]; compare_previous -> the same
-    # totals for the window shifted back by its own length ("previous"); labels via resolve_labels; facts status;
-    # store in cache
+    # totals for the window shifted back by its own length ("previous"; whole local days shift by their day
+    # count, exact UTC bounds by end - start); labels via resolve_labels; facts status; store in cache.
+    # row_count = rows after `limit`, before the row cap. Folded "__other__" rows: count/count_if/sum summed,
+    # rates from summed num/den, percentiles from the merged samples, everything else None; top-n ranks by the
+    # first measure when it adds up, else by the row count. Zero-bucket fill skips stock (snapshot) dimensions.
 @dataclass(frozen=True, slots=True)
 class RunPlan:
     compiled: CompiledReport
     cache_key: str
+    # + definition (as given), params (incl. the state row's last_snapshot_date), scope, facts, row_cap,
+    #   compare_previous, now, near_miss_percent, registry -- what execute_plan and the totals queries need
 async def plan_report(session: AsyncSession, *, defn: ReportDefinition, params: RunParams, user_id: int,
                       reporting: ReportingSettings, row_cap: int | None = None, compare_previous: bool = False,
-                      now: datetime | None = None, registry: Registry | None = None) -> RunPlan
+                      now: datetime | None = None, registry: Registry | None = None,
+                      include_archived: bool = False) -> RunPlan
     # what run_report does first (scope, last_snapshot_date, compile, cache key); the API uses it for the cache
     # lookup and estimate_rows before deciding inline vs. job
 async def raw_measure_values(session: AsyncSession, *, defn: ReportDefinition, measure_key: str,
                              params: RunParams, user_id: int, reporting: ReportingSettings,
-                             now: datetime | None = None, registry: Registry | None = None) -> list[float]
+                             now: datetime | None = None, registry: Registry | None = None,
+                             include_archived: bool = False, budget: QueryBudget | None = None) -> list[float]
     # the percentile value list of one measure (used by the /stats SLA wrapper), capped at PERCENTILE_SAMPLE_CAP
 
 # backend/src/tiqora/reporting/labels.py
@@ -792,7 +814,8 @@ async def resolve_labels(session: AsyncSession, source: LabelSource, keys: Itera
     # service -> service.name; sla -> sla.name; user -> "First Last" (login when empty);
     # customer_company -> customer_company.name (keys loaded as IN-list, string compare on one table);
     # customer_user -> "First Last" from customer_user by login; ticket -> "<tn> <title>"; none -> {}.
-    # Result keys are str(key); missing keys map to str(key).
+    # Result keys are str(key); missing keys map to str(key). Queue HIDDEN_QUEUE_ID (-1) -> "Andere Queue",
+    # never looked up.
 ```
 
 R8b — cache:
@@ -807,8 +830,11 @@ class ReportCache:
     def __init__(self, backend: CacheBackend | None, ttl_seconds: int) -> None
     @staticmethod
     def key_for(*, definition_hash: str, queue_ids: Iterable[int], window: TimeWindow | None, time_zone: str,
-                row_cap: int, compare_previous: bool) -> str
-        # CACHE_PREFIX + sha256(json of: hash, sorted queue ids, window start/end iso, zone, row_cap, compare_previous)
+                row_cap: int, compare_previous: bool, include_archived: bool, extra_filter: Filter | None,
+                last_snapshot_date: date | None, near_miss_percent: int) -> str
+        # CACHE_PREFIX + sha256(json of: hash, sorted queue ids, window start/end iso, zone, row_cap, compare_previous,
+        # CompiledReport.include_archived, sha256 of extra_filter, last_snapshot_date iso, near_miss_percent);
+        # every argument is required (no caller can forget a scope input)
     async def get(self, key: str) -> ReportResultOut | None       # backend errors -> None + log warning
     async def put(self, key: str, result: ReportResultOut) -> None  # ttl 0 or backend None -> no-op; errors logged
 def cache_backend_from_settings(settings: Settings) -> CacheBackend   # redis.asyncio.from_url(settings.redis_url, decode_responses=True)
@@ -904,7 +930,7 @@ GET  /api/v1/admin/reporting/status    -> ReportingStatusOut
 POST /api/v1/admin/reporting/backfill  -> 202 JobAccepted   (body ReportBackfillIn; dedupe_key "report_backfill"; sets state.backfill_job_id)
 ```
 
-Access (`tiqora/reporting/access.py`): `async def require_report_access(session, user) -> None` — `access == "all_agents"` → ok; `"stats_group"` → admin, or `ro` (incl. `rw`) on the valid group named `stats` (`PermissionEngine.groups_for_permission` + `PermissionGroups` lookup by name) → else `HTTPException(403, {"message": "Für Berichte fehlt die Berechtigung (Gruppe „stats“)."})`. The `/api/v1/stats/*` wrappers apply the same check.
+Access (`tiqora/reporting/access.py`): `async def require_report_access(session, user_id: int, reporting: ReportingSettings) -> None` (user id + loaded settings: the jobs only have a user id; `has_report_access` returns the bool) — `access == "all_agents"` → ok; `"stats_group"` → admin, or `ro` (incl. `rw`) on the valid group named `stats` (`PermissionEngine.groups_for_permission` + `PermissionGroups` lookup by name) → else `HTTPException(403, {"message": "Für Berichte fehlt die Berechtigung (Gruppe „stats“)."})`. The `/api/v1/stats/*` wrappers apply the same check.
 
 Jobs (`tiqora/reporting/jobs.py`):
 
