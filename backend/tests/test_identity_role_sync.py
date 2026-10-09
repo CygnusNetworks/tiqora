@@ -7,6 +7,7 @@ Provider slugs use the ``idprole-`` prefix. Rules match the attribute ``groups``
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
@@ -89,6 +90,14 @@ def _clean(url: str) -> None:
                 conn.execute(text(stmt), params)
     finally:
         engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _loggers_enabled() -> None:
+    """Alembic's ``fileConfig`` (migration tests earlier in a full run) disables every logger that
+    already exists, which blanks ``caplog`` for these modules' log assertions."""
+    for name in ("tiqora.identity.login", "tiqora.identity.provisioning"):
+        logging.getLogger(name).disabled = False
 
 
 @pytest.fixture(autouse=True, scope="module")
