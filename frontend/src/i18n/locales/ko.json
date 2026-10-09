@@ -1325,7 +1325,19 @@
     },
     "login": {
       "subtitle": "지원 계정에 로그인하세요.",
-      "email": "이메일 또는 사용자 이름"
+      "email": "이메일 또는 사용자 이름",
+      "ssoDivider": "or",
+      "twoFactorTitle": "Two-factor sign-in",
+      "twoFactorHint": "Enter the 6-digit code from your authenticator app.",
+      "passkeyOnlyHint": "Confirm the sign-in with your passkey.",
+      "totpLabel": "Verification code",
+      "passkeyButton": "Confirm with passkey",
+      "verify": "Confirm",
+      "totpInvalid": "Invalid or expired code.",
+      "passkeyInvalid": "The passkey could not be verified.",
+      "passkeyFailed": "Passkey confirmation failed. Please try again.",
+      "passkeyUnsupported": "This browser does not support passkeys.",
+      "cancel": "Cancel"
     },
     "tickets": {
       "title": "내 티켓",
@@ -1386,6 +1398,11 @@
       "save": "저장",
       "keys": "암호화",
       "keysDesc": "암호화된 이메일을 보낼 수 있도록 PGP 키 또는 S/MIME 인증서를 업로드하세요. 이메일 주소 {{email}}이(가) 포함되어야 합니다."
+    },
+    "security": {
+      "title": "Security",
+      "nav": "Security",
+      "intro": "Protect your account with a second factor when you sign in."
     }
   },
   "admin": {
@@ -2450,7 +2467,12 @@
       "accessGroupsHint": "Every member of these groups, whatever their permission there.",
       "accessRoles": "Roles",
       "accessRolesHint": "Every agent holding one of these roles.",
-      "accessLoadError": "Could not load the current access list."
+      "accessLoadError": "Could not load the current access list.",
+      "reset2fa": "Reset two-factor sign-in",
+      "reset2faConfirmTitle": "Reset two-factor sign-in?",
+      "reset2faConfirmBody": "The authenticator app and all passkeys of {{login}} will be removed. Until a new two-factor sign-in is set up, the password alone is enough to sign in.",
+      "reset2faDone": "Two-factor sign-in of {{login}} was reset.",
+      "reset2faFailed": "Could not reset the two-factor sign-in."
     },
     "customerCompanies": {
       "title_plural": "고객사",

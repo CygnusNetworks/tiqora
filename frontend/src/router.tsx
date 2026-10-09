@@ -60,6 +60,7 @@ import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
 import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
 import { KbArticlePage } from "@/routes/portal/KbArticlePage";
 import { PreferencesPage as PortalPreferencesPage } from "@/routes/portal/PreferencesPage";
+import { SecurityPage as PortalSecurityPage } from "@/routes/portal/SecurityPage";
 import { AdminShell } from "@/components/layout/AdminShell";
 import { RequireAdmin } from "@/auth/RequireAdmin";
 import { AdminHomePage } from "@/routes/admin/AdminHomePage";
@@ -551,8 +552,13 @@ const agentDialRoute = createRoute({
 const portalLoginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/portal/login",
-  validateSearch: (s: Record<string, unknown>): { next?: string } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { next?: string; sso_error?: string; logged_out?: string } => ({
     next: typeof s.next === "string" ? s.next : undefined,
+    // The router JSON-parses search values: `?sso_error=1` arrives as a number.
+    sso_error: searchFlag(s.sso_error),
+    logged_out: searchFlag(s.logged_out),
   }),
   component: () => (
     <RequirePortalEnabled>
@@ -627,6 +633,12 @@ const portalPreferencesRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/preferences",
   component: PortalPreferencesPage,
+});
+
+const portalSecurityRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/security",
+  component: PortalSecurityPage,
 });
 
 // /admin: agent session (RequireAuth) + is_admin from /me (RequireAdmin)
@@ -1096,6 +1108,7 @@ const routeTree = rootRoute.addChildren([
     portalKbRoute,
     portalKbArticleRoute,
     portalPreferencesRoute,
+    portalSecurityRoute,
   ]),
   adminLayoutRoute.addChildren([
     adminIndexRoute,

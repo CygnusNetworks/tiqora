@@ -4,11 +4,22 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CustomerAuthProvider, useCustomerAuth } from "./CustomerAuthContext";
 import { ApiError } from "@/lib/portalApi";
 
-const { portalMeMock, portalLoginMock, portalLogoutMock } = vi.hoisted(() => ({
-  portalMeMock: vi.fn(),
-  portalLoginMock: vi.fn(),
-  portalLogoutMock: vi.fn(),
+const { portalMeMock, portalLoginMock, portalLogoutMock, totpVerifyMock, submitSsoLogoutMock } =
+  vi.hoisted(() => ({
+    portalMeMock: vi.fn(),
+    portalLoginMock: vi.fn(),
+    portalLogoutMock: vi.fn(),
+    totpVerifyMock: vi.fn(),
+    submitSsoLogoutMock: vi.fn(),
+  }));
+
+vi.mock("@/lib/portalSecurityApi", () => ({
+  customerSecurityApi: { totpVerify: totpVerifyMock },
 }));
+
+vi.mock("@/lib/ssoLogout", () => ({ submitSsoLogout: submitSsoLogoutMock }));
+
+vi.mock("@simplewebauthn/browser", () => ({ startAuthentication: vi.fn() }));
 
 vi.mock("@/lib/portalApi", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/portalApi")>();
@@ -109,6 +120,75 @@ describe("CustomerAuthContext", () => {
     expect(portalLogoutMock).toHaveBeenCalled();
     await waitFor(() => expect(result.current.isAuthenticated).toBe(false));
     expect(result.current.customer).toBeNull();
+  });
+
+  it("login() with a pending second factor keeps the customer signed out", async () => {
+    portalLoginMock.mockResolvedValue({
+      customer: null,
+      pending_2fa: true,
+      totp_enrolled: true,
+      passkey_enrolled: false,
+    });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    let res: Awaited<ReturnType<typeof result.current.login>> | undefined;
+    await act(async () => {
+      res = await result.current.login("customer1", "pw");
+    });
+
+    expect(res?.pending_2fa).toBe(true);
+    expect(result.current.pending2fa).toBe(true);
+    expect(result.current.pendingFactors).toEqual({ totp: true, passkey: false });
+    expect(result.current.isAuthenticated).toBe(false);
+  });
+
+  it("verifyTotp() completes the pending sign-in", async () => {
+    portalLoginMock.mockResolvedValue({ customer: null, pending_2fa: true, totp_enrolled: true });
+    totpVerifyMock.mockResolvedValue({ customer: authedCustomer });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await act(async () => {
+      await result.current.login("customer1", "pw");
+    });
+
+    portalMeMock.mockResolvedValue(authedCustomer);
+    await act(async () => {
+      await result.current.verifyTotp("123456");
+    });
+
+    expect(totpVerifyMock).toHaveBeenCalledWith("123456");
+    expect(result.current.pending2fa).toBe(false);
+    expect(result.current.pendingFactors).toBeNull();
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+  });
+
+  it("logout() of an SSO session submits the SSO logout form instead of the plain API call", async () => {
+    portalMeMock.mockResolvedValue({ ...authedCustomer, sso_logout: true });
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(submitSsoLogoutMock).toHaveBeenCalledWith("/api/portal/auth/sso/logout");
+    expect(portalLogoutMock).not.toHaveBeenCalled();
+  });
+
+  it("logout() of a password session does not use the SSO form", async () => {
+    portalMeMock.mockResolvedValue({ ...authedCustomer, sso_logout: false });
+    portalLogoutMock.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useCustomerAuth(), { wrapper });
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true));
+    portalMeMock.mockResolvedValue(null);
+
+    await act(async () => {
+      await result.current.logout();
+    });
+
+    expect(portalLogoutMock).toHaveBeenCalled();
+    expect(submitSsoLogoutMock).not.toHaveBeenCalled();
   });
 
   it("refresh() re-fetches /portal/me", async () => {

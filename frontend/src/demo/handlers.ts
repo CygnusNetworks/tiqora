@@ -9,7 +9,9 @@ import { resolveData, demoPortalUser, demoPortalTickets, demoRefine } from "./mo
  */
 function respond(pathname: string, method: string): unknown {
   // Portal plane (checked before the shared resolver's generic /auth/me).
-  if (pathname.endsWith("/api/portal/auth/methods")) return { password: true };
+  if (pathname.endsWith("/api/portal/auth/methods"))
+    return { password: true, providers: [], webauthn: false };
+  if (pathname.endsWith("/api/portal/auth/totp/status")) return { enabled: false };
   if (pathname.endsWith("/api/portal/auth/me")) return demoPortalUser;
   if (pathname.endsWith("/api/portal/tickets")) return demoPortalTickets;
   if (pathname.startsWith("/api/portal/")) return method === "GET" ? [] : {};

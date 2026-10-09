@@ -1325,7 +1325,19 @@
     },
     "login": {
       "subtitle": "Bei Ihrem Support-Konto anmelden",
-      "email": "E-Mail oder Benutzername"
+      "email": "E-Mail oder Benutzername",
+      "ssoDivider": "oder",
+      "twoFactorTitle": "Zwei-Faktor-Anmeldung",
+      "twoFactorHint": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.",
+      "passkeyOnlyHint": "Bestätigen Sie die Anmeldung mit Ihrem Passkey.",
+      "totpLabel": "Bestätigungscode",
+      "passkeyButton": "Mit Passkey bestätigen",
+      "verify": "Bestätigen",
+      "totpInvalid": "Ungültiger oder abgelaufener Code.",
+      "passkeyInvalid": "Der Passkey konnte nicht bestätigt werden.",
+      "passkeyFailed": "Die Passkey-Bestätigung ist fehlgeschlagen. Bitte erneut versuchen.",
+      "passkeyUnsupported": "Dieser Browser unterstützt keine Passkeys.",
+      "cancel": "Abbrechen"
     },
     "tickets": {
       "title": "Meine Tickets",
@@ -1386,6 +1398,11 @@
       "save": "Speichern",
       "keys": "Verschlüsselung",
       "keysDesc": "Laden Sie Ihren PGP-Schlüssel oder Ihr S/MIME-Zertifikat hoch, damit wir Ihnen verschlüsselte E-Mails senden können. Er muss Ihre E-Mail-Adresse {{email}} enthalten."
+    },
+    "security": {
+      "title": "Sicherheit",
+      "nav": "Sicherheit",
+      "intro": "Schützen Sie Ihr Konto zusätzlich mit einem zweiten Faktor bei der Anmeldung."
     }
   },
   "admin": {
@@ -2450,7 +2467,12 @@
       "accessGroupsHint": "Alle Mitglieder dieser Gruppen, egal mit welchem Recht.",
       "accessRoles": "Rollen",
       "accessRolesHint": "Alle Agenten mit einer dieser Rollen.",
-      "accessLoadError": "Die aktuelle Zugriffsliste konnte nicht geladen werden."
+      "accessLoadError": "Die aktuelle Zugriffsliste konnte nicht geladen werden.",
+      "reset2fa": "Zwei-Faktor-Anmeldung zurücksetzen",
+      "reset2faConfirmTitle": "Zwei-Faktor-Anmeldung zurücksetzen?",
+      "reset2faConfirmBody": "Die Authenticator-App und alle Passkeys von {{login}} werden entfernt. Danach genügt das Passwort zur Anmeldung, bis eine neue Zwei-Faktor-Anmeldung eingerichtet ist.",
+      "reset2faDone": "Zwei-Faktor-Anmeldung von {{login}} wurde zurückgesetzt.",
+      "reset2faFailed": "Die Zwei-Faktor-Anmeldung konnte nicht zurückgesetzt werden."
     },
     "customerCompanies": {
       "title_plural": "Kundenunternehmen",

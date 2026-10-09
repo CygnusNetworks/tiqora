@@ -17,6 +17,7 @@ import type { FieldDef, FieldValues } from "@/components/admin/CrudDrawer";
 import type { DataTableColumn } from "@/components/admin/DataTable";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { MenuItem } from "@/components/ui/Menu";
 import { CustomerCryptoKeys } from "@/components/agent/CustomerCryptoKeys";
 import { CustomerDirectoryAccessDialog } from "@/components/admin/CustomerDirectoryAccessDialog";
@@ -27,7 +28,7 @@ import {
   saveSelectedVcards,
   VCARD_EXPORT_MAX,
 } from "@/components/customers/vcardExport";
-import { DownloadIcon, ImageIcon, KeyIcon, UsersIcon } from "@/components/ui/icons";
+import { DownloadIcon, ImageIcon, KeyIcon, ShieldIcon, UsersIcon } from "@/components/ui/icons";
 import { bulkInChunks } from "@/lib/bulk";
 import { formatDateTime } from "@/lib/format";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/passwordPolicy";
@@ -58,6 +59,25 @@ export function CustomerUsersPage() {
   const [keysLogin, setKeysLogin] = useState<string | null>(null);
   const [accessOpen, setAccessOpen] = useState<FeatureKey | null>(null);
   const [avatarsOpen, setAvatarsOpen] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [resetNotice, setResetNotice] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Lost authenticator: drops the customer's TOTP and passkeys (idempotent, no code needed).
+  const reset2fa = async (row: CustomerUserAdminOut) => {
+    const ok = await confirm({
+      title: t("admin.customerUsers.reset2faConfirmTitle"),
+      message: t("admin.customerUsers.reset2faConfirmBody", { login: row.login }),
+      confirmLabel: t("admin.customerUsers.reset2fa"),
+      variant: "danger",
+    });
+    if (!ok) return;
+    try {
+      await api.resetCustomerUser2fa(row.id);
+      setResetNotice({ ok: true, text: t("admin.customerUsers.reset2faDone", { login: row.login }) });
+    } catch {
+      setResetNotice({ ok: false, text: t("admin.customerUsers.reset2faFailed") });
+    }
+  };
   const debouncedCompanySearch = useDebouncedValue(companySearch, 300);
 
   const companiesQ = useQuery({
@@ -355,6 +375,15 @@ export function CustomerUsersPage() {
                 {t("cryptoKeys.openButton")}
               </span>
             </MenuItem>
+            <MenuItem
+              testId={`admin-customer-user-reset2fa-${row.id}`}
+              onSelect={() => void reset2fa(row)}
+            >
+              <span className="inline-flex items-center gap-2">
+                <ShieldIcon className="text-[14px]" />
+                {t("admin.customerUsers.reset2fa")}
+              </span>
+            </MenuItem>
           </>
         )}
         toFormValues={(row) =>
@@ -398,6 +427,17 @@ export function CustomerUsersPage() {
           ...(v.password ? { password: v.password as string } : {}),
         })}
       />
+
+      {confirmDialog}
+      {resetNotice && (
+        <p
+          role={resetNotice.ok ? "status" : "alert"}
+          data-testid="admin-customer-reset2fa-notice"
+          className={`mt-3 text-sm ${resetNotice.ok ? "text-muted" : "text-danger"}`}
+        >
+          {resetNotice.text}
+        </p>
+      )}
 
       {accessOpen && (
         <CustomerDirectoryAccessDialog feature={accessOpen} onClose={() => setAccessOpen(null)} />
