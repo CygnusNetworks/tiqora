@@ -2104,6 +2104,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/deploy-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Deploy Status */
+        get: operations["get_deploy_status_api_v1_admin_deploy_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/dynamic-fields": {
         parameters: {
             query?: never;
@@ -2827,6 +2844,23 @@ export interface paths {
         head?: never;
         /** Update Priority */
         patch: operations["update_priority_api_v1_admin_priorities__priority_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/processes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Processes */
+        get: operations["list_admin_processes_api_v1_admin_processes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/queue-customer-links": {
@@ -8413,6 +8447,21 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** AdminProcessOut */
+        AdminProcessOut: {
+            /** Activity Count */
+            activity_count: number;
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** Start Interfaces */
+            start_interfaces: string[];
+            /** State Entity Id */
+            state_entity_id: string;
+            /** State Name */
+            state_name: string;
+        };
         /**
          * AgentCustomerCreateOut
          * @description Created customer-user ref for the ticket Kunde dialog.
@@ -11656,6 +11705,14 @@ export interface components {
              */
             kind: "process" | "acl";
         };
+        /** DeployKindStatusOut */
+        DeployKindStatusOut: {
+            /** Pending Changes */
+            pending_changes: number;
+            revision: components["schemas"]["RevisionOut"] | null;
+            /** Running Live */
+            running_live: boolean;
+        };
         /** DeployOut */
         DeployOut: {
             /**
@@ -11672,6 +11729,15 @@ export interface components {
             kind: "process" | "acl";
             /** Revision Id */
             revision_id: number;
+        };
+        /** DeployStatusOut */
+        DeployStatusOut: {
+            acl: components["schemas"]["DeployKindStatusOut"];
+            /** Can Deploy From Tiqora */
+            can_deploy_from_tiqora: boolean;
+            /** Ownership Active */
+            ownership_active: boolean;
+            process: components["schemas"]["DeployKindStatusOut"];
         };
         /** DialOut */
         DialOut: {
@@ -14995,6 +15061,22 @@ export interface components {
             label: string | null;
             /** Url */
             url: string | null;
+        };
+        /** RevisionOut */
+        RevisionOut: {
+            /**
+             * Deployed At
+             * Format: date-time
+             */
+            deployed_at: string;
+            /** Deployed By */
+            deployed_by: number | null;
+            /** Entity Count */
+            entity_count: number;
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
         };
         /** RoleAssignment */
         RoleAssignment: {
@@ -22887,6 +22969,39 @@ export interface operations {
             };
         };
     };
+    get_deploy_status_api_v1_admin_deploy_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_dynamic_fields_api_v1_admin_dynamic_fields_get: {
         parameters: {
             query?: {
@@ -25217,6 +25332,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_processes_api_v1_admin_processes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProcessOut"][];
                 };
             };
             /** @description Validation Error */

@@ -15,10 +15,8 @@ from pydantic import BaseModel
 
 from tiqora.api.deps import AppSettings, DbSession
 from tiqora.api.v1.admin.deps import AdminUser
-from tiqora.deployed.settings import PROCESS_DEPLOY_SECTION, ProcessDeploySettings
+from tiqora.deployed.gate import can_deploy_from_tiqora
 from tiqora.deployed.watcher import deploy_from_tiqora
-from tiqora.domain.ownership import get_ownership_state
-from tiqora.settings_sections.store import load_section_values
 
 router = APIRouter(prefix="/deploy", tags=["admin:deploy"])
 
@@ -44,18 +42,10 @@ class DeployOut(BaseModel):
 async def post_deploy(
     body: DeployIn, admin: AdminUser, session: DbSession, settings: AppSettings
 ) -> DeployOut:
-    if not (await get_ownership_state(session, settings)).active:
-        values = ProcessDeploySettings.model_validate(
-            (
-                await load_section_values(
-                    session, PROCESS_DEPLOY_SECTION, secret_key=settings.secret_key
-                )
-            ).model_dump()
-        )
-        if not values.deploy_from_tiqora:
-            raise HTTPException(status.HTTP_409_CONFLICT, detail=GATE_DETAIL)
-        # deploy_from_tiqora owns its transaction: end the read transaction first.
-        await session.rollback()
+    if not await can_deploy_from_tiqora(session, settings):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=GATE_DETAIL)
+    # deploy_from_tiqora owns its transaction: end the read transaction first.
+    await session.rollback()
     try:
         result = await deploy_from_tiqora(session, body.kind, user_id=admin.id)
     except TimeoutError:

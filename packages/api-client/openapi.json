@@ -649,6 +649,47 @@
         "title": "ActivityDialogSummaryOut",
         "type": "object"
       },
+      "AdminProcessOut": {
+        "properties": {
+          "activity_count": {
+            "title": "Activity Count",
+            "type": "integer"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "start_interfaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Start Interfaces",
+            "type": "array"
+          },
+          "state_entity_id": {
+            "title": "State Entity Id",
+            "type": "string"
+          },
+          "state_name": {
+            "title": "State Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_id",
+          "name",
+          "state_entity_id",
+          "state_name",
+          "activity_count",
+          "start_interfaces"
+        ],
+        "title": "AdminProcessOut",
+        "type": "object"
+      },
       "AgentCustomerCreateOut": {
         "description": "Created customer-user ref for the ticket Kunde dialog.",
         "properties": {
@@ -11023,6 +11064,35 @@
         "title": "DeployIn",
         "type": "object"
       },
+      "DeployKindStatusOut": {
+        "properties": {
+          "pending_changes": {
+            "title": "Pending Changes",
+            "type": "integer"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RevisionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running_live": {
+            "title": "Running Live",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "pending_changes",
+          "running_live"
+        ],
+        "title": "DeployKindStatusOut",
+        "type": "object"
+      },
       "DeployOut": {
         "properties": {
           "action": {
@@ -11057,6 +11127,32 @@
           "action"
         ],
         "title": "DeployOut",
+        "type": "object"
+      },
+      "DeployStatusOut": {
+        "properties": {
+          "acl": {
+            "$ref": "#/components/schemas/DeployKindStatusOut"
+          },
+          "can_deploy_from_tiqora": {
+            "title": "Can Deploy From Tiqora",
+            "type": "boolean"
+          },
+          "ownership_active": {
+            "title": "Ownership Active",
+            "type": "boolean"
+          },
+          "process": {
+            "$ref": "#/components/schemas/DeployKindStatusOut"
+          }
+        },
+        "required": [
+          "process",
+          "acl",
+          "ownership_active",
+          "can_deploy_from_tiqora"
+        ],
+        "title": "DeployStatusOut",
         "type": "object"
       },
       "DialOut": {
@@ -20807,6 +20903,47 @@
           "url"
         ],
         "title": "ResolvedCustomerLink",
+        "type": "object"
+      },
+      "RevisionOut": {
+        "properties": {
+          "deployed_at": {
+            "format": "date-time",
+            "title": "Deployed At",
+            "type": "string"
+          },
+          "deployed_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployed By"
+          },
+          "entity_count": {
+            "title": "Entity Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "entity_count",
+          "deployed_at",
+          "deployed_by"
+        ],
+        "title": "RevisionOut",
         "type": "object"
       },
       "RoleAssignment": {
@@ -39836,6 +39973,71 @@
         ]
       }
     },
+    "/api/v1/admin/deploy-status": {
+      "get": {
+        "operationId": "get_deploy_status_api_v1_admin_deploy_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Deploy Status",
+        "tags": [
+          "admin:deploy"
+        ]
+      }
+    },
     "/api/v1/admin/dynamic-fields": {
       "get": {
         "operationId": "list_dynamic_fields_api_v1_admin_dynamic_fields_get",
@@ -45137,6 +45339,75 @@
         "summary": "Update Priority",
         "tags": [
           "admin:priorities"
+        ]
+      }
+    },
+    "/api/v1/admin/processes": {
+      "get": {
+        "operationId": "list_admin_processes_api_v1_admin_processes_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminProcessOut"
+                  },
+                  "title": "Response List Admin Processes Api V1 Admin Processes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Admin Processes",
+        "tags": [
+          "admin:deploy"
         ]
       }
     },
