@@ -778,7 +778,7 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Configurable dashboard widgets | missing | Fixed dashboard sections, no per-agent layout |
 | Link overview / link-type admin | missing | Ticket links can be listed and created; no delete, overview page or FAQ/appointment targets |
 | Note to linked tickets (`AgentTicketNoteToLinkedTicket`) | missing | |
-| Stats framework | partial | Fixed reports under `/api/v1/stats` (volume, open snapshot, SLA, workload, backlog) with CSV export; no configurable statistics, no scheduled delivery |
+| Stats framework | partial | Configurable statistics not yet (builder in phase 2); 25 built-in reports incl. Znuny `TicketAccountedTime`-style time accounting, SLA in working minutes from the Znuny calendars, XLSX/CSV export; no Znuny stats import / scheduling yet. See [Reporting differences](#reporting-differences-to-znuny-stats) |
 | Ticket export | partial | `GET /tickets/export.csv` (synchronous) plus `POST /tickets/export-jobs` which runs the export as a background job with progress, cancel and download; no Znuny equivalent (Znuny has CSV via stats only) |
 | Bulk action | partial | State, priority, owner, queue, lock only |
 | Preferences | partial | Language, TOTP/passkeys; no queue favourites, ticket-list options or notification matrix |
@@ -848,3 +848,50 @@ narrower than Znuny), **by design** (deliberate platform choice).
   regular Tiqora migration; the `worker` process must be running for exports.
 - Editing dynamic fields in ticket zoom requires enabling them in
   `Ticket::Frontend::AgentTicketFreeText###DynamicField` (SysConfig).
+
+## Reporting differences to Znuny stats
+
+Reports (`/api/v1/reports`, and the `/api/v1/stats/*` wrappers that now run the
+same built-ins) read Tiqora's own fact tables, not the live Znuny tables, so some
+figures differ from Znuny's `Kernel::System::Stats`:
+
+- **One close per state transition.** A close is a transition from a non-closed
+  to a closed state, detected by diffing the state column over the history
+  (writer-independent). Znuny's `_TicketGetClosed` instead takes the MAX over all
+  `StateUpdate`/`NewTicket` rows with a closed state, so a closed-to-closed
+  sub-state change moves Znuny's "Closed" time. For a few tickets the solution
+  time therefore differs from Znuny's by such a sub-state change.
+- **Solution minutes run to the last close**, not the first one (the old
+  `/api/v1/stats` used the first close). A reopened and closed-again ticket counts
+  its full open time.
+- **Owner names, not logins**, label the agent dimensions in reports and in the
+  `/api/v1/stats/*` JSON/CSV.
+- **Numbers are incomplete until the first backfill finishes** (worker loop
+  `report_facts`, or `tiqora report backfill`). Until then reports show a hint
+  and the figures cover only what is built so far.
+- **Truncation.** When a row cap cuts a `/api/v1/stats/*` result the response
+  carries `X-Tiqora-Truncated: 1`; a warning is logged once per request.
+- **"Open now" endpoints ignore date filters.** The open-ticket snapshot and the
+  agent workload describe the current state, so `from`/`to` do not apply to them.
+- **Closed count is a creation cohort.** In `ticket_kpis`, `volume_by_queue`,
+  `sla_by_customer` and `top_customers`, "closed tickets" are tickets created in
+  the window and by now closed, not tickets closed in the window.
+- **First-contact resolution.** `first_contact_resolution` counts as closed the
+  tickets that are currently closed; the rates are taken over the tickets with a
+  close inside the window. Figures differ from a pure close-in-window view only for
+  tickets reopened after their close.
+- **Job results are private.** The result of a report job (run or export) can be
+  fetched by its creator only, administrators included. A user may have at most 3
+  report jobs queued or running; further requests get 429.
+- **Inline runs have a 75 s budget** (below the 90 s nginx `/api/` timeout) and
+  answer 504 with a JSON `detail.message` when it is used up; large reports
+  run as background jobs instead.
+- **API keys** need the `stats` scope: `GET` calls work read-only, running reports
+  (`POST /reports/run`, exports) needs read-write.
+- **Cache.** Results are cached for up to `reporting.cache_seconds` (default 300,
+  0 = off) per viewer scope. Results that depend on "now" (relative date filters,
+  ages of open tickets) can therefore be that stale. Results computed while the
+  facts were not ready are never cached. GDPR erasure purges the whole report
+  cache.
+- **Admin rebuild.** Rebuilding the report data from the admin page restarts the
+  build: reports show a hint and are incomplete until the rebuild has finished.

@@ -154,6 +154,20 @@ creation). Ticket-number counter interleaving, DateChecksum checksum digits,
 and escalation columns (incl. zero-on-close) are golden-validated too — see
 docs/testing.md.
 
+## Reporting
+
+Reports (`tiqora/reporting/`) are read-only on every Znuny table. They derive
+their fact tables from `ticket_history`, which both systems write, using a
+gap-safe watermark over `ticket_history.id`, so a Znuny write is picked up
+exactly like a Tiqora write; the parser keys on column diffs and history names
+that Znuny and Tiqora emit alike. The only history row Tiqora adds for
+reporting is its own `TimeAccounting` change (written like Znuny, see
+[compatibility.md](compatibility.md)). All report state lives in `tiqora_*`
+tables, so Znuny is unaffected; its own stats module keeps working and may show
+slightly different figures (see
+[Reporting differences](compatibility.md#reporting-differences-to-znuny-stats)).
+Run exactly one worker so the incremental loop has a single writer.
+
 ## Escalation recompute
 
 Source: `Ticket.pm` → `TicketEscalationIndexBuild`.

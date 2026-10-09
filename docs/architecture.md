@@ -504,34 +504,47 @@ The consumer links a ticket as `{TIQORA_PUBLIC_BASE_URL}/agent/tickets/{ticket_i
 
 ### Stats / reporting
 
-`tiqora/stats/` — a modern equivalent of Znuny's `Kernel::System::Stats`
-(AgentStatistics), not a port: instead of Znuny's dynamic report-object
-framework (arbitrary user-defined X/Y-axis stat objects), `StatsService`
-provides a fixed set of purpose-built, permission-filtered (`ro` queues, same
-scoping as `TicketService`) reports with typed params (`StatsFilters`) and
-dataclass results:
+`tiqora/reporting/` — a semantic-layer report engine, a modern equivalent of
+Znuny's `Kernel::System::Stats`, not a port. Znuny's dynamic stats objects
+are replaced by a catalogue of 25 built-in reports over typed sources.
 
-- ticket volume (created vs. closed per day/week/month bucket)
-- open-ticket snapshot by queue/state/priority/owner
-- SLA/escalation: escalated count + first-response/update/solution breach
-  counts (from the ticket `escalation_*` epoch columns) plus raw
-  first-response/solution time-to-event samples (minutes) for
-  percentile/histogram display client-side
-- agent workload (open tickets owned + tickets closed in the filtered period)
-- backlog trend (running open-ticket count, derived from the volume report's
-  created/closed deltas)
-
-Bucketing is done in Python after fetching bare `(id, timestamp)` rows rather
-than with dialect-specific SQL date-trunc functions, so the same code runs
-against both the MySQL and PostgreSQL backends. `/api/v1/stats/*`
-(`api/v1/stats.py`) exposes one JSON endpoint plus a `.csv` streaming-export
-sibling per report, gated on any authenticated agent (`CurrentUser`) — access
-control is enforced by the queue scoping inside `StatsService`, not by a
-separate route-level permission check. The frontend `/agent/stats` page
-(`routes/agent/StatsPage.tsx`) renders a filter bar (queue, date range,
-granularity), mono-numeral stat tiles, and hand-rolled SVG bar/line charts
-(`components/agent/stats/{BarChart,LineChart}.tsx` — no charting dependency)
-plus a CSV-downloadable agent-workload table.
+- **Fact tables** (`db/tiqora/`, built by `reporting/facts.py`, `facts_store.py`,
+  `history_events.py`): one row per ticket (`tickets`), parsed `ticket_history`
+  events (`ticket_events`: state close/reopen, owner, queue, escalation, SLA,
+  process activity), accounted time, and daily snapshots. The history parser
+  reads rows written by Znuny and Tiqora alike.
+- **Loop** (`incremental.py`, `worker/report_facts.py`): the worker service
+  `report_facts` advances a gap-safe watermark over `ticket_history.id`
+  (auto-increment gaps are tracked, never skipped), rebuilds the facts of tickets
+  in a dirty queue (`dirty.py`; writers, GDPR erasure and failures mark tickets
+  dirty, failing tickets back off) and writes the daily `snapshots.py` rows.
+  `backfill.py` builds everything on first start as a background job (also
+  `tiqora report backfill|status`); numbers are incomplete until it finishes.
+  SLA minutes count working time from the Znuny calendars (`working_time.py`).
+- **Semantic layer** (`semantic.py`, `sources/`): sources `tickets`,
+  `ticket_events`, `daily_snapshot`, `accounted_time` and the live
+  `open_tickets` declare dimensions, measures and filters.
+  `definition.py` (`ReportDefinition`, `schema_version: 1`) is validated and
+  turned into SQL by `compiler.py` / `filter_sql.py`; `engine.py` runs it
+  (plan, cache lookup, queries, labels, post-processing). `catalogue.py` holds
+  the built-ins, `export.py` writes XLSX/CSV, `cache.py` is the Redis result
+  cache, `jobs.py` the background-job glue.
+- **Permissions** (`access.py`, compiler): a report needs `reporting.access`
+  (`all_agents` or the Znuny `stats` group); the viewer's `ro` queues are
+  applied as "current queue" (the ticket's queue now, not at event time) and
+  that scope is ANDed outside every user-supplied condition, so no filter can
+  widen it.
+- **Time zones**: timestamps stay UTC in the facts; bucketing and relative
+  windows shift by the zone's UTC offset (`reporting.time_zone`, default the
+  Znuny zone) in the compiler.
+- **API**: `api/v1/reports.py` (catalogue, inline run, background run, export
+  jobs, polling), `api/v1/admin/reporting.py` (status, rebuild) and the thin
+  `/api/v1/stats/*` wrappers (`api/v1/stats.py`) that run built-ins.
+- **Frontend**: `/agent/reports` (overview, catalogue), `/agent/reports/$reportKey`
+  (viewer with filters, previous-period compare, export) and the
+  time-accounting report; hand-rolled SVG charts in `components/agent/stats/`
+  (stacked bar, area, donut, heatmap, KPI with sparkline/delta, pivot with sticky
+  headers). `/agent/stats` redirects there.
 
 ### Calendar / appointments
 

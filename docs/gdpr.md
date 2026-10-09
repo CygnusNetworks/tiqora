@@ -233,6 +233,18 @@ Each apply, rollback and manual purge writes a `tiqora_gdpr_audit` row
 - `gdpr.customer_extra_pii_columns` — optional JSON list of extra
   `customer_user` columns to treat as PII.
 
+### Reporting data
+
+The report fact tables (`tiqora/reporting/`) copy `customer_id` and
+`customer_user` of every ticket, and cached report results can hold customer ids
+and names. Admin erasure therefore deletes the facts and events of every
+affected ticket in the same transaction and queues those tickets for a rebuild
+(the rebuilt rows no longer carry the erased references), and it purges the
+whole report result cache (Redis keys `tiqora:report:v1:*`) afterwards instead of
+waiting for the TTL. `tiqora gdpr anonymize-customer` does not touch the fact
+tables: they keep the old `customer_user` until the tickets are rebuilt (Admin,
+report data, rebuild).
+
 ### Caveats
 
 - **Parallel operation with Znuny.** The admin API bypasses the ownership

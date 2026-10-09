@@ -42,7 +42,7 @@ and never commit real credentials.
 | Variable | Example | Notes |
 |---|---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://user:pass@db:5432/tiqora` | Or `mysql+aiomysql://…` |
-| `REDIS_URL` | `redis://redis:6379/0` | Sessions, presence, SSE pub/sub, rate limiting |
+| `REDIS_URL` | `redis://redis:6379/0` | Sessions, presence, SSE pub/sub, rate limiting, report result cache |
 | `MEILI_URL` | `http://meilisearch:7700` | |
 | `MEILI_MASTER_KEY` | strong secret | Production required |
 | `TIQORA_SECRET_KEY` | random 32+ bytes | Cookie/session material |
@@ -282,6 +282,28 @@ When co-running with Znuny:
 4. Keep Znuny daemon jobs enabled until Tiqora daemon feature flags say otherwise.
 5. Terminate TLS at a reverse proxy; route `/api`, `/mcp`, and static UI paths
    to Tiqora; leave Znuny paths as needed during migration.
+
+## Reporting data
+
+The worker service `report_facts` (loop interval `TIQORA_REPORT_FACTS_INTERVAL`
+seconds, default 60; switch `daemon.report_facts.enabled` in Admin, Dienste =
+services) keeps the report fact tables, the dirty-ticket queue and the daily
+snapshots current. Run **one** worker. On the first start after the upgrade the
+worker enqueues a **backfill** that builds the facts from the whole
+`ticket_history`; large installations need minutes to hours. Reports show a hint
+and their numbers are incomplete until it has finished. Operate it from the CLI:
+
+```sh
+tiqora report backfill [--since YYYY-MM-DD]   # start or resume; --since starts at the first ticket created on/after that date
+tiqora report status                          # state of the report data as JSON
+```
+
+The admin page for report data (Admin, Berichte = reports) shows the state and
+can rebuild everything; during a rebuild reports are incomplete again. Redis
+serves as the report result cache (keys `tiqora:report:v1:*`, TTL
+`reporting.cache_seconds`, default 300); if Redis is down reports still run,
+uncached. Reports run inline for at most 75 s, below nginx's 90 s `/api/`
+timeout; larger ones run as background jobs.
 
 ## Reverse proxy sketch
 
