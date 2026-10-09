@@ -414,7 +414,7 @@ framework. Items below are intentionally incomplete or out of scope.
 | Operation errors | keep Tiqora's `ErrorCode` to HTTP status mapping, computed before the outbound mapping: `...AuthFail` 401, `...AccessDenied` 403, `...MissingParameter` / `...InvalidParameter` 400, `...RateLimited` 429 with `Retry-After`, `...NotImplemented` 501, every other error 200 | HTTP 200 for operation errors |
 | Operation answers `Success => 0` (OutOfOffice without entries) | HTTP 500 fault `{"faultcode": "Server", "faultstring": ...}` | same (`Provider.pm` `_GenerateErrorResponse`) |
 | OutOfOffice `UserSearch` | words AND-ed, each matching login / first name / last name as a whole value (`*` wildcard); Znuny's `|`, `AND`/`OR`, `!` and parentheses are not supported | `QueryCondition` |
-| GI mails (`ArticleSend`, auto responses) | sent by the worker, `MailQueue` defaults (3 attempts, 2/4 min backoff, 5xx final); the `MailQueue` SysConfig values are not read; a send cut off by a worker restart is recorded as failed, not retried | `MailQueue` with the SysConfig values |
+| GI mails (`ArticleSend`, auto responses) | sent by the worker, `MailQueue` defaults (3 attempts, 2/4 min backoff, 5xx final); the `MailQueue` SysConfig values are not read; a send cut off by a worker restart after SMTP began is recorded as failed, not retried (before that it is requeued) | `MailQueue` with the SysConfig values |
 | Unknown webservice | 404 JSON fault | bare 500 |
 | SessionCreate | does not copy `UserPw` into the `sessions` row | copies it |
 | OutOfOffice CSV with an unterminated quote | rejected with "Error while parsing" | silently truncated |
