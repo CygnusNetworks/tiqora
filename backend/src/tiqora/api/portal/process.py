@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.api.portal.deps import CurrentCustomer, DbSession
+from tiqora.db.engine import get_session_factory
 from tiqora.domain.portal_ticket_service import (
     PORTAL_SYSTEM_USER_ID,
     PortalTicketAccessDenied,
@@ -26,7 +27,6 @@ from tiqora.domain.ticket_write_service import InvalidInput
 from tiqora.domain.ticket_write_service import TicketNotFound as WriteTicketNotFound
 from tiqora.process.actor import ProcessActor
 from tiqora.process.availability import (
-    assert_can_start,
     available_dialogs,
     dialog_allows,
     list_startable_processes,
@@ -37,7 +37,7 @@ from tiqora.process.availability import (
 from tiqora.process.config import ActivityDialogFieldConfig
 from tiqora.process.dialog_form import build_start_form, build_ticket_dialog_form
 from tiqora.process.dump import PROCESS_STATE_NAMES
-from tiqora.process.engine import start_process, submit_activity_dialog
+from tiqora.process.engine import submit_activity_dialog
 from tiqora.process.exceptions import (
     ActivityDialogNotAvailable,
     ActivityDialogNotFound,
@@ -51,12 +51,15 @@ from tiqora.process.exceptions import (
     UnresolvedFieldValue,
 )
 from tiqora.process.graph import ProcessRepository
+from tiqora.process.process_ticket import create_process_ticket, enroll_ticket
 from tiqora.process.schemas import (
     ActivityDialogDetailOut,
     ActivityDialogFieldOut,
     ActivityDialogSubmitIn,
     ActivityDialogSubmitOut,
     ActivityDialogSummaryOut,
+    NewProcessTicketIn,
+    NewProcessTicketOut,
     ProcessDialogFormOut,
     ProcessStartIn,
     ProcessSummaryOut,
@@ -275,29 +278,59 @@ async def get_ticket_dialog_form(
         raise _map_exc(exc) from exc
 
 
+@router.post("/tickets", response_model=NewProcessTicketOut, status_code=status.HTTP_201_CREATED)
+async def create_new_process_ticket(
+    body: NewProcessTicketIn, customer: CurrentCustomer, session: DbSession
+) -> NewProcessTicketOut:
+    """Create a ticket from the start dialog of a process (customer interface). The customer
+    identity comes from the session: submitted ``CustomerUserID``/``CustomerID``/``Owner`` are
+    ignored (the engine forces them from the actor, owner = the portal system user). A queue
+    chosen in the dialog must be one of the customer's create queues."""
+    sysconfig = SysConfig(session)
+    actor = _actor(customer)
+    repository = ProcessRepository(session)
+    try:
+        async with session.begin():
+            result = await create_process_ticket(
+                session,
+                get_session_factory(),
+                sysconfig,
+                actor=actor,
+                process_entity_id=body.process_entity_id,
+                field_values=body.field_values,
+                repository=repository,
+            )
+    except _MAPPED as exc:
+        raise _map_exc(exc) from exc
+    state = await _ticket_process_state_out_customer(session, result.ticket_id, actor, repository)
+    return NewProcessTicketOut(
+        ticket_id=result.ticket_id,
+        ticket_number=result.ticket_number,
+        activity_changed=result.transition.activity_changed,
+        unsupported_actions=result.transition.unsupported_actions,
+        state=state,
+    )
+
+
 @router.post("/ticket/{ticket_id}/start", response_model=TicketProcessStateOut)
 async def start_ticket_process(
     ticket_id: int, body: ProcessStartIn, customer: CurrentCustomer, session: DbSession
 ) -> TicketProcessStateOut:
+    """Enroll an existing ticket through the process start dialog (assert_can_start, the
+    dialog's mandatory fields and the first transitions run in ``enroll_ticket``)."""
     sysconfig = SysConfig(session)
     actor = _actor(customer)
     repository = ProcessRepository(session)  # one revision for the whole request
     try:
         async with session.begin():
             await _assert_customer_ticket(session, customer, ticket_id)
-            await assert_can_start(
+            await enroll_ticket(
                 session,
-                actor,
-                process_entity_id=body.process_entity_id,
-                ticket_id=ticket_id,
-                repository=repository,
-            )
-            await start_process(
-                session,
+                sysconfig,
+                actor=actor,
                 ticket_id=ticket_id,
                 process_entity_id=body.process_entity_id,
-                user_id=PORTAL_SYSTEM_USER_ID,
-                sysconfig=sysconfig,
+                field_values=body.field_values,
                 repository=repository,
             )
     except _MAPPED as exc:

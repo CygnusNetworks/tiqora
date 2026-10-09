@@ -258,7 +258,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start Ticket Process */
+        /**
+         * Start Ticket Process
+         * @description Enroll an existing ticket through the process start dialog (assert_can_start, the
+         *     dialog's mandatory fields and the first transitions run in ``enroll_ticket``).
+         */
         post: operations["start_ticket_process_api_portal_process_ticket__ticket_id__start_post"];
         delete?: never;
         options?: never;
@@ -294,6 +298,29 @@ export interface paths {
         put?: never;
         /** Submit Ticket Activity Dialog */
         post: operations["submit_ticket_activity_dialog_api_portal_process_ticket__ticket_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/process/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create New Process Ticket
+         * @description Create a ticket from the start dialog of a process (customer interface). The customer
+         *     identity comes from the session: submitted ``CustomerUserID``/``CustomerID``/``Owner`` are
+         *     ignored (the engine forces them from the actor, owner = the portal system user). A queue
+         *     chosen in the dialog must be one of the customer's create queues.
+         */
+        post: operations["create_new_process_ticket_api_portal_process_tickets_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -18061,6 +18088,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityDialogSubmitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_new_process_ticket_api_portal_process_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProcessTicketIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewProcessTicketOut"];
                 };
             };
             /** @description Validation Error */

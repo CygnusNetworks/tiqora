@@ -33,7 +33,7 @@ from tiqora.db.legacy.ticket import TicketLockType, TicketPriority, TicketState
 from tiqora.domain.ticket_write_service import TicketIn, assign_owner, create_ticket
 from tiqora.permissions.engine import PermissionEngine
 from tiqora.process.actor import ProcessActor
-from tiqora.process.availability import assert_can_start
+from tiqora.process.availability import assert_can_start, customer_create_queue_ids
 from tiqora.process.engine import (
     TransitionOutcome,
     _resolve_dialog_field_id,  # noqa: PLC2701 -- deliberate reuse
@@ -290,6 +290,17 @@ async def create_process_ticket(
         raise ProcessPermissionDenied(
             f"user {actor.user_id} lacks 'create' on queue {queue_id} of process "
             f"{process_entity_id!r}"
+        )
+
+    if (
+        actor.interface == "CustomerInterface"
+        and (values.get("Queue") or values.get("QueueID"))
+        and queue_id not in await customer_create_queue_ids(session, actor)
+    ):
+        # CustomerTicketProcess.pm:4626-4690 _GetQueues: only queues of the customer's create
+        # groups are offered; a queue chosen explicitly must come from that list.
+        raise ProcessPermissionDenied(
+            f"customer {actor.customer_user_login!r} may not create tickets in queue {queue_id}"
         )
 
     type_id = await _optional_id(session, values, "Type", "type id", _resolve_type_id)

@@ -28686,6 +28686,7 @@
     },
     "/api/portal/process/ticket/{ticket_id}/start": {
       "post": {
+        "description": "Enroll an existing ticket through the process start dialog (assert_can_start, the\ndialog's mandatory fields and the first transitions run in ``enroll_ticket``).",
         "operationId": "start_ticket_process_api_portal_process_ticket__ticket_id__start_post",
         "parameters": [
           {
@@ -28873,6 +28874,66 @@
           }
         },
         "summary": "Submit Ticket Activity Dialog",
+        "tags": [
+          "portal-process"
+        ]
+      }
+    },
+    "/api/portal/process/tickets": {
+      "post": {
+        "description": "Create a ticket from the start dialog of a process (customer interface). The customer\nidentity comes from the session: submitted ``CustomerUserID``/``CustomerID``/``Owner`` are\nignored (the engine forces them from the actor, owner = the portal system user). A queue\nchosen in the dialog must be one of the customer's create queues.",
+        "operationId": "create_new_process_ticket_api_portal_process_tickets_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProcessTicketIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewProcessTicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create New Process Ticket",
         "tags": [
           "portal-process"
         ]

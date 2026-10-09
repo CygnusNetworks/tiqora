@@ -16,8 +16,9 @@ Option sources:
 
 Known limitations: agent option ACLs see the ticket's own process (its dynamic fields) but not
 the ``ProcessEntityID``/``ActivityDialogEntityID`` of the dialog being opened (the wave-0 option
-source has no such parameter); customer Service/SLA lists are not narrowed to the customer's
-services.
+source has no such parameter); the customer SLA list is the union over the customer's services
+(the form has no selected service yet), and the customer Queue list keeps the system intake
+queues hidden on top of Znuny's create-group rule.
 """
 
 from __future__ import annotations
@@ -29,7 +30,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField
-from tiqora.db.legacy.queue import Queue
+from tiqora.db.legacy.queue import Queue, Service, ServiceCustomerUser, ServiceSla, Sla
+from tiqora.db.legacy.ticket import Ticket
 from tiqora.db.legacy.user import Users
 from tiqora.domain.dynamic_field_config import config_from_yaml
 from tiqora.domain.field_options import (
@@ -42,10 +44,16 @@ from tiqora.domain.field_options import (
     _base_field_maps,  # noqa: PLC2701 -- deliberate reuse
     _sorted_options,  # noqa: PLC2701 -- deliberate reuse
     collect_field_options,
+    ticket_acl_context,
 )
 from tiqora.domain.ticket_acl import apply_ticket_acl
+from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
 from tiqora.process.actor import ProcessActor
-from tiqora.process.availability import assert_can_start, assert_can_submit
+from tiqora.process.availability import (
+    assert_can_start,
+    assert_can_submit,
+    customer_create_queue_ids,
+)
 from tiqora.process.config import ActivityDialogFieldConfig
 from tiqora.process.exceptions import ProcessNotFound, TicketNotInProcess
 from tiqora.process.fields import field_config, visible_fields
@@ -67,6 +75,7 @@ __all__ = [
     "build_start_form",
     "build_ticket_dialog_form",
     "collect_customer_field_options",
+    "customer_service_map",
 ]
 
 # Znuny's default customer TicketMoveList: every valid queue except the system queues.
@@ -135,15 +144,86 @@ def _field_kind(name: str, dynamic_fields: Mapping[str, DynamicField]) -> FieldK
     return "unsupported"  # Attachments (phase 2, rulings F34), unknown names, unknown DFs
 
 
-async def _customer_queues(session: AsyncSession) -> dict[int, str]:
+async def _customer_queues(session: AsyncSession, actor: ProcessActor) -> dict[int, str]:
+    """The customer's create queues (:func:`customer_create_queue_ids`, Znuny ``_GetQueues``),
+    minus the system intake queues (a deliberate Tiqora extra: Znuny's own hiding relies on the
+    ``users`` group, which ``CustomerGroupAlwaysGroups`` hands to every customer)."""
+    queues = await customer_create_queue_ids(session, actor)
+    return {i: n for i, n in queues.items() if n not in _CUSTOMER_HIDDEN_QUEUES}
+
+
+async def customer_service_map(session: AsyncSession, login: str) -> dict[int, str]:
+    """``TicketServiceList`` for a customer user (``Ticket.pm:2503-2560``): the valid services of
+    ``CustomerUserServiceMemberList`` (``Service.pm:1190-1235``; no assignment at all -> the
+    ``<DEFAULT>`` services), without children of invalid services unless
+    ``Ticket::Service::KeepChildren`` (``Service.pm:188-205``)."""
+
+    async def member_ids(who: str) -> set[int]:
+        rows = await session.execute(
+            select(ServiceCustomerUser.service_id).where(
+                ServiceCustomerUser.customer_user_login == who
+            )
+        )
+        return {int(r) for r in rows.scalars()}
+
+    ids = await member_ids(login)
+    if not ids:
+        ids = await member_ids("<DEFAULT>")
+    if not ids:
+        return {}
+    all_rows = (await session.execute(select(Service.id, Service.name, Service.valid_id))).all()
+    invalid_names = [r[1] for r in all_rows if r[2] != _VALID]
+    keep_children = str(await SysConfig(session).get("Ticket::Service::KeepChildren", 0)) in (
+        "1",
+        "True",
+        "true",
+    )
+    out: dict[int, str] = {}
+    for sid, name, valid in all_rows:
+        if int(sid) not in ids or valid != _VALID:
+            continue
+        if not keep_children and any(name.startswith(f"{bad}::") for bad in invalid_names):
+            continue
+        out[int(sid)] = name
+    return dict(sorted(out.items(), key=lambda kv: kv[1]))
+
+
+async def _customer_slas(session: AsyncSession, services: Mapping[int, str]) -> dict[int, str]:
+    """SLAs assigned to the customer's services (``_GetSLAs`` asks ``SLAList(ServiceID)`` for the
+    chosen service; the form carries no selection yet, so the union is offered)."""
+    if not services:
+        return {}
     rows = (
         await session.execute(
-            select(Queue.id, Queue.name)
-            .where(Queue.valid_id == _VALID, Queue.name.not_in(sorted(_CUSTOMER_HIDDEN_QUEUES)))
-            .order_by(Queue.name)
+            select(Sla.id, Sla.name)
+            .join(ServiceSla, ServiceSla.sla_id == Sla.id)
+            .where(ServiceSla.service_id.in_(sorted(services)), Sla.valid_id == _VALID)
+            .order_by(Sla.name)
         )
     ).all()
     return {int(r[0]): r[1] for r in rows}
+
+
+async def _ticket_attribute_ids(session: AsyncSession, ticket_id: int | None) -> dict[str, int]:
+    """Current attribute ids of the ticket for the Ticket Attribute Relations context."""
+    if ticket_id is None:
+        return {}
+    row = (
+        await session.execute(
+            select(
+                Ticket.queue_id,
+                Ticket.service_id,
+                Ticket.type_id,
+                Ticket.ticket_state_id,
+                Ticket.ticket_priority_id,
+                Ticket.sla_id,
+            ).where(Ticket.id == ticket_id)
+        )
+    ).first()
+    if row is None:
+        return {}
+    keys = ("queue_id", "service_id", "type_id", "state_id", "priority_id", "sla_id")
+    return {k: int(v) for k, v in zip(keys, row, strict=True) if v is not None}
 
 
 async def collect_customer_field_options(
@@ -154,6 +234,7 @@ async def collect_customer_field_options(
     *,
     process: Mapping[str, str] | None = None,
     dynamic_fields: Mapping[str, DynamicField] | None = None,
+    queue_id: int | None = None,
 ) -> dict[str, list[ProcessDialogOptionOut]]:
     """Options for the customer interface, keyed by the requested field name.
 
@@ -169,9 +250,17 @@ async def collect_customer_field_options(
     out: dict[str, list[ProcessDialogOptionOut]] = {}
 
     attrs = {f for f in fields if f in ATTRIBUTE_OPTION_FIELDS}
-    base = await _base_field_maps(session, None, attrs - {"queue"})
+    base = await _base_field_maps(session, None, attrs - {"queue", "service", "sla"})
     if "queue" in attrs:
-        base["queue"] = await _customer_queues(session)
+        base["queue"] = await _customer_queues(session, actor)
+    if attrs & {"service", "sla"}:
+        # CustomerTicketProcess.pm:4569-4602 / 4548-4566: only the customer user's services.
+        services = await customer_service_map(session, login)
+        if "service" in attrs:
+            base["service"] = services
+        if "sla" in attrs:
+            base["sla"] = await _customer_slas(session, services)
+    acl_maps: dict[str, dict[int, str]] = {}
     for field in (f for f in fields if f in base):
         mapping = base[field]
         kept = await apply_ticket_acl(
@@ -186,11 +275,19 @@ async def collect_customer_field_options(
             process=process,
             sysconfig=sysconfig,
         )
-        out[field] = [
-            ProcessDialogOptionOut(value=str(key), label=label)
-            for key, label in mapping.items()
-            if key in kept
-        ]
+        acl_maps[field] = {k: v for k, v in mapping.items() if k in kept}
+    # Ticket Attribute Relations, like the agent source (collect_ticket_field_options): the
+    # ticket's own attributes (or the dialog's default queue) are the context.
+    ids = await _ticket_attribute_ids(session, ticket_id)
+    if ticket_id is None and queue_id is not None:
+        ids["queue_id"] = queue_id
+    ticket_ctx = await ticket_acl_context(session, **ids)
+    if ticket_ctx:
+        acl_maps = await apply_attribute_relations_to_field_maps(
+            session, acl_maps, ticket_context=ticket_ctx
+        )
+    for field, mapping in acl_maps.items():
+        out[field] = [ProcessDialogOptionOut(value=str(k), label=v) for k, v in mapping.items()]
 
     df_names = [f for f in fields if f.startswith(DF_OPTION_PREFIX)]
     rows = (
@@ -363,6 +460,11 @@ async def build_dialog_form(
             process=process_context,
         )
     else:
+        default_queue_id = None
+        if ticket_id is None and "Queue" in dialog_fields:
+            default_queue_id = await _default_queue_id(
+                session, dialog_fields["Queue"].default_value
+            )
         wanted = [_ATTRIBUTE_KEY[n] for n in names if n in _ATTRIBUTE_KEY]
         wanted += [n for n in names if _field_kind(n, dynamic_fields) in _DF_OPTION_KINDS]
         collected = await collect_customer_field_options(
@@ -372,6 +474,7 @@ async def build_dialog_form(
             ticket_id,
             process=process_context,
             dynamic_fields=dynamic_fields,
+            queue_id=default_queue_id,
         )
         options = {
             name: collected.get(_ATTRIBUTE_KEY.get(name, name), [])
