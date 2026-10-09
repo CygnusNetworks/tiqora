@@ -28,7 +28,7 @@ from tiqora.filters import FilterError
 from tiqora.jobs.schemas import JobAccepted
 from tiqora.jobs.service import count_active_jobs, enqueue_job, lock_user_job_quota
 from tiqora.reporting.access import require_report_access
-from tiqora.reporting.cache import CacheBackend, ReportCache
+from tiqora.reporting.cache import CacheBackend, ReportCache, read_cache_generation
 from tiqora.reporting.catalogue import BUILTIN_REPORTS, BuiltinReport
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition
@@ -198,9 +198,12 @@ async def run_report_endpoint(
     200 with ``result`` (inline or from the cache), or 202 with ``job`` when
     the report is large; poll ``GET /jobs/{id}``, the job result is the report.
     """
+    # the cache generation is read before this request's first database read: a purge
+    # (GDPR erasure, rebuild) after it lets nothing this request computes be found again
+    generation = await read_cache_generation(cache_backend)
     reporting = await _access(session, user, settings)
     definition, params, report_key = await _prepare(session, user, body)
-    cache = ReportCache(cache_backend, reporting.cache_seconds)
+    cache = ReportCache(cache_backend, reporting.cache_seconds, generation=generation)
     # one shared deadline for every query of this request (estimate included)
     budget = QueryBudget.inline(reporting)
     try:

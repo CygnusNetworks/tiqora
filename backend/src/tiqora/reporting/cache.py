@@ -8,6 +8,14 @@ last snapshot date (it moves the stock dates), the near-miss percentage, the
 window, the zone, the row cap and ``compare_previous``. All of them are
 required arguments so no caller can forget one. Cache failures never fail a
 report: errors are logged and treated as a miss.
+
+Generation: the stored key is ``<key>:g<n>`` with ``n`` the value of
+:data:`GENERATION_KEY` read ONCE per :class:`ReportCache` (callers read it before
+the run's first database read, see :func:`read_cache_generation`).
+:func:`purge_report_cache` bumps it before deleting the entries, so a run that
+was already computing (e.g. with customer data a GDPR erasure just removed)
+stores its result under the old generation, which nobody reads any more. When the
+generation cannot be read the cache is off for that run.
 """
 
 from __future__ import annotations
@@ -29,6 +37,9 @@ from tiqora.reporting.schemas import ReportResultOut
 logger = structlog.get_logger(__name__)
 
 CACHE_PREFIX: Final = "tiqora:report:v1:"
+#: counter bumped by every purge; deliberately outside ``CACHE_PREFIX`` (never purged)
+GENERATION_KEY: Final = "tiqora:report:generation"
+_UNREAD: Final = object()
 
 
 class CacheBackend(Protocol):
@@ -44,10 +55,38 @@ def _filter_digest(flt: Filter | None) -> str | None:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+async def read_cache_generation(backend: CacheBackend | None) -> int | None:
+    """The current cache generation (0 when never bumped); ``None`` = unreadable (cache off)."""
+    if backend is None:
+        return None
+    try:
+        raw = await backend.get(GENERATION_KEY)
+        return int(raw or 0)
+    except Exception as exc:  # noqa: BLE001 - a broken cache is a miss
+        logger.warning("report_cache_generation_failed", error=str(exc))
+        return None
+
+
 class ReportCache:
-    def __init__(self, backend: CacheBackend | None, ttl_seconds: int) -> None:
+    def __init__(
+        self,
+        backend: CacheBackend | None,
+        ttl_seconds: int,
+        *,
+        generation: int | None | object = _UNREAD,
+    ) -> None:
+        """``generation``: pass the value read before the run's first DB read; when left
+        out it is read on the first ``get``/``put`` of this instance."""
         self._backend = backend
         self._ttl = ttl_seconds
+        self._generation = generation
+
+    async def _stored_key(self, key: str) -> str | None:
+        if self._generation is _UNREAD:
+            self._generation = await read_cache_generation(self._backend)
+        if not isinstance(self._generation, int):
+            return None
+        return f"{key}:g{self._generation}"
 
     @staticmethod
     def key_for(
@@ -87,8 +126,11 @@ class ReportCache:
         """The cached result (``cached=True``), or ``None`` on a miss or any backend error."""
         if self._backend is None or self._ttl <= 0:
             return None
+        stored = await self._stored_key(key)
+        if stored is None:
+            return None
         try:
-            raw = await self._backend.get(key)
+            raw = await self._backend.get(stored)
         except Exception as exc:  # noqa: BLE001 - a broken cache is a miss
             logger.warning("report_cache_get_failed", error=str(exc))
             return None
@@ -105,8 +147,11 @@ class ReportCache:
         """Store ``result`` for the TTL; no-op without backend or with TTL 0."""
         if self._backend is None or self._ttl <= 0:
             return
+        stored = await self._stored_key(key)
+        if stored is None:
+            return
         try:
-            await self._backend.set(key, result.model_dump_json(), ex=self._ttl)
+            await self._backend.set(stored, result.model_dump_json(), ex=self._ttl)
         except Exception as exc:  # noqa: BLE001 - never fail a report over the cache
             logger.warning("report_cache_put_failed", error=str(exc))
 
@@ -118,16 +163,24 @@ class PurgeableBackend(Protocol):
 
     async def delete(self, *names: Any) -> Any: ...
 
+    async def incr(self, name: Any) -> Any: ...
+
 
 async def purge_report_cache(backend: PurgeableBackend, *, batch: int = 500) -> int:
-    """Delete every cached report result (all scopes); returns the number of keys.
+    """Invalidate every cached report result (all scopes); returns the number of keys deleted.
 
-    For data removals whose effect must not wait for the TTL, e.g. a GDPR
-    erasure (cached rows/labels may hold the erased customer ids/names).
-    Best effort: errors are logged, never raised.
+    Bumps :data:`GENERATION_KEY` first (runs already computing store under the old
+    generation, which is never read again), then deletes the entries. For data
+    removals and rebuilds whose effect must not wait for the TTL: GDPR erasure and
+    anonymisation (cached rows/labels may hold customer ids/names), a backfill or
+    rebuild of the report data. Best effort: errors are logged, never raised.
     """
     deleted = 0
     pending: list[Any] = []
+    try:
+        await backend.incr(GENERATION_KEY)
+    except Exception as exc:  # noqa: BLE001 - the delete below still runs
+        logger.warning("report_cache_generation_bump_failed", error=str(exc))
     try:
         async for key in backend.scan_iter(match=CACHE_PREFIX + "*", count=batch):
             pending.append(key)

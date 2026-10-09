@@ -10,9 +10,11 @@ import pytest
 from tiqora.filters import Filter
 from tiqora.reporting.cache import (
     CACHE_PREFIX,
+    GENERATION_KEY,
     ReportCache,
     purge_report_cache,
     purge_report_cache_at,
+    read_cache_generation,
 )
 from tiqora.reporting.definition import TimeWindow
 from tiqora.reporting.schemas import (
@@ -149,7 +151,7 @@ async def test_round_trip_and_ttl_zero() -> None:
     cache = ReportCache(backend, ttl_seconds=300)
     result = _result()
     await cache.put("k", result)
-    assert backend.ttls == {"k": 300}
+    assert backend.ttls == {"k:g0": 300}  # generation 0: never purged
     hit = await cache.get("k")
     assert hit is not None and hit.cached is True
     assert hit.model_dump(mode="json", exclude={"cached"}) == result.model_dump(
@@ -200,12 +202,25 @@ class _ScanBackend:
             self.store.pop(name, None)
         return len(names)
 
+    async def incr(self, name: str) -> int:
+        if self.fail:
+            raise ConnectionError("redis down")
+        value = int(self.store.get(name, "0")) + 1
+        self.store[name] = str(value)
+        return value
+
+    async def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    async def set(self, key: str, value: str, ex: int) -> None:
+        self.store[key] = value
+
 
 async def test_purge_report_cache_drops_only_report_entries() -> None:
     reports = [f"{CACHE_PREFIX}{i}" for i in range(5)]
     backend = _ScanBackend([*reports, "tiqora:session:abc", "tiqora:avatar:x"])
     assert await purge_report_cache(backend, batch=2) == 5
-    assert set(backend.store) == {"tiqora:session:abc", "tiqora:avatar:x"}
+    assert set(backend.store) == {"tiqora:session:abc", "tiqora:avatar:x", GENERATION_KEY}
     assert backend.deletes == [2, 2, 1]  # batched
     assert await purge_report_cache(_ScanBackend(reports, fail=True)) == 0  # logged, not raised
 
@@ -214,3 +229,37 @@ async def test_purge_report_cache_at_never_raises() -> None:
     """A GDPR erasure must not fail because Redis is down or misconfigured."""
     assert await purge_report_cache_at("redis://127.0.0.1:1/0") == 0  # connection refused
     assert await purge_report_cache_at("not-a-redis-url") == 0  # rejected by from_url
+
+
+async def test_purge_bumps_the_generation_so_in_flight_runs_cannot_recache() -> None:
+    """T13 M2: a run that read the generation before a purge stores where nobody reads."""
+    backend = _ScanBackend([])
+    result = _result()
+    before = ReportCache(backend, ttl_seconds=300, generation=await read_cache_generation(backend))
+    assert await before.get("k") is None  # a run starts (generation 0) ...
+    assert await purge_report_cache(backend) == 0  # ... a GDPR erasure purges meanwhile ...
+    await before.put("k", result)  # ... and the run stores its (pre-erasure) numbers
+    assert backend.store["k:g0"]  # stored, but under the old generation
+    after = ReportCache(backend, ttl_seconds=300)  # every later request (lazy read)
+    assert await after.get("k") is None
+    await after.put("k", result)
+    assert (await after.get("k")) is not None and "k:g1" in backend.store
+    assert await read_cache_generation(backend) == 1
+    # the generation counter itself survives purges (it is outside CACHE_PREFIX)
+    await purge_report_cache(backend)
+    assert backend.store[GENERATION_KEY] == "2"
+    assert "k:g1" in backend.store  # the toy key "k" lies outside CACHE_PREFIX
+    assert not GENERATION_KEY.startswith(CACHE_PREFIX)
+
+
+async def test_unreadable_generation_turns_the_cache_off() -> None:
+    assert await read_cache_generation(_BrokenBackend()) is None
+    assert await read_cache_generation(None) is None
+    backend = _FakeBackend()
+    backend.store[GENERATION_KEY] = "garbage"
+    cache = ReportCache(backend, ttl_seconds=300)
+    await cache.put("k", _result())
+    assert await cache.get("k") is None and set(backend.store) == {GENERATION_KEY}
+    off = ReportCache(backend, ttl_seconds=300, generation=None)
+    await off.put("k", _result())
+    assert set(backend.store) == {GENERATION_KEY}

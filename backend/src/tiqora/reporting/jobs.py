@@ -29,7 +29,11 @@ from tiqora.jobs.context import JobContext, JobFailed
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import MAX_RESULT_CHARS
 from tiqora.reporting.access import has_report_access
-from tiqora.reporting.cache import ReportCache, cache_backend_from_settings
+from tiqora.reporting.cache import (
+    ReportCache,
+    cache_backend_from_settings,
+    read_cache_generation,
+)
 from tiqora.reporting.catalogue import BUILTIN_REPORTS
 from tiqora.reporting.compiler import RunParams
 from tiqora.reporting.definition import DefinitionError, ReportDefinition
@@ -129,13 +133,11 @@ async def prepare_run(
 
 
 @asynccontextmanager
-async def _job_cache(
-    settings: Settings, reporting: ReportingSettings
-) -> AsyncIterator[ReportCache]:
-    """The result cache of the API (same key builder), on its own Redis client."""
+async def _job_cache_backend(settings: Settings) -> AsyncIterator[Any]:
+    """The Redis client of the API's result cache (same key builder), closed afterwards."""
     backend: Any = cache_backend_from_settings(settings)
     try:
-        yield ReportCache(backend, reporting.cache_seconds)
+        yield backend
     finally:
         close = getattr(backend, "aclose", None)
         if close is not None:
@@ -189,9 +191,12 @@ async def run_report_job(ctx: JobContext, payload: ReportRunPayload) -> dict[str
     """Run one report in the background; the result is the job result (and cached)."""
     body = payload.run
     await ctx.progress(0, None, "Bericht wird berechnet …")
-    async with ctx.session_factory() as session:
-        reporting, definition, params, key = await _checked(session, ctx, payload.user_id, body)
-        async with _job_cache(ctx.settings, reporting) as cache:
+    async with _job_cache_backend(ctx.settings) as backend:
+        # read before the run's first database read (see tiqora.reporting.cache)
+        generation = await read_cache_generation(backend)
+        async with ctx.session_factory() as session:
+            reporting, definition, params, key = await _checked(session, ctx, payload.user_id, body)
+            cache = ReportCache(backend, reporting.cache_seconds, generation=generation)
             result = await _run(
                 session,
                 user_id=payload.user_id,

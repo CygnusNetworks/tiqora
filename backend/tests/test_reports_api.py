@@ -33,6 +33,7 @@ from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.extensions import get_registry
 from tiqora.jobs.runner import JobRunner
+from tiqora.reporting.cache import GENERATION_KEY
 from tiqora.reporting.engine import QueryBudget
 from tiqora.reporting.facts_store import rebuild_ticket_facts
 from tiqora.reporting.settings import REPORTING_SECTION
@@ -245,6 +246,8 @@ class Env:
         self.client = client
         #: the user every request is made as (``get_current_user`` override)
         self.user = USER
+        #: the in-memory result cache shared by the API and the jobs
+        self.cache = _MemoryCache()
 
     @property
     def dialect(self) -> str:
@@ -318,6 +321,7 @@ async def env(
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             holder.append(Env(sync_url, factory, c))
+            holder[0].cache = cache
             yield holder[0]
     finally:
         await engine.dispose()
@@ -552,6 +556,32 @@ async def test_force_job_returns_202_and_job_result_is_report(env: Env) -> None:
     assert again.json()["result"]["rows"] == [["email", 2]]
     fresh = await _run(env, {**body, "no_cache": True})
     assert fresh.status_code == 200 and fresh.json()["result"]["cached"] is False
+
+
+async def test_purge_during_an_inline_run_leaves_no_findable_result(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T13 M2: the request reads the cache generation first; a purge (GDPR erasure,
+    rebuild) while it computes makes its stored result unreachable."""
+    await env.facts_ready()
+    body = {"report_key": "builtin.channel_mix", "time_range": JUNE}
+    real_estimate = reports_api.estimate_rows
+
+    async def estimate_then_purge(*args: Any, **kwargs: Any) -> int:
+        rows = await real_estimate(*args, **kwargs)
+        env.cache.store[GENERATION_KEY] = "1"  # what purge_report_cache's INCR does
+        return rows
+
+    monkeypatch.setattr(reports_api, "estimate_rows", estimate_then_purge)
+    first = await _run(env, body)
+    assert first.status_code == 200 and first.json()["result"]["cached"] is False
+    assert any(k.endswith(":g0") for k in env.cache.store)  # stored under the old generation
+    monkeypatch.setattr(reports_api, "estimate_rows", real_estimate)
+    again = await _run(env, body)
+    assert again.json()["result"]["cached"] is False  # not found: computed afresh ...
+    third = await _run(env, body)
+    assert third.json()["result"]["cached"] is True  # ... and cached under generation 1
+    assert any(k.endswith(":g1") for k in env.cache.store)
 
 
 async def test_threshold_triggers_job(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:

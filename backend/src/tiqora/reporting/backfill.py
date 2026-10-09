@@ -26,6 +26,7 @@ from tiqora.db.tiqora.models import TiqoraReportTicketFact
 from tiqora.jobs.context import JobCancelled, JobContext
 from tiqora.jobs.registry import JobHandler
 from tiqora.jobs.service import utc_now
+from tiqora.reporting.cache import purge_report_cache_at
 from tiqora.reporting.facts_store import FACT_CHUNK_SIZE, rebuild_and_commit
 from tiqora.reporting.settings import load_reporting_settings, reporting_time_zone
 from tiqora.reporting.snapshots import snapshot_days
@@ -137,6 +138,10 @@ async def _begin(
             state.backfill_run_token,
         )
         await session.commit()
+    if not resume:
+        # a new build (first backfill, admin rebuild, CLI): results cached from the old
+        # data must not outlive it (best effort, never raises)
+        await purge_report_cache_at(settings.redis_url)
     return run
 
 

@@ -57,6 +57,8 @@ from tiqora.reporting.state import (
 pytestmark = pytest.mark.db
 
 LO, HI = 47620, 47659
+#: redis URLs ``backfill.purge_report_cache_at`` was called with (no real Redis in tests)
+PURGES: list[str] = []
 GROUP, QUEUE, AGENT = 47620, 47621, 47623
 TICKETS = (47630, 47631, 47632, 47633, 47634)
 FUTURE = 47639
@@ -411,6 +413,18 @@ async def test_backfill_since_starts_at_first_ticket_created_on_or_after(
         await engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _record_cache_purges(monkeypatch: pytest.MonkeyPatch) -> Generator[None, None, None]:
+    async def record(redis_url: str) -> int:
+        PURGES.append(redis_url)
+        return 0
+
+    PURGES.clear()
+    monkeypatch.setattr(backfill, "purge_report_cache_at", record)
+    yield
+    PURGES.clear()
+
+
 @pytest.mark.parametrize("url_fixture", ["mariadb_znuny_url", "postgres_znuny_url"])
 async def test_backfill_resume_and_idempotent(
     url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
@@ -450,6 +464,7 @@ async def test_backfill_resume_and_idempotent(
         assert state.backfill_status == "running"
         assert state.backfill_cursor_ticket_id == all_ids[1]  # the 2nd id of the range
         assert state.backfill_start_ticket_id == all_ids[0] - 1
+        assert PURGES[:] == [SETTINGS.redis_url]  # a new run invalidates the result cache
 
         seen.clear()
         second = Recorder()
@@ -465,6 +480,7 @@ async def test_backfill_resume_and_idempotent(
         # continued after the cursor: nothing of the first chunk again, everything else once
         assert [i for chunk in seen for i in chunk] == all_ids[2:]
         assert all(len(chunk) <= 2 for chunk in seen)
+        assert len(PURGES) == 1  # resuming the same run does not
         async with factory() as s:
             assert (await load_state(s)).backfill_status == "done"
         resumed = await _event_rows(factory)
@@ -481,6 +497,7 @@ async def test_backfill_resume_and_idempotent(
             now=NOW,
         )
         assert [i for chunk in seen for i in chunk] == all_ids  # from the start again
+        assert len(PURGES) == 2  # a restart (admin rebuild) is a new run
         assert await _event_rows(factory) == resumed
     finally:
         await engine.dispose()

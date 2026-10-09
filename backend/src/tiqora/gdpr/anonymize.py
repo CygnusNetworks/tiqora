@@ -13,8 +13,12 @@ customer_user under that company), this replaces:
 * ``customer_company`` (optional, ``anonymize_company=True`` — off by
   default since a company may have other, non-anonymized customer_users).
 
-Tickets themselves (title, queue, state, timestamps) are left untouched —
-they remain intact for analytics. Referential consistency (the same
+Tickets themselves (title, queue, state, timestamps, and ``customer_id`` /
+``customer_user_id``) are left untouched — they remain intact for analytics.
+Reporting: the customer's tickets are queued for a fact rebuild and the whole
+report result cache is invalidated (cached rows and labels can hold the old
+names); the rebuilt facts copy ``customer_user`` from the ticket row, i.e. the
+unchanged login. Referential consistency (the same
 original value always maps to the same replacement) is delegated to
 :class:`tiqora.domain.dev_anonymize.ValueMapper`, reused here rather than
 duplicated.
@@ -24,6 +28,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import structlog
 from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -36,7 +41,11 @@ from tiqora.db.tiqora.models import TiqoraAvatar
 from tiqora.domain.dev_anonymize import ValueMapper
 from tiqora.gdpr.audit import record_audit
 from tiqora.gdpr.gate import require_write_gate
+from tiqora.reporting.cache import purge_report_cache_at
+from tiqora.reporting.dirty import mark_tickets_dirty
 from tiqora.znuny.sessions import delete_customer_sessions
+
+logger = structlog.get_logger(__name__)
 
 
 class CustomerNotFoundError(ValueError):
@@ -244,6 +253,17 @@ async def anonymize_customer(
                     )
                 result.articles += 1
     progress.append(f"article_data_mime: {result.articles} rows updated")
+
+    # --- report data: rebuild the tickets' facts, drop cached results (names, labels) ---
+    if ticket_ids:
+        try:
+            async with session_factory() as session, session.begin():
+                await mark_tickets_dirty(session, ticket_ids)
+            progress.append(f"report facts: {len(ticket_ids)} tickets queued for a rebuild")
+        except Exception as exc:  # noqa: BLE001 - the scrub above is done; never lose its audit
+            logger.warning("anonymize_report_rebuild_not_queued", error=str(exc))
+            progress.append("report facts: NOT queued (rebuild the report data in Admin)")
+    await purge_report_cache_at(settings.redis_url)
 
     async with session_factory() as session:
         await record_audit(

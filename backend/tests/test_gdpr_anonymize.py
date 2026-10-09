@@ -12,12 +12,13 @@ import contextlib
 from datetime import datetime
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tiqora.config import Settings
 from tiqora.db.legacy.customer import CustomerUser
 from tiqora.db.legacy.ticket import Ticket
+from tiqora.db.tiqora.base import TiqoraBase
 from tiqora.gdpr.anonymize import CustomerNotFoundError, anonymize_customer
 from tiqora.gdpr.gate import GdprRefusedError
 
@@ -74,9 +75,11 @@ async def _insert_customer(session: AsyncSession, *, login: str, customer_id: st
         )
 
 
-async def _insert_ticket(session: AsyncSession, *, customer_user_id: str) -> int:
+async def _insert_ticket(
+    session: AsyncSession, *, customer_user_id: str, tn: str = "2026010112345678"
+) -> int:
     t = Ticket(
-        tn="2026010112345678",
+        tn=tn,
         title="Test",
         queue_id=1,
         ticket_lock_id=1,
@@ -316,3 +319,73 @@ async def test_anonymize_customer_raises_when_login_not_found(mariadb_znuny_url:
             factory, Settings(), login="does.not.exist@example.com", force_parallel=True
         )
     await engine.dispose()
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_anonymize_customer_queues_report_rebuild_and_purges_cache(
+    mariadb_znuny_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Parked T22: the customer's tickets get rebuilt facts, cached reports are dropped."""
+    import tiqora.gdpr.anonymize as anonymize_mod
+    from tiqora.reporting.facts_store import rebuild_ticket_facts
+
+    purges: list[str] = []
+
+    async def record(redis_url: str) -> int:
+        purges.append(redis_url)
+        return 0
+
+    monkeypatch.setattr(anonymize_mod, "purge_report_cache_at", record)
+    sync_engine = create_engine(mariadb_znuny_url)
+    TiqoraBase.metadata.create_all(sync_engine)  # the report tables (migration 0062)
+    sync_engine.dispose()
+    engine = create_async_engine(_mysql_async(mariadb_znuny_url))
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    login = "gdpr.report@example.com"
+    settings = Settings()
+    async with factory() as session:
+        await _seed_tiqora_tables(session)
+        await _insert_customer(session, login=login, customer_id="ANON-GDPR5")
+        ticket_id = await _insert_ticket(session, customer_user_id=login, tn="2026010112345679")
+    try:
+        await anonymize_customer(factory, settings, login=login, seed=13, force_parallel=True)
+        assert purges == [settings.redis_url]
+        async with factory() as session:
+            dirty = (
+                await session.execute(
+                    text("SELECT COUNT(*) FROM tiqora_report_dirty_ticket WHERE ticket_id = :t"),
+                    {"t": ticket_id},
+                )
+            ).scalar_one()
+            assert int(dirty) == 1
+            await rebuild_ticket_facts(session, [ticket_id], now=NOW)
+            await session.commit()
+            fact = (
+                await session.execute(
+                    text(
+                        "SELECT f.customer_user, t.customer_user_id"
+                        " FROM tiqora_report_ticket_fact f"
+                        " JOIN ticket t ON t.id = f.ticket_id WHERE f.ticket_id = :t"
+                    ),
+                    {"t": ticket_id},
+                )
+            ).one()
+            # the rebuilt fact copies the ticket row, which anonymisation leaves unchanged
+            assert fact[0] == fact[1] == login
+    finally:
+        async with factory() as session:
+            for table in ("tiqora_report_ticket_event", "tiqora_report_ticket_fact"):
+                await session.execute(
+                    text(f"DELETE FROM {table} WHERE ticket_id = :t"), {"t": ticket_id}
+                )
+            await session.execute(
+                text("DELETE FROM tiqora_report_dirty_ticket WHERE ticket_id = :t"),
+                {"t": ticket_id},
+            )
+            await session.execute(text("DELETE FROM ticket WHERE id = :t"), {"t": ticket_id})
+            await session.execute(
+                text("DELETE FROM customer_user WHERE customer_id = 'ANON-GDPR5'")
+            )
+            await session.commit()
+        await engine.dispose()
