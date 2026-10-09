@@ -120,8 +120,7 @@ export interface paths {
         put?: never;
         /**
          * SAML assertion consumer service (portal)
-         * @description The IdP's browser POST; CSRF-exempt by design, authenticated by signature, stored request
-         *     id and the per-browser cookie. Every failure redirects to ``/portal/login``.
+         * @description The IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/portal/login``.
          */
         post: operations["portal_saml_acs_api_portal_auth_saml__slug__acs_post"];
         delete?: never;
@@ -154,7 +153,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Start a portal SSO login */
+        /**
+         * Start a portal SSO login
+         * @description Starts a customer login, or (``test=``) an admin's test run of a customer provider.
+         *
+         *     A test run needs the admin's AGENT session cookie; without one the answer is 403 and
+         *     never a real login. The run itself never creates a session (see ``finish_*``).
+         */
         get: operations["portal_sso_login_api_portal_auth_sso__slug__login_get"];
         put?: never;
         post?: never;
@@ -4734,10 +4739,7 @@ export interface paths {
         put?: never;
         /**
          * SAML assertion consumer service
-         * @description Receives the IdP's browser POST (``SAMLResponse``, ``RelayState``).
-         *
-         *     CSRF-exempt by design (cross-site form POST); the XML signature, the stored request id
-         *     and the per-browser cookie authenticate it. Every failure redirects to ``/login``.
+         * @description Receives the IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/login``.
          */
         post: operations["saml_acs_api_v1_auth_saml__slug__acs_post"];
         delete?: never;
@@ -18330,6 +18332,7 @@ export interface operations {
         parameters: {
             query?: {
                 next?: string | null;
+                test?: string | null;
             };
             header?: never;
             path: {

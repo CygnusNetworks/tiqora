@@ -29236,7 +29236,7 @@
     },
     "/api/portal/auth/saml/{slug}/acs": {
       "post": {
-        "description": "The IdP's browser POST; CSRF-exempt by design, authenticated by signature, stored request\nid and the per-browser cookie. Every failure redirects to ``/portal/login``.",
+        "description": "The IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/portal/login``.",
         "operationId": "portal_saml_acs_api_portal_auth_saml__slug__acs_post",
         "parameters": [
           {
@@ -29296,6 +29296,7 @@
     },
     "/api/portal/auth/sso/{slug}/login": {
       "get": {
+        "description": "Starts a customer login, or (``test=``) an admin's test run of a customer provider.\n\nA test run needs the admin's AGENT session cookie; without one the answer is 403 and\nnever a real login. The run itself never creates a session (see ``finish_*``).",
         "operationId": "portal_sso_login_api_portal_auth_sso__slug__login_get",
         "parameters": [
           {
@@ -29321,6 +29322,22 @@
                 }
               ],
               "title": "Next"
+            }
+          },
+          {
+            "in": "query",
+            "name": "test",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Test"
             }
           }
         ],
@@ -58354,7 +58371,7 @@
     },
     "/api/v1/auth/saml/{slug}/acs": {
       "post": {
-        "description": "Receives the IdP's browser POST (``SAMLResponse``, ``RelayState``).\n\nCSRF-exempt by design (cross-site form POST); the XML signature, the stored request id\nand the per-browser cookie authenticate it. Every failure redirects to ``/login``.",
+        "description": "Receives the IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/login``.",
         "operationId": "saml_acs_api_v1_auth_saml__slug__acs_post",
         "parameters": [
           {

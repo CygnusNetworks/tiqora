@@ -323,6 +323,7 @@ async def test_saml_unavailable(env: Env, monkeypatch: pytest.MonkeyPatch) -> No
     await _provider(env)
     missing = SamlAvailability(False, "xmlsec1", None)
     monkeypatch.setattr("tiqora.identity.sso_routes.saml_availability", lambda: missing)
+    monkeypatch.setattr("tiqora.identity.login_providers.saml_availability", lambda: missing)
     monkeypatch.setattr("tiqora.api.v1.auth.saml_availability", lambda: missing)
     resp = await env.client.get(LOGIN_PATH)
     assert _error(resp) == "saml_unavailable"

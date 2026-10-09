@@ -67,6 +67,7 @@ from tiqora.identity.saml_metadata import (
 )
 from tiqora.identity.saml_runtime import SamlUnavailable, saml_availability
 from tiqora.identity.saml_sp import (
+    MAX_RESPONSE_BYTES,
     SamlResponseInvalid,
     SamlServiceProvider,
     decode_saml_b64,
@@ -91,6 +92,19 @@ logger = structlog.get_logger(__name__)
 
 OIDC_STATE_COOKIE = "tiqora_oidc_state"
 SAML_REQUEST_COOKIE: Final = "tiqora_saml_req"
+CUSTOMER_OIDC_STATE_COOKIE: Final = "tiqora_customer_oidc_state"
+CUSTOMER_SAML_REQUEST_COOKIE: Final = "tiqora_customer_saml_req"
+
+
+def oidc_state_cookie(user_kind: UserKind) -> str:
+    """Per-surface name: a state cookie of one login surface never binds the other's callback."""
+    return OIDC_STATE_COOKIE if user_kind == "agent" else CUSTOMER_OIDC_STATE_COOKIE
+
+
+def saml_request_cookie(user_kind: UserKind) -> str:
+    return SAML_REQUEST_COOKIE if user_kind == "agent" else CUSTOMER_SAML_REQUEST_COOKIE
+
+
 SAML_METADATA_TYPE = "application/samlmetadata+xml"
 _MAX_REQUEST_ID = 256
 
@@ -321,7 +335,7 @@ async def start_sso_login(
     # the returned state, so an attacker cannot replay a state/code they minted
     # into a victim's session (OIDC login CSRF / session fixation).
     resp.set_cookie(
-        key=OIDC_STATE_COOKIE,
+        key=oidc_state_cookie(user_kind),
         value=state,
         httponly=True,
         secure=settings.session_cookie_secure,
@@ -382,7 +396,7 @@ async def _start_saml_login(
     if not secure:
         logger.warning("saml_cookie_binding_disabled_http", slug=record.slug)
     resp.set_cookie(
-        key=SAML_REQUEST_COOKIE,
+        key=saml_request_cookie(user_kind),
         value=redirect.request_id,
         httponly=True,
         secure=secure,
@@ -423,7 +437,7 @@ async def finish_oidc_callback(
         settings=settings,
         json_response=json_response,
     )
-    response.delete_cookie(OIDC_STATE_COOKIE, path="/")
+    response.delete_cookie(oidc_state_cookie(user_kind), path="/")
     return response
 
 
@@ -453,7 +467,7 @@ async def _finish_oidc_callback(
             _Fail("state", http_status=status.HTTP_400_BAD_REQUEST, detail="Missing code/state")
         )
     redis = await get_redis(request)
-    cookie_state = request.cookies.get(OIDC_STATE_COOKIE)
+    cookie_state = request.cookies.get(oidc_state_cookie(user_kind))
     # State must exist server-side AND match the per-browser cookie set at login start.
     if not cookie_state or not secrets.compare_digest(cookie_state, state):
         return fail(state_fail)
@@ -781,6 +795,45 @@ def _assertion_ttl(not_on_or_after: datetime | None, skew: int) -> int:
     return max(60, int(remaining) + skew)
 
 
+def _form_text(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+async def handle_saml_acs_post(
+    request: Request,
+    *,
+    slug: str,
+    user_kind: UserKind,
+    session: AsyncSession,
+    settings: Settings,
+) -> Response:
+    """The IdP's browser POST (``SAMLResponse``, ``RelayState``) for either login surface.
+
+    CSRF-exempt by design (cross-site form POST); the XML signature, the stored request id and
+    the per-browser cookie authenticate it. Every failure redirects to the surface's login page.
+    """
+    home = _default_next(user_kind, None)
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_RESPONSE_BYTES * 2:
+        return login_error_redirect(user_kind, "saml_invalid", home)
+    try:
+        form = await request.form()
+    except Exception:  # noqa: BLE001 - malformed/oversized form bodies are a failed login
+        return login_error_redirect(user_kind, "saml_invalid", home)
+    saml_response = _form_text(form.get("SAMLResponse"))
+    if not saml_response:
+        return login_error_redirect(user_kind, "saml_invalid", home)
+    return await finish_saml_acs(
+        request,
+        slug=slug,
+        user_kind=user_kind,
+        saml_response=saml_response,
+        relay_state=_form_text(form.get("RelayState")),
+        session=session,
+        settings=settings,
+    )
+
+
 async def finish_saml_acs(
     request: Request,
     *,
@@ -803,7 +856,7 @@ async def finish_saml_acs(
     )
     secure, samesite = _saml_cookie_flags(settings)
     response.delete_cookie(
-        SAML_REQUEST_COOKIE,
+        saml_request_cookie(user_kind),
         path="/",
         secure=secure,
         httponly=True,
@@ -857,7 +910,7 @@ async def _finish_saml_acs(
     # only opt-in IdP-initiated logins are unbound. Limitation: one cookie per browser, so two
     # parallel login tabs overwrite each other and the older tab fails with ``state``.
     if in_response_to is not None:
-        cookie = request.cookies.get(SAML_REQUEST_COOKIE)
+        cookie = request.cookies.get(saml_request_cookie(user_kind))
         if not cookie or not secrets.compare_digest(cookie, in_response_to):
             return fail("state", await _stored_next(redis, in_response_to, user_kind))
 
@@ -1174,7 +1227,11 @@ async def handle_sls(
             settings=settings,
             session=session,
         )
-        user_kind: UserKind = state.user_kind if state is not None else "agent"
+        user_kind = (
+            state.user_kind
+            if state is not None
+            else await _sls_fallback_kind(session, settings, slug)
+        )
         return RedirectResponse(logged_out_path(user_kind), status_code=status.HTTP_303_SEE_OTHER)
     if saml_request:
         # Task 21 implements IdP-initiated single logout.
@@ -1182,7 +1239,18 @@ async def handle_sls(
             {"detail": "IdP-initiated logout not supported yet"},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-    return RedirectResponse(logged_out_path("agent"), status_code=status.HTTP_303_SEE_OTHER)
+    fallback = await _sls_fallback_kind(session, settings, slug)
+    return RedirectResponse(logged_out_path(fallback), status_code=status.HTTP_303_SEE_OTHER)
+
+
+async def _sls_fallback_kind(session: AsyncSession, settings: Settings, slug: str) -> UserKind:
+    """Login page for an SLS call without a stored logout request: a customer-only provider
+    ends on the portal login, everything else (agent, both, unknown) on ``/login``."""
+    try:
+        record = await get_provider_by_slug(session, slug, secret_key=settings.secret_key)
+    except Exception:  # noqa: BLE001 - the local session is gone either way
+        return "agent"
+    return "customer" if record is not None and record.audience == "customer" else "agent"
 
 
 async def _consume_logout_response(

@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import httpx
 import pytest
 import pytest_asyncio
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, delete, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._identity_helpers import (
@@ -32,12 +32,17 @@ from tiqora.api.app import create_app
 from tiqora.api.deps import get_db
 from tiqora.config import Settings
 from tiqora.db.tiqora.base import TiqoraBase
+from tiqora.db.tiqora.models import TiqoraSettings
 from tiqora.domain.auth import SessionStore
 from tiqora.domain.auth_config import AuthConfigService
 from tiqora.domain.customer_auth import CustomerSessionStore
 from tiqora.domain.oidc import OidcClientConfig, OIDCService, clear_discovery_cache
-from tiqora.identity import sso_routes
+from tiqora.domain.settings_store import KEY_PORTAL_ENABLED, set_setting
+from tiqora.identity import flow_state, sso_routes
 from tiqora.identity.config_models import AttributeMap, JitDefaults
+from tiqora.identity.flow_state import TestRun
+from tiqora.identity.http import safe_portal_next
+from tiqora.identity.saml_sp import MAX_RESPONSE_BYTES
 from tiqora.identity.store import ProviderChanges, update_provider
 
 pytestmark = pytest.mark.db
@@ -66,7 +71,9 @@ def _clean(url: str) -> None:
                     text("SELECT COALESCE(MAX(id), 0) FROM tiqora_cache_invalidation")
                 )
                 _INVAL_MARK[url] = int(row.scalar_one())
-            conn.execute(text("DELETE FROM customer_user WHERE login LIKE 'idp.agent.4727%'"))
+            for like in ("idp.agent.4727%", "idp.kunde.4727%", "idp.kunde.4728%"):
+                conn.execute(text("DELETE FROM customer_user WHERE login LIKE :p"), {"p": like})
+            conn.execute(delete(TiqoraSettings).where(TiqoraSettings.key == KEY_PORTAL_ENABLED))
             conn.execute(
                 text("DELETE FROM tiqora_cache_invalidation WHERE id > :mx"),
                 {"mx": _INVAL_MARK[url]},
@@ -347,7 +354,12 @@ async def test_agent_state_cannot_finish_as_customer(env: Env) -> None:
         ("/\\evil.example.net", "/portal"),
         ("/%09/evil.example.net", "/portal"),
         ("/\t/evil.example.net", "/portal"),
-        ("/portal/../admin", "/portal/../admin"),  # still a same-site path under /portal
+        ("/portal/../admin", "/portal"),
+        ("/portal/%2e%2e/admin", "/portal"),
+        ("/portal/%2E%2E/admin", "/portal"),
+        ("/portal/./tickets", "/portal"),
+        ("/portal/a/%2e/b", "/portal"),
+        ("/portalx", "/portal"),
         ("/portal/tickets?x=1", "/portal/tickets?x=1"),
         ("https://evil.example.net/portal", "/portal"),
     ],
@@ -380,11 +392,21 @@ async def test_provider_audience_is_enforced_per_login_surface(env: Env) -> None
     assert _error(for_customer) == ("/portal/login", "unknown_provider")
     for_agent = await env.client.get(f"/api/v1/auth/sso/{SLUG}cu/login")
     assert _error(for_agent) == ("/login", "unknown_provider")
-    # a customer-only provider has no agent callback either
-    cb = await env.client.get(
-        f"/api/v1/auth/oidc/{SLUG}cu/callback", params={"code": "c", "state": "nope"}
+
+
+async def test_callback_rechecks_audience_after_a_valid_state(env: Env) -> None:
+    """A state minted while the provider served agents is useless once it is customer-only."""
+    rec = await _oidc_provider(env, "flip", audience="agent")
+    env.oidc.claims["c"] = {"sub": "s-flip", "preferred_username": "idp.agent.47274"}
+    q = await env.start_oidc(f"/api/v1/auth/sso/{SLUG}flip/login")  # valid agent state + cookie
+    await update_provider(
+        env.session, rec.id, ProviderChanges(audience="customer"), secret_key=KEY, actor_id=1
     )
-    assert _error(cb)[1] in {"state", "unknown_provider"}
+    await env.session.commit()
+    cb = await env.client.get(
+        f"/api/v1/auth/oidc/{SLUG}flip/callback", params={"code": "c", "state": q["state"][0]}
+    )
+    assert _error(cb) == ("/login", "unknown_provider")
     assert env.client.cookies.get(AGENT_COOKIE) is None
 
 
@@ -435,25 +457,51 @@ async def test_customer_idp_response_never_logs_in_or_creates_an_agent(env: Env)
 
 
 async def test_agent_idp_response_never_logs_in_or_creates_a_customer(env: Env) -> None:
-    await seed_customer(env.session, "idp.kunde.47263@example.org")
+    cid = await seed_customer(env.session, "idp.kunde.47263@example.org")
     await _oidc_provider(
         env,
         "ag2",
         audience="agent",
-        jit_enabled=True,
-        attribute_map=AttributeMap(login=["preferred_username"], email=["email"]),
+        match_by="login",
+        attribute_map=AttributeMap(login=["preferred_username"]),
     )
+    # The IdP asserts the login of an existing CUSTOMER; there is no such agent.
     env.oidc.claims["c"] = {
         "sub": "s-customer-lookalike",
         "preferred_username": "idp.kunde.47263@example.org",
     }
+    customers_before = (
+        await env.session.execute(
+            text("SELECT COUNT(*) FROM customer_user WHERE id = :i"), {"i": cid}
+        )
+    ).scalar_one()
     q = await env.start_oidc(f"/api/v1/auth/sso/{SLUG}ag2/login")
     resp = await env.client.get(
         f"/api/v1/auth/oidc/{SLUG}ag2/callback", params={"code": "c", "state": q["state"][0]}
     )
-    assert resp.status_code == 302
-    assert resp.headers["location"].startswith("/login?")  # no_match / jit_missing_fields: rejected
+    assert _error(resp) == ("/login", "no_match")
     assert not (_set_cookie_names(resp) & {AGENT_COOKIE, CUSTOMER_COOKIE})
+    assert (
+        await env.session.execute(
+            text("SELECT COUNT(*) FROM users WHERE login = :l"),
+            {"l": "idp.kunde.47263@example.org"},
+        )
+    ).scalar_one() == 0
+    assert customers_before == 1
+    assert (
+        await env.session.execute(
+            text("SELECT COUNT(*) FROM customer_user WHERE login LIKE 'idp.kunde.47263%'")
+        )
+    ).scalar_one() == 1  # untouched, no duplicate
+    assert (
+        await env.session.execute(
+            text(
+                "SELECT COUNT(*) FROM tiqora_identity_link WHERE provider_id IN"
+                " (SELECT id FROM tiqora_identity_provider WHERE slug = :s)"
+            ),
+            {"s": f"{SLUG}ag2"},
+        )
+    ).scalar_one() == 0
     # and the customer portal does not accept that provider at all
     at_portal = await env.client.get(f"/api/portal/auth/sso/{SLUG}ag2/login")
     assert _error(at_portal) == ("/portal/login", "unknown_provider")
@@ -564,7 +612,8 @@ async def _saml_provider(env: Env, idp: SamlTestIdp, slug: str, audience: Any = 
 def _acs_request(
     env: Env, path: str, body: str, *, relay: str = "", req_id: str | None = None
 ) -> Any:
-    jar = f"tiqora_saml_req={req_id}" if req_id else ""
+    name = "tiqora_customer_saml_req" if path.startswith("/api/portal") else "tiqora_saml_req"
+    jar = f"{name}={req_id}" if req_id else ""
     return env.client.post(
         path,
         content=urlencode({"SAMLResponse": body, "RelayState": relay}),
@@ -661,7 +710,7 @@ async def test_portal_saml_request_cannot_finish_at_agent_acs(env: Env, idp: Sam
         relay=relay,
         req_id=req_id,
     )
-    assert resp.status_code == 302 and resp.headers["location"].startswith("/login?")
+    assert _error(resp) == ("/login", "state")
     assert not _set_cookie_names(resp) & {CUSTOMER_COOKIE, AGENT_COOKIE}
     # and the request is still usable at the portal ACS
     ok = await _acs_request(
@@ -734,3 +783,253 @@ async def test_portal_logout_is_post_only_and_csrf_checked(env: Env) -> None:
         "/api/portal/auth/sso/logout", headers={"Origin": "https://evil.example.org"}
     )
     assert forged.status_code == 403
+
+
+# ------------------------------------------------------------- fix round 1: new coverage
+
+
+def test_safe_portal_next_rejects_dot_segments_and_foreign_prefixes() -> None:
+    for bad in (
+        "/portal/../admin",
+        "/portal/%2e%2e/admin",
+        "/portal/%2E%2e/admin",
+        "/portal/./x",
+        "/portal/%2e/x",
+        "/portal/a/../../admin",
+        "/portal/%09/x",
+        "/portal/a\\b",
+        "/portalx",
+        "/admin",
+        None,
+        "",
+    ):
+        assert safe_portal_next(bad) == "/portal", bad
+    for good in ("/portal", "/portal/", "/portal/tickets/5?x=1#frag", "/portal?x=1"):
+        assert safe_portal_next(good) == good
+
+
+async def _test_run(env: Env, slug: str, admin_id: int) -> str:
+    rec = await sso_routes.get_provider_by_slug(env.session, f"{SLUG}{slug}", secret_key=KEY)
+    assert rec is not None
+    await flow_state.put_test(
+        env.redis,
+        "tid-portal",
+        TestRun(provider_id=rec.id, admin_id=admin_id, audience="customer"),
+        secret_key=KEY,
+    )
+    return "tid-portal"
+
+
+async def test_customer_test_run_needs_an_admin_and_never_logs_in(env: Env) -> None:
+    await _oidc_provider(
+        env,
+        "tr",
+        jit_enabled=True,
+        jit_defaults=JitDefaults(customer_id="idp-jit-co"),
+        attribute_map=AttributeMap(login=["preferred_username"], email=["email"]),
+    )
+    await seed_agent(env.session, 47274, "idp.agent.47274")
+    await seed_agent(env.session, 47275, "idp.agent.47275")
+    tid = await _test_run(env, "tr", 47274)
+    env.oidc.claims["c"] = {
+        "sub": "s-test",
+        "preferred_username": "idp.kunde.47260@example.org",
+        "email": "idp.kunde.47260@example.test",
+        "email_verified": True,
+    }
+    path = f"/api/portal/auth/sso/{SLUG}tr/login"
+
+    # No agent session at all: 403, no redirect to the IdP, no cookie, no real login.
+    anon = await env.client.get(path, params={"test": tid})
+    assert anon.status_code == 403 and not anon.headers.get_list("set-cookie")
+
+    # A different agent than the one who started the run: refused as a plain state error.
+    other = await env.agent_store.create(47275, "idp.agent.47275")
+    env.client.cookies.set(AGENT_COOKIE, other)
+    wrong = await env.client.get(path, params={"test": tid})
+    assert _error(wrong) == ("/portal/login", "state")
+
+    # The admin who started it: IdP round trip, ends on the admin page, nothing is created.
+    env.client.cookies.clear()
+    env.client.cookies.set(AGENT_COOKIE, await env.agent_store.create(47274, "idp.agent.47274"))
+    start = await env.client.get(path, params={"test": tid})
+    assert start.status_code == 302, start.text
+    q = parse_qs(urlparse(start.headers["location"]).query)
+    done = await env.client.get(
+        f"/api/portal/auth/oidc/{SLUG}tr/callback", params={"code": "c", "state": q["state"][0]}
+    )
+    assert done.status_code == 302
+    assert done.headers["location"].startswith("/admin/identity-providers/")
+    assert CUSTOMER_COOKIE not in _set_cookie_names(done)
+    assert env.client.cookies.get(CUSTOMER_COOKIE) is None
+    for table in ("customer_user WHERE login LIKE 'idp.kunde.47260%'", "tiqora_identity_link"):
+        count = (await env.session.execute(text(f"SELECT COUNT(*) FROM {table}"))).scalar_one()  # noqa: S608
+        assert count == 0, table
+    assert not [k for k in env.redis.store if k.startswith("tiqora:csession:")]
+
+
+async def test_portal_disabled_by_setting_answers_404(env: Env) -> None:
+    await _oidc_provider(env, "gate2", audience="customer")
+    assert (await env.client.get("/api/portal/auth/methods")).status_code == 200
+    await set_setting(env.session, KEY_PORTAL_ENABLED, "false")
+    await env.session.commit()
+    try:
+        for path in (
+            "/api/portal/auth/methods",
+            f"/api/portal/auth/sso/{SLUG}gate2/login",
+            f"/api/portal/auth/oidc/{SLUG}gate2/callback",
+        ):
+            resp = await env.client.get(path)
+            assert resp.status_code == 404, path
+        acs = await env.client.post(f"/api/portal/auth/saml/{SLUG}gate2/acs", headers=SAME)
+        out = await env.client.post("/api/portal/auth/sso/logout", headers=SAME)
+        assert (acs.status_code, out.status_code) == (404, 404)
+    finally:
+        await env.session.execute(
+            delete(TiqoraSettings).where(TiqoraSettings.key == KEY_PORTAL_ENABLED)
+        )
+        await env.session.commit()
+
+
+async def test_state_cookies_are_per_surface(env: Env) -> None:
+    await _oidc_provider(env, "ck", audience="both")
+    env.oidc.claims["c"] = {"sub": "s-ck", "preferred_username": "idp.agent.47276"}
+    slug = f"{SLUG}ck"
+
+    portal = await env.client.get(f"/api/portal/auth/sso/{slug}/login")
+    assert "tiqora_customer_oidc_state=" in portal.headers["set-cookie"]
+    assert "tiqora_oidc_state=" not in portal.headers["set-cookie"]
+    state = parse_qs(urlparse(portal.headers["location"]).query)["state"][0]
+    # The agent-named cookie (e.g. from a parallel agent login) cannot bind the portal callback.
+    env.client.cookies.clear()
+    env.client.cookies.set("tiqora_oidc_state", state)
+    resp = await env.client.get(
+        f"/api/portal/auth/oidc/{slug}/callback", params={"code": "c", "state": state}
+    )
+    assert _error(resp) == ("/portal/login", "state")
+
+    agent = await env.client.get(f"/api/v1/auth/sso/{slug}/login")
+    assert "tiqora_oidc_state=" in agent.headers["set-cookie"]
+    assert "tiqora_customer_oidc_state=" not in agent.headers["set-cookie"]
+    a_state = parse_qs(urlparse(agent.headers["location"]).query)["state"][0]
+    env.client.cookies.clear()
+    env.client.cookies.set("tiqora_customer_oidc_state", a_state)
+    resp = await env.client.get(
+        f"/api/v1/auth/oidc/{slug}/callback", params={"code": "c", "state": a_state}
+    )
+    assert _error(resp) == ("/login", "state")
+
+
+async def test_empty_saml_acs_post_lands_on_each_surfaces_login(env: Env) -> None:
+    """Both ACS routes share one form helper; failures end on their own login page."""
+    await _oidc_provider(env, "form", audience="both")
+    slug = f"{SLUG}form"
+    headers = {"Origin": "https://idp.example.org"}
+    agent = await env.client.post(f"/api/v1/auth/saml/{slug}/acs", content=b"", headers=headers)
+    portal = await env.client.post(
+        f"/api/portal/auth/saml/{slug}/acs", content=b"", headers=headers
+    )
+    assert _error(agent) == ("/login", "saml_invalid")
+    assert _error(portal) == ("/portal/login", "saml_invalid")
+    huge = {**headers, "Content-Length": str(MAX_RESPONSE_BYTES * 2 + 1)}
+    assert _error(await env.client.post(f"/api/portal/auth/saml/{slug}/acs", headers=huge))[0] == (
+        "/portal/login"
+    )
+
+
+async def test_sls_without_stored_request_falls_back_per_provider_audience(env: Env) -> None:
+    await _oidc_provider(env, "slc", audience="customer")
+    await _oidc_provider(env, "sla", audience="agent")
+    await _oidc_provider(env, "slb", audience="both")
+    expect = {
+        "slc": "/portal/login?logged_out=1",
+        "sla": "/login?logged_out=1",
+        "slb": "/login?logged_out=1",
+    }
+    for short, location in expect.items():
+        resp = await env.client.get(f"/api/v1/auth/saml/{SLUG}{short}/sls")
+        assert (resp.status_code, resp.headers["location"]) == (303, location), short
+    unknown = await env.client.get("/api/v1/auth/saml/idptest-portal-nope/sls")
+    assert unknown.headers["location"] == "/login?logged_out=1"
+    # an unverifiable response without a stored request behaves the same
+    junk = await env.client.get(f"/api/v1/auth/saml/{SLUG}slc/sls", params={"SAMLResponse": "eA=="})
+    assert (junk.status_code, junk.headers["location"]) == (303, "/portal/login?logged_out=1")
+
+
+@pytest.mark.saml
+async def test_portal_methods_lists_a_saml_provider(env: Env, idp: SamlTestIdp) -> None:
+    slug = await _saml_provider(env, idp, "msaml", audience="customer")
+    await _saml_provider(env, idp, "msaml-agent", audience="agent")
+    body = (await env.client.get("/api/portal/auth/methods")).json()
+    saml = [p for p in body["providers"] if p["kind"] == "saml"]
+    assert [p["slug"] for p in saml] == [slug]
+
+
+@pytest.mark.saml
+async def test_idp_initiated_agent_response_cannot_log_in_at_portal(
+    env: Env, idp: SamlTestIdp
+) -> None:
+    slug = f"{SLUG}idpi"
+    await make_provider(
+        env.session,
+        slug=slug,
+        kind="saml",
+        audience="both",
+        attribute_map=AttributeMap(login=["uid"]),
+        config={
+            "idp_metadata_xml": idp.metadata_xml(),
+            "name_id_format": "persistent",
+            "allow_idp_initiated": True,
+        },
+        settings=env.settings,
+    )
+    await env.session.commit()
+    idp.trust_sp((await env.client.get(f"/api/v1/auth/saml/{slug}/metadata")).text)
+    await env.agent(47277, "idp.kunde.47277")
+    agent_acs = f"/api/v1/auth/saml/{slug}/acs"
+    portal_acs = f"/api/portal/auth/saml/{slug}/acs"
+    body = _saml_response_unsolicited(idp, slug, agent_acs, "idp.kunde.47277")
+    # Aimed at the agent ACS, posted to the portal ACS: Recipient/Destination mismatch.
+    resp = await _acs_request(env, portal_acs, body)
+    assert _error(resp) == ("/portal/login", "saml_invalid")
+    assert not _set_cookie_names(resp) & {CUSTOMER_COOKIE, AGENT_COOKIE}
+    # control: the very same response is fine at the agent ACS (IdP-initiated allowed)
+    ok = await _acs_request(env, agent_acs, body)
+    assert ok.status_code == 200, ok.text
+    assert AGENT_COOKIE in _set_cookie_names(ok)
+
+
+def _saml_response_unsolicited(idp: SamlTestIdp, slug: str, acs_path: str, uid: str) -> str:
+    return idp.login_response(
+        in_response_to=None,
+        acs_url=f"{BASE}{acs_path}",
+        sp_entity_id=f"{BASE}/api/v1/auth/saml/{slug}/metadata",
+        name_id=f"u-{uid}",
+        attributes={"uid": [uid]},
+    )
+
+
+@pytest.mark.saml
+async def test_saml_request_cookie_is_per_surface(env: Env, idp: SamlTestIdp) -> None:
+    slug = await _saml_provider(env, idp, "cksaml")
+    await seed_customer(env.session, "idp.kunde.47278@example.org")
+    start = await env.client.get(f"/api/portal/auth/sso/{slug}/login")
+    assert "tiqora_customer_saml_req=" in start.headers["set-cookie"]
+    assert "tiqora_saml_req=" not in start.headers["set-cookie"]
+    req_id, _acs, relay = idp.parse_login_redirect(start.headers["location"])
+    portal_acs = f"/api/portal/auth/saml/{slug}/acs"
+    body = _saml_response(idp, slug, req_id, portal_acs, "idp.kunde.47278@example.org")
+    env.client.cookies.clear()
+    # the AGENT cookie name carrying the right id does not bind the portal ACS
+    wrong = await env.client.post(
+        portal_acs,
+        content=urlencode({"SAMLResponse": body, "RelayState": relay}),
+        headers={
+            "Origin": "https://idp.example.org",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Cookie": f"tiqora_saml_req={req_id}",
+        },
+    )
+    assert _error(wrong) == ("/portal/login", "state")
+    ok = await _acs_request(env, portal_acs, body, relay=relay, req_id=req_id)
+    assert ok.status_code == 200, ok.text

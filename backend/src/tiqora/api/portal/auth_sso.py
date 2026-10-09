@@ -13,16 +13,15 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from tiqora.api.deps import AppSettings, DbSession
-from tiqora.api.v1.auth import login_providers
 from tiqora.domain.schemas import PortalAuthMethodsOut
-from tiqora.identity.http import login_error_redirect
-from tiqora.identity.saml_sp import MAX_RESPONSE_BYTES
+from tiqora.identity.login_providers import login_providers
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
-    finish_saml_acs,
+    handle_saml_acs_post,
+    resolve_admin_id,
     sso_logout,
     start_sso_login,
 )
@@ -47,16 +46,27 @@ async def portal_sso_login(
     settings: AppSettings,
     session: DbSession,
     next: Annotated[str | None, Query()] = None,
+    test: Annotated[str | None, Query()] = None,
 ) -> Response:
+    """Starts a customer login, or (``test=``) an admin's test run of a customer provider.
+
+    A test run needs the admin's AGENT session cookie; without one the answer is 403 and
+    never a real login. The run itself never creates a session (see ``finish_*``).
+    """
+    admin_id: int | None = None
+    if test:
+        admin_id = await resolve_admin_id(request, session, settings)
+        if admin_id is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin session required for a test")
     return await start_sso_login(
         request,
         slug=slug,
         user_kind="customer",
         next_path=next,
-        test_id=None,  # admin test logins are agent-only
+        test_id=test,
         session=session,
         settings=settings,
-        current_admin_id=None,
+        current_admin_id=admin_id,
     )
 
 
@@ -82,37 +92,15 @@ async def portal_oidc_callback(
     )
 
 
-def _form_text(value: object) -> str | None:
-    return value if isinstance(value, str) else None
-
-
 @router.post(
     "/saml/{slug}/acs", response_model=None, summary="SAML assertion consumer service (portal)"
 )
 async def portal_saml_acs(
     slug: str, request: Request, settings: AppSettings, session: DbSession
 ) -> Response:
-    """The IdP's browser POST; CSRF-exempt by design, authenticated by signature, stored request
-    id and the per-browser cookie. Every failure redirects to ``/portal/login``."""
-    portal_home = "/portal"
-    declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MAX_RESPONSE_BYTES * 2:
-        return login_error_redirect("customer", "saml_invalid", portal_home)
-    try:
-        form = await request.form()
-    except Exception:  # noqa: BLE001 - malformed/oversized form bodies are a failed login
-        return login_error_redirect("customer", "saml_invalid", portal_home)
-    saml_response = _form_text(form.get("SAMLResponse"))
-    if not saml_response:
-        return login_error_redirect("customer", "saml_invalid", portal_home)
-    return await finish_saml_acs(
-        request,
-        slug=slug,
-        user_kind="customer",
-        saml_response=saml_response,
-        relay_state=_form_text(form.get("RelayState")),
-        session=session,
-        settings=settings,
+    """The IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/portal/login``."""
+    return await handle_saml_acs_post(
+        request, slug=slug, user_kind="customer", session=session, settings=settings
     )
 
 

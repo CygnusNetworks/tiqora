@@ -8,12 +8,10 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from tiqora.api.deps import AppSettings, DbSession
-from tiqora.identity.http import login_error_redirect
 from tiqora.identity.saml_runtime import saml_availability
-from tiqora.identity.saml_sp import MAX_RESPONSE_BYTES
 from tiqora.identity.sso_routes import (
     finish_oidc_callback,
-    finish_saml_acs,
+    handle_saml_acs_post,
     handle_sls,
     resolve_admin_id,
     saml_metadata_response,
@@ -67,10 +65,6 @@ async def oidc_provider_callback(
     )
 
 
-def _form_text(value: object) -> str | None:
-    return value if isinstance(value, str) else None
-
-
 @router.post("/saml/{slug}/acs", response_model=None, summary="SAML assertion consumer service")
 async def saml_acs(
     slug: str,
@@ -78,29 +72,9 @@ async def saml_acs(
     settings: AppSettings,
     session: DbSession,
 ) -> Response:
-    """Receives the IdP's browser POST (``SAMLResponse``, ``RelayState``).
-
-    CSRF-exempt by design (cross-site form POST); the XML signature, the stored request id
-    and the per-browser cookie authenticate it. Every failure redirects to ``/login``.
-    """
-    declared = request.headers.get("content-length", "")
-    if declared.isdigit() and int(declared) > MAX_RESPONSE_BYTES * 2:
-        return login_error_redirect("agent", "saml_invalid", "/")
-    try:
-        form = await request.form()
-    except Exception:  # noqa: BLE001 - malformed/oversized form bodies are a failed login
-        return login_error_redirect("agent", "saml_invalid", "/")
-    saml_response = _form_text(form.get("SAMLResponse"))
-    if not saml_response:
-        return login_error_redirect("agent", "saml_invalid", "/")
-    return await finish_saml_acs(
-        request,
-        slug=slug,
-        user_kind="agent",
-        saml_response=saml_response,
-        relay_state=_form_text(form.get("RelayState")),
-        session=session,
-        settings=settings,
+    """Receives the IdP's browser POST; CSRF-exempt by design. Failures redirect to ``/login``."""
+    return await handle_saml_acs_post(
+        request, slug=slug, user_kind="agent", session=session, settings=settings
     )
 
 

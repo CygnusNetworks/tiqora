@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from html import escape
 from typing import Any, Final, get_args
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from fastapi import status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -53,9 +53,22 @@ def safe_next(next_path: str | None, *, default: str = "/") -> str:
 
 
 def safe_portal_next(next_path: str | None) -> str:
-    """Like :func:`safe_next`, but the target must live under ``/portal``."""
+    """Like :func:`safe_next`, but the target must be ``/portal`` or live under ``/portal/``.
+
+    Dot segments ("." / "..") are refused raw and percent-encoded (decoded once, then checked)
+    so ``/portal/../admin`` and ``/portal/%2e%2e/admin`` cannot leave the portal.
+    """
     candidate = safe_next(next_path, default="/portal")
-    if candidate == "/portal" or candidate.startswith(("/portal/", "/portal?", "/portal#")):
+    path = candidate.split("?", 1)[0].split("#", 1)[0]
+    decoded = unquote(path)
+    if (
+        any(ord(c) < 0x20 or ord(c) == 0x7F for c in decoded)
+        or "\\" in decoded
+        or any(seg in {".", ".."} for seg in decoded.split("/"))
+        or any(seg in {".", ".."} for seg in path.split("/"))
+    ):
+        return "/portal"
+    if path == "/portal" or path.startswith("/portal/"):
         return candidate
     return "/portal"
 
