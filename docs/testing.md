@@ -57,6 +57,31 @@ Default peer is **Znuny 6.5.22** (`GOLDEN_PEER=znuny-6.5`). Further peers
 (6.0–7.3) are selected via `GOLDEN_PEER` once the matching release tree is
 present under the repo root (see `peers.yaml`).
 
+## SAML tests (`saml` marker) and identity suites
+
+SAML tests (`-m saml`, e.g. `test_identity_saml_*`, the logout and portal SSO modules) need the
+`saml` extra (pysaml2) **and** the `xmlsec1` binary. Install both locally:
+
+```sh
+brew install libxmlsec1            # macOS; Debian/Ubuntu: apt-get install xmlsec1
+cd backend && uv sync --extra dev --extra crypto --extra saml
+```
+
+Without them the modules skip. CI (`.github/workflows/ci.yml`, nightly) installs `xmlsec1` and the extra and sets
+`TIQORA_REQUIRE_SAML_TESTS=1`, which turns a missing pysaml2/`xmlsec1` into a hard failure so the
+security corpus (signature stripping, wrong Recipient, replay, SHA-1 rejection/opt-in, ...) cannot
+silently vanish:
+
+```sh
+cd backend
+TIQORA_STRICT_DB_LEAKS=1 TIQORA_REQUIRE_SAML_TESTS=1 uv run python -m pytest -q
+```
+
+The `env OIDC/LDAP unchanged` tests (`test_env_oidc_unchanged_*`, `test_env_ldap_login_unchanged`)
+are the production safety net: re-run them after any change to `identity/sso_routes.py`,
+`identity/login.py` or `api/v1/auth.py`. The JIT account shape is additionally compared with real
+Znuny in `tests/golden/test_identity_jit.py` (golden suite, manual: `GOLDEN=1 just golden-run`).
+
 ## Optional: Keycloak round trip (OIDC + SAML)
 
 `backend/tests/test_identity_keycloak.py` (marker `keycloak`) starts a real Keycloak
