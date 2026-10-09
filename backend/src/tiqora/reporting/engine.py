@@ -68,6 +68,9 @@ from tiqora.reporting.state import facts_status_of, load_state
 
 OTHER_KEY: Final = "__other__"
 PERCENTILE_SAMPLE_CAP: Final = 200_000
+#: hard bound on the groups one query may load (inline AND job mode): beyond it the
+#: result is cut (arbitrary groups, ``truncated``) before top-n, sort and the row cap
+MAX_GROUPS: int = 200_000
 #: shared deadline of all queries of one inline request (nginx cuts /api/ at 90 s)
 INLINE_BUDGET_SECONDS: Final = 75
 #: client-side backstop on top of the server-side statement timeout
@@ -323,10 +326,18 @@ def _empty_group(plans: Sequence[MeasurePlan]) -> _Group:
 async def _collect(
     session: AsyncSession, compiled: CompiledReport, budget: QueryBudget
 ) -> tuple[dict[Key, _Group], bool]:
-    """Groups of one compiled query (+ its percentile samples); bool = samples were capped."""
+    """Groups of one compiled query (+ its percentile samples); bool = result was cut.
+
+    At most :data:`MAX_GROUPS` groups are loaded (``LIMIT MAX_GROUPS + 1``): a wider
+    result keeps an arbitrary subset and is reported as truncated, so one report can
+    never load millions of groups into the worker.
+    """
     assert compiled.stmt is not None
+    cap = MAX_GROUPS
+    rows = await _fetch(session, compiled.stmt.limit(cap + 1), budget)
+    truncated = len(rows) > cap
     groups: dict[Key, _Group] = {}
-    for row in await _fetch(session, compiled.stmt, budget):
+    for row in rows[:cap]:
         m = row._mapping
         values: list[Any] = []
         for plan in compiled.measures:
@@ -337,7 +348,6 @@ async def _collect(
             else:
                 values.append(_num(m[plan.columns[0]]))
         groups[tuple(m[d] for d in compiled.dims)] = _Group(n=int(m["n"]), values=values)
-    truncated = False
     if compiled.raw_stmt is not None:
         raw = await _fetch(session, compiled.raw_stmt.limit(PERCENTILE_SAMPLE_CAP + 1), budget)
         if len(raw) > PERCENTILE_SAMPLE_CAP:
@@ -351,7 +361,7 @@ async def _collect(
         for row in raw:
             m = row._mapping
             group = groups.get(tuple(m[d] for d in compiled.dims))
-            if group is None:  # same WHERE as stmt: cannot happen
+            if group is None:  # a group cut off by MAX_GROUPS
                 continue
             for i, label in slots:
                 value = m[label]

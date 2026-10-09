@@ -749,6 +749,44 @@ async def test_sort_limit_and_row_cap(url_fixture: str, request: pytest.FixtureR
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("url_fixture", URLS)
+async def test_max_groups_cuts_before_top_n_and_row_cap(
+    url_fixture: str, request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """I2: no query loads more than MAX_GROUPS groups, inline or in a job (budget None)."""
+    import tiqora.reporting.engine as engine_mod
+
+    db = await _db(request, url_fixture)
+    try:
+        by_type = {
+            "source": "tickets",
+            "dimensions": [{"key": "state_type"}],
+            "measures": [{"key": "tickets"}, {"key": "first_response_p50"}],
+            "time_range": JUNE,
+            "totals": {"grand": True},
+        }
+        full = await db.run(by_type)
+        assert len(full.rows) == 3 and full.truncated is False
+        monkeypatch.setattr(engine_mod, "MAX_GROUPS", 2)
+        db.statements.clear()
+        cut = await db.run(by_type)  # budget None = job mode
+        assert len(cut.rows) == 2 and cut.truncated is True and cut.row_count == 2
+        assert {row[0] for row in cut.rows} < {row[0] for row in full.rows}
+        # the main query asked for at most MAX_GROUPS + 1 rows
+        main = next(st for st in db.statements if "GROUP BY" in st.upper())
+        assert "LIMIT" in main.upper()
+        # the grand total is its own one-group query: unaffected by the cut
+        assert cut.totals is not None and cut.totals.grand == full.totals.grand  # type: ignore[union-attr]
+        # top-n works on the groups that were loaded
+        top = await db.run(
+            {**by_type, "dimensions": [{"key": "state_type", "top_n": 1}], "totals": {}}
+        )
+        assert top.truncated is True and len(top.rows) == 2
+    finally:
+        await db.engine.dispose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url_fixture", URLS)
 async def test_empty_scope_returns_empty_result_without_query(
     url_fixture: str, request: pytest.FixtureRequest
 ) -> None:
