@@ -23,6 +23,7 @@ const {
   getCustomer,
   phoneConfig,
   dial,
+  fieldOptionsFetch,
 } = vi.hoisted(() => ({
   patchTicket: vi.fn(),
   listReferencePriorities: vi.fn(),
@@ -39,7 +40,10 @@ const {
   getCustomer: vi.fn(),
   phoneConfig: vi.fn(),
   dial: vi.fn(),
+  fieldOptionsFetch: vi.fn(),
 }));
+
+vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
 
 vi.mock("@/lib/phoneApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/phoneApi")>("@/lib/phoneApi");
@@ -185,6 +189,8 @@ describe("TicketHeaderActions", () => {
       service: {},
       sla: {},
       queue: {},
+      owner: {},
+      responsible: {},
     });
     listArticles.mockReset().mockResolvedValue([
       {
@@ -216,6 +222,10 @@ describe("TicketHeaderActions", () => {
       signature_is_html: false,
     });
     getTicketCustomerLink.mockReset().mockResolvedValue({ label: null, url: null });
+    // The scoped owner/responsible lists (the server applies queue permissions and ACLs).
+    fieldOptionsFetch.mockReset().mockImplementation(async (body: { fields: string[] }) => ({
+      options: { [body.fields[0]]: [{ value: "2", label: "Ada Lovelace" }] },
+    }));
   });
 
   it("renders the status bar and the priority/queue/owner/customer values", async () => {
@@ -354,12 +364,150 @@ describe("TicketHeaderActions", () => {
   });
 
   it("shows a search field in the owner listbox once there are more than 8 agents", async () => {
-    listReferenceAgents.mockResolvedValue(
-      Array.from({ length: 9 }, (_, i) => ({ id: i + 1, login: `agent${i}`, full_name: `Agent ${i}` })),
-    );
+    fieldOptionsFetch.mockResolvedValue({
+      options: {
+        owner: Array.from({ length: 9 }, (_, i) => ({ value: String(i + 1), label: `Agent ${i}` })),
+      },
+    });
     wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
     fireEvent.click(screen.getByTestId("ticket-pill-owner"));
     expect(await screen.findByTestId("ticket-pill-owner-menu-search")).toBeInTheDocument();
+  });
+
+  it("offers only the scoped owner list, not every agent", async () => {
+    listReferenceAgents.mockResolvedValue([
+      { id: 2, login: "ada", full_name: "Ada Lovelace" },
+      { id: 3, login: "bob", full_name: "Bob Outsider" },
+    ]);
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    await waitFor(() =>
+      expect(fieldOptionsFetch).toHaveBeenCalledWith(
+        { fields: ["owner"], context: { action: "AgentTicketOwner", ticket_id: 7 } },
+        expect.anything(),
+      ),
+    );
+    expect(fieldOptionsFetch).toHaveBeenCalledWith(
+      { fields: ["responsible"], context: { action: "AgentTicketResponsible", ticket_id: 7 } },
+      expect.anything(),
+    );
+    fireEvent.click(screen.getByTestId("ticket-pill-owner"));
+    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+    expect(screen.queryByText("Bob Outsider")).not.toBeInTheDocument();
+  });
+
+  it("offers an empty owner list when the server scopes everybody out", async () => {
+    fieldOptionsFetch.mockResolvedValue({ options: { owner: [], responsible: [] } });
+    listReferenceAgents.mockResolvedValue([{ id: 2, login: "ada", full_name: "Ada Lovelace" }]);
+    wrap(<TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} />);
+    await waitFor(() => expect(fieldOptionsFetch).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId("ticket-pill-owner"));
+    await screen.findByTestId("ticket-pill-owner-menu");
+    expect(screen.queryByText("Ada Lovelace")).not.toBeInTheDocument();
+  });
+
+  describe("Action ACL gating (allowedActions)", () => {
+    it("hides reply, merge and close when only AgentTicketNote is allowed", async () => {
+      wrap(
+        <TicketHeaderActions
+          ticket={makeTicket()}
+          canNote
+          onOpenNote={vi.fn()}
+          allowedActions={new Set(["AgentTicketNote"])}
+        />,
+      );
+      await screen.findByTestId("ticket-status-4");
+      expect(screen.getByTestId("ticket-actions-note")).toBeInTheDocument();
+      expect(screen.queryByTestId("ticket-actions-reply")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ticket-status-closed")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ticket-status-pending")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("ticket-actions-more"));
+      await screen.findByTestId("ticket-actions-more-menu");
+      expect(screen.queryByTestId("more-merge")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("more-link")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("more-lock")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("more-watch")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("more-print")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ticket-actions-phone")).not.toBeInTheDocument();
+    });
+
+    it("shows everything while the ACL result is unknown (null)", async () => {
+      wrap(
+        <TicketHeaderActions ticket={makeTicket()} canNote onOpenNote={vi.fn()} allowedActions={null} />,
+      );
+      await screen.findByTestId("ticket-status-closed");
+      expect(screen.getByTestId("ticket-actions-reply")).toBeInTheDocument();
+      expect(screen.getByTestId("ticket-status-pending")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("ticket-actions-more"));
+      await screen.findByTestId("more-merge");
+      for (const id of ["more-link", "more-lock", "more-watch", "more-print"]) {
+        expect(screen.getByTestId(id)).toBeInTheDocument();
+      }
+      expect(screen.getByTestId("ticket-actions-phone")).toBeInTheDocument();
+    });
+
+    it("keeps phone outbound only when AgentTicketPhoneOutbound is allowed", async () => {
+      wrap(
+        <TicketHeaderActions
+          ticket={makeTicket()}
+          canNote
+          onOpenNote={vi.fn()}
+          allowedActions={new Set(["AgentTicketPhoneOutbound"])}
+        />,
+      );
+      fireEvent.click(await screen.findByTestId("ticket-actions-phone"));
+      expect(await screen.findByTestId("phone-menu-outbound")).toBeInTheDocument();
+      expect(screen.queryByTestId("phone-menu-inbound")).not.toBeInTheDocument();
+    });
+
+    it("turns the ticket pills into read-only values when their actions are forbidden", async () => {
+      listReferenceTypes.mockResolvedValue([
+        { id: 1, name: "Unclassified" },
+        { id: 2, name: "Incident" },
+      ]);
+      wrap(
+        <TicketHeaderActions
+          ticket={makeTicket({ type_id: 2, type_name: "Incident" })}
+          canNote
+          onOpenNote={vi.fn()}
+          allowedActions={new Set(["AgentTicketNote"])}
+        />,
+      );
+      await screen.findByTestId("ticket-readonly-type");
+      expect(screen.getByTestId("ticket-readonly-type")).toHaveTextContent("Incident");
+      for (const id of [
+        "ticket-pill-type",
+        "ticket-pill-priority",
+        "ticket-pill-queue",
+        "ticket-pill-owner",
+        "ticket-pill-responsible",
+        "ticket-pill-customer",
+      ]) {
+        expect(screen.queryByTestId(id)).not.toBeInTheDocument();
+      }
+      expect(screen.getByTestId("ticket-readonly-queue")).toHaveTextContent("Support");
+      expect(screen.getByTestId("ticket-readonly-owner")).toHaveTextContent("Ada");
+      expect(screen.getByTestId("ticket-readonly-customer")).toHaveTextContent("bob");
+      expect(screen.getByTestId("ticket-readonly-priority")).toHaveTextContent("normal");
+      // Read-only: clicking the customer value opens no picker.
+      fireEvent.click(screen.getByTestId("ticket-readonly-customer"));
+      expect(screen.queryByTestId("customer-picker-dialog")).not.toBeInTheDocument();
+    });
+
+    it("keeps the pickers for exactly the allowed actions", async () => {
+      wrap(
+        <TicketHeaderActions
+          ticket={makeTicket()}
+          canNote
+          onOpenNote={vi.fn()}
+          allowedActions={new Set(["AgentTicketOwner", "AgentTicketMove"])}
+        />,
+      );
+      await screen.findByTestId("ticket-status-4");
+      expect(screen.getByTestId("ticket-pill-owner")).toBeInTheDocument();
+      expect(screen.getByTestId("ticket-pill-queue")).toBeInTheDocument();
+      expect(screen.queryByTestId("ticket-pill-responsible")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("ticket-pill-priority")).not.toBeInTheDocument();
+    });
   });
 
   it("opens the customer picker dialog from the customer pill", async () => {

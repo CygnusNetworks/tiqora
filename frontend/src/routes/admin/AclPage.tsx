@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { api, ApiError, type AclOut, type AclCreate } from "@/lib/api";
 import { DataTable, type DataTableColumn } from "@/components/admin/DataTable";
 import { CrudDrawer, type FieldDef, type FieldValues } from "@/components/admin/CrudDrawer";
+import { DEPLOY_STATUS_QUERY_KEY, DeployStatusCard } from "@/components/process/DeployStatusCard";
 import { Button } from "@/components/ui/Button";
 import { PlusIcon } from "@/components/ui/icons";
 
@@ -25,6 +26,8 @@ export function AclPage() {
       setDrawerOpen(false);
       setSubmitError(null);
       await qc.invalidateQueries({ queryKey: ["admin", "acl"] });
+      // every ACL write is a draft: the deploy card counts it
+      await qc.invalidateQueries({ queryKey: DEPLOY_STATUS_QUERY_KEY });
     },
     onError: (err: unknown) => {
       setSubmitError(err instanceof ApiError ? err.message : String(err));
@@ -107,6 +110,7 @@ export function AclPage() {
           {t("admin.acl.new")}
         </Button>
       </div>
+      <DeployStatusCard kind="acl" />
       <DataTable
         columns={columns}
         rows={listQ.data ?? []}

@@ -7,6 +7,7 @@ reuse them without an import cycle (``reference.py`` re-imports them).
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -15,26 +16,58 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from tiqora.db.legacy.dynamic_field import DynamicField
 from tiqora.db.legacy.queue import Queue, Service, Sla
-from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
+from tiqora.db.legacy.ticket import (
+    Ticket,
+    TicketPriority,
+    TicketState,
+    TicketStateType,
+    TicketType,
+)
+from tiqora.db.legacy.user import Users
 from tiqora.domain.auth import AuthenticatedUser
 from tiqora.domain.ticket_acl import apply_ticket_acl
-from tiqora.domain.ticket_service import TicketService
+from tiqora.domain.ticket_service import TicketAccessDenied, TicketNotFound, TicketService
 from tiqora.permissions.engine import PermissionEngine
+from tiqora.znuny.sysconfig import SysConfig
 
 # Znuny's "valid" list id -- 1 == valid, everything else is invalid/temporary.
-_VALID = 1
+VALID_ID = 1
 
-ATTRIBUTE_OPTION_FIELDS: tuple[str, ...] = ("state", "queue", "priority", "type", "service", "sla")
+#: Znuny's default ``System::Permission`` (no ``responsible`` key: the picker falls back to ``rw``).
+DEFAULT_SYSTEM_PERMISSION: tuple[str, ...] = (
+    "ro",
+    "move_into",
+    "create",
+    "note",
+    "owner",
+    "priority",
+    "rw",
+)
+
+ATTRIBUTE_OPTION_FIELDS: tuple[str, ...] = (
+    "state",
+    "queue",
+    "priority",
+    "type",
+    "service",
+    "sla",
+    "owner",
+    "responsible",
+)
+#: Agent pickers: ACL data is ``{user_id: login}``, the output labels are the full names.
+AGENT_OPTION_FIELDS: frozenset[str] = frozenset({"owner", "responsible"})
 DF_OPTION_PREFIX = "DynamicField_"
 _OPTION_DF_TYPES = frozenset({"Dropdown", "Multiselect"})
 
-_FIELD_TO_SUBTYPE: dict[str, str] = {
+FIELD_TO_SUBTYPE: dict[str, str] = {
     "state": "State",
     "queue": "Queue",
     "priority": "Priority",
     "type": "Type",
     "service": "Service",
     "sla": "SLA",
+    "owner": "Owner",
+    "responsible": "Responsible",
 }
 
 
@@ -50,34 +83,55 @@ class TicketFieldOptionsOut(BaseModel):
     type: dict[str, str] = {}
     service: dict[str, str] = {}
     sla: dict[str, str] = {}
+    owner: dict[str, str] = {}
+    responsible: dict[str, str] = {}
 
 
-async def _base_field_maps(
+async def base_field_maps(
     session: AsyncSession,
-    user: AuthenticatedUser,
+    user: AuthenticatedUser | None,
     fields: set[str],
     *,
     queue_id: int | None = None,
+    queue_ids: Sequence[int] | None = None,
+    picker_queue_id: int | None = None,
+    honor_everyone: bool = True,
+    sysconfig: SysConfig | None = None,
+    state_types: Sequence[str] | None = None,
 ) -> dict[str, dict[int, str]]:
     """Unfiltered valid id→name maps for the requested fields.
 
-    Queues are still permission-gated (``ro``); ACL is additional filtering.
+    Queues are still permission-gated (``ro``); ACL is additional filtering. *user* may be
+    ``None`` (the customer interface) only when ``queue`` is not requested.
+
+    Owner and responsible pickers are scoped like Znuny's ``_GetOwners``/``_GetResponsibles``:
+    unless ``Ticket::ChangeOwnerToEveryone`` is on (Perl truthiness: a stored ``'0'`` is off),
+    only agents with ``owner`` (``responsible``) or ``rw`` on the queue's group are offered.
+    The queue is *queue_id* (bulk: the selected move-target queue wins), else the union over
+    *queue_ids* (bulk: the selected tickets' queues), else *picker_queue_id* (start forms:
+    ``Process::DefaultQueue``; used for the pickers only, never as ACL context). Without any
+    queue the list is empty (AgentTicketBulk.pm:1969-1998). *honor_everyone* False ignores the
+    setting (process dialog on an existing ticket, AgentTicketProcess.pm:6402-6413).
+
+    *state_types* restricts the states to those state type names, like
+    ``TicketStateList(Action => ...)`` with the frontend's ``StateType`` setting
+    (Ticket.pm:4656-4672 -> ``StateGetStatesByType``, State.pm:388-395); ``None`` lists every
+    valid state.
     """
     out: dict[str, dict[int, str]] = {}
     if "state" in fields:
-        rows = (
-            await session.execute(
-                select(TicketState.id, TicketState.name)
-                .where(TicketState.valid_id == _VALID)
-                .order_by(TicketState.id)
+        stmt = select(TicketState.id, TicketState.name).where(TicketState.valid_id == VALID_ID)
+        if state_types is not None:
+            stmt = stmt.join(TicketStateType, TicketStateType.id == TicketState.type_id).where(
+                TicketStateType.name.in_(list(state_types))
             )
-        ).all()
+        rows = (await session.execute(stmt.order_by(TicketState.id))).all()
         out["state"] = {int(r[0]): r[1] for r in rows}
     if "priority" in fields:
         rows = (
             await session.execute(
                 select(TicketPriority.id, TicketPriority.name)
-                .where(TicketPriority.valid_id == _VALID)
+                .where(TicketPriority.valid_id == VALID_ID)
                 .order_by(TicketPriority.id)
             )
         ).all()
@@ -86,7 +140,7 @@ async def _base_field_maps(
         rows = (
             await session.execute(
                 select(TicketType.id, TicketType.name)
-                .where(TicketType.valid_id == _VALID)
+                .where(TicketType.valid_id == VALID_ID)
                 .order_by(TicketType.name)
             )
         ).all()
@@ -95,7 +149,7 @@ async def _base_field_maps(
         rows = (
             await session.execute(
                 select(Service.id, Service.name)
-                .where(Service.valid_id == _VALID)
+                .where(Service.valid_id == VALID_ID)
                 .order_by(Service.name)
             )
         ).all()
@@ -103,11 +157,38 @@ async def _base_field_maps(
     if "sla" in fields:
         rows = (
             await session.execute(
-                select(Sla.id, Sla.name).where(Sla.valid_id == _VALID).order_by(Sla.name)
+                select(Sla.id, Sla.name).where(Sla.valid_id == VALID_ID).order_by(Sla.name)
             )
         ).all()
         out["sla"] = {int(r[0]): r[1] for r in rows}
+    if fields & AGENT_OPTION_FIELDS:
+        # Znuny _GetOwners/_GetResponsibles hand the ACL {UserID => UserLogin}
+        # (AgentTicketBulk.pm / AgentTicketOwner.pm); labels become full names later.
+        rows = (
+            await session.execute(
+                select(Users.id, Users.login)
+                .where(Users.valid_id == VALID_ID)
+                .order_by(Users.login)
+            )
+        ).all()
+        agents = {int(r[0]): r[1] for r in rows}
+        sysconfig = sysconfig or SysConfig(session)
+        if queue_id:
+            scope = [queue_id]
+        elif queue_ids:
+            scope = list(queue_ids)
+        else:
+            scope = [picker_queue_id] if picker_queue_id else []
+        everyone = honor_everyone and await sysconfig.get_bool("Ticket::ChangeOwnerToEveryone")
+        for field in AGENT_OPTION_FIELDS & fields:
+            if everyone:
+                out[field] = dict(agents)
+                continue
+            allowed = await _queue_agents(session, sysconfig, scope, field)
+            out[field] = {i: n for i, n in agents.items() if i in allowed}
     if "queue" in fields:
+        if user is None:
+            raise ValueError("queue options need an agent user")
         pe = PermissionEngine(session)
         group_ids = await pe.groups_for_permission(user.id, "ro")
         if not group_ids:
@@ -116,13 +197,42 @@ async def _base_field_maps(
             rows = (
                 await session.execute(
                     select(Queue.id, Queue.name)
-                    .where(Queue.group_id.in_(group_ids), Queue.valid_id == _VALID)
+                    .where(Queue.group_id.in_(group_ids), Queue.valid_id == VALID_ID)
                     .order_by(Queue.name)
                 )
             ).all()
             out["queue"] = {int(r[0]): r[1] for r in rows}
-    _ = queue_id  # reserved for form-side Queue checks when callers pass it
     return out
+
+
+async def _queue_agents(
+    session: AsyncSession, sysconfig: SysConfig, queue_ids: Sequence[int], field: str
+) -> set[int]:
+    """Agents with the field's permission on the group of any queue in *queue_ids* (union,
+    like AgentTicketBulk.pm's never-reset ``%AllGroupsMembersNew``)."""
+    configured = await sysconfig.get("System::Permission", None)
+    permissions = configured if isinstance(configured, list) else DEFAULT_SYSTEM_PERMISSION
+    # AgentTicketProcess.pm:6401 -- the key is used only when System::Permission lists it.
+    key = field if field in permissions else "rw"
+    allowed: set[int] = set()
+    pe = PermissionEngine(session)
+    for qid in dict.fromkeys(queue_ids):
+        group_id = (
+            await session.execute(select(Queue.group_id).where(Queue.id == qid))
+        ).scalar_one_or_none()
+        if group_id is not None:
+            allowed |= await pe.users_for_group_permission(group_id, key)
+    return allowed
+
+
+async def _agent_full_names(session: AsyncSession, user_ids: set[int]) -> dict[int, str]:
+    """``{user_id: "First Last"}`` (the picker labels) for the surviving agents."""
+    rows = (
+        await session.execute(
+            select(Users.id, Users.first_name, Users.last_name).where(Users.id.in_(user_ids))
+        )
+    ).all()
+    return {int(r[0]): f"{r[1]} {r[2]}".strip() for r in rows}
 
 
 async def ticket_acl_context(
@@ -178,17 +288,41 @@ async def collect_ticket_field_options(
     ticket_id: int | None = None,
     action: str | None = None,
     queue_id: int | None = None,
+    queue_ids: Sequence[int] | None = None,
+    picker_queue_id: int | None = None,
+    honor_everyone: bool = True,
     service_id: int | None = None,
     type_id: int | None = None,
     state_id: int | None = None,
     priority_id: int | None = None,
     sla_id: int | None = None,
+    process: Mapping[str, str] | None = None,
+    state_types: Sequence[str] | None = None,
 ) -> TicketFieldOptionsOut:
-    """Load base maps, apply Ticket ACL, then Ticket Attribute Relations."""
+    """Load base maps, apply Ticket ACL, then Ticket Attribute Relations.
+
+    *process*: ``ProcessEntityID`` / ``ActivityDialogEntityID`` / ``ActivityEntityID`` of the
+    process dialog the lists are built for (live ``Process`` ACL checks,
+    ``TicketACL.pm:1118-1146``). *queue_ids* (bulk: the queues of the selected tickets) scope
+    the owner/responsible pickers, as do *picker_queue_id* and *honor_everyone*, see
+    :func:`base_field_maps`, which also explains *state_types*.
+    """
     from tiqora.domain.ticket_acl import filter_id_name_map
     from tiqora.domain.ticket_attribute_relations import apply_attribute_relations_to_field_maps
+    from tiqora.znuny.sysconfig import SysConfig
 
-    base = await _base_field_maps(session, user, fields, queue_id=queue_id)
+    sysconfig = SysConfig(session)  # one reader for the pickers and every field's ACL pass
+    base = await base_field_maps(
+        session,
+        user,
+        fields,
+        queue_id=queue_id,
+        queue_ids=queue_ids,
+        picker_queue_id=picker_queue_id,
+        honor_everyone=honor_everyone,
+        sysconfig=sysconfig,
+        state_types=state_types,
+    )
     ticket_ctx = await ticket_acl_context(
         session,
         queue_id=queue_id,
@@ -202,7 +336,7 @@ async def collect_ticket_field_options(
 
     acl_maps: dict[str, dict[int, str]] = {}
     for field, mapping in base.items():
-        subtype = _FIELD_TO_SUBTYPE[field]
+        subtype = FIELD_TO_SUBTYPE[field]
         filtered = await filter_id_name_map(
             session,
             user_id=user.id,
@@ -211,6 +345,8 @@ async def collect_ticket_field_options(
             ticket_id=ticket_id,
             action=action,
             checks=checks,
+            process=process,
+            sysconfig=sysconfig,
         )
         acl_maps[field] = filtered
 
@@ -218,6 +354,14 @@ async def collect_ticket_field_options(
         acl_maps = await apply_attribute_relations_to_field_maps(
             session, acl_maps, ticket_context=ticket_ctx
         )
+
+    agent_ids = {i for f in AGENT_OPTION_FIELDS for i in acl_maps.get(f, {})}
+    if agent_ids:
+        names = await _agent_full_names(session, agent_ids)
+        for field in AGENT_OPTION_FIELDS & acl_maps.keys():
+            labelled = {i: names.get(i, login) for i, login in acl_maps[field].items()}
+            # BuildSelection sorts by label (full name), not by login.
+            acl_maps[field] = dict(sorted(labelled.items(), key=lambda kv: (kv[1].lower(), kv[0])))
 
     result = TicketFieldOptionsOut()
     for field, mapping in acl_maps.items():
@@ -235,6 +379,9 @@ class FieldOptionsContext(BaseModel):
     priority_id: int | None = None
     sla_id: int | None = None
     customer_user_id: str | None = None
+    #: Bulk: the selected tickets; the owner/responsible lists keep the agents allowed on all
+    #: their queues (``AgentTicketBulk.pm`` ``_GetOwners``/``_GetResponsibles``).
+    ticket_ids: list[int] = Field(default_factory=list, max_length=500)
     #: Current form values by dynamic-field name (feed ``DynamicField_<name>`` ACL checks).
     dynamic_fields: dict[str, list[str]] = Field(default_factory=dict)
 
@@ -255,7 +402,7 @@ class FieldOptionsOut(BaseModel):
     options: dict[str, list[FieldOptionOut]]
 
 
-def _sorted_options(items: dict[str, str]) -> list[FieldOptionOut]:
+def sorted_options(items: dict[str, str]) -> list[FieldOptionOut]:
     # Znuny LayoutObject->BuildSelection default (no Sort option): values sorted
     # case-insensitively, `sort { lc $a cmp lc $b } values %List`
     # (Kernel/Output/HTML/Layout.pm, _BuildSelectionDataRefCreate, ~l. 5538).
@@ -264,15 +411,48 @@ def _sorted_options(items: dict[str, str]) -> list[FieldOptionOut]:
     return [FieldOptionOut(value=k, label=v) for k, v in ordered]
 
 
+async def _selected_queue_ids(
+    session: AsyncSession, user: AuthenticatedUser, ticket_ids: Sequence[int]
+) -> list[int] | None:
+    """Queues of the bulk-selected tickets (``None`` without a selection).
+
+    Unknown ids raise :class:`TicketNotFound`, tickets in queues without ``ro`` raise
+    :class:`TicketAccessDenied` (same rule as ``GET /tickets/{id}``).
+    """
+    wanted = {i for i in ticket_ids if i}
+    if not wanted:
+        return None
+    rows = (
+        await session.execute(select(Ticket.id, Ticket.queue_id).where(Ticket.id.in_(wanted)))
+    ).all()
+    if {int(r[0]) for r in rows} != wanted:
+        raise TicketNotFound(f"ticket {sorted(wanted - {int(r[0]) for r in rows})[0]} not found")
+    queue_ids = sorted({int(r[1]) for r in rows})
+    for qid in queue_ids:
+        if not await PermissionEngine(session).check(user.id, qid, "ro"):
+            raise TicketAccessDenied(f"no ro on queue {qid}")
+    return queue_ids
+
+
 async def collect_field_options(
-    session: AsyncSession, user: AuthenticatedUser, req: FieldOptionsRequest
+    session: AsyncSession,
+    user: AuthenticatedUser,
+    req: FieldOptionsRequest,
+    *,
+    process: Mapping[str, str] | None = None,
+    picker_queue_id: int | None = None,
+    honor_everyone: bool = True,
+    state_types: Sequence[str] | None = None,
 ) -> FieldOptionsOut:
     """Options for attribute and dynamic fields, filtered by Ticket ACLs.
 
     With ``context.ticket_id`` the ticket must be readable
     (:class:`~tiqora.domain.ticket_service.TicketNotFound` /
     :class:`~tiqora.domain.ticket_service.TicketAccessDenied` propagate); its
-    attributes are the default ACL context, explicit ``context`` ids override.
+    attributes are the default ACL context, explicit ``context`` ids override. *process*
+    (not part of the API request) carries the process ids of an activity dialog form
+    (``AgentTicketProcess.pm:1103-1105, 2638, 4319``). *picker_queue_id* / *honor_everyone* /
+    *state_types*: see :func:`base_field_maps`.
     """
     from tiqora.domain.dynamic_field_config import config_from_yaml
 
@@ -291,6 +471,7 @@ async def collect_field_options(
             if ids[key] is None:
                 ids[key] = getattr(detail, key, None)
 
+    queue_ids = await _selected_queue_ids(session, user, ctx.ticket_ids)
     attr_fields = [f.strip().lower() for f in req.fields]
     attr_requested = {f for f in attr_fields if f in ATTRIBUTE_OPTION_FIELDS}
     attribute_maps: dict[str, dict[str, str]] = {}
@@ -301,6 +482,11 @@ async def collect_field_options(
             fields=attr_requested,
             ticket_id=ctx.ticket_id,
             action=ctx.action,
+            process=process,
+            queue_ids=queue_ids,
+            picker_queue_id=picker_queue_id,
+            honor_everyone=honor_everyone,
+            state_types=state_types,
             **ids,
         )
         attribute_maps = {f: getattr(collected, f) for f in attr_requested}
@@ -318,7 +504,7 @@ async def collect_field_options(
                 await session.execute(
                     select(DynamicField).where(
                         DynamicField.name.in_(df_names),
-                        DynamicField.valid_id == _VALID,
+                        DynamicField.valid_id == VALID_ID,
                         DynamicField.object_type == "Ticket",
                         DynamicField.field_type.in_(sorted(_OPTION_DF_TYPES)),
                     )
@@ -339,7 +525,10 @@ async def collect_field_options(
         key = requested.strip().lower()
         if key in ATTRIBUTE_OPTION_FIELDS:
             mapping = attribute_maps.get(key, {})
-            options[key] = [FieldOptionOut(value=k, label=v) for k, v in mapping.items()]
+            if key in AGENT_OPTION_FIELDS:
+                options[key] = sorted_options(mapping)
+            else:
+                options[key] = [FieldOptionOut(value=k, label=v) for k, v in mapping.items()]
             continue
         if not requested.startswith(DF_OPTION_PREFIX):
             continue
@@ -365,6 +554,7 @@ async def collect_field_options(
             action=ctx.action,
             checks=checks,
             customer_user_id=ctx.customer_user_id,
+            process=process,
         )
-        options[requested] = _sorted_options({k: labels[k] for k in filtered if k in labels})
+        options[requested] = sorted_options({k: labels[k] for k in filtered if k in labels})
     return FieldOptionsOut(options=options)

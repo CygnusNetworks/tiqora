@@ -23,6 +23,8 @@ export type TicketPropsBarProps = {
     value: number | null;
     onChange: (id: number) => void;
     source?: string | null;
+    /** Name shown when `value` is not in `agents` (e.g. the creator is not in the scoped list). */
+    fallbackName?: string;
   };
   priorities: Ref[];
   priorityId: number | null;
@@ -171,7 +173,11 @@ export function TicketPropsBar({
   const priority = priorities.find((p) => p.id === priorityId);
   const state = states.find((s) => s.id === stateId);
   const agent = owner?.agents.find((a) => a.id === owner.value);
-  const agentName = agent ? agent.full_name || agent.login : null;
+  const agentName = agent
+    ? agent.full_name || agent.login
+    : owner?.value != null
+      ? (owner.fallbackName ?? null)
+      : null;
 
   return (
     <div

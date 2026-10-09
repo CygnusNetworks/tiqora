@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { api } from "@/lib/api";
+import { processApi } from "@/lib/processApi";
+import { actionAllowed, type AllowedActions } from "@/lib/aclActions";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { StartProcessDialog } from "./StartProcessDialog";
@@ -25,11 +26,14 @@ export function ProcessWidget({
   hideInactiveStart = false,
   startOpen: startOpenProp,
   onStartOpenChange,
+  allowedActions = null,
 }: {
   ticketId: number;
   hideInactiveStart?: boolean;
   startOpen?: boolean;
   onStartOpenChange?: (open: boolean) => void;
+  /** Action ACL result: starting and dialogs need `AgentTicketProcess` (`null` = unknown, allowed). */
+  allowedActions?: AllowedActions;
 }) {
   const { t } = useTranslation();
   const [startOpenLocal, setStartOpenLocal] = useState(false);
@@ -42,7 +46,7 @@ export function ProcessWidget({
 
   const stateQ = useQuery({
     queryKey: ["process", "ticket", ticketId, "state"],
-    queryFn: ({ signal }) => api.getTicketProcessState(ticketId, signal),
+    queryFn: ({ signal }) => processApi.ticketState(ticketId, signal),
   });
 
   // Loading/error are transient for a secondary feature — stay out of the way.
@@ -57,6 +61,10 @@ export function ProcessWidget({
 
   const state = stateQ.data;
   const inProcess = Boolean(state.process_entity_id);
+  // Znuny: an Inactive process takes no further steps (FadeAway tickets keep going).
+  const switchedOff = state.process_state === "Inactive";
+  // An Action ACL on AgentTicketProcess removes start and dialogs like Znuny's zoom menu does.
+  const processAllowed = actionAllowed(allowedActions, "AgentTicketProcess");
 
   // Not in a process: optional start affordance (or dialog-only when the
   // ticket-zoom ⋮ menu owns the trigger).
@@ -66,7 +74,7 @@ export function ProcessWidget({
         className={hideInactiveStart ? undefined : "flex justify-end"}
         data-testid="process-widget-inactive"
       >
-        {!hideInactiveStart && (
+        {!hideInactiveStart && state.can_start && processAllowed && (
           <button
             type="button"
             onClick={() => setStartOpen(true)}
@@ -113,11 +121,15 @@ export function ProcessWidget({
           <span className="mb-1 block text-xs uppercase tracking-wide text-muted">
             {t("process.widget.actions")}
           </span>
-          {state.available_dialogs.length === 0 ? (
+          {switchedOff ? (
+            <p className="text-sm text-muted" data-testid="process-widget-inactive-note">
+              {t("process.widget.inactive")}
+            </p>
+          ) : !processAllowed || (state.available_dialogs ?? []).length === 0 ? (
             <p className="text-sm text-muted">{t("process.widget.noDialogs")}</p>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {state.available_dialogs.map((d) => (
+              {(state.available_dialogs ?? []).map((d) => (
                 <Button
                   key={d.entity_id}
                   variant="secondary"
@@ -134,7 +146,7 @@ export function ProcessWidget({
         </div>
       </div>
 
-      {openDialogEntityId && (
+      {openDialogEntityId && !switchedOff && (
         <ActivityDialogModal
           ticketId={ticketId}
           activityDialogEntityId={openDialogEntityId}

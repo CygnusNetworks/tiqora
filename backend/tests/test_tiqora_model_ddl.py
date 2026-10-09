@@ -63,6 +63,19 @@ def test_job_file_data_and_result_fit_large_payloads_on_mariadb() -> None:
     assert "TEXT" in _column_ddl(TiqoraJob.__table__, "payload", postgresql.dialect())
 
 
+def test_revision_config_fits_large_dumps_on_mariadb() -> None:
+    """Process/ACL dumps exceed 64 KiB: ``config`` is ``MEDIUMTEXT`` on MariaDB, like the
+    deployed-revisions migration; PostgreSQL ``TEXT`` is unbounded."""
+    from tiqora.db.tiqora.models import TiqoraAclRevision, TiqoraProcessRevision
+
+    for model in (TiqoraProcessRevision, TiqoraAclRevision):
+        assert "MEDIUMTEXT" in _column_ddl(model.__table__, "config", mysql.dialect())
+        assert (
+            _column_ddl(model.__table__, "config", postgresql.dialect()) == "config TEXT NOT NULL,"
+        )
+        assert "VARCHAR(64) NOT NULL" in _column_ddl(model.__table__, "checksum", mysql.dialect())
+
+
 def test_report_fact_columns_ddl() -> None:
     from tiqora.db.tiqora.models import (
         TiqoraReportDailySnapshot,

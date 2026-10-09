@@ -31,6 +31,11 @@ vi.mock("@tanstack/react-router", () => ({
 
 const listAcls = vi.fn();
 const createAcl = vi.fn();
+const deployStatus = vi.fn();
+
+vi.mock("@/lib/deployStatusApi", () => ({
+  deployStatusApi: { status: (...args: unknown[]) => deployStatus(...args), deploy: vi.fn() },
+}));
 
 vi.mock("@/lib/api", () => ({
   ApiError: class ApiError extends Error {
@@ -71,10 +76,24 @@ const sampleAcl = {
   change_time: "2026-07-01T00:00:00Z",
 };
 
+const deployKind = (pending: number) => ({
+  pending_changes: pending,
+  running_live: false,
+  revision: { id: 3, source: "znuny", entity_count: 4, deployed_at: "2026-10-08T10:00:00Z", deployed_by: null },
+});
+const deployBody = (aclPending = 2) => ({
+  process: deployKind(0),
+  acl: deployKind(aclPending),
+  ownership_active: false,
+  can_deploy_from_tiqora: false,
+});
+
 describe("AclPage", () => {
   beforeEach(() => {
     listAcls.mockReset();
     createAcl.mockReset();
+    deployStatus.mockReset();
+    deployStatus.mockResolvedValue(deployBody());
   });
 
   it("lists ACLs with a link to their detail page", async () => {
@@ -138,5 +157,19 @@ describe("AclPage", () => {
     });
     const body = createAcl.mock.calls[0][0];
     expect(body.name).toBe("NewAcl");
+    // the new draft shows up in the deploy card on the same page
+    await waitFor(() => expect(deployStatus).toHaveBeenCalledTimes(2));
+  });
+
+  it("shows the ACL deploy status with the number of undeployed edits", async () => {
+    listAcls.mockResolvedValue([sampleAcl]);
+    renderPage();
+
+    const card = await screen.findByTestId("deploy-status-acl");
+    expect(card).toBeInTheDocument();
+    expect(screen.getByTestId("deploy-status-pending")).toHaveTextContent(
+      i18n.t("admin.deploy.pending", { count: 2 }),
+    );
+    expect(screen.queryByTestId("deploy-status-process")).not.toBeInTheDocument();
   });
 });

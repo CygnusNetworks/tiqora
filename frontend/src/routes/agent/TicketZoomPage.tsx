@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
+import { processApi } from "@/lib/processApi";
+import type { AllowedActions } from "@/lib/aclActions";
 import { useAuth } from "@/auth/AuthContext";
 import { TicketHeader } from "@/components/agent/TicketHeader";
 import { ArticleMasterDetail } from "@/components/agent/ArticleMasterDetail";
@@ -44,9 +46,18 @@ export function TicketZoomPage() {
 
   const processStateQ = useQuery({
     queryKey: ["process", "ticket", ticketId, "state"],
-    queryFn: ({ signal }) => api.getTicketProcessState(ticketId, signal),
+    queryFn: ({ signal }) => processApi.ticketState(ticketId, signal),
     enabled: validTicketId,
   });
+
+  // Znuny's zoom menu runs the Action ACLs over its entries; a forbidden entry is hidden.
+  // null (loading / error) = show everything.
+  const aclActionsQ = useQuery({
+    queryKey: ["tickets", ticketId, "acl-actions"],
+    queryFn: ({ signal }) => processApi.aclActions(ticketId, signal),
+    enabled: validTicketId,
+  });
+  const allowedActions: AllowedActions = aclActionsQ.data ? new Set(aclActionsQ.data.allowed) : null;
 
   // Remember recently viewed tickets for the dashboard "Last views" strip.
   useEffect(() => {
@@ -99,7 +110,8 @@ export function TicketZoomPage() {
   const canStartProcess =
     !processStateQ.isLoading &&
     !processStateQ.isError &&
-    !processStateQ.data?.process_entity_id;
+    !processStateQ.data?.process_entity_id &&
+    Boolean(processStateQ.data?.can_start);
 
   const sortLabel =
     tab === "articles"
@@ -143,6 +155,7 @@ export function TicketZoomPage() {
       }}
       canNote={canNote}
       canStartProcess={Boolean(canStartProcess)}
+      allowedActions={allowedActions}
       onStartProcess={() => setProcessStartOpen(true)}
     />
   );
@@ -158,6 +171,7 @@ export function TicketZoomPage() {
             ticket={ticketQ.data}
             overflowItems={overflowItems}
             canNote={canNote}
+            allowedActions={allowedActions}
             onOpenNote={() => {
               setTab("articles");
               setNoteOpen(true);
@@ -170,6 +184,7 @@ export function TicketZoomPage() {
       <ProcessWidget
         ticketId={ticketId}
         hideInactiveStart
+        allowedActions={allowedActions}
         startOpen={processStartOpen}
         onStartOpenChange={setProcessStartOpen}
       />

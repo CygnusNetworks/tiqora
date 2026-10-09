@@ -413,7 +413,8 @@
       "applyMany": "Apply {{count}} changes",
       "apply_one": "Change 1 ticket",
       "apply_other": "Change {{count}} tickets",
-      "discard": "Discard"
+      "discard": "Discard",
+      "ownerLimit": "The owner choice is only checked against the first {{max}} tickets."
     },
     "countBadge_one": "1 tiket",
     "countBadge_other": "{{count}} tiketů",
@@ -1301,7 +1302,8 @@
       "autoReplyNoCustomer": "· bez potvrzení přijetí (žádný zákazník)",
       "answeredAt": "přijato {{time}}",
       "endedAt": "ukončeno {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "Připojeno živě",
@@ -1410,6 +1412,14 @@
       "title": "Security",
       "nav": "Security",
       "intro": "Protect your account with a second factor when you sign in."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -2738,12 +2748,21 @@
       "name": "Název",
       "entityId": "ID entity",
       "activityCount": "Aktivity",
+      "startInterfaces": "Can be started by",
+      "interfaceAgent": "Agent",
+      "interfaceCustomer": "Customer",
       "readOnlyNote": "Návrh procesů je třeba provádět v admin rozhraní Znuny; toto je pouze pro čtení.",
       "startActivity": "Startovací aktivita",
       "activities": "Aktivity",
       "dialogs": "Dialogy",
       "noDialogs": "—",
-      "loadError": "Proces se nepodařilo načíst."
+      "loadError": "Proces se nepodařilo načíst.",
+      "stateLabel": "State",
+      "states": {
+        "Active": "Active",
+        "Inactive": "Switched off",
+        "FadeAway": "Phasing out"
+      }
     },
     "mailOutbound": {
       "title": "Odchozí e-mail (SMTP)",
@@ -3069,10 +3088,15 @@
         "report_facts": {
           "name": "Report data upkeep",
           "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
+        },
+        "deploy_watch": {
+          "name": "Deploy watcher",
+          "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
         }
       },
       "takeoverBadge": "Převzetí",
-      "settingsLink": "Settings"
+      "settingsLink": "Settings",
+      "deployLive": "No deployment detected yet: Tiqora runs the drafts directly. Please deploy once in Znuny."
     },
     "mailLog": {
       "title": "Log e-mailové komunikace",
@@ -3877,6 +3901,15 @@
             "help": "If a single query takes longer it is stopped and a message is shown."
           }
         }
+      },
+      "process": {
+        "title": "Processes and ACLs",
+        "fields": {
+          "deploy_from_tiqora": {
+            "label": "Deploy processes and ACLs in Tiqora (Znuny no longer runs)",
+            "help": "Only turn this on when Znuny no longer runs in parallel. Otherwise Znuny keeps showing the old state."
+          }
+        }
       }
     },
     "identity": {
@@ -4311,6 +4344,23 @@
       "loadError": "The state of the report data could not be loaded.",
       "failed": "The last build failed",
       "queued": "A build is queued"
+    },
+    "deploy": {
+      "title": "Deployment",
+      "deployedAt": "Deployed on {{date}}",
+      "source": {
+        "initial": "at startup",
+        "znuny": "from Znuny",
+        "tiqora": "by Tiqora"
+      },
+      "pending_one": "{{count}} change has not been deployed yet. It only applies after “Deploy” in Znuny.",
+      "pending_other": "{{count}} changes have not been deployed yet. They only apply after “Deploy” in Znuny.",
+      "pendingHere_one": "{{count}} change has not been deployed yet. It only applies after “Deploy”.",
+      "pendingHere_other": "{{count}} changes have not been deployed yet. They only apply after “Deploy”.",
+      "runningLive": "No deployed revision yet – Tiqora runs the draft state.",
+      "ownership": "Tiqora deploys changes itself (Znuny is switched off).",
+      "deployNow": "Deploy",
+      "deployFailed": "Deployment failed."
     }
   },
   "kb": {
@@ -4526,7 +4576,8 @@
       "actions": "Dostupné akce",
       "loadError": "Stav procesu se nepodařilo načíst.",
       "noDialogs": "Pro tuto aktivitu nejsou k dispozici žádné akce.",
-      "noCustomerDialogs": "V tomto kroku nejsou k dispozici žádné zákaznické dialogy."
+      "noCustomerDialogs": "V tomto kroku nejsou k dispozici žádné zákaznické dialogy.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Spustit proces",
@@ -4535,7 +4586,11 @@
       "cancel": "Zrušit",
       "loadError": "Procesy se nepodařilo načíst.",
       "startError": "Proces se nepodařilo spustit.",
-      "empty": "Žádné procesy k dispozici."
+      "empty": "Žádné procesy k dispozici.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4547,7 +4602,45 @@
       "submitError": "Dialog se nepodařilo odeslat.",
       "articleSubject": "Předmět",
       "articleBody": "Tělo",
-      "fieldFallbackNote": "Prostý textový vstup (pro tento typ pole není dedicovaný widget)."
+      "fieldFallbackNote": "Prostý textový vstup (pro tento typ pole není dedicovaný widget).",
+      "conflict": "This step is not possible right now.",
+      "forbidden": "You are not allowed to carry out this step here."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text",
+      "Attachments": "Attachments"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed.",
+      "invalid": "Please check your input. A required field is missing or a value is invalid."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start."
     }
   },
   "agentTemplates": {

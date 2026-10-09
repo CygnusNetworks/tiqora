@@ -7,13 +7,14 @@ semantics that ``Kernel/GenericInterface/Mapping/Simple.pm`` and ``XSLT.pm`` rel
 from __future__ import annotations
 
 import re
-from functools import lru_cache
 from typing import Any
 
 import regex
 
 from tiqora.api.compat.mapping import MappingConfigError, MappingError
 from tiqora.util.perl import perl_truthy as perl_truthy  # re-export (single implementation)
+from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS, PerlRegexError
+from tiqora.util.perl_regex import compile_perl_regex as _compile_perl_regex
 from tiqora.znuny.perl_format import perl_num_str
 
 
@@ -33,19 +34,12 @@ def perl_str(value: Any) -> str:
     return str(value)
 
 
-# Webservice configs are admin-controlled but still untrusted for CPU time: a catastrophic pattern
-# such as ``(a+)+`` must not block the event loop. mrab-regex enforces a per-call timeout.
-REGEX_TIMEOUT_SECONDS = 0.2
-
-
-@lru_cache(maxsize=512)
 def compile_perl_regex(pattern: str, *, verbose: bool) -> regex.Pattern[str]:
-    """Compile a Perl regex from a webservice config; ``verbose`` = Perl ``/xms``."""
-    flags = regex.VERBOSE | regex.MULTILINE | regex.DOTALL if verbose else 0
+    """Shared compiler (``tiqora.util.perl_regex``); a broken pattern is a MappingConfigError."""
     try:
-        return regex.compile(pattern, flags)
-    except (regex.error, RecursionError, OverflowError) as exc:
-        raise MappingConfigError(f"Invalid regular expression {pattern!r}: {exc}") from exc
+        return _compile_perl_regex(pattern, verbose=verbose)
+    except PerlRegexError as exc:
+        raise MappingConfigError(str(exc)) from exc
 
 
 def _fullmatch_x_regex(pattern: str) -> regex.Pattern[str]:

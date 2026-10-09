@@ -12,6 +12,15 @@ dispatching TransitionActions, and driving Activity Dialog submission
 
 from __future__ import annotations
 
+from tiqora.process.actor import Interface, ProcessActor
+from tiqora.process.conditions import (
+    BASE_CONDITION_TYPES,
+    ConditionData,
+    ConditionValue,
+    evaluate_condition_field,
+    get_condition_data,
+    resolve_transition_tags,
+)
 from tiqora.process.config import (
     ActivityConfig,
     ActivityDialogConfig,
@@ -26,9 +35,12 @@ from tiqora.process.config import (
 )
 from tiqora.process.engine import (
     ActivityDialogSubmitResult,
+    TransitionOutcome,
+    apply_activity_dialog,
     evaluate_transition,
     execute_transition_action,
     get_ticket_attrs,
+    run_transitions,
     start_process,
     submit_activity_dialog,
 )
@@ -41,6 +53,20 @@ from tiqora.process.exceptions import (
     TicketAlreadyInProcess,
     TicketNotInProcess,
 )
+from tiqora.process.fields import (
+    CUSTOMER_SKIP_FIELDS,
+    DISPLAY_HIDDEN,
+    DISPLAY_OPTIONAL,
+    DISPLAY_REQUIRED,
+    FIELD_ALIASES,
+    TICKET_REQUIRED_FIELDS,
+    canonical_field_name,
+    dialog_field_order,
+    effective_field_values,
+    missing_required_fields,
+    normalize_field_values,
+    visible_fields,
+)
 from tiqora.process.graph import (
     ActivityDialogNode,
     ActivityNode,
@@ -50,8 +76,15 @@ from tiqora.process.graph import (
     TransitionActionNode,
     TransitionNode,
 )
+from tiqora.process.process_ticket import (
+    ProcessTicketResult,
+    create_process_ticket,
+    enroll_ticket,
+)
 from tiqora.process.schemas import (
     ActivityDialogSummaryOut,
+    NewProcessTicketIn,
+    NewProcessTicketOut,
     ProcessStateOut,
     ProcessSummaryOut,
     TransitionSummaryOut,
@@ -66,7 +99,30 @@ from tiqora.process.ticket_state import (
 )
 
 __all__ = [
+    "BASE_CONDITION_TYPES",
+    "ConditionData",
+    "ConditionValue",
+    "evaluate_condition_field",
+    "get_condition_data",
+    "resolve_transition_tags",
     "ACTIVITY_ID_DF_NAME",
+    "CUSTOMER_SKIP_FIELDS",
+    "DISPLAY_HIDDEN",
+    "DISPLAY_OPTIONAL",
+    "DISPLAY_REQUIRED",
+    "FIELD_ALIASES",
+    "TICKET_REQUIRED_FIELDS",
+    "Interface",
+    "ProcessActor",
+    "apply_activity_dialog",
+    "canonical_field_name",
+    "create_process_ticket",
+    "enroll_ticket",
+    "dialog_field_order",
+    "effective_field_values",
+    "missing_required_fields",
+    "normalize_field_values",
+    "visible_fields",
     "PROCESS_ID_DF_NAME",
     "ActivityConfig",
     "ActivityDialogConfig",
@@ -83,7 +139,10 @@ __all__ = [
     "ProcessNotFound",
     "ProcessPermissionDenied",
     "ProcessRepository",
+    "NewProcessTicketIn",
+    "NewProcessTicketOut",
     "ProcessStateOut",
+    "ProcessTicketResult",
     "ProcessSummary",
     "ProcessSummaryOut",
     "RequiredFieldMissing",
@@ -97,6 +156,7 @@ __all__ = [
     "TransitionConditionField",
     "TransitionConfig",
     "TransitionNode",
+    "TransitionOutcome",
     "TransitionPathEntry",
     "TransitionSummaryOut",
     "evaluate_transition",
@@ -104,6 +164,7 @@ __all__ = [
     "get_ticket_attrs",
     "get_ticket_process_candidates",
     "get_ticket_process_state",
+    "run_transitions",
     "start_process",
     "submit_activity_dialog",
 ]

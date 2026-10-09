@@ -65,7 +65,8 @@ Engine:
 - [ ] Respect process state: S1 startable, S3 FadeAway = running tickets
       continue but no new starts, S2 Inactive = not offered
 - [ ] Run **deployed** configuration only (see "Deploy model")
-- [ ] ACLs applied to process list, activity dialogs, actions, bulk, compat API
+- [ ] ACLs applied to process list, activity dialogs, actions, bulk (not the
+      compat API: Znuny's GenericInterface calls no `TicketAcl`, ruling F33)
 - [ ] Smart tags (`<OTRS_TICKET_*>`, `<OTRS_CUSTOMER_*>`, `<OTRS_CURRENT_*>`,
       `<OTRS_Agent_*>`, `<OTRS_CONFIG_*>`) in action config and condition
       values, using the existing notification placeholder engine
@@ -137,7 +138,8 @@ Designer:
 - Tiqora runs from a **deployed snapshot**, never from live `pm_*` rows:
   `tiqora_process_revision` (`id, deployed_at, deployed_by, source
   (tiqora|znuny), config JSON = full resolved process set, checksum`). The
-  engine loads the newest revision (cached, invalidated via Redis).
+  engine loads the newest revision (one indexed `SELECT` of the newest id and
+  checksum plus an in-process cache; no Redis, ruling F33).
 - **Deploy from Tiqora** (parallel-op): snapshot `pm_*` → new revision →
   enqueue a `tiqora_cache_invalidation` signal `process_deploy` →
   **TiqoraSync** (Znuny add-on) runs `ProcessDump` (and `ACLDump` for
@@ -159,8 +161,10 @@ Designer:
 
 - Process state gate (S1/S2/S3) in start, list and portal.
 - ACL application through one function used by every surface
-  (`ticket_acl.filter_process_options(user, ticket, kind)`), with the
-  compat API and bulk paths included; tests per surface.
+  (`ticket_acl.filter_process_options(...)`, signature widened for the customer
+  principal and process context), with the bulk path included; tests per
+  surface. The compat API stays without ACLs like Znuny's GenericInterface
+  (ruling F33).
 - Smart tags: reuse the notification template renderer; same escaping rules
   as Znuny (`<OTRS_TICKET_DynamicField_X_Value>` etc.).
 - Condition modules: registry `tiqora/process/condition_modules.py` keyed by

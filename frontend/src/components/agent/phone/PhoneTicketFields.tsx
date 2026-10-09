@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api } from "@/lib/api";
+import { useAgentOptions } from "@/lib/agentOptions";
 import type { DynamicFieldDef } from "@/lib/phoneApi";
 import type { PhoneTicketFieldsValue } from "./phoneTicketValue";
 import { SelectMenu, type SelectMenuItem } from "@/components/ui/SelectMenu";
@@ -70,24 +71,40 @@ export function PhoneTicketFields({
   value,
   onChange,
   fields,
+  queueId,
 }: {
   value: PhoneTicketFieldsValue;
   onChange: (next: PhoneTicketFieldsValue) => void;
   /** Optional dynamic fields only; required ones are rendered by the page. */
   fields: DynamicFieldDef[];
+  /** The ticket's queue: scopes the responsible list (empty until a queue is chosen, like Znuny). */
+  queueId: number | null;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const set = (patch: Partial<PhoneTicketFieldsValue>) => onChange({ ...value, ...patch });
 
-  const agentsQ = useQuery({ queryKey: ["reference", "agents"], queryFn: () => api.listReferenceAgents() });
+  const responsibleOptions = useAgentOptions(
+    "responsible",
+    { action: "AgentTicketPhone", queue_id: queueId ?? undefined },
+    { enabled: queueId !== null },
+  );
+  // A responsible chosen for another queue is cleared once the new queue's list is loaded without them.
+  const responsibleLoaded = responsibleOptions.loaded;
+  const responsibleItems = responsibleOptions.items;
+  const responsibleId = value.responsibleId;
+  useEffect(() => {
+    if (!responsibleLoaded || responsibleId === null) return;
+    if (!responsibleItems.some((i) => i.value === responsibleId)) onChange({ ...value, responsibleId: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responsibleLoaded, responsibleItems, responsibleId]);
   const typesQ = useQuery({ queryKey: ["reference", "types"], queryFn: () => api.listReferenceTypes() });
   const servicesQ = useQuery({ queryKey: ["reference", "services"], queryFn: () => api.listReferenceServices() });
   const slasQ = useQuery({
     queryKey: ["reference", "slas", value.serviceId],
     queryFn: () => api.listReferenceSlas(value.serviceId ? { service_id: value.serviceId } : {}),
   });
-  const agentItems = (agentsQ.data ?? []).map((a) => ({ value: a.id, label: a.full_name || a.login, hint: a.login }));
+  const agentItems = responsibleOptions.items;
   const typeItems = (typesQ.data ?? []).map((x) => ({ value: x.id, label: x.name }));
   const serviceItems = (servicesQ.data ?? []).map((x) => ({ value: x.id, label: x.name }));
   const slaItems = (slasQ.data ?? []).map((x) => ({ value: x.id, label: x.name }));

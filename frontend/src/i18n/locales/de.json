@@ -413,7 +413,8 @@
       "applyMany": "{{count}} Änderungen anwenden",
       "apply_one": "1 Ticket ändern",
       "apply_other": "{{count}} Tickets ändern",
-      "discard": "Verwerfen"
+      "discard": "Verwerfen",
+      "ownerLimit": "Die Auswahl der Besitzer gilt nur für die ersten {{max}} Tickets."
     },
     "countBadge_one": "1 Ticket",
     "countBadge_other": "{{count}} Tickets",
@@ -1301,7 +1302,8 @@
       "autoReplyNoCustomer": "· keine Eingangsbestätigung (kein Kunde)",
       "answeredAt": "{{time}} angenommen",
       "endedAt": "beendet {{time}}"
-    }
+    },
+    "processLabel": "Prozess starten"
   },
   "connection": {
     "live": "Live verbunden",
@@ -1410,6 +1412,14 @@
       "title": "Sicherheit",
       "nav": "Sicherheit",
       "intro": "Schützen Sie Ihr Konto zusätzlich mit einem zweiten Faktor bei der Anmeldung."
+    },
+    "process": {
+      "start": "Neues Prozessticket",
+      "title": "Neues Prozessticket",
+      "empty": "Es gibt keinen Prozess, den Sie starten können.",
+      "chooseProcess": "Prozess wählen",
+      "loadError": "Prozesse konnten nicht geladen werden.",
+      "submitError": "Die Anfrage konnte nicht gesendet werden."
     }
   },
   "admin": {
@@ -2746,12 +2756,21 @@
       "name": "Name",
       "entityId": "Entity-ID",
       "activityCount": "Aktivitäten",
+      "startInterfaces": "Startbar für",
+      "interfaceAgent": "Agent",
+      "interfaceCustomer": "Kunde",
       "readOnlyNote": "Die Prozessgestaltung muss in der Znuny-Administration erfolgen; dies ist eine reine Leseansicht.",
       "startActivity": "Startaktivität",
       "activities": "Aktivitäten",
       "dialogs": "Dialoge",
       "noDialogs": "—",
-      "loadError": "Prozess konnte nicht geladen werden."
+      "loadError": "Prozess konnte nicht geladen werden.",
+      "stateLabel": "Status",
+      "states": {
+        "Active": "Aktiv",
+        "Inactive": "Abgeschaltet",
+        "FadeAway": "Läuft aus"
+      }
     },
     "mailOutbound": {
       "title": "Ausgehende E-Mail (SMTP)",
@@ -3077,10 +3096,15 @@
         "report_facts": {
           "name": "Berichtsdaten aktuell halten",
           "description": "Hält die Auswertungsdaten für Berichte (Ticketdaten und tägliche Bestände offener Tickets) laufend aktuell."
+        },
+        "deploy_watch": {
+          "name": "Bereitstellung beobachten",
+          "description": "Erkennt in Znuny bereitgestellte Prozesse und ACLs und lässt Tiqora erst dann damit arbeiten."
         }
       },
       "takeoverBadge": "Übernahme",
-      "settingsLink": "Einstellungen"
+      "settingsLink": "Einstellungen",
+      "deployLive": "Noch keine Bereitstellung erkannt: Tiqora nutzt den Entwurfsstand. Bitte in Znuny einmal bereitstellen."
     },
     "mailLog": {
       "title": "E-Mail-Kommunikationsprotokoll",
@@ -3885,6 +3909,15 @@
             "help": "Dauert eine einzelne Abfrage länger, wird sie abgebrochen und eine Meldung angezeigt."
           }
         }
+      },
+      "process": {
+        "title": "Prozesse und ACLs",
+        "fields": {
+          "deploy_from_tiqora": {
+            "label": "Prozesse und ACLs in Tiqora bereitstellen (Znuny läuft nicht mehr)",
+            "help": "Nur einschalten, wenn Znuny nicht mehr parallel läuft. Sonst zeigt Znuny weiter den alten Stand an."
+          }
+        }
       }
     },
     "identity": {
@@ -4319,6 +4352,23 @@
       "loadError": "Der Zustand der Berichtsdaten konnte nicht geladen werden.",
       "failed": "Der letzte Aufbau ist fehlgeschlagen",
       "queued": "Aufbau ist eingeplant"
+    },
+    "deploy": {
+      "title": "Bereitstellung",
+      "deployedAt": "Bereitgestellt am {{date}}",
+      "source": {
+        "initial": "beim Start",
+        "znuny": "aus Znuny",
+        "tiqora": "von Tiqora"
+      },
+      "pending_one": "{{count}} Änderung ist noch nicht bereitgestellt. Sie gilt erst nach „Bereitstellen“ in Znuny.",
+      "pending_other": "{{count}} Änderungen sind noch nicht bereitgestellt. Sie gelten erst nach „Bereitstellen“ in Znuny.",
+      "pendingHere_one": "{{count}} Änderung ist noch nicht bereitgestellt. Sie gilt erst nach „Bereitstellen“.",
+      "pendingHere_other": "{{count}} Änderungen sind noch nicht bereitgestellt. Sie gelten erst nach „Bereitstellen“.",
+      "runningLive": "Noch keine bereitgestellte Fassung – Tiqora nutzt den Entwurfsstand.",
+      "ownership": "Tiqora stellt Änderungen selbst bereit (Znuny ist abgeschaltet).",
+      "deployNow": "Bereitstellen",
+      "deployFailed": "Bereitstellen fehlgeschlagen."
     }
   },
   "kb": {
@@ -4528,13 +4578,14 @@
   "process": {
     "widget": {
       "title": "Prozess",
-      "activity": "Activity",
+      "activity": "Aktivität",
       "notInProcess": "Dieses Ticket ist Teil keines Prozesses.",
       "startButton": "Prozess starten",
       "actions": "Verfügbare Aktionen",
       "loadError": "Prozessstatus konnte nicht geladen werden.",
       "noDialogs": "Keine Aktionen bei dieser Aktivität verfügbar.",
-      "noCustomerDialogs": "In diesem Schritt sind keine Kundendialoge verfügbar."
+      "noCustomerDialogs": "In diesem Schritt sind keine Kundendialoge verfügbar.",
+      "inactive": "Dieser Prozess ist abgeschaltet. Es sind keine Schritte möglich."
     },
     "start": {
       "title": "Prozess starten",
@@ -4543,7 +4594,11 @@
       "cancel": "Abbrechen",
       "loadError": "Prozesse konnten nicht geladen werden.",
       "startError": "Prozess konnte nicht gestartet werden.",
-      "empty": "Keine Prozesse verfügbar."
+      "empty": "Keine Prozesse verfügbar.",
+      "next": "Weiter",
+      "forbidden": "Sie dürfen diesen Prozess hier nicht starten.",
+      "conflict": "Dieser Prozess kann für dieses Ticket im Moment nicht gestartet werden.",
+      "notFound": "Dieser Prozess oder dieses Ticket existiert nicht mehr."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4555,7 +4610,45 @@
       "submitError": "Dialog konnte nicht übermittelt werden.",
       "articleSubject": "Betreff",
       "articleBody": "Text",
-      "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp)."
+      "fieldFallbackNote": "Texteingabe (kein spezielles Widget für diesen Feldtyp).",
+      "conflict": "Dieser Schritt ist im Moment nicht möglich.",
+      "forbidden": "Diesen Schritt dürfen Sie hier nicht ausführen."
+    },
+    "field": {
+      "Title": "Titel",
+      "Queue": "Queue",
+      "State": "Status",
+      "Priority": "Priorität",
+      "Type": "Typ",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Besitzer",
+      "Responsible": "Verantwortlicher",
+      "Lock": "Sperre",
+      "CustomerUserID": "Kundenbenutzer",
+      "CustomerID": "Kundennummer",
+      "PendingTime": "Erinnerung am",
+      "ArticleSubject": "Betreff",
+      "ArticleBody": "Text",
+      "Attachments": "Anhänge"
+    },
+    "form": {
+      "unsupported": "Dieses Feld kann hier noch nicht ausgefüllt werden.",
+      "required": "Pflichtfeld",
+      "submit": "Absenden",
+      "cancel": "Abbrechen",
+      "loadError": "Formular konnte nicht geladen werden.",
+      "submitError": "Senden fehlgeschlagen.",
+      "invalid": "Bitte prüfen Sie die Eingaben. Ein Pflichtfeld fehlt oder ein Wert ist ungültig."
+    },
+    "lock": {
+      "lock": "gesperrt",
+      "unlock": "frei"
+    },
+    "newTicket": {
+      "title": "Neues Prozessticket",
+      "chooseProcess": "Prozess wählen",
+      "empty": "Es gibt keinen Prozess, den Sie starten können."
     }
   },
   "agentTemplates": {

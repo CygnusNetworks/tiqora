@@ -519,7 +519,8 @@ export interface paths {
         };
         /**
          * List Processes
-         * @description List processes a customer may start (all known processes; start is gated separately).
+         * @description Processes the customer may start (Active, start dialog for the customer interface, ACLs).
+         *     With ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.
          */
         get: operations["list_processes_api_portal_process__get"];
         put?: never;
@@ -547,6 +548,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portal/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ticket Dialog Form */
+        get: operations["get_ticket_dialog_form_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portal/process/ticket/{ticket_id}/start": {
         parameters: {
             query?: never;
@@ -556,7 +574,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start Ticket Process */
+        /**
+         * Start Ticket Process
+         * @description Enroll an existing ticket through the process start dialog (assert_can_start, the
+         *     dialog's mandatory fields and the first transitions run in ``enroll_ticket``).
+         */
         post: operations["start_ticket_process_api_portal_process_ticket__ticket_id__start_post"];
         delete?: never;
         options?: never;
@@ -592,6 +614,49 @@ export interface paths {
         put?: never;
         /** Submit Ticket Activity Dialog */
         post: operations["submit_ticket_activity_dialog_api_portal_process_ticket__ticket_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/process/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create New Process Ticket
+         * @description Create a ticket from the start dialog of a process (customer interface). The customer
+         *     identity comes from the session: submitted ``CustomerUserID``/``CustomerID``/``Owner`` are
+         *     ignored (the engine forces them from the actor, owner = the portal system user). A queue
+         *     chosen in the dialog must be one of the customer's create queues.
+         */
+        post: operations["create_new_process_ticket_api_portal_process_tickets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portal/process/{process_entity_id}/start-form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Start Form
+         * @description The start dialog of a process for the customer interface, built by the server.
+         */
+        get: operations["get_start_form_api_portal_process__process_entity_id__start_form_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2434,6 +2499,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/deploy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Deploy */
+        post: operations["post_deploy_api_v1_admin_deploy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/deploy-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Deploy Status */
+        get: operations["get_deploy_status_api_v1_admin_deploy_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/dynamic-fields": {
         parameters: {
             query?: never;
@@ -3364,6 +3463,23 @@ export interface paths {
         head?: never;
         /** Update Priority */
         patch: operations["update_priority_api_v1_admin_priorities__priority_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/processes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Admin Processes */
+        get: operations["list_admin_processes_api_v1_admin_processes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/queue-customer-links": {
@@ -6550,7 +6666,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Processes */
+        /**
+         * List Processes
+         * @description Processes the agent may start (Active, start dialog for the agent interface, ACLs).
+         *     With ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.
+         */
         get: operations["list_processes_api_v1_process__get"];
         put?: never;
         post?: never;
@@ -6569,6 +6689,27 @@ export interface paths {
         };
         /** Get Activity Dialog */
         get: operations["get_activity_dialog_api_v1_process_activity_dialog__activity_dialog_entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ticket Dialog Form
+         * @description A dialog of the ticket's current activity as a server-built form; 403 when the dialog is
+         *     hidden for this agent (interface, Permission, ACLs), like the submit.
+         */
+        get: operations["get_ticket_dialog_form_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6632,10 +6773,31 @@ export interface paths {
          * @description Submit an activity dialog for *ticket_id*.
          *
          *     Requires ``rw`` on the ticket's queue as a coarse gate — the dialog's own
-         *     (finer-grained) ``Permission`` config, if set, is enforced again inside
-         *     ``engine.submit_activity_dialog`` itself.
+         *     (finer-grained) ``Permission`` config, the interface and the ACLs are enforced again
+         *     inside ``engine.submit_activity_dialog`` (``availability.assert_can_submit``).
          */
         post: operations["submit_ticket_activity_dialog_api_v1_process_ticket__ticket_id__submit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create New Process Ticket
+         * @description Create a ticket from the start dialog of a process. Needs ``create`` on the resolved
+         *     queue (403), a startable process (409) and the start dialog's mandatory fields (400).
+         */
+        post: operations["create_new_process_ticket_api_v1_process_tickets_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6651,6 +6813,28 @@ export interface paths {
         };
         /** Get Process */
         get: operations["get_process_api_v1_process__process_entity_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process/{process_entity_id}/start-form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Start Form
+         * @description The start dialog of a process, built by the server: visible fields in order with their
+         *     kind and ACL-filtered options. With ``ticket_id`` (enroll context) the ticket-bound gates
+         *     of :func:`assert_can_start` apply.
+         */
+        get: operations["get_start_form_api_v1_process__process_entity_id__start_form_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7654,6 +7838,28 @@ export interface paths {
          *     ``move_into``, ``rw``, …). Personal watch/unwatch stays ungated.
          */
         patch: operations["patch_ticket_api_v1_tickets__ticket_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/tickets/{ticket_id}/acl-actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ticket Acl Actions
+         * @description Zoom menu actions left after ``Action`` ACLs (Znuny ``AgentTicketZoom`` menu).
+         *
+         *     Same access rule as ``GET /tickets/{id}`` (``ro`` on the ticket's queue).
+         */
+        get: operations["ticket_acl_actions_api_v1_tickets__ticket_id__acl_actions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/tickets/{ticket_id}/acquire-lock": {
@@ -9277,6 +9483,21 @@ export interface components {
             entity_id: string;
             /** Name */
             name: string;
+        };
+        /** AdminProcessOut */
+        AdminProcessOut: {
+            /** Activity Count */
+            activity_count: number;
+            /** Entity Id */
+            entity_id: string;
+            /** Name */
+            name: string;
+            /** Start Interfaces */
+            start_interfaces: string[];
+            /** State Entity Id */
+            state_entity_id: string;
+            /** State Name */
+            state_name: string;
         };
         /**
          * AgentCustomerCreateOut
@@ -12579,6 +12800,48 @@ export interface components {
             /** Version */
             version?: string | null;
         };
+        /** DeployIn */
+        DeployIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "process" | "acl";
+        };
+        /** DeployKindStatusOut */
+        DeployKindStatusOut: {
+            /** Pending Changes */
+            pending_changes: number;
+            revision: components["schemas"]["RevisionOut"] | null;
+            /** Running Live */
+            running_live: boolean;
+        };
+        /** DeployOut */
+        DeployOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "recorded" | "unchanged";
+            /** Checksum */
+            checksum: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "process" | "acl";
+            /** Revision Id */
+            revision_id: number;
+        };
+        /** DeployStatusOut */
+        DeployStatusOut: {
+            acl: components["schemas"]["DeployKindStatusOut"];
+            /** Can Deploy From Tiqora */
+            can_deploy_from_tiqora: boolean;
+            /** Ownership Active */
+            ownership_active: boolean;
+            process: components["schemas"]["DeployKindStatusOut"];
+        };
         /** DialOut */
         DialOut: {
             /** Call Id */
@@ -13011,6 +13274,8 @@ export interface components {
             state_id?: number | null;
             /** Ticket Id */
             ticket_id?: number | null;
+            /** Ticket Ids */
+            ticket_ids?: number[];
             /** Type Id */
             type_id?: number | null;
         };
@@ -14765,6 +15030,33 @@ export interface components {
             name: string;
         };
         /**
+         * NewProcessTicketIn
+         * @description Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket.
+         */
+        NewProcessTicketIn: {
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
+            /** Process Entity Id */
+            process_entity_id: string;
+        };
+        /**
+         * NewProcessTicketOut
+         * @description The created process ticket and the outcome of its first transition pass.
+         */
+        NewProcessTicketOut: {
+            /** Activity Changed */
+            activity_changed: boolean;
+            state: components["schemas"]["TicketProcessStateOut"];
+            /** Ticket Id */
+            ticket_id: number;
+            /** Ticket Number */
+            ticket_number: string;
+            /** Unsupported Actions */
+            unsupported_actions: string[];
+        };
+        /**
          * NewTicketPhoneCallIn
          * @description First article of a phone ticket (Znuny AgentTicketPhone).
          */
@@ -15902,11 +16194,74 @@ export interface components {
             /** State Entity Id */
             state_entity_id: string;
         };
+        /** ProcessDialogFieldOut */
+        ProcessDialogFieldOut: {
+            /** Default */
+            default?: unknown;
+            /**
+             * Description Long
+             * @default
+             */
+            description_long: string;
+            /**
+             * Description Short
+             * @default
+             */
+            description_short: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "text" | "textarea" | "select" | "multiselect" | "boolean" | "date" | "datetime" | "article" | "pending_time" | "customer" | "unsupported";
+            /** Label */
+            label: string;
+            /** Name */
+            name: string;
+            /** Options */
+            options?: components["schemas"]["ProcessDialogOptionOut"][];
+            /** Required */
+            required: boolean;
+        };
+        /**
+         * ProcessDialogFormOut
+         * @description One activity dialog as the server wants it rendered: visible fields in order, with
+         *     their kind and the ACL-filtered options.
+         */
+        ProcessDialogFormOut: {
+            /** Activity Dialog Entity Id */
+            activity_dialog_entity_id: string;
+            /** Description Long */
+            description_long: string;
+            /** Description Short */
+            description_short: string;
+            /** Fields */
+            fields: components["schemas"]["ProcessDialogFieldOut"][];
+            /** Name */
+            name: string;
+            /** Process Entity Id */
+            process_entity_id: string;
+            /** Submit Advice Text */
+            submit_advice_text: string;
+            /** Submit Button Text */
+            submit_button_text: string;
+        };
+        /** ProcessDialogOptionOut */
+        ProcessDialogOptionOut: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
         /**
          * ProcessStartIn
-         * @description Body of ``POST /api/v1/process/ticket/{ticket_id}/start``.
+         * @description Body of ``POST /api/v1/process/ticket/{ticket_id}/start`` (enroll through the start
+         *     dialog: ``field_values`` are the dialog's fields, like a dialog submit).
          */
         ProcessStartIn: {
+            /** Field Values */
+            field_values?: {
+                [key: string]: unknown;
+            };
             /** Process Entity Id */
             process_entity_id: string;
         };
@@ -15923,6 +16278,11 @@ export interface components {
             name: string;
             /** State Entity Id */
             state_entity_id: string;
+            /**
+             * State Name
+             * @default
+             */
+            state_name: string;
         };
         /**
          * ProviderChanges
@@ -16705,6 +17065,22 @@ export interface components {
              * @enum {string}
              */
             type: "id" | "string" | "enum" | "date" | "hour" | "weekday" | "count" | "number" | "minutes" | "hours" | "days" | "units" | "percent";
+        };
+        /** RevisionOut */
+        RevisionOut: {
+            /**
+             * Deployed At
+             * Format: date-time
+             */
+            deployed_at: string;
+            /** Deployed By */
+            deployed_by: number | null;
+            /** Entity Count */
+            entity_count: number;
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
         };
         /** RoleAssignment */
         RoleAssignment: {
@@ -17874,6 +18250,14 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * TicketAclActionsOut
+         * @description Zoom menu entries the ticket's ACLs leave available (in ``ZOOM_ACTIONS`` order).
+         */
+        TicketAclActionsOut: {
+            /** Allowed */
+            allowed: string[];
+        };
         /** TicketAttributeRelationCreate */
         TicketAttributeRelationCreate: {
             /**
@@ -18204,6 +18588,13 @@ export interface components {
          */
         TicketFieldOptionsOut: {
             /**
+             * Owner
+             * @default {}
+             */
+            owner: {
+                [key: string]: string;
+            };
+            /**
              * Priority
              * @default {}
              */
@@ -18215,6 +18606,13 @@ export interface components {
              * @default {}
              */
             queue: {
+                [key: string]: string;
+            };
+            /**
+             * Responsible
+             * @default {}
+             */
+            responsible: {
                 [key: string]: string;
             };
             /**
@@ -18549,10 +18947,17 @@ export interface components {
              * @default 0
              */
             available_transitions_count: number;
+            /**
+             * Can Start
+             * @default false
+             */
+            can_start: boolean;
             /** Process Entity Id */
             process_entity_id?: string | null;
             /** Process Name */
             process_name?: string | null;
+            /** Process State */
+            process_state?: string | null;
         };
         /**
          * TicketSearchHitOut
@@ -19932,7 +20337,9 @@ export interface operations {
     };
     list_processes_api_portal_process__get: {
         parameters: {
-            query?: never;
+            query?: {
+                ticket_id?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: {
@@ -19981,6 +20388,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityDialogDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_dialog_form_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                ticket_id: number;
+                activity_dialog_entity_id: string;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDialogFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -20088,6 +20529,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityDialogSubmitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_new_process_ticket_api_portal_process_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProcessTicketIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewProcessTicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_start_form_api_portal_process__process_entity_id__start_form_get: {
+        parameters: {
+            query?: {
+                ticket_id?: number | null;
+            };
+            header?: never;
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_customer_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDialogFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -25236,6 +25747,76 @@ export interface operations {
             };
         };
     };
+    post_deploy_api_v1_admin_deploy_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeployIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_deploy_status_api_v1_admin_deploy_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeployStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_dynamic_fields_api_v1_admin_dynamic_fields_get: {
         parameters: {
             query?: {
@@ -28099,6 +28680,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PriorityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_admin_processes_api_v1_admin_processes_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminProcessOut"][];
                 };
             };
             /** @description Validation Error */
@@ -36427,7 +37041,9 @@ export interface operations {
     };
     list_processes_api_v1_process__get: {
         parameters: {
-            query?: never;
+            query?: {
+                ticket_id?: number | null;
+            };
             header?: {
                 authorization?: string | null;
             };
@@ -36480,6 +37096,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityDialogDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ticket_dialog_form_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+                activity_dialog_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDialogFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -36606,6 +37258,43 @@ export interface operations {
             };
         };
     };
+    create_new_process_ticket_api_v1_process_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewProcessTicketIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewProcessTicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_process_api_v1_process__process_entity_id__get: {
         parameters: {
             query?: never;
@@ -36628,6 +37317,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_start_form_api_v1_process__process_entity_id__start_form_get: {
+        parameters: {
+            query?: {
+                ticket_id?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                process_entity_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDialogFormOut"];
                 };
             };
             /** @description Validation Error */
@@ -38612,6 +39338,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ticket_acl_actions_api_v1_tickets__ticket_id__acl_actions_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                ticket_id: number;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketAclActionsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

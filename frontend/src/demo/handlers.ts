@@ -4,6 +4,7 @@ import {
   resolveReportRun,
   demoPortalUser,
   demoPortalTickets,
+  demoPortalProcess,
   demoRefine,
 } from "./mockData";
 import { setDemoFactsBuilding } from "./reportsMock";
@@ -57,6 +58,10 @@ function respond(pathname: string, method: string): unknown {
   }
   if (pathname.endsWith("/api/portal/auth/me")) return demoPortalUser;
   if (pathname.endsWith("/api/portal/tickets")) return demoPortalTickets;
+  if (pathname.startsWith("/api/portal/process")) {
+    const data = demoPortalProcess(pathname, method);
+    if (data !== undefined) return data;
+  }
   if (pathname.startsWith("/api/portal/")) return method === "GET" ? [] : {};
 
   if (pathname.includes("/api/v1/report")) syncDemoFacts();

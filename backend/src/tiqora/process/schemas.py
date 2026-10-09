@@ -8,7 +8,7 @@ calendar module's schemas/service separation.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -22,6 +22,7 @@ class ProcessSummaryOut(BaseModel):
     entity_id: str
     name: str
     state_entity_id: str
+    state_name: str = ""
 
 
 class ActivityDialogSummaryOut(BaseModel):
@@ -117,6 +118,8 @@ class TicketProcessStateOut(BaseModel):
     activity_name: str | None = None
     available_dialogs: list[ActivityDialogSummaryOut] = Field(default_factory=list)
     available_transitions_count: int = 0
+    process_state: str | None = None  # "Active" | "Inactive" | "FadeAway"
+    can_start: bool = False  # not in a process, the Action ACL allows it, >= 1 startable process
 
 
 class ActivityDialogFieldOut(BaseModel):
@@ -144,9 +147,11 @@ class ActivityDialogDetailOut(BaseModel):
 
 
 class ProcessStartIn(BaseModel):
-    """Body of ``POST /api/v1/process/ticket/{ticket_id}/start``."""
+    """Body of ``POST /api/v1/process/ticket/{ticket_id}/start`` (enroll through the start
+    dialog: ``field_values`` are the dialog's fields, like a dialog submit)."""
 
     process_entity_id: str
+    field_values: dict[str, Any] = Field(default_factory=dict)
 
 
 class ActivityDialogSubmitIn(BaseModel):
@@ -167,3 +172,69 @@ class ActivityDialogSubmitOut(BaseModel):
     transition_entity_id: str | None
     unsupported_actions: list[str]
     state: TicketProcessStateOut
+
+
+class NewProcessTicketIn(BaseModel):
+    """Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket."""
+
+    process_entity_id: str
+    field_values: dict[str, Any] = Field(default_factory=dict)
+
+
+class NewProcessTicketOut(BaseModel):
+    """The created process ticket and the outcome of its first transition pass."""
+
+    ticket_id: int
+    ticket_number: str
+    activity_changed: bool
+    unsupported_actions: list[str]
+    state: TicketProcessStateOut
+
+
+# ---------------------------------------------------------------------------
+# Server-built activity dialog form (D9)
+# ---------------------------------------------------------------------------
+
+FieldKind = Literal[
+    "text",
+    "textarea",
+    "select",
+    "multiselect",
+    "boolean",
+    "date",
+    "datetime",
+    "article",
+    "pending_time",
+    "customer",
+    "unsupported",
+]
+
+
+class ProcessDialogOptionOut(BaseModel):
+    value: str
+    label: str
+
+
+class ProcessDialogFieldOut(BaseModel):
+    name: str  # canonical name, e.g. "Queue", "DynamicField_Region", "Article"
+    kind: FieldKind
+    label: str  # DF label; ticket attributes: the canonical name (the frontend translates)
+    required: bool
+    description_short: str = ""
+    description_long: str = ""
+    default: Any = None
+    options: list[ProcessDialogOptionOut] = Field(default_factory=list)
+
+
+class ProcessDialogFormOut(BaseModel):
+    """One activity dialog as the server wants it rendered: visible fields in order, with
+    their kind and the ACL-filtered options."""
+
+    process_entity_id: str
+    activity_dialog_entity_id: str
+    name: str
+    description_short: str
+    description_long: str
+    submit_button_text: str
+    submit_advice_text: str
+    fields: list[ProcessDialogFieldOut]

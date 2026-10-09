@@ -1565,10 +1565,15 @@ async def change_title(
     new_title: str,
     user_id: int,
 ) -> None:
-    """Change ticket title."""
+    """Change ticket title (port of ``Ticket.pm::TicketTitleUpdate``).
+
+    No-op (no UPDATE, no history, no event) when the title is unchanged: Znuny returns
+    early on ``$Ticket{Title} eq $Param{Title}`` (Ticket.pm:1883)."""
     t = await _ticket_must_exist(session, ticket_id)
     old_title = str(t.get("title") or "")
     title_truncated = (replace_non_bmp(new_title) or "")[:255]
+    if t.get("title") is not None and old_title == title_truncated:
+        return
 
     await session.execute(
         text(
@@ -1595,16 +1600,40 @@ async def set_customer(
     customer_id: str | None,
     customer_user_id: str | None,
     user_id: int,
+    only_given: bool = False,
 ) -> None:
-    """Set ticket customer."""
+    """Set ticket customer (``Ticket.pm::TicketCustomerSet``).
+
+    ``only_given=True`` is Znuny's exact shape: a ``None`` value leaves its column alone
+    (``No`` / ``User`` are each optional, Ticket.pm:3488-3513). The default writes both
+    columns, a ``None`` as NULL (the historical Tiqora behaviour other callers rely on)."""
     await _ticket_must_exist(session, ticket_id)
-    await session.execute(
-        text(
-            "UPDATE ticket SET customer_id = :cid, customer_user_id = :cuid,"
-            " change_time = current_timestamp, change_by = :uid WHERE id = :tid"
-        ),
-        {"cid": customer_id, "cuid": customer_user_id, "uid": user_id, "tid": ticket_id},
-    )
+    if only_given:
+        if customer_id is None and customer_user_id is None:
+            return
+        sets = [
+            column
+            for column, value in (
+                ("customer_id = :cid", customer_id),
+                ("customer_user_id = :cuid", customer_user_id),
+            )
+            if value is not None
+        ]
+        await session.execute(
+            text(
+                f"UPDATE ticket SET {', '.join(sets)},"  # noqa: S608 -- fixed column names
+                " change_time = current_timestamp, change_by = :uid WHERE id = :tid"
+            ),
+            {"cid": customer_id, "cuid": customer_user_id, "uid": user_id, "tid": ticket_id},
+        )
+    else:
+        await session.execute(
+            text(
+                "UPDATE ticket SET customer_id = :cid, customer_user_id = :cuid,"
+                " change_time = current_timestamp, change_by = :uid WHERE id = :tid"
+            ),
+            {"cid": customer_id, "cuid": customer_user_id, "uid": user_id, "tid": ticket_id},
+        )
     await add_customer_update(
         session,
         ticket_id=ticket_id,

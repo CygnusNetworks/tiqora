@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { api, ApiError, type AclUpdate } from "@/lib/api";
+import { DEPLOY_STATUS_QUERY_KEY } from "@/components/process/DeployStatusCard";
 import { Spinner } from "@/components/ui/Spinner";
 import { HelpPopover } from "@/components/ui/HelpPopover";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +50,7 @@ export function AclDetailPage() {
       window.setTimeout(() => setSavedFlash(false), 1500);
       await qc.invalidateQueries({ queryKey: ["admin", "acl"] });
       await qc.invalidateQueries({ queryKey: ["admin", "acl", aclId] });
+      await qc.invalidateQueries({ queryKey: DEPLOY_STATUS_QUERY_KEY });
     },
     onError: (err: unknown) => {
       setSubmitError(err instanceof ApiError ? err.message : String(err));
@@ -59,6 +61,7 @@ export function AclDetailPage() {
     mutationFn: () => api.deleteAcl(id),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["admin", "acl"] });
+      await qc.invalidateQueries({ queryKey: DEPLOY_STATUS_QUERY_KEY });
       void navigate({ to: "/admin/acl" });
     },
     onError: (err: unknown) => {

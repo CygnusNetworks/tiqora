@@ -69,8 +69,13 @@ export type TicketTableSelection = {
 export type TicketQuickEdit = {
   stateItems: SelectMenuItem<number>[];
   priorityItems: SelectMenuItem<number>[];
+  /** Owner choices of the ticket `ownerTicketId` (scoped to that ticket's queue by the server). */
   agentItems: SelectMenuItem<number>[];
   agentsLoading?: boolean;
+  /** The row whose owner menu was opened last; other rows show no choices until opened. */
+  ownerTicketId?: number | null;
+  /** Fires when a row's owner menu opens, so the caller can load that ticket's choices. */
+  onRequestOwners?: (ticketId: number) => void;
   onPatch: (ticketId: number, body: MutationRequest) => void;
   onRequestOptions: () => void;
 };
@@ -873,11 +878,14 @@ function TicketRow({
           <QuickEditTrigger
             testId={`ticket-row-owner-${ticket.id}`}
             panelTestId={`ticket-row-owner-menu-${ticket.id}`}
-            items={quickEdit.agentItems}
+            items={quickEdit.ownerTicketId === ticket.id ? quickEdit.agentItems : []}
             value={ticket.owner_id}
-            loading={quickEdit.agentsLoading}
+            loading={quickEdit.ownerTicketId === ticket.id ? quickEdit.agentsLoading : true}
             searchThreshold={8}
-            onOpen={quickEdit.onRequestOptions}
+            onOpen={() => {
+              quickEdit.onRequestOptions();
+              quickEdit.onRequestOwners?.(ticket.id);
+            }}
             onSelect={(id) => quickEdit.onPatch(ticket.id, { owner_id: id })}
             placeholder={t("ticket.dialog.selectPlaceholder")}
           >

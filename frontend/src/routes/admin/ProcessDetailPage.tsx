@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "@tanstack/react-router";
-import { api } from "@/lib/api";
+import { processApi } from "@/lib/processApi";
 import { Spinner } from "@/components/ui/Spinner";
 import { Badge } from "@/components/ui/Badge";
 
@@ -18,7 +18,7 @@ export function ProcessDetailPage() {
   const { processEntityId } = useParams({ from: "/admin/processes/$processEntityId" });
   const detailQ = useQuery({
     queryKey: ["admin", "processes", processEntityId],
-    queryFn: ({ signal }) => api.getProcess(processEntityId, signal),
+    queryFn: ({ signal }) => processApi.detail(processEntityId, signal),
   });
 
   return (

@@ -18,7 +18,9 @@ target_metadata = tiqora_metadata
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Keep loggers that exist already (an in-process `tiqora migrate`, the test suite): the
+    # default disable_existing_loggers=True silences every tiqora.* logger created before.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", _normalize_url(settings.database_url))

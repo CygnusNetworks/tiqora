@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import contextlib
 import uuid
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 
 NOW = datetime(2026, 1, 1, 12, 0, 0)
 
@@ -58,7 +61,14 @@ Interface:
 Permission: ''
 """
 
-TRANSITION_CONFIG_YAML = "ConditionLinking: and\n"
+# Znuny never fires a transition without a Condition (Transition.pm:322-327): require a
+# Title starting with "Updated", which only the dialog submission sets (enrolling through the
+# start dialog also runs the transitions, so it must not match the ticket's initial title).
+_TITLE_CONDITION = (
+    "Condition:\n  '1':\n    Fields:\n      Title:\n        Match: ^Updated\n        Type: Regexp\n"
+    "    Type: and\n  Type: and\nConditionLinking: and\n"
+)
+TRANSITION_CONFIG_YAML = _TITLE_CONDITION
 
 TRANSITION_ACTION_CONFIG_YAML = """
 Config:
@@ -69,6 +79,46 @@ Module: Kernel::System::ProcessManagement::TransitionAction::TicketStateSet
 
 def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
+
+
+# Every table this module writes, children first (group_user has no id: removed by its
+# group/user ids first). The module deletes what it committed, so it also passes on its own.
+_WRITTEN_TABLES = (
+    "tiqora_event_outbox",
+    "tiqora_cache_invalidation",
+    "ticket_history",
+    "article_data_mime_attachment",
+    "article_data_mime_plain",
+    "article_data_mime",
+    "article",
+    "dynamic_field_value",
+    "ticket",
+    "ticket_number_counter",
+    "pm_transition_action",
+    "pm_transition",
+    "pm_activity_dialog",
+    "pm_activity",
+    "pm_process",
+    "queue",
+    "permission_groups",
+    "users",
+)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _delete_written_rows(mariadb_znuny_url: str) -> Iterator[None]:
+    marks = snapshot_marks(mariadb_znuny_url, _WRITTEN_TABLES)
+    yield
+    delete_above_marks(
+        mariadb_znuny_url,
+        marks,
+        first=[
+            (
+                "DELETE FROM group_user WHERE group_id > :g OR user_id > :u",
+                {"g": marks["permission_groups"], "u": marks["users"]},
+            )
+        ],
+    )
 
 
 async def _seed_tiqora_tables(session: AsyncSession) -> None:
@@ -290,6 +340,8 @@ async def test_process_list_detail_and_ticket_lifecycle_via_rest(mariadb_znuny_u
         assert resp.status_code == 200
         entity_ids = {p["entity_id"] for p in resp.json()}
         assert ids["process_entity_id"] in entity_ids
+        mine = next(p for p in resp.json() if p["entity_id"] == ids["process_entity_id"])
+        assert mine["state_name"] == "Active"
 
         # 2. get process detail
         resp = await client.get(f"/api/v1/process/{ids['process_entity_id']}")
@@ -313,6 +365,8 @@ async def test_process_list_detail_and_ticket_lifecycle_via_rest(mariadb_znuny_u
         assert state["process_entity_id"] is None
         assert state["activity_entity_id"] is None
         assert state["available_dialogs"] == []
+        assert state["process_state"] is None
+        assert state["can_start"] is True
 
         # 5. unknown ticket -> 404
         resp = await client.get("/api/v1/process/ticket/999999999/state")
@@ -342,6 +396,8 @@ async def test_process_list_detail_and_ticket_lifecycle_via_rest(mariadb_znuny_u
         assert state["activity_entity_id"] == ids["activity_a"]
         assert [d["entity_id"] for d in state["available_dialogs"]] == [ids["dialog_entity_id"]]
         assert state["available_transitions_count"] == 1
+        assert state["process_state"] == "Active"
+        assert state["can_start"] is False
 
         # starting again -> 409 (already in process)
         resp = await client.post(

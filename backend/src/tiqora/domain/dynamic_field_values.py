@@ -15,7 +15,7 @@ Port of ``Kernel/System/DynamicField/Backend.pm`` (``ValueSet``,
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -266,6 +266,44 @@ def readable_history_value(field_type: str, values: Sequence[str]) -> str:
     if field_type == "Date":
         return first[:10]
     return first
+
+
+def df_display_value(
+    field_type: str, config: Mapping[str, Any], stored: str | Sequence[str] | None
+) -> str:
+    """Display value of a stored dynamic-field value (``..._Value`` smart tags, templates).
+
+    ``Backend->ValueLookup`` followed by ``ReadableValueRender``, without a language object:
+    Dropdown / Multiselect keys map through ``PossibleValues`` (``BaseSelect.pm:806-836``,
+    ``Multiselect.pm:860-903``; a key without a non-empty label stays itself, empty keys are
+    dropped), Checkbox ``1`` / other becomes ``Checked`` / ``Unchecked`` (``Backend.pm:825-842``
+    via ``Checkbox`` lookup; empty stays empty), everything else is the stored value, with
+    ``ReadableValueRender`` joining a Multiselect with ``", "`` and cutting a Date to its day.
+    """
+    keys = [stored] if isinstance(stored, str) else [str(v) for v in (stored or [])]
+    if field_type in ("Dropdown", "Multiselect"):
+        raw = config.get("PossibleValues")
+        possible = {str(k): v for k, v in raw.items()} if isinstance(raw, dict) else {}
+        # Perl truthiness: a label of "" or "0" does not count, the key is shown instead.
+        shown = [
+            k if possible.get(k) in (None, "", "0", 0) else str(possible[k])
+            for k in keys
+            if k not in ("", "0")
+        ]
+        return readable_history_value(field_type, shown)
+    if field_type == "Checkbox":
+        key = keys[0] if keys else ""
+        return "" if key == "" else ("Checked" if key == "1" else "Unchecked")
+    return readable_history_value(field_type, keys)
+
+
+def df_readable_value(field_type: str, stored: str | Sequence[str] | None) -> str:
+    """``ReadableValueRender`` of a stored value: a Multiselect joins its truthy items with
+    ``", "`` (``Multiselect.pm:775-787`` skips ``""`` and ``"0"``), a Date keeps the day."""
+    keys = [stored] if isinstance(stored, str) else [str(v) for v in (stored or [])]
+    if field_type == "Multiselect":
+        keys = [k for k in keys if k not in ("", "0")]
+    return readable_history_value(field_type, keys)
 
 
 def truncate_history_parts(field_name: str, value: str, old_value: str) -> tuple[str, str, str]:

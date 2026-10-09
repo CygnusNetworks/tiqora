@@ -27,7 +27,7 @@ const {
   patchTicket,
   listReferenceStates,
   listReferencePriorities,
-  listReferenceAgents,
+  fieldOptionsFetch,
   startTicketExport,
   jobGet,
   ticketFacets,
@@ -37,11 +37,13 @@ const {
   patchTicket: vi.fn(),
   listReferenceStates: vi.fn(),
   listReferencePriorities: vi.fn(),
-  listReferenceAgents: vi.fn(),
+  fieldOptionsFetch: vi.fn(),
   startTicketExport: vi.fn(),
   jobGet: vi.fn(),
   ticketFacets: vi.fn(),
 }));
+
+vi.mock("@/lib/fieldOptionsApi", () => ({ fieldOptionsApi: { fetch: fieldOptionsFetch } }));
 
 vi.mock("@/lib/jobsApi", async () => {
   const actual = await vi.importActual<typeof import("@/lib/jobsApi")>("@/lib/jobsApi");
@@ -58,7 +60,6 @@ vi.mock("@/lib/api", async () => {
       patchTicket,
       listReferenceStates,
       listReferencePriorities,
-      listReferenceAgents,
       ticketFacets,
     },
   };
@@ -166,13 +167,30 @@ const tickets = [
   makeTicket({ id: 103 }),
 ];
 
+type OptionList = { value: string; label: string }[];
+const ADA_BOB: OptionList = [
+  { value: "5", label: "Ada Agent" },
+  { value: "6", label: "Bob Agent" },
+];
+
+function serveFieldOptions(options: Record<string, OptionList>) {
+  fieldOptionsFetch.mockImplementation(async (body: { fields: string[] }) => ({
+    options: Object.fromEntries(
+      body.fields.flatMap((f) => {
+        const list = options[f] ?? (f === "owner" || f === "responsible" ? ADA_BOB : undefined);
+        return list ? [[f, list]] : [];
+      }),
+    ),
+  }));
+}
+
 function resetMocks() {
   listQueues.mockReset();
   listTickets.mockReset();
   patchTicket.mockReset();
   listReferenceStates.mockReset();
   listReferencePriorities.mockReset();
-  listReferenceAgents.mockReset();
+  fieldOptionsFetch.mockReset();
   ticketFacets.mockReset();
   startTicketExport.mockReset();
   jobGet.mockReset();
@@ -191,10 +209,9 @@ function resetMocks() {
     { id: 3, name: "3 normal" },
     { id: 4, name: "4 high" },
   ]);
-  listReferenceAgents.mockResolvedValue([
-    { id: 5, login: "agent1", full_name: "Ada Agent" },
-    { id: 6, login: "agent2", full_name: "Bob Agent" },
-  ]);
+  // Owner/responsible come scoped from the server; state/priority/queue are left out here, so
+  // those pickers stay unfiltered (use `serveFieldOptions` to filter them).
+  serveFieldOptions({});
   patchTicket.mockResolvedValue(undefined);
   authUser.current = { id: 5, login: "agent1", is_admin: false };
 }
@@ -452,6 +469,139 @@ describe("QueuesPage selection", () => {
     expect(screen.getByTestId("queue-row-check-101")).not.toBeChecked();
   });
 
+  it("loads the bulk pickers with the AgentTicketBulk field options of the selection", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+    fireEvent.click(screen.getByTestId("queue-row-check-102"));
+    // Nothing is asked while the panel is closed.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fieldOptionsFetch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+
+    await waitFor(() =>
+      expect(fieldOptionsFetch).toHaveBeenCalledWith(
+        {
+          fields: ["state", "priority", "queue", "owner"],
+          context: { action: "AgentTicketBulk", ticket_ids: [101, 102], queue_id: undefined },
+        },
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("an owner missing from the ACL map is not offered in the bulk owner picker", async () => {
+    serveFieldOptions({ owner: [{ value: "6", label: "Bob Agent" }] });
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    await screen.findByTestId("queue-bulk-panel");
+    fireEvent.click(screen.getByTestId("queue-bulk-field-owner"));
+    fireEvent.click(await screen.findByTestId("queue-bulk-owner-select"));
+    expect(await screen.findByTestId("queue-bulk-owner-select-menu-option-6")).toBeInTheDocument();
+    expect(screen.queryByTestId("queue-bulk-owner-select-menu-option-5")).not.toBeInTheDocument();
+  });
+
+  it("offers no bulk owners when the server knows no queue for the selection, and disables 'mine'", async () => {
+    serveFieldOptions({ owner: [], responsible: [] });
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-mine")).toBeDisabled());
+    fireEvent.click(await screen.findByTestId("queue-bulk-field-owner"));
+    fireEvent.click(await screen.findByTestId("queue-bulk-owner-select"));
+    await screen.findByTestId("queue-bulk-owner-select-menu");
+    expect(screen.queryByTestId("queue-bulk-owner-select-menu-option-5")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("queue-bulk-owner-select-menu-option-6")).not.toBeInTheDocument();
+  });
+
+  it("asks again with the move-target queue once one is picked", async () => {
+    listQueues.mockResolvedValue([{ id: 9, name: "Sales", group_id: 1, valid: true }]);
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-move"));
+    // The quick action opens the queue picker itself.
+    fireEvent.click(await screen.findByTestId("queue-bulk-queue-select-menu-option-9"));
+
+    await waitFor(() =>
+      expect(fieldOptionsFetch).toHaveBeenCalledWith(
+        {
+          fields: ["state", "priority", "queue", "owner"],
+          context: { action: "AgentTicketBulk", ticket_ids: [101], queue_id: 9 },
+        },
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("says the owner check covers only the first 500 tickets when more are selected", async () => {
+    const bigTotal = 600;
+    const firstPage = Array.from({ length: 3 }, (_, i) => makeTicket({ id: 100 + i }));
+    listTickets.mockImplementation(async (params: ListParams = {}) => {
+      if (params.escalating_within != null) return page([]);
+      const offset = params.offset ?? 0;
+      const limit = params.limit ?? 50;
+      if (limit === 50) return page(firstPage, bigTotal);
+      const items = [];
+      for (let i = offset; i < Math.min(offset + limit, bigTotal); i++) items.push(makeTicket({ id: 1000 + i }));
+      return page(items, bigTotal);
+    });
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-100");
+    fireEvent.click(screen.getByTestId("queue-row-check-100"));
+    fireEvent.click(await screen.findByTestId("queue-select-all-matches"));
+    await waitFor(() =>
+      expect(screen.getByTestId("queue-select-all-status").textContent).toMatch(/600/),
+    );
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    await screen.findByTestId("queue-bulk-panel");
+    fireEvent.click(await screen.findByTestId("queue-bulk-quick-mine"));
+    expect(await screen.findByTestId("queue-bulk-owner-notice")).toHaveTextContent("500");
+    await waitFor(() => {
+      const ids = fieldOptionsFetch.mock.calls.at(-1)?.[0].context.ticket_ids as number[];
+      expect(ids).toHaveLength(500);
+    });
+  });
+
+  it("shows no owner notice for a small selection", async () => {
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+    fireEvent.click(screen.getByTestId("queue-bulk-quick-mine"));
+    await screen.findByTestId("queue-bulk-panel");
+    expect(screen.queryByTestId("queue-bulk-owner-notice")).not.toBeInTheDocument();
+  });
+
+  it("filters the bulk state and priority pickers by the ACL result", async () => {
+    serveFieldOptions({
+      state: [
+        { value: "1", label: "new" },
+        { value: "4", label: "open" },
+      ],
+      priority: [{ value: "3", label: "3 normal" }],
+    });
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+    fireEvent.click(screen.getByTestId("queue-row-check-101"));
+
+    fireEvent.click(screen.getByTestId("queue-bulk-all-fields"));
+    // Closing is not allowed by the ACL: the quick action has no state to prefill.
+    await waitFor(() => expect(screen.getByTestId("queue-bulk-quick-close")).toBeDisabled());
+    expect(screen.getByTestId("queue-bulk-quick-pending")).toBeDisabled();
+    await screen.findByTestId("queue-bulk-priority-3");
+    expect(screen.queryByTestId("queue-bulk-priority-4")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("queue-bulk-state-select"));
+    expect(await screen.findByTestId("queue-bulk-state-select-menu-option-4")).toBeInTheDocument();
+    expect(screen.queryByTestId("queue-bulk-state-select-menu-option-2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("queue-bulk-state-select-menu-option-6")).not.toBeInTheDocument();
+  });
+
   it("the ✕ button clears the selection and hides the action bar", async () => {
     await renderQueuesPage();
     await screen.findByTestId("ticket-row-101");
@@ -472,7 +622,7 @@ describe("QueuesPage row quick edit", () => {
 
     expect(listReferenceStates).not.toHaveBeenCalled();
     expect(listReferencePriorities).not.toHaveBeenCalled();
-    expect(listReferenceAgents).not.toHaveBeenCalled();
+    expect(fieldOptionsFetch).not.toHaveBeenCalled();
   });
 
   it("clicking a row's state cell lazily fetches states and patches only that ticket, without navigating", async () => {
@@ -501,6 +651,20 @@ describe("QueuesPage row quick edit", () => {
     await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(102, { owner_id: 6 }));
   });
 
+  it("the owner menu offers the server's scoped list for that ticket only", async () => {
+    serveFieldOptions({ owner: [{ value: "6", label: "Bob Agent" }] });
+    await renderQueuesPage();
+    await screen.findByTestId("ticket-row-101");
+
+    fireEvent.click(screen.getByTestId("ticket-row-owner-102"));
+    await screen.findByTestId("ticket-row-owner-menu-102-option-6");
+    expect(screen.queryByTestId("ticket-row-owner-menu-102-option-5")).not.toBeInTheDocument();
+    expect(fieldOptionsFetch).toHaveBeenCalledWith(
+      { fields: ["owner"], context: { action: "AgentTicketOwner", ticket_id: 102 } },
+      expect.anything(),
+    );
+  });
+
   it("row quick edit stays available while rows are selected", async () => {
     await renderQueuesPage();
     await screen.findByTestId("ticket-row-101");
@@ -519,13 +683,13 @@ describe("QueuesPage customer filter", () => {
     patchTicket.mockReset();
     listReferenceStates.mockReset();
     listReferencePriorities.mockReset();
-    listReferenceAgents.mockReset();
+    fieldOptionsFetch.mockReset();
     void i18n.changeLanguage("de");
 
     listQueues.mockResolvedValue([]);
     listReferenceStates.mockResolvedValue([]);
     listReferencePriorities.mockResolvedValue([]);
-    listReferenceAgents.mockResolvedValue([]);
+    serveFieldOptions({ owner: [], responsible: [] });
     patchTicket.mockResolvedValue(undefined);
   });
 

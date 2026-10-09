@@ -23,6 +23,7 @@ import {
   NewTicketPage as AgentNewTicketPage,
   type NewTicketSearch,
 } from "@/routes/agent/NewTicketPage";
+import { NewProcessTicketPage, type NewProcessTicketSearch } from "@/routes/agent/NewProcessTicketPage";
 import {
   KbArticleNewPage,
   KbArticleEditPage,
@@ -58,6 +59,10 @@ import {
   type PortalTicketListSearch,
 } from "@/routes/portal/TicketListPage";
 import { NewTicketPage } from "@/routes/portal/NewTicketPage";
+import {
+  NewProcessTicketPage as PortalNewProcessTicketPage,
+  type PortalNewProcessTicketSearch,
+} from "@/routes/portal/NewProcessTicketPage";
 import { TicketDetailPage } from "@/routes/portal/TicketDetailPage";
 import { KbSearchPage, type PortalKbSearch } from "@/routes/portal/KbSearchPage";
 import { KbArticlePage } from "@/routes/portal/KbArticlePage";
@@ -309,6 +314,16 @@ const agentNewTicketRoute = createRoute({
     from_call: s.from_call === true || s.from_call === 1 || s.from_call === "1" || s.from_call === "true" ? true : undefined,
   }),
   component: AgentNewTicketPage,
+});
+
+// Literal path; no `$param` sibling can capture "process/new".
+const agentNewProcessTicketRoute = createRoute({
+  getParentRoute: () => agentLayoutRoute,
+  path: "/process/new",
+  validateSearch: (s: Record<string, unknown>): NewProcessTicketSearch => ({
+    process: typeof s.process === "string" && s.process !== "" ? s.process : undefined,
+  }),
+  component: NewProcessTicketPage,
 });
 
 const agentTicketRoute = createRoute({
@@ -630,6 +645,16 @@ const portalNewTicketRoute = createRoute({
   getParentRoute: () => portalLayoutRoute,
   path: "/tickets/new",
   component: NewTicketPage,
+});
+
+// Literal path; /portal/tickets/$ticketId cannot capture it.
+const portalNewProcessTicketRoute = createRoute({
+  getParentRoute: () => portalLayoutRoute,
+  path: "/process/new",
+  validateSearch: (s: Record<string, unknown>): PortalNewProcessTicketSearch => ({
+    process: typeof s.process === "string" && s.process !== "" ? s.process : undefined,
+  }),
+  component: PortalNewProcessTicketPage,
 });
 
 const portalTicketRoute = createRoute({
@@ -1112,6 +1137,7 @@ const routeTree = rootRoute.addChildren([
     agentIndexRoute,
     agentQueuesRoute,
     agentNewTicketRoute,
+    agentNewProcessTicketRoute,
     agentTicketRoute,
     agentSearchRoute,
     agentKbRoute,
@@ -1136,6 +1162,7 @@ const routeTree = rootRoute.addChildren([
   portalLayoutRoute.addChildren([
     portalIndexRoute,
     portalNewTicketRoute,
+    portalNewProcessTicketRoute,
     portalTicketRoute,
     portalKbRoute,
     portalKbArticleRoute,

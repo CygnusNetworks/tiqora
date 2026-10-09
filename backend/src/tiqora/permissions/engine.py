@@ -118,6 +118,43 @@ class PermissionEngine:
                 out.add(group_id)
         return out
 
+    async def users_for_group_permission(self, group_id: int, key: str) -> set[int]:
+        """Valid users holding *key* (or ``rw``) on *group_id*, roles included.
+
+        Znuny ``Group::PermissionGroupGet`` (``GroupMemberList`` with role inheritance):
+        direct ``group_user`` rows plus ``group_role`` rows (``permission_value = 1``) of the
+        user's valid roles. *key* is not checked against :data:`PERMISSION_KEYS`: a site may
+        add ``responsible`` to ``System::Permission``. An invalid group has no members.
+        """
+        if group_id not in await self._valid_group_ids():
+            return set()
+        keys = (key, "rw")
+        direct = await self._session.execute(
+            select(GroupUser.user_id)
+            .join(Users, Users.id == GroupUser.user_id)
+            .where(
+                GroupUser.group_id == group_id,
+                GroupUser.permission_key.in_(keys),
+                Users.valid_id == 1,
+            )
+        )
+        out = {int(r[0]) for r in direct.all()}
+        via_role = await self._session.execute(
+            select(RoleUser.user_id)
+            .join(Roles, Roles.id == RoleUser.role_id)
+            .join(GroupRole, GroupRole.role_id == RoleUser.role_id)
+            .join(Users, Users.id == RoleUser.user_id)
+            .where(
+                GroupRole.group_id == group_id,
+                GroupRole.permission_key.in_(keys),
+                GroupRole.permission_value == 1,
+                Roles.valid_id == 1,
+                Users.valid_id == 1,
+            )
+        )
+        out |= {int(r[0]) for r in via_role.all()}
+        return out
+
     async def is_admin(self, user_id: int) -> bool:
         """Return True if *user_id* has ``rw`` on the ``admin`` group.
 

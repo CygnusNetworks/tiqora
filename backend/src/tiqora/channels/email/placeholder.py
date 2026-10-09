@@ -23,6 +23,13 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.domain.dynamic_field_config import config_from_yaml
+from tiqora.domain.dynamic_field_values import (
+    DynamicFieldConfig,
+    df_display_value,
+    df_readable_value,
+    get_df_values_bulk,
+)
 from tiqora.domain.settings_store import get_setting_bool
 from tiqora.domain.timezones import format_in_zone, resolve_user_time_zone
 from tiqora.znuny.sysconfig import SysConfig
@@ -113,6 +120,15 @@ class PlaceholderContext:
     # the text is written for. Datetimes are stringified at load time, so a
     # context is only valid for the zone it was loaded with.
     time_zone: str = "UTC"
+    # Znuny's TemplateGenerator::_Replace answers an unknown or empty tag with "-" and leaves
+    # <OTRS_TA_*> alone (TemplateGenerator.pm:1592-1600, 1682, 2050-2068). Off for e-mail
+    # templates and notifications, which keep rendering an empty string; on for process smart tags.
+    znuny_dash: bool = False
+    # Last customer / agent article (Znuny ``Data`` / ``DataAgent``): read by the generic
+    # ``<OTRS_CUSTOMER_*>`` / ``<OTRS_AGENT_*>`` tags only, never by ``CUSTOMER_DATA_`` (allow-list
+    # gate) or ``CURRENT_``.
+    customer_article: dict[str, str] = field(default_factory=dict)
+    agent_article: dict[str, str] = field(default_factory=dict)
 
 
 def _as_str(value: Any, zone: str = "UTC") -> str:
@@ -357,6 +373,33 @@ async def _fetch_customer_allowlist(session: AsyncSession) -> set[str] | None:
         return None
 
 
+async def _fetch_ticket_df_entries(session: AsyncSession, ticket_id: int) -> dict[str, str]:
+    """``dynamicfield_<name>`` (stored) and ``dynamicfield_<name>_value`` (display) per valid
+    ticket dynamic field that has a value; multiple values are joined with ``", "``."""
+    rows = (
+        await session.execute(
+            text(
+                "SELECT id, name, field_type, config FROM dynamic_field"
+                " WHERE object_type = 'Ticket' AND valid_id = 1 ORDER BY id"
+            )
+        )
+    ).fetchall()
+    fields = {
+        int(r[0]): (DynamicFieldConfig(id=int(r[0]), name=str(r[1]), field_type=str(r[2])), r[3])
+        for r in rows
+    }
+    values = await get_df_values_bulk(session, [f for f, _ in fields.values()], [ticket_id])
+    out: dict[str, str] = {}
+    for field_id, (df, raw_config) in fields.items():
+        stored = [v for v in values.get((field_id, ticket_id), []) if v != ""]
+        if not stored:
+            continue
+        key = f"dynamicfield_{df.name.lower()}"
+        out[key] = df_readable_value(df.field_type, stored)
+        out[f"{key}_value"] = df_display_value(df.field_type, config_from_yaml(raw_config), stored)
+    return out
+
+
 async def load_agent_maps(session: AsyncSession, user_id: int | None) -> dict[str, str]:
     """Placeholder maps (``UserFirstname``/``UserFullname``/…) for one agent.
 
@@ -501,6 +544,8 @@ async def load_placeholder_context(
         if col in row:
             ticket_map[col] = _as_str(row.get(col))
 
+    ticket_map.update(await _fetch_ticket_df_entries(session, int(ticket_id)))
+
     # Caller-supplied ticket vars win for explicit keys (autoresponse overrides).
     if ticket:
         ticket_map.update(_lower_map({k: _as_str(v, time_zone) for k, v in ticket.items()}))
@@ -538,23 +583,29 @@ async def _resolve_tag_raw(
         found = _lookup(ctx.ticket, field)
         return "" if found is None else found
 
-    if tag_u.startswith("CUSTOMER_DATA_"):
-        field = tag[len("CUSTOMER_DATA_") :]
-        # Optional allow-list: when set, only registered+enabled tags resolve.
-        if ctx.customer_allowlist is not None and field.lower() not in ctx.customer_allowlist:
-            return ""
-        found = _lookup(ctx.customer, field)
-        return "" if found is None else found
-
-    if tag_u.startswith("CUSTOMER_"):
-        rest = tag[len("CUSTOMER_") :]
+    # OTRS_CUSTOMER_DATA aliases OTRS_CUSTOMER (TemplateGenerator.pm:1687): one hash,
+    # CustomerUser plus the article ``Data`` (:1529), and the same subject / body specials.
+    is_customer_data = tag_u.startswith("CUSTOMER_DATA_")
+    if is_customer_data or tag_u.startswith("CUSTOMER_"):
+        rest = tag[len("CUSTOMER_DATA_" if is_customer_data else "CUSTOMER_") :]
         rest_u = rest.upper()
+        # Optional allow-list (CUSTOMER_DATA_ only): registered+enabled tags resolve.
+        if (
+            is_customer_data
+            and ctx.customer_allowlist is not None
+            and rest.lower() not in ctx.customer_allowlist
+        ):
+            return ""
         if rest_u == "SUBJECT" or rest_u.startswith("SUBJECT"):
             # CUSTOMER_SUBJECT[n] → first n chars of subject
             subj = ctx.customer_subject or ""
             if bracket and bracket.isdigit():
                 return subj[: int(bracket)]
             return subj
+        if is_customer_data and rest_u == "EMAIL" and "email" in ctx.customer:
+            # The raw customer_user.email column used by existing templates; Znuny's quoted-body
+            # special of that name is only reachable through ``<OTRS_CUSTOMER_EMAIL>``.
+            return ctx.customer["email"]
         if rest_u == "EMAIL" or rest_u.startswith("EMAIL"):
             lines = ctx.customer_email_lines
             count = int(bracket) if bracket and bracket.isdigit() else len(lines)
@@ -574,7 +625,7 @@ async def _resolve_tag_raw(
                     ).strip()
                 return full or ctx.customer.get("userlogin") or ""
             return ""
-        found = _lookup(ctx.customer, rest)
+        found = _lookup({**ctx.customer, **ctx.customer_article}, rest)
         return "" if found is None else found
 
     if tag_u.startswith("OWNER_"):
@@ -587,13 +638,10 @@ async def _resolve_tag_raw(
         found = _lookup(ctx.responsible, field)
         return "" if found is None else found
 
-    if tag_u.startswith("CURRENT_"):
-        field = tag[len("CURRENT_") :]
-        found = _lookup(ctx.current_user, field)
-        return "" if found is None else found
-
-    if tag_u.startswith("AGENT_"):
-        field = tag[len("AGENT_") :]
+    # OTRS_CURRENT aliases OTRS_AGENT (TemplateGenerator.pm:1687): CurrentUser plus DataAgent
+    # (:1484), with the same subject / body specials.
+    if tag_u.startswith(("CURRENT_", "AGENT_")):
+        field = tag[len("CURRENT_" if tag_u.startswith("CURRENT_") else "AGENT_") :]
         field_u = field.upper()
         # Agent article subject/body need article context — empty when absent.
         if field_u.startswith("SUBJECT") and ctx.agent_subject is not None:
@@ -605,7 +653,7 @@ async def _resolve_tag_raw(
             return "\n".join(lines[: int(bracket)] if bracket and bracket.isdigit() else lines)
         if field_u in {"SUBJECT", "BODY", "NOTE", "EMAIL"}:
             return ""
-        found = _lookup(ctx.current_user, field)
+        found = _lookup({**ctx.current_user, **ctx.agent_article}, field)
         return "" if found is None else found
 
     if tag_u == "QUEUE":
@@ -646,7 +694,8 @@ async def _resolve_tag_raw(
     if tag_u == "LAST_NAME":
         return ctx.current_user.get("userlastname") or ""
 
-    # Completely unknown tag prefix/name → empty (do not leave raw markup).
+    # Completely unknown tag prefix/name → empty (do not leave raw markup); in Znuny mode the
+    # caller turns the empty result into "-" (TemplateGenerator.pm:1682, the OTRS_ catch-all).
     logger.debug("placeholder_unknown_tag", tag=tag)
     return ""
 
@@ -666,11 +715,11 @@ async def _resolve_tag(
     ctx: PlaceholderContext,
     sysconfig: SysConfig,
 ) -> str:
-    """Resolve one tag and mask secrets (single choke point for every expansion path).
+    """Resolve one tag and mask secrets (single choke point for templates, conditions, actions).
 
     ``OTRS_CONFIG_<name>`` is masked when the setting name ends in ``password``/``pw`` plus
-    digits (``:1799-1806`` -> ``:2132-2143``); every other hash element whose name matches
-    ``config|secret|passw|userpw|auth|token`` becomes ``xxx`` (``:2050-2056``).
+    digits (``:1799-1806`` -> ``:2132-2143``); every other hash/special element whose name
+    matches ``config|secret|passw|userpw|auth|token`` becomes ``xxx`` (``:2050-2056``).
     Dynamic-field tags are Znuny's ``Dynamic`` handler and are not masked.
     """
     value = await _resolve_tag_raw(tag, bracket, ctx=ctx, sysconfig=sysconfig)
@@ -784,7 +833,20 @@ async def _expand_placeholders_inner(
     for match in list(_TAG_RE.finditer(text)):
         tag = match.group(1)
         bracket = match.group(2)
+        tag_u = tag.upper()
+        if ctx.znuny_dash and tag_u.startswith("TA_"):
+            continue  # process-management marker, kept verbatim (TemplateGenerator.pm:1592-1600)
         replacement = await _resolve_tag(tag, bracket, ctx=ctx, sysconfig=sysconfig)
+        if (
+            ctx.znuny_dash
+            and not tag_u.startswith("CONFIG_")
+            and (replacement == "" or (replacement == "0" and "DYNAMICFIELD_" not in tag_u))
+        ):
+            # DF tags keep "0" (_ReplaceDynamicField, TemplateGenerator.pm:1340-1346); only hash
+            # elements turn a falsy value into "-".
+            # An empty hash value falls through to the "-" catch-all (TemplateGenerator.pm:2050,
+            # 1682); OTRS_CONFIG_ is replaced earlier, ``Get($Key) // ''``, and stays empty (:1799).
+            replacement = "-"
         if ctx.escape_html:
             # Values reach an HTML template as plain text (a quoted article, a
             # name): escape them, and keep their line breaks visible.

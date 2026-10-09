@@ -91,7 +91,11 @@ function makeTicket(overrides: Partial<TicketDetail> = {}): TicketDetail {
   } as TicketDetail;
 }
 
-function wrap(ticket: TicketDetail, overflowItems?: React.ReactNode) {
+function wrap(
+  ticket: TicketDetail,
+  overflowItems?: React.ReactNode,
+  allowedActions?: ReadonlySet<string> | null,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -103,6 +107,7 @@ function wrap(ticket: TicketDetail, overflowItems?: React.ReactNode) {
           overflowItems={overflowItems}
           canNote
           onOpenNote={vi.fn()}
+          allowedActions={allowedActions}
         />
       </I18nextProvider>
     </QueryClientProvider>,
@@ -180,5 +185,28 @@ describe("TicketHeader", () => {
     const item = await screen.findByText("5 very high");
     fireEvent.click(item);
     await waitFor(() => expect(patchTicket).toHaveBeenCalledWith(7, { priority_id: 5 }));
+  });
+
+  it("passes the Action ACL result down: pills and the dynamic-field edit follow it", async () => {
+    screenDynamicFields.mockResolvedValue([
+      { name: "Area", label: "Bereich", field_type: "Dropdown", required: false, possible_values: { net: "Netz" } },
+    ]);
+    const ticket = makeTicket({
+      permissions: { ro: true, rw: true, note: true, owner: true, priority: true, move_into: true, create: true },
+      dynamic_fields: [{ name: "Area", label: "Bereich", field_type: "Dropdown", values: ["net"] }],
+    });
+    const { unmount } = wrap(ticket, undefined, new Set(["AgentTicketNote"]));
+    await screen.findByText("Netz");
+    expect(screen.queryByTestId("ticket-df-edit")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-pill-priority")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("ticket-pill-owner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ticket-readonly-owner")).toHaveTextContent("Ada");
+    expect(screen.queryByTestId("ticket-actions-reply")).not.toBeInTheDocument();
+    unmount();
+
+    wrap(ticket, undefined, new Set(["AgentTicketFreeText", "AgentTicketPriority", "AgentTicketCompose"]));
+    expect(await screen.findByTestId("ticket-df-edit")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-pill-priority")).toBeInTheDocument();
+    expect(screen.getByTestId("ticket-actions-reply")).toBeInTheDocument();
   });
 });

@@ -7,12 +7,12 @@ from typing import Any
 
 from tiqora.api.compat.mapping import DataInclude, MappingError
 from tiqora.api.compat.mapping.perl import (
-    REGEX_TIMEOUT_SECONDS,
     compile_perl_regex,
     perl_is_string,
     perl_str,
     perl_truthy,
 )
+from tiqora.util.perl_regex import REGEX_TIMEOUT_SECONDS
 
 _CSV_PARAM = "OutOfOfficeEntriesCSVString"
 

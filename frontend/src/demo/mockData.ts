@@ -1546,6 +1546,74 @@ const demoExportJob = {
   finished_at: "2026-10-08T09:00:02Z",
 };
 
+const demoZoomActions = [
+  "AgentTicketCompose", "AgentTicketForward", "AgentTicketNote", "AgentTicketPhoneOutbound",
+  "AgentTicketPhoneInbound", "AgentTicketClose", "AgentTicketPending", "AgentTicketPriority",
+  "AgentTicketMove", "AgentTicketOwner", "AgentTicketResponsible", "AgentTicketCustomer",
+  "AgentTicketLock", "AgentTicketWatcher", "AgentLinkObject", "AgentTicketMerge",
+  "AgentTicketPrint", "AgentTicketFreeText", "AgentTicketProcess",
+];
+
+const demoDeployRevision = {
+  id: 3,
+  source: "znuny",
+  entity_count: 3,
+  deployed_at: "2026-10-07T14:30:00Z",
+  deployed_by: null,
+};
+const demoDeployStatus = {
+  process: { revision: demoDeployRevision, pending_changes: 2, running_live: false },
+  acl: { revision: { ...demoDeployRevision, id: 5, source: "initial" }, pending_changes: 0, running_live: false },
+  ownership_active: false,
+  can_deploy_from_tiqora: true,
+};
+const demoAdminProcesses = [
+  { entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active", activity_count: 4, start_interfaces: ["AgentInterface", "CustomerInterface"] },
+  { entity_id: "Process-onb", name: "Onboarding", state_entity_id: "S2", state_name: "Inactive", activity_count: 6, start_interfaces: ["AgentInterface"] },
+  { entity_id: "Process-old", name: "Altprozess Beschaffung", state_entity_id: "S3", state_name: "FadeAway", activity_count: 3, start_interfaces: [] },
+];
+
+// Single process of the admin detail page (ProcessDetailOut): the list rows plus two activities.
+function demoProcessDetail(entityId: string) {
+  const row = demoAdminProcesses.find((r) => r.entity_id === entityId) ?? demoAdminProcesses[0];
+  return {
+    id: demoAdminProcesses.indexOf(row) + 1,
+    entity_id: row.entity_id,
+    name: row.name,
+    state_entity_id: row.state_entity_id,
+    start_activity_entity_id: "Activity-1",
+    activities: [
+      { entity_id: "Activity-1", name: "Antrag erfassen", activity_dialogs: [{ entity_id: "AD-1", name: "Antrag" }] },
+      {
+        entity_id: "Activity-2",
+        name: "Genehmigung",
+        activity_dialogs: [
+          { entity_id: "AD-2", name: "Genehmigen" },
+          { entity_id: "AD-3", name: "Rückfrage" },
+        ],
+      },
+    ],
+  };
+}
+// Daemons page: the deploy watcher runs in live mode (the banner under its name).
+const demoDaemons = {
+  services: [
+    {
+      slug: "deploy_watch",
+      enabled: true,
+      toggleable: true,
+      schedule: "interval",
+      interval_seconds: 30,
+      interval_overridden: false,
+      tick_timeout_seconds: 60,
+      last_run_at: "2026-10-08T10:00:00Z",
+      last_ok_at: "2026-10-08T10:00:00Z",
+      last_error: null,
+      last_result: { mode: "live" },
+    },
+  ],
+};
+
 const demoReportExportJob = {
   id: 9201,
   kind: "core.report_export",
@@ -1742,7 +1810,20 @@ export function resolveData(path: string, method: string): unknown | undefined {
   // Zoom edit: Znuny's AgentTicketFreeText dynamic-field config (Category has a value, Due is empty)
   // (the resolver sees no query/body: every screen gets the same config, options stay the static ones)
   if (p.endsWith("/api/v1/reference/dynamic-fields")) return demoFreeTextFields;
-  if (p.endsWith("/api/v1/reference/field-options") && method === "POST") return { options: {} };
+  // The resolver cannot read the request, so the scoped owner/responsible lists are the same for
+  // every ticket and queue; the other fields are left out (the pickers keep their static lists).
+  if (p.endsWith("/api/v1/reference/field-options") && method === "POST") {
+    const agents = OWNERS.map((o) => ({ value: String(o.owner_id), label: o.owner_name }));
+    return { options: { owner: agents, responsible: agents } };
+  }
+  // Zoom menu: no Action ACL in the demo, everything is allowed.
+  if (p.match(/\/api\/v1\/tickets\/\d+\/acl-actions$/)) return { allowed: demoZoomActions };
+  // Admin: deployed process / ACL revisions (Tiqora may deploy itself, two process edits are pending).
+  if (p.endsWith("/api/v1/admin/deploy-status")) return demoDeployStatus;
+  if (p.endsWith("/api/v1/admin/deploy") && method === "POST")
+    return { action: "recorded", checksum: "demo", kind: "process", revision_id: 4 };
+  if (p.endsWith("/api/v1/admin/processes")) return demoAdminProcesses;
+  if (p.endsWith("/api/v1/admin/daemons") && method === "GET") return demoDaemons;
   if (p.endsWith("/api/v1/phone/calls/active")) return [];
   if (p.endsWith("/api/v1/reference/caller")) return demoCallerLookup;
   // Background jobs: the ticket CSV export finishes at once in the demo.
@@ -1824,6 +1905,15 @@ export function resolveData(path: string, method: string): unknown | undefined {
   if (p.endsWith("/api/v1/kb/assignable-groups")) return [{ id: 2, name: "users" }, { id: 3, name: "support" }];
   if (p.endsWith("/api/v1/calendar/calendars")) return calendars;
   if (p.endsWith("/api/v1/calendar/appointments")) return occurrences;
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/state$/)) return processTicketState;
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/) || p.match(/\/api\/v1\/process\/[^/]+\/start-form$/)) return processDialogForm;
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/submit$/) && method === "POST") return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: processTicketState };
+  if (p.endsWith("/api/v1/process/tickets") && method === "POST") return { ticket_id: 1, ticket_number: "2026100001", activity_changed: true, unsupported_actions: [], state: processTicketState };
+  if (p.match(/\/api\/v1\/process\/ticket\/\d+\/start$/) && method === "POST") return processTicketState;
+  if (p.match(/\/api\/v1\/process\/?$/) && method === "GET") return [{ id: 1, entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active" }];
+  // One process of the admin detail page; ids that are not a process (ticket/, tickets) fall through.
+  const processDetail = p.match(/\/api\/v1\/process\/([^/?]+)$/);
+  if (processDetail && method === "GET") return demoProcessDetail(decodeURIComponent(processDetail[1]));
   if (p.includes("/api/v1/process")) return method === "GET" ? [] : {};
   // Admin — assignment editors (before the generic list handler)
   if (p.match(/\/admin\/groups\/\d+\/customer-users$/)) { const id = Number(p.split("/").slice(-2)[0]); return groupCustomerUsers[id] ?? []; }
@@ -1986,3 +2076,83 @@ export function resolveData(path: string, method: string): unknown | undefined {
   return undefined;
 }
 
+
+const processTicketState = {
+  process_entity_id: "Process-demo",
+  process_name: "Bestellung",
+  activity_entity_id: "Activity-demo",
+  activity_name: "Freigabe prüfen",
+  available_dialogs: [{ entity_id: "ActivityDialog-demo", name: "Freigabe erteilen", description_short: "" }],
+  available_transitions_count: 1,
+  process_state: "Active",
+  can_start: false,
+};
+
+const processDialogForm = {
+  process_entity_id: "Process-demo",
+  activity_dialog_entity_id: "ActivityDialog-demo",
+  name: "Freigabe erteilen",
+  description_short: "Bitte die Bestellung prüfen und freigeben.",
+  description_long: "",
+  submit_button_text: "Freigeben",
+  submit_advice_text: "",
+  fields: [
+    { name: "Priority", kind: "select", label: "Priority", required: true, description_short: "", description_long: "", default: "3", options: [{ value: "3", label: "3 normal" }, { value: "4", label: "4 hoch" }] },
+    { name: "Article", kind: "article", label: "Article", required: true, description_short: "", description_long: "", default: null, options: [] },
+    { name: "PendingTime", kind: "pending_time", label: "PendingTime", required: false, description_short: "", description_long: "", default: null, options: [] },
+    { name: "Attachments", kind: "unsupported", label: "Attachments", required: false, description_short: "", description_long: "", default: null, options: [] },
+  ],
+};
+
+// --- Customer portal process plane -------------------------------------------------------
+// Customer-shaped: the server drops Owner/Responsible/Lock/PendingTime/CustomerID/CustomerUserID
+// for customers (CustomerTicketProcess), so these forms carry only title, article and a queue pick.
+const portalField = (name: string, kind: string, extra: Record<string, unknown> = {}) => ({
+  name, kind, label: name, required: false, description_short: "", description_long: "", default: null, options: [], ...extra,
+});
+
+const portalStartForm = {
+  process_entity_id: "Process-demo",
+  activity_dialog_entity_id: "ActivityDialog-start",
+  name: "Bestellung anlegen",
+  description_short: "Beschreiben Sie, was Sie bestellen möchten.",
+  description_long: "",
+  submit_button_text: "Bestellen",
+  submit_advice_text: "",
+  fields: [
+    portalField("Title", "text", { required: true }),
+    portalField("Queue", "select", { required: true, options: [{ value: "2", label: "Support" }, { value: "3", label: "Sales" }] }),
+    portalField("Article", "article", { required: true }),
+  ],
+};
+
+const portalDialogForm = {
+  ...portalStartForm,
+  activity_dialog_entity_id: "ActivityDialog-demo",
+  name: "Rückfrage beantworten",
+  description_short: "",
+  submit_button_text: "Antworten",
+  fields: [portalField("Article", "article", { required: true })],
+};
+
+const portalProcessState = {
+  ...processTicketState,
+  activity_name: "Rückfrage",
+  available_dialogs: [{ entity_id: "ActivityDialog-demo", name: "Rückfrage beantworten", description_short: "" }],
+};
+
+/** Mocks for `/api/portal/process*`; undefined when the path is not a process route. */
+export function demoPortalProcess(pathname: string, method: string): unknown {
+  const p = pathname.replace(/\/+$/, "");
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/state$/)) return portalProcessState;
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/dialog\/[^/]+\/form$/)) return portalDialogForm;
+  if (p.match(/\/api\/portal\/process\/[^/]+\/start-form$/)) return portalStartForm;
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/submit$/) && method === "POST")
+    return { activity_changed: true, new_activity_entity_id: null, transition_entity_id: null, unsupported_actions: [], state: portalProcessState };
+  if (p.endsWith("/api/portal/process/tickets") && method === "POST")
+    return { ticket_id: 1, ticket_number: "2026100001", activity_changed: true, unsupported_actions: [], state: portalProcessState };
+  if (p.match(/\/api\/portal\/process\/ticket\/\d+\/start$/) && method === "POST") return portalProcessState;
+  if (p.endsWith("/api/portal/process") && method === "GET")
+    return [{ id: 1, entity_id: "Process-demo", name: "Bestellung", state_entity_id: "S1", state_name: "Active" }];
+  return undefined;
+}

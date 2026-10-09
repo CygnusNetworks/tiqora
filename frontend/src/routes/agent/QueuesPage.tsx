@@ -39,6 +39,8 @@ import { TICKET_CHANNEL_KEYS, TICKET_CHANNELS } from "@/lib/ticketChannel";
 import { runConcurrent } from "@/lib/bulk";
 import { cn } from "@/lib/cn";
 import { jobsApi } from "@/lib/jobsApi";
+import { fieldOptionsApi } from "@/lib/fieldOptionsApi";
+import { useAgentOptions } from "@/lib/agentOptions";
 import { apiErrorMessage } from "@/lib/avatarApi";
 import { JobDialog } from "@/components/jobs/JobDialog";
 import { priorityLabel } from "@/lib/priority";
@@ -120,6 +122,8 @@ const SELECT_ALL_HARD_MAX = 2000;
 const SELECT_ALL_PAGE_SIZE = 200;
 /** Concurrent PATCH requests in flight for a bulk apply. */
 const BULK_CONCURRENCY = 4;
+/** `context.ticket_ids` of POST /reference/field-options accepts at most this many ids. */
+const BULK_OPTIONS_MAX = 500;
 /** How many overdue / due-soon tickets the pinned block shows before "show all". */
 const PINNED_MAX = 5;
 
@@ -369,11 +373,14 @@ export function QueuesPage() {
     queryFn: () => api.listReferenceStates(),
     enabled: wantsReferenceData,
   });
-  const agentsQ = useQuery({
-    queryKey: ["reference", "agents"],
-    queryFn: () => api.listReferenceAgents(),
-    enabled: wantsReferenceData,
-  });
+  // Row quick edit: owner choices of the ticket whose owner menu was opened last (scoped to
+  // its queue and the ACLs by the server, like Znuny's owner dialog).
+  const [ownerTicketId, setOwnerTicketId] = useState<number | null>(null);
+  const rowOwners = useAgentOptions(
+    "owner",
+    { ticket_id: ownerTicketId ?? undefined },
+    { enabled: ownerTicketId !== null },
+  );
 
   const selectedQueueName = (() => {
     if (view) {
@@ -509,19 +516,47 @@ export function QueuesPage() {
     value: p.id,
     label: priorityLabel(t, p.name, p.name),
   }));
-  const agentItems: SelectMenuItem<number>[] = (agentsQ.data ?? []).map((a) => ({
-    value: a.id,
-    label: a.full_name,
-    hint: a.login,
+  // Bulk pickers follow Znuny's AgentTicketBulk: ACL-filtered state/priority/queue, owner and
+  // responsible scoped to the selected tickets' queues (the move target wins). While the answer
+  // is not there yet (or failed) state/priority/queue stay unfiltered; agents stay empty.
+  // The endpoint takes at most BULK_OPTIONS_MAX ids; beyond that the first ones decide.
+  const bulkIds = selectedIds.slice(0, BULK_OPTIONS_MAX);
+  const bulkOptionsQ = useQuery({
+    queryKey: ["reference", "field-options", "bulk", bulkIds, draft.queue_id ?? null],
+    queryFn: ({ signal }) =>
+      fieldOptionsApi.fetch(
+        {
+          fields: ["state", "priority", "queue", "owner"],
+          context: { action: "AgentTicketBulk", ticket_ids: bulkIds, queue_id: draft.queue_id },
+        },
+        signal,
+      ),
+    // Only while the panel is open; no placeholder data, so owners of an older selection or
+    // move target are never clickable while the new answer is on its way.
+    enabled: hasSelection && panelOpen && bulkIds.length > 0,
+  });
+  const bulkOptions = bulkOptionsQ.data?.options;
+  const allowedIds = (field: string): Set<number> | null =>
+    bulkOptions?.[field] ? new Set(bulkOptions[field].map((o) => Number(o.value))) : null;
+  const allowedStates = allowedIds("state");
+  const allowedPriorities = allowedIds("priority");
+  const allowedQueues = allowedIds("queue");
+  const agentItems: SelectMenuItem<number>[] = rowOwners.items;
+  const bulkAgentItems: SelectMenuItem<number>[] = (bulkOptions?.owner ?? []).map((o) => ({
+    value: Number(o.value),
+    label: o.label,
   }));
   const bulkQueueItems: SelectMenuItem<number>[] = flattenQueues(queuesQ.data ?? [])
-    .filter((q) => q.valid)
+    .filter((q) => q.valid && (allowedQueues === null || allowedQueues.has(q.id)))
     .map((q) => ({ value: q.id, label: q.name }));
 
   // ── Bulk quick actions ─────────────────────────────────────────────────
   // Each one adds its change to the draft and opens the panel; pressed again
   // it takes the change back out. Closing the panel discards the draft.
-  const bulkStates = statesQ.data ?? [];
+  const bulkStates = (statesQ.data ?? []).filter((s) => allowedStates === null || allowedStates.has(s.id));
+  const bulkPriorities = (prioritiesQ.data ?? []).filter(
+    (p) => allowedPriorities === null || allowedPriorities.has(p.id),
+  );
   const closeState =
     bulkStates.find((s) => s.name === "closed successful") ??
     bulkStates.find((s) => s.type_name.startsWith("closed"));
@@ -563,7 +598,15 @@ export function QueuesPage() {
   const quickActions: { key: QuickAction; icon: ReactNode; label: string; disabled?: boolean }[] = [
     { key: "close", icon: <CheckIcon />, label: t("queue.bulk.quickClose"), disabled: !closeState },
     { key: "pending", icon: <ClockIcon />, label: t("queue.bulk.quickPending"), disabled: !pendingState },
-    { key: "mine", icon: <UserIcon />, label: t("queue.bulk.quickMine"), disabled: user?.id == null },
+    {
+      key: "mine",
+      icon: <UserIcon />,
+      label: t("queue.bulk.quickMine"),
+      // Only while the server's owner list for this selection includes me.
+      disabled:
+        user?.id == null ||
+        (bulkOptions?.owner != null && !bulkAgentItems.some((a) => a.value === user.id)),
+    },
     { key: "move", icon: <FolderIcon />, label: t("queue.bulk.quickMove") },
   ];
   const selectedKnown = [...pinnedItems, ...items.filter((i) => !pinnedIds.has(i.id))].filter((i) =>
@@ -982,7 +1025,9 @@ export function QueuesPage() {
             stateItems,
             priorityItems,
             agentItems,
-            agentsLoading: agentsQ.isLoading,
+            agentsLoading: rowOwners.isLoading,
+            ownerTicketId,
+            onRequestOwners: setOwnerTicketId,
             onRequestOptions: () => setRefDataRequested(true),
             onPatch: (id, body) => rowPatch.mutate({ id, body }),
           }}
@@ -993,10 +1038,15 @@ export function QueuesPage() {
         <BulkEditPanel
           count={selectedIds.length}
           known={selectedKnown}
+          ownerNotice={
+            selectedIds.length > BULK_OPTIONS_MAX
+              ? t("queue.bulk.ownerLimit", { max: BULK_OPTIONS_MAX })
+              : undefined
+          }
           refs={{
             states: bulkStates,
-            priorities: prioritiesQ.data ?? [],
-            agents: agentItems,
+            priorities: bulkPriorities,
+            agents: bulkAgentItems,
             queues: bulkQueueItems,
           }}
           draft={draft}

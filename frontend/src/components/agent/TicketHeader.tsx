@@ -3,6 +3,7 @@ import { LinkedTickets } from "./LinkedTickets";
 import { TicketDynamicFields } from "./TicketDynamicFields";
 import { TicketHeaderActions } from "./TicketHeaderActions";
 import type { TicketAiSlots } from "./AiPanel";
+import type { AllowedActions } from "@/lib/aclActions";
 import { combinedEscalationLevel, spineClassName, stateColorVar } from "@/lib/status";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -18,6 +19,7 @@ export function TicketHeader({
   onOpenNote,
   ai,
   similar,
+  allowedActions = null,
 }: {
   ticket: TicketDetail;
   /** Page-level items appended to the header's ⋯ menu. */
@@ -30,6 +32,8 @@ export function TicketHeader({
   ai?: TicketAiSlots;
   /** "Similar tickets" trigger for the people row. */
   similar?: ReactNode;
+  /** Action ACL result for this ticket (`null` = unknown: show everything). */
+  allowedActions?: AllowedActions;
 }) {
   const escLevel = combinedEscalationLevel([
     ticket.escalation_time,
@@ -54,9 +58,10 @@ export function TicketHeader({
         overflowItems={overflowItems}
         ai={ai}
         similar={similar}
+        allowedActions={allowedActions}
       />
       <LinkedTickets ticketId={ticket.id} />
-      <TicketDynamicFields ticket={ticket} />
+      <TicketDynamicFields ticket={ticket} allowedActions={allowedActions} />
     </header>
   );
 }

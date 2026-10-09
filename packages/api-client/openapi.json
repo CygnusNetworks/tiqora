@@ -677,6 +677,47 @@
         "title": "ActivityDialogSummaryOut",
         "type": "object"
       },
+      "AdminProcessOut": {
+        "properties": {
+          "activity_count": {
+            "title": "Activity Count",
+            "type": "integer"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "start_interfaces": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Start Interfaces",
+            "type": "array"
+          },
+          "state_entity_id": {
+            "title": "State Entity Id",
+            "type": "string"
+          },
+          "state_name": {
+            "title": "State Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entity_id",
+          "name",
+          "state_entity_id",
+          "state_name",
+          "activity_count",
+          "start_interfaces"
+        ],
+        "title": "AdminProcessOut",
+        "type": "object"
+      },
       "AgentCustomerCreateOut": {
         "description": "Created customer-user ref for the ticket Kunde dialog.",
         "properties": {
@@ -11161,6 +11202,114 @@
         "title": "DbStatusOut",
         "type": "object"
       },
+      "DeployIn": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "process",
+              "acl"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "DeployIn",
+        "type": "object"
+      },
+      "DeployKindStatusOut": {
+        "properties": {
+          "pending_changes": {
+            "title": "Pending Changes",
+            "type": "integer"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RevisionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running_live": {
+            "title": "Running Live",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revision",
+          "pending_changes",
+          "running_live"
+        ],
+        "title": "DeployKindStatusOut",
+        "type": "object"
+      },
+      "DeployOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "recorded",
+              "unchanged"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "checksum": {
+            "title": "Checksum",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "process",
+              "acl"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "revision_id": {
+            "title": "Revision Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "revision_id",
+          "checksum",
+          "action"
+        ],
+        "title": "DeployOut",
+        "type": "object"
+      },
+      "DeployStatusOut": {
+        "properties": {
+          "acl": {
+            "$ref": "#/components/schemas/DeployKindStatusOut"
+          },
+          "can_deploy_from_tiqora": {
+            "title": "Can Deploy From Tiqora",
+            "type": "boolean"
+          },
+          "ownership_active": {
+            "title": "Ownership Active",
+            "type": "boolean"
+          },
+          "process": {
+            "$ref": "#/components/schemas/DeployKindStatusOut"
+          }
+        },
+        "required": [
+          "process",
+          "acl",
+          "ownership_active",
+          "can_deploy_from_tiqora"
+        ],
+        "title": "DeployStatusOut",
+        "type": "object"
+      },
       "DialOut": {
         "properties": {
           "call_id": {
@@ -12386,6 +12535,14 @@
               }
             ],
             "title": "Ticket Id"
+          },
+          "ticket_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 500,
+            "title": "Ticket Ids",
+            "type": "array"
           },
           "type_id": {
             "anyOf": [
@@ -17595,6 +17752,61 @@
         "title": "NamedRefOut",
         "type": "object"
       },
+      "NewProcessTicketIn": {
+        "description": "Body of ``POST /api/v1/process/tickets``: start dialog values of a new process ticket.",
+        "properties": {
+          "field_values": {
+            "additionalProperties": true,
+            "title": "Field Values",
+            "type": "object"
+          },
+          "process_entity_id": {
+            "title": "Process Entity Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "process_entity_id"
+        ],
+        "title": "NewProcessTicketIn",
+        "type": "object"
+      },
+      "NewProcessTicketOut": {
+        "description": "The created process ticket and the outcome of its first transition pass.",
+        "properties": {
+          "activity_changed": {
+            "title": "Activity Changed",
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/TicketProcessStateOut"
+          },
+          "ticket_id": {
+            "title": "Ticket Id",
+            "type": "integer"
+          },
+          "ticket_number": {
+            "title": "Ticket Number",
+            "type": "string"
+          },
+          "unsupported_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unsupported Actions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "ticket_number",
+          "activity_changed",
+          "unsupported_actions",
+          "state"
+        ],
+        "title": "NewProcessTicketOut",
+        "type": "object"
+      },
       "NewTicketPhoneCallIn": {
         "description": "First article of a phone ticket (Znuny AgentTicketPhone).",
         "properties": {
@@ -20682,9 +20894,145 @@
         "title": "ProcessDetailOut",
         "type": "object"
       },
-      "ProcessStartIn": {
-        "description": "Body of ``POST /api/v1/process/ticket/{ticket_id}/start``.",
+      "ProcessDialogFieldOut": {
         "properties": {
+          "default": {
+            "title": "Default"
+          },
+          "description_long": {
+            "default": "",
+            "title": "Description Long",
+            "type": "string"
+          },
+          "description_short": {
+            "default": "",
+            "title": "Description Short",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "textarea",
+              "select",
+              "multiselect",
+              "boolean",
+              "date",
+              "datetime",
+              "article",
+              "pending_time",
+              "customer",
+              "unsupported"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessDialogOptionOut"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "label",
+          "required"
+        ],
+        "title": "ProcessDialogFieldOut",
+        "type": "object"
+      },
+      "ProcessDialogFormOut": {
+        "description": "One activity dialog as the server wants it rendered: visible fields in order, with\ntheir kind and the ACL-filtered options.",
+        "properties": {
+          "activity_dialog_entity_id": {
+            "title": "Activity Dialog Entity Id",
+            "type": "string"
+          },
+          "description_long": {
+            "title": "Description Long",
+            "type": "string"
+          },
+          "description_short": {
+            "title": "Description Short",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessDialogFieldOut"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "process_entity_id": {
+            "title": "Process Entity Id",
+            "type": "string"
+          },
+          "submit_advice_text": {
+            "title": "Submit Advice Text",
+            "type": "string"
+          },
+          "submit_button_text": {
+            "title": "Submit Button Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "process_entity_id",
+          "activity_dialog_entity_id",
+          "name",
+          "description_short",
+          "description_long",
+          "submit_button_text",
+          "submit_advice_text",
+          "fields"
+        ],
+        "title": "ProcessDialogFormOut",
+        "type": "object"
+      },
+      "ProcessDialogOptionOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "ProcessDialogOptionOut",
+        "type": "object"
+      },
+      "ProcessStartIn": {
+        "description": "Body of ``POST /api/v1/process/ticket/{ticket_id}/start`` (enroll through the start\ndialog: ``field_values`` are the dialog's fields, like a dialog submit).",
+        "properties": {
+          "field_values": {
+            "additionalProperties": true,
+            "title": "Field Values",
+            "type": "object"
+          },
           "process_entity_id": {
             "title": "Process Entity Id",
             "type": "string"
@@ -20713,6 +21061,11 @@
           },
           "state_entity_id": {
             "title": "State Entity Id",
+            "type": "string"
+          },
+          "state_name": {
+            "default": "",
+            "title": "State Name",
             "type": "string"
           }
         },
@@ -23556,6 +23909,47 @@
           "label_key"
         ],
         "title": "ResultColumnOut",
+        "type": "object"
+      },
+      "RevisionOut": {
+        "properties": {
+          "deployed_at": {
+            "format": "date-time",
+            "title": "Deployed At",
+            "type": "string"
+          },
+          "deployed_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deployed By"
+          },
+          "entity_count": {
+            "title": "Entity Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "entity_count",
+          "deployed_at",
+          "deployed_by"
+        ],
+        "title": "RevisionOut",
         "type": "object"
       },
       "RoleAssignment": {
@@ -27287,6 +27681,23 @@
         "title": "TemplateOut",
         "type": "object"
       },
+      "TicketAclActionsOut": {
+        "description": "Zoom menu entries the ticket's ACLs leave available (in ``ZOOM_ACTIONS`` order).",
+        "properties": {
+          "allowed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "allowed"
+        ],
+        "title": "TicketAclActionsOut",
+        "type": "object"
+      },
       "TicketAttributeRelationCreate": {
         "properties": {
           "acl_data": {
@@ -28178,6 +28589,14 @@
       "TicketFieldOptionsOut": {
         "description": "ACL-filtered id\u2192name maps (string keys for JSON).\n\nOnly requested fields are populated; others are omitted (empty dict).",
         "properties": {
+          "owner": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Owner",
+            "type": "object"
+          },
           "priority": {
             "additionalProperties": {
               "type": "string"
@@ -28192,6 +28611,14 @@
             },
             "default": {},
             "title": "Queue",
+            "type": "object"
+          },
+          "responsible": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Responsible",
             "type": "object"
           },
           "service": {
@@ -29033,6 +29460,11 @@
             "title": "Available Transitions Count",
             "type": "integer"
           },
+          "can_start": {
+            "default": false,
+            "title": "Can Start",
+            "type": "boolean"
+          },
           "process_entity_id": {
             "anyOf": [
               {
@@ -29054,6 +29486,17 @@
               }
             ],
             "title": "Process Name"
+          },
+          "process_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process State"
           }
         },
         "title": "TicketProcessStateOut",
@@ -31992,9 +32435,25 @@
     },
     "/api/portal/process/": {
       "get": {
-        "description": "List processes a customer may start (all known processes; start is gated separately).",
+        "description": "Processes the customer may start (Active, start dialog for the customer interface, ACLs).\nWith ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.",
         "operationId": "list_processes_api_portal_process__get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
           {
             "in": "cookie",
             "name": "tiqora_customer_session",
@@ -32102,8 +32561,76 @@
         ]
       }
     },
+    "/api/portal/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form": {
+      "get": {
+        "operationId": "get_ticket_dialog_form_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "activity_dialog_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Dialog Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Dialog Form",
+        "tags": [
+          "portal-process"
+        ]
+      }
+    },
     "/api/portal/process/ticket/{ticket_id}/start": {
       "post": {
+        "description": "Enroll an existing ticket through the process start dialog (assert_can_start, the\ndialog's mandatory fields and the first transitions run in ``enroll_ticket``).",
         "operationId": "start_ticket_process_api_portal_process_ticket__ticket_id__start_post",
         "parameters": [
           {
@@ -32291,6 +32818,141 @@
           }
         },
         "summary": "Submit Ticket Activity Dialog",
+        "tags": [
+          "portal-process"
+        ]
+      }
+    },
+    "/api/portal/process/tickets": {
+      "post": {
+        "description": "Create a ticket from the start dialog of a process (customer interface). The customer\nidentity comes from the session: submitted ``CustomerUserID``/``CustomerID``/``Owner`` are\nignored (the engine forces them from the actor, owner = the portal system user). A queue\nchosen in the dialog must be one of the customer's create queues.",
+        "operationId": "create_new_process_ticket_api_portal_process_tickets_post",
+        "parameters": [
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProcessTicketIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewProcessTicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create New Process Ticket",
+        "tags": [
+          "portal-process"
+        ]
+      }
+    },
+    "/api/portal/process/{process_entity_id}/start-form": {
+      "get": {
+        "description": "The start dialog of a process for the customer interface, built by the server.",
+        "operationId": "get_start_form_api_portal_process__process_entity_id__start_form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Start Form",
         "tags": [
           "portal-process"
         ]
@@ -43679,6 +44341,146 @@
         ]
       }
     },
+    "/api/v1/admin/deploy": {
+      "post": {
+        "operationId": "post_deploy_api_v1_admin_deploy_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Deploy",
+        "tags": [
+          "admin:deploy"
+        ]
+      }
+    },
+    "/api/v1/admin/deploy-status": {
+      "get": {
+        "operationId": "get_deploy_status_api_v1_admin_deploy_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Deploy Status",
+        "tags": [
+          "admin:deploy"
+        ]
+      }
+    },
     "/api/v1/admin/dynamic-fields": {
       "get": {
         "operationId": "list_dynamic_fields_api_v1_admin_dynamic_fields_get",
@@ -50127,6 +50929,75 @@
         "summary": "Update Priority",
         "tags": [
           "admin:priorities"
+        ]
+      }
+    },
+    "/api/v1/admin/processes": {
+      "get": {
+        "operationId": "list_admin_processes_api_v1_admin_processes_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminProcessOut"
+                  },
+                  "title": "Response List Admin Processes Api V1 Admin Processes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Admin Processes",
+        "tags": [
+          "admin:deploy"
         ]
       }
     },
@@ -68098,8 +68969,25 @@
     },
     "/api/v1/process/": {
       "get": {
+        "description": "Processes the agent may start (Active, start dialog for the agent interface, ACLs).\nWith ``ticket_id`` (enroll context) the ticket is access-checked and the Action ACL applies.",
         "operationId": "list_processes_api_v1_process__get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
           {
             "in": "header",
             "name": "authorization",
@@ -68234,6 +69122,90 @@
           }
         },
         "summary": "Get Activity Dialog",
+        "tags": [
+          "process"
+        ]
+      }
+    },
+    "/api/v1/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form": {
+      "get": {
+        "description": "A dialog of the ticket's current activity as a server-built form; 403 when the dialog is\nhidden for this agent (interface, Permission, ACLs), like the submit.",
+        "operationId": "get_ticket_dialog_form_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "activity_dialog_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Dialog Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Dialog Form",
         "tags": [
           "process"
         ]
@@ -68400,7 +69372,7 @@
     },
     "/api/v1/process/ticket/{ticket_id}/submit": {
       "post": {
-        "description": "Submit an activity dialog for *ticket_id*.\n\nRequires ``rw`` on the ticket's queue as a coarse gate \u2014 the dialog's own\n(finer-grained) ``Permission`` config, if set, is enforced again inside\n``engine.submit_activity_dialog`` itself.",
+        "description": "Submit an activity dialog for *ticket_id*.\n\nRequires ``rw`` on the ticket's queue as a coarse gate \u2014 the dialog's own\n(finer-grained) ``Permission`` config, the interface and the ACLs are enforced again\ninside ``engine.submit_activity_dialog`` (``availability.assert_can_submit``).",
         "operationId": "submit_ticket_activity_dialog_api_v1_process_ticket__ticket_id__submit_post",
         "parameters": [
           {
@@ -68483,6 +69455,82 @@
         ]
       }
     },
+    "/api/v1/process/tickets": {
+      "post": {
+        "description": "Create a ticket from the start dialog of a process. Needs ``create`` on the resolved\nqueue (403), a startable process (409) and the start dialog's mandatory fields (400).",
+        "operationId": "create_new_process_ticket_api_v1_process_tickets_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewProcessTicketIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewProcessTicketOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create New Process Ticket",
+        "tags": [
+          "process"
+        ]
+      }
+    },
     "/api/v1/process/{process_entity_id}": {
       "get": {
         "operationId": "get_process_api_v1_process__process_entity_id__get",
@@ -68552,6 +69600,97 @@
           }
         },
         "summary": "Get Process",
+        "tags": [
+          "process"
+        ]
+      }
+    },
+    "/api/v1/process/{process_entity_id}/start-form": {
+      "get": {
+        "description": "The start dialog of a process, built by the server: visible fields in order with their\nkind and ACL-filtered options. With ``ticket_id`` (enroll context) the ticket-bound gates\nof :func:`assert_can_start` apply.",
+        "operationId": "get_start_form_api_v1_process__process_entity_id__start_form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Start Form",
         "tags": [
           "process"
         ]
@@ -75006,6 +76145,81 @@
           }
         },
         "summary": "Patch Ticket",
+        "tags": [
+          "tickets"
+        ]
+      }
+    },
+    "/api/v1/tickets/{ticket_id}/acl-actions": {
+      "get": {
+        "description": "Zoom menu actions left after ``Action`` ACLs (Znuny ``AgentTicketZoom`` menu).\n\nSame access rule as ``GET /tickets/{id}`` (``ro`` on the ticket's queue).",
+        "operationId": "ticket_acl_actions_api_v1_tickets__ticket_id__acl_actions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketAclActionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ticket Acl Actions",
         "tags": [
           "tickets"
         ]

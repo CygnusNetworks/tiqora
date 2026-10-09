@@ -1,9 +1,8 @@
-"""Pure unit tests for ``evaluate_transition`` (no DB) — subtask 2.
+"""Pure unit tests for ``evaluate_transition`` (no DB) and the TicketCreate action.
 
-Builds ``TransitionConfig``/``TransitionConditionBlock``/
-``TransitionConditionField`` objects directly (as subtask 1's
-``test_process_config.py`` does via YAML parsing) and feeds them straight to
-``evaluate_transition`` with a hand-built ``ticket_attrs`` dict.
+Builds ``TransitionConfig``/``TransitionConditionBlock``/``TransitionConditionField`` objects
+directly and feeds them to ``evaluate_transition`` with a hand-built condition-data dict
+(Znuny semantics: ``conditions.py``; the full matrix is in ``test_process_conditions.py``).
 
 Also hosts a mocked ``TicketCreate`` transition-action unit test (no DB).
 """
@@ -51,14 +50,18 @@ def _config(
     return TransitionConfig(condition_linking=condition_linking, conditions=blocks)
 
 
-def test_no_condition_key_matches_unconditionally() -> None:
+def test_no_condition_key_never_matches() -> None:
+    # Transition.pm:322-327: no Condition -> "No conditions for transition" error, no match
+    # (was: unconditional match).
     config = TransitionConfig(condition_linking="and", conditions=[])
-    assert evaluate_transition(config, ATTRS) is True
+    assert evaluate_transition(config, ATTRS) is False
 
 
-def test_empty_fields_in_block_is_vacuously_true() -> None:
+def test_empty_fields_in_block_is_a_config_error() -> None:
+    # Transition.pm:359-366: a block without Fields logs "No Fields in Transition" and returns
+    # (was: vacuously true).
     config = _config({})
-    assert evaluate_transition(config, ATTRS) is True
+    assert evaluate_transition(config, ATTRS) is False
 
 
 # --- String -----------------------------------------------------------------
@@ -153,9 +156,10 @@ def test_not_equal_false_when_same_case_insensitive() -> None:
 # --- Missing field defaults to "" -------------------------------------------
 
 
-def test_missing_field_treated_as_empty_string() -> None:
+def test_missing_field_with_empty_string_match_never_matches() -> None:
+    # String.pm:116-123: an empty Match is a config error -> no match (was: "" == "").
     config = _config({"DynamicField_Missing": ("", "String")})
-    assert evaluate_transition(config, ATTRS) is True
+    assert evaluate_transition(config, ATTRS) is False
 
 
 def test_missing_field_nonempty_match_fails() -> None:
@@ -186,9 +190,10 @@ def test_greater_than_or_equal() -> None:
     assert evaluate_transition(config, {**ATTRS, "Score": "4"}) is False
 
 
-def test_greater_than_equals_alias() -> None:
+def test_greater_than_equals_is_not_a_znuny_type() -> None:
+    # TransitionValidation/ only ships GreaterThanOrEqual; an unknown Type is a config error.
     config = _config({"Score": ("5", "GreaterThanEquals")})
-    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is True
+    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is False
 
 
 def test_less_than_numeric() -> None:
@@ -205,9 +210,9 @@ def test_less_than_or_equal() -> None:
     assert evaluate_transition(config, {**ATTRS, "Score": "6"}) is False
 
 
-def test_less_than_equals_alias() -> None:
+def test_less_than_equals_is_not_a_znuny_type() -> None:
     config = _config({"Score": ("5", "LessThanEquals")})
-    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is True
+    assert evaluate_transition(config, {**ATTRS, "Score": "5"}) is False
 
 
 def test_greater_than_datetime_compares_as_epoch() -> None:

@@ -48,6 +48,7 @@ export function BulkEditPanel({
   onClose,
   openField,
   className,
+  ownerNotice,
 }: {
   /** Number of selected tickets (may exceed `known` with "select all matches"). */
   count: number;
@@ -64,6 +65,8 @@ export function BulkEditPanel({
   /** Opens that field's menu once (e.g. "Verschieben…" → the queue list); bump `seq` to reopen. */
   openField?: { field: BulkField; seq: number } | null;
   className?: string;
+  /** Hint under the owner picker (e.g. the list was only checked against part of the selection). */
+  ownerNotice?: string;
 }) {
   const { t, i18n } = useTranslation();
   const rootRef = useRef<HTMLElement>(null);
@@ -223,14 +226,21 @@ export function BulkEditPanel({
       </div>
     ),
     owner: (
-      <SelectField
-        items={agentItems}
-        value={draft.owner_id ?? null}
-        onChange={(id) => set({ owner_id: id })}
-        placeholder={t("queue.bulk.unchanged")}
-        aria-label={fieldLabel("owner")}
-        testId="queue-bulk-owner-select"
-      />
+      <div className="space-y-1">
+        <SelectField
+          items={agentItems}
+          value={draft.owner_id ?? null}
+          onChange={(id) => set({ owner_id: id })}
+          placeholder={t("queue.bulk.unchanged")}
+          aria-label={fieldLabel("owner")}
+          testId="queue-bulk-owner-select"
+        />
+        {ownerNotice && (
+          <p className="text-[11.5px] text-muted" data-testid="queue-bulk-owner-notice">
+            {ownerNotice}
+          </p>
+        )}
+      </div>
     ),
     queue: (
       <SelectField

@@ -413,7 +413,8 @@
       "applyMany": "Apply {{count}} changes",
       "apply_one": "Change 1 ticket",
       "apply_other": "Change {{count}} tickets",
-      "discard": "Discard"
+      "discard": "Discard",
+      "ownerLimit": "The owner choice is only checked against the first {{max}} tickets."
     },
     "countBadge_one": "1 tiket",
     "countBadge_other": "{{count}} tiket",
@@ -1301,7 +1302,8 @@
       "autoReplyNoCustomer": "· tanpa konfirmasi penerimaan (tanpa pelanggan)",
       "answeredAt": "dijawab {{time}}",
       "endedAt": "berakhir {{time}}"
-    }
+    },
+    "processLabel": "Start process"
   },
   "connection": {
     "live": "Terhubung langsung",
@@ -1410,6 +1412,14 @@
       "title": "Security",
       "nav": "Security",
       "intro": "Protect your account with a second factor when you sign in."
+    },
+    "process": {
+      "start": "Start a process",
+      "title": "Start a process",
+      "empty": "There is no process you can start.",
+      "chooseProcess": "Choose a process",
+      "loadError": "Processes could not be loaded.",
+      "submitError": "The request could not be sent."
     }
   },
   "admin": {
@@ -2738,12 +2748,21 @@
       "name": "Nama",
       "entityId": "ID Entitas",
       "activityCount": "Kegiatan",
+      "startInterfaces": "Can be started by",
+      "interfaceAgent": "Agent",
+      "interfaceCustomer": "Customer",
       "readOnlyNote": "Desain proses harus dilakukan di antarmuka admin Znuny; ini adalah tampilan hanya-baca.",
       "startActivity": "Mulai aktivitas",
       "activities": "Kegiatan",
       "dialogs": "Dialog",
       "noDialogs": "—",
-      "loadError": "Tidak dapat memuat proses."
+      "loadError": "Tidak dapat memuat proses.",
+      "stateLabel": "State",
+      "states": {
+        "Active": "Active",
+        "Inactive": "Switched off",
+        "FadeAway": "Phasing out"
+      }
     },
     "mailOutbound": {
       "title": "Email keluar (SMTP)",
@@ -3069,10 +3088,15 @@
         "report_facts": {
           "name": "Report data upkeep",
           "description": "Keeps the report data (ticket facts and daily open-ticket snapshots) up to date continuously."
+        },
+        "deploy_watch": {
+          "name": "Deploy watcher",
+          "description": "Detects processes and ACLs deployed in Znuny and makes Tiqora use them only after that."
         }
       },
       "takeoverBadge": "Pengambilalihan",
-      "settingsLink": "Settings"
+      "settingsLink": "Settings",
+      "deployLive": "No deployment detected yet: Tiqora runs the drafts directly. Please deploy once in Znuny."
     },
     "mailLog": {
       "title": "Log komunikasi email",
@@ -3877,6 +3901,15 @@
             "help": "If a single query takes longer it is stopped and a message is shown."
           }
         }
+      },
+      "process": {
+        "title": "Processes and ACLs",
+        "fields": {
+          "deploy_from_tiqora": {
+            "label": "Deploy processes and ACLs in Tiqora (Znuny no longer runs)",
+            "help": "Only turn this on when Znuny no longer runs in parallel. Otherwise Znuny keeps showing the old state."
+          }
+        }
       }
     },
     "identity": {
@@ -4311,6 +4344,23 @@
       "loadError": "The state of the report data could not be loaded.",
       "failed": "The last build failed",
       "queued": "A build is queued"
+    },
+    "deploy": {
+      "title": "Deployment",
+      "deployedAt": "Deployed on {{date}}",
+      "source": {
+        "initial": "at startup",
+        "znuny": "from Znuny",
+        "tiqora": "by Tiqora"
+      },
+      "pending_one": "{{count}} change has not been deployed yet. It only applies after “Deploy” in Znuny.",
+      "pending_other": "{{count}} changes have not been deployed yet. They only apply after “Deploy” in Znuny.",
+      "pendingHere_one": "{{count}} change has not been deployed yet. It only applies after “Deploy”.",
+      "pendingHere_other": "{{count}} changes have not been deployed yet. They only apply after “Deploy”.",
+      "runningLive": "No deployed revision yet – Tiqora runs the draft state.",
+      "ownership": "Tiqora deploys changes itself (Znuny is switched off).",
+      "deployNow": "Deploy",
+      "deployFailed": "Deployment failed."
     }
   },
   "kb": {
@@ -4526,7 +4576,8 @@
       "actions": "Tindakan yang tersedia",
       "loadError": "Tidak dapat memuat status proses.",
       "noDialogs": "Tidak ada tindakan yang tersedia pada aktivitas ini.",
-      "noCustomerDialogs": "Tidak ada dialog pelanggan pada langkah ini."
+      "noCustomerDialogs": "Tidak ada dialog pelanggan pada langkah ini.",
+      "inactive": "This process is switched off. No steps are possible."
     },
     "start": {
       "title": "Mulai proses",
@@ -4535,7 +4586,11 @@
       "cancel": "Batalkan",
       "loadError": "Tidak dapat memuat proses.",
       "startError": "Tidak dapat memulai proses.",
-      "empty": "Tidak ada proses yang tersedia."
+      "empty": "Tidak ada proses yang tersedia.",
+      "next": "Next",
+      "forbidden": "You are not allowed to start this process here.",
+      "conflict": "This process cannot be started for this ticket right now.",
+      "notFound": "This process or ticket no longer exists."
     },
     "dialog": {
       "requiredMark": "*",
@@ -4547,7 +4602,45 @@
       "submitError": "Tidak dapat mengirimkan dialog.",
       "articleSubject": "Subyek",
       "articleBody": "Tubuh",
-      "fieldFallbackNote": "Input teks biasa (tidak ada widget khusus untuk jenis kolom ini)."
+      "fieldFallbackNote": "Input teks biasa (tidak ada widget khusus untuk jenis kolom ini).",
+      "conflict": "This step is not possible right now.",
+      "forbidden": "You are not allowed to carry out this step here."
+    },
+    "field": {
+      "Title": "Title",
+      "Queue": "Queue",
+      "State": "State",
+      "Priority": "Priority",
+      "Type": "Type",
+      "Service": "Service",
+      "SLA": "SLA",
+      "Owner": "Owner",
+      "Responsible": "Responsible",
+      "Lock": "Lock",
+      "CustomerUserID": "Customer user",
+      "CustomerID": "Customer ID",
+      "PendingTime": "Remind on",
+      "ArticleSubject": "Subject",
+      "ArticleBody": "Text",
+      "Attachments": "Attachments"
+    },
+    "form": {
+      "unsupported": "This field cannot be filled in here yet.",
+      "required": "Required",
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "loadError": "Could not load the form.",
+      "submitError": "Sending failed.",
+      "invalid": "Please check your input. A required field is missing or a value is invalid."
+    },
+    "lock": {
+      "lock": "locked",
+      "unlock": "unlocked"
+    },
+    "newTicket": {
+      "title": "New process ticket",
+      "chooseProcess": "Choose a process",
+      "empty": "There is no process you can start."
     }
   },
   "agentTemplates": {

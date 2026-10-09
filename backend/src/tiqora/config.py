@@ -458,6 +458,12 @@ class Settings(BaseSettings):
         default=60, validation_alias="TIQORA_OUTBOX_DRAIN_INTERVAL"
     )
 
+    # Deploy watcher (process/ACL revisions); a full dump + checksum per tick while
+    # Znuny's sync tables are empty (ruling F31).
+    deploy_watch_interval_seconds: int = Field(
+        default=30, ge=5, le=3600, validation_alias="TIQORA_DEPLOY_WATCH_INTERVAL_SECONDS"
+    )
+
     # Report data upkeep (facts, events, daily snapshots). ``daemon.report_facts.enabled``
     # (default ON) switches it off; this is only the poll interval.
     report_facts_interval_seconds: int = Field(

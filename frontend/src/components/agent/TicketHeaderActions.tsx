@@ -26,6 +26,8 @@ import { articleSortKey } from "@/lib/article";
 import { flattenQueues } from "./QueueTree";
 import { CustomerPickerDialog, LinkDialog, MergeDialog, PendingDialog } from "./ActionToolbar";
 import { ticketPerms, usePatchTicket } from "@/lib/ticket";
+import { actionAllowed, type AllowedActions } from "@/lib/aclActions";
+import { useAgentOptions } from "@/lib/agentOptions";
 import { stateColorVar } from "@/lib/status";
 import type { TicketAiSlots } from "./AiPanel";
 import { TicketBackNav } from "./TicketBackNav";
@@ -65,6 +67,7 @@ export function TicketHeaderActions({
   overflowItems,
   ai,
   similar,
+  allowedActions = null,
 }: {
   ticket: TicketDetail;
   /** Whether the agent may reply / add notes (``note`` permission). */
@@ -77,6 +80,11 @@ export function TicketHeaderActions({
   ai?: TicketAiSlots;
   /** "Similar tickets" trigger for the people row. */
   similar?: ReactNode;
+  /**
+   * Action ACL result (`GET /tickets/{id}/acl-actions`): a forbidden entry is hidden, like
+   * Znuny's zoom menu. Value pills stay as read-only text. `null` = unknown: show everything.
+   */
+  allowedActions?: AllowedActions;
 }) {
   const { t, i18n } = useTranslation();
   const locale = toBcp47(i18n.language);
@@ -86,6 +94,7 @@ export function TicketHeaderActions({
   const perms = ticketPerms(ticket);
   const noPerm = t("ticket.toolbar.noPermission");
   const patch = usePatchTicket(ticketId);
+  const can = (action: string) => actionAllowed(allowedActions, action);
 
   // Base reference lists (full catalog) + ACL filter map for this ticket.
   // Znuny TicketACL reduces pickers to Possible/PossibleNot without replacing
@@ -114,10 +123,13 @@ export function TicketHeaderActions({
     queryFn: () => api.listReferenceStates(),
   });
   const queuesQ = useQuery({ queryKey: ["queues"], queryFn: () => api.listQueues() });
+  // Names only (the responsible's name is not on the ticket); the pickers use the scoped lists.
   const agentsQ = useQuery({
     queryKey: ["reference", "agents"],
     queryFn: () => api.listReferenceAgents(),
   });
+  const ownerOptions = useAgentOptions("owner", { ticket_id: ticketId });
+  const responsibleOptions = useAgentOptions("responsible", { ticket_id: ticketId });
   const aclFieldsQ = useQuery({
     queryKey: ["tickets", ticketId, "field-options", "AgentTicketZoom"],
     queryFn: () =>
@@ -175,11 +187,6 @@ export function TicketHeaderActions({
     .filter((q) => q.valid && aclAllowed("queue", q.id))
     .map((q) => ({ value: q.id, label: q.name }));
   const agents = agentsQ.data ?? [];
-  const agentItems: SelectMenuItem<number>[] = agents.map((a) => ({
-    value: a.id,
-    label: a.full_name,
-    hint: a.login,
-  }));
   const responsibleAgent = agents.find((a) => a.id === ticket.responsible_user_id);
   const ownerName = ticket.owner_name || ticket.owner_login || "—";
   const customerLabel = ticket.customer_user_id || ticket.customer_id || "—";
@@ -268,6 +275,7 @@ export function TicketHeaderActions({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <AutopilotSwitch ticketId={ticketId} canNote={canNote} />
+          {can("AgentTicketCompose") && (
           <span title={!canNote ? noPerm : undefined} className="inline-flex items-stretch">
             <Button
               variant="primary"
@@ -299,6 +307,8 @@ export function TicketHeaderActions({
             </Button>
             {ai?.draftsButton}
           </span>
+          )}
+          {can("AgentTicketNote") && (
           <span title={!canNote ? noPerm : undefined} className="inline-flex">
             <Button
               variant="secondary"
@@ -310,7 +320,8 @@ export function TicketHeaderActions({
               ＋ {t("ticket.addNote")}
             </Button>
           </span>
-          {perms.rw && (
+          )}
+          {perms.rw && (can("AgentTicketPhoneInbound") || can("AgentTicketPhoneOutbound")) && (
             <>
             <Menu
               align="right"
@@ -328,13 +339,17 @@ export function TicketHeaderActions({
               )}
             >
               <MenuLabel>{t("phone.menuLabel")}</MenuLabel>
-              <MenuItem testId="phone-menu-inbound" onSelect={() => openPhoneCall("inbound")}>
-                ↙ {t("phone.inbound")}
-              </MenuItem>
-              <MenuItem testId="phone-menu-outbound" onSelect={() => openPhoneCall("outbound")}>
-                ↗ {t("phone.outbound")}
-              </MenuItem>
-              {customerNumbers.length > 0 && (
+              {can("AgentTicketPhoneInbound") && (
+                <MenuItem testId="phone-menu-inbound" onSelect={() => openPhoneCall("inbound")}>
+                  ↙ {t("phone.inbound")}
+                </MenuItem>
+              )}
+              {can("AgentTicketPhoneOutbound") && (
+                <MenuItem testId="phone-menu-outbound" onSelect={() => openPhoneCall("outbound")}>
+                  ↗ {t("phone.outbound")}
+                </MenuItem>
+              )}
+              {can("AgentTicketPhoneOutbound") && customerNumbers.length > 0 && (
                 <>
                   <MenuSeparator />
                   <MenuLabel>{t("phone.callCustomer")}</MenuLabel>
@@ -403,7 +418,7 @@ export function TicketHeaderActions({
             )}
           >
             <MenuLabel>{t("ticket.actionsGroupAssign")}</MenuLabel>
-            {perms.rw && (
+            {perms.rw && can("AgentTicketLock") && (
               <MenuItem
                 testId="more-lock"
                 onSelect={() => patch.mutate({ lock: isLocked ? "unlock" : "lock" })}
@@ -411,7 +426,7 @@ export function TicketHeaderActions({
                 {isLocked ? t("ticket.toolbar.unlock") : t("ticket.toolbar.lock")}
               </MenuItem>
             )}
-            {user && (
+            {user && can("AgentTicketWatcher") && (
               <MenuItem testId="more-watch" selected={ticket.is_watched} onSelect={toggleWatch}>
                 {ticket.is_watched ? t("ticket.toolbar.unwatch") : t("ticket.toolbar.watch")}
               </MenuItem>
@@ -419,12 +434,12 @@ export function TicketHeaderActions({
 
             <MenuSeparator />
             <MenuLabel>{t("ticket.actionsGroupOrganize")}</MenuLabel>
-            {perms.rw && (
+            {perms.rw && can("AgentLinkObject") && (
               <MenuItem testId="more-link" onSelect={() => setDialog("link")}>
                 {t("ticket.toolbar.link")}
               </MenuItem>
             )}
-            {perms.rw && (
+            {perms.rw && can("AgentTicketMerge") && (
               <MenuItem testId="more-merge" onSelect={() => setDialog("merge")}>
                 {t("ticket.toolbar.merge")}
               </MenuItem>
@@ -432,14 +447,16 @@ export function TicketHeaderActions({
 
             <MenuSeparator />
             <MenuLabel>{t("ticket.actionsGroupMisc")}</MenuLabel>
-            <MenuItem
-              testId="more-print"
-              onSelect={() => {
-                window.open(api.ticketPrintUrl(ticketId), "_blank", "noopener,noreferrer");
-              }}
-            >
-              {t("ticket.toolbar.print")}
-            </MenuItem>
+            {can("AgentTicketPrint") && (
+              <MenuItem
+                testId="more-print"
+                onSelect={() => {
+                  window.open(api.ticketPrintUrl(ticketId), "_blank", "noopener,noreferrer");
+                }}
+              >
+                {t("ticket.toolbar.print")}
+              </MenuItem>
+            )}
             <MenuItem
               testId="more-appointment"
               onSelect={() => void navigate({ to: "/agent/calendar" })}
@@ -484,7 +501,7 @@ export function TicketHeaderActions({
               {stateLabel(t, s.name)}
             </StatusSegment>
           ))}
-          {pendingStates.length > 0 && (
+          {pendingStates.length > 0 && can("AgentTicketPending") && (
             <StatusSegment
               testId="ticket-status-pending"
               color="var(--color-state-pending)"
@@ -495,7 +512,7 @@ export function TicketHeaderActions({
               {inPending ? stateLabel(t, ticket.state) : t("ticket.stateGroup.pending")} ⌄
             </StatusSegment>
           )}
-          {closedStates.length > 0 && (
+          {closedStates.length > 0 && can("AgentTicketClose") && (
             <Menu
               align="left"
               panelTestId="ticket-status-closed-menu"
@@ -534,6 +551,7 @@ export function TicketHeaderActions({
           {(typesQ.data?.length ?? 0) > 1 && (
             <HeaderPickMenu
               testId="ticket-pill-type"
+              readOnly={!can("AgentTicketFreeText")}
               panelTestId="ticket-pill-type-menu"
               label={ticket.type_name || t("ticket.type")}
               heading={t("ticket.type")}
@@ -546,6 +564,7 @@ export function TicketHeaderActions({
           {(servicesQ.data?.length ?? 0) > 1 && (
             <HeaderPickMenu
               testId="ticket-pill-service"
+              readOnly={!can("AgentTicketFreeText")}
               panelTestId="ticket-pill-service-menu"
               label={ticket.service_name || t("ticket.service")}
               heading={t("ticket.service")}
@@ -559,6 +578,7 @@ export function TicketHeaderActions({
           {(slasQ.data?.length ?? 0) > 1 && (
             <HeaderPickMenu
               testId="ticket-pill-sla"
+              readOnly={!can("AgentTicketFreeText")}
               panelTestId="ticket-pill-sla-menu"
               label={ticket.sla_name || t("ticket.sla")}
               heading={t("ticket.sla")}
@@ -569,6 +589,11 @@ export function TicketHeaderActions({
               onSelect={(id) => patch.mutate({ sla_id: id })}
             />
           )}
+          {!can("AgentTicketPriority") ? (
+            <span data-testid="ticket-readonly-priority">
+              <PriorityChip priority={ticket.priority} priorityId={ticket.priority_id} />
+            </span>
+          ) : (
           <span
             title={!perms.priority ? noPerm : undefined}
             className={cn(!perms.priority && "opacity-60")}
@@ -601,6 +626,7 @@ export function TicketHeaderActions({
               ))}
             </Menu>
           </span>
+          )}
           <SlaChip ticket={ticket} />
         </div>
       </div>
@@ -612,6 +638,7 @@ export function TicketHeaderActions({
           value={ticket.queue_id}
           valueLabel={ticket.queue_name}
           disabledTitle={!perms.move_into ? noPerm : undefined}
+          readOnly={!can("AgentTicketMove")}
           rootLabel={t("ticket.queue")}
           placeholder={t("ticket.dialog.selectPlaceholder")}
           onSelect={(id) => patch.mutate({ queue_id: id })}
@@ -622,19 +649,26 @@ export function TicketHeaderActions({
           testId="ticket-pill-owner"
           panelTestId="ticket-pill-owner-menu"
           disabledTitle={!perms.owner ? noPerm : undefined}
-          items={agentItems}
+          readOnly={!can("AgentTicketOwner")}
+          loading={ownerOptions.isLoading}
+          items={ownerOptions.items}
           value={ticket.owner_id}
           placeholder={t("ticket.dialog.selectPlaceholder")}
           onSelect={(id) => patch.mutate({ owner_id: id })}
         />
         <PersonSelect
           label={t("ticket.toolbar.responsible")}
-          name={responsibleAgent?.full_name || "—"}
+          name={
+            responsibleAgent?.full_name ||
+            (ticket.responsible_user_id ? `#${ticket.responsible_user_id}` : "—")
+          }
           testId="ticket-pill-responsible"
           panelTestId="ticket-pill-responsible-menu"
           disabledTitle={!perms.owner ? noPerm : undefined}
           muted={!ticket.responsible_user_id}
-          items={agentItems}
+          readOnly={!can("AgentTicketResponsible")}
+          loading={responsibleOptions.isLoading}
+          items={responsibleOptions.items}
           value={ticket.responsible_user_id ?? null}
           placeholder={t("ticket.dialog.selectPlaceholder")}
           onSelect={(id) => patch.mutate({ responsible_id: id })}
@@ -644,11 +678,11 @@ export function TicketHeaderActions({
           name={customerLabel}
           email={ticket.customer_email}
           avatarTone="customer"
-          testId="ticket-pill-customer"
-          disabledTitle={!perms.rw ? noPerm : undefined}
+          testId={can("AgentTicketCustomer") ? "ticket-pill-customer" : "ticket-readonly-customer"}
+          disabledTitle={!perms.rw && can("AgentTicketCustomer") ? noPerm : undefined}
           muted={!ticket.customer_user_id}
           unresolvedTitle={customerUnresolved ? t("ticket.customerUnresolved") : undefined}
-          onClick={perms.rw ? () => setDialog("customer") : undefined}
+          onClick={perms.rw && can("AgentTicketCustomer") ? () => setDialog("customer") : undefined}
         />
         {/* Only link to the customer centre when the login actually resolves to
             a customer_user record — `customer_user_id` is a free-text column
@@ -803,6 +837,7 @@ function HeaderPickMenu({
   selectedId,
   onSelect,
   onClear,
+  readOnly,
 }: {
   testId: string;
   panelTestId: string;
@@ -814,7 +849,19 @@ function HeaderPickMenu({
   onSelect: (id: number) => void;
   /** Offers a "—" entry that clears the value. */
   onClear?: () => void;
+  /** An Action ACL removed the control: show the value as plain text (nothing without one). */
+  readOnly?: boolean;
 }) {
+  if (readOnly) {
+    return selectedId == null ? null : (
+      <span
+        data-testid={testId.replace("ticket-pill-", "ticket-readonly-")}
+        className="rounded-md border border-hairline px-2 py-0.5 text-xs text-muted"
+      >
+        {label}
+      </span>
+    );
+  }
   return (
     <span title={disabledTitle} className={cn(disabledTitle && "opacity-60")}>
       <Menu
@@ -897,11 +944,14 @@ function QueueBreadcrumb({
   rootLabel,
   placeholder,
   onSelect,
+  readOnly,
 }: {
   items: SelectMenuItem<number>[];
   value: number;
   valueLabel: string | null | undefined;
   disabledTitle?: string;
+  /** An Action ACL removed the control: the queue stays as plain text. */
+  readOnly?: boolean;
   rootLabel: string;
   placeholder: string;
   onSelect: (id: number) => void;
@@ -912,6 +962,13 @@ function QueueBreadcrumb({
       <span className="font-medium text-ink">{valueLabel || "—"}</span>
     </>
   );
+  if (readOnly) {
+    return (
+      <span data-testid="ticket-readonly-queue" className="text-xs">
+        {crumb}
+      </span>
+    );
+  }
   if (disabledTitle) {
     return (
       <span data-testid="ticket-pill-queue" title={disabledTitle} className="text-xs opacity-60">
@@ -1049,6 +1106,8 @@ function PersonSelect({
   value,
   placeholder,
   onSelect,
+  readOnly,
+  loading,
 }: {
   label: string;
   name: string;
@@ -1056,11 +1115,19 @@ function PersonSelect({
   panelTestId: string;
   disabledTitle?: string;
   muted?: boolean;
+  /** An Action ACL removed the control: the person stays as plain text. */
+  readOnly?: boolean;
+  loading?: boolean;
   items: SelectMenuItem<number>[];
   value: number | null;
   placeholder: string;
   onSelect: (value: number) => void;
 }) {
+  if (readOnly) {
+    return (
+      <PersonShell label={label} name={name} testId={testId.replace("ticket-pill-", "ticket-readonly-")} muted={muted} />
+    );
+  }
   if (disabledTitle) {
     return (
       <PersonShell label={label} name={name} testId={testId} disabledTitle={disabledTitle} muted={muted} />
@@ -1073,6 +1140,7 @@ function PersonSelect({
       onSelect={onSelect}
       placeholder={placeholder}
       panelTestId={panelTestId}
+      loading={loading}
       trigger={({ ref, toggleProps }) => (
         <PersonShell
           label={label}

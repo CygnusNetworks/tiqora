@@ -38,7 +38,7 @@ by ``calendar/service.py``.
 Deferred/unsupported scope (documented, not silently missing)
 ---------------------------------------------------------------
 - Condition type ``Module`` (custom Perl module) is treated as non-matching
-  with a logged warning — see ``_evaluate_field``. Ordered comparisons
+  with a logged warning — see ``conditions.py``. Ordered comparisons
   (``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
   ``LessThanOrEqual``) are implemented per Znuny
   ``TransitionValidation::Base``.
@@ -47,14 +47,7 @@ Deferred/unsupported scope (documented, not silently missing)
   ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``.
   Unsupported modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
-- ``%<OTRS_TICKET_...>%``/``<OTRS_...>`` smart-tag placeholder substitution
-  inside TransitionAction ``Config`` values (Znuny's
-  ``TemplateGenerator::_Replace``, used e.g. by
-  ``TransitionValidation::Base::CheckValueGet``/``MatchValueGet``) is NOT
-  implemented — Config values and condition Match values are used verbatim.
-  Documented as a deferred feature, not a line-by-line port.
-- Activity Dialog ``PendingTime``/``PendingTimeDiff`` submission fields are
-  not applied from ``field_values`` (only a transition action's own
+- Activity Dialog ``PendingTimeDiff`` is not a dialog field (a transition action's own
   ``PendingTimeDiff`` on ``TicketStateSet`` is honoured).
 """
 
@@ -62,7 +55,7 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -70,16 +63,15 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
+from tiqora.channels.email.placeholder import PlaceholderContext
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
+from tiqora.domain.dynamic_field_values import load_ticket_dynamic_field
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     TicketIn,
-    _priority_name,  # noqa: PLC2701 -- deliberate reuse, see module docstring
-    _queue_name,  # noqa: PLC2701
-    _state_name,  # noqa: PLC2701
+    _state_type_name,  # noqa: PLC2701
     _ticket_must_exist,  # noqa: PLC2701
     add_article,
     assign_owner,
@@ -99,10 +91,20 @@ from tiqora.domain.ticket_write_service import (
     update_dynamic_field,
     watch_ticket,
 )
-from tiqora.permissions.engine import PermissionEngine
+from tiqora.process.actor import ProcessActor
+from tiqora.process.availability import RUNNING_STATES, assert_can_submit
+from tiqora.process.conditions import (
+    ConditionConfigError,
+    ConditionData,
+    as_integer,
+    check_transition,
+    evaluate_transition,
+    get_condition_data,
+    resolve_transition_tags,
+    value_validate,
+)
 from tiqora.process.config import ActivityDialogConfig, TransitionActionConfig, TransitionConfig
 from tiqora.process.exceptions import (
-    ActivityDialogNotAvailable,
     ActivityDialogNotFound,
     ProcessNotFound,
     ProcessPermissionDenied,
@@ -111,24 +113,49 @@ from tiqora.process.exceptions import (
     TicketNotInProcess,
     UnresolvedFieldValue,
 )
+from tiqora.process.fields import (
+    canonical_field_name,
+    dialog_field_order,
+    effective_field_values,
+    is_present,
+    missing_required_fields,
+)
 from tiqora.process.graph import ProcessRepository
+from tiqora.process.smart_tags import (
+    build_tag_context,
+    render_tags,
+    replace_action_config,
+    split_scalar_list,
+)
 from tiqora.process.ticket_state import (
     ACTIVITY_ID_DF_NAME,
     PROCESS_ID_DF_NAME,
+    TicketProcessCandidates,
     get_ticket_process_state,
 )
 from tiqora.util.perl import perl_truthy
 from tiqora.znuny.cache_invalidation import invalidate_ticket_cache
-from tiqora.znuny.history import add_pending_time
+from tiqora.znuny.history import (
+    TYPE_ADD_NOTE,
+    TYPE_FOLLOW_UP,
+    TYPE_PHONE_CALL_AGENT,
+    TYPE_PHONE_CALL_CUSTOMER,
+    TYPE_WEB_REQUEST_CUSTOMER,
+    add_pending_time,
+)
 from tiqora.znuny.sysconfig import SysConfig
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityDialogSubmitResult",
+    "TransitionOutcome",
+    "apply_activity_dialog",
+    "dialog_values_and_missing",
     "evaluate_transition",
     "execute_transition_action",
     "get_ticket_attrs",
+    "run_transitions",
     "start_process",
     "submit_activity_dialog",
 ]
@@ -146,6 +173,7 @@ async def start_process(
     process_entity_id: str,
     user_id: int,
     sysconfig: SysConfig,  # noqa: ARG001 -- kept for signature symmetry with the other engine entry points
+    repository: ProcessRepository | None = None,
 ) -> None:
     """Start *process_entity_id* on *ticket_id* at its ``StartActivity``.
 
@@ -162,7 +190,7 @@ async def start_process(
     Znuny instance for this port, but consistent with the single-process
     Dynamic Field pair modelling the ticket <-> process link).
     """
-    repository = ProcessRepository(session)
+    repository = repository or ProcessRepository(session)
     graph = await repository.get_process(process_entity_id)
     if graph is None or graph.config.start_activity is None:
         raise ProcessNotFound(process_entity_id)
@@ -188,82 +216,9 @@ async def start_process(
 
 
 # ---------------------------------------------------------------------------
-# 2 & 3. get_ticket_attrs + evaluate_transition
+# 2 & 3. condition data + transition evaluation (see ``conditions.py``)
 # ---------------------------------------------------------------------------
 
-
-async def get_ticket_attrs(session: AsyncSession, ticket_id: int) -> dict[str, str]:
-    """Build the flat ``{field_name: value}`` dict used for condition
-    evaluation and (indirectly, by documentation) for TransitionAction
-    Config placeholder resolution (not implemented, see module docstring).
-
-    Reuses ``ticket_write_service``'s private ``_ticket_must_exist``/
-    ``_queue_name``/``_state_name``/``_priority_name`` lookup helpers
-    (favoring reuse per subtask instructions) plus the same
-    ``DynamicField``/``DynamicFieldValue`` loading pattern used by
-    ``TicketService._load_dynamic_fields``. Multi-value dynamic fields are
-    joined with ``", "`` — matching the string this flat model can hold and
-    the same join convention ``update_dynamic_field`` uses for its history
-    "old value" string.
-    """
-    t = await _ticket_must_exist(session, ticket_id)
-    attrs: dict[str, str] = {
-        "Queue": await _queue_name(session, int(t["queue_id"])),
-        "State": await _state_name(session, int(t["ticket_state_id"])),
-        "Priority": await _priority_name(session, int(t["ticket_priority_id"])),
-        "Title": str(t.get("title") or ""),
-    }
-
-    fields = (
-        (
-            await session.execute(
-                select(DynamicField).where(
-                    DynamicField.object_type == "Ticket", DynamicField.valid_id == 1
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    if not fields:
-        return attrs
-
-    field_by_id = {f.id: f for f in fields}
-    values = (
-        (
-            await session.execute(
-                select(DynamicFieldValue).where(
-                    DynamicFieldValue.object_id == ticket_id,
-                    DynamicFieldValue.field_id.in_(field_by_id.keys()),
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    grouped: dict[int, list[str]] = {}
-    for v in values:
-        val: str | None = None
-        if v.value_text is not None:
-            val = str(v.value_text)
-        elif v.value_int is not None:
-            val = str(v.value_int)
-        elif v.value_date is not None:
-            val = v.value_date.strftime("%Y-%m-%d %H:%M:%S")
-        if val is not None:
-            grouped.setdefault(v.field_id, []).append(val)
-
-    for fid, field in field_by_id.items():
-        attrs[f"DynamicField_{field.name}"] = ", ".join(grouped.get(fid, []))
-
-    return attrs
-
-
-# DateTime / Date → epoch, matching TransitionValidation::Base::ValueValidate.
-_DATETIME_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})\s(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$")
-_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
-# Znuny VariableCheck::IsInteger — optional leading '-', no leading zeros.
-_INTEGER_RE = re.compile(r"^(-)?(?:0|[1-9]\d*)$")
 # DynamicFieldPendingTimeSet offset: ``1d 5h 12m 500s`` (parts optional).
 _OFFSET_RE = re.compile(
     r"^(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s\s*)?$",
@@ -271,175 +226,14 @@ _OFFSET_RE = re.compile(
 )
 
 
-def _value_validate(raw: str) -> str | int:
-    """Port of ``TransitionValidation::Base::ValueValidate``.
-
-    DateTime (``YYYY-MM-DD HH:MM[:SS]``) and Date (``YYYY-MM-DD``) strings
-    become epoch seconds (UTC); everything else is returned as-is.
-    """
-    m = _DATETIME_RE.match(raw)
-    if m:
-        y, mo, d, h, mi, sec = m.groups()
-        dt = datetime(int(y), int(mo), int(d), int(h), int(mi), int(sec or 0), tzinfo=UTC)
-        return int(dt.timestamp())
-    m = _DATE_RE.match(raw)
-    if m:
-        y, mo, d = m.groups()
-        dt = datetime(int(y), int(mo), int(d), 0, 0, 0, tzinfo=UTC)
-        return int(dt.timestamp())
-    return raw
-
-
-def _as_integer(value: Any) -> int | None:
-    """Port of Znuny ``IsInteger`` after ValueValidate (ints or integer strings)."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    s = str(value).strip()
-    if _INTEGER_RE.match(s):
-        return int(s)
-    return None
-
-
-def _compare_ordered(value: str, match: Any, op: str) -> bool:
-    """Znuny GreaterThan/LessThan/… — integer compare after ValueValidate.
-
-    Both sides are ValueValidate'd (dates → epoch), then must both be
-    integers (``IsInteger``); otherwise the condition does not match.
-    """
-    check_i = _as_integer(_value_validate(str(value)))
-    match_i = _as_integer(_value_validate(str(match)))
-    if check_i is None or match_i is None:
-        return False
-    if op == "gt":
-        return check_i > match_i
-    if op == "gte":
-        return check_i >= match_i
-    if op == "lt":
-        return check_i < match_i
-    if op == "lte":
-        return check_i <= match_i
-    return False
-
-
-def _evaluate_field(match: Any, type_: str, value: str) -> bool:
-    """Evaluate one ``Fields`` entry of a transition condition block.
-
-    ``value`` is looked up from ``ticket_attrs`` by the caller, already
-    defaulted to ``""`` if the field is absent (per subtask instructions:
-    an absent field is treated as empty string, not a missing/error state).
-
-    Semantics verified against
-    ``znuny-6.5.22/Kernel/System/ProcessManagement/TransitionValidation/*.pm``
-    (String.pm / Regexp.pm / Base.pm's ``Contains``/``NotContains``/
-    ``Equal``/``NotEqual`` / ordered compares):
-
-    - ``String``: exact match via Perl ``eq`` — case-SENSITIVE (the task
-      brief's "case-insensitive" guess does not hold; ``String.pm`` compares
-      with plain ``eq``, no ``lc()``. Verified directly in the .pm source).
-    - ``Regexp``: the raw ``Match`` string is used as a regex pattern,
-      matched against the value with ``re.search`` (Perl ``=~``).
-      Python's ``re`` syntax is a close but not 100%-identical superset/
-      subset of Perl's; documented divergence, not fixed here.
-    - ``Contains``/``NotContains``: Base.pm's ``Contains()``/``NotContains()``
-      lower-case both sides and match ``$CheckValue =~ m{$MatchValue}`` — the
-      match value is itself interpolated as a *regex*, not a literal
-      substring, and the comparison is case-insensitive. Ported faithfully:
-      ``re.search(match, value, re.IGNORECASE)``.
-    - ``Equal``/``NotEqual``: Base.pm's ``Equal()``/``NotEqual()`` lower-case
-      both sides and compare with ``eq``/``ne`` (for the plain-string case
-      this engine operates on — Znuny's array-ref handling is not relevant
-      to a flat string attribute dict).
-    - ``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
-      ``LessThanOrEqual`` (and ``…Equals`` aliases): ValueValidate both
-      sides (DateTime/Date → epoch), then integer compare only — non-integer
-      values do not match (Znuny ``IsInteger`` gate).
-    - ``Module``-based (custom Perl module) conditions remain UNSUPPORTED:
-      logged and treated as non-matching (``False``), never raised.
-    """
-    type_lower = type_.lower()
-
-    if type_lower == "string":
-        if not isinstance(match, str):
-            return False
-        return value == match
-
-    if type_lower == "regexp":
-        pattern = match if isinstance(match, str) else str(match)
-        try:
-            return re.search(pattern, value) is not None
-        except re.error:
-            logger.warning("invalid Regexp condition pattern %r", pattern)
-            return False
-
-    if type_lower == "contains":
-        pattern = str(match)
-        try:
-            return re.search(pattern, value, re.IGNORECASE) is not None
-        except re.error:
-            logger.warning("invalid Contains condition pattern %r", pattern)
-            return False
-
-    if type_lower == "notcontains":
-        pattern = str(match)
-        try:
-            return re.search(pattern, value, re.IGNORECASE) is None
-        except re.error:
-            logger.warning("invalid NotContains condition pattern %r", pattern)
-            return True
-
-    if type_lower == "equal":
-        return value.lower() == str(match).lower()
-
-    if type_lower == "notequal":
-        return value.lower() != str(match).lower()
-
-    if type_lower == "greaterthan":
-        return _compare_ordered(value, match, "gt")
-
-    if type_lower in ("greaterthanorequal", "greaterthanequals", "greaterthanequal"):
-        return _compare_ordered(value, match, "gte")
-
-    if type_lower == "lessthan":
-        return _compare_ordered(value, match, "lt")
-
-    if type_lower in ("lessthanorequal", "lessthanequals", "lessthanequal"):
-        return _compare_ordered(value, match, "lte")
-
-    logger.warning("unsupported/deferred transition condition Type: %s", type_)
-    return False
-
-
-def evaluate_transition(transition_config: TransitionConfig, ticket_attrs: dict[str, str]) -> bool:
-    """Evaluate whether *transition_config* matches *ticket_attrs*.
-
-    No ``Condition``/empty ``conditions`` => unconditional match (``True``),
-    per Znuny semantics (see ``TransitionConfig`` docstring). Otherwise:
-    ``Fields`` within one condition block combine per that block's
-    ``type_`` (``and``/``or``), and blocks combine per
-    ``transition_config.condition_linking`` (``and``/``or``). An empty
-    ``Fields`` map within a block is vacuously ``True`` for that block.
-    """
-    if not transition_config.conditions:
-        return True
-
-    block_results: list[bool] = []
-    for block in transition_config.conditions:
-        field_results = [
-            _evaluate_field(cond.match, cond.type_, ticket_attrs.get(name, ""))
-            for name, cond in block.fields.items()
-        ]
-        if not field_results:
-            block_results.append(True)
-        elif block.type_.lower() == "or":
-            block_results.append(any(field_results))
-        else:
-            block_results.append(all(field_results))
-
-    if transition_config.condition_linking.lower() == "or":
-        return any(block_results)
-    return all(block_results)
+async def get_ticket_attrs(session: AsyncSession, ticket_id: int) -> dict[str, str]:
+    """Flat ``{name: str}`` view of :func:`get_condition_data` (lists joined with ``", "``,
+    unset values ``""``) for the actions that only need strings."""
+    data = await get_condition_data(session, ticket_id)
+    return {
+        name: ", ".join(value) if isinstance(value, list) else (value or "")
+        for name, value in data.items()
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -523,6 +317,22 @@ async def _resolve_sla_id(session: AsyncSession, name: str | None, id_: int | No
     ).scalar_one_or_none()
 
 
+async def _ticket_column_unchanged(
+    session: AsyncSession, ticket_id: int, column: str, new_id: int
+) -> bool:
+    """Same queue/priority/responsible: Znuny's ``TicketQueueSet`` (Ticket.pm:2157),
+    ``TicketPrioritySet`` (:5380) and ``TicketResponsibleSet`` (:5094) write nothing. The
+    dialog now preselects the ticket's current values, so an untouched field is submitted."""
+    t = await _ticket_must_exist(session, ticket_id)
+    return int(t[column]) == new_id
+
+
+async def _state_unchanged(session: AsyncSession, ticket_id: int, state_id: int) -> bool:
+    """Same state: Znuny writes nothing (TicketStateSet.pm:163, Ticket.pm:4531-4539)."""
+    t = await _ticket_must_exist(session, ticket_id)
+    return int(t["ticket_state_id"]) == state_id
+
+
 async def _action_ticket_state_set(
     session: AsyncSession,
     config: dict[str, Any],
@@ -539,6 +349,8 @@ async def _action_ticket_state_set(
     diff = config.get("PendingTimeDiff")
     if diff is not None:
         pending_time = datetime.now(UTC) + timedelta(seconds=int(diff))
+    elif await _state_unchanged(session, ticket_id, int(state_id)):
+        return
     await change_state(
         session,
         ticket_id=ticket_id,
@@ -635,16 +447,41 @@ async def _action_ticket_customer_set(
     user_id: int,
     sysconfig: SysConfig,
 ) -> None:
+    """Port of TransitionAction::TicketCustomerSet (TicketCustomerSet.pm:103-190): a falsy
+    ``CustomerID`` falls back to ``No``, ``CustomerUserID`` to ``User``; each key that differs
+    from the ticket is set by its own ``TicketCustomerSet`` call (own history row), an equal
+    one is skipped."""
     del sysconfig
-    customer_id = config.get("CustomerID", config.get("No"))
-    customer_user_id = config.get("CustomerUserID", config.get("User"))
-    await set_customer(
-        session,
-        ticket_id=ticket_id,
-        customer_id=customer_id,
-        customer_user_id=customer_user_id,
-        user_id=user_id,
-    )
+    keys = ("CustomerID", "No", "CustomerUserID", "User")
+    if not any(perl_truthy(config.get(k)) for k in keys):
+        raise RequiredFieldMissing(
+            "TicketCustomerSet: Config must set CustomerID/No or CustomerUserID/User"
+        )
+    customer_id = config.get("CustomerID")
+    if not perl_truthy(customer_id) and perl_truthy(config.get("No")):
+        customer_id = config.get("No")
+    customer_user_id = config.get("CustomerUserID")
+    if not perl_truthy(customer_user_id) and perl_truthy(config.get("User")):
+        customer_user_id = config.get("User")
+    t = await _ticket_must_exist(session, ticket_id)
+    if customer_id is not None and str(customer_id) != t.get("customer_id"):
+        await set_customer(
+            session,
+            ticket_id=ticket_id,
+            customer_id=str(customer_id),
+            customer_user_id=None,
+            user_id=user_id,
+            only_given=True,
+        )
+    if customer_user_id is not None and str(customer_user_id) != t.get("customer_user_id"):
+        await set_customer(
+            session,
+            ticket_id=ticket_id,
+            customer_id=None,
+            customer_user_id=str(customer_user_id),
+            user_id=user_id,
+            only_given=True,
+        )
 
 
 async def _action_ticket_responsible_set(
@@ -706,6 +543,12 @@ async def _action_dynamic_field_set(
         field_name = key.removeprefix("DynamicField_")
         values = value if isinstance(value, list) else [value]
         str_values = [str(v) for v in values]
+        if isinstance(value, str) and value:
+            # DynamicFieldSet.pm:132-143 (bug#14900): a Multiselect value written as one
+            # string ("a, b" -- also what a dynamic-field smart tag yields) is a comma list.
+            field = await load_ticket_dynamic_field(session, field_name)
+            if field is not None and field.field_type == "Multiselect":
+                str_values = split_scalar_list(value)
         await update_dynamic_field(
             session, ticket_id=ticket_id, field_name=field_name, values=str_values, user_id=user_id
         )
@@ -1011,10 +854,10 @@ async def _action_dynamic_field_pending_time_set(
     raw = attrs.get(f"DynamicField_{field}", "") or attrs.get(str(field), "")
     if not raw:
         return
-    validated = _value_validate(str(raw).strip())
+    validated = value_validate(str(raw).strip())
     # After ValueValidate, datetimes are epoch ints; plain strings that are
     # already epoch also work via _as_integer.
-    epoch = _as_integer(validated)
+    epoch = as_integer(validated)
     if epoch is None:
         # Try a final parse for values ValueValidate did not rewrite.
         try:
@@ -1221,8 +1064,8 @@ async def _action_ticket_create(
     # Optional pending time on the *new* ticket (Znuny PendingTime / PendingTimeDiff).
     pending_time: datetime | None = None
     if config.get("PendingTime"):
-        validated = _value_validate(str(config["PendingTime"]).strip())
-        epoch = _as_integer(validated)
+        validated = value_validate(str(config["PendingTime"]).strip())
+        epoch = as_integer(validated)
         if epoch is not None:
             pending_time = datetime.fromtimestamp(epoch, tz=UTC)
     elif config.get("PendingTimeDiff") is not None:
@@ -1312,9 +1155,12 @@ async def execute_transition_action(
     ``process_entity_id``/``activity_entity_id``/``transition_entity_id`` are
     accepted for parity with Znuny's ``TransitionAction::Run()`` signature
     (which passes them to every action module) but are not currently
-    consulted by any of the implemented handlers — kept for forward
-    compatibility (logging, future placeholder substitution) and because
-    the subtask spec mandates this exact signature.
+    consulted by any of the implemented handlers.
+
+    The handler receives a copy of ``action.config`` with the smart tags replaced
+    (:func:`tiqora.process.smart_tags.replace_action_config`, Znuny's
+    ``_ReplaceTicketAttributes`` + ``_ReplaceAdditionalAttributes``); ``action`` itself is never
+    mutated.
     """
     del process_entity_id, activity_entity_id, transition_entity_id  # see docstring
     module_name = _module_short_name(action.module)
@@ -1322,7 +1168,10 @@ async def execute_transition_action(
     if handler is None:
         logger.warning("unsupported ProcessManagement TransitionAction module: %s", action.module)
         return module_name
-    await handler(session, action.config, ticket_id, user_id, sysconfig)
+    config = await replace_action_config(
+        action.config, session=session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig
+    )
+    await handler(session, config, ticket_id, user_id, sysconfig)
     return None
 
 
@@ -1339,25 +1188,6 @@ class ActivityDialogSubmitResult:
     new_activity_entity_id: str | None
     unsupported_actions: list[str]
     transition_entity_id: str | None
-
-
-def _is_present(field_name: str, field_values: dict[str, Any]) -> bool:
-    """Required-field presence check for one dialog ``Fields`` entry.
-
-    The pseudo-field ``Article`` is special-cased: Znuny's Article dialog
-    field is really a bundle of ``Subject``/``Body``/... sub-fields, so
-    "present" means either of the two content-bearing ones was submitted.
-    """
-    if field_name == "Article":
-        return bool(field_values.get("Subject")) or bool(field_values.get("Body"))
-    value = field_values.get(field_name)
-    if value is None:
-        return False
-    if isinstance(value, str):
-        return value.strip() != ""
-    if isinstance(value, list):
-        return len(value) > 0
-    return True
 
 
 async def _resolve_dialog_field_id(
@@ -1400,11 +1230,13 @@ async def _apply_dialog_field_changes(
     ticket_id: int,
     user_id: int,
     sysconfig: SysConfig,
+    sender_type: str = "agent",
+    new_ticket: bool = False,
 ) -> None:
     """Apply submitted field_values to the ticket, per the field names the
     dialog config declares. Only fields actually present (and non-blank) in
     ``field_values`` are applied — the required/optional check already ran in
-    the caller.
+    the caller (:func:`apply_activity_dialog`).
     """
     if "Queue" in field_values:
         queue_id = await _resolve_dialog_field_id(
@@ -1414,7 +1246,9 @@ async def _apply_dialog_field_changes(
             raw=field_values["Queue"],
             resolver=_resolve_queue_id,
         )
-        if queue_id is not None:
+        if queue_id is not None and not await _ticket_column_unchanged(
+            session, ticket_id, "queue_id", queue_id
+        ):
             await move_queue(
                 session,
                 ticket_id=ticket_id,
@@ -1431,7 +1265,7 @@ async def _apply_dialog_field_changes(
             raw=field_values["State"],
             resolver=_resolve_state_id,
         )
-        if state_id is not None:
+        if state_id is not None and not await _state_unchanged(session, ticket_id, state_id):
             await change_state(
                 session,
                 ticket_id=ticket_id,
@@ -1448,7 +1282,9 @@ async def _apply_dialog_field_changes(
             raw=field_values["Priority"],
             resolver=_resolve_priority_id,
         )
-        if priority_id is not None:
+        if priority_id is not None and not await _ticket_column_unchanged(
+            session, ticket_id, "ticket_priority_id", priority_id
+        ):
             await change_priority(
                 session,
                 ticket_id=ticket_id,
@@ -1457,27 +1293,62 @@ async def _apply_dialog_field_changes(
                 sysconfig=sysconfig,
             )
 
-    if "Title" in field_values and field_values["Title"]:
-        await change_title(
-            session, ticket_id=ticket_id, new_title=str(field_values["Title"]), user_id=user_id
-        )
-
-    if "Owner" in field_values:
-        owner_id = await _resolve_dialog_field_id(
+    if "Type" in field_values:
+        type_id = await _resolve_dialog_field_id(
             session,
-            field="Owner",
-            kind="user id",
-            raw=field_values["Owner"],
-            resolver=_resolve_user_id,
+            field="Type",
+            kind="type id",
+            raw=field_values["Type"],
+            resolver=_resolve_type_id,
         )
-        if owner_id is not None:
-            await assign_owner(
+        if type_id is not None:
+            await change_type(
                 session,
                 ticket_id=ticket_id,
-                new_owner_id=owner_id,
+                new_type_id=type_id,
                 user_id=user_id,
                 sysconfig=sysconfig,
             )
+
+    if "Service" in field_values:
+        service_id = await _resolve_dialog_field_id(
+            session,
+            field="Service",
+            kind="service id",
+            raw=field_values["Service"],
+            resolver=_resolve_service_id,
+        )
+        if service_id is not None:
+            await change_service(
+                session,
+                ticket_id=ticket_id,
+                new_service_id=service_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+
+    if "SLA" in field_values:
+        sla_id = await _resolve_dialog_field_id(
+            session,
+            field="SLA",
+            kind="sla id",
+            raw=field_values["SLA"],
+            resolver=_resolve_sla_id,
+        )
+        if sla_id is not None:
+            await change_sla(
+                session,
+                ticket_id=ticket_id,
+                new_sla_id=sla_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+
+    if "Title" in field_values and field_values["Title"]:
+        # change_title is a no-op for an unchanged title (Ticket.pm:1883).
+        await change_title(
+            session, ticket_id=ticket_id, new_title=str(field_values["Title"]), user_id=user_id
+        )
 
     if "Responsible" in field_values:
         responsible_id = await _resolve_dialog_field_id(
@@ -1487,51 +1358,445 @@ async def _apply_dialog_field_changes(
             raw=field_values["Responsible"],
             resolver=_resolve_user_id,
         )
-        if responsible_id is not None:
+        if responsible_id is not None and not await _ticket_column_unchanged(
+            session, ticket_id, "responsible_user_id", responsible_id
+        ):
             await assign_responsible(
                 session, ticket_id=ticket_id, new_responsible_id=responsible_id, user_id=user_id
+            )
+
+    if "Lock" in field_values:
+        lock_raw = str(field_values["Lock"]).strip().lower()
+        if lock_raw in {"lock", "2"}:
+            await lock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        elif lock_raw in {"unlock", "1"}:
+            await unlock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+        elif lock_raw:
+            raise UnresolvedFieldValue(
+                f"activity dialog field 'Lock': could not resolve {field_values['Lock']!r} "
+                "to a lock (expected lock/unlock or lock id 1/2)"
             )
 
     if "CustomerID" in field_values or "CustomerUserID" in field_values:
         t = await _ticket_must_exist(session, ticket_id)
         customer_id = field_values.get("CustomerID", t.get("customer_id"))
         customer_user_id = field_values.get("CustomerUserID", t.get("customer_user_id"))
-        await set_customer(
+        # AgentTicketProcess.pm:5770-5783: no TicketCustomerSet when CustomerID and
+        # CustomerUser both equal the ticket's (Perl ``eq``: undef compares as "").
+        unchanged = str(customer_id or "") == str(t.get("customer_id") or "") and str(
+            customer_user_id or ""
+        ) == str(t.get("customer_user_id") or "")
+        if not unchanged:
+            await set_customer(
+                session,
+                ticket_id=ticket_id,
+                customer_id=customer_id,
+                customer_user_id=customer_user_id,
+                user_id=user_id,
+            )
+
+    # Dynamic fields, the article and the owner are stored in FieldOrder (the Znuny save loop,
+    # AgentTicketProcess.pm:5463ff; Owner via $TicketFieldSetSub, :5800-5860); a dynamic field
+    # the order does not list comes last. A new ticket stores all dynamic fields first
+    # (:5262-5290), the article and the owner follow.
+    order = dialog_field_order(dialog_config)
+    dynamic = [k for k in field_values if k.startswith("DynamicField_")]
+    dynamic.sort(key=lambda k: order.index(k) if k in order else len(order))
+    steps = [n for n in order if n in ("Article", "Owner") or n in dynamic]
+    steps += [k for k in dynamic if k not in steps]
+    if new_ticket:
+        steps = dynamic + [n for n in steps if n not in dynamic]
+    for step in steps:
+        if step == "Owner":
+            owner_id = (
+                await _resolve_dialog_field_id(
+                    session,
+                    field="Owner",
+                    kind="user id",
+                    raw=field_values["Owner"],
+                    resolver=_resolve_user_id,
+                )
+                if "Owner" in field_values
+                else None
+            )
+            if owner_id is not None:
+                await assign_owner(
+                    session,
+                    ticket_id=ticket_id,
+                    new_owner_id=owner_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                )
+            continue
+        if step == "Article":
+            await _store_dialog_article(
+                session,
+                dialog_config=dialog_config,
+                field_values=field_values,
+                ticket_id=ticket_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+                sender_type=sender_type,
+                new_ticket=new_ticket,
+            )
+            continue
+        value = field_values[step]
+        values = value if isinstance(value, list) else [value]
+        await update_dynamic_field(
             session,
             ticket_id=ticket_id,
-            customer_id=customer_id,
-            customer_user_id=customer_user_id,
+            field_name=step.removeprefix("DynamicField_"),
+            values=[str(v) for v in values],
             user_id=user_id,
         )
 
-    if "Article" in dialog_config.fields and _is_present("Article", field_values):
-        article_field_cfg = dialog_config.fields["Article"].config
-        channel_raw = str(
-            article_field_cfg.get("ArticleType")
-            or article_field_cfg.get("CommunicationChannel")
-            or "note"
-        ).lower()
-        channel = _ARTICLE_CHANNEL_MAP.get(channel_raw, "note")
-        article = ArticleIn(
-            sender_type=str(field_values.get("SenderType") or "agent"),
-            is_visible_for_customer=perl_truthy(article_field_cfg.get("IsVisibleForCustomer", 0)),
-            subject=str(field_values.get("Subject", "")),
-            body=str(field_values.get("Body", "")),
-            channel=channel,
-        )
-        await add_article(
-            session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+
+async def _store_dialog_article(
+    session: AsyncSession,
+    *,
+    dialog_config: ActivityDialogConfig,
+    field_values: dict[str, Any],
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+    sender_type: str,
+    new_ticket: bool = False,
+) -> None:
+    """Article (AgentTicketProcess.pm:5576, 5686-5687): stored only when Subject AND Body are
+    set; sender, visibility and channel come from the dialog config, never from the request."""
+    article_cfg = next(
+        (c for n, c in dialog_config.fields.items() if canonical_field_name(n) == "Article"), None
+    )
+    if (
+        article_cfg is None
+        or not is_present(field_values.get("Subject"))
+        or not is_present(field_values.get("Body"))
+    ):
+        return
+    cfg = article_cfg.config
+    channel_raw = str(cfg.get("CommunicationChannel") or cfg.get("ArticleType") or "note").lower()
+    # The history row is the dialog's, not add_article's channel-derived default:
+    # agent AgentTicketProcess.pm:5650-5654 (AddNote "%%Note" for every channel but Phone,
+    # PhoneCallAgent "%%"); customer CustomerTicketProcess.pm:3955-3962 (PhoneCallCustomer for
+    # Phone, else WebRequestCustomer on a new ticket and FollowUp on an existing one, "%%").
+    phone = channel_raw == "phone"
+    if sender_type == "agent":
+        history_type = TYPE_PHONE_CALL_AGENT if phone else TYPE_ADD_NOTE
+        history_comment = "%%" if phone else "%%Note"
+    else:
+        if phone:
+            history_type = TYPE_PHONE_CALL_CUSTOMER
+        else:
+            history_type = TYPE_WEB_REQUEST_CUSTOMER if new_ticket else TYPE_FOLLOW_UP
+        history_comment = "%%"
+    article = ArticleIn(
+        sender_type=sender_type,
+        is_visible_for_customer=perl_truthy(cfg.get("IsVisibleForCustomer", 0)),
+        subject=str(field_values["Subject"]),
+        body=str(field_values["Body"]),
+        channel=_ARTICLE_CHANNEL_MAP.get(channel_raw, "note"),
+        history_type_override=history_type,
+        history_comment_override=history_comment,
+    )
+    await add_article(
+        session, ticket_id=ticket_id, article=article, user_id=user_id, sysconfig=sysconfig
+    )
+
+
+async def _ensure_required_lock(
+    session: AsyncSession, *, ticket_id: int, user_id: int, sysconfig: SysConfig
+) -> None:
+    """Dialog ``RequiredLock`` (AgentTicketProcess.pm:182-224).
+
+    Locked ticket: only its owner may continue (``OwnerCheck``), otherwise denied.
+    Unlocked ticket: ``TicketLockSet lock``, then ``TicketOwnerSet`` only if the owner differs.
+    """
+    t = await _ticket_must_exist(session, ticket_id)
+    if int(t["ticket_lock_id"]) != 1:  # 1 = unlock
+        if int(t["user_id"]) != user_id:
+            raise ProcessPermissionDenied("Das Ticket ist von einer anderen Person gesperrt.")
+        return
+    await lock_ticket(session, ticket_id=ticket_id, user_id=user_id, sysconfig=sysconfig)
+    if int(t["user_id"]) != user_id:
+        await assign_owner(
+            session,
+            ticket_id=ticket_id,
+            new_owner_id=user_id,
+            user_id=user_id,
+            sysconfig=sysconfig,
         )
 
-    for key, value in field_values.items():
-        if not key.startswith("DynamicField_"):
-            continue
-        field_name = key.removeprefix("DynamicField_")
-        values = value if isinstance(value, list) else [value]
-        str_values = [str(v) for v in values]
-        await update_dynamic_field(
-            session, ticket_id=ticket_id, field_name=field_name, values=str_values, user_id=user_id
+
+async def _existing_state_id(session: AsyncSession, id_: int) -> int | None:
+    return (
+        await session.execute(select(TicketState.id).where(TicketState.id == id_))
+    ).scalar_one_or_none()
+
+
+def _dialog_default(dialog: ActivityDialogConfig, field_name: str) -> str:
+    """DefaultValue of the field spelled exactly *field_name* (``State`` is not ``StateID``)."""
+    cfg = dialog.fields.get(field_name)
+    raw = cfg.default_value if cfg is not None else None
+    return str(raw).strip() if raw is not None else ""
+
+
+async def _dialog_target_state_id(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    dialog: ActivityDialogConfig,
+    values: dict[str, Any],
+) -> int | None:
+    """State the ticket ends in, for deciding about PendingTime (AgentTicketProcess.pm:1262-1297).
+
+    Znuny's order: the submitted state (``StateGet ID``; a number counts only when that state
+    exists), fallback 1 the ``State`` field's DefaultValue (by name), fallback 2 the ``StateID``
+    field's DefaultValue (as an id, :1279-1284), fallback 3 the ticket's current state.
+    """
+    submitted = values.get("State")
+    text_value = str(submitted).strip() if submitted is not None else ""
+    if text_value:
+        resolved = await _resolve_state_id(session, text_value, None)
+        if resolved is None and text_value.isdigit():
+            resolved = await _existing_state_id(session, int(text_value))
+        if resolved is not None:
+            return resolved
+    default_name = _dialog_default(dialog, "State")
+    if default_name:
+        resolved = await _resolve_state_id(session, default_name, None)
+        if resolved is not None:
+            return resolved
+    default_id = _dialog_default(dialog, "StateID")
+    if default_id.isdigit():
+        resolved = await _existing_state_id(session, int(default_id))
+        if resolved is not None:
+            return resolved
+    ticket = await _ticket_must_exist(session, ticket_id)
+    return int(ticket["ticket_state_id"])
+
+
+async def _resolve_dialog_pending_time(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    dialog: ActivityDialogConfig,
+    values: dict[str, Any],
+) -> tuple[bool, datetime | None]:
+    """Dialog ``PendingTime`` (D8): ``(target_is_pending, UTC minute to store)``.
+
+    Znuny reads the field only when the target state's type starts with ``pending``
+    (AgentTicketProcess.pm:1299-1303, case-insensitive) and stores it with
+    ``TicketPendingTimeSet`` from Year..Minute — seconds are dropped and ``:00`` is used
+    (Ticket.pm:4033-4040). The value is an ISO 8601 string (naive = UTC), the same contract as
+    ``PATCH /tickets/{id}``. A pending target without a value returns ``(True, None)``, so the
+    caller can enforce ``Display: 2``; a non-pending target is ``(False, None)`` and the value
+    is ignored.
+    """
+    state_id = await _dialog_target_state_id(
+        session, ticket_id=ticket_id, dialog=dialog, values=values
+    )
+    if state_id is None or not (await _state_type_name(session, state_id)).lower().startswith(
+        "pending"
+    ):
+        return False, None
+    raw = values.get("PendingTime")
+    if not is_present(raw):
+        return True, None
+    try:
+        if not isinstance(raw, str):
+            raise ValueError("not a string")
+        parsed = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise UnresolvedFieldValue(
+            f"activity dialog field 'PendingTime': could not parse {raw!r} as an ISO 8601 datetime"
+        ) from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return True, parsed.astimezone(UTC).replace(second=0, microsecond=0)
+
+
+def dialog_values_and_missing(
+    dialog: ActivityDialogConfig, field_values: Mapping[str, Any], actor: ProcessActor
+) -> tuple[dict[str, Any], list[str]]:
+    """Effective dialog values and the ``Display: 2`` fields still missing (PendingTime included).
+
+    On the customer interface ``CustomerUserID``/``CustomerID`` are the acting customer
+    (CustomerTicketProcess.pm:3560-3569, 3675-3676): whatever was submitted is ignored and a
+    mandatory CustomerUserID counts as given, although the form never asks for it.
+    """
+    values = effective_field_values(dialog, field_values, actor.interface)
+    if actor.interface == "CustomerInterface":
+        values["CustomerUserID"] = actor.customer_user_login
+        values["CustomerID"] = actor.customer_id
+    return values, missing_required_fields(dialog, values, actor.interface)
+
+
+async def apply_activity_dialog(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    dialog: ActivityDialogConfig,
+    field_values: dict[str, Any],
+    actor: ProcessActor,
+    sysconfig: SysConfig,
+    skip_fields: frozenset[str] = frozenset(),
+    apply_required_lock: bool = True,
+    new_ticket: bool = False,
+) -> None:
+    """Validate and store one activity dialog submission with Znuny's field semantics.
+
+    ``skip_fields`` (canonical names) are validated but not written again — used when a field
+    was already consumed by ``create_ticket``. ``apply_required_lock=False`` and
+    ``new_ticket=True`` for new tickets (Znuny never runs RequiredLock on create, stores the
+    dynamic fields right after creating the ticket, and a customer's article is a web request
+    instead of a follow-up).
+    """
+    values, missing = dialog_values_and_missing(dialog, field_values, actor)
+    customer_filled = actor.interface == "CustomerInterface"
+    # PendingTime is only required (and only read) when the target state is a pending one.
+    pending_required = "PendingTime" in missing
+    missing = [name for name in missing if name != "PendingTime"]
+    pending_time: datetime | None = None
+    if "PendingTime" in values or pending_required:
+        target_is_pending, pending_time = await _resolve_dialog_pending_time(
+            session, ticket_id=ticket_id, dialog=dialog, values=values
         )
+        if target_is_pending and pending_time is None and pending_required:
+            missing.append("PendingTime")
+    if missing:
+        raise RequiredFieldMissing(f"required activity dialog field missing: {', '.join(missing)}")
+    if customer_filled:
+        # The ticket already carries this customer; do not rewrite it.
+        values.pop("CustomerUserID")
+        values.pop("CustomerID")
+    # ``if ($ActivityDialogHashRef->{RequiredLock})`` (AgentTicketProcess.pm:183): Perl truthiness.
+    if (
+        apply_required_lock
+        and perl_truthy(dialog.required_lock)
+        and actor.interface == "AgentInterface"
+    ):
+        await _ensure_required_lock(
+            session, ticket_id=ticket_id, user_id=actor.user_id, sysconfig=sysconfig
+        )
+    await _apply_dialog_field_changes(
+        session,
+        dialog_config=dialog,
+        field_values={k: v for k, v in values.items() if k not in skip_fields},
+        ticket_id=ticket_id,
+        user_id=actor.user_id,
+        sysconfig=sysconfig,
+        sender_type="customer" if actor.interface == "CustomerInterface" else "agent",
+        new_ticket=new_ticket,
+    )
+    if pending_time is not None:
+        # AgentTicketProcess.pm:5554-5575: TicketPendingTimeSet after the other fields.
+        await _set_ticket_pending_time(
+            session, ticket_id=ticket_id, pending_time=pending_time, user_id=actor.user_id
+        )
+
+
+@dataclass(frozen=True)
+class TransitionOutcome:
+    """Result of one :func:`run_transitions` pass."""
+
+    activity_changed: bool
+    new_activity_entity_id: str | None
+    transition_entity_id: str | None
+    unsupported_actions: list[str]
+
+
+_NO_TRANSITION = TransitionOutcome(False, None, None, [])
+
+
+async def run_transitions(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+    repository: ProcessRepository | None = None,
+) -> TransitionOutcome:
+    """Run the first matching transition of the ticket's current activity.
+
+    Znuny's ``TicketProcessTransitions`` event runs only for Active and FadeAway processes
+    (``Process.pm:395-402``), so any other state is a no-op. Transitions are checked in
+    ``cmp`` order of their entity ids (``Process.pm:442-445``); ``Data`` is a fresh
+    ``TicketGet`` (:func:`get_condition_data`) and smart tags in Base-type conditions are
+    rendered with the ticket's placeholder context.
+    """
+    state = await get_ticket_process_state(session, ticket_id)
+    if state is None:
+        return _NO_TRANSITION
+    repository = repository or ProcessRepository(session)
+    graph = await repository.get_process(state.process_entity_id)
+    if graph is None or graph.state_entity_id not in RUNNING_STATES:
+        return _NO_TRANSITION
+    activity = graph.activities.get(state.activity_entity_id)
+    if activity is None:
+        return _NO_TRANSITION
+
+    data: ConditionData = await get_condition_data(session, ticket_id)
+    tag_ctx: list[PlaceholderContext] = []  # built on the first tag only
+
+    async def _render(text_: str) -> str:
+        if not tag_ctx:
+            tag_ctx.append(
+                await build_tag_context(
+                    session,
+                    ticket_id=ticket_id,
+                    user_id=user_id,
+                    sysconfig=sysconfig,
+                    data=data,
+                    for_condition=True,
+                )
+            )
+        return await render_tags(text_, ctx=tag_ctx[0], sysconfig=sysconfig)
+
+    tags = await resolve_transition_tags(
+        TransitionConfig(
+            conditions=[b for t in activity.outgoing_transitions for b in t.config.conditions]
+        ),
+        data,
+        render=_render,
+    )
+    for transition in sorted(activity.outgoing_transitions, key=lambda t: t.entity_id):
+        try:
+            if not check_transition(transition.config, data, tags=tags):
+                continue
+        except ConditionConfigError as exc:
+            # Znuny's bare ``return`` leaves TransitionCheck: nothing fires (Transition.pm:322).
+            logger.error("transition %s: %s; no transition runs", transition.entity_id, exc)
+            return _NO_TRANSITION
+        # The new activity is stored BEFORE the actions run (Process.pm:501, actions from :558),
+        # so the history shows the activity update first.
+        await update_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            field_name=ACTIVITY_ID_DF_NAME,
+            values=[transition.target_activity_entity_id],
+            user_id=user_id,
+        )
+        unsupported: list[str] = []
+        for action_node in transition.actions:
+            skipped = await execute_transition_action(
+                session,
+                action=action_node.config,
+                ticket_id=ticket_id,
+                process_entity_id=graph.entity_id,
+                activity_entity_id=activity.entity_id,
+                transition_entity_id=transition.entity_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+            if skipped is not None:
+                unsupported.append(skipped)
+        return TransitionOutcome(
+            activity_changed=True,
+            new_activity_entity_id=transition.target_activity_entity_id,
+            transition_entity_id=transition.entity_id,
+            unsupported_actions=unsupported,
+        )
+    return _NO_TRANSITION
 
 
 async def submit_activity_dialog(
@@ -1542,11 +1807,14 @@ async def submit_activity_dialog(
     field_values: dict[str, Any],
     user_id: int,
     sysconfig: SysConfig,
+    actor: ProcessActor | None = None,
+    repository: ProcessRepository | None = None,
 ) -> ActivityDialogSubmitResult:
     """Submit an Activity Dialog for *ticket_id*: apply field changes, then
-    evaluate the current activity's outgoing transitions in listed (YAML
-    insertion) order and, for the first one that matches, run its
-    TransitionActions and move the ticket to its target activity.
+    evaluate the current activity's outgoing transitions in entity-id order
+    (:func:`run_transitions`, ``Process.pm:442-445``) and, for the first one that
+    matches, move the ticket to its target activity and then run its
+    TransitionActions (``Process.pm:501``, ``:558ff``).
 
     Structurally mirrors Znuny's ``AgentTicketProcess.pm`` submit flow
     (validate dialog -> apply fields -> ``_TransitionDo`` -> advance
@@ -1561,7 +1829,7 @@ async def submit_activity_dialog(
     if state is None:
         raise TicketNotInProcess(ticket_id)
 
-    repository = ProcessRepository(session)
+    repository = repository or ProcessRepository(session)
     graph = await repository.get_process(state.process_entity_id)
     if graph is None:
         raise ProcessNotFound(state.process_entity_id)
@@ -1570,79 +1838,47 @@ async def submit_activity_dialog(
     if activity is None:
         raise TicketNotInProcess(ticket_id)
 
-    dialog_node = next(
-        (d for d in activity.activity_dialogs if d.entity_id == activity_dialog_entity_id), None
-    )
-    if dialog_node is None:
-        if await repository.get_activity_dialog(activity_dialog_entity_id) is None:
-            raise ActivityDialogNotFound(activity_dialog_entity_id)
-        raise ActivityDialogNotAvailable(activity_dialog_entity_id)
+    if all(d.entity_id != activity_dialog_entity_id for d in activity.activity_dialogs) and (
+        await repository.get_activity_dialog(activity_dialog_entity_id) is None
+    ):
+        raise ActivityDialogNotFound(activity_dialog_entity_id)
 
+    actor = actor or ProcessActor.agent(user_id)
+    # Process state, dialog on the current activity, Interface, Permission (agents) and the
+    # Action / ActivityDialog ACLs (availability.py; AgentTicketProcess.pm:140-177).
+    dialog_node = await assert_can_submit(
+        session,
+        actor,
+        ticket_id=ticket_id,
+        candidates=TicketProcessCandidates(
+            process=graph,
+            activity_entity_id=activity.entity_id,
+            activity_dialogs=activity.activity_dialogs,
+            outgoing_transitions=activity.outgoing_transitions,
+        ),
+        activity_dialog_entity_id=activity_dialog_entity_id,
+    )
     dialog_config = dialog_node.config
 
-    if dialog_config.permission:
-        t = await _ticket_must_exist(session, ticket_id)
-        perms = PermissionEngine(session)
-        if not await perms.check(user_id, int(t["queue_id"]), dialog_config.permission):
-            raise ProcessPermissionDenied(
-                f"user {user_id} lacks {dialog_config.permission!r} for activity dialog "
-                f"{activity_dialog_entity_id!r}"
-            )
-
-    for field_name, field_cfg in dialog_config.fields.items():
-        if field_cfg.required and not _is_present(field_name, field_values):
-            raise RequiredFieldMissing(f"required activity dialog field missing: {field_name}")
-
-    await _apply_dialog_field_changes(
+    await apply_activity_dialog(
         session,
-        dialog_config=dialog_config,
-        field_values=field_values,
         ticket_id=ticket_id,
-        user_id=user_id,
+        dialog=dialog_config,
+        field_values=field_values,
+        actor=actor,
         sysconfig=sysconfig,
     )
 
-    unsupported: list[str] = []
-    activity_changed = False
-    new_activity_entity_id: str | None = None
-    matched_transition_entity_id: str | None = None
-
-    # Transitions are evaluated in Path's YAML insertion order (Python dicts
-    # preserve it) — Znuny does not guarantee explicit ordering either.
-    for transition in activity.outgoing_transitions:
-        attrs = await get_ticket_attrs(session, ticket_id)
-        if not evaluate_transition(transition.config, attrs):
-            continue
-
-        for action_node in transition.actions:
-            skipped = await execute_transition_action(
-                session,
-                action=action_node.config,
-                ticket_id=ticket_id,
-                process_entity_id=graph.entity_id,
-                activity_entity_id=activity.entity_id,
-                transition_entity_id=transition.entity_id,
-                user_id=user_id,
-                sysconfig=sysconfig,
-            )
-            if skipped is not None:
-                unsupported.append(skipped)
-
-        await update_dynamic_field(
-            session,
-            ticket_id=ticket_id,
-            field_name=ACTIVITY_ID_DF_NAME,
-            values=[transition.target_activity_entity_id],
-            user_id=user_id,
-        )
-        activity_changed = True
-        new_activity_entity_id = transition.target_activity_entity_id
-        matched_transition_entity_id = transition.entity_id
-        break
-
+    outcome = await run_transitions(
+        session,
+        ticket_id=ticket_id,
+        user_id=user_id,
+        sysconfig=sysconfig,
+        repository=repository,
+    )
     return ActivityDialogSubmitResult(
-        activity_changed=activity_changed,
-        new_activity_entity_id=new_activity_entity_id,
-        unsupported_actions=unsupported,
-        transition_entity_id=matched_transition_entity_id,
+        activity_changed=outcome.activity_changed,
+        new_activity_entity_id=outcome.new_activity_entity_id,
+        unsupported_actions=outcome.unsupported_actions,
+        transition_entity_id=outcome.transition_entity_id,
     )

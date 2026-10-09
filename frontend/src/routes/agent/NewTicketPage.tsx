@@ -29,6 +29,7 @@ import { RefineDiffView } from "@/components/agent/RefineDiffView";
 import { useRefineReview } from "@/components/agent/useRefineReview";
 import { CallerLookup } from "@/components/agent/phone/CallerLookup";
 import { PhoneTicketFields } from "@/components/agent/phone/PhoneTicketFields";
+import { useAgentOptions } from "@/lib/agentOptions";
 import { PhoneCallStrip } from "@/components/agent/phone/PhoneCallStrip";
 import { PhoneNoteFooter } from "@/components/agent/phone/PhoneNoteFooter";
 import { DynamicFieldsForm } from "@/components/fields";
@@ -172,18 +173,33 @@ export function NewTicketPage() {
     [statesQ.data, ticketType],
   );
 
-  const agentsQ = useQuery({
-    queryKey: ["reference", "agents"],
-    queryFn: () => api.listReferenceAgents(),
-    enabled: ticketType === "phone",
-  });
-
   const [customer, setCustomer] = useState<CustomerRef | null>(null);
   const [customerQuery, setCustomerQuery] = useState("");
   const [skipCustomer, setSkipCustomer] = useState(false);
   const debouncedCustomerQuery = useDebouncedValue(customerQuery, 250);
 
   const [queue, setQueue] = useState<number | "">(queueId ?? "");
+  // Owner choices follow the chosen queue (Znuny: members with owner/rw on its group, then the
+  // ACLs); before a queue is known the list is empty, like Znuny.
+  const ownerOptions = useAgentOptions(
+    "owner",
+    { action: "AgentTicketPhone", queue_id: queue === "" ? undefined : queue },
+    { enabled: ticketType === "phone" && queue !== "" },
+  );
+  const ownerLoaded = ownerOptions.loaded;
+  const ownerItems = ownerOptions.items;
+  // An owner picked for another queue (or by a call prefill) that the new queue's list does not offer is dropped:
+  // the default (the creator) takes over, instead of submitting a stale id.
+  useEffect(() => {
+    if (!ownerLoaded) return;
+    setPhoneFields((f) =>
+      f.ownerId !== null && !ownerItems.some((i) => i.value === f.ownerId) ? { ...f, ownerId: null } : f,
+    );
+  }, [ownerLoaded, ownerItems]);
+  const ownerAgents = useMemo(
+    () => ownerOptions.items.map((i) => ({ id: i.value, full_name: i.label, login: "" })),
+    [ownerOptions.items],
+  );
   // A queue the agent picked by hand (or the `?queue_id=` param) is never
   // replaced by a suggestion; otherwise the queue follows the customer.
   const [queuePinned, setQueuePinned] = useState(queueId !== undefined);
@@ -835,8 +851,12 @@ export function NewTicketPage() {
               owner={
                 ticketType === "phone"
                   ? {
-                      agents: agentsQ.data ?? [],
+                      agents: ownerAgents,
                       value: phoneFields.ownerId ?? user?.id ?? null,
+                      fallbackName:
+                        (phoneFields.ownerId ?? user?.id) === user?.id
+                          ? [user?.first_name, user?.last_name].filter(Boolean).join(" ") || user?.login
+                          : `#${phoneFields.ownerId}`,
                       onChange: (id) => setPhoneFields((f) => ({ ...f, ownerId: id })),
                       source:
                         search.owner_id !== undefined && phoneFields.ownerId === search.owner_id
@@ -876,7 +896,12 @@ export function NewTicketPage() {
             )}
 
             {ticketType === "phone" && (
-              <PhoneTicketFields value={phoneFields} onChange={setPhoneFields} fields={optionalDfs} />
+              <PhoneTicketFields
+                value={phoneFields}
+                onChange={setPhoneFields}
+                fields={optionalDfs}
+                queueId={queue === "" ? null : queue}
+              />
             )}
 
             {ticketType === "phone" ? (

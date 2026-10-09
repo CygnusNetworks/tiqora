@@ -1,30 +1,22 @@
 """In-memory, fully-linked ProcessManagement object graph + async loader.
 
-``ProcessRepository`` loads one ``pm_process`` row plus every
-``pm_activity``/``pm_activity_dialog``/``pm_transition``/``pm_transition_action``
-row it (transitively) references — by ``entity_id`` — into a
+``ProcessRepository`` loads one process plus every activity, activity dialog,
+transition and transition action it (transitively) references — by ``entity_id`` — into a
 ``ProcessGraph``: Process -> Activities -> ActivityDialogs, and
 Activity -> outgoing Transitions -> target Activity + TransitionActions.
 
-Read-only. No condition evaluation, no action dispatch — that is subtask 2's
+Definitions come from a :class:`~tiqora.process.source.ProcessSource` (the newest
+deployed revision, or the live rows before the first one), never from ``pm_*``
+directly. Read-only. No condition evaluation, no action dispatch — that is subtask 2's
 ``process/engine.py``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TypeVar
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tiqora.db.legacy.process_management import (
-    PmActivity,
-    PmActivityDialog,
-    PmProcess,
-    PmTransition,
-    PmTransitionAction,
-)
 from tiqora.process.config import (
     ActivityConfig,
     ActivityDialogConfig,
@@ -33,8 +25,8 @@ from tiqora.process.config import (
     TransitionActionConfig,
     TransitionConfig,
 )
-
-_EntityRow = TypeVar("_EntityRow", PmActivity, PmActivityDialog, PmTransition, PmTransitionAction)
+from tiqora.process.dump import PROCESS_STATE_NAMES
+from tiqora.process.source import EntityRecord, ProcessSource, active_process_source
 
 
 @dataclass(frozen=True)
@@ -103,49 +95,51 @@ class ProcessSummary:
     entity_id: str
     name: str
     state_entity_id: str
+    state_name: str
 
 
 class ProcessRepository:
     """Async, read-only loader for the ProcessManagement object graph.
 
-    Znuny process validity/activation is normally driven by SysConfig
-    (``Process::Default::...``) plus a ``general_catalog`` "Process::State"
-    entity that ``state_entity_id`` (e.g. ``S1``) references. Tiqora does
-    not model ``general_catalog`` lookups here — ``list_processes`` returns
-    ALL ``pm_process`` rows with their raw ``state_entity_id`` and leaves
-    "is this process active" to the caller (e.g. resolve ``S1`` against
-    ``general_catalog`` separately, or compare against a configured active
-    id). This is a deliberate simplification, not an oversight.
+    ``state_entity_id`` is one of ``S1`` (Active), ``S2`` (Inactive) or
+    ``S3`` (FadeAway). Znuny hardcodes these three in
+    ``Kernel/System/ProcessManagement/DB/Process/State.pm`` (lines 48-50,
+    67-69), not in ``general_catalog``; the names live in
+    :data:`tiqora.process.dump.PROCESS_STATE_NAMES`. ``list_processes``
+    returns ALL processes with their raw ``state_entity_id`` and
+    leaves the "is this process active" decision to the caller.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, source: ProcessSource | None = None) -> None:
         self._session = session
+        self._source = source
+
+    async def _get_source(self) -> ProcessSource:
+        if self._source is None:
+            self._source = await active_process_source(self._session)
+        return self._source
 
     async def list_processes(self) -> list[ProcessSummary]:
-        rows = (
-            (await self._session.execute(select(PmProcess).order_by(PmProcess.name)))
-            .scalars()
-            .all()
-        )
+        source = await self._get_source()
         return [
             ProcessSummary(
-                id=row.id,
-                entity_id=row.entity_id,
-                name=row.name,
-                state_entity_id=row.state_entity_id,
+                id=rec.id,
+                entity_id=rec.entity_id,
+                name=rec.name,
+                state_entity_id=rec.state_entity_id,
+                state_name=PROCESS_STATE_NAMES.get(rec.state_entity_id, ""),
             )
-            for row in rows
+            for rec in await source.list_processes()
         ]
 
     async def get_process(self, entity_id: str) -> ProcessGraph | None:
-        process_row = (
-            await self._session.execute(select(PmProcess).where(PmProcess.entity_id == entity_id))
-        ).scalar_one_or_none()
-        if process_row is None:
+        source = await self._get_source()
+        process_rec = (await source.load("Process", [entity_id])).get(entity_id)
+        if process_rec is None:
             return None
 
-        process_config = ProcessConfig.from_yaml(process_row.config)
-        layout = ProcessLayout.from_yaml(process_row.layout)
+        process_config = ProcessConfig.from_dict(process_rec.data)
+        layout = ProcessLayout(positions=dict(process_rec.layout))
 
         activity_entity_ids = set(process_config.path.keys())
         for transitions in process_config.path.values():
@@ -155,52 +149,44 @@ class ProcessRepository:
         if process_config.start_activity:
             activity_entity_ids.add(process_config.start_activity)
 
-        activity_rows = await self._load_by_entity_id(PmActivity, activity_entity_ids)
+        activity_recs = await source.load("Activity", activity_entity_ids)
         activity_configs = {
-            row.entity_id: ActivityConfig.from_yaml(row.config) for row in activity_rows.values()
+            eid: ActivityConfig.from_dict(rec.data) for eid, rec in activity_recs.items()
         }
 
         dialog_entity_ids: set[str] = set()
         for ac in activity_configs.values():
             dialog_entity_ids.update(ac.ordered_activity_dialog_entity_ids)
-        dialog_rows = await self._load_by_entity_id(PmActivityDialog, dialog_entity_ids)
         dialog_nodes = {
-            row.entity_id: ActivityDialogNode(
-                id=row.id,
-                entity_id=row.entity_id,
-                name=row.name,
-                config=ActivityDialogConfig.from_yaml(row.config),
-            )
-            for row in dialog_rows.values()
+            eid: _dialog_node(rec)
+            for eid, rec in (await source.load("ActivityDialog", dialog_entity_ids)).items()
         }
 
         transition_entity_ids: set[str] = set()
         for transitions in process_config.path.values():
             transition_entity_ids.update(transitions.keys())
-        transition_rows = await self._load_by_entity_id(PmTransition, transition_entity_ids)
+        transition_recs = await source.load("Transition", transition_entity_ids)
         transition_configs = {
-            row.entity_id: TransitionConfig.from_yaml(row.config)
-            for row in transition_rows.values()
+            eid: TransitionConfig.from_dict(rec.data) for eid, rec in transition_recs.items()
         }
 
         action_entity_ids: set[str] = set()
         for transitions in process_config.path.values():
             for entry in transitions.values():
                 action_entity_ids.update(entry.transition_actions)
-        action_rows = await self._load_by_entity_id(PmTransitionAction, action_entity_ids)
         action_nodes = {
-            row.entity_id: TransitionActionNode(
-                id=row.id,
-                entity_id=row.entity_id,
-                name=row.name,
-                config=TransitionActionConfig.from_yaml(row.config),
+            eid: TransitionActionNode(
+                id=rec.id,
+                entity_id=rec.entity_id,
+                name=rec.name,
+                config=TransitionActionConfig.from_dict(rec.data),
             )
-            for row in action_rows.values()
+            for eid, rec in (await source.load("TransitionAction", action_entity_ids)).items()
         }
 
         activities: dict[str, ActivityNode] = {}
-        for entity_id, row in activity_rows.items():
-            activity_config = activity_configs[entity_id]
+        for entity_id_, rec in activity_recs.items():
+            activity_config = activity_configs[entity_id_]
             dialogs = [
                 dialog_nodes[d_id]
                 for d_id in activity_config.ordered_activity_dialog_entity_ids
@@ -208,64 +194,53 @@ class ProcessRepository:
             ]
 
             outgoing: list[TransitionNode] = []
-            for transition_id, entry in (process_config.path.get(entity_id) or {}).items():
-                transition_row = transition_rows.get(transition_id)
-                if transition_row is None:
+            for transition_id, entry in (process_config.path.get(entity_id_) or {}).items():
+                transition_rec = transition_recs.get(transition_id)
+                if transition_rec is None:
                     continue
                 actions = [
                     action_nodes[a_id] for a_id in entry.transition_actions if a_id in action_nodes
                 ]
                 outgoing.append(
                     TransitionNode(
-                        id=transition_row.id,
-                        entity_id=transition_row.entity_id,
-                        name=transition_row.name,
+                        id=transition_rec.id,
+                        entity_id=transition_rec.entity_id,
+                        name=transition_rec.name,
                         config=transition_configs[transition_id],
                         target_activity_entity_id=entry.activity_entity_id,
                         actions=actions,
                     )
                 )
 
-            activities[entity_id] = ActivityNode(
-                id=row.id,
-                entity_id=row.entity_id,
-                name=row.name,
+            activities[entity_id_] = ActivityNode(
+                id=rec.id,
+                entity_id=rec.entity_id,
+                name=rec.name,
                 config=activity_config,
                 activity_dialogs=dialogs,
                 outgoing_transitions=outgoing,
             )
 
         return ProcessGraph(
-            id=process_row.id,
-            entity_id=process_row.entity_id,
-            name=process_row.name,
-            state_entity_id=process_row.state_entity_id,
+            id=process_rec.id,
+            entity_id=process_rec.entity_id,
+            name=process_rec.name,
+            state_entity_id=process_rec.state_entity_id,
             config=process_config,
             layout=layout,
             activities=activities,
         )
 
-    async def get_activity(self, entity_id: str) -> PmActivity | None:
-        return (
-            await self._session.execute(select(PmActivity).where(PmActivity.entity_id == entity_id))
-        ).scalar_one_or_none()
+    async def get_activity_dialog(self, entity_id: str) -> ActivityDialogNode | None:
+        source = await self._get_source()
+        rec = (await source.load("ActivityDialog", [entity_id])).get(entity_id)
+        return _dialog_node(rec) if rec is not None else None
 
-    async def get_activity_dialog(self, entity_id: str) -> PmActivityDialog | None:
-        return (
-            await self._session.execute(
-                select(PmActivityDialog).where(PmActivityDialog.entity_id == entity_id)
-            )
-        ).scalar_one_or_none()
 
-    async def _load_by_entity_id(
-        self, model: type[_EntityRow], entity_ids: set[str]
-    ) -> dict[str, _EntityRow]:
-        """Fetch *model* rows whose ``entity_id`` is in *entity_ids*, keyed by entity_id."""
-        if not entity_ids:
-            return {}
-        rows = (
-            (await self._session.execute(select(model).where(model.entity_id.in_(entity_ids))))
-            .scalars()
-            .all()
-        )
-        return {row.entity_id: row for row in rows}
+def _dialog_node(rec: EntityRecord) -> ActivityDialogNode:
+    return ActivityDialogNode(
+        id=rec.id,
+        entity_id=rec.entity_id,
+        name=rec.name,
+        config=ActivityDialogConfig.from_dict(rec.data),
+    )

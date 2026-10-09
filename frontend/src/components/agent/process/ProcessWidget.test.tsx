@@ -3,43 +3,22 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18nextProvider } from "react-i18next";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import i18n from "@/i18n";
+import { ApiError } from "@tiqora/api-client";
 import { ProcessWidget } from "./ProcessWidget";
-import type {
-  ActivityDialogDetailOut,
-  ProcessSummaryOut,
-  TicketProcessStateOut,
-} from "@/lib/api";
+import type { ProcessDialogFormData, ProcessSummary, TicketProcessState } from "@/lib/processApi";
 
-const {
-  getTicketProcessState,
-  listProcesses,
-  startTicketProcess,
-  getActivityDialog,
-  submitActivityDialog,
-  listQueues,
-} = vi.hoisted(() => ({
-  getTicketProcessState: vi.fn(),
-  listProcesses: vi.fn(),
-  startTicketProcess: vi.fn(),
-  getActivityDialog: vi.fn(),
-  submitActivityDialog: vi.fn(),
-  listQueues: vi.fn(),
+const { listStartable, startForm, enroll, ticketState, dialogForm, submit } = vi.hoisted(() => ({
+  listStartable: vi.fn(),
+  startForm: vi.fn(),
+  enroll: vi.fn(),
+  ticketState: vi.fn(),
+  dialogForm: vi.fn(),
+  submit: vi.fn(),
 }));
 
-vi.mock("@/lib/api", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return {
-    ...actual,
-    api: {
-      getTicketProcessState,
-      listProcesses,
-      startTicketProcess,
-      getActivityDialog,
-      submitActivityDialog,
-      listQueues,
-    },
-  };
-});
+vi.mock("@/lib/processApi", () => ({
+  processApi: { listStartable, startForm, enroll, ticketState, dialogForm, submit },
+}));
 
 function wrap(ui: React.ReactElement) {
   const queryClient = new QueryClient({
@@ -52,16 +31,18 @@ function wrap(ui: React.ReactElement) {
   );
 }
 
-const notInProcessState: TicketProcessStateOut = {
+const notInProcessState: TicketProcessState = {
   process_entity_id: null,
   process_name: null,
   activity_entity_id: null,
   activity_name: null,
   available_dialogs: [],
   available_transitions_count: 0,
+  process_state: null,
+  can_start: true,
 };
 
-const activeState: TicketProcessStateOut = {
+const activeState: TicketProcessState = {
   process_entity_id: "Process-1",
   process_name: "Onboarding",
   activity_entity_id: "Activity-1",
@@ -70,29 +51,25 @@ const activeState: TicketProcessStateOut = {
     { entity_id: "ActivityDialog-1", name: "Set Title", description_short: "Set the title" },
   ],
   available_transitions_count: 1,
+  process_state: "Active",
+  can_start: false,
 };
 
-const dialogDetail: ActivityDialogDetailOut = {
-  entity_id: "ActivityDialog-1",
+const dialogDetail: ProcessDialogFormData = {
+  process_entity_id: "Process-1",
+  activity_dialog_entity_id: "ActivityDialog-1",
   name: "Set Title",
   description_short: "Set the title",
   description_long: "Fill in the ticket title.",
-  field_order: ["Title"],
-  fields: {
-    Title: {
-      display: "1",
-      default_value: "",
-      description_short: "Title",
-      description_long: "Ticket title",
-      config: {},
-    },
-  },
-  submit_advice_text: "",
   submit_button_text: "Submit",
+  submit_advice_text: "",
+  fields: [
+    { name: "Title", kind: "text", label: "Title", required: true, description_short: "", description_long: "", default: null, options: [] },
+  ],
 };
 
-const processSummaries: ProcessSummaryOut[] = [
-  { id: 1, entity_id: "Process-1", name: "Onboarding", state_entity_id: "S1" },
+const processSummaries: ProcessSummary[] = [
+  { id: 1, entity_id: "Process-1", name: "Onboarding", state_entity_id: "S1", state_name: "Active" },
 ];
 
 beforeEach(() => {
@@ -101,7 +78,7 @@ beforeEach(() => {
 
 describe("ProcessWidget", () => {
   it("renders the start-process affordance when the ticket is not in a process", async () => {
-    getTicketProcessState.mockResolvedValue(notInProcessState);
+    ticketState.mockResolvedValue(notInProcessState);
     wrap(<ProcessWidget ticketId={42} />);
 
     await waitFor(() => expect(screen.getByTestId("process-widget-inactive")).toBeInTheDocument());
@@ -109,7 +86,7 @@ describe("ProcessWidget", () => {
   });
 
   it("renders the current activity and dialog buttons when in a process", async () => {
-    getTicketProcessState.mockResolvedValue(activeState);
+    ticketState.mockResolvedValue(activeState);
     wrap(<ProcessWidget ticketId={42} />);
 
     await waitFor(() =>
@@ -119,9 +96,8 @@ describe("ProcessWidget", () => {
   });
 
   it("opens the dialog and renders dynamic form fields from the fetched detail", async () => {
-    getTicketProcessState.mockResolvedValue(activeState);
-    getActivityDialog.mockResolvedValue(dialogDetail);
-    listQueues.mockResolvedValue([]);
+    ticketState.mockResolvedValue(activeState);
+    dialogForm.mockResolvedValue(dialogDetail);
     wrap(<ProcessWidget ticketId={42} />);
 
     await waitFor(() =>
@@ -133,9 +109,8 @@ describe("ProcessWidget", () => {
   });
 
   it("blocks submit and shows an error when a required field is left blank", async () => {
-    getTicketProcessState.mockResolvedValue(activeState);
-    getActivityDialog.mockResolvedValue(dialogDetail);
-    listQueues.mockResolvedValue([]);
+    ticketState.mockResolvedValue(activeState);
+    dialogForm.mockResolvedValue(dialogDetail);
     wrap(<ProcessWidget ticketId={42} />);
 
     fireEvent.click(await screen.findByTestId("process-dialog-button-ActivityDialog-1"));
@@ -143,17 +118,47 @@ describe("ProcessWidget", () => {
 
     fireEvent.click(screen.getByTestId("process-dialog-submit"));
 
-    await waitFor(() =>
-      expect(screen.getByTestId("process-dialog-required-error")).toBeInTheDocument(),
+    await waitFor(() => expect(screen.getByTestId("process-field-Title-error")).toBeInTheDocument());
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [400, "Please check your input. A required field is missing or a value is invalid."],
+    [403, "You are not allowed to carry out this step here."],
+    [404, "This process or ticket no longer exists."],
+    [409, "This step is not possible right now."],
+  ])("shows plain German text, never the server detail, when the dialog submit fails with %i", async (status, text) => {
+    ticketState.mockResolvedValue(activeState);
+    dialogForm.mockResolvedValue(dialogDetail);
+    submit.mockRejectedValue(new ApiError(status, { detail: "process 'P' is not running" }, "/x"));
+    wrap(<ProcessWidget ticketId={42} />);
+
+    fireEvent.click(await screen.findByTestId("process-dialog-button-ActivityDialog-1"));
+    fireEvent.change(await screen.findByTestId("process-field-Title"), { target: { value: "New title" } });
+    fireEvent.click(screen.getByTestId("process-dialog-submit"));
+
+    const err = await screen.findByTestId("process-dialog-error");
+    expect(err).toHaveTextContent(text);
+    expect(err).not.toHaveTextContent("not running");
+  });
+
+  it("does not title the dialog 'could not load' while the form is loading, and does not retry a 403", async () => {
+    ticketState.mockResolvedValue(activeState);
+    dialogForm.mockRejectedValue(new ApiError(403, null, "/x"));
+    wrap(<ProcessWidget ticketId={42} />);
+
+    fireEvent.click(await screen.findByTestId("process-dialog-button-ActivityDialog-1"));
+    expect(screen.queryByText("Could not load the form.")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("process-dialog-load-error")).toHaveTextContent(
+      "You are not allowed to carry out this step here.",
     );
-    expect(submitActivityDialog).not.toHaveBeenCalled();
+    expect(dialogForm).toHaveBeenCalledTimes(1);
   });
 
   it("submits successfully and refreshes the ticket state", async () => {
-    getTicketProcessState.mockResolvedValueOnce(activeState).mockResolvedValueOnce(notInProcessState);
-    getActivityDialog.mockResolvedValue(dialogDetail);
-    listQueues.mockResolvedValue([]);
-    submitActivityDialog.mockResolvedValue({
+    ticketState.mockResolvedValueOnce(activeState).mockResolvedValueOnce(notInProcessState);
+    dialogForm.mockResolvedValue(dialogDetail);
+    submit.mockResolvedValue({
       activity_changed: true,
       new_activity_entity_id: null,
       transition_entity_id: null,
@@ -163,34 +168,99 @@ describe("ProcessWidget", () => {
     wrap(<ProcessWidget ticketId={42} />);
 
     fireEvent.click(await screen.findByTestId("process-dialog-button-ActivityDialog-1"));
-    const titleInput = await screen.findByTestId("process-field-Title-input");
+    const titleInput = await screen.findByTestId("process-field-Title");
     fireEvent.change(titleInput, { target: { value: "New title" } });
 
     fireEvent.click(screen.getByTestId("process-dialog-submit"));
 
-    await waitFor(() => expect(submitActivityDialog).toHaveBeenCalledWith(42, {
+    await waitFor(() => expect(submit).toHaveBeenCalledWith(42, {
       activity_dialog_entity_id: "ActivityDialog-1",
       field_values: { Title: "New title" },
     }));
     await waitFor(() => expect(screen.queryByTestId("process-dialog-form")).not.toBeInTheDocument());
   });
 
-  it("starts a process from the start-process dialog", async () => {
-    getTicketProcessState.mockResolvedValue(notInProcessState);
-    listProcesses.mockResolvedValue(processSummaries);
-    startTicketProcess.mockResolvedValue(activeState);
+  it("hides the start button when the ticket cannot start a process", async () => {
+    ticketState.mockResolvedValue({ ...notInProcessState, can_start: false });
+    wrap(<ProcessWidget ticketId={42} />);
+
+    await waitFor(() => expect(screen.getByTestId("process-widget-inactive")).toBeInTheDocument());
+    expect(screen.queryByTestId("process-widget-start-button")).not.toBeInTheDocument();
+  });
+
+  it("shows the inactive note instead of dialog buttons for a switched-off process", async () => {
+    ticketState.mockResolvedValue({ ...activeState, process_state: "Inactive" });
+    wrap(<ProcessWidget ticketId={42} />);
+
+    expect(await screen.findByTestId("process-widget-inactive-note")).toHaveTextContent(
+      i18n.t("process.widget.inactive"),
+    );
+    expect(screen.queryByTestId("process-dialog-button-ActivityDialog-1")).not.toBeInTheDocument();
+  });
+
+  it("starts a process in two steps: pick, then the start form, then enroll with the ticket", async () => {
+    ticketState.mockResolvedValue(notInProcessState);
+    listStartable.mockResolvedValue(processSummaries);
+    startForm.mockResolvedValue(dialogDetail);
+    enroll.mockResolvedValue(activeState);
     wrap(<ProcessWidget ticketId={42} />);
 
     fireEvent.click(await screen.findByTestId("process-widget-start-button"));
     await screen.findByTestId("process-start-select");
+    expect(listStartable).toHaveBeenCalledWith({ ticketId: 42 }, expect.anything());
 
     // SelectField: open the menu and click the option in its portal panel.
     fireEvent.click(screen.getByTestId("process-start-select"));
     fireEvent.click(screen.getByTestId("process-start-select-menu-option-Process-1"));
+    fireEvent.click(screen.getByTestId("process-start-next"));
+
+    await screen.findByTestId("process-start-form");
+    expect(startForm).toHaveBeenCalledWith("Process-1", { ticketId: 42 }, expect.anything());
+    fireEvent.change(await screen.findByLabelText(/Title/), { target: { value: "Neu" } });
     fireEvent.click(screen.getByTestId("process-start-submit"));
 
     await waitFor(() =>
-      expect(startTicketProcess).toHaveBeenCalledWith(42, { process_entity_id: "Process-1" }),
+      expect(enroll).toHaveBeenCalledWith(42, {
+        process_entity_id: "Process-1",
+        field_values: { Title: "Neu" },
+      }),
     );
+  });
+
+  it("shows a plain message when the server refuses the start (403)", async () => {
+    ticketState.mockResolvedValue(notInProcessState);
+    listStartable.mockResolvedValue(processSummaries);
+    startForm.mockRejectedValue(new ApiError(403, { detail: "Forbidden" }, "/x"));
+    wrap(<ProcessWidget ticketId={42} />);
+
+    fireEvent.click(await screen.findByTestId("process-widget-start-button"));
+    await screen.findByTestId("process-start-select");
+    fireEvent.click(screen.getByTestId("process-start-select"));
+    fireEvent.click(screen.getByTestId("process-start-select-menu-option-Process-1"));
+    fireEvent.click(screen.getByTestId("process-start-next"));
+
+    expect(await screen.findByTestId("process-start-load-error")).toHaveTextContent(
+      i18n.t("process.start.forbidden"),
+    );
+  });
+
+  it("hides the start button and the dialog buttons when AgentTicketProcess is forbidden", async () => {
+    const forbidden = new Set(["AgentTicketNote"]);
+    ticketState.mockResolvedValue(notInProcessState);
+    const first = wrap(<ProcessWidget ticketId={42} allowedActions={forbidden} />);
+    await screen.findByTestId("process-widget-inactive");
+    expect(screen.queryByTestId("process-widget-start-button")).not.toBeInTheDocument();
+    first.unmount();
+
+    ticketState.mockResolvedValue(activeState);
+    wrap(<ProcessWidget ticketId={42} allowedActions={forbidden} />);
+    await screen.findByTestId("process-widget-activity-name");
+    expect(screen.queryByTestId("process-dialog-button-ActivityDialog-1")).not.toBeInTheDocument();
+  });
+
+  it("keeps start and dialogs when AgentTicketProcess is allowed", async () => {
+    ticketState.mockResolvedValue(activeState);
+    wrap(<ProcessWidget ticketId={42} allowedActions={new Set(["AgentTicketProcess"])} />);
+    expect(await screen.findByTestId("process-dialog-button-ActivityDialog-1")).toBeInTheDocument();
   });
 });

@@ -138,7 +138,9 @@ def test_identity_migrations_upgrade_downgrade_and_hold_large_metadata(alembic_e
         _migrate(_PREVIOUS)
         assert _tables(sync_url) == set()
 
-        _migrate("head")
+        # Up to the identity head, not "head": later migrations (deployed revisions, 0066)
+        # sit on top of it.
+        _migrate(_TWO_FACTOR)
         assert _version(sync_url) == _TWO_FACTOR
         assert _tables(sync_url) == _TABLES
 
