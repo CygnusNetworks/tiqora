@@ -18,6 +18,8 @@ import yaml
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tiqora.util.perl import perl_truthy
+
 # Documented Znuny defaults (Framework.xml / Ticket.xml / Defaults.pm) used when
 # sysconfig tables are empty (fresh schema without Config rebuild).
 ZNUNY_SETTING_DEFAULTS: Final[dict[str, Any]] = {
@@ -203,6 +205,18 @@ class SysConfig:
             return fallback
         return str(value)
 
+    async def get_bool(self, name: str, default: bool = False) -> bool:
+        """Checkbox / yes-no setting with Perl truthiness.
+
+        Znuny stores checkboxes as YAML strings (``--- '0'`` decodes to ``"0"``), so
+        ``bool(value)`` would read a disabled setting as enabled. *default* applies
+        only when the setting is absent (``None``), not for ``""`` / ``"0"``.
+        """
+        value = await self.get(name)
+        if value is None:
+            return default
+        return perl_truthy(value)
+
     async def get_many(self, names: list[str] | tuple[str, ...]) -> dict[str, Any]:
         """Resolve several settings (each may hit cache / DB)."""
         return {name: await self.get(name) for name in names}
@@ -310,7 +324,7 @@ class SysConfig:
         return await self.get_str("PostmasterFollowUpStateClosed", "open")
 
     async def postmaster_bounce_as_followup(self) -> bool:
-        return bool(await self.get("PostmasterBounceEmailAsFollowUp", 1))
+        return await self.get_bool("PostmasterBounceEmailAsFollowUp", True)
 
     async def postmaster_user_id(self) -> int:
         return int(await self.get("PostmasterUserID", 1) or 1)
@@ -348,8 +362,7 @@ class SysConfig:
         key = REQUIRED_LOCK_ACTIONS.get(action)
         if key is None:
             return False
-        value = await self.get(key, 1)
-        return bool(int(value or 0))
+        return await self.get_bool(key, True)
 
     async def get_layers(self, name: str) -> tuple[Any | None, Any | None]:
         """``(set, default)`` for *name*, decoded; ``None`` where absent.

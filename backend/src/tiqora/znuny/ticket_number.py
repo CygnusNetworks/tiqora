@@ -309,7 +309,7 @@ async def ticket_number_build(
 
     now_local = datetime.now(_tzinfo(tz))
     if short == GENERATOR_DATE:
-        use_fmt = bool(await sysconfig.get("Ticket::NumberGenerator::Date::UseFormattedCounter"))
+        use_fmt = await sysconfig.get_bool("Ticket::NumberGenerator::Date::UseFormattedCounter")
         min_size = await _min_counter_size(sysconfig, None)
         return format_date(
             counter,
