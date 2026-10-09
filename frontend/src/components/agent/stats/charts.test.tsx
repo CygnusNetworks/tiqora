@@ -137,7 +137,7 @@ describe("charts", () => {
 
   it("kpi delta is green when the direction is the good one and muted when flat", () => {
     const { rerender } = render(
-      <KpiTile label="T" value="1" delta={{ value: 0.05, direction: "down", goodWhen: "down" }} testId="k" />,
+      <KpiTile label="T" value="1" delta={{ value: -0.05, direction: "down", goodWhen: "down" }} testId="k" />,
     );
     expect(screen.getByTestId("k-delta")).toHaveClass("text-green");
     expect(screen.getByTestId("k-delta")).toHaveTextContent("−5");
@@ -168,7 +168,8 @@ describe("charts", () => {
   it("line chart hit areas are focusable, show the tooltip on focus and carry the values", () => {
     render(<LineChart testId="lc" labels={["KW 1", "KW 2"]} series={twoSeries} />);
     const hit = screen.getByTestId("lc-hit-1");
-    expect(hit).toHaveAttribute("tabindex", "0");
+    expect(hit).toHaveAttribute("tabindex", "-1");
+    expect(hit).toHaveAttribute("role", "img");
     expect(hit).toHaveAttribute("aria-label", expect.stringContaining("Erstellt 5"));
     fireEvent.focus(hit);
     expect(screen.getByTestId("lc-tooltip")).toHaveTextContent("KW 2");
@@ -189,9 +190,13 @@ describe("charts", () => {
         <HeatmapChart testId="hm" rows={[{ key: "r", label: "Mo" }]} columns={[{ key: "c", label: "9" }]} values={[[5]]} />
       </>,
     );
-    for (const id of ["sb-hit-0", "bc-hit-0", "dn-slice-a", "hm-cell-0-0"]) {
+    for (const id of ["sb-hit-0", "bc-hit-0", "dn-slice-a"]) {
       expect(screen.getByTestId(id)).toHaveAttribute("tabindex", "0");
     }
+    // dense grids stay out of the tab order but keep their label
+    expect(screen.getByTestId("hm-cell-0-0")).toHaveAttribute("tabindex", "-1");
+    expect(screen.getByTestId("hm-cell-0-0")).toHaveAttribute("role", "img");
+    expect(screen.getByTestId("hm-cell-0-0")).toHaveAttribute("aria-label", "Mo · 9: 5");
     expect(screen.getByTestId("sb-hit-0")).toHaveAttribute("aria-label", "Mo: Eingang 2");
     expect(screen.getByTestId("bc-hit-0")).toHaveAttribute("aria-label", "A: 4");
     fireEvent.focus(screen.getByTestId("bc-hit-0"));
@@ -307,5 +312,26 @@ describe("charts", () => {
     expect(svg).toHaveAttribute("aria-hidden", "true");
     expect(svg).not.toHaveAttribute("role");
     expect(svg.querySelector("polyline")).toBeNull();
+  });
+
+  it("stacked bar leaves the tab order above 12 categories", () => {
+    const cats = (n: number) => Array.from({ length: n }, (_, i) => ({ key: `c${i}`, label: `K${i}` }));
+    const ser = (n: number) => [{ key: "s", label: "S", color: seriesColor(0), values: Array.from({ length: n }, () => 1) }];
+    const { rerender } = render(<StackedBarChart testId="sb" categories={cats(12)} series={ser(12)} />);
+    expect(screen.getByTestId("sb-hit-0")).toHaveAttribute("tabindex", "0");
+    rerender(<StackedBarChart testId="sb" categories={cats(13)} series={ser(13)} />);
+    expect(screen.getByTestId("sb-hit-0")).toHaveAttribute("tabindex", "-1");
+    expect(screen.getByTestId("sb-hit-0")).toHaveAttribute("role", "img");
+    expect(screen.getByTestId("sb-hit-0")).toHaveAttribute("aria-label", "K0: S 1");
+  });
+
+  it("kpi arrow and wording follow the sign of the value, colour follows direction", () => {
+    render(<KpiTile label="T" value="1" delta={{ value: 0.2, direction: "down", goodWhen: "down" }} testId="k" />);
+    const d = screen.getByTestId("k-delta");
+    expect(d).toHaveTextContent("Increase");
+    expect(d).toHaveTextContent("+20");
+    expect(d).not.toHaveTextContent("−");
+    expect(d.querySelector("path")?.getAttribute("d")).toBe("M6 2 L10 8 H2 Z");
+    expect(d).toHaveClass("text-green");
   });
 });

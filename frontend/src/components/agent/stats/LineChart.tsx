@@ -29,7 +29,8 @@ export type LineChartProps = {
  * Used for time-bucketed reports (ticket volume, backlog trend). One y axis
  * starting at zero, 2 px lines, a crosshair + tooltip per bucket and a legend
  * for two or more series. A single bucket gets a persistent marker per series.
- * Negative values extend the axis below zero.
+ * Negative values extend the axis below zero. Hit rects are programmatically focusable but out of
+ * the tab order (dense); each keeps role="img" and an aria-label with the values.
  */
 export function LineChart({
   labels,
@@ -144,7 +145,7 @@ export function LineChart({
               width={edge ? w / 2 : w}
               height={chartHeight}
               fill="transparent"
-              tabIndex={0}
+              tabIndex={-1}
               role="img"
               aria-label={`${label}: ${series.map((s) => `${s.name} ${s.values[i] === undefined ? "—" : fmt(s.values[i])}`).join(", ")}`}
               onFocus={() => setHover(i)}

@@ -112,7 +112,7 @@ export function StackedBarChart({
             width={band}
             height={chartHeight}
             fill="transparent"
-            tabIndex={0}
+            tabIndex={categories.length > 12 ? -1 : 0}
             role="img"
             aria-label={`${c.label}: ${series
               .filter((s) => s.values[ci] != null)

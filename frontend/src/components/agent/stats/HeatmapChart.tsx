@@ -20,7 +20,7 @@ const CELL_H = 24;
 const LABEL_W = 92;
 const HEADER_H = 22;
 
-/** Rows x columns grid; colour = sequential ramp of value / max, empty cells use the subtle surface. */
+/** Rows x columns grid (cells are out of the tab order but keep role="img" + aria-label); colour = sequential ramp of value / max, empty cells use the subtle surface. */
 export function HeatmapChart({
   rows,
   columns,
@@ -90,7 +90,7 @@ export function HeatmapChart({
                       fill={v === null ? "var(--color-surface-subtle)" : sequentialColor(tone)}
                       stroke="var(--color-surface)"
                       strokeWidth={2}
-                      tabIndex={0}
+                      tabIndex={-1}
                       role="img"
                       aria-label={`${row.label} · ${col.label}: ${v === null ? "—" : fmt(v)}`}
                       onFocus={() => setHover({ r, c })}

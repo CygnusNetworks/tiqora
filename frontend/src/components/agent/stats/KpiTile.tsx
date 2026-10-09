@@ -3,8 +3,13 @@ import { Sparkline } from "./Sparkline";
 import { useChartFormat } from "./chartLocale";
 
 export type KpiDelta = {
-  /** Relative change, 0.12 = 12 %; may be negative (-0.08 = down 8 %). */
+  /** Relative change, 0.12 = 12 %; may be negative (-0.08 = down 8 %). The sign drives arrow, text and screen-reader wording. */
   value: number;
+  /**
+   * Caller contract: only meaningful for colour. `direction === goodWhen` is green, the opposite is red,
+   * "flat" is muted. Pass the direction of the change (the sign of `value`); the tile never lets it
+   * contradict the printed sign.
+   */
   direction: "up" | "down" | "flat";
   /** Which direction is an improvement; decides green vs. red. */
   goodWhen: "up" | "down";
@@ -41,14 +46,9 @@ export function KpiTile({ label, value, delta, sparkline, hint, testId }: KpiTil
     : delta.direction === delta.goodWhen
       ? "text-green"
       : "text-danger";
-  // A negative number always reads as a decrease; otherwise the direction decides.
-  const sign = !delta
-    ? ""
-    : delta.value < 0 || (delta.value > 0 && delta.direction === "down")
-      ? "−"
-      : delta.value > 0 && delta.direction === "up"
-        ? "+"
-        : "";
+  // Arrow, sign and screen-reader text all come from the sign of the number.
+  const shown: KpiDelta["direction"] = !delta || delta.value === 0 ? "flat" : delta.value < 0 ? "down" : "up";
+  const sign = shown === "down" ? "−" : shown === "up" ? "+" : "";
   const percent = delta ? `${sign}${formatPercent(Math.abs(delta.value))}` : "";
 
   return (
@@ -65,12 +65,12 @@ export function KpiTile({ label, value, delta, sparkline, hint, testId }: KpiTil
           className={cn("mt-1 flex items-center gap-1 text-xs font-medium tabular-nums", tone)}
           data-testid={testId ? `${testId}-delta` : undefined}
         >
-          <Arrow direction={delta.direction} />
+          <Arrow direction={shown} />
           <span className="sr-only">
             {t(
-              delta.direction === "up"
+              shown === "up"
                 ? "reports.chart.deltaUp"
-                : delta.direction === "down"
+                : shown === "down"
                   ? "reports.chart.deltaDown"
                   : "reports.chart.deltaFlat",
             )}
