@@ -49,15 +49,16 @@ Backend (new unless marked):
 |---|---|
 | `backend/src/tiqora/reporting/__init__.py` | package docstring only (no import side effects) |
 | `backend/src/tiqora/reporting/settings.py` | `ReportingSettings`, `REPORTING_SECTION` |
-| `backend/src/tiqora/reporting/working_time.py` | `WorkingCalendar`, `EscalationTargets`, `CalendarResolver`, `to_epoch`, `from_epoch`, `working_minutes` |
+| `backend/src/tiqora/reporting/working_time.py` | `WorkingCalendar`, `EscalationTargets`, `CalendarResolver`, `to_epoch` (re-export of `escalation.to_epoch`), `from_epoch`, `working_minutes`, `due_at` |
 | `backend/src/tiqora/reporting/history_events.py` | pure: `TicketRow`, `HistoryRow`, `ArticleRow`, `EventRow`, `derive_events` |
 | `backend/src/tiqora/reporting/facts.py` | pure: `AiFlags`, `FactInputs`, `FactRow`, `compute_fact`, `CHANNEL_KEYS`, `FACT_VERSION` |
 | `backend/src/tiqora/reporting/facts_store.py` | DB: `load_fact_inputs`, `rebuild_ticket_facts`, `rebuild_and_commit`, `delete_ticket_facts`, `fact_write_lock` |
 | `backend/src/tiqora/reporting/dirty.py` | `mark_tickets_dirty`, `take_dirty_ticket_ids` |
-| `backend/src/tiqora/reporting/state.py` | `load_state`, `save_state`, `facts_status` |
+| `backend/src/tiqora/reporting/state.py` | `STATE_NAME`, `load_state`, `facts_status` |
 | `backend/src/tiqora/reporting/incremental.py` | `run_report_facts_tick` + constants |
 | `backend/src/tiqora/reporting/snapshots.py` | `Segment`, `ticket_timeline`, `day_end_instants`, `compute_snapshot_counts`, `write_snapshots`, `snapshot_days` |
 | `backend/src/tiqora/reporting/backfill.py` | `ReportBackfillPayload`, `run_backfill`, `REPORT_BACKFILL_JOB` |
+| `backend/src/tiqora/reporting/filter_sql.py` | `compile_conditions` on the shared wave-0 predicate helpers extracted from `filters/tickets.py` |
 | `backend/src/tiqora/reporting/sql.py` | `shift_seconds`, `date_bucket`, `date_part`, `TzSegment`, `tz_segments`, `to_local`, `statement_timeout`, `ReportQueryTimeout` |
 | `backend/src/tiqora/reporting/definition.py` | `ReportDefinition` and parts, `TimeWindow`, `resolve_time_window`, `DefinitionError`, `validate_definition`, `definition_hash` |
 | `backend/src/tiqora/reporting/semantic.py` | `Dimension`, `Measure`, `FilterOnlyField`, `ReportSource`, `CompileContext`, `REPORT_SOURCES` |
@@ -77,8 +78,6 @@ Backend (new unless marked):
 | `backend/src/tiqora/cli/report.py` | `tiqora report backfill|status` |
 | `backend/src/tiqora/worker/report_facts.py` | `run_report_facts_worker_tick` (enabled switch + settings) |
 | modify `backend/src/tiqora/znuny/escalation.py` | public `escalation_preferences`, `calendar_config`, `to_epoch`; new `working_seconds_between` |
-| modify `backend/src/tiqora/domain/ticket_write_service.py` | `add_time_accounting` → Znuny-identical (change_time + `TimeAccounting` history) |
-| modify `backend/src/tiqora/znuny/history.py` | `TYPE_TIME_ACCOUNTING`, `add_time_accounting_history` |
 | modify `backend/src/tiqora/stats/service.py` | `StatsService` methods delegate to built-ins |
 | modify `backend/src/tiqora/gdpr/erasure.py` | delete facts + mark tickets dirty on erasure/rollback |
 | modify shared: `db/tiqora/models.py`, `extensions/core.py`, `config.py`, `domain/settings_store.py`, `worker/__main__.py`, `worker/services.py`, `api/v1/__init__.py`, `api/v1/admin/__init__.py`, `main.py` | registrations only (listed per task) |
@@ -243,7 +242,7 @@ class ReportingSettings(BaseModel):
     near_miss_percent: int = Field(10, ge=1, le=50)
     cache_seconds: int = Field(300, ge=0, le=3600)
     inline_row_threshold: int = Field(200_000, ge=1_000, le=10_000_000)
-    max_result_rows: int = Field(5_000, ge=100, le=50_000)
+    max_result_rows: int = Field(5_000, ge=100, le=10_000)
     export_row_limit: int = Field(100_000, ge=1_000, le=1_000_000)
     query_timeout_seconds: int = Field(60, ge=5, le=600)
 REPORTING_SECTION = SettingsSection(key="reporting", model=ReportingSettings,
@@ -441,7 +440,7 @@ async def run_report_facts_tick(*, settings: Settings | None = None,
 Tick order (each step commits on its own; every step is idempotent, so a crash in between only repeats work):
 
 1. `load_state`. If `last_history_id == 0`: set it to `MAX(ticket_history.id)` (0 if empty), commit (older history belongs to the backfill).
-2. If `backfill_status == "pending"` and `backfill_job_id is None`: `enqueue_job(kind="core.report_backfill", payload=ReportBackfillPayload(), created_by=None, dedupe_key="report_backfill")`, store the job id, commit.
+2. If `backfill_status == "pending"` and `backfill_job_id is None`: `enqueue_job(session, kind="core.report_backfill", payload=ReportBackfillPayload(), created_by=None, dedupe_key="report_backfill")`, store the job id, commit.
 3. History: up to `MAX_BATCHES_PER_TICK` times read `id, ticket_id` with `id > last_history_id ORDER BY id LIMIT HISTORY_BATCH`, plus rows whose id is in the gap list. Gap bookkeeping: every id between the old watermark and the batch maximum that was not returned joins the gap list with `first_seen = wall_clock()`; gap ids that now returned a row leave it; gaps older than `GAP_TTL_SECONDS` are dropped (rolled-back inserts); the list is capped at `MAX_GAPS` (oldest dropped). Rebuild touched tickets with `rebuild_and_commit`, then save `last_history_id` + `gap_ids` + `last_tick_at`, commit. (A time-based "only rows older than 60 s" filter was rejected: `ticket_history.create_time` is written with the DB session's `current_timestamp`, whose zone is not reliably UTC on prod.)
 4. Dirty queue: `take_dirty_ticket_ids(DIRTY_BATCH)` → `rebuild_and_commit` → `clear_dirty`, commit.
 5. Fact version upgrade (only when `backfill_status == "done"`): up to `VERSION_UPGRADE_BATCH` fact ticket ids with `fact_version < FACT_VERSION` → rebuild.
@@ -1112,7 +1111,7 @@ Colour tokens (`themes/tokens.css`, validated in the session that wrote this pla
 7. **Working minutes without working hours.** Znuny's `FirstResponseInMin`/`SolutionInMin` are 0 when no working hours are configured; facts store `NULL` there and breaches fall back to wall-clock minutes, so P50 values are never a misleading 0.
 8. **Labels for exports come from the frontend** (`ReportExportIn.column_labels/value_labels`): there is no server-side i18n catalogue, and duplicating 49 locales server-side is not worth it in phase 1. Phase 3 scheduled exports (no browser) will need a server-side label set — recorded there.
 9. **Not in phase 1:** dynamic fields as dimensions (`df.<Name>` keys reserved; needs the "reportable" side table), `articles`/`ai_usage` sources, AI impact and mail-delivery reports (phase 4), the read replica URL (still open; `run_report` takes a session, so a second engine can be passed later).
-10. **`TimeAccounting` history parity fix** (Task 6): Tiqora's `add_time_accounting` writes no `TimeAccounting` history row and does not touch `ticket.change_time`; Znuny's `TicketAccountTime` does both. Fixed here because the facts' `accounted_time` is refreshed through history rows.
+10. ~~**`TimeAccounting` history parity fix** (Task 6): Tiqora's `add_time_accounting` writes no `TimeAccounting` history row and does not touch `ticket.change_time`; Znuny's `TicketAccountTime` does both. Fixed here because the facts' `accounted_time` is refreshed through history rows.~~ Struck ([R-T6]): `add_time_accounting` on main already does both.
 
 ---
 ## Tasks
@@ -1436,6 +1435,8 @@ Order: backend Tasks 1→17 are sequential (each builds on the committed previou
 
 ### Task 6: `TimeAccounting` history like Znuny (backend)
 
+> **Verify-only ([R-T6]).** `add_time_accounting` on main already writes `change_time`, the `%%unit%%perl_sum` history row and normalises 0.256 to 0.25. Run `tests/test_time_accounting_znuny.py` plus the existing time-accounting tests; add no new function, no new test file and no `format(float(...), ".15g")` rewrite. The steps below are superseded.
+
 **Files:**
 - Modify: `backend/src/tiqora/znuny/history.py` (`TYPE_TIME_ACCOUNTING: Final = "TimeAccounting"`, `async def add_time_accounting_history(session, *, ticket_id, article_id, time_unit: str, accounted_time: str, user_id) -> None`), `backend/src/tiqora/domain/ticket_write_service.py` (`add_time_accounting`)
 - Test: `backend/tests/test_time_accounting_history.py` (both dialects, band 47200–47219); existing tests found by `grep -ln "time-accounting\|add_time_accounting" backend/tests` stay green.
@@ -1531,7 +1532,7 @@ Order: backend Tasks 1→17 are sequential (each builds on the committed previou
   ```
   `test_admin_reporting_api.py`: admin GET status 200 with `history_lag >= 0`; non-admin 403; POST backfill → 202 `{"job_id", "status": "queued"}`, a second POST while queued returns the same `job_id` (dedupe); `state.backfill_job_id` set.
 - [ ] **Step 2: Run → FAIL.** `cd backend && TIQORA_STRICT_DB_LEAKS=1 uv run python -m pytest -q tests/test_reporting_backfill.py tests/test_admin_reporting_api.py`
-- [ ] **Step 3: Implement** per R6/R9. `run_backfill_job(ctx, payload)` = `run_backfill(ctx.session_factory, ctx.settings, payload, progress=ctx.progress, check_cancelled=ctx.check_cancelled)`. `since` → first ticket id: `SELECT MIN(id) FROM ticket WHERE create_time >= :since_utc` (local midnight of `since` in the reporting zone → naive UTC). Zone via `load_reporting_settings` + `reporting_time_zone`. Admin POST: `enqueue_job(kind="core.report_backfill", payload=ReportBackfillPayload(**body.model_dump()), created_by=user.id, dedupe_key="report_backfill")`, set `state.backfill_job_id`, and when `restart` set `backfill_status="pending"` only if no job is active; commit; 202. Status: `history_lag = MAX(ticket_history.id) - last_history_id`, counts by `SELECT COUNT(*)`. CLI: argparse subcommands `backfill` (`--since`, `--restart`, `--no-snapshots`) printing `"{done}/{total} {message}"` per progress call, and `status` printing `facts_status(...).model_dump_json(indent=2)`.
+- [ ] **Step 3: Implement** per R6/R9. `run_backfill_job(ctx, payload)` = `run_backfill(ctx.session_factory, ctx.settings, payload, progress=ctx.progress, check_cancelled=ctx.check_cancelled)`. `since` → first ticket id: `SELECT MIN(id) FROM ticket WHERE create_time >= :since_utc` (local midnight of `since` in the reporting zone → naive UTC). Zone via `load_reporting_settings` + `reporting_time_zone`. Admin POST: `enqueue_job(session, kind="core.report_backfill", payload=ReportBackfillPayload(**body.model_dump()), created_by=user.id, dedupe_key="report_backfill")`, set `state.backfill_job_id`, and when `restart` set `backfill_status="pending"` only if no job is active; commit; 202. Status: `history_lag = MAX(ticket_history.id) - last_history_id`, counts by `SELECT COUNT(*)`. CLI: argparse subcommands `backfill` (`--since`, `--restart`, `--no-snapshots`) printing `"{done}/{total} {message}"` per progress call, and `status` printing `facts_status(...).model_dump_json(indent=2)`.
 - [ ] **Step 4: Run → PASS**, regenerate openapi, lint gates, commit `feat(reporting): resumable backfill job, CLI and admin status`.
 
 ### Task 9: Incremental fact loop, worker service, GDPR hook (backend)

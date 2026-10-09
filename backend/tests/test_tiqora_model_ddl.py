@@ -59,3 +59,41 @@ def test_job_file_data_and_result_fit_large_payloads_on_mariadb() -> None:
     assert "MEDIUMTEXT" in _column_ddl(TiqoraJob.__table__, "result", mysql.dialect())
     assert "MEDIUMTEXT" in _column_ddl(TiqoraJob.__table__, "payload", mysql.dialect())
     assert "TEXT" in _column_ddl(TiqoraJob.__table__, "payload", postgresql.dialect())
+
+
+def test_report_fact_columns_ddl() -> None:
+    from tiqora.db.tiqora.models import (
+        TiqoraReportDailySnapshot,
+        TiqoraReportState,
+        TiqoraReportTicketFact,
+    )
+
+    fact = TiqoraReportTicketFact.__table__
+    assert "NUMERIC(12, 2)" in _column_ddl(fact, "accounted_time", postgresql.dialect())
+    assert "NUMERIC(12, 2)" in _column_ddl(fact, "accounted_time", mysql.dialect())
+    pk = [c.name for c in TiqoraReportDailySnapshot.__table__.primary_key.columns]
+    assert pk == ["snapshot_date", "queue_id", "state_type", "priority_id"]
+    assert "MEDIUMTEXT" in _column_ddl(TiqoraReportState.__table__, "gap_ids", mysql.dialect())
+    assert "MEDIUMTEXT" not in _column_ddl(
+        TiqoraReportState.__table__, "gap_ids", postgresql.dialect()
+    )
+
+
+def test_report_ticket_ids_do_not_generate_ids() -> None:
+    """Fact and dirty ``ticket_id`` mirror ``ticket.id``; an insert that forgot it
+    must fail instead of inventing an id (same trap as ``tiqora_user_auth_config``)."""
+    from tiqora.db.tiqora.models import (
+        TiqoraReportDailySnapshot,
+        TiqoraReportDirtyTicket,
+        TiqoraReportTicketFact,
+    )
+
+    for table, column in (
+        (TiqoraReportTicketFact.__table__, "ticket_id"),
+        (TiqoraReportDirtyTicket.__table__, "ticket_id"),
+        (TiqoraReportDailySnapshot.__table__, "queue_id"),
+        (TiqoraReportDailySnapshot.__table__, "priority_id"),
+    ):
+        assert "AUTO_INCREMENT" not in _column_ddl(table, column, mysql.dialect())
+        for marker in ("SERIAL", "GENERATED"):
+            assert marker not in _column_ddl(table, column, postgresql.dialect())
