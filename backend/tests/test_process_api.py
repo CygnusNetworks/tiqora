@@ -58,7 +58,13 @@ Interface:
 Permission: ''
 """
 
-TRANSITION_CONFIG_YAML = "ConditionLinking: and\n"
+# Znuny never fires a transition without a Condition (Transition.pm:322-327): require a
+# non-empty Title, which the dialog submission sets.
+_TITLE_CONDITION = (
+    "Condition:\n  '1':\n    Fields:\n      Title:\n        Match: .\n        Type: Regexp\n"
+    "    Type: and\n  Type: and\nConditionLinking: and\n"
+)
+TRANSITION_CONFIG_YAML = _TITLE_CONDITION
 
 TRANSITION_ACTION_CONFIG_YAML = """
 Config:

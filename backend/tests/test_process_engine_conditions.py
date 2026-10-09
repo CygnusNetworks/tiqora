@@ -51,14 +51,18 @@ def _config(
     return TransitionConfig(condition_linking=condition_linking, conditions=blocks)
 
 
-def test_no_condition_key_matches_unconditionally() -> None:
+def test_no_condition_key_never_matches() -> None:
+    # Transition.pm:322-327: no Condition -> "No conditions for transition" error, no match
+    # (was: unconditional match).
     config = TransitionConfig(condition_linking="and", conditions=[])
-    assert evaluate_transition(config, ATTRS) is True
+    assert evaluate_transition(config, ATTRS) is False
 
 
-def test_empty_fields_in_block_is_vacuously_true() -> None:
+def test_empty_fields_in_block_is_a_config_error() -> None:
+    # Transition.pm:359-366: a block without Fields logs "No Fields in Transition" and returns
+    # (was: vacuously true).
     config = _config({})
-    assert evaluate_transition(config, ATTRS) is True
+    assert evaluate_transition(config, ATTRS) is False
 
 
 # --- String -----------------------------------------------------------------
@@ -153,9 +157,10 @@ def test_not_equal_false_when_same_case_insensitive() -> None:
 # --- Missing field defaults to "" -------------------------------------------
 
 
-def test_missing_field_treated_as_empty_string() -> None:
+def test_missing_field_with_empty_string_match_never_matches() -> None:
+    # String.pm:116-123: an empty Match is a config error -> no match (was: "" == "").
     config = _config({"DynamicField_Missing": ("", "String")})
-    assert evaluate_transition(config, ATTRS) is True
+    assert evaluate_transition(config, ATTRS) is False
 
 
 def test_missing_field_nonempty_match_fails() -> None:

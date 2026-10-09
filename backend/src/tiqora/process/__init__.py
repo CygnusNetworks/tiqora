@@ -13,6 +13,14 @@ dispatching TransitionActions, and driving Activity Dialog submission
 from __future__ import annotations
 
 from tiqora.process.actor import Interface, ProcessActor
+from tiqora.process.conditions import (
+    BASE_CONDITION_TYPES,
+    ConditionData,
+    ConditionValue,
+    evaluate_condition_field,
+    get_condition_data,
+    resolve_transition_tags,
+)
 from tiqora.process.config import (
     ActivityConfig,
     ActivityDialogConfig,
@@ -27,10 +35,12 @@ from tiqora.process.config import (
 )
 from tiqora.process.engine import (
     ActivityDialogSubmitResult,
+    TransitionOutcome,
     apply_activity_dialog,
     evaluate_transition,
     execute_transition_action,
     get_ticket_attrs,
+    run_transitions,
     start_process,
     submit_activity_dialog,
 )
@@ -82,6 +92,12 @@ from tiqora.process.ticket_state import (
 )
 
 __all__ = [
+    "BASE_CONDITION_TYPES",
+    "ConditionData",
+    "ConditionValue",
+    "evaluate_condition_field",
+    "get_condition_data",
+    "resolve_transition_tags",
     "ACTIVITY_ID_DF_NAME",
     "CUSTOMER_SKIP_FIELDS",
     "DISPLAY_HIDDEN",
@@ -128,6 +144,7 @@ __all__ = [
     "TransitionConditionField",
     "TransitionConfig",
     "TransitionNode",
+    "TransitionOutcome",
     "TransitionPathEntry",
     "TransitionSummaryOut",
     "evaluate_transition",
@@ -135,6 +152,7 @@ __all__ = [
     "get_ticket_attrs",
     "get_ticket_process_candidates",
     "get_ticket_process_state",
+    "run_transitions",
     "start_process",
     "submit_activity_dialog",
 ]

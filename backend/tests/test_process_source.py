@@ -98,6 +98,14 @@ def _entity(conn: Any, table: str, n: int, kind: str, name: str, config: str, **
     conn.execute(text(f"INSERT INTO {table} ({cols}) VALUES ({vals})"), params)
 
 
+# Znuny never fires a transition without a Condition (Transition.pm:322-327): require a
+# non-empty Title, which the dialog submission sets.
+_TITLE_CONDITION = (
+    "Condition:\n  '1':\n    Fields:\n      Title:\n        Match: .\n        Type: Regexp\n"
+    "    Type: and\n  Type: and\nConditionLinking: and\n"
+)
+
+
 def _seed(sync_url: str) -> None:
     _SEEDED.append(sync_url)
     engine = create_engine(sync_url)
@@ -124,7 +132,7 @@ def _seed(sync_url: str) -> None:
             "DescriptionShort: Short\nFieldOrder: [Title]\nFields:\n  Title:\n    Display: '1'\n"
             "Interface: [AgentInterface]\nPermission: ''\n",
         )
-        _entity(conn, "pm_transition", 1, "Transition", "T1", "ConditionLinking: and\n")
+        _entity(conn, "pm_transition", 1, "Transition", "T1", _TITLE_CONDITION)
         _entity(
             conn,
             "pm_transition_action",

@@ -38,7 +38,7 @@ by ``calendar/service.py``.
 Deferred/unsupported scope (documented, not silently missing)
 ---------------------------------------------------------------
 - Condition type ``Module`` (custom Perl module) is treated as non-matching
-  with a logged warning — see ``_evaluate_field``. Ordered comparisons
+  with a logged warning — see ``conditions.py``. Ordered comparisons
   (``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
   ``LessThanOrEqual``) are implemented per Znuny
   ``TransitionValidation::Base``.
@@ -47,12 +47,8 @@ Deferred/unsupported scope (documented, not silently missing)
   ``Appointment*`` (Create/Update/Remove), ``ConfigItemUpdate``.
   Unsupported modules are logged and no-op'd, and collected into
   ``ActivityDialogSubmitResult.unsupported_actions``.
-- ``%<OTRS_TICKET_...>%``/``<OTRS_...>`` smart-tag placeholder substitution
-  inside TransitionAction ``Config`` values (Znuny's
-  ``TemplateGenerator::_Replace``, used e.g. by
-  ``TransitionValidation::Base::CheckValueGet``/``MatchValueGet``) is NOT
-  implemented — Config values and condition Match values are used verbatim.
-  Documented as a deferred feature, not a line-by-line port.
+- Smart tags in TransitionAction ``Config`` values (``TransitionAction::Base``) are not
+  yet substituted (Task 10); in Base-type transition conditions they are (``conditions.py``).
 - Activity Dialog ``PendingTime``/``PendingTimeDiff`` submission fields are
   not applied from ``field_values`` (only a transition action's own
   ``PendingTimeDiff`` on ``TicketStateSet`` is honoured).
@@ -70,16 +66,13 @@ from typing import Any
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from tiqora.db.legacy.dynamic_field import DynamicField, DynamicFieldValue
+from tiqora.channels.email.placeholder import expand_placeholders
 from tiqora.db.legacy.queue import Queue, Service, Sla
 from tiqora.db.legacy.ticket import TicketPriority, TicketState, TicketType
 from tiqora.db.legacy.user import Users
 from tiqora.domain.ticket_write_service import (
     ArticleIn,
     TicketIn,
-    _priority_name,  # noqa: PLC2701 -- deliberate reuse, see module docstring
-    _queue_name,  # noqa: PLC2701
-    _state_name,  # noqa: PLC2701
     _ticket_must_exist,  # noqa: PLC2701
     add_article,
     assign_owner,
@@ -100,7 +93,15 @@ from tiqora.domain.ticket_write_service import (
     watch_ticket,
 )
 from tiqora.process.actor import ProcessActor
-from tiqora.process.availability import assert_can_submit
+from tiqora.process.availability import RUNNING_STATES, assert_can_submit
+from tiqora.process.conditions import (
+    ConditionData,
+    _as_integer,  # noqa: PLC2701 -- shared Base.pm helpers
+    _value_validate,  # noqa: PLC2701
+    evaluate_transition,
+    get_condition_data,
+    resolve_transition_tags,
+)
 from tiqora.process.config import ActivityDialogConfig, TransitionActionConfig, TransitionConfig
 from tiqora.process.exceptions import (
     ActivityDialogNotFound,
@@ -132,10 +133,12 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "ActivityDialogSubmitResult",
+    "TransitionOutcome",
     "apply_activity_dialog",
     "evaluate_transition",
     "execute_transition_action",
     "get_ticket_attrs",
+    "run_transitions",
     "start_process",
     "submit_activity_dialog",
 ]
@@ -196,82 +199,9 @@ async def start_process(
 
 
 # ---------------------------------------------------------------------------
-# 2 & 3. get_ticket_attrs + evaluate_transition
+# 2 & 3. condition data + transition evaluation (see ``conditions.py``)
 # ---------------------------------------------------------------------------
 
-
-async def get_ticket_attrs(session: AsyncSession, ticket_id: int) -> dict[str, str]:
-    """Build the flat ``{field_name: value}`` dict used for condition
-    evaluation and (indirectly, by documentation) for TransitionAction
-    Config placeholder resolution (not implemented, see module docstring).
-
-    Reuses ``ticket_write_service``'s private ``_ticket_must_exist``/
-    ``_queue_name``/``_state_name``/``_priority_name`` lookup helpers
-    (favoring reuse per subtask instructions) plus the same
-    ``DynamicField``/``DynamicFieldValue`` loading pattern used by
-    ``TicketService._load_dynamic_fields``. Multi-value dynamic fields are
-    joined with ``", "`` — matching the string this flat model can hold and
-    the same join convention ``update_dynamic_field`` uses for its history
-    "old value" string.
-    """
-    t = await _ticket_must_exist(session, ticket_id)
-    attrs: dict[str, str] = {
-        "Queue": await _queue_name(session, int(t["queue_id"])),
-        "State": await _state_name(session, int(t["ticket_state_id"])),
-        "Priority": await _priority_name(session, int(t["ticket_priority_id"])),
-        "Title": str(t.get("title") or ""),
-    }
-
-    fields = (
-        (
-            await session.execute(
-                select(DynamicField).where(
-                    DynamicField.object_type == "Ticket", DynamicField.valid_id == 1
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    if not fields:
-        return attrs
-
-    field_by_id = {f.id: f for f in fields}
-    values = (
-        (
-            await session.execute(
-                select(DynamicFieldValue).where(
-                    DynamicFieldValue.object_id == ticket_id,
-                    DynamicFieldValue.field_id.in_(field_by_id.keys()),
-                )
-            )
-        )
-        .scalars()
-        .all()
-    )
-    grouped: dict[int, list[str]] = {}
-    for v in values:
-        val: str | None = None
-        if v.value_text is not None:
-            val = str(v.value_text)
-        elif v.value_int is not None:
-            val = str(v.value_int)
-        elif v.value_date is not None:
-            val = v.value_date.strftime("%Y-%m-%d %H:%M:%S")
-        if val is not None:
-            grouped.setdefault(v.field_id, []).append(val)
-
-    for fid, field in field_by_id.items():
-        attrs[f"DynamicField_{field.name}"] = ", ".join(grouped.get(fid, []))
-
-    return attrs
-
-
-# DateTime / Date → epoch, matching TransitionValidation::Base::ValueValidate.
-_DATETIME_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})\s(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$")
-_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
-# Znuny VariableCheck::IsInteger — optional leading '-', no leading zeros.
-_INTEGER_RE = re.compile(r"^(-)?(?:0|[1-9]\d*)$")
 # DynamicFieldPendingTimeSet offset: ``1d 5h 12m 500s`` (parts optional).
 _OFFSET_RE = re.compile(
     r"^(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s\s*)?$",
@@ -279,175 +209,14 @@ _OFFSET_RE = re.compile(
 )
 
 
-def _value_validate(raw: str) -> str | int:
-    """Port of ``TransitionValidation::Base::ValueValidate``.
-
-    DateTime (``YYYY-MM-DD HH:MM[:SS]``) and Date (``YYYY-MM-DD``) strings
-    become epoch seconds (UTC); everything else is returned as-is.
-    """
-    m = _DATETIME_RE.match(raw)
-    if m:
-        y, mo, d, h, mi, sec = m.groups()
-        dt = datetime(int(y), int(mo), int(d), int(h), int(mi), int(sec or 0), tzinfo=UTC)
-        return int(dt.timestamp())
-    m = _DATE_RE.match(raw)
-    if m:
-        y, mo, d = m.groups()
-        dt = datetime(int(y), int(mo), int(d), 0, 0, 0, tzinfo=UTC)
-        return int(dt.timestamp())
-    return raw
-
-
-def _as_integer(value: Any) -> int | None:
-    """Port of Znuny ``IsInteger`` after ValueValidate (ints or integer strings)."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    s = str(value).strip()
-    if _INTEGER_RE.match(s):
-        return int(s)
-    return None
-
-
-def _compare_ordered(value: str, match: Any, op: str) -> bool:
-    """Znuny GreaterThan/LessThan/… — integer compare after ValueValidate.
-
-    Both sides are ValueValidate'd (dates → epoch), then must both be
-    integers (``IsInteger``); otherwise the condition does not match.
-    """
-    check_i = _as_integer(_value_validate(str(value)))
-    match_i = _as_integer(_value_validate(str(match)))
-    if check_i is None or match_i is None:
-        return False
-    if op == "gt":
-        return check_i > match_i
-    if op == "gte":
-        return check_i >= match_i
-    if op == "lt":
-        return check_i < match_i
-    if op == "lte":
-        return check_i <= match_i
-    return False
-
-
-def _evaluate_field(match: Any, type_: str, value: str) -> bool:
-    """Evaluate one ``Fields`` entry of a transition condition block.
-
-    ``value`` is looked up from ``ticket_attrs`` by the caller, already
-    defaulted to ``""`` if the field is absent (per subtask instructions:
-    an absent field is treated as empty string, not a missing/error state).
-
-    Semantics verified against
-    ``znuny-6.5.22/Kernel/System/ProcessManagement/TransitionValidation/*.pm``
-    (String.pm / Regexp.pm / Base.pm's ``Contains``/``NotContains``/
-    ``Equal``/``NotEqual`` / ordered compares):
-
-    - ``String``: exact match via Perl ``eq`` — case-SENSITIVE (the task
-      brief's "case-insensitive" guess does not hold; ``String.pm`` compares
-      with plain ``eq``, no ``lc()``. Verified directly in the .pm source).
-    - ``Regexp``: the raw ``Match`` string is used as a regex pattern,
-      matched against the value with ``re.search`` (Perl ``=~``).
-      Python's ``re`` syntax is a close but not 100%-identical superset/
-      subset of Perl's; documented divergence, not fixed here.
-    - ``Contains``/``NotContains``: Base.pm's ``Contains()``/``NotContains()``
-      lower-case both sides and match ``$CheckValue =~ m{$MatchValue}`` — the
-      match value is itself interpolated as a *regex*, not a literal
-      substring, and the comparison is case-insensitive. Ported faithfully:
-      ``re.search(match, value, re.IGNORECASE)``.
-    - ``Equal``/``NotEqual``: Base.pm's ``Equal()``/``NotEqual()`` lower-case
-      both sides and compare with ``eq``/``ne`` (for the plain-string case
-      this engine operates on — Znuny's array-ref handling is not relevant
-      to a flat string attribute dict).
-    - ``GreaterThan`` / ``GreaterThanOrEqual`` / ``LessThan`` /
-      ``LessThanOrEqual`` (and ``…Equals`` aliases): ValueValidate both
-      sides (DateTime/Date → epoch), then integer compare only — non-integer
-      values do not match (Znuny ``IsInteger`` gate).
-    - ``Module``-based (custom Perl module) conditions remain UNSUPPORTED:
-      logged and treated as non-matching (``False``), never raised.
-    """
-    type_lower = type_.lower()
-
-    if type_lower == "string":
-        if not isinstance(match, str):
-            return False
-        return value == match
-
-    if type_lower == "regexp":
-        pattern = match if isinstance(match, str) else str(match)
-        try:
-            return re.search(pattern, value) is not None
-        except re.error:
-            logger.warning("invalid Regexp condition pattern %r", pattern)
-            return False
-
-    if type_lower == "contains":
-        pattern = str(match)
-        try:
-            return re.search(pattern, value, re.IGNORECASE) is not None
-        except re.error:
-            logger.warning("invalid Contains condition pattern %r", pattern)
-            return False
-
-    if type_lower == "notcontains":
-        pattern = str(match)
-        try:
-            return re.search(pattern, value, re.IGNORECASE) is None
-        except re.error:
-            logger.warning("invalid NotContains condition pattern %r", pattern)
-            return True
-
-    if type_lower == "equal":
-        return value.lower() == str(match).lower()
-
-    if type_lower == "notequal":
-        return value.lower() != str(match).lower()
-
-    if type_lower == "greaterthan":
-        return _compare_ordered(value, match, "gt")
-
-    if type_lower in ("greaterthanorequal", "greaterthanequals", "greaterthanequal"):
-        return _compare_ordered(value, match, "gte")
-
-    if type_lower == "lessthan":
-        return _compare_ordered(value, match, "lt")
-
-    if type_lower in ("lessthanorequal", "lessthanequals", "lessthanequal"):
-        return _compare_ordered(value, match, "lte")
-
-    logger.warning("unsupported/deferred transition condition Type: %s", type_)
-    return False
-
-
-def evaluate_transition(transition_config: TransitionConfig, ticket_attrs: dict[str, str]) -> bool:
-    """Evaluate whether *transition_config* matches *ticket_attrs*.
-
-    No ``Condition``/empty ``conditions`` => unconditional match (``True``),
-    per Znuny semantics (see ``TransitionConfig`` docstring). Otherwise:
-    ``Fields`` within one condition block combine per that block's
-    ``type_`` (``and``/``or``), and blocks combine per
-    ``transition_config.condition_linking`` (``and``/``or``). An empty
-    ``Fields`` map within a block is vacuously ``True`` for that block.
-    """
-    if not transition_config.conditions:
-        return True
-
-    block_results: list[bool] = []
-    for block in transition_config.conditions:
-        field_results = [
-            _evaluate_field(cond.match, cond.type_, ticket_attrs.get(name, ""))
-            for name, cond in block.fields.items()
-        ]
-        if not field_results:
-            block_results.append(True)
-        elif block.type_.lower() == "or":
-            block_results.append(any(field_results))
-        else:
-            block_results.append(all(field_results))
-
-    if transition_config.condition_linking.lower() == "or":
-        return any(block_results)
-    return all(block_results)
+async def get_ticket_attrs(session: AsyncSession, ticket_id: int) -> dict[str, str]:
+    """Flat ``{name: str}`` view of :func:`get_condition_data` (lists joined with ``", "``,
+    unset values ``""``) for the actions that only need strings."""
+    data = await get_condition_data(session, ticket_id)
+    return {
+        name: ", ".join(value) if isinstance(value, list) else (value or "")
+        for name, value in data.items()
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1653,6 +1422,92 @@ async def apply_activity_dialog(
     )
 
 
+@dataclass(frozen=True)
+class TransitionOutcome:
+    """Result of one :func:`run_transitions` pass."""
+
+    activity_changed: bool
+    new_activity_entity_id: str | None
+    transition_entity_id: str | None
+    unsupported_actions: list[str]
+
+
+_NO_TRANSITION = TransitionOutcome(False, None, None, [])
+
+
+async def run_transitions(
+    session: AsyncSession,
+    *,
+    ticket_id: int,
+    user_id: int,
+    sysconfig: SysConfig,
+    repository: ProcessRepository | None = None,
+) -> TransitionOutcome:
+    """Run the first matching transition of the ticket's current activity.
+
+    Znuny's ``TicketProcessTransitions`` event runs only for Active and FadeAway processes
+    (``Process.pm:395-402``), so any other state is a no-op. Transitions are checked in
+    ``cmp`` order of their entity ids (``Process.pm:442-445``); ``Data`` is a fresh
+    ``TicketGet`` (:func:`get_condition_data`) and smart tags in Base-type conditions are
+    rendered with the ticket's placeholder context.
+    """
+    state = await get_ticket_process_state(session, ticket_id)
+    if state is None:
+        return _NO_TRANSITION
+    repository = repository or ProcessRepository(session)
+    graph = await repository.get_process(state.process_entity_id)
+    if graph is None or graph.state_entity_id not in RUNNING_STATES:
+        return _NO_TRANSITION
+    activity = graph.activities.get(state.activity_entity_id)
+    if activity is None:
+        return _NO_TRANSITION
+
+    async def _render(text_: str) -> str:
+        return await expand_placeholders(
+            session, sysconfig, text_, ticket_id=ticket_id, user_id=user_id
+        )
+
+    data: ConditionData = await get_condition_data(session, ticket_id)
+    tags = await resolve_transition_tags(
+        TransitionConfig(
+            conditions=[b for t in activity.outgoing_transitions for b in t.config.conditions]
+        ),
+        data,
+        render=_render,
+    )
+    for transition in sorted(activity.outgoing_transitions, key=lambda t: t.entity_id):
+        if not evaluate_transition(transition.config, data, tags=tags):
+            continue
+        unsupported: list[str] = []
+        for action_node in transition.actions:
+            skipped = await execute_transition_action(
+                session,
+                action=action_node.config,
+                ticket_id=ticket_id,
+                process_entity_id=graph.entity_id,
+                activity_entity_id=activity.entity_id,
+                transition_entity_id=transition.entity_id,
+                user_id=user_id,
+                sysconfig=sysconfig,
+            )
+            if skipped is not None:
+                unsupported.append(skipped)
+        await update_dynamic_field(
+            session,
+            ticket_id=ticket_id,
+            field_name=ACTIVITY_ID_DF_NAME,
+            values=[transition.target_activity_entity_id],
+            user_id=user_id,
+        )
+        return TransitionOutcome(
+            activity_changed=True,
+            new_activity_entity_id=transition.target_activity_entity_id,
+            transition_entity_id=transition.entity_id,
+            unsupported_actions=unsupported,
+        )
+    return _NO_TRANSITION
+
+
 async def submit_activity_dialog(
     session: AsyncSession,
     *,
@@ -1722,47 +1577,16 @@ async def submit_activity_dialog(
         sysconfig=sysconfig,
     )
 
-    unsupported: list[str] = []
-    activity_changed = False
-    new_activity_entity_id: str | None = None
-    matched_transition_entity_id: str | None = None
-
-    # Transitions are evaluated in Path's YAML insertion order (Python dicts
-    # preserve it) — Znuny does not guarantee explicit ordering either.
-    for transition in activity.outgoing_transitions:
-        attrs = await get_ticket_attrs(session, ticket_id)
-        if not evaluate_transition(transition.config, attrs):
-            continue
-
-        for action_node in transition.actions:
-            skipped = await execute_transition_action(
-                session,
-                action=action_node.config,
-                ticket_id=ticket_id,
-                process_entity_id=graph.entity_id,
-                activity_entity_id=activity.entity_id,
-                transition_entity_id=transition.entity_id,
-                user_id=user_id,
-                sysconfig=sysconfig,
-            )
-            if skipped is not None:
-                unsupported.append(skipped)
-
-        await update_dynamic_field(
-            session,
-            ticket_id=ticket_id,
-            field_name=ACTIVITY_ID_DF_NAME,
-            values=[transition.target_activity_entity_id],
-            user_id=user_id,
-        )
-        activity_changed = True
-        new_activity_entity_id = transition.target_activity_entity_id
-        matched_transition_entity_id = transition.entity_id
-        break
-
+    outcome = await run_transitions(
+        session,
+        ticket_id=ticket_id,
+        user_id=user_id,
+        sysconfig=sysconfig,
+        repository=repository,
+    )
     return ActivityDialogSubmitResult(
-        activity_changed=activity_changed,
-        new_activity_entity_id=new_activity_entity_id,
-        unsupported_actions=unsupported,
-        transition_entity_id=matched_transition_entity_id,
+        activity_changed=outcome.activity_changed,
+        new_activity_entity_id=outcome.new_activity_entity_id,
+        unsupported_actions=outcome.unsupported_actions,
+        transition_entity_id=outcome.transition_entity_id,
     )

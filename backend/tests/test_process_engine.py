@@ -100,7 +100,19 @@ Interface:
 Permission: ''
 """
 
-TRANSITION_CONFIG_YAML = "ConditionLinking: and\n"
+# Znuny never fires a transition without a Condition (Transition.pm:322-327), so the fixtures
+# carry a real one: a non-empty Title, which every dialog submission here sets.
+_TITLE_NONEMPTY_CONDITION = """Condition:
+  '1':
+    Fields:
+      Title:
+        Match: .
+        Type: Regexp
+    Type: and
+  Type: and
+ConditionLinking: and
+"""
+TRANSITION_CONFIG_YAML = _TITLE_NONEMPTY_CONDITION
 
 TRANSITION_ACTION_CONFIG_YAML = """
 Config:
@@ -590,7 +602,7 @@ Interface:
 Permission: ''
 """
 
-UNSUP_TRANSITION_CONFIG_YAML = "ConditionLinking: and\n"
+UNSUP_TRANSITION_CONFIG_YAML = _TITLE_NONEMPTY_CONDITION
 
 # ExecuteInvoker remains deferred (no GenericInterface invoker runtime) —
 # used here to assert skip-and-report behaviour for unknown modules.
