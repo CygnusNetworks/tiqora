@@ -291,7 +291,9 @@ purpose](#deviations-kept-on-purpose)); operation errors are `Client` faults.
 An operation the webservice does not configure answers a `Server` fault
 "OperationType for operation '...' is not registered" with HTTP 500. A body
 longer than the webservice's `MaxLength` answers 413 "Request Entity Too Large"
-(`text/plain`) before it is parsed, like `SOAP.pm`.
+(`text/plain`) before it is parsed, like `SOAP.pm`; a body sent without
+`Content-Length` (chunked) is counted while it streams in and refused as soon as it
+passes the limit, without reading the rest.
 
 ### Namespace configuration
 
@@ -374,7 +376,12 @@ framework. Items below are intentionally incomplete or out of scope.
 
 ### TicketCreate / TicketUpdate
 
-`ArticleSend: 1` (agents, TicketCreate and TicketUpdate) stores the article like an agent reply (signature, threading headers, `EmailSecurity` — see [crypto.md](crypto.md)) and sends it from the worker, like Znuny's `MailQueue`: each mail of the request (every `ArticleSend` article and every auto response) is one background job (kind `gi_mail`) committed together with the ticket and articles, and the request answers without waiting for SMTP. The worker rebuilds the mail from the stored article (a signed or encrypted mail is sent from its stored bytes, unchanged). A mail that cannot be sent is recorded like Znuny's `MailQueue` records a permanent failure: the article's transmission error (`article_data_mime_send_error`) and a `failed` row in the mail log; the job shows as failed. There is one attempt (Znuny retries temporary errors up to `MailQueue###ItemMaxAttempts`). The `worker` process must run for these mails. Multiple `Article` entries, `TimeUnit`, `AutoResponseType`, `HistoryType`/`HistoryComment`, article dynamic fields and `NoAgentNotify` are implemented like Znuny.
+`ArticleSend: 1` (agents, TicketCreate and TicketUpdate) stores the article like an agent reply (signature, threading headers, `EmailSecurity` — see [crypto.md](crypto.md)) and sends it from the worker, like Znuny's `MailQueue`: each mail of the request (every `ArticleSend` article and every auto response) is one background job (kind `gi_mail`) committed together with the ticket and articles, and the request answers without waiting for SMTP. The worker rebuilds the mail from the stored article (a signed or encrypted mail is sent from its stored bytes, unchanged). The `worker` process must run for these mails. Delivery follows `Kernel/System/MailQueue.pm` with its default settings:
+
+- **Order:** the mails run in their own job lane with one slot, so they go out one after the other in the order they were queued (Znuny's single `MailQueue` daemon task), and long jobs such as ticket exports never delay them. A mail waiting for a retry does not hold back the mails behind it (Znuny skips items whose `DueTime` lies ahead too), so after a temporary error a later mail of the same request can leave first.
+- **Retries:** at most 3 attempts (`MailQueue###ItemMaxAttempts`). A temporary error (a 4xx reply, a refused or dropped connection, a timeout, an error without any SMTP reply) is tried again after 2 minutes, then after 4 (`attempts × IncrementAttemptDelayInMinutes`, default 2); every failed attempt writes a `failed` mail-log row whose detail says that the mail will be tried again. A 5xx reply, or a temporary error on the third attempt, is final: the article's transmission error (`article_data_mime_send_error`) and a `failed` mail-log row, like `MailQueue::_SendError`; the job shows as failed. Tiqora uses Znuny's default values and does not read the `MailQueue` SysConfig hash.
+- **Interruption:** the worker marks a mail as "sending" right before SMTP. A mail whose worker stops or crashes before that mark goes back into the queue and is sent later (it keeps its attempt count, so a mail that keeps crashing the worker stops after 3 attempts). A mail interrupted after the mark is never sent again, because it may already have reached the relay; it is recorded like a final failure (transmission error "Sending was interrupted by a restart of the worker; the mail may not have been delivered." and a `failed` mail-log row). The worker's shutdown grace (20 s) is shorter than the SMTP timeout (60 s by default) on purpose: this rule decides what happens to a send cut off by a restart. Docker stops a container after 10 s unless `stop_grace_period` is raised; a send cut off by that ends the same way once the stale job is reaped (after 3 minutes). A temporary SMTP error after the relay accepted the data (for example a timeout while waiting for the final reply) is retried and can deliver the mail twice — Znuny behaves the same.
+- **Auto responses:** queue and type are decided when the article is stored (Znuny `ArticleCreate` → `SendAutoResponse`): a later queue move, or a backlog in the worker, does not change which auto response goes out. The auto response article is stored only after a successful send; a failed attempt leaves a `failed` mail-log row for the ticket and nothing else (no article, no loop-protection entry). A mail that went out but could not be stored afterwards is not sent again. Multiple `Article` entries, `TimeUnit`, `AutoResponseType`, `HistoryType`/`HistoryComment`, article dynamic fields and `NoAgentNotify` are implemented like Znuny.
 
 | Gap | Behaviour |
 |-----|----------------|
@@ -403,10 +410,11 @@ framework. Items below are intentionally incomplete or out of scope.
 | Article text search (`MIMEBase_*`, `Fulltext`) | `LOWER(column) LIKE` on the article columns: no stop words, no tokenisation, no word index | search index (`article_search_index`) with tokenisation and stop words |
 | Non-integer element in a TicketSearch id filter | whole search returns empty (as Znuny); an element of more than 16 digits counts as non-integer (`Quote(..., 'Integer')`) | empty |
 | `_` in `MIMEBase_*` / `Fulltext` values | a literal character (as Znuny, `Quote(..., 'Like')`) | same |
+| TicketSearch `*Minutes` beyond the date range (`"1e300"`) | create / article / escalation times: the bound becomes the earliest (or, negative, the latest) date, so "older than" matches nothing and "newer than" everything; change / last change / close / pending times: empty result | `DateTime` saturates to a date like `-292277022601-11-04`: the same rows for the direct comparisons, "Invalid time format" (empty) for the history families |
 | Operation errors | keep Tiqora's `ErrorCode` to HTTP status mapping, computed before the outbound mapping: `...AuthFail` 401, `...AccessDenied` 403, `...MissingParameter` / `...InvalidParameter` 400, `...RateLimited` 429 with `Retry-After`, `...NotImplemented` 501, every other error 200 | HTTP 200 for operation errors |
 | Operation answers `Success => 0` (OutOfOffice without entries) | HTTP 500 fault `{"faultcode": "Server", "faultstring": ...}` | same (`Provider.pm` `_GenerateErrorResponse`) |
 | OutOfOffice `UserSearch` | words AND-ed, each matching login / first name / last name as a whole value (`*` wildcard); Znuny's `|`, `AND`/`OR`, `!` and parentheses are not supported | `QueryCondition` |
-| GI mails (`ArticleSend`, auto responses) | sent by the worker, one attempt | `MailQueue`, retries temporary errors |
+| GI mails (`ArticleSend`, auto responses) | sent by the worker, `MailQueue` defaults (3 attempts, 2/4 min backoff, 5xx final); the `MailQueue` SysConfig values are not read; a send cut off by a worker restart is recorded as failed, not retried | `MailQueue` with the SysConfig values |
 | Unknown webservice | 404 JSON fault | bare 500 |
 | SessionCreate | does not copy `UserPw` into the `sessions` row | copies it |
 | OutOfOffice CSV with an unterminated quote | rejected with "Error while parsing" | silently truncated |
@@ -505,10 +513,11 @@ client against the list before updating.
   relied on silence must turn the queue's auto response off.
 - `ArticleSend` and auto responses are sent by the worker, not inside the call
   (Znuny's `MailQueue` does the same): the call answers at once, the mails follow
-  within a few seconds. A mail that cannot be sent no longer turns the answer into
-  `<Operation>.OperationFailed`; the call succeeds, and the failure is recorded on
-  the article (transmission error, `article_data_mime_send_error`) and in the mail
-  log. Check the mail log instead of the response. The signature is converted to
+  within a few seconds, one after the other (after a temporary SMTP error the mail
+  is tried again 2 and 4 minutes later). A mail that cannot be sent no longer turns
+  the answer into `<Operation>.OperationFailed`; the call succeeds, and a final
+  failure is recorded on the article (transmission error,
+  `article_data_mime_send_error`) and in the mail log. Check the mail log instead of the response. The signature is converted to
   the article's content type and appended directly behind the body.
 - `TicketCreate` without `Owner` makes the calling agent the owner, unlocked
   (before: `root@localhost`), with an `OwnerUpdate` history row. With an

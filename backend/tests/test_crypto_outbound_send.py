@@ -25,6 +25,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from tests._crypto_mail_fixtures import CUSTOMER, SUPPORT, CryptoWorld
+from tests._gi_mail_jobs import delete_gi_mail_jobs
 from tests._row_cleanup import cleanup_module
 from tiqora.config import get_settings
 from tiqora.crypto.config import CryptoConfig, PgpConfig, SmimeConfig
@@ -79,8 +80,8 @@ def _cleanup(conn: Any) -> None:
             f"DELETE FROM ticket WHERE id = {tid}",
         ):
             conn.execute(text(sql))
+    delete_gi_mail_jobs(conn, ticket_ids=tickets)
     for sql in (
-        "DELETE FROM tiqora_job WHERE kind = 'gi_mail'",
         "DELETE FROM tiqora_mail_log WHERE subject LIKE 'crypto-out %'"
         " OR subject LIKE '%crypto-out %'",
         f"DELETE FROM queue WHERE id = {QUEUE_ID}",

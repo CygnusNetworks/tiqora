@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tiqora.jobs.context import JobCancelled, JobContext, JobFailed
+from tiqora.jobs.context import JobCancelled, JobContext, JobFailed, JobRetry
 from tiqora.jobs.registry import JOB_HANDLERS, JobHandler
 from tiqora.jobs.service import (
     ACTIVE_STATUSES,
@@ -31,6 +31,7 @@ __all__ = [
     "JobFailed",
     "JobHandler",
     "JobNotCancellable",
+    "JobRetry",
     "UnknownJobKind",
     "can_view_job",
     "enqueue_job",

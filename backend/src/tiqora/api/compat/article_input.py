@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import base64
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from email.message import EmailMessage
 from typing import Any
 
 import structlog
@@ -18,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tiqora.api.compat.mapping.perl import perl_is_string, perl_str, perl_truthy
+from tiqora.channels.email.smtp import MailSender
 from tiqora.domain.dynamic_field_values import (
     DynamicFieldConfig,
     DynamicFieldValueError,
@@ -442,6 +445,38 @@ async def parse_gi_articles(
     return out
 
 
+class _HookedSender:
+    """A :class:`MailSender` that awaits ``before_send`` before and ``after_send`` after
+    every successful send."""
+
+    def __init__(
+        self,
+        inner: MailSender,
+        before_send: Callable[[], Awaitable[None]] | None,
+        after_send: Callable[[], Awaitable[None]] | None,
+    ) -> None:
+        self._inner = inner
+        self._before_send = before_send
+        self._after_send = after_send
+
+    @property
+    def last_smtp_code(self) -> int | None:
+        code = getattr(self._inner, "last_smtp_code", None)
+        return code if isinstance(code, int) else None
+
+    @property
+    def last_smtp_detail(self) -> str | None:
+        detail = getattr(self._inner, "last_smtp_detail", None)
+        return str(detail) if detail else None
+
+    async def send(self, message: EmailMessage, *, envelope_from: str | None = None) -> None:
+        if self._before_send is not None:
+            await self._before_send()
+        await self._inner.send(message, envelope_from=envelope_from)
+        if self._after_send is not None:
+            await self._after_send()
+
+
 async def send_gi_auto_response(
     session: AsyncSession,
     session_factory: async_sessionmaker[AsyncSession],
@@ -454,9 +489,15 @@ async def send_gi_auto_response(
     subject: str,
     body: str,
     user_id: int,
+    before_send: Callable[[], Awaitable[None]] | None = None,
+    after_send: Callable[[], Awaitable[None]] | None = None,
 ) -> int | None:
     """The queue's auto response for a request article (Znuny ``ArticleCreate`` →
     ``SendAutoResponse``, ``OrigHeader`` = the article's From / Subject / Body).
+
+    ``before_send`` is awaited right before the SMTP send (the GI mail worker's
+    checkpoint), ``after_send`` right after a successful one; neither is called when no
+    mail goes out.
 
     Only for articles stored with ``add_article``; the caller does not call it for
     ``ArticleSend``. Sent through the configured outbound relay; without one nothing is
@@ -469,9 +510,11 @@ async def send_gi_auto_response(
     if not (await mail_outbound.resolve_outbound_smtp(session)).enabled:
         logger.info("compat_auto_response_no_outbound_relay", ticket_id=ticket_id)
         return None
-    sender = await mail_outbound.build_outbound_sender(
+    sender: MailSender = await mail_outbound.build_outbound_sender(
         session, sendmail_bcc=(await sysconfig.sendmail_bcc()) or None
     )
+    if before_send is not None or after_send is not None:
+        sender = _HookedSender(sender, before_send, after_send)
     return await send_auto_response(
         session,
         session_factory,

@@ -24,7 +24,7 @@ import re
 import secrets
 import socket
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from email.message import EmailMessage
 from typing import TYPE_CHECKING, Any
@@ -827,7 +827,11 @@ async def record_transmission_error(
 
 
 async def dispatch_pending_agent_email(
-    session: AsyncSession, sysconfig: SysConfig, pending: PendingAgentEmail
+    session: AsyncSession,
+    sysconfig: SysConfig,
+    pending: PendingAgentEmail,
+    *,
+    retry_note: Callable[[BaseException], str | None] | None = None,
 ) -> None:
     """Send a stored agent email (after the commit) and record the outcome.
 
@@ -835,6 +839,11 @@ async def dispatch_pending_agent_email(
     failure is logged to ``tiqora_mail_log``, recorded as the article's transmission error
     (:func:`record_transmission_error`, the caller commits) and raised as
     :class:`OutboundMailError`; the stored article stays.
+
+    ``retry_note`` (the GI mail worker) decides per failure: a text when the mail will be
+    tried again - the log row's detail then carries it and no transmission error is
+    recorded (Znuny's ``MailQueue`` only sets it for a final failure) - or ``None`` when
+    the failure is final.
     """
     from tiqora.domain import mail_outbound
 
@@ -869,13 +878,16 @@ async def dispatch_pending_agent_email(
             sender, prepared, extra_headers=pending.extra_headers, message=pending.message
         )
     except Exception as exc:  # OutboundMailError, or the sender could not even be built
+        note = retry_note(exc) if retry_note is not None else None
         await write_mail_log(
             session,
             status="failed",
-            detail=str(exc),
+            detail=str(exc) if note is None else f"{exc} ({note})",
             duration_ms=int((time.perf_counter() - t0) * 1000),
             **common,
         )
+        if note is not None:
+            raise
         await record_transmission_error(
             session,
             article_id=pending.article_id,

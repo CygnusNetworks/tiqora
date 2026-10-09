@@ -586,12 +586,31 @@ requests at 90 s). A feature route validates permissions, calls `enqueue_job`
 (optional `dedupe_key` returns an already active job) and answers
 `202 {job_id, status}`; there is deliberately no generic "create job"
 endpoint. The UI polls `GET /api/v1/jobs/{id}` (1 s for the first 30 s, then
-3 s). Handlers (`JobHandler`: `kind`, `payload_model`, `run`, `timeout_seconds`)
+3 s). Handlers (`JobHandler`: `kind`, `payload_model`, `run`, `timeout_seconds`,
+plus `lane`, `max_attempts`, `requeue_if_interrupted`, `on_interrupted`)
 get a `JobContext` for throttled `progress()`, cooperative `check_cancelled()`
 and `add_file()` (result files live in `tiqora_job_file`, up to 200 MiB). The
 `JobRunner` claims queued rows with a conditional `UPDATE` (several worker
-replicas are safe), honours `jobs.max_concurrency`, heartbeats every 30 s and
-reaps `running` rows without a heartbeat for 180 s as failed ("interrupted").
+replicas are safe), heartbeats every 30 s and reaps `running` rows without a
+heartbeat for 180 s as failed ("interrupted").
+Lanes: a handler names its `lane` (default `"default"`). Every lane is filled
+on its own, in job id order; `default` has `jobs.max_concurrency` slots per
+runner, every other lane the slots in `tiqora.jobs.registry.LANE_SLOTS` (1 if
+not listed), counted over all runners. `gi_mail` runs in `mail` (1 slot): GI
+mails go out one by one in queue order and never wait behind an export.
+Retries: a handler raises `JobRetry(message, delay_seconds=...)`; the row goes
+back to `queued` with `due_at` (claims skip it until then) and `attempts`
+counts every claim (`ctx.attempt`, `ctx.max_attempts` = the handler's
+`max_attempts`, default 1; a retry on the last attempt fails with the message).
+Interruptions: a handler with `requeue_if_interrupted=True` calls
+`ctx.checkpoint("...")` right before an irreversible step (SMTP); a job
+interrupted by shutdown (grace 20 s) or reaped before its checkpoint is put
+back into the queue (while `attempts < max_attempts`), one interrupted after it
+fails and the handler's `on_interrupted` hook records the failure (also called
+after a timeout). `checkpoint()`, retry and finalize are conditional on the
+claim (`worker_id` + `attempts`), so a reaped and requeued job is never
+overwritten by its old claim, and the old claim stops at its checkpoint.
+Existing kinds use the defaults and behave as before.
 Failure mapping: `JobFailed(msg)` shows `msg`; a timeout or any other
 exception ends the job `failed` with a plain German message while details go to
 the worker log (no traceback ever reaches the UI); the loop keeps running.

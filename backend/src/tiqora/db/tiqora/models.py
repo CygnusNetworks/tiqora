@@ -867,6 +867,12 @@ class TiqoraJob(TiqoraBase):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # claims so far; a retried / requeued job keeps counting
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # a queued job is not claimed before this moment (retry backoff)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # set by the handler right before an irreversible step (JobContext.checkpoint)
+    checkpoint: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     __table_args__ = (
         Index("ix_tiqora_job_status_created", "status", "created_at"),

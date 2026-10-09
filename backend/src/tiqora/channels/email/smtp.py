@@ -63,6 +63,36 @@ def envelope_recipients(message: EmailMessage, extra: str | None) -> list[str] |
     return recipients
 
 
+def smtp_reply_codes(exc: BaseException) -> list[int]:
+    """SMTP reply codes carried by ``exc`` or the first error in its cause chain that has
+    any (aiosmtplib response errors; a refused-recipients error has one per recipient)."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        codes: list[int] = []
+        if isinstance(current, aiosmtplib.SMTPRecipientsRefused):
+            codes = [r.code for r in current.recipients if isinstance(r.code, int)]
+        elif isinstance(current, aiosmtplib.SMTPResponseException) and isinstance(
+            current.code, int
+        ):
+            codes = [current.code]
+        if codes:
+            return codes
+        current = current.__cause__ or current.__context__
+    return []
+
+
+def is_permanent_smtp_failure(exc: BaseException) -> bool:
+    """Znuny ``MailQueue::_SendError``: only a 5xx reply is a permanent error.
+
+    4xx replies, connection errors, timeouts and errors without an SMTP reply are
+    temporary (the mail is tried again).
+    """
+    codes = smtp_reply_codes(exc)
+    return bool(codes) and all(500 <= code < 600 for code in codes)
+
+
 class SmtpMailSender:
     """Default sender: aiosmtplib against host/port/security/auth/timeout."""
 

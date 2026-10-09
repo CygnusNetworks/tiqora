@@ -23,6 +23,7 @@ from tiqora.jobs import (
     JobContext,
     JobFailed,
     JobHandler,
+    JobRetry,
     enqueue_job,
     get_job,
     request_cancel,
@@ -55,13 +56,14 @@ async def _noop(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
     return {"n": payload.n}
 
 
-def _handler(kind: str, run: Run, timeout_seconds: int = 3600) -> JobHandler:
+def _handler(kind: str, run: Run, timeout_seconds: int = 3600, **extra: Any) -> JobHandler:
     return JobHandler(
         kind=kind,
         payload_model=_Payload,
         run=run,
         title_key="x",
         timeout_seconds=timeout_seconds,
+        **extra,
     )
 
 
@@ -454,3 +456,300 @@ async def test_running_job_without_heartbeat_is_reaped_by_started_at(
     out = await _runner(factory, reg).run_once()
     assert out["reaped"] == 1
     assert (await _fetch(factory, job_id)).status == "failed"
+
+
+# --- retries, interruption requeue, checkpoint, lanes --------------------------------
+
+
+async def _force_running(
+    factory: async_sessionmaker[AsyncSession],
+    job_id: int,
+    *,
+    attempts: int,
+    checkpoint: str | None,
+) -> None:
+    """Make a queued job look like a claim of a dead worker (no heartbeat for 10 min)."""
+    old = utc_now() - timedelta(minutes=10)
+    async with factory() as s:
+        await s.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == job_id)
+            .values(
+                status="running",
+                worker_id="dead:1",
+                started_at=old,
+                heartbeat_at=old,
+                attempts=attempts,
+                checkpoint=checkpoint,
+            )
+        )
+        await s.commit()
+
+
+async def test_job_retry_requeues_with_due_time_and_runs_again(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async def flaky(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        if ctx.attempt == 1:
+            raise JobRetry("Neuer Versuch später.", delay_seconds=3600)
+        return {"attempt": ctx.attempt}
+
+    reg = _registry(_handler("test.flaky", flaky, max_attempts=3))
+    job_id = await _enqueue(factory, reg, kind="test.flaky")
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await runner.wait_idle()
+    job = await _fetch(factory, job_id)
+    assert job.status == "queued"
+    assert job.attempts == 1
+    assert job.worker_id is None
+    assert job.due_at is not None
+    assert job.due_at > utc_now() + timedelta(seconds=3500)
+    # not due yet: nothing starts
+    assert (await runner.run_once())["started"] == 0
+    async with factory() as s:
+        await s.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == job_id)
+            .values(due_at=utc_now() - timedelta(seconds=1))
+        )
+        await s.commit()
+    assert (await runner.run_once())["started"] == 1
+    await runner.wait_idle()
+    job = await _fetch(factory, job_id)
+    assert job.status == "succeeded"
+    assert job.attempts == 2
+    assert json.loads(job.result or "{}") == {"attempt": 2}
+
+
+async def test_job_retry_on_the_last_attempt_fails_with_its_message(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async def flaky(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        raise JobRetry("Der Server war nicht erreichbar.", delay_seconds=60)
+
+    reg = _registry(_handler("test.flaky", flaky))  # max_attempts defaults to 1
+    job_id = await _enqueue(factory, reg, kind="test.flaky")
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await runner.wait_idle()
+    job = await _fetch(factory, job_id)
+    assert job.status == "failed"
+    assert job.error == "Der Server war nicht erreichbar."
+
+
+async def test_shutdown_requeues_a_job_interrupted_before_its_checkpoint(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    started = asyncio.Event()
+    hooked: list[int] = []
+
+    async def forever(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        started.set()
+        await asyncio.Event().wait()
+        return {}
+
+    async def hook(ctx: JobContext, payload: _Payload) -> None:
+        hooked.append(ctx.job_id)
+
+    reg = _registry(
+        _handler(
+            "test.mail",
+            forever,
+            max_attempts=3,
+            requeue_if_interrupted=True,
+            on_interrupted=hook,
+        )
+    )
+    job_id = await _enqueue(factory, reg, kind="test.mail")
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await asyncio.wait_for(started.wait(), 5)
+    await runner.shutdown(grace_seconds=0.1)
+    job = await _fetch(factory, job_id)
+    assert job.status == "queued"
+    assert job.worker_id is None
+    assert job.attempts == 1
+    assert job.error is None
+    assert hooked == []
+
+
+async def test_shutdown_fails_a_job_interrupted_after_its_checkpoint_and_calls_the_hook(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    started = asyncio.Event()
+    hooked: list[tuple[int, int]] = []
+
+    async def sending(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        await ctx.checkpoint("sending")
+        started.set()
+        await asyncio.Event().wait()
+        return {}
+
+    async def hook(ctx: JobContext, payload: _Payload) -> None:
+        hooked.append((ctx.job_id, payload.n))
+
+    reg = _registry(
+        _handler(
+            "test.mail",
+            sending,
+            max_attempts=3,
+            requeue_if_interrupted=True,
+            on_interrupted=hook,
+        )
+    )
+    job_id = await _enqueue(factory, reg, kind="test.mail", n=4)
+    runner = _runner(factory, reg)
+    await runner.run_once()
+    await asyncio.wait_for(started.wait(), 5)
+    await runner.shutdown(grace_seconds=0.1)
+    job = await _fetch(factory, job_id)
+    assert job.status == "failed"
+    assert job.error == INTERRUPTED_MESSAGE
+    assert job.checkpoint == "sending"
+    assert hooked == [(job_id, 4)]
+
+
+@pytest.mark.parametrize(
+    ("attempts", "checkpoint", "expected"),
+    [(1, None, "queued"), (1, "sending", "failed"), (3, None, "failed")],
+)
+async def test_reaper_requeues_only_before_checkpoint_and_below_max_attempts(
+    factory: async_sessionmaker[AsyncSession],
+    attempts: int,
+    checkpoint: str | None,
+    expected: str,
+) -> None:
+    hooked: list[int] = []
+
+    async def hook(ctx: JobContext, payload: _Payload) -> None:
+        hooked.append(ctx.attempt)
+
+    reg = _registry(
+        _handler(
+            "test.mail", _noop, max_attempts=3, requeue_if_interrupted=True, on_interrupted=hook
+        )
+    )
+    job_id = await _enqueue(factory, reg, kind="test.mail")
+    await _force_running(factory, job_id, attempts=attempts, checkpoint=checkpoint)
+    runner = _runner(factory, reg, "b:1")
+    out = await runner._reap()
+    job = await _fetch(factory, job_id)
+    assert out == 1
+    assert job.status == expected
+    if expected == "queued":
+        assert job.worker_id is None and job.started_at is None and hooked == []
+    else:
+        assert job.error == INTERRUPTED_MESSAGE
+        assert hooked == [attempts]
+
+
+async def test_checkpoint_of_a_reaped_claim_raises_and_the_step_never_runs(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    release = asyncio.Event()
+    started = asyncio.Event()
+    side_effects: list[int] = []
+
+    async def mail(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        started.set()
+        await release.wait()
+        await ctx.checkpoint("sending")
+        side_effects.append(ctx.attempt)
+        return {}
+
+    reg = _registry(_handler("test.mail", mail, max_attempts=3, requeue_if_interrupted=True))
+    job_id = await _enqueue(factory, reg, kind="test.mail")
+    runner_a = _runner(factory, reg, "a:1")
+    await runner_a.run_once()
+    await asyncio.wait_for(started.wait(), 5)
+    async with factory() as s:
+        await s.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == job_id)
+            .values(heartbeat_at=utc_now() - timedelta(minutes=10))
+        )
+        await s.commit()
+    assert await _runner(factory, reg, "b:1")._reap() == 1
+    assert (await _fetch(factory, job_id)).status == "queued"
+    release.set()
+    await runner_a.wait_idle()
+    job = await _fetch(factory, job_id)
+    assert side_effects == []  # the old claim never reached its irreversible step
+    assert job.status == "queued"  # and did not overwrite the requeued row
+
+
+async def test_lane_job_is_not_blocked_by_a_full_default_lane(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    release = asyncio.Event()
+
+    async def blocked(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        await release.wait()
+        return {}
+
+    reg = _registry(_handler("test.blocked", blocked), _handler("test.mail", _noop, lane="mail"))
+    async with factory() as s:
+        await save_section_values(
+            s, JOBS_SECTION, {"max_concurrency": 1}, secret_key=_SETTINGS.secret_key
+        )
+        await s.commit()
+    export_id = await _enqueue(factory, reg, kind="test.blocked")
+    runner = _runner(factory, reg)
+    assert (await runner.run_once())["started"] == 1
+    mail_id = await _enqueue(factory, reg, kind="test.mail")
+    assert (await runner.run_once())["started"] == 1
+    await _wait_for(lambda: _status_is(factory, mail_id, "succeeded"))
+    assert (await _fetch(factory, export_id)).status == "running"
+    release.set()
+    await runner.wait_idle()
+
+
+async def _status_is(factory: async_sessionmaker[AsyncSession], job_id: int, status: str) -> bool:
+    return (await _fetch(factory, job_id)).status == status
+
+
+async def test_one_slot_lane_runs_its_jobs_one_after_the_other_in_id_order(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    order: list[int] = []
+    release = asyncio.Event()
+
+    async def mail(ctx: JobContext, payload: _Payload) -> dict[str, Any]:
+        order.append(payload.n)
+        await release.wait()
+        return {}
+
+    reg = _registry(_handler("test.mail", mail, lane="mail"))
+    ids = [await _enqueue(factory, reg, kind="test.mail", n=i) for i in range(3)]
+    runner = _runner(factory, reg)
+    assert (await runner.run_once())["started"] == 1
+    # a second runner (worker replica) sees the lane's running job too
+    assert (await _runner(factory, reg, "b:1").run_once())["started"] == 0
+    release.set()
+    await runner.wait_idle()
+    for _ in range(2):
+        assert (await runner.run_once())["started"] == 1
+        await runner.wait_idle()
+    assert order == [0, 1, 2]
+    assert [(await _fetch(factory, i)).status for i in ids] == ["succeeded"] * 3
+
+
+async def test_a_retry_waiting_for_its_due_time_does_not_block_later_lane_jobs(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    reg = _registry(_handler("test.mail", _noop, lane="mail", max_attempts=3))
+    first = await _enqueue(factory, reg, kind="test.mail", n=1)
+    second = await _enqueue(factory, reg, kind="test.mail", n=2)
+    async with factory() as s:
+        await s.execute(
+            update(TiqoraJob)
+            .where(TiqoraJob.id == first)
+            .values(due_at=utc_now() + timedelta(minutes=2), attempts=1)
+        )
+        await s.commit()
+    runner = _runner(factory, reg)
+    assert (await runner.run_once())["started"] == 1
+    await runner.wait_idle()
+    assert (await _fetch(factory, first)).status == "queued"
+    assert (await _fetch(factory, second)).status == "succeeded"

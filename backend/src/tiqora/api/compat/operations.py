@@ -724,12 +724,15 @@ async def _queue_gi_mail(
     article_id: int,
     user_id: int,
     auto_response_type: str = "",
+    queue_id: int | None = None,
 ) -> None:
     """Queue one mail of the request as a worker job, in the request transaction.
 
     The job row commits together with the ticket and article (never a job whose article
     could still roll back, never a committed article whose mail is lost). The request
     answers without waiting for SMTP - Znuny queues these mails in its MailQueue too.
+    An auto response carries the ticket's queue at this moment: Znuny decides it in
+    ``ArticleCreate``, so a later queue move (or a worker backlog) does not change it.
     """
     from tiqora.jobs.handlers.gi_mail import GI_MAIL_KIND, GiMailPayload
     from tiqora.jobs.service import enqueue_job
@@ -743,6 +746,7 @@ async def _queue_gi_mail(
             article_id=article_id,
             user_id=user_id,
             auto_response_type=auto_response_type,
+            queue_id=queue_id,
         ),
         created_by=None,  # a system job: not listed as anyone's own background task
     )
@@ -764,17 +768,18 @@ async def _write_gi_article(
     never for ``ArticleSend``) - only while an outbound relay is configured, because without
     one no auto response is ever sent.
     """
+    queue_row = (
+        await session.execute(
+            text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
+        )
+    ).first()
+    queue_id = int(queue_row[0]) if queue_row else 0
     if gi.send:
-        queue_row = (
-            await session.execute(
-                text("SELECT queue_id FROM ticket WHERE id = :tid"), {"tid": ticket_id}
-            )
-        ).first()
         pending = await store_agent_email_for_dispatch(
             session,
             sysconfig,
             ticket_id=ticket_id,
-            queue_id=int(queue_row[0]) if queue_row else 0,
+            queue_id=queue_id,
             user_id=user_id,
             article=_as_send_article(gi.article, gi.raw),
         )
@@ -802,6 +807,7 @@ async def _write_gi_article(
                 article_id=article_id,
                 user_id=user_id,
                 auto_response_type=gi.auto_response_type,
+                queue_id=queue_id,
             )
     if gi.time_unit is not None:
         await add_time_accounting(
