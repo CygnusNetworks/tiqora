@@ -8,7 +8,7 @@ calendar module's schemas/service separation.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -170,3 +170,52 @@ class ActivityDialogSubmitOut(BaseModel):
     transition_entity_id: str | None
     unsupported_actions: list[str]
     state: TicketProcessStateOut
+
+
+# ---------------------------------------------------------------------------
+# Server-built activity dialog form (D9)
+# ---------------------------------------------------------------------------
+
+FieldKind = Literal[
+    "text",
+    "textarea",
+    "select",
+    "multiselect",
+    "boolean",
+    "date",
+    "datetime",
+    "article",
+    "pending_time",
+    "customer",
+    "unsupported",
+]
+
+
+class ProcessDialogOptionOut(BaseModel):
+    value: str
+    label: str
+
+
+class ProcessDialogFieldOut(BaseModel):
+    name: str  # canonical name, e.g. "Queue", "DynamicField_Region", "Article"
+    kind: FieldKind
+    label: str  # DF label; ticket attributes: the canonical name (the frontend translates)
+    required: bool
+    description_short: str = ""
+    description_long: str = ""
+    default: Any = None
+    options: list[ProcessDialogOptionOut] = Field(default_factory=list)
+
+
+class ProcessDialogFormOut(BaseModel):
+    """One activity dialog as the server wants it rendered: visible fields in order, with
+    their kind and the ACL-filtered options."""
+
+    process_entity_id: str
+    activity_dialog_entity_id: str
+    name: str
+    description_short: str
+    description_long: str
+    submit_button_text: str
+    submit_advice_text: str
+    fields: list[ProcessDialogFieldOut]

@@ -54,14 +54,15 @@ class TicketFieldOptionsOut(BaseModel):
 
 async def _base_field_maps(
     session: AsyncSession,
-    user: AuthenticatedUser,
+    user: AuthenticatedUser | None,
     fields: set[str],
     *,
     queue_id: int | None = None,
 ) -> dict[str, dict[int, str]]:
     """Unfiltered valid id→name maps for the requested fields.
 
-    Queues are still permission-gated (``ro``); ACL is additional filtering.
+    Queues are still permission-gated (``ro``); ACL is additional filtering. *user* may be
+    ``None`` (the customer interface) only when ``queue`` is not requested.
     """
     out: dict[str, dict[int, str]] = {}
     if "state" in fields:
@@ -108,6 +109,8 @@ async def _base_field_maps(
         ).all()
         out["sla"] = {int(r[0]): r[1] for r in rows}
     if "queue" in fields:
+        if user is None:
+            raise ValueError("queue options need an agent user")
         pe = PermissionEngine(session)
         group_ids = await pe.groups_for_permission(user.id, "ro")
         if not group_ids:

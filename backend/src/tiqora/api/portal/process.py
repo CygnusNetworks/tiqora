@@ -35,6 +35,7 @@ from tiqora.process.availability import (
     can_start as can_start_process,
 )
 from tiqora.process.config import ActivityDialogFieldConfig
+from tiqora.process.dialog_form import build_start_form, build_ticket_dialog_form
 from tiqora.process.dump import PROCESS_STATE_NAMES
 from tiqora.process.engine import start_process, submit_activity_dialog
 from tiqora.process.exceptions import (
@@ -56,6 +57,7 @@ from tiqora.process.schemas import (
     ActivityDialogSubmitIn,
     ActivityDialogSubmitOut,
     ActivityDialogSummaryOut,
+    ProcessDialogFormOut,
     ProcessStartIn,
     ProcessSummaryOut,
     TicketProcessStateOut,
@@ -188,6 +190,30 @@ async def list_processes(
     return [ProcessSummaryOut.model_validate(s, from_attributes=True) for s in summaries]
 
 
+@router.get("/{process_entity_id}/start-form", response_model=ProcessDialogFormOut)
+async def get_start_form(
+    process_entity_id: str,
+    customer: CurrentCustomer,
+    session: DbSession,
+    ticket_id: int | None = None,
+) -> ProcessDialogFormOut:
+    """The start dialog of a process for the customer interface, built by the server."""
+    repository = ProcessRepository(session)
+    try:
+        if ticket_id is not None:
+            await _assert_customer_ticket(session, customer, ticket_id)
+        return await build_start_form(
+            session,
+            actor=_actor(customer),
+            user=None,
+            process_entity_id=process_entity_id,
+            ticket_id=ticket_id,
+            repository=repository,
+        )
+    except _MAPPED as exc:
+        raise _map_exc(exc) from exc
+
+
 @router.get("/activity-dialog/{activity_dialog_entity_id}", response_model=ActivityDialogDetailOut)
 async def get_activity_dialog(
     activity_dialog_entity_id: str, customer: CurrentCustomer, session: DbSession
@@ -226,6 +252,27 @@ async def get_ticket_state(
     return await _ticket_process_state_out_customer(
         session, ticket_id, _actor(customer), ProcessRepository(session)
     )
+
+
+@router.get(
+    "/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form",
+    response_model=ProcessDialogFormOut,
+)
+async def get_ticket_dialog_form(
+    ticket_id: int, activity_dialog_entity_id: str, customer: CurrentCustomer, session: DbSession
+) -> ProcessDialogFormOut:
+    try:
+        await _assert_customer_ticket(session, customer, ticket_id)
+        return await build_ticket_dialog_form(
+            session,
+            actor=_actor(customer),
+            user=None,
+            ticket_id=ticket_id,
+            activity_dialog_entity_id=activity_dialog_entity_id,
+            repository=ProcessRepository(session),
+        )
+    except _MAPPED as exc:
+        raise _map_exc(exc) from exc
 
 
 @router.post("/ticket/{ticket_id}/start", response_model=TicketProcessStateOut)

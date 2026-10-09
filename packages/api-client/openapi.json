@@ -19478,6 +19478,137 @@
         "title": "ProcessDetailOut",
         "type": "object"
       },
+      "ProcessDialogFieldOut": {
+        "properties": {
+          "default": {
+            "title": "Default"
+          },
+          "description_long": {
+            "default": "",
+            "title": "Description Long",
+            "type": "string"
+          },
+          "description_short": {
+            "default": "",
+            "title": "Description Short",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "textarea",
+              "select",
+              "multiselect",
+              "boolean",
+              "date",
+              "datetime",
+              "article",
+              "pending_time",
+              "customer",
+              "unsupported"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessDialogOptionOut"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "label",
+          "required"
+        ],
+        "title": "ProcessDialogFieldOut",
+        "type": "object"
+      },
+      "ProcessDialogFormOut": {
+        "description": "One activity dialog as the server wants it rendered: visible fields in order, with\ntheir kind and the ACL-filtered options.",
+        "properties": {
+          "activity_dialog_entity_id": {
+            "title": "Activity Dialog Entity Id",
+            "type": "string"
+          },
+          "description_long": {
+            "title": "Description Long",
+            "type": "string"
+          },
+          "description_short": {
+            "title": "Description Short",
+            "type": "string"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/ProcessDialogFieldOut"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "process_entity_id": {
+            "title": "Process Entity Id",
+            "type": "string"
+          },
+          "submit_advice_text": {
+            "title": "Submit Advice Text",
+            "type": "string"
+          },
+          "submit_button_text": {
+            "title": "Submit Button Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "process_entity_id",
+          "activity_dialog_entity_id",
+          "name",
+          "description_short",
+          "description_long",
+          "submit_button_text",
+          "submit_advice_text",
+          "fields"
+        ],
+        "title": "ProcessDialogFormOut",
+        "type": "object"
+      },
+      "ProcessDialogOptionOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "ProcessDialogOptionOut",
+        "type": "object"
+      },
       "ProcessStartIn": {
         "description": "Body of ``POST /api/v1/process/ticket/{ticket_id}/start``.",
         "properties": {
@@ -28426,6 +28557,73 @@
         ]
       }
     },
+    "/api/portal/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form": {
+      "get": {
+        "operationId": "get_ticket_dialog_form_api_portal_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "activity_dialog_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Dialog Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Dialog Form",
+        "tags": [
+          "portal-process"
+        ]
+      }
+    },
     "/api/portal/process/ticket/{ticket_id}/start": {
       "post": {
         "operationId": "start_ticket_process_api_portal_process_ticket__ticket_id__start_post",
@@ -28615,6 +28813,81 @@
           }
         },
         "summary": "Submit Ticket Activity Dialog",
+        "tags": [
+          "portal-process"
+        ]
+      }
+    },
+    "/api/portal/process/{process_entity_id}/start-form": {
+      "get": {
+        "description": "The start dialog of a process for the customer interface, built by the server.",
+        "operationId": "get_start_form_api_portal_process__process_entity_id__start_form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_customer_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Customer Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Start Form",
         "tags": [
           "portal-process"
         ]
@@ -63009,6 +63282,90 @@
         ]
       }
     },
+    "/api/v1/process/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form": {
+      "get": {
+        "description": "A dialog of the ticket's current activity as a server-built form; 403 when the dialog is\nhidden for this agent (interface, Permission, ACLs), like the submit.",
+        "operationId": "get_ticket_dialog_form_api_v1_process_ticket__ticket_id__dialog__activity_dialog_entity_id__form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "title": "Ticket Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "activity_dialog_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Activity Dialog Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticket Dialog Form",
+        "tags": [
+          "process"
+        ]
+      }
+    },
     "/api/v1/process/ticket/{ticket_id}/start": {
       "post": {
         "operationId": "start_ticket_process_api_v1_process_ticket__ticket_id__start_post",
@@ -63322,6 +63679,97 @@
           }
         },
         "summary": "Get Process",
+        "tags": [
+          "process"
+        ]
+      }
+    },
+    "/api/v1/process/{process_entity_id}/start-form": {
+      "get": {
+        "description": "The start dialog of a process, built by the server: visible fields in order with their\nkind and ACL-filtered options. With ``ticket_id`` (enroll context) the ticket-bound gates\nof :func:`assert_can_start` apply.",
+        "operationId": "get_start_form_api_v1_process__process_entity_id__start_form_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "process_entity_id",
+            "required": true,
+            "schema": {
+              "title": "Process Entity Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticket_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticket Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "tiqora_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tiqora Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessDialogFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Start Form",
         "tags": [
           "process"
         ]

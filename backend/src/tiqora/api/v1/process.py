@@ -50,6 +50,7 @@ from tiqora.process.availability import (
     can_start as can_start_process,
 )
 from tiqora.process.config import ActivityDialogFieldConfig
+from tiqora.process.dialog_form import build_start_form, build_ticket_dialog_form
 from tiqora.process.dump import PROCESS_STATE_NAMES
 from tiqora.process.engine import start_process, submit_activity_dialog
 from tiqora.process.exceptions import (
@@ -74,6 +75,7 @@ from tiqora.process.schemas import (
     ActivityDialogSummaryOut,
     ProcessActivityOut,
     ProcessDetailOut,
+    ProcessDialogFormOut,
     ProcessStartIn,
     ProcessSummaryOut,
     TicketProcessStateOut,
@@ -204,6 +206,31 @@ async def list_processes(
     return [ProcessSummaryOut.model_validate(s, from_attributes=True) for s in summaries]
 
 
+@router.get("/{process_entity_id}/start-form", response_model=ProcessDialogFormOut)
+async def get_start_form(
+    process_entity_id: str, user: CurrentUser, session: DbSession, ticket_id: int | None = None
+) -> ProcessDialogFormOut:
+    """The start dialog of a process, built by the server: visible fields in order with their
+    kind and ACL-filtered options. With ``ticket_id`` (enroll context) the ticket-bound gates
+    of :func:`assert_can_start` apply."""
+    repository = ProcessRepository(session)
+    try:
+        if ticket_id is not None:
+            await _assert_ticket_permission(
+                session, ticket_id=ticket_id, user_id=user.id, permission="ro"
+            )
+        return await build_start_form(
+            session,
+            actor=ProcessActor.agent(user.id),
+            user=user,
+            process_entity_id=process_entity_id,
+            ticket_id=ticket_id,
+            repository=repository,
+        )
+    except _MAPPED_ERRORS as exc:
+        raise _map_exc(exc) from exc
+
+
 @router.get("/{process_entity_id}", response_model=ProcessDetailOut)
 async def get_process(
     process_entity_id: str, user: CurrentUser, session: DbSession
@@ -287,6 +314,31 @@ async def get_ticket_state(
     return await _ticket_process_state_out(
         session, ticket_id, ProcessActor.agent(user.id), ProcessRepository(session)
     )
+
+
+@router.get(
+    "/ticket/{ticket_id}/dialog/{activity_dialog_entity_id}/form",
+    response_model=ProcessDialogFormOut,
+)
+async def get_ticket_dialog_form(
+    ticket_id: int, activity_dialog_entity_id: str, user: CurrentUser, session: DbSession
+) -> ProcessDialogFormOut:
+    """A dialog of the ticket's current activity as a server-built form; 403 when the dialog is
+    hidden for this agent (interface, Permission, ACLs), like the submit."""
+    try:
+        await _assert_ticket_permission(
+            session, ticket_id=ticket_id, user_id=user.id, permission="ro"
+        )
+        return await build_ticket_dialog_form(
+            session,
+            actor=ProcessActor.agent(user.id),
+            user=user,
+            ticket_id=ticket_id,
+            activity_dialog_entity_id=activity_dialog_entity_id,
+            repository=ProcessRepository(session),
+        )
+    except _MAPPED_ERRORS as exc:
+        raise _map_exc(exc) from exc
 
 
 @router.post("/ticket/{ticket_id}/start", response_model=TicketProcessStateOut)
