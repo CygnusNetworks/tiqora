@@ -286,6 +286,18 @@ the exact SQL/CLI commands and Prometheus metric names to watch.
 
 ---
 
+## Processes and ACLs while Znuny is still in use
+
+Tiqora runs ticket processes and ACLs from the last deployed state, exactly like
+Znuny. Admins who change a process or an ACL (in Znuny, or the ACL admin in
+Tiqora) must press **"Bereitstellen"** in Znuny; Tiqora picks the new state up
+within about 30 seconds. The admin pages for processes and ACLs show a card
+"Bereitstellung" with the time of the last deployed state and the number of
+changes that are not yet deployed. After Stage 4 (schema ownership) Tiqora
+deploys by itself. When you upgrade Tiqora, the first watcher tick records one
+new state per kind; that is expected. Details:
+[`../process-management.md`](../process-management.md#deployed-revisions-tiqora-runs-what-was-deployed).
+
 ## Boundaries, restated
 
 - **Stages 0–3** are all safely reversible by flipping flags/config back

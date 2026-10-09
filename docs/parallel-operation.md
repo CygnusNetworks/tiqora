@@ -102,6 +102,7 @@ except optionally via the TiqoraSync OPM for cache invalidation.
 | `tiqora_placeholder_field` | Registry of customer_user/company columns for the placeholder picker |
 | `tiqora_gdpr_job` | Applied GDPR erasure jobs with backup window and status |
 | `tiqora_gdpr_backup` | Per-row snapshots taken before GDPR anonymize/delete |
+| `tiqora_process_revision`, `tiqora_acl_revision` | Deployed process / ACL states (canonical JSON dump of Znuny's `ProcessDump` / `ACLDump`, checksum, source, time) |
 
 Plus the Alembic version table `tiqora_alembic_version` (not application state).
 
@@ -867,6 +868,27 @@ likely impact:
   links, and other tables). Links, cache, and the search index are left to
   the normal outbox/reindex path (a deleted ticket's stale search entry is
   removed on the next full reindex, not immediately).
+
+## Processes and ACLs: deploy in Znuny
+
+Tiqora runs processes and ACLs from the last **deployed** state, like Znuny.
+While Znuny is still in use:
+
+- Process and ACL edits made in **either** system (Znuny's admin, or the ACL
+  admin in Tiqora, which writes `acl_sync` like Znuny) are drafts. Admins must
+  press **"Bereitstellen"** in Znuny; Tiqora records the new state at the next
+  tick of the `deploy_watch` loop (default 30 s, "Dienste" page, service
+  "Deploy-Wächter").
+- Until the first deploy has been seen, Tiqora runs the live (draft) rows and
+  the "Dienste" page warns; one "Bereitstellen" in Znuny ends that state.
+- Znuny's process import writes no sync rows and is picked up by Tiqora
+  without a deploy.
+- On the first tick after an upgrade Tiqora records one new revision per kind
+  (process, ACL); this is expected (corrected dump checksums).
+
+After the schema cutover (see below) Tiqora is the only system and deploys
+automatically: each tick records a revision when something changed and clears
+`pm_entity_sync` / `acl_sync`.
 
 ## Schema ownership
 

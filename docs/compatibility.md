@@ -379,6 +379,11 @@ MariaDB and validated:
   picker filtering via `domain/ticket_acl.py` and field-options; ticket
   attribute relations (`acl_ticket_attribute_relations`) have CSV admin + the
   same field-options chain. Queue *access* remains group/role.
+- ACL edits in Tiqora write `acl_sync` like Znuny's AdminACL (`not_sync` on
+  create/update, `deleted` on delete) and are drafts until "Bereitstellen" in
+  Znuny. ACLs run from the deployed state (`tiqora_acl_revision`); before the
+  first revision they run from the live `acl` rows. After cutover Tiqora
+  deploys on its own.
 - Deferred relative to full Znuny admin breadth:
   `group_customer` (company-level) assignment endpoints
   (`group_customer_user` is implemented), SysConfig deploy UI, GI webservice
@@ -435,7 +440,15 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Znuny feature | Status | Note |
 |---|---|---|
 | Process designer | by design | Processes are imported and executed; admin UI is list/detail ([process-management.md](process-management.md)) |
-| `Module` conditions, `ExecuteInvoker`/`Appointment*`/`ConfigItemUpdate` actions, smart tags | missing | Logged as unsupported |
+| Process deploy ("Bereitstellen") | yes | Engine and ACLs run from the deployed state only; Tiqora detects a Znuny deploy within one watch interval. Tiqora has no deploy button; after cutover it deploys by itself |
+| Process state gate (Active / FadeAway / Inactive) | yes | Same rules as Znuny: only Active starts, FadeAway keeps running tickets, Inactive refuses dialogs and runs no transitions |
+| ACLs on process list, dialogs, action menu and bulk | yes | Agents as the agent, portal customers as the customer (never as root); Properties on `Process` entity ids work |
+| New process ticket (agent and portal), enroll via start dialog | yes | "Neues Prozessticket" / "Prozess starten"; Znuny's create order, `Process::Default*` for hidden fields, immediate first transition |
+| Compat (GenericInterface) API and ACLs | by design | No ACL filtering, exactly as Znuny's GenericInterface (it never calls `TicketAcl`) |
+| Smart tags in actions and conditions | yes | `<OTRS_TICKET_*>`, dynamic fields, first/last article, template placeholders; conditions of the Base types only, like Znuny |
+| `Module` conditions, `ExecuteInvoker`/`Appointment*`/`ConfigItemUpdate` actions | missing | Logged as unsupported |
+| Transitions after every ticket change | missing | Evaluated after process dialogs and new process tickets only |
+| Znuny 7.x process YAML | verified | Same format as 6.5 (no renamed keys); `pm_process_preferences` (7.2+) is snapshotted. Golden tests passed on Znuny 6.5 and on 7.3.5 |
 | GenericAgent execution | partial | Pragmatic subset: no absolute `TimeSlot`, `Next`/`After`, dynamic-field criteria; off by default |
 | Edit single occurrence of a recurring appointment | missing | Exclusion list (`recur_exclude`) instead |
 
@@ -453,6 +466,16 @@ narrower than Znuny), **by design** (deliberate platform choice).
 | Hybrid (vector + keyword) retrieval for KB/RAG | missing | Planned |
 
 ## Upgrade notes (next release)
+
+- **Process and ACL revisions.** New tables `tiqora_process_revision` and
+  `tiqora_acl_revision` come with the regular Tiqora migration. Processes and
+  ACLs now run from the deployed state. The first watcher tick after the
+  upgrade records one new revision per kind; that is expected (the dump
+  checksums follow Znuny: Perl `||` defaults and ACL CreateBy/ChangeBy as
+  logins). Process admins must press "Bereitstellen" in Znuny for edits to
+  take effect ([process-management.md](process-management.md)).
+- Dialog fields with `Display: 1` are now optional and `2` mandatory (Znuny
+  semantics; it was the other way round).
 
 - **DateTime dynamic fields are now stored in UTC.** Values entered through the
   phone and new-ticket forms (and the ticket-zoom editor) are converted from the

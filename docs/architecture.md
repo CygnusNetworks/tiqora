@@ -518,6 +518,28 @@ activity dialog submission) plus `api/v1/process.py`
 `pm_transition_action` tables verbatim (`db/legacy/process_management.py`)
 — same shared-schema, no-migration approach as Calendar above.
 
+Since the process-correctness work the engine no longer reads `pm_*`
+directly: `process/source.py` hands it the newest **deployed** revision
+(`tiqora_process_revision`), falling back to the live rows only until a first
+revision exists. The new package `tiqora/deployed/` holds the revision store
+(`store.py`: `record_revision`, `load_active_revision`, in-process cache keyed by
+the newest revision id), the dump builders (`process/dump.py`,
+`deployed/acl_dump.py`, Znuny's `ProcessDump` / `ACLDump` shapes with a sha256
+checksum), the sync-table helpers (`sync_tables.py`: `pm_entity_sync` /
+`acl_sync` counts, `acl_sync` writes, clearing after cutover) and the detector
+`watcher.py`. The worker loop `deploy_watch` (`worker/__main__.py`, catalog
+row `deploy_watch`, interval `TIQORA_DEPLOY_WATCH_INTERVAL_SECONDS`) records a
+revision when Znuny deployed (sync table empty and dump changed) or, after
+cutover, whenever the dump changes. ACLs (`domain/ticket_acl.py`
+`load_valid_acls`) read `tiqora_acl_revision` the same way. Revision tables:
+`id`, `source` (`initial`/`znuny`/`tiqora`), `checksum`, `entity_count`,
+`config` (canonical JSON), `deployed_at` (naive UTC), `deployed_by`.
+
+Availability (state gate, interface, ACL) for every surface lives in
+`process/availability.py`; `process/process_ticket.py` creates new process
+tickets and enrolls tickets; `process/dialog_form.py` builds the dialog forms
+on the server. Details: [process-management.md](process-management.md).
+
 Engine flow, one line: start a process at its `StartActivity` -> agent
 submits an activity dialog -> validate required fields + the dialog's
 `Permission` -> apply submitted field changes to the ticket (reusing
