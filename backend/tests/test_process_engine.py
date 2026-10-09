@@ -15,7 +15,7 @@ Follows the same ``mariadb_znuny_url`` fixture / ``_seed_tiqora_tables`` /
 from __future__ import annotations
 
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 from tiqora.domain.ticket_write_service import TicketIn, create_ticket
 from tiqora.process.actor import ProcessActor
 from tiqora.process.config import (
@@ -124,6 +125,39 @@ Module: Kernel::System::ProcessManagement::TransitionAction::TicketStateSet
 
 def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
+
+
+# Every table this module writes, children first: the module deletes what it committed
+# (rows above the ids present before it ran), so it also passes on its own.
+_WRITTEN_TABLES = (
+    "tiqora_event_outbox",
+    "tiqora_cache_invalidation",
+    "ticket_history",
+    "article_data_mime_attachment",
+    "article_data_mime_plain",
+    "article_data_mime",
+    "article",
+    "dynamic_field_value",
+    "ticket",
+    "ticket_number_counter",
+    "dynamic_field",
+    "pm_transition_action",
+    "pm_transition",
+    "pm_activity_dialog",
+    "pm_activity",
+    "pm_process",
+    "sla",
+    "service",
+    "ticket_type",
+    "users",
+)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _delete_written_rows(mariadb_znuny_url: str) -> Iterator[None]:
+    marks = snapshot_marks(mariadb_znuny_url, _WRITTEN_TABLES)
+    yield
+    delete_above_marks(mariadb_znuny_url, marks)
 
 
 async def _seed_tiqora_tables(session: AsyncSession) -> None:

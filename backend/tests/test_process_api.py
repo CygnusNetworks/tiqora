@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import contextlib
 import uuid
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Any
 
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from tests._row_cleanup import delete_above_marks, snapshot_marks
 
 NOW = datetime(2026, 1, 1, 12, 0, 0)
 
@@ -76,6 +79,46 @@ Module: Kernel::System::ProcessManagement::TransitionAction::TicketStateSet
 
 def _mysql_async(url: str) -> str:
     return url.replace("mysql+pymysql://", "mysql+aiomysql://")
+
+
+# Every table this module writes, children first (group_user has no id: removed by its
+# group/user ids first). The module deletes what it committed, so it also passes on its own.
+_WRITTEN_TABLES = (
+    "tiqora_event_outbox",
+    "tiqora_cache_invalidation",
+    "ticket_history",
+    "article_data_mime_attachment",
+    "article_data_mime_plain",
+    "article_data_mime",
+    "article",
+    "dynamic_field_value",
+    "ticket",
+    "ticket_number_counter",
+    "pm_transition_action",
+    "pm_transition",
+    "pm_activity_dialog",
+    "pm_activity",
+    "pm_process",
+    "queue",
+    "permission_groups",
+    "users",
+)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _delete_written_rows(mariadb_znuny_url: str) -> Iterator[None]:
+    marks = snapshot_marks(mariadb_znuny_url, _WRITTEN_TABLES)
+    yield
+    delete_above_marks(
+        mariadb_znuny_url,
+        marks,
+        first=[
+            (
+                "DELETE FROM group_user WHERE group_id > :g OR user_id > :u",
+                {"g": marks["permission_groups"], "u": marks["users"]},
+            )
+        ],
+    )
 
 
 async def _seed_tiqora_tables(session: AsyncSession) -> None:

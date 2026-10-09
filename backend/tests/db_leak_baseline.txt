@@ -77,8 +77,6 @@ test_poller.py
 test_portal_auth.py
 test_portal_tickets.py
 test_postmaster_db.py
-test_process_api.py
-test_process_engine.py
 test_read_api_db.py
 test_reference_api.py
 test_search_flag.py

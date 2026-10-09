@@ -89,3 +89,45 @@ def cleanup_module(
     snapshot = snapshot_max_ids(sync_url, tables)
     yield
     delete_rows_above(sync_url, snapshot, setting_keys=setting_keys)
+
+
+def snapshot_marks(sync_url: str, tables: Sequence[str]) -> dict[str, int]:
+    """Highest id per table; a table that does not exist yet gets ``0`` (every row it will
+    hold is the module's own)."""
+    engine = create_engine(sync_url)
+    marks: dict[str, int] = {}
+    try:
+        for table in tables:
+            try:
+                with engine.begin() as conn:
+                    marks[table] = int(
+                        conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table}")).scalar_one()
+                    )
+            except DatabaseError:
+                marks[table] = 0
+        return marks
+    finally:
+        engine.dispose()
+
+
+def delete_above_marks(
+    sync_url: str,
+    marks: dict[str, int],
+    *,
+    first: Sequence[tuple[str, dict[str, int]]] = (),
+) -> None:
+    """Delete every row above the marks, in the marks' order (children first). *first* are
+    extra statements for tables without an ``id`` column (e.g. ``group_user``). Each statement
+    runs in its own transaction, so a table that never got created is simply skipped."""
+    engine = create_engine(sync_url)
+    try:
+        statements = [*first]
+        statements += [(f"DELETE FROM {t} WHERE id > :m", {"m": m}) for t, m in marks.items()]
+        for sql, params in statements:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(sql), params)
+            except DatabaseError:
+                continue
+    finally:
+        engine.dispose()

@@ -423,7 +423,7 @@ async def test_acl_deploy_cycle(session: AsyncSession) -> None:
     loaded = await load_active_revision(session, "acl")
     assert loaded is not None
     entry = loaded.dump["ACL"][ACL_NAME]
-    # Values equal the deployed ZZZACL file; metadata equals ACLListGet (raw user ids, F7).
+    # Values equal the deployed ZZZACL file; metadata equals ACLListGet (user logins, see below).
     assert _norm(entry["Values"]) == _norm(peer["Values"])
     assert entry["Values"] == {
         "StopAfterMatch": 1,
