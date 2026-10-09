@@ -45,6 +45,7 @@ from tiqora.ai.context import (
     render_ticket_header,
     ticket_snapshot,
 )
+from tiqora.ai.customer_pause import active_pause_for_ticket
 from tiqora.ai.gate import AiGateError, require_feature_allowed
 from tiqora.ai.handoff import mark_ai_escalated
 from tiqora.ai.identity import (
@@ -1445,6 +1446,8 @@ async def run_ticket_agent(
             paused_state = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
             if paused_state is not None and paused_state.ai_paused_at is not None:
                 raise PolicyDisabledError("AI automation is paused for this ticket")
+            if await active_pause_for_ticket(session, ticket_id) is not None:
+                raise PolicyDisabledError("AI automation is paused for this customer")
 
         if trigger == TRIGGER_MANUAL:
             if acting_user_id is None:

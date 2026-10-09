@@ -1079,7 +1079,8 @@
       "sub": {
         "queueLimits": "within queue limits",
         "grant": "{{remaining}} of {{total}} replies left",
-        "stoppedBy": "by {{name}}"
+        "stoppedBy": "by {{name}}",
+        "customerPaused": "Customer paused"
       },
       "reason": {
         "max_clarifications": "Clarification limit reached",
@@ -1092,7 +1093,8 @@
       "explain": {
         "active": "The AI answers new customer messages automatically.",
         "stopped": "The AI no longer acts automatically on this ticket until you switch it back on.",
-        "handedOver": "The AI handed this ticket to the team and no longer answers automatically."
+        "handedOver": "The AI handed this ticket to the team and no longer answers automatically.",
+        "customerPaused": "The AI automation is switched off for this customer (all their tickets). Manual Assist stays available."
       },
       "remaining": "Remaining",
       "remainingOf": "{{remaining}} of {{total}}",
@@ -1107,7 +1109,8 @@
       "startHint": "Afterwards the AI hands the ticket back to the team. Queue limits don't apply meanwhile.",
       "error": "Could not change the autopilot. Please try again.",
       "listStopped": "AI stopped",
-      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top."
+      "escalatedInfo": "AI handed off to the team at {{dateTime}}: {{reason}}. Switch it back on with the AI autopilot switch at the top.",
+      "customerPausedHint": "To switch it back on, lift the pause on the customer."
     }
   },
   "search": {
@@ -4236,5 +4239,22 @@
       "phone": "Phone",
       "mobile": "Mobile"
     }
+  },
+  "customerAiPause": {
+    "title": "AI automation",
+    "off": "Switched on for this customer.",
+    "activeUntil": "Switched off until {{date}}.",
+    "activeForever": "Switched off until lifted.",
+    "by": "by {{name}}",
+    "lift": "Switch back on",
+    "pause": "Switch off",
+    "duration": "Duration",
+    "untilLifted": "Until lifted",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "reason": "Reason",
+    "reasonPlaceholder": "Reason (optional)",
+    "hint": "Stops auto-reply, triage and auto-summary for all tickets of this customer. Manual Assist stays available.",
+    "error": "Could not save the change."
   }
 }

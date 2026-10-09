@@ -1079,7 +1079,8 @@
       "sub": {
         "queueLimits": "nach Queue-Limits",
         "grant": "noch {{remaining}} von {{total}} Antworten",
-        "stoppedBy": "von {{name}}"
+        "stoppedBy": "von {{name}}",
+        "customerPaused": "Kunde pausiert"
       },
       "reason": {
         "max_clarifications": "Rückfragen-Limit erreicht",
@@ -1092,7 +1093,8 @@
       "explain": {
         "active": "Die KI beantwortet neue Kundennachrichten automatisch.",
         "stopped": "Die KI reagiert auf diesem Ticket nicht mehr automatisch, bis du sie wieder einschaltest.",
-        "handedOver": "Die KI hat das Ticket an das Team übergeben und antwortet nicht mehr automatisch."
+        "handedOver": "Die KI hat das Ticket an das Team übergeben und antwortet nicht mehr automatisch.",
+        "customerPaused": "Die KI-Automatik ist für diesen Kunden abgeschaltet (alle seine Tickets). Der manuelle Assistent bleibt verfügbar."
       },
       "remaining": "Verbleibend",
       "remainingOf": "{{remaining}} von {{total}}",
@@ -1107,7 +1109,8 @@
       "startHint": "Danach übergibt die KI wieder an das Team. Die Queue-Limits gelten in dieser Zeit nicht.",
       "error": "Der Autopilot konnte nicht geändert werden. Bitte erneut versuchen.",
       "listStopped": "KI gestoppt",
-      "escalatedInfo": "KI hat um {{dateTime}} an das Team übergeben: {{reason}}. Über den Schalter „KI-Autopilot“ oben lässt sie sich wieder einschalten."
+      "escalatedInfo": "KI hat um {{dateTime}} an das Team übergeben: {{reason}}. Über den Schalter „KI-Autopilot“ oben lässt sie sich wieder einschalten.",
+      "customerPausedHint": "Zum Wiedereinschalten die Pause beim Kunden aufheben."
     }
   },
   "search": {
@@ -4236,5 +4239,22 @@
       "phone": "Telefon",
       "mobile": "Mobil"
     }
+  },
+  "customerAiPause": {
+    "title": "KI-Automatik",
+    "off": "Für diesen Kunden eingeschaltet.",
+    "activeUntil": "Abgeschaltet bis {{date}}.",
+    "activeForever": "Abgeschaltet bis zur Aufhebung.",
+    "by": "von {{name}}",
+    "lift": "Wieder einschalten",
+    "pause": "Abschalten",
+    "duration": "Dauer",
+    "untilLifted": "Bis zur Aufhebung",
+    "days_one": "{{count}} Tag",
+    "days_other": "{{count}} Tage",
+    "reason": "Grund",
+    "reasonPlaceholder": "Grund (optional)",
+    "hint": "Stoppt Auto-Antwort, Triage und Auto-Zusammenfassung für alle Tickets dieses Kunden. Der manuelle Assistent bleibt verfügbar.",
+    "error": "Die Änderung konnte nicht gespeichert werden."
   }
 }

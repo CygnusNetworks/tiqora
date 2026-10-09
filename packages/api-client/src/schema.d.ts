@@ -5058,6 +5058,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customers/companies/{customer_id}/ai-pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Company Ai Pause */
+        get: operations["get_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_get"];
+        /**
+         * Put Company Ai Pause
+         * @description Switch the AI automation off for every contact of the company.
+         */
+        put: operations["put_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_put"];
+        post?: never;
+        /** Delete Company Ai Pause */
+        delete: operations["delete_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/customers/companies/{customer_id}/logo": {
         parameters: {
             query?: never;
@@ -5162,6 +5184,28 @@ export interface paths {
         head?: never;
         /** Fill Customer */
         patch: operations["fill_customer_api_v1_customers__login__patch"];
+        trace?: never;
+    };
+    "/api/v1/customers/{login}/ai-pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Customer Ai Pause */
+        get: operations["get_customer_ai_pause_api_v1_customers__login__ai_pause_get"];
+        /**
+         * Put Customer Ai Pause
+         * @description Switch the AI automation off for this customer user (all their tickets).
+         */
+        put: operations["put_customer_ai_pause_api_v1_customers__login__ai_pause_put"];
+        post?: never;
+        /** Delete Customer Ai Pause */
+        delete: operations["delete_customer_ai_pause_api_v1_customers__login__ai_pause_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/customers/{login}/avatar": {
@@ -10707,6 +10751,29 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        /** CustomerAiPauseIn */
+        CustomerAiPauseIn: {
+            /** Days */
+            days?: number | null;
+            /** Reason */
+            reason?: string | null;
+        };
+        /**
+         * CustomerAiPauseOut
+         * @description Whether the AI automation is switched off for a customer user or company.
+         */
+        CustomerAiPauseOut: {
+            /** Active */
+            active: boolean;
+            /** By Name */
+            by_name?: string | null;
+            /** Paused Until */
+            paused_until?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Since */
+            since?: string | null;
         };
         /** CustomerCompanyCreate */
         CustomerCompanyCreate: {
@@ -30801,6 +30868,113 @@ export interface operations {
             };
         };
     };
+    get_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAiPauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_company_ai_pause_api_v1_customers_companies__customer_id__ai_pause_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                customer_id: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_company_logo_api_v1_customers_companies__customer_id__logo_put: {
         parameters: {
             query?: never;
@@ -31083,6 +31257,113 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomerFillOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_customer_ai_pause_api_v1_customers__login__ai_pause_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_customer_ai_pause_api_v1_customers__login__ai_pause_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAiPauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerAiPauseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_ai_pause_api_v1_customers__login__ai_pause_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                login: string;
+            };
+            cookie?: {
+                tiqora_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

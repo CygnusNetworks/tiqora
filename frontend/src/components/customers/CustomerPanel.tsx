@@ -17,6 +17,7 @@ import { isAvatarImage, isVcardFile, useFileDrop } from "@/lib/useFileDrop";
 import { DropOverlay, EditableAvatar } from "./AvatarEditor";
 import { useAvatarEditor } from "./useAvatarEditor";
 import { CallAction, EmailTicketLink, PhoneTicketLink } from "./CustomerActions";
+import { CustomerAiPause } from "./CustomerAiPause";
 import {
   CustomerKeysAddLink,
   CustomerKeysDialog,
@@ -332,6 +333,7 @@ export function CustomerPanel({
             )}
             <CustomerKeysAddLink data={keysQ.data} onOpen={() => setKeysOpen(true)} />
           </div>
+          <CustomerAiPause scope="user" customerKey={c.login} canEdit={canEdit} />
         </aside>
       </div>
 

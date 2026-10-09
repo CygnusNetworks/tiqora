@@ -51,6 +51,8 @@ from tiqora.ai.context import (
     get_or_create_state,
     ticket_snapshot,
 )
+from tiqora.ai.customer_pause import SKIP_REASON as CUSTOMER_PAUSE_SKIP_REASON
+from tiqora.ai.customer_pause import active_pause_for_ticket
 from tiqora.ai.gate import TIQORA_ONLY_CHANNELS, is_auto_reply_paused, is_tiqora_primary
 from tiqora.ai.handoff import consume_ai_grant, mark_ai_escalated
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
@@ -235,6 +237,10 @@ async def _cap_reason(
     # handoff flag above, nothing clears this on its own.
     if getattr(state, "ai_paused_at", None) is not None:
         return "ai_paused"
+    # The same for the customer: an agent switched the automation off for
+    # this customer user / company (indefinitely or until a date).
+    if await active_pause_for_ticket(session, ticket_id) is not None:
+        return CUSTOMER_PAUSE_SKIP_REASON
     # A release an agent granted by hand replaces the per-ticket caps until
     # it is used up; rate limits and budgets below still apply.
     grant = getattr(state, "ai_grant_remaining", None)
@@ -275,6 +281,8 @@ async def _defer_for_open_triage(session: AsyncSession, ticket_id: int, article_
     # skip the event with "ai_paused".
     paused = await session.get(TiqoraAiTicketState, ticket_id, populate_existing=True)
     if paused is not None and paused.ai_paused_at is not None:
+        return False
+    if await active_pause_for_ticket(session, ticket_id) is not None:
         return False
     row = (
         await session.execute(

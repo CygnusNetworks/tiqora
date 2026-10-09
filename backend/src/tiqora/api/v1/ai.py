@@ -33,6 +33,7 @@ from tiqora.ai.context import (
     latest_customer_article_id,
     load_articles,
 )
+from tiqora.ai.customer_pause import active_pause_for_ticket
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.kb_wiring import kb_bundle, kb_get_article_fn, kb_search_fn
 from tiqora.ai.listfields import parse_str_list
@@ -593,6 +594,21 @@ async def _autopilot_out(
     unanswered = await unanswered_customer_article(session, ticket_id) is not None
     if policy is None or not policy.enabled_auto_reply:
         return AiAutopilotOut(mode="unavailable", unanswered_customer_message=unanswered)
+    customer_pause = await active_pause_for_ticket(session, ticket_id)
+    if customer_pause is not None:
+        # Stopped for the whole customer: lifting it is done on the customer
+        # (the ticket's own switch would change nothing).
+        return AiAutopilotOut(
+            mode="stopped",
+            reason="customer_paused",
+            by_name=(
+                await _user_name(session, customer_pause.created_by)
+                if customer_pause.created_by is not None
+                else None
+            ),
+            since=customer_pause.created_at,
+            unanswered_customer_message=unanswered,
+        )
     if state is not None and state.ai_paused_at is not None:
         return AiAutopilotOut(
             mode="stopped",

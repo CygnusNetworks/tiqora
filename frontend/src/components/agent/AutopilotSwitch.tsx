@@ -46,6 +46,7 @@ export function AutopilotSwitch({ ticketId, canNote }: { ticketId: number; canNo
   const locale = i18n.language;
   const isActive = auto.mode === "active";
   const isStopped = auto.mode === "stopped";
+  const customerPaused = isStopped && auto.reason === "customer_paused";
   const granted = isActive && auto.grant_remaining != null && auto.grant_total != null;
 
   const label = isActive
@@ -60,7 +61,9 @@ export function AutopilotSwitch({ ticketId, canNote }: { ticketId: number; canNo
       })
     : isActive
       ? t("ticket.autopilot.sub.queueLimits")
-      : isStopped
+      : customerPaused
+        ? t("ticket.autopilot.sub.customerPaused")
+        : isStopped
         ? auto.by_name
           ? t("ticket.autopilot.sub.stoppedBy", { name: auto.by_name })
           : formatDateTime(auto.since, locale)
@@ -138,7 +141,9 @@ function AutopilotPanel({ ticketId, auto }: { ticketId: number; auto: AiAutopilo
 
   const explain = isActive
     ? t("ticket.autopilot.explain.active")
-    : auto.mode === "stopped"
+    : auto.reason === "customer_paused"
+      ? t("ticket.autopilot.explain.customerPaused")
+      : auto.mode === "stopped"
       ? t("ticket.autopilot.explain.stopped")
       : t("ticket.autopilot.explain.handedOver");
 
@@ -175,6 +180,10 @@ function AutopilotPanel({ ticketId, auto }: { ticketId: number; auto: AiAutopilo
           </button>
           <p className="text-[11px] leading-relaxed text-muted">{t("ticket.autopilot.stopHint")}</p>
         </div>
+      ) : auto.reason === "customer_paused" ? (
+        <p className="text-[11px] leading-relaxed text-muted" data-testid="autopilot-customer-paused">
+          {t("ticket.autopilot.customerPausedHint")}
+        </p>
       ) : (
         <div className="space-y-2.5">
           <p className="text-xs font-medium text-ink">{t("ticket.autopilot.startFor")}</p>

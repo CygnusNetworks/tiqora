@@ -136,4 +136,18 @@ describe("AutopilotSwitch", () => {
     fireEvent.click(await screen.findByTestId("autopilot-stop"));
     expect(await screen.findByTestId("autopilot-error")).toBeInTheDocument();
   });
+
+  it("shows a customer pause instead of the start controls", async () => {
+    getState.mockResolvedValue({
+      ...baseState,
+      autopilot: { mode: "stopped", reason: "customer_paused", by_name: "Erika" },
+    });
+    wrap(<AutopilotSwitch ticketId={7} canNote />);
+
+    const pill = await screen.findByTestId("autopilot-switch");
+    expect(pill.textContent).toContain("Customer paused");
+    fireEvent.click(pill);
+    expect(await screen.findByTestId("autopilot-customer-paused")).toBeInTheDocument();
+    expect(screen.queryByTestId("autopilot-start")).toBeNull();
+  });
 });

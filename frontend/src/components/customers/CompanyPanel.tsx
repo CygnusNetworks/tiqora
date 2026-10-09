@@ -13,6 +13,7 @@ import { isAvatarImage, useFileDrop } from "@/lib/useFileDrop";
 import { DropOverlay, EditableAvatar } from "./AvatarEditor";
 import { useAvatarEditor } from "./useAvatarEditor";
 import { CallAction, EmailTicketLink } from "./CustomerActions";
+import { CustomerAiPause } from "./CustomerAiPause";
 import { customerName, initialsOf } from "./customerFormat";
 
 const CONTACTS_SHOWN = 200;
@@ -168,6 +169,12 @@ export function CompanyPanel({
           </a>
         )}
       </div>
+
+      <CustomerAiPause
+        scope="company"
+        customerKey={customerId}
+        canEdit={Boolean(user?.can_edit_customers)}
+      />
 
       <section className="rounded-lg border border-hairline bg-surface" aria-labelledby="company-contacts-title">
         <h2 id="company-contacts-title" className="px-3.5 py-2.5 text-sm font-semibold text-ink">

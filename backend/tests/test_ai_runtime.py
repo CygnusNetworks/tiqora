@@ -4224,7 +4224,10 @@ def test_user_message_drops_quoted_earlier_mail_from_customer_articles() -> None
         sender_type="customer",
         is_visible_for_customer=True,
         subject="Re: Help",
-        body="Still broken.\n\nOn Fri, 9 Oct 2026 at 09:26 X <x@y.de> wrote:\n> Hallo,\n> alt\n> text\n",
+        body=(
+            "Still broken.\n\nOn Fri, 9 Oct 2026 at 09:26 X <x@y.de> wrote:\n"
+            "> Hallo,\n> alt\n> text\n"
+        ),
         from_address="customer@example.com",
         is_ai_origin=False,
     )

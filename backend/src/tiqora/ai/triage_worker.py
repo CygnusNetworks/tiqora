@@ -46,6 +46,8 @@ from tiqora.ai.context import (
     pii_never_mask,
     ticket_snapshot,
 )
+from tiqora.ai.customer_pause import SKIP_REASON as CUSTOMER_PAUSE_SKIP_REASON
+from tiqora.ai.customer_pause import active_pause_for_ticket
 from tiqora.ai.gate import is_tiqora_primary
 from tiqora.ai.listfields import parse_str_list
 from tiqora.ai.llm_routing import (
@@ -201,6 +203,8 @@ async def _skip_reason(
         return "escalated_to_human"
     if row["ai_paused_at"] is not None:
         return "ai_paused"
+    if await active_pause_for_ticket(session, ticket_id) is not None:
+        return CUSTOMER_PAUSE_SKIP_REASON
     created = row["create_time"]
     if isinstance(created, datetime):
         age = datetime.now(UTC).replace(tzinfo=None) - created.replace(tzinfo=None)
